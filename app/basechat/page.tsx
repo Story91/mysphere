@@ -118,6 +118,7 @@ function BanPage({ children }: { children: React.ReactNode }) {
 }
 
 export default function BaseChat() {
+  const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
   // Globalne deklaracje stanów modalu przeniesione na początek funkcji
   const [modalMessage, setModalMessage] = useState('');
   const [modalType, setModalType] = useState<'error' | 'warning' | 'confirm'>('error');
@@ -1391,7 +1392,7 @@ export default function BaseChat() {
     <BanPage>
       <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
       <div className="min-h-screen relative">
-        {/* Background effects - moved to bottom */}
+        {/* Background effects */}
         <div className="fixed inset-0 z-0">
           <div className="absolute inset-0 bg-black opacity-90">
             <div className="absolute inset-0 bg-[url('/matrix.png')] opacity-10 animate-matrix"></div>
@@ -1407,10 +1408,9 @@ export default function BaseChat() {
           }}></div>
         </div>
 
-        {/* All content moved above background */}
         <div className="relative z-10">
+          {/* Widgets */}
           <div className="w-full space-y-1">
-            {/* Widget dla głównych kryptowalut */}
             <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
               <gecko-coin-price-marquee-widget 
                 locale="en" 
@@ -1419,8 +1419,6 @@ export default function BaseChat() {
                 initial-currency="usd"
               />
             </div>
-
-            {/* Widget dla memecoinów i innych tokenów */}
             <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
               <gecko-coin-price-marquee-widget 
                 locale="en" 
@@ -1430,9 +1428,13 @@ export default function BaseChat() {
               />
             </div>
           </div>
+
+          {/* Main content with panels */}
           <div className="flex h-screen overflow-hidden">
-            {/* Profil po lewej */}
-            <div className="w-80 p-4 bg-white dark:bg-gray-800 overflow-y-auto">
+            {/* Left panel (Profile & Stats) */}
+            <div className={`${
+              activeMobilePanel === 'left' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
+            } lg:block lg:relative lg:w-80 lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4`}>
               <div className="mb-8">
                 {isConnected ? (
                   <div className="space-y-4">
@@ -1443,7 +1445,7 @@ export default function BaseChat() {
                           {currentRank}
                         </div>
                         <div className="text-sm text-gray-500 mt-1">{RANK_DESCRIPTIONS[currentRank]}</div>
-                      </div>
+            </div>
 
                       {isConnected && userProfile && (
                         <div className="mb-6">
@@ -1513,13 +1515,13 @@ export default function BaseChat() {
                               <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <span className="text-white text-sm">
                                   {isUploading ? 'Uploading...' : 'Change Picture'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                          </span>
+            </div>
+            </div>
+          </div>
                           {/* Reszta profilu */}
-                        </div>
-                      )}
+            </div>
+          )}
 
                       <div className="text-center">
                         {isEditingName ? (
@@ -1531,10 +1533,10 @@ export default function BaseChat() {
                               placeholder="Enter username"
                               className="px-2 py-1 border rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600"
                             />
-                            <button
+                      <button
                               onClick={handleSaveCustomName}
                               className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
-                            >
+                      >
                               Save
                             </button>
                             <button
@@ -1555,26 +1557,26 @@ export default function BaseChat() {
                                 className="text-sm text-blue-500 hover:text-blue-600"
                               >
                                 ✏️
-                              </button>
-                            )}
-                          </div>
+                      </button>
+                    )}
+                  </div>
                         )}
                         <div className="text-sm text-gray-500 break-all mt-2">
                           <Address address={address} />
-                        </div>
-                      </div>
-                    </div>
+            </div>
+            </div>
+          </div>
 
                     {/* Bio Section - Moved and restyled */}
                     <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
                       <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2">
                           <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                           </svg>
                           <div className="text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">About Me</div>
-                        </div>
-                        <button
+                    </div>
+              <button
                           onClick={async () => {
                             if (!address) return;
                             
@@ -1602,13 +1604,13 @@ export default function BaseChat() {
                             }
                           }}
                           className="flex items-center space-x-1 text-sm text-blue-500 hover:text-blue-600 transition-colors duration-200"
-                        >
+                    >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
+                      </svg>
                           <span>Edit</span>
-                        </button>
-                      </div>
+                    </button>
+                  </div>
                       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
                         <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
                           {userProfile.bio || 
@@ -1619,9 +1621,9 @@ export default function BaseChat() {
                               <span>Click Edit to add your bio</span>
                             </span>
                           }
-                        </div>
-                      </div>
-                    </div>
+                </div>
+              </div>
+            </div>
 
                     {/* Stats Grid - Network Activity */}
                     <div className="grid grid-cols-2 gap-4 mt-4">
@@ -1709,7 +1711,7 @@ export default function BaseChat() {
 
                       <div className="relative pt-1">
                         <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-gray-200 dark:bg-gray-600">
-                          <div
+          <div 
                             style={{ width: `${progress}%` }}
                             className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300"
                           ></div>
@@ -1725,48 +1727,52 @@ export default function BaseChat() {
                   <div className="text-center py-4 text-gray-500">
                     Connect wallet to view profile
                   </div>
-                )}
+          )}
               </div>
             </div>
 
-            {/* Główna zawartość */}
-            <div className="flex-1 p-4 overflow-y-auto">
+            {/* Middle panel (Feed) */}
+            <div className={`flex-1 p-4 overflow-y-auto ${
+              activeMobilePanel === 'main' ? 'block w-full' : 'hidden lg:block'
+            }`}>
               {/* Combined search and post switcher section */}
               <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4">
-                <div className="flex space-x-2">
+                {/* Search row */}
+                <div className="flex flex-col gap-2">
                   <input
                     type="text"
                     placeholder="Search posts..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    className="w-full px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                   />
-                  <button
-                    onClick={() => setShowOnlyUserPosts(false)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${!showOnlyUserPosts ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
-                  >
-                    All Posts
-                  </button>
-                  <button
-                    onClick={() => setShowOnlyUserPosts(true)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${showOnlyUserPosts ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
-                  >
-                    My Posts
-                  </button>
-                  <select
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
-                    className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm"
-                  >
-                    <option value="newest">Newest</option>
-                    <option value="oldest">Oldest</option>
-                  </select>
+                  {/* Filters row */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowOnlyUserPosts(false)}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${!showOnlyUserPosts ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                    >
+                      All Posts
+                    </button>
+                    <button
+                      onClick={() => setShowOnlyUserPosts(true)}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${showOnlyUserPosts ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                    >
+                      My Posts
+                    </button>
+                    <button
+                      onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
+                      className="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                    >
+                      {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* New post creation */}
               {isConnected ? (
-                <>
+    <>
                   {canCreatePosts ? (
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow mb-6">
                       <div className="flex items-center space-x-3 mb-4">
@@ -1778,7 +1784,7 @@ export default function BaseChat() {
                           />
                         ) : (
                           <Avatar address={address} className="w-10 h-10 rounded-full" />
-                        )}
+          )}
                         <div className="flex-1">
                           <textarea
                             value={newPost}
@@ -1787,51 +1793,51 @@ export default function BaseChat() {
                             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                             rows={3}
                           />
-                        </div>
-                      </div>
-                      
+              </div>
+        </div>
+
                       {/* Media preview in post */}
-                      {(postPreviewImage || postPreviewVideo) && (
+                {(postPreviewImage || postPreviewVideo) && (
                         <div className="mb-4 relative">
                           {postPreviewImage ? (
-                            <img 
-                              src={postPreviewImage} 
-                              alt="Preview" 
+                      <img
+                        src={postPreviewImage}
+                        alt="Preview"
                               className="max-h-60 rounded-lg object-cover"
-                            />
+                      />
                           ) : postPreviewVideo && (
-                            <video 
-                              src={postPreviewVideo}
+                      <video
+                        src={postPreviewVideo}
                               className="max-h-60 rounded-lg w-full"
-                              controls
+                        controls
                             >
                               Your browser does not support video playback.
                             </video>
-                          )}
-                          <button
-                            onClick={() => {
-                              setPostPreviewImage(null);
-                              setPostPreviewVideo(null);
-                            }}
+                    )}
+          <button
+              onClick={() => {
+                        setPostPreviewImage(null);
+                        setPostPreviewVideo(null);
+              }}
                             className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                          >
+                    >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                           {uploadProgress > 0 && uploadProgress < 100 && (
                             <div className="absolute bottom-2 left-2 right-2 bg-gray-200 rounded-full h-2">
                               <div 
                                 className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                                 style={{ width: `${uploadProgress}%` }}
                               />
-                            </div>
-                          )}
-                        </div>
+          </div>
+                )}
+        </div>
                       )}
-                      
+
                       <div className="flex justify-between items-center">
-                        <button
+            <button
                           onClick={() => document.getElementById('fileInput')?.click()}
                           className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                         >
@@ -1979,23 +1985,23 @@ export default function BaseChat() {
                   <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-2">
-                        {displayUserName(post.author, `post-${post.id}`)}
+                            {displayUserName(post.author, `post-${post.id}`)}
                         <div className="text-xs text-gray-500">
-                          {formatTimestamp(post.timestamp)}
+                            {formatTimestamp(post.timestamp)}
+                          </div>
                         </div>
-                      </div>
                       
                       {/* Opcje posta dla autora */}
                       {post.author === address && (
                         <div className="relative">
-                          <button
+                        <button
                             className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
                             onClick={() => setEditingPost(editingPost === post.id ? null : post.id)}
-                          >
+                        >
                             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                            </svg>
-                          </button>
+                          </svg>
+                        </button>
                           
                           {editingPost === post.id && (
                             <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 border border-gray-200 dark:border-gray-700">
@@ -2015,11 +2021,11 @@ export default function BaseChat() {
                                 Usuń post
                               </button>
                             </div>
-                          )}
-                        </div>
                       )}
                     </div>
-                    
+                      )}
+                    </div>
+
                     {editingPost === post.id ? (
                       <div className="mb-4">
                         <textarea
@@ -2027,7 +2033,7 @@ export default function BaseChat() {
                           onChange={(e) => setEditedContent(e.target.value)}
                           className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-gray-100"
                           rows={3}
-                        />
+                          />
                         <div className="flex justify-end space-x-2 mt-2">
                           <button
                             onClick={() => {
@@ -2057,17 +2063,17 @@ export default function BaseChat() {
                             type: 'video',
                             url: post.video
                           } : undefined}
-                        />
+                          />
                       </div>
                     )}
-                    
+
                     <div className="flex items-center space-x-4 mb-4">
                       <button
                         onClick={() => handleToggleLike(post.id)}
                         className={`flex items-center space-x-1 ${
                           post.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-                        }`}
-                      >
+            }`}
+          >
                         <svg 
                           className="w-5 h-5" 
                           fill={post.likedBy?.includes(address || '') ? "currentColor" : "none"}
@@ -2122,10 +2128,10 @@ export default function BaseChat() {
                                     <button
                                       className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
                                       onClick={() => setEditingComment(editingComment?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
-                                    >
+                      >
                                       <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                      </svg>
+            </svg>
                                     </button>
                                     
                                     {editingComment?.commentId === comment.id && (
@@ -2144,14 +2150,14 @@ export default function BaseChat() {
                                           className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                                         >
                                           Delete
-                                        </button>
+            </button>
                                       </div>
                                     )}
                                   </div>
                                 )}
                               </div>
                             </div>
-                            
+
                             {editingComment?.commentId === comment.id ? (
                               <div>
                                 <textarea
@@ -2160,11 +2166,11 @@ export default function BaseChat() {
                                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                                 <div className="flex justify-end space-x-2 mt-2">
-                                  <button
-                                    onClick={() => {
+            <button
+              onClick={() => {
                                       setEditingComment(null);
                                       setEditedCommentContent('');
-                                    }}
+              }}
                                     className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                                   >
                                     Cancel
@@ -2174,40 +2180,40 @@ export default function BaseChat() {
                                     className="px-3 py-1 text-xs text-white bg-blue-500 hover:bg-blue-600 rounded"
                                   >
                                     Save
-                                  </button>
+          </button>
                                 </div>
                               </div>
                             ) : (
                               <>
-                                <p className="text-sm text-gray-800 dark:text-gray-200">{comment.content}</p>
-                                
+                            <p className="text-sm text-gray-800 dark:text-gray-200">{comment.content}</p>
+
                                 {/* Przyciski akcji komentarza */}
-                                <div className="flex items-center space-x-4 mt-2">
-                                  <button
-                                    onClick={() => handleToggleCommentLike(post.id, comment.id)}
-                                    className={`flex items-center space-x-1 ${
-                                      comment.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-                                    }`}
-                                  >
-                                    <svg 
-                                      className="w-4 h-4" 
-                                      fill={comment.likedBy?.includes(address || '') ? "currentColor" : "none"}
-                                      stroke="currentColor" 
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path 
-                                        strokeLinecap="round" 
-                                        strokeLinejoin="round" 
-                                        strokeWidth={2} 
-                                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                                      />
-                                    </svg>
-                                    <span className="text-xs">{comment.likes || 0}</span>
-                                  </button>
-                                </div>
+                            <div className="flex items-center space-x-4 mt-2">
+                              <button
+                                onClick={() => handleToggleCommentLike(post.id, comment.id)}
+                                className={`flex items-center space-x-1 ${
+                                  comment.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
+                                }`}
+                              >
+                                <svg 
+                                  className="w-4 h-4" 
+                                  fill={comment.likedBy?.includes(address || '') ? "currentColor" : "none"}
+                                  stroke="currentColor" 
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path 
+                                    strokeLinecap="round" 
+                                    strokeLinejoin="round" 
+                                    strokeWidth={2} 
+                                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                                  />
+                                </svg>
+                                <span className="text-xs">{comment.likes || 0}</span>
+                              </button>
+                            </div>
                               </>
                             )}
-                            
+
                             {/* Formularz odpowiedzi */}
                             {replyingTo?.commentId === comment.id && (
                               <div className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
@@ -2236,7 +2242,7 @@ export default function BaseChat() {
                                 </div>
                               </div>
                             )}
-                            
+
                             {/* Wyświetl odpowiedzi */}
                             {post.comments
                               .filter(reply => reply.replyTo === comment.id)
@@ -2248,44 +2254,44 @@ export default function BaseChat() {
                                       <div className="text-xs text-gray-500">
                                         {formatTimestamp(reply.timestamp)}
                                       </div>
-                                    </div>
-                                    
-                                    {reply.author === address && (
-                                      <div className="relative">
-                                        <button
-                                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
-                                          onClick={() => setEditingComment(editingComment?.commentId === reply.id ? null : { postId: post.id, commentId: reply.id })}
-                                        >
-                                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                          </svg>
-                                        </button>
-                                        
-                                        {editingComment?.commentId === reply.id && (
-                                          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
-                                            <button
-                                              onClick={() => {
-                                                setEditingComment({ postId: post.id, commentId: reply.id });
-                                                setEditedCommentContent(reply.content);
-                                              }}
-                                              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                            >
-                                              Edit
-                                            </button>
-                                            <button
-                                              onClick={() => handleDeleteComment(post.id, reply.id)}
-                                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                            >
-                                              Delete
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
                                   </div>
-                                  
+
+                                  {reply.author === address && (
+                                    <div className="relative">
+                                      <button
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
+                                        onClick={() => setEditingComment(editingComment?.commentId === reply.id ? null : { postId: post.id, commentId: reply.id })}
+                                      >
+                                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                        </svg>
+                                      </button>
+
+                                      {editingComment?.commentId === reply.id && (
+                                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
+                                          <button
+                                            onClick={() => {
+                                              setEditingComment({ postId: post.id, commentId: reply.id });
+                                              setEditedCommentContent(reply.content);
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteComment(post.id, reply.id)}
+                                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  </div>
+
                                   <p className="text-sm text-gray-800 dark:text-gray-200">{reply.content}</p>
-                                  
+
                                   <div className="flex items-center space-x-4 mt-2">
                                     <button
                                       onClick={() => handleToggleCommentLike(post.id, reply.id)}
@@ -2313,20 +2319,20 @@ export default function BaseChat() {
                               ))}
                           </div>
                         ))}
-                      
+
                       {post.comments.length > 5 && (
-                        <button
+                              <button
                           onClick={() => setExpandedComments(prev => ({
                             ...prev,
                             [post.id]: !prev[post.id]
                           }))}
                           className="w-full text-sm text-blue-500 hover:text-blue-600 py-2"
-                        >
+                              >
                           {expandedComments[post.id] ? 
                             `Hide comments (${post.comments.length - 5})` : 
                             `Show more comments (${post.comments.length - 5})`
                           }
-                        </button>
+                              </button>
                       )}
                       
                       {/* New comment input */}
@@ -2344,27 +2350,29 @@ export default function BaseChat() {
                                   className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
-                              <button
+                                <button
                                 onClick={() => handleAddComment(post.id)}
                                 disabled={!newComments[post.id]?.trim()}
                                 className="px-3 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
+                                >
                                 Comment
-                              </button>
-                            </>
+                                </button>
+    </>
                           ) : (
                             <p className="text-sm text-gray-500 italic">Get BaseName to comment on posts</p>
                           )}
-                        </div>
-                      )}
-                    </div>
+                              </div>
+                            )}
+                          </div>
                   </div>
-                ))}
+                        ))}
               </div>
             </div>
 
-            {/* Right sidebar */}
-            <div className="w-80 p-4 bg-white dark:bg-gray-800 overflow-y-auto">
+            {/* Right panel (Trends & Global Statistics) */}
+            <div className={`${
+              activeMobilePanel === 'right' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
+            } lg:block lg:relative lg:w-80 lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4`}>
               {/* Global Statistics */}
               <div className="mb-4">
                 <h2 className="text-lg font-semibold mb-3 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
@@ -2422,7 +2430,7 @@ export default function BaseChat() {
                         </svg>
                         Likes Received
                       </span>
-                      <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-2">
                         <span className="text-xs text-gray-400">{userProfile.likesReceived} × 1</span>
                         <span className="text-pink-500 font-semibold">{userProfile.likesReceived}</span>
                       </div>
@@ -2434,13 +2442,13 @@ export default function BaseChat() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                         Activity Bonus
-                      </span>
+                                  </span>
                       <div className="flex items-center space-x-2">
                         <span className="text-xs text-gray-400">+25%</span>
                         <span className="text-purple-500 font-semibold">
                           {Math.round((userProfile.postCount * 5 + userProfile.likesReceived) * 0.25)}
-                        </span>
-                      </div>
+                                  </span>
+                                </div>
                     </div>
 
                     <div className="relative">
@@ -2478,10 +2486,10 @@ export default function BaseChat() {
                         </li>
                       </ul>
                       <div className="mt-2 text-xs italic text-gray-500">Building the Base community together!</div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                              </div>
+                          </div>
+                      </div>
+                    )}
 
               {/* Most Active Users */}
               <div className="mb-4 relative z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
@@ -2514,8 +2522,8 @@ export default function BaseChat() {
                       </div>
                     </div>
                   </div>
-                </div>
               </div>
+            </div>
 
               {/* Trending Hashtags */}
               <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
@@ -2537,7 +2545,7 @@ export default function BaseChat() {
                   {trendingTags
                     .slice(0, expandedTagsList ? undefined : 5)
                     .map(({ tag, count }) => (
-                      <div 
+                      <div
                         key={tag} 
                         className="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-all duration-300 group"
                       >
@@ -2550,13 +2558,13 @@ export default function BaseChat() {
                           <span className="text-xs text-gray-400">posts</span>
                         </div>
                       </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+        </div>
 
       {/* Animowany modal */}
       <AnimatePresence>
@@ -2594,12 +2602,12 @@ export default function BaseChat() {
                   <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
+                </svg>
+            </div>
                 )}
                 
                 <p className="text-lg mb-4 whitespace-pre-line text-gray-800 dark:text-gray-100">{modalMessage}</p>
-                
+
                 <div className="flex justify-center gap-4">
                   <button
                     onClick={() => setShowModal(false)}
@@ -2609,21 +2617,21 @@ export default function BaseChat() {
                     Cancel
                   </button>
                   {modalType === 'confirm' && (
-                    <button
+                      <button
                       onClick={handleConfirmUpload}
                       className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
                       disabled={isUploading}
-                    >
+                      >
                       {isUploading ? 'Uploading...' : 'Confirm'}
-                    </button>
-                  )}
-                </div>
-              </div>
+              </button>
+                    )}
+            </div>
+            </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       {/* ReCaptcha component as small button */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2">
         <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-full border border-gray-200 dark:border-gray-700 shadow-lg shadow-blue-500/20 hover:bg-white hover:dark:bg-gray-800 transition-all duration-300">
@@ -2636,21 +2644,63 @@ export default function BaseChat() {
               <ReCaptcha action="create_post" isVerifying={isVerifying} />
             </div>
           </div>
-        </div>
-      </div>
+            </div>
+          </div>
 
       {/* Add small padding */}
       <div className="pb-8">
         {/* ... rest of the content ... */}
       </div>
       <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
-      {showDailyPostOverlay && (
-        <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
-          <div className="px-4 py-2 bg-black bg-opacity-50 text-white rounded">
-            {dailyPostCount}/5 posts today
-          </div>
+          {showDailyPostOverlay && (
+            <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
+              <div className="px-4 py-2 bg-black bg-opacity-50 text-white rounded">
+                {dailyPostCount}/5 posts today
+              </div>
+            </div>
+          )}
+
+      {/* Mobile footer */}
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-t border-[#0052FF]/20 z-50">
+        <div className="flex items-center justify-around p-4">
+          <button
+            onClick={() => setActiveMobilePanel('left')}
+            className={`flex flex-col items-center p-2 rounded-xl transition-colors ${
+              activeMobilePanel === 'left' ? 'text-[#0052FF]' : 'text-gray-400'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span className="text-xs mt-1">Profile</span>
+          </button>
+          <button
+            onClick={() => setActiveMobilePanel('main')}
+            className={`flex flex-col items-center p-2 rounded-xl transition-colors ${
+              activeMobilePanel === 'main' ? 'text-[#0052FF]' : 'text-gray-400'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span className="text-xs mt-1">Feed</span>
+          </button>
+          <button
+            onClick={() => setActiveMobilePanel('right')}
+            className={`flex flex-col items-center p-2 rounded-xl transition-colors ${
+              activeMobilePanel === 'right' ? 'text-[#0052FF]' : 'text-gray-400'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+            <span className="text-xs mt-1">Trends</span>
+          </button>
         </div>
-      )}
+      </div>
+
+      {/* Padding for mobile footer */}
+      <div className="h-20 lg:h-0" />
     </BanPage>
   );
 }

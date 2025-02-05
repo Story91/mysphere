@@ -44,6 +44,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
             display: 'modal',
             termsUrl: 'https://basebook.xyz/terms',
             privacyUrl: 'https://basebook.xyz/privacy',
+          },
+          // @ts-ignore
+          coinbaseWallet: {
+            appName: 'BaseBook',
+            appLogoUrl: '/android-chrome-192x192.png',
+            darkMode: true,
+            defaultChain: base,
+            chainId: 8453,
+            jsonRpcUrl: 'https://base-mainnet.public.blastapi.io',
+            fallbackRpcUrls: [
+              'https://mainnet.base.org',
+              'https://base.blockpi.network/v1/rpc/public'
+            ]
           }
         }}
         projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
