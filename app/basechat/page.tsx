@@ -632,7 +632,9 @@ export default function BaseChat() {
       const users = await Promise.all(usersSnap.docs.map(async doc => {
         const data = doc.data();
         
-        // Podstawowe dane użytkownika
+        // Zmieniona obsługa lastActive
+        const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
+
         const stats = {
           posts: data.postsCount || 0,
           likes: data.likesReceived || 0
@@ -659,7 +661,7 @@ export default function BaseChat() {
           address: doc.id,
           points: totalPoints,
           stats: stats,
-          lastActive: data.lastActive?.toMillis() || Date.now(),
+          lastActive: lastActive,
           name: userName
         };
       }));
@@ -1250,15 +1252,21 @@ export default function BaseChat() {
       // Zaktualizuj ranking aktywnych użytkowników
       const usersSnap = await getDocs(collection(db, 'users'));
       const activeUsersData = usersSnap.docs
-        .map(doc => ({
-          address: doc.id,
-          points: doc.data().baseChatPoints?.totalPoints || 0,
-          stats: {
-            posts: doc.data().postsCount || 0,
-            likes: doc.data().likesReceived || 0
-          },
-          lastActive: doc.data().lastActive?.toMillis() || 0
-        }))
+        .map(doc => {
+          const data = doc.data();
+          // Zmieniona obsługa lastActive
+          const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
+            
+          return {
+            address: doc.id,
+            points: data.baseChatPoints?.totalPoints || 0,
+            stats: {
+              posts: data.postsCount || 0,
+              likes: data.likesReceived || 0
+            },
+            lastActive: lastActive
+          };
+        })
         .sort((a, b) => b.points - a.points)
         .slice(0, 10);
 
