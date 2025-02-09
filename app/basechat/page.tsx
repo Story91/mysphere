@@ -1110,7 +1110,7 @@ export default function BaseChat() {
   const [displayLimit, setDisplayLimit] = useState(100);
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
 
-  const displayedPosts = expandedPosts ? sortedPosts : sortedPosts.slice(-displayLimit);
+  const displayedPosts = expandedPosts ? sortedPosts : sortedPosts.slice(0, displayLimit);
 
   useEffect(() => {
     if (expandedPosts) return; // Gdy mamy pełny widok, nie korzystamy z infinite scroll
