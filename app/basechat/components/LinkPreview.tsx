@@ -38,11 +38,13 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
   const [previews, setPreviews] = useState<{[key: string]: LinkPreview}>({});
   const [showFullImage, setShowFullImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState('');
+  const [failedImages, setFailedImages] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     // Znajdź wszystkie linki w tekście
-    const foundLinks = linkifyjs.find(content);
-    setLinks(foundLinks.map((link: LinkifyMatch) => link.value));
+    const foundLinks = linkifyjs.find(content || '');
+    const uniqueLinks = Array.from(new Set(foundLinks.map((link: LinkifyMatch) => link.value)));
+    setLinks(uniqueLinks);
   }, [content]);
 
   useEffect(() => {
@@ -90,26 +92,6 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
 
   return (
     <div>
-      {/* Wyświetl oryginalny tekst z klikalnymi linkami */}
-      <div className="text-gray-800 dark:text-gray-200 mb-4 break-words">
-        {content.split(/(\s+)/).map((part, index) => {
-          const isLink = links.includes(part);
-          return isLink ? (
-            <a
-              key={index}
-              href={part}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:underline font-medium"
-            >
-              {formatLink(part)}
-            </a>
-          ) : (
-            <span key={index}>{part}</span>
-          );
-        })}
-      </div>
-
       {/* Wyświetl media (zdjęcie lub wideo) */}
       {media && (
         <div className="mb-4">
@@ -122,6 +104,10 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
                 src={media.url}
                 alt="Post content"
                 className="w-full rounded-lg object-contain max-h-[500px]"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
               />
               <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity rounded-lg" />
               <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity">
@@ -146,15 +132,17 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
       {/* Wyświetl podglądy linków */}
       <div className="space-y-4">
         {links.map((link, index) => {
-          const preview = previews[link];
-          if (!preview || !isValidUrl(link)) return null;
-
           let hostname = '';
           try {
             hostname = new URL(link).hostname;
           } catch (e) {
             return null;
           }
+
+          const preview = previews[link];
+          if (!preview) return null;
+
+          const hasFailedImage = failedImages[link];
 
           return (
             <a
@@ -165,15 +153,21 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
               className="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
             >
               <div className="flex flex-col md:flex-row">
-                {preview.image && (
+                {preview.image && !hasFailedImage ? (
                   <div className="w-full md:w-48 h-48 md:h-auto flex-shrink-0">
                     <img
                       src={preview.image}
                       alt={preview.title || 'Link preview'}
                       className="w-full h-full object-cover"
+                      onError={() => {
+                        setFailedImages(prev => ({
+                          ...prev,
+                          [link]: true
+                        }));
+                      }}
                     />
                   </div>
-                )}
+                ) : null}
                 <div className="flex-1 p-4">
                   <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
                     <div className="flex items-center">
@@ -181,6 +175,10 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
                         src={`https://www.google.com/s2/favicons?domain=${hostname}`}
                         alt="Site icon"
                         className="w-4 h-4 mr-2"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
                       />
                       {hostname}
                     </div>

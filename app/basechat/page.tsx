@@ -117,8 +117,22 @@ function BanPage({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+type EthereumAddress = `0x${string}`;
+
+const toEthereumAddress = (address: string): EthereumAddress => {
+  if (!address.startsWith('0x')) {
+    throw new Error('Invalid Ethereum address format');
+  }
+  return address as `0x${string}`;
+};
+
 export default function BaseChat() {
   const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
+  // Stany dla generowania AI
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  
   // Globalne deklaracje stanów modalu przeniesione na początek funkcji
   const [modalMessage, setModalMessage] = useState('');
   const [modalType, setModalType] = useState<'error' | 'warning' | 'confirm'>('error');
@@ -163,7 +177,7 @@ export default function BaseChat() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [customName, setCustomName] = useState('');
   const [userNames, setUserNames] = useState<{[key: string]: {name: string, avatar?: string}}>({});
-  const [expandedPosts, setExpandedPosts] = useState(false);
+  const [expandedPosts, setExpandedPosts] = useState<{[key: string]: boolean}>({});
   const [editingPost, setEditingPost] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState('');
   const [editingComment, setEditingComment] = useState<{postId: string, commentId: string} | null>(null);
@@ -234,7 +248,7 @@ export default function BaseChat() {
               className="w-6 h-6 rounded-full mr-2"
             />
           ) : (
-            <Avatar address={userAddress} className="w-6 h-6 rounded-full mr-2" />
+            <Avatar address={toEthereumAddress(userAddress)} className="w-6 h-6 rounded-full mr-2" />
           )}
           <div
             className="cursor-pointer"
@@ -1396,6 +1410,84 @@ export default function BaseChat() {
     fetchDailyPostCount();
   }, [address, isConnected]);
 
+  const handleGenerateAIPost = async () => {
+    if (!aiPrompt.trim() || !address || isGeneratingAI) return;
+    
+    try {
+      setIsGeneratingAI(true);
+      console.log('Starting AI post generation...');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://basebook.vercel.app',
+            'X-Title': 'BaseBook',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: "deepseek/deepseek-r1:free",
+            messages: [
+              {
+                role: "system",
+                  content: "You are an assistant who generates engaging social media posts related to the Base blockchain ecosystem. Your posts should be informative, but also friendly and encouraging interaction."
+              },
+              {
+                role: "user",
+                content: aiPrompt
+              }
+            ],
+            temperature: 1,
+            top_p: 1,
+            repetition_penalty: 1
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        console.log('Received API response, status:', response.status);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('API Error:', errorData);
+          throw new Error(errorData.error || `Error while generating post (${response.status})`);
+        }
+
+        const data = await response.json();
+        console.log('Received data:', data);
+
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+          console.error('Invalid response structure:', data);
+          throw new Error('Invalid API response');
+        }
+
+        const generatedPost = data.choices[0].message.content;
+        console.log('Post generated:', generatedPost);
+
+        setNewPost(generatedPost);
+        setShowAIModal(false);
+        setAiPrompt('');
+        
+      } catch (fetchError: unknown) {
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('Request timeout exceeded');
+        }
+        throw fetchError;
+      }
+
+    } catch (error: unknown) {
+      console.error('Error generating AI post:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`An error occurred while generating the post: ${errorMessage}`);
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
   return (
     <BanPage>
       <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
@@ -1472,13 +1564,13 @@ export default function BaseChat() {
                                   setModalType('error');
                                   setShowModal(true);
                                   return;
-                                }
+        }
 
                                 // Sprawdź czy można zmienić zdjęcie
                                 const userRef = doc(db, 'users', address);
                                 const userDoc = await getDoc(userRef);
                                 const userData = userDoc.data();
-                                
+
                                 if (userData?.lastImageUpdate) {
                                   const lastUpdate = userData.lastImageUpdate.toDate();
                                   const oneMonthAgo = new Date();
@@ -1503,14 +1595,14 @@ export default function BaseChat() {
                                 setModalMessage('Are you sure you want to change your profile picture?\nNext change will be possible in one month.\nMaximum file size: 1MB');
                                 setModalType('confirm');
                                 setShowModal(true);
-                              }}
+                  }}
                               accept="image/*"
                               className="hidden"
                             />
                             <div 
                               className="relative w-32 h-32 mx-auto mb-4 cursor-pointer group"
                               onClick={() => fileInputRef.current?.click()}
-                            >
+                >
                               {previewImage || userProfile.avatar ? (
                                 <img
                                   src={previewImage || userProfile.avatar}
@@ -1541,16 +1633,16 @@ export default function BaseChat() {
                               placeholder="Enter username"
                               className="px-2 py-1 border rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600"
                             />
-                      <button
+                <button
                               onClick={handleSaveCustomName}
                               className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
                       >
                               Save
-                            </button>
-                            <button
+                </button>
+                <button
                               onClick={() => setIsEditingName(false)}
                               className="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600"
-                            >
+                >
                               Cancel
                             </button>
                           </div>
@@ -1823,7 +1915,7 @@ export default function BaseChat() {
                             </video>
                     )}
           <button
-              onClick={() => {
+                  onClick={() => {
                         setPostPreviewImage(null);
                         setPostPreviewVideo(null);
               }}
@@ -1845,15 +1937,27 @@ export default function BaseChat() {
                       )}
 
                       <div className="flex justify-between items-center">
-            <button
-                          onClick={() => document.getElementById('fileInput')?.click()}
-                          className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          <span>Add photo/video</span>
-                        </button>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => document.getElementById('fileInput')?.click()}
+                className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>Add photo/video</span>
+              </button>
+
+              <button
+                onClick={() => setShowAIModal(true)}
+                className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span>Generate AI Post</span>
+              </button>
+            </div>
                         <input
                           id="fileInput"
                           type="file"
@@ -1973,7 +2077,7 @@ export default function BaseChat() {
                         }
                         .animate-blink-fast {
                           animation: blink-fast 0.5s step-end infinite;
-                        }
+                    }
                       `}</style>
                     </div>
                   )}
@@ -2017,7 +2121,7 @@ export default function BaseChat() {
                                 onClick={() => {
                                   setEditingPost(post.id);
                                   setEditedContent(post.content);
-                                }}
+                  }}
                                 className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                               >
                                 Edytuj post
@@ -2025,7 +2129,7 @@ export default function BaseChat() {
                               <button
                                 onClick={() => handleDeletePost(post.id)}
                                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                              >
+                >
                                 Usuń post
                               </button>
                             </div>
@@ -2041,7 +2145,7 @@ export default function BaseChat() {
                           onChange={(e) => setEditedContent(e.target.value)}
                           className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-gray-100"
                           rows={3}
-                          />
+                        />
                         <div className="flex justify-end space-x-2 mt-2">
                           <button
                             onClick={() => {
@@ -2062,16 +2166,33 @@ export default function BaseChat() {
                       </div>
                     ) : (
                       <div className="mb-4">
-                        <LinkPreview 
-                          content={post.content} 
-                          media={post.image ? {
-                            type: 'image',
-                            url: post.image
-                          } : post.video ? {
-                            type: 'video',
-                            url: post.video
-                          } : undefined}
+                        <div className="whitespace-pre-wrap break-words text-gray-900 dark:text-white">
+                          {expandedPosts[post.id] ? post.content : 
+                            post.content.length > 280 ? 
+                              `${post.content.slice(0, 280)}...` : 
+                              post.content
+                          }
+                          {post.content.length > 280 && (
+                            <button
+                              onClick={() => setExpandedPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
+                              className="block text-blue-500 hover:text-blue-600 text-sm mt-2"
+                            >
+                              {expandedPosts[post.id] ? 'Show less' : 'Show more'}
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-2">
+                          <LinkPreview 
+                            content={post.content}
+                            media={post.image ? {
+                              type: 'image',
+                              url: post.image
+                            } : post.video ? {
+                              type: 'video',
+                              url: post.video
+                            } : undefined}
                           />
+                        </div>
                       </div>
                     )}
 
@@ -2546,7 +2667,7 @@ export default function BaseChat() {
                       className="text-sm text-blue-500 hover:text-blue-600 transition-colors"
                     >
                       {expandedTagsList ? 'Show Less' : 'Show More'}
-                      </button>
+                </button>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -2570,9 +2691,9 @@ export default function BaseChat() {
                 </div>
               </div>
             </div>
+              </div>
+            </div>
           </div>
-        </div>
-        </div>
 
       {/* Animowany modal */}
       <AnimatePresence>
@@ -2623,17 +2744,17 @@ export default function BaseChat() {
                     disabled={isUploading}
                   >
                     Cancel
-                  </button>
-                  {modalType === 'confirm' && (
-                      <button
-                      onClick={handleConfirmUpload}
+                </button>
+                {modalType === 'confirm' && (
+                  <button
+                    onClick={handleConfirmUpload}
                       className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
-                      disabled={isUploading}
-                      >
+                    disabled={isUploading}
+                  >
                       {isUploading ? 'Uploading...' : 'Confirm'}
-              </button>
-                    )}
-            </div>
+                  </button>
+                )}
+              </div>
             </div>
             </motion.div>
           </motion.div>
@@ -2665,8 +2786,8 @@ export default function BaseChat() {
               <div className="px-4 py-2 bg-black bg-opacity-50 text-white rounded">
                 {dailyPostCount}/5 posts today
               </div>
-            </div>
-          )}
+          </div>
+        )}
 
       {/* Mobile footer */}
       <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-t border-[#0052FF]/20 z-50">
@@ -2709,6 +2830,99 @@ export default function BaseChat() {
 
       {/* Padding for mobile footer */}
       <div className="h-20 lg:h-0" />
+
+      {/* Modal do generowania postów AI */}
+      <AnimatePresence>
+        {showAIModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+            onClick={() => setShowAIModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-6 max-w-md w-full mx-4 border border-white/10 shadow-[0_0_30px_rgba(59,130,246,0.2)]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex flex-col items-center mb-6 relative">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent"></div>
+                
+                <h3 className="text-xl font-medium text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 mt-4">
+                  AI Post Generator
+                </h3>
+                
+                <div className="text-sm text-gray-400 mt-2 text-center">
+                  Let AI help you create engaging content
+                </div>
+
+                <button
+                  onClick={() => setShowAIModal(false)}
+                  className="absolute top-0 right-0 text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="relative">
+                <textarea
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="I'm your personal Base network agent. How can I assist you with creating engaging content today?"
+                  className="w-full px-4 py-3 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-md border border-white/10 rounded-xl text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                  rows={4}
+                  maxLength={500}
+                />
+                <div className="absolute bottom-3 right-3 text-xs text-gray-500">
+                  {aiPrompt.length}/500
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center mt-4">
+                <button
+                  onClick={() => setShowAIModal(false)}
+                  className="px-4 py-2 text-sm text-gray-400 hover:text-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGenerateAIPost}
+                  disabled={isGeneratingAI || !aiPrompt.trim()}
+                  className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-500/30 to-purple-500/30 backdrop-blur-md rounded-xl text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed border border-white/20"
+                >
+                  {isGeneratingAI ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Generate
+                    </span>
+                  )}
+                </button>
+              </div>
+              {isGeneratingAI && (
+                <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-blue-500/10 to-purple-500/10 backdrop-blur-md border border-white/10 shadow-lg">
+                  <p className="text-sm text-white/80 text-center">
+                    Due to high demand, generation may take about a minute.
+                    <br />
+                    <span className="text-blue-400 font-medium">We're creating the perfect post for you! ✨</span>
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </BanPage>
   );
 }
