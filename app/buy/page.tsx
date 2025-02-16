@@ -11,7 +11,7 @@ export default function BuyPage() {
     <div className="min-h-screen bg-black">
       {/* Matrix background effect */}
       <div className="fixed inset-0 bg-black opacity-90">
-        <div className="absolute inset-0 bg-[url('/matrix.png')] opacity-10 animate-matrix"></div>
+        {/* Usunięto odwołanie do matrix.png */}
       </div>
 
       {/* Cyber grid background */}

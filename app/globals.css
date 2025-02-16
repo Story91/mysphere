@@ -35,9 +35,51 @@
   font-style: normal;
 }
 
-/* Usuwam animację glow i zostawiam stałe podświetlenie */
+/* Efekty dla badge'y */
+.badge-glass {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
 .badge-glow {
-  box-shadow: 0 0 15px rgba(0, 82, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 82, 255, 0.2);
+  transition: all 0.3s ease;
+  border-radius: 16px;
+}
+
+.badge-glow:hover {
+  box-shadow: 0 0 30px rgba(0, 82, 255, 0.3);
+  transform: translateY(-2px) scale(1.02);
+}
+
+.badge-hover {
+  transition: all 0.3s ease;
+  border-radius: 16px;
+}
+
+.badge-hover:hover {
+  transform: translateY(-2px);
+}
+
+/* Animacja pulsu dla badge'y */
+@keyframes badgePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 82, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(0, 82, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 82, 255, 0);
+  }
+}
+
+.badge-pulse {
+  animation: badgePulse 2s infinite;
+  border-radius: 16px;
 }
 
 /* Efekt szkła */
@@ -396,4 +438,42 @@ h1, h2, h3, h4, h5, h6 {
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: rgba(0, 82, 255, 0.4);
   }
+}
+
+/* Google Fonts Styles */
+.font-roboto { font-family: 'Roboto', sans-serif; }
+.font-open-sans { font-family: 'Open Sans', sans-serif; }
+.font-montserrat { font-family: 'Montserrat', sans-serif; }
+.font-lato { font-family: 'Lato', sans-serif; }
+.font-poppins { font-family: 'Poppins', sans-serif; }
+.font-pacifico { font-family: 'Pacifico', cursive; }
+.font-dancing-script { font-family: 'Dancing Script', cursive; }
+.font-lobster { font-family: 'Lobster', cursive; }
+.font-permanent-marker { font-family: 'Permanent Marker', cursive; }
+.font-playfair { font-family: 'Playfair Display', serif; }
+.font-merriweather { font-family: 'Merriweather', serif; }
+.font-crimson { font-family: 'Crimson Text', serif; }
+.font-bebas { font-family: 'Bebas Neue', sans-serif; }
+.font-oswald { font-family: 'Oswald', sans-serif; }
+.font-anton { font-family: 'Anton', sans-serif; }
+
+/* Style dla ikon w menu rozwijanym */
+.wallet-dropdown svg {
+  color: #111111 !important;
+  stroke: #111111 !important;
+}
+
+.wallet-dropdown-link svg {
+  color: #111111 !important;
+  stroke: #111111 !important;
+}
+
+.wallet-dropdown-fund svg {
+  color: #111111 !important;
+  stroke: #111111 !important;
+}
+
+.wallet-dropdown-disconnect svg {
+  color: #111111 !important;
+  stroke: #111111 !important;
 }

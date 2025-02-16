@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, PropsWithChildren } from 'react';
 import { useAccount, useSendTransaction } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
@@ -37,6 +37,32 @@ import { useBanStatus } from '../hooks/useBanStatus';
 import LinkPreview from './components/LinkPreview';
 import { useReCaptcha } from '../hooks/useReCaptcha';
 import ReCaptcha from '../components/ReCaptcha/ReCaptcha';
+
+import FrameSDK from '@farcaster/frame-sdk'
+import farcasterFrame from '@farcaster/frame-wagmi-connector'
+import { wagmiConfig } from '../components/Web3Provider/wagmiConfig'
+import { connect } from 'wagmi/actions'
+
+function FarcasterFrameProvider({ children }: PropsWithChildren) {
+  useEffect(() => {
+    const init = async () => {
+      const context = await FrameSDK.context
+
+      // Autoconnect if running in a frame.
+      if (context?.client.clientFid) {
+        connect(wagmiConfig, { connector: farcasterFrame() })
+      }
+
+      // Hide splash screen after UI renders.
+      setTimeout(() => {
+        FrameSDK.actions.ready()
+      }, 500)
+    }
+    init()
+  }, [])
+
+  return <>{children}</>
+}
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -203,6 +229,24 @@ export default function BaseChat() {
     chain: base 
   });
 
+  // Inicjalizacja Frame SDK
+  useEffect(() => {
+    const init = async () => {
+      const context = await FrameSDK.context
+
+      // Autoconnect if running in a frame.
+      if (context?.client.clientFid) {
+        connect(wagmiConfig, { connector: farcasterFrame() })
+      }
+
+      // Hide splash screen after UI renders.
+      setTimeout(() => {
+        FrameSDK.actions.ready()
+      }, 500)
+    }
+    init()
+  }, [])
+
   // Funkcja sprawdzająca czy użytkownik może tworzyć posty
   const canCreatePosts = Boolean(baseName);
 
@@ -238,7 +282,7 @@ export default function BaseChat() {
   const displayUserName = (userAddress: string, elementId: string) => {
     const userName = userNames[userAddress]?.name || userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
     
-    return (
+  return (
       <div className="relative inline-block">
         <div className="flex items-center">
           {userNames[userAddress]?.avatar ? (
@@ -626,29 +670,29 @@ export default function BaseChat() {
         setActiveUsers(JSON.parse(cachedData));
         setIsLoadingUsers(false);
       }
-      
+        
       if (cachedNames) {
         setUserNames(JSON.parse(cachedNames));
-      }
+        }
     } catch (error) {
       console.error('Error loading cached data:', error);
-    }
+      }
   }, []);
 
   // Zmodyfikowana funkcja getActiveUsers
   const getActiveUsers = useCallback(async () => {
     if (!db) return;
-    
+
     try {
       const usersRef = collection(db, 'users');
       const usersSnap = await getDocs(usersRef);
-      
+
       const users = await Promise.all(usersSnap.docs.map(async doc => {
         const data = doc.data();
-        
+
         // Zmieniona obsługa lastActive
         const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
-
+        
         const stats = {
           posts: data.postsCount || 0,
           likes: data.likesReceived || 0
@@ -682,11 +726,11 @@ export default function BaseChat() {
 
       // Sortuj użytkowników po punktach
       const sortedUsers = users.sort((a, b) => b.points - a.points);
-      
+
       // Zapisz do localStorage
       localStorage.setItem('activeUsers', JSON.stringify(sortedUsers));
       localStorage.setItem('userNames', JSON.stringify(userNames));
-      
+
       setActiveUsers(sortedUsers);
       setIsLoadingUsers(false);
     } catch (error) {
@@ -702,15 +746,15 @@ export default function BaseChat() {
     
     // Natychmiast pobierz świeże dane
     getActiveUsers();
-    
+        
     // Następnie odświeżaj co 30 sekund przez pierwsze 2 minuty
     const quickRefreshInterval = setInterval(getActiveUsers, 30 * 1000);
-    
+      
     // Po 2 minutach przełącz na odświeżanie co 5 minut
     const slowRefreshTimeout = setTimeout(() => {
       clearInterval(quickRefreshInterval);
       const slowRefreshInterval = setInterval(getActiveUsers, 5 * 60 * 1000);
-      
+    
       // Cleanup dla wolnego odświeżania
       return () => clearInterval(slowRefreshInterval);
     }, 2 * 60 * 1000);
@@ -831,14 +875,14 @@ export default function BaseChat() {
                   name: baseName,
                   avatar: profile.avatar
                 }
-              }));
+      }));
             }
           }
         } catch (error) {
           console.error('Error loading user profile:', error);
         }
       };
-      
+
       loadUserProfile();
     }
   }, [isConnected, address, baseName]);
@@ -863,7 +907,7 @@ export default function BaseChat() {
         await fetchUserStats(address);
       }
     };
-
+      
     resetStats();
   }, [address]);
 
@@ -889,8 +933,8 @@ export default function BaseChat() {
     }
 
     // Sprawdź czy można zmienić zdjęcie
-    const userRef = doc(db, 'users', address);
-    const userDoc = await getDoc(userRef);
+          const userRef = doc(db, 'users', address);
+          const userDoc = await getDoc(userRef);
     const userData = userDoc.data();
     
     if (userData?.lastImageUpdate) {
@@ -942,7 +986,7 @@ export default function BaseChat() {
       // Aktualizuj lokalny stan
       setPreviewImage(url);
       setUserProfile(prev => ({
-        ...prev,
+            ...prev,
         avatar: url
       }));
       
@@ -1242,9 +1286,9 @@ export default function BaseChat() {
 
   // Dodaj nową funkcję do obliczania i zapisywania BaseChat Points
   const calculateAndSaveBaseChatPoints = async () => {
-    if (!address || !isConnected) return;
+      if (!address || !isConnected) return;
 
-    try {
+      try {
       // Oblicz punkty
       const postPoints = userProfile.postCount * 5;
       const likePoints = userProfile.likesReceived;
@@ -1270,7 +1314,7 @@ export default function BaseChat() {
           const data = doc.data();
           // Zmieniona obsługa lastActive
           const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
-            
+          
           return {
             address: doc.id,
             points: data.baseChatPoints?.totalPoints || 0,
@@ -1348,7 +1392,7 @@ export default function BaseChat() {
 
     return items;
   };
-
+        
   // Funkcja renderująca pojedynczy element listy użytkowników
   const renderUserItem = (user: any, index: number) => (
     <div key={user.address} className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
@@ -1391,8 +1435,8 @@ export default function BaseChat() {
         {user.points} pts
       </div>
     </div>
-  );
-
+        );
+        
   useEffect(() => {
     const fetchDailyPostCount = async () => {
       if (!isConnected || !address) return;
@@ -1434,7 +1478,7 @@ export default function BaseChat() {
             messages: [
               {
                 role: "system",
-                  content: "You are an assistant who generates engaging social media posts related to the Base blockchain ecosystem. Your posts should be informative, but also friendly and encouraging interaction."
+                content: "You are an assistant who generates engaging social media posts related to the Base blockchain ecosystem. Your posts should be informative, but also friendly and encouraging interaction."
               },
               {
                 role: "user",
@@ -1489,337 +1533,337 @@ export default function BaseChat() {
   };
 
   return (
-    <BanPage>
-      <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
-      <div className="min-h-screen relative">
-        {/* Background effects */}
-        <div className="fixed inset-0 z-0">
-          <div className="absolute inset-0 bg-black opacity-90">
-            <div className="absolute inset-0 bg-[url('/matrix.png')] opacity-10 animate-matrix"></div>
-          </div>
-          {/* Glowing Coinbase orb */}
-          <div className="absolute inset-0">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-[#0052FF] blur-[150px] opacity-20 animate-pulse"></div>
-          </div>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.1)_0%,transparent_70%)]"></div>
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(0, 82, 255, 0.05) 25%, rgba(0, 82, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 82, 255, 0.05) 75%, rgba(0, 82, 255, 0.05) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(0, 82, 255, 0.05) 25%, rgba(0, 82, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 82, 255, 0.05) 75%, rgba(0, 82, 255, 0.05) 76%, transparent 77%, transparent)',
-            backgroundSize: '50px 50px'
-          }}></div>
-        </div>
-
-        <div className="relative z-10">
-          {/* Widgets */}
-          <div className="w-full space-y-1">
-            <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
-              <gecko-coin-price-marquee-widget 
-                locale="en" 
-                outlined="true"
-                coin-ids="bitcoin,ethereum,binancecoin,ripple,cardano,solana,polkadot,dogecoin" 
-                initial-currency="usd"
-              />
+      <BanPage>
+        <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
+        <div className="min-h-screen relative">
+          {/* Background effects */}
+          <div className="fixed inset-0 z-0">
+            <div className="absolute inset-0 bg-black opacity-90">
+              {/* Usunięto odwołanie do matrix.png */}
             </div>
-            <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
-              <gecko-coin-price-marquee-widget 
-                locale="en" 
-                outlined="true"
-                coin-ids="official-trump,american-coin,maga,ondo-finance,fartcoin,department-of-government-efficiency,ai16z,dogelon-mars,jupiter-exchange-solana,dogecoin,griffain,virtual-protocol,aixbt" 
-                initial-currency="usd"
-              />
+            {/* Glowing Coinbase orb */}
+            <div className="absolute inset-0">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-[#0052FF] blur-[150px] opacity-20 animate-pulse"></div>
             </div>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.1)_0%,transparent_70%)]"></div>
+            <div className="absolute inset-0" style={{
+              backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(0, 82, 255, 0.05) 25%, rgba(0, 82, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 82, 255, 0.05) 75%, rgba(0, 82, 255, 0.05) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(0, 82, 255, 0.05) 25%, rgba(0, 82, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 82, 255, 0.05) 75%, rgba(0, 82, 255, 0.05) 76%, transparent 77%, transparent)',
+              backgroundSize: '50px 50px'
+            }}></div>
           </div>
 
-          {/* Main content with panels */}
-          <div className="flex h-screen overflow-hidden">
-            {/* Left panel (Profile & Stats) */}
-            <div className={`${
-              activeMobilePanel === 'left' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
-            } lg:block lg:relative lg:w-80 lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4`}>
-              <div className="mb-8">
-                {isConnected ? (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                      {/* Rank section moved and centered */}
-                      <div className="text-center mb-4">
-                        <div className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 text-transparent bg-clip-text animate-gradient">
-                          {currentRank}
-                        </div>
-                        <div className="text-sm text-gray-500 mt-1">{RANK_DESCRIPTIONS[currentRank]}</div>
-            </div>
-
-                      {isConnected && userProfile && (
-                        <div className="mb-6">
-                          <div className="relative group">
-                            <input
-                              type="file"
-                              ref={fileInputRef}
-                              onChange={async (e) => {
-                                if (!e.target.files || !e.target.files[0] || !address) return;
-                                
-                                const file = e.target.files[0];
-                                
-                                // Sprawdź rozmiar pliku (max 1MB)
-                                if (file.size > 1024 * 1024) {
-                                  setModalMessage('Maximum file size is 1MB');
-                                  setModalType('error');
-                                  setShowModal(true);
-                                  return;
-        }
-
-                                // Sprawdź czy można zmienić zdjęcie
-                                const userRef = doc(db, 'users', address);
-                                const userDoc = await getDoc(userRef);
-                                const userData = userDoc.data();
-
-                                if (userData?.lastImageUpdate) {
-                                  const lastUpdate = userData.lastImageUpdate.toDate();
-                                  const oneMonthAgo = new Date();
-                                  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                                  
-                                  if (lastUpdate > oneMonthAgo) {
-                                    const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
-                                    const now = new Date();
-                                    const diff = timeToWait.getTime() - now.getTime();
-                                    
-                                    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                                    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                    
-                                    setModalMessage(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
-                                    setModalType('warning');
-                                    setShowModal(true);
-                                    return;
-                                  }
-                                }
-
-                                setSelectedFile(file);
-                                setModalMessage('Are you sure you want to change your profile picture?\nNext change will be possible in one month.\nMaximum file size: 1MB');
-                                setModalType('confirm');
-                                setShowModal(true);
-                  }}
-                              accept="image/*"
-                              className="hidden"
-                            />
-                            <div 
-                              className="relative w-32 h-32 mx-auto mb-4 cursor-pointer group"
-                              onClick={() => fileInputRef.current?.click()}
-                >
-                              {previewImage || userProfile.avatar ? (
-                                <img
-                                  src={previewImage || userProfile.avatar}
-                                  alt="Profile"
-                                  className="w-32 h-32 rounded-full object-cover border-4 border-blue-500 group-hover:opacity-80 transition-opacity"
-                                />
-                              ) : (
-                                <Avatar address={address} className="w-32 h-32 rounded-full border-4 border-blue-500 group-hover:opacity-80 transition-opacity" />
-                              )}
-                              <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span className="text-white text-sm">
-                                  {isUploading ? 'Uploading...' : 'Change Picture'}
-                          </span>
-            </div>
-            </div>
-          </div>
-                          {/* Reszta profilu */}
-            </div>
-          )}
-
-                      <div className="text-center">
-                        {isEditingName ? (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={customName}
-                              onChange={(e) => setCustomName(e.target.value)}
-                              placeholder="Enter username"
-                              className="px-2 py-1 border rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600"
-                            />
-                <button
-                              onClick={handleSaveCustomName}
-                              className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
-                      >
-                              Save
-                </button>
-                <button
-                              onClick={() => setIsEditingName(false)}
-                              className="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600"
-                >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center space-x-2">
-                            <span className={`${isBaseName(userProfile.name) ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold animate-pulse' : 'text-gray-900 dark:text-white'}`}>
-                              {userProfile.name}
-                            </span>
-                            {!baseName && (
-                              <button
-                                onClick={() => setIsEditingName(true)}
-                                className="text-sm text-blue-500 hover:text-blue-600"
-                              >
-                                ✏️
-                      </button>
-                    )}
-                  </div>
-                        )}
-                        <div className="text-sm text-gray-500 break-all mt-2">
-                          <Address address={address} />
-            </div>
-            </div>
-          </div>
-
-                    {/* Bio Section - Moved and restyled */}
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
-                      <div className="flex justify-between items-center mb-3">
-                  <div className="flex items-center space-x-2">
-                          <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                          <div className="text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">About Me</div>
-                    </div>
-              <button
-                          onClick={async () => {
-                            if (!address) return;
-                            
-                            // Sprawdź ostatnią edycję bio
-                            const userRef = doc(db, 'users', address);
-                            const userDoc = await getDoc(userRef);
-                            const lastBioUpdate = userDoc.data()?.lastBioUpdate?.toDate() || new Date(0);
-                            const now = new Date();
-                            
-                            // Sprawdź czy minęło 24h od ostatniej edycji
-                            if (now.getTime() - lastBioUpdate.getTime() < 24 * 60 * 60 * 1000) {
-                              const nextUpdate = new Date(lastBioUpdate.getTime() + 24 * 60 * 60 * 1000);
-                              const hoursLeft = Math.ceil((nextUpdate.getTime() - now.getTime()) / (1000 * 60 * 60));
-                              alert(`You can edit your bio once per day. ${hoursLeft} hours remaining.`);
-                              return;
-                            }
-
-                            const newBio = prompt('Enter your bio (max 90 characters):', userProfile.bio);
-                            if (newBio && newBio.length <= 90) {
-                              await updateDoc(userRef, { 
-                                bio: newBio,
-                                lastBioUpdate: serverTimestamp()
-                              });
-                              setUserProfile(prev => ({ ...prev, bio: newBio }));
-                            }
-                          }}
-                          className="flex items-center space-x-1 text-sm text-blue-500 hover:text-blue-600 transition-colors duration-200"
-                    >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                          <span>Edit</span>
-                    </button>
-                  </div>
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
-                        <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                          {userProfile.bio || 
-                            <span className="text-gray-400 italic flex items-center justify-center space-x-2">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span>Click Edit to add your bio</span>
-                            </span>
-                          }
-                </div>
+          <div className="relative z-10">
+            {/* Widgets */}
+            <div className="w-full space-y-1">
+              <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
+                <gecko-coin-price-marquee-widget 
+                  locale="en" 
+                  outlined="true"
+                  coin-ids="bitcoin,ethereum,binancecoin,ripple,cardano,solana,polkadot,dogecoin" 
+                  initial-currency="usd"
+                />
+              </div>
+              <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
+                <gecko-coin-price-marquee-widget 
+                  locale="en" 
+                  outlined="true"
+                  coin-ids="official-trump,american-coin,maga,ondo-finance,fartcoin,department-of-government-efficiency,ai16z,dogelon-mars,jupiter-exchange-solana,dogecoin,griffain,virtual-protocol,aixbt" 
+                  initial-currency="usd"
+                />
               </div>
             </div>
 
-                    {/* Stats Grid - Network Activity */}
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                        <div className="text-blue-500 text-2xl font-bold">{stats.transactions}</div>
-                        <div className="text-sm text-gray-500">Transactions</div>
-                        <div className="text-xs text-gray-400">{stats.transactionPoints} points</div>
-                      </div>
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                        <div className="text-green-500 text-2xl font-bold">{stats.tokens}</div>
-                        <div className="text-sm text-gray-500">Tokens</div>
-                        <div className="text-xs text-gray-400">{stats.tokenPoints} points</div>
-                      </div>
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                        <div className="text-purple-500 text-2xl font-bold">{stats.nfts}</div>
-                        <div className="text-sm text-gray-500">NFTs</div>
-                        <div className="text-xs text-gray-400">{stats.nftPoints} points</div>
-                      </div>
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                        <div className="text-yellow-500 text-2xl font-bold">{stats.contracts}</div>
-                        <div className="text-sm text-gray-500">Contracts</div>
-                        <div className="text-xs text-gray-400">{stats.contractPoints} points</div>
-                      </div>
+            {/* Main content with panels */}
+            <div className="flex h-screen overflow-hidden">
+              {/* Left panel (Profile & Stats) */}
+              <div className={`${
+                activeMobilePanel === 'left' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
+              } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4`}>
+                <div className="mb-8">
+                  {isConnected ? (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                        {/* Rank section moved and centered */}
+                        <div className="text-center mb-4">
+                          <div className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 text-transparent bg-clip-text animate-gradient">
+                            {currentRank}
+                          </div>
+                          <div className="text-sm text-gray-500 mt-1">{RANK_DESCRIPTIONS[currentRank]}</div>
+              </div>
+
+                        {isConnected && userProfile && (
+                          <div className="mb-6">
+                            <div className="relative group">
+                              <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={async (e) => {
+                                  if (!e.target.files || !e.target.files[0] || !address) return;
+                                  
+                                  const file = e.target.files[0];
+                                  
+                                  // Sprawdź rozmiar pliku (max 1MB)
+                                  if (file.size > 1024 * 1024) {
+                                    setModalMessage('Maximum file size is 1MB');
+                                    setModalType('error');
+                                    setShowModal(true);
+                                    return;
+      }
+
+                                  // Sprawdź czy można zmienić zdjęcie
+                                  const userRef = doc(db, 'users', address);
+                                  const userDoc = await getDoc(userRef);
+                                  const userData = userDoc.data();
+
+                                  if (userData?.lastImageUpdate) {
+                                    const lastUpdate = userData.lastImageUpdate.toDate();
+                                    const oneMonthAgo = new Date();
+                                    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                                    
+                                    if (lastUpdate > oneMonthAgo) {
+                                      const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
+                                      const now = new Date();
+                                      const diff = timeToWait.getTime() - now.getTime();
+                                      
+                                      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                      
+                                      setModalMessage(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
+                                      setModalType('warning');
+                                      setShowModal(true);
+                                      return;
+                                    }
+                                  }
+
+                                  setSelectedFile(file);
+                                  setModalMessage('Are you sure you want to change your profile picture?\nNext change will be possible in one month.\nMaximum file size: 1MB');
+                                  setModalType('confirm');
+                                  setShowModal(true);
+                    }}
+                                accept="image/*"
+                                className="hidden"
+                              />
+                              <div 
+                                className="relative w-32 h-32 mx-auto mb-4 cursor-pointer group"
+                                onClick={() => fileInputRef.current?.click()}
+                  >
+                                {previewImage || userProfile.avatar ? (
+                                  <img
+                                    src={previewImage || userProfile.avatar}
+                                    alt="Profile"
+                                    className="w-32 h-32 rounded-full object-cover border-4 border-blue-500 group-hover:opacity-80 transition-opacity"
+                                  />
+                                ) : (
+                                  <Avatar address={address} className="w-32 h-32 rounded-full border-4 border-blue-500 group-hover:opacity-80 transition-opacity" />
+                                )}
+                                <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <span className="text-white text-sm">
+                                    {isUploading ? 'Uploading...' : 'Change Picture'}
+                            </span>
+                  </div>
+                  </div>
+                </div>
+                            {/* Reszta profilu */}
+              </div>
+              )}
+
+                          <div className="text-center">
+                            {isEditingName ? (
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="text"
+                                  value={customName}
+                                  onChange={(e) => setCustomName(e.target.value)}
+                                  placeholder="Enter username"
+                                  className="px-2 py-1 border rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+                                />
+                    <button
+                                  onClick={handleSaveCustomName}
+                                  className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
+                      >
+                                  Save
+                    </button>
+                    <button
+                                  onClick={() => setIsEditingName(false)}
+                                  className="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600"
+                    >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center space-x-2">
+                                <span className={`${isBaseName(userProfile.name) ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold animate-pulse' : 'text-gray-900 dark:text-white'}`}>
+                                  {userProfile.name}
+                                </span>
+                                {!baseName && (
+                                  <button
+                                    onClick={() => setIsEditingName(true)}
+                                    className="text-sm text-blue-500 hover:text-blue-600"
+                                  >
+                                    ✏️
+                        </button>
+                      )}
                     </div>
+                            )}
+                            <div className="text-sm text-gray-500 break-all mt-2">
+                              <Address address={address} />
+              </div>
+              </div>
+            </div>
 
-                    {/* Stats Grid - Posts and Likes */}
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                        <div className="text-blue-500 text-2xl font-bold">{userProfile.postCount}</div>
-                        <div className="text-sm text-gray-500">Posts</div>
+                      {/* Bio Section - Moved and restyled */}
+                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
+                        <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center space-x-2">
+                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            <div className="text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">About Me</div>
                       </div>
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                        <div className="text-pink-500 text-2xl font-bold">{userProfile.likesReceived}</div>
-                        <div className="text-sm text-gray-500">Likes Received</div>
-                      </div>
-                    </div>
-
-                    {/* Total Points Section */}
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
-                      <div className="flex justify-between items-center mb-4">
-                        <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                          Total Points
-                        </div>
-                        <div className="text-2xl font-bold text-indigo-500">
-                          {stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 mb-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Current Rank:</span>
-                          <span className="text-green-500 font-semibold">{currentRank}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Next Rank:</span>
-                          <span className="text-blue-500 font-semibold">{nextRank}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Progress:</span>
-                          <span className="text-purple-500 font-semibold">{Math.round(progress)}%</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Badges Earned:</span>
-                          <span className="text-orange-500 font-semibold">
-                            {BADGES.filter(badge => badge.condition({
-                              totalPoints: stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints,
-                              rank: currentRank,
-                              percentile: 0,
-                              breakdown: {
-                                transactionPoints: stats.transactionPoints,
-                                tokenPoints: stats.tokenPoints,
-                                nftPoints: stats.nftPoints,
-                                uniqueContractPoints: stats.contractPoints
-                              },
-                              stats: {
-                                transactions: stats.transactions,
-                                tokens: stats.tokens,
-                                nfts: stats.nfts,
-                                contracts: stats.contracts
+                <button
+                            onClick={async () => {
+                              if (!address) return;
+                              
+                              // Sprawdź ostatnią edycję bio
+                              const userRef = doc(db, 'users', address);
+                              const userDoc = await getDoc(userRef);
+                              const lastBioUpdate = userDoc.data()?.lastBioUpdate?.toDate() || new Date(0);
+                              const now = new Date();
+                              
+                              // Sprawdź czy minęło 24h od ostatniej edycji
+                              if (now.getTime() - lastBioUpdate.getTime() < 24 * 60 * 60 * 1000) {
+                                const nextUpdate = new Date(lastBioUpdate.getTime() + 24 * 60 * 60 * 1000);
+                                const hoursLeft = Math.ceil((nextUpdate.getTime() - now.getTime()) / (1000 * 60 * 60));
+                                alert(`You can edit your bio once per day. ${hoursLeft} hours remaining.`);
+                                return;
                               }
-                            })).length}/24
-                          </span>
-                        </div>
-                      </div>
 
-                      <div className="relative pt-1">
-                        <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-gray-200 dark:bg-gray-600">
-          <div 
-                            style={{ width: `${progress}%` }}
-                            className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300"
-                          ></div>
-                        </div>
-                      </div>
+                              const newBio = prompt('Enter your bio (max 90 characters):', userProfile.bio);
+                              if (newBio && newBio.length <= 90) {
+                                await updateDoc(userRef, { 
+                                  bio: newBio,
+                                  lastBioUpdate: serverTimestamp()
+                                });
+                                setUserProfile(prev => ({ ...prev, bio: newBio }));
+                              }
+                            }}
+                            className="flex items-center space-x-1 text-sm text-blue-500 hover:text-blue-600 transition-colors duration-200"
+                  >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                            <span>Edit</span>
+                      </button>
+                    </div>
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
+                          <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                            {userProfile.bio || 
+                              <span className="text-gray-400 italic flex items-center justify-center space-x-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Click Edit to add your bio</span>
+                              </span>
+                            }
+              </div>
+                    </div>
+                  </div>
 
-                      <div className="mt-4 text-xs text-gray-500 text-center">
-                        {RANK_DESCRIPTIONS[currentRank]}
+                  {/* Stats Grid - Network Activity */}
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                      <div className="text-blue-500 text-2xl font-bold">{stats.transactions}</div>
+                      <div className="text-sm text-gray-500">Transactions</div>
+                      <div className="text-xs text-gray-400">{stats.transactionPoints} points</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                      <div className="text-green-500 text-2xl font-bold">{stats.tokens}</div>
+                      <div className="text-sm text-gray-500">Tokens</div>
+                      <div className="text-xs text-gray-400">{stats.tokenPoints} points</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                      <div className="text-purple-500 text-2xl font-bold">{stats.nfts}</div>
+                      <div className="text-sm text-gray-500">NFTs</div>
+                      <div className="text-xs text-gray-400">{stats.nftPoints} points</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                      <div className="text-yellow-500 text-2xl font-bold">{stats.contracts}</div>
+                      <div className="text-sm text-gray-500">Contracts</div>
+                      <div className="text-xs text-gray-400">{stats.contractPoints} points</div>
+                    </div>
+                  </div>
+
+                  {/* Stats Grid - Posts and Likes */}
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                      <div className="text-blue-500 text-2xl font-bold">{userProfile.postCount}</div>
+                      <div className="text-sm text-gray-500">Posts</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                      <div className="text-pink-500 text-2xl font-bold">{userProfile.likesReceived}</div>
+                      <div className="text-sm text-gray-500">Likes Received</div>
+                    </div>
+                  </div>
+
+                  {/* Total Points Section */}
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                        Total Points
+                      </div>
+                      <div className="text-2xl font-bold text-indigo-500">
+                        {stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 mb-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Current Rank:</span>
+                        <span className="text-green-500 font-semibold">{currentRank}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Next Rank:</span>
+                        <span className="text-blue-500 font-semibold">{nextRank}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Progress:</span>
+                        <span className="text-purple-500 font-semibold">{Math.round(progress)}%</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Badges Earned:</span>
+                        <span className="text-orange-500 font-semibold">
+                          {BADGES.filter(badge => badge.condition({
+                            totalPoints: stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints,
+                            rank: currentRank,
+                            percentile: 0,
+                            breakdown: {
+                              transactionPoints: stats.transactionPoints,
+                              tokenPoints: stats.tokenPoints,
+                              nftPoints: stats.nftPoints,
+                              uniqueContractPoints: stats.contractPoints
+                            },
+                            stats: {
+                              transactions: stats.transactions,
+                              tokens: stats.tokens,
+                              nfts: stats.nfts,
+                              contracts: stats.contracts
+                            }
+                          })).length}/24
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="relative pt-1">
+                      <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-gray-200 dark:bg-gray-600">
+        <div 
+                              style={{ width: `${progress}%` }}
+                              className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300"
+                            ></div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 text-xs text-gray-500 text-center">
+                          {RANK_DESCRIPTIONS[currentRank]}
                       </div>
                     </div>
                   </div>
@@ -1873,38 +1917,38 @@ export default function BaseChat() {
               {/* New post creation */}
               {isConnected ? (
     <>
-                  {canCreatePosts ? (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow mb-6">
-                      <div className="flex items-center space-x-3 mb-4">
-                        {userProfile.avatar ? (
-                          <img
-                            src={userProfile.avatar}
-                            alt="Profile"
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <Avatar address={address} className="w-10 h-10 rounded-full" />
-          )}
-                        <div className="flex-1">
-                          <textarea
-                            value={newPost}
-                            onChange={(e) => setNewPost(e.target.value)}
-                            placeholder="What's happening on Base?"
-                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            rows={3}
-                          />
+                    {canCreatePosts ? (
+                      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow mb-6">
+                        <div className="flex items-center space-x-3 mb-4">
+                          {userProfile.avatar ? (
+                            <img
+                              src={userProfile.avatar}
+                              alt="Profile"
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <Avatar address={address} className="w-10 h-10 rounded-full" />
+            )}
+                          <div className="flex-1">
+                            <textarea
+                              value={newPost}
+                              onChange={(e) => setNewPost(e.target.value)}
+                              placeholder="What's happening on Base?"
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                              rows={3}
+                            />
+                </div>
               </div>
-        </div>
 
-                      {/* Media preview in post */}
+                        {/* Media preview in post */}
                 {(postPreviewImage || postPreviewVideo) && (
                         <div className="mb-4 relative">
                           {postPreviewImage ? (
-                      <img
-                        src={postPreviewImage}
+                    <img
+                      src={postPreviewImage}
                         alt="Preview"
                               className="max-h-60 rounded-lg object-cover"
-                      />
+                    />
                           ) : postPreviewVideo && (
                       <video
                         src={postPreviewVideo}
@@ -1914,14 +1958,14 @@ export default function BaseChat() {
                               Your browser does not support video playback.
                             </video>
                     )}
-          <button
+                    <button
                   onClick={() => {
                         setPostPreviewImage(null);
                         setPostPreviewVideo(null);
               }}
                             className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                     >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
@@ -1933,372 +1977,370 @@ export default function BaseChat() {
                               />
           </div>
                 )}
-        </div>
-                      )}
+                  </div>
+                )}
 
-                      <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => document.getElementById('fileInput')?.click()}
-                className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span>Add photo/video</span>
-              </button>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={() => document.getElementById('fileInput')?.click()}
+                      className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>Add photo/video</span>
+                    </button>
 
-              <button
-                onClick={() => setShowAIModal(true)}
-                className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span>Generate AI Post</span>
-              </button>
-            </div>
-                        <input
-                          id="fileInput"
-                          type="file"
-                          accept="image/*,video/*"
-                          onChange={handlePostFileSelect}
-                          className="hidden"
-                        />
-                        <button
-                          onClick={handleCreatePost}
-                          disabled={!newPost.trim()}
-                          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Post
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-white rounded-xl p-6 text-center shadow-lg mb-6 border border-[#0052FF]/20 relative overflow-hidden">
-                      {/* Matrix background effect */}
-                      <div className="absolute inset-0 bg-[url('/matrix-code.png')] opacity-[0.08] animate-matrix"></div>
-                      <div className="absolute inset-0 bg-gradient-to-br from-[#0052FF]/10 via-transparent to-[#0052FF]/10"></div>
-                      
-                      <div className="relative z-10">
-                        <div className="text-xl font-['Share_Tech_Mono'] text-[#0052FF] mb-3 tracking-[0.2em] animate-glitch">
-                          {'>'} SYSTEM_BASECHAT_DETECTED
-                        </div>
-                        
-                        <div className="font-['Share_Tech_Mono'] text-[#0052FF]/80 mb-4 tracking-[0.15em] text-base typewriter">
-                          {'>'} INITIALIZING_ONCHAIN_PROTOCOL
-                          <span className="animate-blink ml-1">_</span>
-                        </div>
+                    <button
+                      onClick={() => setShowAIModal(true)}
+                      className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span>Generate AI Post</span>
+                    </button>
+                  </div>
+                  <input
+                    id="fileInput"
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handlePostFileSelect}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={handleCreatePost}
+                    disabled={!newPost.trim()}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Post
+                  </button>
+                </div>
+              </div>
+          ) : (
+            <div className="bg-white rounded-xl p-6 text-center shadow-lg mb-6 border border-[#0052FF]/20 relative overflow-hidden">
+              {/* Usuwam linię z matrix-code.png i zastępuję ją gradientem */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/80 to-black/40"></div>
+              <div className="relative z-10">
+                <div className="text-xl font-['Share_Tech_Mono'] text-[#0052FF] mb-3 tracking-[0.2em] animate-glitch">
+                  {'>'} SYSTEM_BASECHAT_DETECTED
+                </div>
+                
+                <div className="font-['Share_Tech_Mono'] text-[#0052FF]/80 mb-4 tracking-[0.15em] text-base typewriter">
+                  {'>'} INITIALIZING_ONCHAIN_PROTOCOL
+                  <span className="animate-blink ml-1">_</span>
+                </div>
 
-                        <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mb-4 animate-scan"></div>
+                <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mb-4 animate-scan"></div>
 
-                        <div className="font-['Share_Tech_Mono'] text-[#0052FF] mb-4 tracking-[0.15em] text-lg animate-glitch-2">
-                          {'>'} BRING_NEW_PEOPLE_ONCHAIN
-                        </div>
+                <div className="font-['Share_Tech_Mono'] text-[#0052FF] mb-4 tracking-[0.15em] text-lg animate-glitch-2">
+                  {'>'} BRING_NEW_PEOPLE_ONCHAIN
+                </div>
 
-                        <div className="flex justify-center mb-4">
-                          <div className="w-16 h-px bg-[#0052FF]/50"></div>
-                        </div>
+                <div className="flex justify-center mb-4">
+                  <div className="w-16 h-px bg-[#0052FF]/50"></div>
+                </div>
 
-                        <div className="font-['Share_Tech_Mono'] text-[#0052FF]/80 mb-4 tracking-[0.15em] text-base">
-                          {'>'} BASENAME_REQUIRED
-                          <span className="animate-blink ml-1">_</span>
-                        </div>
+                <div className="font-['Share_Tech_Mono'] text-[#0052FF]/80 mb-4 tracking-[0.15em] text-base">
+                  {'>'} BASENAME_REQUIRED
+                  <span className="animate-blink ml-1">_</span>
+                </div>
 
-                        <a href="https://www.base.org/names" target="_blank" rel="noopener noreferrer" 
-                          className="inline-flex items-center px-6 py-2.5 bg-gradient-to-r from-[#0052FF] to-[#0040CC] text-white text-sm font-medium rounded-full transition-all duration-200 transform hover:scale-[1.02] shadow-[0_8px_16px_-3px_rgba(0,82,255,0.5)] hover:shadow-[0_12px_20px_-3px_rgba(0,82,255,0.6)] relative overflow-hidden group">
-                          <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 group-hover:animate-shine"></div>
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                          </svg>
-                          Claim Basename
-                          <span className="ml-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-xs px-1.5 py-0.5 rounded-full font-bold animate-gradient">NEW</span>
-                        </a>
-                      </div>
+                <a href="https://www.base.org/names" target="_blank" rel="noopener noreferrer" 
+                  className="inline-flex items-center px-6 py-2.5 bg-gradient-to-r from-[#0052FF] to-[#0040CC] text-white text-sm font-medium rounded-full transition-all duration-200 transform hover:scale-[1.02] shadow-[0_8px_16px_-3px_rgba(0,82,255,0.5)] hover:shadow-[0_12px_20px_-3px_rgba(0,82,255,0.6)] relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 group-hover:animate-shine"></div>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  Claim Basename
+                  <span className="ml-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-xs px-1.5 py-0.5 rounded-full font-bold animate-gradient">NEW</span>
+                </a>
+              </div>
 
-                      <style jsx>{`
-                        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+              <style jsx>{`
+                @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
-                        @keyframes matrix {
-                          0% { background-position: 0% 0%; }
-                          100% { background-position: 0% 100%; }
-                        }
-                        @keyframes scan {
-                          0% { transform: scaleX(0); opacity: 0.3; }
-                          50% { transform: scaleX(1); opacity: 0.8; }
-                          100% { transform: scaleX(0); opacity: 0.3; }
-                        }
-                        @keyframes glitch {
-                          0% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
-                          25% { transform: translate(-2px,2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
-                          50% { transform: translate(2px,-2px); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
-                          75% { transform: translate(-2px,-2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
-                          100% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
-                        }
-                        @keyframes glitch-2 {
-                          0% { transform: translate(0); }
-                          20% { transform: translate(-1px,1px); }
-                          40% { transform: translate(-1px,-1px); }
-                          60% { transform: translate(1px,1px); }
-                          80% { transform: translate(1px,-1px); }
-                          100% { transform: translate(0); }
-                        }
-                        @keyframes shine {
-                          from { left: -100%; }
-                          to { left: 100%; }
-                        }
-                        .animate-matrix {
-                          animation: matrix 20s linear infinite;
-                        }
-                        .animate-scan {
-                          animation: scan 3s ease-in-out infinite;
-                        }
-                        .animate-glitch {
-                          animation: glitch 3s infinite;
-                        }
-                        .animate-glitch-2 {
-                          animation: glitch-2 2s infinite;
-                        }
-                        .animate-shine {
-                          animation: shine 1.5s linear infinite;
-                        }
-                        .animate-gradient {
-                          background-size: 200% 200%;
-                          animation: gradient 3s ease infinite;
-                        }
-                        .typewriter {
-                          overflow: hidden;
-                          white-space: nowrap;
-                          animation: typing 3.5s steps(40, end);
-                        }
-                        @keyframes blink-fast {
-                          0%, 100% { opacity: 0; }
-                          50% { opacity: 1; }
-                        }
-                        .animate-blink-fast {
-                          animation: blink-fast 0.5s step-end infinite;
+                @keyframes matrix {
+                  0% { background-position: 0% 0%; }
+                  100% { background-position: 0% 100%; }
+                }
+                @keyframes scan {
+                  0% { transform: scaleX(0); opacity: 0.3; }
+                  50% { transform: scaleX(1); opacity: 0.8; }
+                  100% { transform: scaleX(0); opacity: 0.3; }
+                }
+                @keyframes glitch {
+                  0% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
+                  25% { transform: translate(-2px,2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
+                  50% { transform: translate(2px,-2px); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
+                  75% { transform: translate(-2px,-2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
+                  100% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
+                }
+                @keyframes glitch-2 {
+                  0% { transform: translate(0); }
+                  20% { transform: translate(-1px,1px); }
+                  40% { transform: translate(-1px,-1px); }
+                  60% { transform: translate(1px,1px); }
+                  80% { transform: translate(1px,-1px); }
+                  100% { transform: translate(0); }
+                }
+                @keyframes shine {
+                  from { left: -100%; }
+                  to { left: 100%; }
+                }
+                .animate-matrix {
+                  animation: matrix 20s linear infinite;
+                }
+                .animate-scan {
+                  animation: scan 3s ease-in-out infinite;
+                }
+                .animate-glitch {
+                  animation: glitch 3s infinite;
+                }
+                .animate-glitch-2 {
+                  animation: glitch-2 2s infinite;
+                }
+                .animate-shine {
+                  animation: shine 1.5s linear infinite;
+                }
+                .animate-gradient {
+                  background-size: 200% 200%;
+                  animation: gradient 3s ease infinite;
+                }
+                .typewriter {
+                  overflow: hidden;
+                  white-space: nowrap;
+                  animation: typing 3.5s steps(40, end);
+                }
+                @keyframes blink-fast {
+                  0%, 100% { opacity: 0; }
+                  50% { opacity: 1; }
+                }
+                .animate-blink-fast {
+                  animation: blink-fast 0.5s step-end infinite;
                     }
-                      `}</style>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center shadow mb-6">
-                  <p className="text-gray-600 dark:text-gray-300 mb-4">
-                    Connect your wallet to start posting and interacting with the community
-                  </p>
-                  <ConnectWallet />
+                  `}</style>
                 </div>
               )}
+            </>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center shadow mb-6">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Connect your wallet to start posting and interacting with the community
+              </p>
+              <ConnectWallet />
+            </div>
+          )}
 
-              {/* Lista postów */}
-              <div className="space-y-6">
-                {displayedPosts.map((post) => (
-                  <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                            {displayUserName(post.author, `post-${post.id}`)}
-                        <div className="text-xs text-gray-500">
-                            {formatTimestamp(post.timestamp)}
-                          </div>
-                        </div>
+          {/* Lista postów */}
+          <div className="space-y-6">
+            {displayedPosts.map((post) => (
+              <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                        {displayUserName(post.author, `post-${post.id}`)}
+                    <div className="text-xs text-gray-500">
+                        {formatTimestamp(post.timestamp)}
+                      </div>
+                    </div>
+                  
+                  {/* Opcje posta dla autora */}
+                  {post.author === address && (
+                    <div className="relative">
+                    <button
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+                        onClick={() => setEditingPost(editingPost === post.id ? null : post.id)}
+                    >
+                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                    </button>
                       
-                      {/* Opcje posta dla autora */}
-                      {post.author === address && (
-                        <div className="relative">
-                        <button
-                            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-                            onClick={() => setEditingPost(editingPost === post.id ? null : post.id)}
-                        >
-                            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                          </svg>
-                        </button>
-                          
-                          {editingPost === post.id && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 border border-gray-200 dark:border-gray-700">
-                              <button
-                                onClick={() => {
-                                  setEditingPost(post.id);
-                                  setEditedContent(post.content);
-                  }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                              >
-                                Edytuj post
-                              </button>
-                              <button
-                                onClick={() => handleDeletePost(post.id)}
-                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                                Usuń post
-                              </button>
-                            </div>
-                      )}
-                    </div>
-                      )}
-                    </div>
-
-                    {editingPost === post.id ? (
-                      <div className="mb-4">
-                        <textarea
-                          value={editedContent}
-                          onChange={(e) => setEditedContent(e.target.value)}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-gray-100"
-                          rows={3}
-                        />
-                        <div className="flex justify-end space-x-2 mt-2">
+                      {editingPost === post.id && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 border border-gray-200 dark:border-gray-700">
                           <button
                             onClick={() => {
-                              setEditingPost(null);
-                              setEditedContent('');
-                            }}
-                            className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                              setEditingPost(post.id);
+                              setEditedContent(post.content);
+                  }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                           >
-                            Cancel
+                            Edytuj post
                           </button>
                           <button
-                            onClick={() => handleEditPost(post.id, editedContent)}
-                            className="px-3 py-1 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded"
-                          >
-                            Save
+                            onClick={() => handleDeletePost(post.id)}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                            Usuń post
                           </button>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="mb-4">
-                        <div className="whitespace-pre-wrap break-words text-gray-900 dark:text-white">
-                          {expandedPosts[post.id] ? post.content : 
-                            post.content.length > 280 ? 
-                              `${post.content.slice(0, 280)}...` : 
-                              post.content
-                          }
-                          {post.content.length > 280 && (
-                            <button
-                              onClick={() => setExpandedPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
-                              className="block text-blue-500 hover:text-blue-600 text-sm mt-2"
-                            >
-                              {expandedPosts[post.id] ? 'Show less' : 'Show more'}
-                            </button>
-                          )}
-                        </div>
-                        <div className="mt-2">
-                          <LinkPreview 
-                            content={post.content}
-                            media={post.image ? {
-                              type: 'image',
-                              url: post.image
-                            } : post.video ? {
-                              type: 'video',
-                              url: post.video
-                            } : undefined}
-                          />
-                        </div>
-                      </div>
-                    )}
+                  )}
+                </div>
+                  )}
+                </div>
 
-                    <div className="flex items-center space-x-4 mb-4">
+                {editingPost === post.id ? (
+                  <div className="mb-4">
+                    <textarea
+                      value={editedContent}
+                      onChange={(e) => setEditedContent(e.target.value)}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-gray-100"
+                      rows={3}
+                    />
+                    <div className="flex justify-end space-x-2 mt-2">
                       <button
-                        onClick={() => handleToggleLike(post.id)}
-                        className={`flex items-center space-x-1 ${
-                          post.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-            }`}
-          >
-                        <svg 
-                          className="w-5 h-5" 
-                          fill={post.likedBy?.includes(address || '') ? "currentColor" : "none"}
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            strokeWidth={2} 
-                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                          />
-                        </svg>
-                        <span>{post.likes}</span>
+                        onClick={() => {
+                          setEditingPost(null);
+                          setEditedContent('');
+                        }}
+                        className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleEditPost(post.id, editedContent)}
+                        className="px-3 py-1 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded"
+                      >
+                        Save
                       </button>
                     </div>
-                    
-                    {/* Comments section */}
-                    <div className="space-y-4">
-                      {/* Wyświetl komentarze */}
-                      {(expandedComments[post.id] ? post.comments : post.comments.slice(0, 5))
-                        .filter(comment => !comment.replyTo) // Filtruj tylko główne komentarze
-                        .map(comment => (
-                          <div key={comment.id} className="mt-4 border-t dark:border-gray-700 pt-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center space-x-2">
-                                {displayUserName(comment.author, `comment-${post.id}-${comment.id}`)}
-                                <div className="text-xs text-gray-500">
-                                  {formatTimestamp(comment.timestamp)}
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center space-x-2">
-                                {/* Przycisk odpowiedzi */}
-                                {canCreatePosts ? (
-                                  <button
-                                    onClick={() => setReplyingTo(replyingTo?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
-                                    className="text-sm text-gray-500 hover:text-blue-500 flex items-center space-x-1"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                    </svg>
-                                    <span>Reply</span>
-                                  </button>
-                                ) : (
-                                  <span className="text-sm text-gray-500 italic">Get BaseName to reply</span>
-                                )}
-                                
-                                {/* Opcje komentarza dla autora */}
-                                {comment.author === address && (
-                                  <div className="relative">
-                                    <button
-                                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
-                                      onClick={() => setEditingComment(editingComment?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
-                      >
-                                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-            </svg>
-                                    </button>
-                                    
-                                    {editingComment?.commentId === comment.id && (
-                                      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
-                                        <button
-                                          onClick={() => {
-                                            setEditingComment({ postId: post.id, commentId: comment.id });
-                                            setEditedCommentContent(comment.content);
-                                          }}
-                                          className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        >
-                                          Edit
-                                        </button>
-                                        <button
-                                          onClick={() => handleDeleteComment(post.id, comment.id)}
-                                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        >
-                                          Delete
-            </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+                  </div>
+                ) : (
+                  <div className="mb-4">
+                    <div className="whitespace-pre-wrap break-words text-gray-900 dark:text-white">
+                      {expandedPosts[post.id] ? post.content : 
+                        post.content.length > 280 ? 
+                          `${post.content.slice(0, 280)}...` : 
+                          post.content
+                      }
+                      {post.content.length > 280 && (
+                        <button
+                          onClick={() => setExpandedPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
+                          className="block text-blue-500 hover:text-blue-600 text-sm mt-2"
+                        >
+                          {expandedPosts[post.id] ? 'Show less' : 'Show more'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-2">
+                      <LinkPreview 
+                        content={post.content}
+                        media={post.image ? {
+                          type: 'image',
+                          url: post.image
+                        } : post.video ? {
+                          type: 'video',
+                          url: post.video
+                        } : undefined}
+                      />
+                    </div>
+                  </div>
+                )}
 
-                            {editingComment?.commentId === comment.id ? (
-                              <div>
-                                <textarea
-                                  value={editedCommentContent}
-                                  onChange={(e) => setEditedCommentContent(e.target.value)}
-                                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <div className="flex justify-end space-x-2 mt-2">
-            <button
-              onClick={() => {
-                                      setEditingComment(null);
-                                      setEditedCommentContent('');
+                <div className="flex items-center space-x-4 mb-4">
+                  <button
+                    onClick={() => handleToggleLike(post.id)}
+                    className={`flex items-center space-x-1 ${
+                      post.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
+            }`}
+          >
+                    <svg 
+                      className="w-5 h-5" 
+                      fill={post.likedBy?.includes(address || '') ? "currentColor" : "none"}
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                      />
+                    </svg>
+                    <span>{post.likes}</span>
+                  </button>
+                </div>
+                
+                {/* Comments section */}
+                <div className="space-y-4">
+                  {/* Wyświetl komentarze */}
+                  {(expandedComments[post.id] ? post.comments : post.comments.slice(0, 5))
+                    .filter(comment => !comment.replyTo) // Filtruj tylko główne komentarze
+                    .map(comment => (
+                      <div key={comment.id} className="mt-4 border-t dark:border-gray-700 pt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            {displayUserName(comment.author, `comment-${post.id}-${comment.id}`)}
+                            <div className="text-xs text-gray-500">
+                              {formatTimestamp(comment.timestamp)}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            {/* Przycisk odpowiedzi */}
+                            {canCreatePosts ? (
+                              <button
+                                onClick={() => setReplyingTo(replyingTo?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
+                                className="text-sm text-gray-500 hover:text-blue-500 flex items-center space-x-1"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                                <span>Reply</span>
+                              </button>
+                            ) : (
+                              <span className="text-sm text-gray-500 italic">Get BaseName to reply</span>
+                            )}
+                            
+                            {/* Opcje komentarza dla autora */}
+                            {comment.author === address && (
+                              <div className="relative">
+                                <button
+                                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
+                                  onClick={() => setEditingComment(editingComment?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
+                      >
+                                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
+                                  </button>
+                                  
+                                  {editingComment?.commentId === comment.id && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
+                                      <button
+                                        onClick={() => {
+                                          setEditingComment({ postId: post.id, commentId: comment.id });
+                                          setEditedCommentContent(comment.content);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteComment(post.id, comment.id)}
+                                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                      >
+                                        Delete
+              </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                        {editingComment?.commentId === comment.id ? (
+                          <div>
+                            <textarea
+                              value={editedCommentContent}
+                              onChange={(e) => setEditedCommentContent(e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <div className="flex justify-end space-x-2 mt-2">
+          <button
+            onClick={() => {
+                                    setEditingComment(null);
+                                    setEditedCommentContent('');
               }}
                                     className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                                   >
@@ -2310,189 +2352,189 @@ export default function BaseChat() {
                                   >
                                     Save
           </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                            <p className="text-sm text-gray-800 dark:text-gray-200">{comment.content}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                        <p className="text-sm text-gray-800 dark:text-gray-200">{comment.content}</p>
 
-                                {/* Przyciski akcji komentarza */}
-                            <div className="flex items-center space-x-4 mt-2">
+                            {/* Przyciski akcji komentarza */}
+                        <div className="flex items-center space-x-4 mt-2">
+                          <button
+                            onClick={() => handleToggleCommentLike(post.id, comment.id)}
+                            className={`flex items-center space-x-1 ${
+                              comment.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
+                            }`}
+                          >
+                            <svg 
+                              className="w-4 h-4" 
+                              fill={comment.likedBy?.includes(address || '') ? "currentColor" : "none"}
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth={2} 
+                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                              />
+                            </svg>
+                            <span className="text-xs">{comment.likes || 0}</span>
+                          </button>
+                        </div>
+                          </>
+                        )}
+
+                        {/* Formularz odpowiedzi */}
+                        {replyingTo?.commentId === comment.id && (
+                          <div className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
+                            <textarea
+                              value={replyContent}
+                              onChange={(e) => setReplyContent(e.target.value)}
+                              placeholder="Write a reply..."
+                              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <div className="flex justify-end space-x-2 mt-2">
                               <button
-                                onClick={() => handleToggleCommentLike(post.id, comment.id)}
-                                className={`flex items-center space-x-1 ${
-                                  comment.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-                                }`}
+                                onClick={() => {
+                                  setReplyingTo(null);
+                                  setReplyContent('');
+                                }}
+                                className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                               >
-                                <svg 
-                                  className="w-4 h-4" 
-                                  fill={comment.likedBy?.includes(address || '') ? "currentColor" : "none"}
-                                  stroke="currentColor" 
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path 
-                                    strokeLinecap="round" 
-                                    strokeLinejoin="round" 
-                                    strokeWidth={2} 
-                                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                                  />
-                                </svg>
-                                <span className="text-xs">{comment.likes || 0}</span>
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleAddReply(post.id, comment.id)}
+                                className="px-3 py-1 text-xs text-white bg-blue-500 hover:bg-blue-600 rounded"
+                              >
+                                Reply
                               </button>
                             </div>
-                              </>
-                            )}
+                          </div>
+                        )}
 
-                            {/* Formularz odpowiedzi */}
-                            {replyingTo?.commentId === comment.id && (
-                              <div className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
-                                <textarea
-                                  value={replyContent}
-                                  onChange={(e) => setReplyContent(e.target.value)}
-                                  placeholder="Write a reply..."
-                                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <div className="flex justify-end space-x-2 mt-2">
-                                  <button
-                                    onClick={() => {
-                                      setReplyingTo(null);
-                                      setReplyContent('');
-                                    }}
-                                    className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    onClick={() => handleAddReply(post.id, comment.id)}
-                                    className="px-3 py-1 text-xs text-white bg-blue-500 hover:bg-blue-600 rounded"
-                                  >
-                                    Reply
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Wyświetl odpowiedzi */}
-                            {post.comments
-                              .filter(reply => reply.replyTo === comment.id)
-                              .map(reply => (
-                                <div key={reply.id} className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center space-x-2">
-                                      {displayUserName(reply.author, `reply-${post.id}-${reply.id}`)}
-                                      <div className="text-xs text-gray-500">
-                                        {formatTimestamp(reply.timestamp)}
-                                      </div>
+                        {/* Wyświetl odpowiedzi */}
+                        {post.comments
+                          .filter(reply => reply.replyTo === comment.id)
+                          .map(reply => (
+                            <div key={reply.id} className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  {displayUserName(reply.author, `reply-${post.id}-${reply.id}`)}
+                                  <div className="text-xs text-gray-500">
+                                    {formatTimestamp(reply.timestamp)}
                                   </div>
+                              </div>
 
-                                  {reply.author === address && (
-                                    <div className="relative">
+                              {reply.author === address && (
+                                <div className="relative">
+                                  <button
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
+                                    onClick={() => setEditingComment(editingComment?.commentId === reply.id ? null : { postId: post.id, commentId: reply.id })}
+                                  >
+                                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                    </svg>
+                                  </button>
+
+                                  {editingComment?.commentId === reply.id && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
                                       <button
-                                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
-                                        onClick={() => setEditingComment(editingComment?.commentId === reply.id ? null : { postId: post.id, commentId: reply.id })}
+                                        onClick={() => {
+                                          setEditingComment({ postId: post.id, commentId: reply.id });
+                                          setEditedCommentContent(reply.content);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                       >
-                                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                        </svg>
+                                        Edit
                                       </button>
-
-                                      {editingComment?.commentId === reply.id && (
-                                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
-                                          <button
-                                            onClick={() => {
-                                              setEditingComment({ postId: post.id, commentId: reply.id });
-                                              setEditedCommentContent(reply.content);
-                                            }}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                          >
-                                            Edit
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteComment(post.id, reply.id)}
-                                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                          >
-                                            Delete
-                                          </button>
-                                        </div>
-                                      )}
+                                      <button
+                                        onClick={() => handleDeleteComment(post.id, reply.id)}
+                                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                      >
+                                        Delete
+                                      </button>
                                     </div>
                                   )}
-                                  </div>
-
-                                  <p className="text-sm text-gray-800 dark:text-gray-200">{reply.content}</p>
-
-                                  <div className="flex items-center space-x-4 mt-2">
-                                    <button
-                                      onClick={() => handleToggleCommentLike(post.id, reply.id)}
-                                      className={`flex items-center space-x-1 ${
-                                        reply.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-                                      }`}
-                                    >
-                                      <svg 
-                                        className="w-4 h-4" 
-                                        fill={reply.likedBy?.includes(address || '') ? "currentColor" : "none"}
-                                        stroke="currentColor" 
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path 
-                                          strokeLinecap="round" 
-                                          strokeLinejoin="round" 
-                                          strokeWidth={2} 
-                                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                                        />
-                                      </svg>
-                                      <span className="text-xs">{reply.likes || 0}</span>
-                                    </button>
-                                  </div>
                                 </div>
-                              ))}
-                          </div>
+                              )}
+                              </div>
+
+                              <p className="text-sm text-gray-800 dark:text-gray-200">{reply.content}</p>
+
+                              <div className="flex items-center space-x-4 mt-2">
+                                <button
+                                  onClick={() => handleToggleCommentLike(post.id, reply.id)}
+                                  className={`flex items-center space-x-1 ${
+                                    reply.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
+                                  }`}
+                                >
+                                  <svg 
+                                    className="w-4 h-4" 
+                                    fill={reply.likedBy?.includes(address || '') ? "currentColor" : "none"}
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path 
+                                      strokeLinecap="round" 
+                                      strokeLinejoin="round" 
+                                      strokeWidth={2} 
+                                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                                    />
+                                  </svg>
+                                  <span className="text-xs">{reply.likes || 0}</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
                         ))}
 
-                      {post.comments.length > 5 && (
-                              <button
-                          onClick={() => setExpandedComments(prev => ({
-                            ...prev,
-                            [post.id]: !prev[post.id]
-                          }))}
-                          className="w-full text-sm text-blue-500 hover:text-blue-600 py-2"
-                              >
-                          {expandedComments[post.id] ? 
-                            `Hide comments (${post.comments.length - 5})` : 
-                            `Show more comments (${post.comments.length - 5})`
-                          }
-                              </button>
-                      )}
-                      
-                      {/* New comment input */}
-                      {isConnected && (
-                        <div className="flex items-center space-x-2">
-                          {canCreatePosts ? (
-                            <>
-                              <Avatar address={address} className="w-6 h-6 rounded-full" />
-                              <div className="flex-1">
-                                <input
-                                  type="text"
-                                  placeholder="Write a comment..."
-                                  value={newComments[post.id] || ''}
-                                  onChange={(e) => setNewComments(prev => ({...prev, [post.id]: e.target.value}))}
-                                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-                                <button
-                                onClick={() => handleAddComment(post.id)}
-                                disabled={!newComments[post.id]?.trim()}
-                                className="px-3 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                Comment
-                                </button>
-    </>
-                          ) : (
-                            <p className="text-sm text-gray-500 italic">Get BaseName to comment on posts</p>
-                          )}
-                              </div>
-                            )}
+                  {post.comments.length > 5 && (
+                          <button
+                      onClick={() => setExpandedComments(prev => ({
+                        ...prev,
+                        [post.id]: !prev[post.id]
+                      }))}
+                      className="w-full text-sm text-blue-500 hover:text-blue-600 py-2"
+                          >
+                      {expandedComments[post.id] ? 
+                        `Hide comments (${post.comments.length - 5})` : 
+                        `Show more comments (${post.comments.length - 5})`
+                      }
+                          </button>
+                  )}
+                  
+                  {/* New comment input */}
+                  {isConnected && (
+                    <div className="flex items-center space-x-2">
+                      {canCreatePosts ? (
+                        <>
+                          <Avatar address={address} className="w-6 h-6 rounded-full" />
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              placeholder="Write a comment..."
+                              value={newComments[post.id] || ''}
+                              onChange={(e) => setNewComments(prev => ({...prev, [post.id]: e.target.value}))}
+                              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
                           </div>
+                            <button
+                            onClick={() => handleAddComment(post.id)}
+                            disabled={!newComments[post.id]?.trim()}
+                            className="px-3 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                            Comment
+                            </button>
+      </>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic">Get BaseName to comment on posts</p>
+                    )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                         ))}
               </div>
@@ -2501,12 +2543,12 @@ export default function BaseChat() {
             {/* Right panel (Trends & Global Statistics) */}
             <div className={`${
               activeMobilePanel === 'right' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
-            } lg:block lg:relative lg:w-80 lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4`}>
+            } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4`}>
               {/* Global Statistics */}
               <div className="mb-4">
                 <h2 className="text-lg font-semibold mb-3 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
-                  Global Statistics
-                  <div className="ml-2 text-2xl">🔥</div>
+                    Global Statistics
+                    <div className="ml-2 text-2xl">🔥</div>
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
@@ -2559,7 +2601,7 @@ export default function BaseChat() {
                         </svg>
                         Likes Received
                       </span>
-                                <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
                         <span className="text-xs text-gray-400">{userProfile.likesReceived} × 1</span>
                         <span className="text-pink-500 font-semibold">{userProfile.likesReceived}</span>
                       </div>

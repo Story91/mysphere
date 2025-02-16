@@ -34,6 +34,7 @@ export default function Navigation() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   useEffect(() => {
     if (address) {
@@ -73,12 +74,18 @@ export default function Navigation() {
   };
 
   const navLinks = [
-    { href: '/basechat', label: 'BaseChat', icon: '/elo2.png' },
-    { href: '/profile', label: 'Profile' },
-    { href: '/buy', label: 'Buy&Swap' },
-    { href: '/bridge', label: 'Bridge' },
+    { href: '/basechat', label: 'MySphere', icon: '/elo2.png' },
+    { href: '/profile', label: 'Identity' },
+    {
+      label: 'Finance',
+      dropdownItems: [
+        { href: '/buy', label: 'Buy&Swap' },
+        { href: '/bridge', label: 'Bridge' }
+      ]
+    },
     { href: '/nft', label: 'NFT' },
     { href: '/messages', label: 'DM' },
+    { href: '/quotes', label: 'QUOTES' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ];
 
@@ -87,11 +94,8 @@ export default function Navigation() {
       {/* Cyber grid background */}
       <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_24%,rgba(0,82,255,0.03)_25%,rgba(0,82,255,0.03)_26%,transparent_27%,transparent_74%,rgba(0,82,255,0.03)_75%,rgba(0,82,255,0.03)_76%,transparent_77%,transparent),linear-gradient(0deg,transparent_24%,rgba(0,82,255,0.03)_25%,rgba(0,82,255,0.03)_26%,transparent_27%,transparent_74%,rgba(0,82,255,0.03)_75%,rgba(0,82,255,0.03)_76%,transparent_77%,transparent)] bg-[length:30px_30px] opacity-60"></div>
       
-      {/* Matrix rain effect */}
-      <div className="absolute inset-0 bg-[url('/matrix-code.png')] opacity-5 animate-matrix"></div>
-      
-      {/* Glow effect */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0052FF]/10 via-transparent to-transparent"></div>
+      {/* Gradient effect */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/80 to-black/40"></div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 relative z-10">
         <div className="flex items-center justify-between">
@@ -111,34 +115,75 @@ export default function Navigation() {
             </Link>
             
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-2 bg-black/20 p-1.5 rounded-2xl backdrop-blur-xl border border-[#0052FF]/20 relative overflow-hidden">
+            <nav className="hidden md:flex items-center space-x-2 bg-black/20 p-1.5 rounded-2xl backdrop-blur-xl border border-[#0052FF]/20 relative">
               {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`relative group px-5 py-2.5 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 ${
-                    pathname === link.href
-                      ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
-                      : 'text-gray-100 hover:text-[#0052FF]'
-                  }`}
-                >
-                  <span className="relative z-10 flex items-center">
-                    {link.icon && (
-                      <Image
-                        src={link.icon}
-                        alt={link.label}
-                        width={56}
-                        height={56}
-                        className="object-contain"
-                      />
+                link.dropdownItems ? (
+                  <div key={link.label} className="relative">
+                    <button
+                      onClick={() => setActiveDropdown(activeDropdown === link.label ? null : link.label)}
+                      className={`relative px-5 py-2.5 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 text-gray-100 hover:text-[#0052FF] ${
+                        activeDropdown === link.label ? 'bg-white text-gray-900' : ''
+                      }`}
+                    >
+                      <span className="relative z-10 flex items-center">
+                        {link.label}
+                        <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </span>
+                    </button>
+                    {activeDropdown === link.label && (
+                      <div className="absolute left-1/2 transform -translate-x-1/2 w-max mt-2 bg-white/95 backdrop-blur-xl rounded-xl shadow-[0_8px_16px_rgba(0,0,0,0.1)] border border-[#0052FF]/10 overflow-hidden">
+                        {link.dropdownItems.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setActiveDropdown(null)}
+                            className="flex items-center gap-2 px-4 py-2.5 text-gray-900 hover:bg-[#0052FF]/5 transition-colors duration-200 whitespace-nowrap"
+                          >
+                            {item.label === 'Buy&Swap' ? (
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M3 7L9 13M9 7L3 13M21 11L15 17M15 11L21 17" stroke="#0052FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 7H4M4 7V11M4 7L9 12M16 17H20M20 17V13M20 17L15 12" stroke="#0052FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                            <span className="font-['Coinbase_Display']">{item.label}</span>
+                          </Link>
+                        ))}
+                      </div>
                     )}
-                    {!link.icon && link.label}
-                  </span>
-                  <div className="absolute inset-0 rounded-xl bg-[#0052FF]/0 group-hover:bg-[#0052FF]/5 transition-all duration-300"></div>
-                  {pathname === link.href && (
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4C8FFF] opacity-20 animate-pulse"></div>
-                  )}
-                </Link>
+                  </div>
+                ) : (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`relative group px-5 py-2.5 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 ${
+                      pathname === link.href
+                        ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
+                        : 'text-gray-100 hover:text-[#0052FF]'
+                    }`}
+                  >
+                    <span className="relative z-10 flex items-center">
+                      {link.label}
+                      {link.icon && (
+                        <Image
+                          src={link.icon}
+                          alt={link.label}
+                          width={56}
+                          height={56}
+                          className="object-contain ml-2"
+                        />
+                      )}
+                    </span>
+                    <div className="absolute inset-0 rounded-xl bg-[#0052FF]/0 group-hover:bg-[#0052FF]/5 transition-all duration-300"></div>
+                    {pathname === link.href && (
+                      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4C8FFF] opacity-20 animate-pulse"></div>
+                    )}
+                  </Link>
+                )
               ))}
             </nav>
 
@@ -203,32 +248,29 @@ export default function Navigation() {
                   <Avatar className="h-6 w-6" />
                   <Name className="text-white inline" />
                 </ConnectWallet>
-                <WalletDropdown>
-                    <Identity 
-                      className="px-4 pt-3 pb-2 bg-gradient-to-r from-[#0052FF]/10 to-[#00FFB3]/10 hover:from-[#0052FF]/20 hover:to-[#00FFB3]/20"
-                      hasCopyAddressOnClick
-                    >
+                <WalletDropdown className="!fixed md:!absolute !top-[70px] md:!top-full !right-4 !w-[calc(100%-32px)] md:!w-auto !max-w-[400px] !z-[9999] !bg-white wallet-dropdown">
+                    <Identity hasCopyAddressOnClick className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-link">
                       <Avatar />
-                      <Name />
-                      <Address />
-                      <EthBalance />
+                      <Name className="!text-gray-900" />
+                      <Address className="!text-gray-900" />
+                      <EthBalance className="!text-gray-900" />
                     </Identity>
-                    <WalletDropdownBasename className="bg-gradient-to-r from-[#0052FF]/20 to-[#00FFB3]/20 hover:from-[#0052FF]/30 hover:to-[#00FFB3]/30" />
+                    <WalletDropdownBasename className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-link" />
                     <Link 
                       href="/profile" 
                       target="_blank"
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#0052FF]/20 to-[#FF00E5]/20 hover:from-[#0052FF]/30 hover:to-[#FF00E5]/30"
+                      className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 !text-gray-900 wallet-dropdown-link"
                     >
                       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 15C15.3137 15 18 12.3137 18 9C18 5.68629 15.3137 3 12 3C8.68629 3 6 5.68629 6 9C6 12.3137 8.68629 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M2.90625 20.2491C3.82834 18.6531 5.15423 17.3278 6.75064 16.4064C8.34705 15.485 10.1572 15 12.0002 15C13.8432 15 15.6534 15.4851 17.2498 16.4065C18.8462 17.3279 20.1721 18.6533 21.0942 20.2493" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 15C15.3137 15 18 12.3137 18 9C18 5.68629 15.3137 3 12 3C8.68629 3 6 5.68629 6 9C6 12.3137 8.68629 15 12 15Z" stroke="#111111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2.90625 20.2491C3.82834 18.6531 5.15423 17.3278 6.75064 16.4064C8.34705 15.485 10.1572 15 12.0002 15C13.8432 15 15.6534 15.4851 17.2498 16.4065C18.8462 17.3279 20.1721 18.6533 21.0942 20.2493" stroke="#111111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                       SPHERE Identity
                     </Link>
                     <Link 
                       href="https://keys.coinbase.com"
                       target="_blank"
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#00FFB3]/20 to-[#FFAE00]/20 hover:from-[#00FFB3]/30 hover:to-[#FFAE00]/30"
+                      className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 wallet-dropdown-link"
                     >
                       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2"/>
@@ -239,7 +281,7 @@ export default function Navigation() {
                     <Link 
                       href="https://basescan.org"
                       target="_blank"
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#FFAE00]/20 to-[#FF3B00]/20 hover:from-[#FFAE00]/30 hover:to-[#FF3B00]/30"
+                      className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 wallet-dropdown-link"
                     >
                       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M21 21L15.8033 15.8033M15.8033 15.8033C17.1605 14.4461 18 12.5711 18 10.5C18 6.35786 14.6421 3 10.5 3C6.35786 3 3 6.35786 3 10.5C3 14.6421 6.35786 18 10.5 18C12.5711 18 14.4461 17.1605 15.8033 15.8033Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -249,15 +291,15 @@ export default function Navigation() {
                     <Link 
                       href="https://bridge.base.org"
                       target="_blank"
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#FF3B00]/20 to-[#0052FF]/20 hover:from-[#FF3B00]/30 hover:to-[#0052FF]/30"
+                      className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 wallet-dropdown-link"
                     >
                       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M7 10V14M17 10V14M3 12H7M17 12H21M8 17H16C16.5523 17 17 16.5523 17 16V8C17 7.44772 16.5523 7 16 7H8C7.44772 7 7 7.44772 7 8V16C7 16.5523 7.44772 17 8 17Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                       Base Bridge
                     </Link>
-                    <WalletDropdownFundLink className="bg-gradient-to-r from-[#0052FF]/20 to-[#00FFB3]/20 hover:from-[#0052FF]/30 hover:to-[#00FFB3]/30" />
-                    <WalletDropdownDisconnect className="bg-gradient-to-r from-[#FF3B00]/20 to-[#FF0000]/20 hover:from-[#FF3B00]/30 hover:to-[#FF0000]/30" />
+                    <WalletDropdownFundLink className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-fund" />
+                    <WalletDropdownDisconnect className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-disconnect" />
                 </WalletDropdown>
               </Wallet>
           </div>
@@ -267,31 +309,62 @@ export default function Navigation() {
         {isMobileMenuOpen && (
           <nav className="md:hidden mt-4 bg-black/20 p-2 rounded-2xl backdrop-blur-xl border border-[#0052FF]/20">
             {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`block px-4 py-2 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 mb-1 last:mb-0 ${
-                  pathname === link.href
-                    ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
-                    : 'text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5'
-                }`}
-              >
-                <span className="flex items-center">
-                  {link.icon && (
-                    <Image
-                      src={link.icon}
-                      alt={link.label}
-                      width={24}
-                      height={24}
-                      className="mr-2"
-                    />
+              link.dropdownItems ? (
+                <div key={link.label}>
+                  <button
+                    onClick={() => setActiveDropdown(activeDropdown === link.label ? null : link.label)}
+                    className="w-full text-left px-4 py-2 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5 flex items-center justify-between"
+                  >
+                    {link.label}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {activeDropdown === link.label && (
+                    <div className="pl-4">
+                      {link.dropdownItems.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => {
+                            setActiveDropdown(null);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="block px-4 py-2 text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5 rounded-xl transition-colors duration-200"
+                        >
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
                   )}
-                {link.label}
-                </span>
-              </Link>
+                </div>
+              ) : (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`block px-4 py-2 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 mb-1 last:mb-0 ${
+                    pathname === link.href
+                      ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
+                      : 'text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5'
+                  }`}
+                >
+                  <span className="flex items-center">
+                    {link.label}
+                    {link.icon && (
+                      <Image
+                        src={link.icon}
+                        alt={link.label}
+                        width={24}
+                        height={24}
+                        className="ml-2"
+                      />
+                    )}
+                  </span>
+                </Link>
+              )
             ))}
-    </nav>
+          </nav>
         )}
       </div>
     </header>

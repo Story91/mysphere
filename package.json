@@ -11,6 +11,8 @@
   "dependencies": {
     "@coinbase/coinbase-sdk": "^0.14.0",
     "@coinbase/onchainkit": "^0.36.8",
+    "@farcaster/frame-sdk": "^0.0.27",
+    "@farcaster/frame-wagmi-connector": "^0.0.15",
     "@google-cloud/recaptcha-enterprise": "^5.13.0",
     "@moralisweb3/common-evm-utils": "^2.27.2",
     "@radix-ui/react-avatar": "^1.1.2",
@@ -27,6 +29,7 @@
     "@vercel/blob": "^0.27.1",
     "@vercel/speed-insights": "^1.1.0",
     "@wagmi/core": "^2.16.3",
+    "bufferutil": "^4.0.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "firebase": "^11.2.0",
@@ -43,6 +46,7 @@
     "react-icons": "^5.4.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "utf-8-validate": "^5.0.10",
     "viem": "^2.22.19",
     "wagmi": "^2.14.9"
   },

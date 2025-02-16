@@ -10,21 +10,48 @@ export async function GET(request: Request) {
   }
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; BaseBookBot/1.0; +https://basebook.vercel.app)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
+      }
+    });
+
+    if (!response.ok) {
+      return NextResponse.json({
+        title: new URL(url).hostname,
+        description: 'Link preview not available',
+        image: '',
+        siteName: new URL(url).hostname
+      });
+    }
+
     const html = await response.text();
     const root = parse(html);
 
     // Pobierz metadane
     const metadata = {
-      title: root.querySelector('title')?.text || '',
-      description: root.querySelector('meta[name="description"]')?.getAttribute('content') || '',
-      image: root.querySelector('meta[property="og:image"]')?.getAttribute('content') || '',
-      siteName: root.querySelector('meta[property="og:site_name"]')?.getAttribute('content') || '',
+      title: root.querySelector('title')?.text || 
+             root.querySelector('meta[property="og:title"]')?.getAttribute('content') || 
+             new URL(url).hostname,
+      description: root.querySelector('meta[name="description"]')?.getAttribute('content') || 
+                  root.querySelector('meta[property="og:description"]')?.getAttribute('content') || 
+                  'No description available',
+      image: root.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+             root.querySelector('meta[name="twitter:image"]')?.getAttribute('content') || '',
+      siteName: root.querySelector('meta[property="og:site_name"]')?.getAttribute('content') ||
+                new URL(url).hostname,
     };
 
     return NextResponse.json(metadata);
   } catch (error) {
-    console.error('Error fetching link preview:', error);
-    return NextResponse.json({ error: 'Failed to fetch link preview' }, { status: 500 });
+    // Zwróć podstawowe informacje zamiast błędu
+    return NextResponse.json({
+      title: new URL(url).hostname,
+      description: 'Link preview not available',
+      image: '',
+      siteName: new URL(url).hostname
+    });
   }
 } 

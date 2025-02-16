@@ -13,6 +13,22 @@ const themes = [
   { id: 'hacker', name: 'Hacker', gradient: 'from-[#00FF00] via-[#00CC00] to-[#008800]' },
 ];
 
+const tailwindConfig = {
+  theme: {
+    extend: {
+      keyframes: {
+        glow: {
+          '0%, 100%': { opacity: '0.3' },
+          '50%': { opacity: '0.8' }
+        }
+      },
+      animation: {
+        glow: 'glow 2s ease-in-out infinite'
+      }
+    }
+  }
+}
+
 export default function HomePage() {
   const { address } = useAccount();
   const [activeTheme, setActiveTheme] = useState(themes[0]);
@@ -44,7 +60,12 @@ export default function HomePage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const ethResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd&include_24hr_change=true');
+        const ethResponse = await fetch('/api/eth-price');
+
+        if (!ethResponse.ok) {
+          throw new Error(`HTTP error! status: ${ethResponse.status}`);
+        }
+
         const ethData = await ethResponse.json();
         setEthPrice(Number(ethData.ethereum.usd.toFixed(2)));
         setEthPriceChange(Number(ethData.ethereum.usd_24h_change.toFixed(2)));
@@ -140,17 +161,15 @@ export default function HomePage() {
     };
     
     fetchData();
-    const interval = setInterval(fetchData, 15000);
+    const interval = setInterval(fetchData, 60000);
     
     return () => clearInterval(interval);
   }, []);
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Matrix background effect */}
-      <div className="fixed inset-0 bg-black opacity-90">
-        <div className="absolute inset-0 bg-[url('/matrix.png')] opacity-10 animate-matrix"></div>
-      </div>
+      {/* Background overlay */}
+      <div className="fixed inset-0 bg-black/90"></div>
 
       {/* Cyber grid background */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.1)_0%,transparent_70%)]"></div>
@@ -159,17 +178,15 @@ export default function HomePage() {
         backgroundSize: '50px 50px'
       }}></div>
 
-      {/* Glowing orbs - góra, środek i dół */}
+      {/* Glowing orbs */}
       <div className="absolute top-0 left-1/3 w-96 h-96 bg-[#0052FF]/20 rounded-full filter blur-3xl animate-pulse"></div>
       <div className="absolute top-0 right-1/3 w-96 h-96 bg-[#0052FF]/20 rounded-full filter blur-3xl animate-pulse delay-700"></div>
       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-[#4C8FFF]/30 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
       
-      {/* Środkowe orby */}
       <div className="absolute top-1/2 left-1/4 w-80 h-80 bg-[#0052FF]/15 rounded-full filter blur-3xl animate-pulse delay-300"></div>
       <div className="absolute top-1/2 right-1/4 w-80 h-80 bg-[#0052FF]/15 rounded-full filter blur-3xl animate-pulse delay-800"></div>
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 w-72 h-72 bg-[#0052FF]/10 rounded-full filter blur-3xl animate-pulse delay-500"></div>
       
-      {/* Dolne orby */}
       <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-[#0052FF]/10 rounded-full filter blur-3xl animate-pulse delay-200"></div>
       <div className="absolute bottom-0 right-1/3 w-96 h-96 bg-[#0052FF]/10 rounded-full filter blur-3xl animate-pulse delay-600"></div>
       <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-[#0052FF]/5 rounded-full filter blur-3xl animate-pulse delay-900"></div>
@@ -180,38 +197,93 @@ export default function HomePage() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12 relative"
+          className="text-center mb-8 relative"
         >
           <div className={`absolute inset-0 bg-gradient-to-r ${activeTheme.gradient} opacity-5 blur-3xl -z-10`}></div>
-          <div className="flex items-center justify-center mt-2">
-            <div className="transform hover:scale-105 transition-transform duration-300">
+          <div className="flex items-center justify-center mt-2 mb-4">
+            <div className="transform hover:scale-105 transition-transform duration-300 px-4 md:px-0">
               <Image
                 src="/elo2.png"
                 alt="SPHERE"
-                width={450}
-                height={120}
+                width={350}
+                height={100}
                 quality={100}
                 priority
-                className="object-contain"
+                className="object-contain w-[280px] md:w-[350px] h-auto max-w-full"
               />
             </div>
           </div>
-          <p className="font-['Coinbase_Display'] text-[#0052FF] text-xl text-center mt-4 mb-2 animate-pulse">Your gateway to the Base ecosystem</p>
-          <p className="font-['Share_Tech_Mono'] text-sm text-[#0052FF] text-center mb-8">[BETA 0.9.1]</p>
-          <div className="h-0.5 w-32 mx-auto bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mb-4"></div>
+          <p className="font-['Coinbase_Display'] text-[#0052FF] text-base md:text-xl text-center mt-2 mb-1 animate-pulse px-4">Your gateway to the Base ecosystem</p>
+          <p className="font-['Share_Tech_Mono'] text-xs md:text-sm text-[#0052FF] text-center mb-4">[BETA 0.9.1]</p>
+          <div className="h-0.5 w-32 mx-auto bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mt-6 mb-6"></div>
         </motion.div>
 
         {/* Main features */}
-        <div className="relative -mt-2">
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-[200px] mb-8"
-          >
-            <AnimatePresence>
-              {/* Profile Card */}
-              <motion.div variants={itemVariants} className="group">
+        <div className="relative -mt-2 px-4 md:px-8 max-w-7xl mx-auto">
+          <AnimatePresence>
+            <motion.div
+              key="features-container"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 auto-rows-fr mb-8 w-full"
+            >
+              {/* BaseChat Card - przeniesiony na początek */}
+              <motion.div key="basechat-card" variants={itemVariants} className="group">
+                <Link href="/basechat" className="block h-full">
+                  <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border-2 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
+                    activeTheme.id === 'base'
+                      ? 'border-white/50 shadow-[0_0_30px_rgba(255,255,255,0.4)]'
+                      : activeTheme.id === 'cyberpunk'
+                      ? 'border-[#FF00FF]/50 shadow-[0_0_30px_rgba(255,0,255,0.3)]'
+                      : 'border-[#00FF00]/50 shadow-[0_0_30px_rgba(0,255,0,0.3)]'
+                  }`}>
+                    {/* Intensywny biały gradient */}
+                    <div className="absolute inset-0">
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-white/5 to-transparent rounded-xl animate-[pulse_8s_ease-in-out_infinite]"></div>
+                    </div>
+                    {/* Niebieski gradient */}
+                    <div className="absolute inset-0">
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 via-[#1E4DD8]/15 to-[#0052FF]/20 rounded-xl blur-xl animate-[pulse_6s_ease-in-out_infinite]"></div>
+                    </div>
+                    {/* Intensywne białe światło */}
+                    <div className="absolute inset-0">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.5)_0%,transparent_60%)] blur-2xl animate-[pulse_4s_ease-in-out_infinite_1s]"></div>
+                    </div>
+                    {/* Niebieski akcent */}
+                    <div className="absolute inset-0">
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0052FF]/15 via-[#4C8FFF]/10 to-[#0052FF]/15 rounded-xl blur-xl animate-[pulse_7s_ease-in-out_infinite_2s]"></div>
+                    </div>
+                    {/* Świecące krawędzie */}
+                    <div className="absolute inset-0">
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-white/40 rounded-xl animate-[pulse_5s_ease-in-out_infinite_3s]"></div>
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-center gap-4 mb-4">
+                        <Image
+                          src="/elo2.png"
+                          alt="SPHERE"
+                          width={80}
+                          height={80}
+                          className="object-contain w-[80px] h-auto transform hover:scale-105 transition-transform duration-300"
+                        />
+                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#0052FF]/10 border border-[#0052FF]/20">
+                          <span className="w-2 h-2 rounded-full bg-[#0052FF] animate-pulse mr-2"></span>
+                          <span className="text-[#0052FF] text-sm font-['Share_Tech_Mono']">LAUNCH APP</span>
+                        </span>
+                      </div>
+                      <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed text-center">
+                        Connect with other .base.eth owners, share updates, create daily posts about base and earn sphere points!
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+
+              {/* Identity Card (wcześniej Profile) */}
+              <motion.div key="identity-card" variants={itemVariants} className="group">
                 <Link href="/profile" className="block h-full">
                   <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
                     activeTheme.id === 'base'
@@ -228,9 +300,9 @@ export default function HomePage() {
                     {/* Content */}
                     <div className="relative z-10">
                       <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Profile</h2>
+                        <h2 className="text-xl md:text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Identity</h2>
                       </div>
-                      <p className="text-gray-400 text-lg font-['Coinbase_Display'] leading-relaxed">
+                      <p className="text-gray-400 text-sm md:text-lg font-['Coinbase_Display'] leading-relaxed">
                         View your on-chain identity, statistics, and achievements. Track your progress and ranking in the Base ecosystem.
                       </p>
                     </div>
@@ -238,46 +310,8 @@ export default function HomePage() {
                 </Link>
               </motion.div>
 
-              {/* BaseChat Card */}
-              <motion.div variants={itemVariants} className="group">
-                <Link href="/basechat" className="block h-full">
-                  <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
-                    activeTheme.id === 'base'
-                      ? 'border-[#0052FF]/30 group-hover:shadow-[#0052FF]/20'
-                      : activeTheme.id === 'cyberpunk'
-                      ? 'border-[#FF00FF]/30 group-hover:shadow-[#FF00FF]/20'
-                      : 'border-[#00FF00]/30 group-hover:shadow-[#00FF00]/20'
-                  }`}>
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className={`absolute inset-0 bg-gradient-to-r from-[#FF00FF]/20 to-[#FF66FF]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300`}></div>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">
-                          <div className="inline-flex items-center">
-                            <Image
-                              src="/elo2.png"
-                              alt="SPHERE"
-                              width={67}
-                              height={67}
-                              className="object-contain"
-                            />
-                          </div>
-                        </h2>
-                      </div>
-                      <p className="text-gray-400 text-lg font-['Coinbase_Display'] leading-relaxed">
-                        Connect with other .base.eth owners, share updates, create daily posts about base and earn sphere points!
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-
               {/* Buy&Swap Card */}
-              <motion.div variants={itemVariants} className="group">
+              <motion.div key="buyswap-card" variants={itemVariants} className="group">
                 <Link href="/buy" className="block h-full">
                   <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
                     activeTheme.id === 'base'
@@ -296,7 +330,7 @@ export default function HomePage() {
                       <div className="flex items-center justify-between mb-3">
                         <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Buy&Swap</h2>
                       </div>
-                      <p className="text-gray-400 text-lg font-['Coinbase_Display'] leading-relaxed">
+                      <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
                         Purchase and swap tokens directly using various payment methods. Easy and secure way to enter the Base ecosystem.
                       </p>
                     </div>
@@ -305,7 +339,7 @@ export default function HomePage() {
               </motion.div>
 
               {/* Bridge Card */}
-              <motion.div variants={itemVariants} className="group">
+              <motion.div key="bridge-card" variants={itemVariants} className="group">
                 <Link href="/bridge" className="block h-full">
                   <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
                     activeTheme.id === 'base'
@@ -326,7 +360,7 @@ export default function HomePage() {
                           Bridge
                         </h2>
                       </div>
-                      <p className="text-gray-400 text-lg font-['Coinbase_Display'] leading-relaxed">
+                      <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
                         Bridge your assets between Ethereum and Base network. Fast and secure cross-chain transfers.
                       </p>
                     </div>
@@ -335,7 +369,7 @@ export default function HomePage() {
               </motion.div>
 
               {/* NFT Card */}
-              <motion.div variants={itemVariants} className="group">
+              <motion.div key="nft-card" variants={itemVariants} className="group">
                 <Link href="/nft" className="block h-full">
                   <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
                     activeTheme.id === 'base'
@@ -354,7 +388,7 @@ export default function HomePage() {
                       <div className="flex items-center justify-between mb-3">
                         <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">NFT</h2>
                       </div>
-                      <p className="text-gray-400 text-lg font-['Coinbase_Display'] leading-relaxed">
+                      <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
                         Explore, collect, and mint NFTs on Base. View trending collections and manage your NFT portfolio.
                       </p>
                     </div>
@@ -363,7 +397,7 @@ export default function HomePage() {
               </motion.div>
 
               {/* Get Started Card */}
-              <motion.div variants={itemVariants} className="group">
+              <motion.div key="getstarted-card" variants={itemVariants} className="group">
                 <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
                   activeTheme.id === 'base'
                     ? 'border-[#0052FF]/30 group-hover:shadow-[#0052FF]/20'
@@ -381,7 +415,7 @@ export default function HomePage() {
                     <div className="flex items-center justify-between mb-3">
                       <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Get Started</h2>
                     </div>
-                    <p className="text-gray-400 text-lg font-['Coinbase_Display'] leading-relaxed mb-4">
+                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed mb-4">
                       Connect your wallet to access all features and start your journey on Base.
                     </p>
                     {!address && (
@@ -398,18 +432,18 @@ export default function HomePage() {
                   </div>
                 </div>
               </motion.div>
-            </AnimatePresence>
-          </motion.div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Linia rozdzielająca przed BASE NETWORK STATUS */}
-        <div className="h-0.5 w-32 mx-auto bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mt-8 mb-8"></div>
-        <h2 className="text-2xl font-['Coinbase_Display'] font-medium text-center mb-4 text-[#0052FF]">BASE NETWORK STATUS</h2>
+        <div className="h-0.5 w-32 mx-auto bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mt-4 mb-4"></div>
+        <h2 className="text-lg md:text-2xl font-['Coinbase_Display'] font-medium text-center mb-3 text-[#0052FF]">BASE NETWORK STATUS</h2>
 
         {/* Network Stats */}
-        <div className="max-w-4xl mx-auto px-6 mb-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-black/50 backdrop-blur-xl rounded-xl p-4 border border-[#0052FF]/30">
+        <div className="max-w-4xl mx-auto px-4 md:px-8 mb-24">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+            <div className="bg-black/50 backdrop-blur-xl rounded-xl p-4 border border-[#0052FF]/30 max-w-sm mx-auto w-full">
               <h3 className="text-[#0052FF] text-sm font-['Coinbase_Display'] font-medium mb-2">ETH PRICE</h3>
               <p className="text-white text-xl font-['Coinbase_Display']">
                 {ethPrice ? (
@@ -427,7 +461,7 @@ export default function HomePage() {
                 )}
               </p>
             </div>
-            <div className="bg-black/50 backdrop-blur-xl rounded-xl p-4 border border-[#0052FF]/30">
+            <div className="bg-black/50 backdrop-blur-xl rounded-xl p-4 border border-[#0052FF]/30 max-w-sm mx-auto w-full">
               <h3 className="text-[#0052FF] text-sm font-['Coinbase_Display'] font-medium mb-2">GAS PRICE</h3>
               <p className="text-white text-xl font-['Coinbase_Display']">
                 {gasPrice ? (
@@ -450,7 +484,7 @@ export default function HomePage() {
                 )}
               </p>
             </div>
-            <div className="bg-black/50 backdrop-blur-xl rounded-xl p-4 border border-[#0052FF]/30">
+            <div className="bg-black/50 backdrop-blur-xl rounded-xl p-4 border border-[#0052FF]/30 max-w-sm mx-auto w-full">
               <h3 className="text-[#0052FF] text-sm font-['Coinbase_Display'] font-medium mb-2">LATEST BLOCK</h3>
               <p className="text-white text-xl font-['Coinbase_Display']">
                 {lastBlock ? (
@@ -468,7 +502,7 @@ export default function HomePage() {
       </div>
 
       {/* Built on Base section */}
-      <div className="fixed bottom-6 left-0 right-0 text-center">
+      <div className="fixed bottom-4 md:bottom-6 left-0 right-0 text-center">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-none bg-black/20 backdrop-blur-sm border border-[#0052FF]/20 hover:bg-black/40 transition-all shadow-[0_0_10px_rgba(0,82,255,0.15)] hover:shadow-[0_0_20px_rgba(0,82,255,0.4)] opacity-60 hover:opacity-100">
           <span className="font-['Coinbase_Display'] text-base font-medium text-white/70">Built on</span>
           <Link href="https://base.org" target="_blank" className="group flex items-center hover:opacity-90 transition-opacity">
@@ -477,7 +511,7 @@ export default function HomePage() {
               alt="Base Logo"
               width={60}
               height={20}
-              className="group-hover:scale-105 transition-transform"
+              className="group-hover:scale-105 transition-transform w-[60px] h-auto"
             />
           </Link>
           <span className="font-['Coinbase_Display'] text-base font-medium text-white/70">with</span>

@@ -80,7 +80,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-black">
       {/* Matrix background effect */}
       <div className="fixed inset-0 bg-black opacity-90">
-        <div className="absolute inset-0 bg-[url('/matrix.png')] opacity-10 animate-matrix"></div>
+        {/* Usunięto odwołanie do matrix.png */}
       </div>
 
       {/* Cyber grid background */}
@@ -97,7 +97,7 @@ export default function ProfilePage() {
 
       {/* Main content */}
       <div className="relative z-10">
-        <div className="container mx-auto px-4 py-8">
+        <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <IdentityComponent />
         </div>
       </div>

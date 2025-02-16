@@ -44,59 +44,164 @@ const convertTimestamp = (timestamp: Timestamp): number => {
 
 // Zaawansowany system lajków
 export const toggleLike = async (postId: string, userId: string): Promise<boolean> => {
-  const postRef = doc(db, 'posts', postId);
-  const postDoc = await getDoc(postRef);
-  
-  if (!postDoc.exists()) {
-    throw new Error('Post nie istnieje');
+  try {
+    const postRef = doc(db, 'posts', postId);
+    const postDoc = await getDoc(postRef);
+
+    if (!postDoc.exists()) {
+      throw new Error('Post nie istnieje');
+    }
+
+    const postData = postDoc.data();
+    const authorRef = doc(db, 'users', postData.author);
+    const likedBy = postData.likedBy || [];
+    const isLiked = likedBy.includes(userId);
+    
+    const batch = writeBatch(db);
+
+    if (isLiked) {
+      // Usuń lajka
+      batch.update(postRef, {
+        likes: increment(-1),
+        likedBy: arrayRemove(userId)
+      });
+      batch.update(authorRef, {
+        likesReceived: increment(-1),
+        lastActive: serverTimestamp()
+      });
+      
+      await batch.commit();
+      return false;
+    } else {
+      // Dodaj lajka
+      batch.update(postRef, {
+        likes: increment(1),
+        likedBy: arrayUnion(userId)
+      });
+      batch.update(authorRef, {
+        likesReceived: increment(1),
+        lastActive: serverTimestamp()
+      });
+      
+      await batch.commit();
+      return true;
+    }
+  } catch (error) {
+    console.error('Error toggling like:', error);
+    throw error;
   }
+};
 
-  const postData = postDoc.data();
-  const likedBy = postData.likedBy || [];
-  const isLiked = likedBy.includes(userId);
-  const authorRef = doc(db, 'users', postData.author);
-
-  // Sprawdź czy autor ma profil, jeśli nie - utwórz go
-  const authorDoc = await getDoc(authorRef);
-  if (!authorDoc.exists()) {
-    await setDoc(authorRef, {
-      walletAddress: postData.author,
-      name: postData.author.slice(0, 6) + '...' + postData.author.slice(-4),
-      joinedAt: serverTimestamp(),
-      lastActive: serverTimestamp(),
-      likesReceived: 0,
-      stats: {
-        posts: 0,
-        likes: 0,
-        comments: 0
-      }
+// Funkcja do przeliczania lajków użytkownika
+export const recalculateUserLikes = async (userId: string) => {
+  try {
+    console.log('Przeliczam lajki dla użytkownika:', userId);
+    
+    // Pobierz wszystkie posty użytkownika
+    const postsRef = collection(db, 'posts');
+    const postsQuery = query(postsRef, where('author', '==', userId));
+    const postsSnapshot = await getDocs(postsQuery);
+    
+    let totalLikes = 0;
+    
+    // Zlicz wszystkie lajki z postów
+    postsSnapshot.forEach((doc) => {
+      const postData = doc.data();
+      totalLikes += postData.likes || 0;
     });
+    
+    // Aktualizuj profil użytkownika
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      likesReceived: totalLikes,
+      lastCalculated: serverTimestamp()
+    });
+    
+    console.log('Zaktualizowano licznik lajków:', totalLikes);
+    return totalLikes;
+  } catch (error) {
+    console.error('Błąd podczas przeliczania lajków:', error);
+    throw error;
   }
+};
 
-  if (isLiked) {
-    // Usuń lajka
-    await updateDoc(postRef, {
-      likes: increment(-1),
-      likedBy: arrayRemove(userId)
+// Funkcja do usuwania lajków posta
+export const deletePostLikes = async (postId: string) => {
+  try {
+    console.log('Usuwam lajki dla posta:', postId);
+    
+    // Pobierz wszystkie lajki dla danego posta
+    const likesRef = collection(db, 'likes');
+    const likesQuery = query(likesRef, where('postId', '==', postId));
+    const likesSnapshot = await getDocs(likesQuery);
+    
+    // Użyj batcha do usunięcia wszystkich lajków
+    const batch = writeBatch(db);
+    likesSnapshot.forEach((doc) => {
+      batch.delete(doc.ref);
     });
-    // Zmniejsz licznik polubień autora
-    await updateDoc(authorRef, {
-      likesReceived: increment(-1),
+    
+    await batch.commit();
+    console.log('Usunięto lajki:', likesSnapshot.size);
+    
+    // Pobierz autora posta
+    const postRef = doc(db, 'posts', postId);
+    const postDoc = await getDoc(postRef);
+    
+    if (postDoc.exists()) {
+      const authorId = postDoc.data().author;
+      // Przelicz lajki dla autora
+      await recalculateUserLikes(authorId);
+    }
+  } catch (error) {
+    console.error('Błąd podczas usuwania lajków:', error);
+    throw error;
+  }
+};
+
+// Modyfikacja funkcji deletePost aby używała nowego systemu lajków
+export const deletePost = async (postId: string, authorAddress: string) => {
+  try {
+    const postRef = doc(db, 'posts', postId);
+    const postSnap = await getDoc(postRef);
+
+    if (!postSnap.exists()) {
+      throw new Error('Post not found');
+    }
+
+    const postData = postSnap.data();
+    if (postData.author !== authorAddress) {
+      throw new Error('Unauthorized to delete this post');
+    }
+
+    // Prepare batch for atomic operations
+    const batch = writeBatch(db);
+
+    // Odejmij lajki od autora
+    const authorRef = doc(db, 'users', authorAddress);
+    batch.update(authorRef, {
+      likesReceived: increment(-(postData.likes || 0)),
       lastActive: serverTimestamp()
     });
-    return false;
-  } else {
-    // Dodaj lajka
-    await updateDoc(postRef, {
-      likes: increment(1),
-      likedBy: arrayUnion(userId)
+
+    // Delete post comments
+    const commentsRef = collection(db, 'comments');
+    const commentsQuery = query(commentsRef, where('postId', '==', postId));
+    const commentsSnap = await getDocs(commentsQuery);
+    commentsSnap.forEach((doc) => {
+      batch.delete(doc.ref);
     });
-    // Zwiększ licznik polubień autora
-    await updateDoc(authorRef, {
-      likesReceived: increment(1),
-      lastActive: serverTimestamp()
-    });
+
+    // Delete the post
+    batch.delete(postRef);
+
+    // Execute all operations
+    await batch.commit();
+
     return true;
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    throw error;
   }
 };
 
@@ -399,42 +504,6 @@ export const fetchUserProfile = async (address: string): Promise<UserProfile | n
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
-  }
-};
-
-// Dodaj funkcję do usuwania postów
-export const deletePost = async (postId: string, authorAddress: string) => {
-  try {
-    const postRef = doc(db, 'posts', postId);
-    const postSnap = await getDoc(postRef);
-    
-    if (!postSnap.exists()) {
-      throw new Error('Post not found');
-    }
-
-    const postData = postSnap.data();
-    if (postData.author !== authorAddress) {
-      throw new Error('Unauthorized to delete this post');
-    }
-
-    // Usuń wszystkie komentarze posta
-    const commentsRef = collection(db, 'comments');
-    const commentsQuery = query(commentsRef, where('postId', '==', postId));
-    const commentsSnap = await getDocs(commentsQuery);
-    
-    const batch = writeBatch(db);
-    commentsSnap.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-
-    // Usuń post
-    batch.delete(postRef);
-    await batch.commit();
-
-    return true;
-  } catch (error) {
-    console.error('Error deleting post:', error);
-    throw error;
   }
 };
 
@@ -1244,4 +1313,142 @@ export async function clearAllFriendRequests() {
   await batch.commit();
 }
 
-// --- End Friend System Functions --- 
+// --- End Friend System Functions ---
+
+// Calculate user statistics from posts
+export const calculateUserStats = async (userAddress: string) => {
+  try {
+    const postsRef = collection(db, 'posts');
+    const userPostsQuery = query(
+      postsRef,
+      where('author', '==', userAddress)
+    );
+    
+    const postsSnapshot = await getDocs(userPostsQuery);
+    let totalLikes = 0;
+    let totalPosts = postsSnapshot.size;
+    
+    // Calculate total likes from all user's posts
+    postsSnapshot.forEach((doc) => {
+      const postData = doc.data();
+      totalLikes += postData.likes || 0;
+    });
+
+    // Get last 30 days activity
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentPostsQuery = query(
+      postsRef,
+      where('author', '==', userAddress),
+      where('timestamp', '>=', thirtyDaysAgo)
+    );
+    
+    const recentPostsSnapshot = await getDocs(recentPostsQuery);
+    const recentActivityBonus = recentPostsSnapshot.size > 0 ? 1.25 : 1;
+
+    // Calculate total points
+    // Base formula: (posts * 5) + (likes * 1)
+    const points = ((totalPosts * 5) + totalLikes) * recentActivityBonus;
+
+    // Update user statistics
+    const userRef = doc(db, 'users', userAddress);
+    await updateDoc(userRef, {
+      postsCount: totalPosts,
+      likesReceived: totalLikes,
+      lastCalculated: serverTimestamp(),
+      'stats.posts': totalPosts,
+      'stats.likes': totalLikes,
+      'stats.points': Math.round(points)
+    });
+
+    return {
+      posts: totalPosts,
+      likes: totalLikes,
+      points: Math.round(points),
+      hasRecentActivity: recentActivityBonus > 1
+    };
+  } catch (error) {
+    console.error('Error calculating user stats:', error);
+    throw error;
+  }
+};
+
+// Funkcja do odświeżania wszystkich postów
+export const refreshAllPosts = async () => {
+  try {
+    console.log('Rozpoczynam odświeżanie wszystkich postów...');
+    const batch = writeBatch(db);
+    
+    // Pobierz wszystkie posty
+    const postsRef = collection(db, 'posts');
+    const postsSnapshot = await getDocs(postsRef);
+    
+    let processedPosts = 0;
+    let updatedPosts = 0;
+    
+    // Mapa do śledzenia statystyk użytkowników
+    const userStats: { [key: string]: { posts: number, likes: number } } = {};
+    
+    // Przetwórz każdy post
+    for (const postDoc of postsSnapshot.docs) {
+      processedPosts++;
+      const post = postDoc.data();
+      const postRef = doc(db, 'posts', postDoc.id);
+      
+      // Sprawdź czy liczba lajków zgadza się z długością tablicy likedBy
+      const likedBy = post.likedBy || [];
+      const actualLikes = likedBy.length;
+      
+      // Jeśli liczba lajków się różni, zaktualizuj post
+      if (post.likes !== actualLikes) {
+        batch.update(postRef, {
+          likes: actualLikes,
+          lastUpdated: serverTimestamp()
+        });
+        updatedPosts++;
+      }
+      
+      // Aktualizuj statystyki użytkownika
+      if (!userStats[post.author]) {
+        userStats[post.author] = { posts: 0, likes: 0 };
+      }
+      userStats[post.author].posts++;
+      userStats[post.author].likes += actualLikes;
+    }
+    
+    // Aktualizuj statystyki użytkowników
+    for (const [userId, stats] of Object.entries(userStats)) {
+      const userRef = doc(db, 'users', userId);
+      batch.update(userRef, {
+        postsCount: stats.posts,
+        likesReceived: stats.likes,
+        lastCalculated: serverTimestamp(),
+        'stats.posts': stats.posts,
+        'stats.likes': stats.likes,
+        'stats.points': Math.round((stats.posts * 5 + stats.likes) * 1.25)
+      });
+    }
+    
+    // Wykonaj wszystkie aktualizacje
+    await batch.commit();
+    
+    console.log(`Zakończono odświeżanie postów:
+    - Przetworzono postów: ${processedPosts}
+    - Zaktualizowano postów: ${updatedPosts}
+    - Zaktualizowano użytkowników: ${Object.keys(userStats).length}`);
+    
+    return {
+      success: true,
+      processedPosts,
+      updatedPosts,
+      updatedUsers: Object.keys(userStats).length
+    };
+  } catch (error) {
+    console.error('Błąd podczas odświeżania postów:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas odświeżania postów'
+    };
+  }
+};

@@ -207,7 +207,7 @@ export default function IdentityComponent() {
           }}
         />
       ) : (
-        <div className="w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+        <div className="w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg p-2 sm:p-6">
           <div className="flex items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-2">
               <img 
@@ -230,7 +230,7 @@ export default function IdentityComponent() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div className="w-full">
                   <IdentityCard
                     address={address}
@@ -266,17 +266,17 @@ export default function IdentityComponent() {
                 {/* Top Separator Line */}
                 <div className="absolute top-0 left-4 right-4 h-[1px] bg-gradient-to-r from-transparent via-[#0052FF] to-transparent animate-pulse" />
 
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
                   {/* Transactions */}
                   <div className="backdrop-blur-lg bg-black/40 p-4 border border-[#0052FF]/20 shadow-[0_0_15px_rgba(0,82,255,0.1)] relative group hover:shadow-[0_0_20px_rgba(0,82,255,0.2)] transition-all duration-300">
                     <div className="text-center">
                       <div className="text-3xl font-mono font-bold text-[#0052FF] mb-1 animate-pulse">
                         {isLoading ? '...' : stats.stats.transactions}
                       </div>
-                      <div className="text-sm font-mono text-white mb-1">
+                      <div className="text-xs sm:text-sm font-mono text-white mb-1">
                         TRANSACTIONS
                       </div>
-                      <div className="text-xs font-mono text-gray-500">
+                      <div className="text-xs sm:text-sm font-mono text-gray-400">
                         {isLoading ? '...' : `[${stats.breakdown.transactionPoints} PTS]`}
                       </div>
                     </div>
@@ -288,10 +288,10 @@ export default function IdentityComponent() {
                       <div className="text-3xl font-mono font-bold text-[#0052FF] mb-1 animate-pulse">
                         {isLoading ? '...' : stats.stats.tokens}
                       </div>
-                      <div className="text-sm font-mono text-white mb-1">
+                      <div className="text-xs sm:text-sm font-mono text-white mb-1">
                         TOKENS
                       </div>
-                      <div className="text-xs font-mono text-gray-500">
+                      <div className="text-xs sm:text-sm font-mono text-gray-400">
                         {isLoading ? '...' : `[${stats.breakdown.tokenPoints} PTS]`}
                       </div>
                     </div>
@@ -303,10 +303,10 @@ export default function IdentityComponent() {
                       <div className="text-3xl font-mono font-bold text-[#0052FF] mb-1 animate-pulse">
                         {isLoading ? '...' : stats.stats.nfts}
                       </div>
-                      <div className="text-sm font-mono text-white mb-1">
+                      <div className="text-xs sm:text-sm font-mono text-white mb-1">
                         NFTs
                       </div>
-                      <div className="text-xs font-mono text-gray-500">
+                      <div className="text-xs sm:text-sm font-mono text-gray-400">
                         {isLoading ? '...' : `[${stats.breakdown.nftPoints} PTS]`}
                       </div>
                     </div>
@@ -318,10 +318,10 @@ export default function IdentityComponent() {
                       <div className="text-3xl font-mono font-bold text-[#0052FF] mb-1 animate-pulse">
                         {isLoading ? '...' : stats.stats.contracts}
                       </div>
-                      <div className="text-sm font-mono text-white mb-1">
+                      <div className="text-xs sm:text-sm font-mono text-white mb-1">
                         CONTRACTS
                       </div>
-                      <div className="text-xs font-mono text-gray-500">
+                      <div className="text-xs sm:text-sm font-mono text-gray-400">
                         {isLoading ? '...' : `[${stats.breakdown.uniqueContractPoints} PTS]`}
                       </div>
                     </div>
@@ -352,7 +352,7 @@ export default function IdentityComponent() {
                       <div className="text-3xl font-mono font-bold text-[#0052FF] mb-2">
                         {isLoading ? '...' : `[${stats.rank}]`}
                       </div>
-                      <div className="text-sm font-mono text-white">
+                      <div className="text-xs sm:text-sm font-mono text-white">
                         {RANK_DESCRIPTIONS[stats.rank]}
                       </div>
                     </div>
@@ -380,7 +380,7 @@ export default function IdentityComponent() {
                       <div className="text-3xl font-mono font-bold text-[#0052FF] mb-2">
                         {isLoading ? '...' : `[${stats.percentile}%]`}
                       </div>
-                      <div className="text-sm font-mono text-white mb-2">
+                      <div className="text-xs sm:text-sm font-mono text-white mb-2">
                         PROGRESS TO NEXT RANK
                       </div>
                       <div className="mt-2 h-2 bg-black/50 rounded-none border border-[#0052FF]/20 overflow-hidden">
@@ -389,10 +389,10 @@ export default function IdentityComponent() {
                           style={{ width: `${stats.percentile}%` }}
                         >
                           <div className="w-full h-full bg-[#0052FF]/20" />
-                        </div>
-                      </div>
                     </div>
                   </div>
+                </div>
+              </div>
                 </div>
 
                 {/* Bottom Separator Line */}
@@ -400,7 +400,7 @@ export default function IdentityComponent() {
               </div>
 
               {/* Point System i Rank System obok siebie */}
-              <div className="mt-8 grid grid-cols-2 gap-6">
+              <div className="mt-4 sm:mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 {/* Point System */}
                 <div className="bg-black/90 backdrop-blur-lg p-6 relative min-h-[420px]">
                   {/* Top Separator Line */}
@@ -417,11 +417,11 @@ export default function IdentityComponent() {
                           <div className="text-lg font-mono font-bold text-blue-600 dark:text-blue-400 mb-1">
                             TRANSACTIONS
                           </div>
-                          <div className="text-sm font-mono text-gray-400">
+                          <div className="text-xs sm:text-sm font-mono text-gray-400">
                             • Base: <span className="text-[#0052FF]">{POINT_SYSTEM.transactions.base} points</span><br />
                             • Successful: <span className="text-[#0052FF]">{POINT_SYSTEM.transactions.successful} points</span><br />
                             • High Value: <span className="text-[#0052FF]">{POINT_SYSTEM.transactions.highValue} points</span>
-                            <div className="text-xs italic mt-1">{POINT_SYSTEM.transactions.description}</div>
+                            <div className="text-xs sm:text-sm italic mt-1">{POINT_SYSTEM.transactions.description}</div>
                           </div>
                         </div>
                       </div>
@@ -431,9 +431,9 @@ export default function IdentityComponent() {
                           <div className="text-lg font-mono font-bold text-green-600 dark:text-green-400 mb-1">
                             TOKENS
                           </div>
-                          <div className="text-sm font-mono text-gray-400">
+                          <div className="text-xs sm:text-sm font-mono text-gray-400">
                             • <span className="text-[#0052FF]">{POINT_SYSTEM.tokens.points} points</span> per unique token
-                            <div className="text-xs italic mt-1">{POINT_SYSTEM.tokens.description}</div>
+                            <div className="text-xs sm:text-sm italic mt-1">{POINT_SYSTEM.tokens.description}</div>
                           </div>
                         </div>
                       </div>
@@ -443,9 +443,9 @@ export default function IdentityComponent() {
                           <div className="text-lg font-mono font-bold text-purple-600 dark:text-purple-400 mb-1">
                             NFTs
                           </div>
-                          <div className="text-sm font-mono text-gray-400">
+                          <div className="text-xs sm:text-sm font-mono text-gray-400">
                             • <span className="text-[#0052FF]">{POINT_SYSTEM.nfts.points} points</span> per unique NFT
-                            <div className="text-xs italic mt-1">{POINT_SYSTEM.nfts.description}</div>
+                            <div className="text-xs sm:text-sm italic mt-1">{POINT_SYSTEM.nfts.description}</div>
                           </div>
                         </div>
                       </div>
@@ -455,9 +455,9 @@ export default function IdentityComponent() {
                           <div className="text-lg font-mono font-bold text-yellow-600 dark:text-yellow-400 mb-1">
                             CONTRACTS
                           </div>
-                          <div className="text-sm font-mono text-gray-400">
+                          <div className="text-xs sm:text-sm font-mono text-gray-400">
                             • <span className="text-[#0052FF]">{POINT_SYSTEM.contracts.points} points</span> per unique contract
-                            <div className="text-xs italic mt-1">{POINT_SYSTEM.contracts.description}</div>
+                            <div className="text-xs sm:text-sm italic mt-1">{POINT_SYSTEM.contracts.description}</div>
                           </div>
                         </div>
                       </div>
@@ -494,25 +494,25 @@ export default function IdentityComponent() {
                           
                           <div className="relative z-10 p-3 flex justify-between items-center">
                             <div>
-                              <div className="text-lg font-mono font-bold text-white">
+                              <div className="text-lg sm:text-xl font-mono font-bold text-white">
                                 {rankInfo.rank}
                               </div>
-                              <div className="text-xs font-mono text-gray-400">
+                              <div className="text-xs sm:text-sm font-mono text-gray-400">
                                 {rankInfo.description}
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="text-sm font-mono font-bold text-[#0052FF]">
+                              <div className="text-sm sm:text-base font-mono font-bold text-[#0052FF]">
                                 {rankInfo.threshold.toLocaleString()} pts
                               </div>
                               {index < RANK_INFO.length - 1 && (
-                                <div className="text-[10px] font-mono text-gray-500">
+                                <div className="text-xs sm:text-sm font-mono text-gray-500">
                                   Next: {RANK_INFO[index + 1].threshold.toLocaleString()}
                                 </div>
                               )}
                             </div>
                             {stats.rank === rankInfo.rank && (
-                              <div className="absolute top-1 right-1 text-[#0052FF] text-[10px] font-mono animate-pulse">
+                              <div className="absolute top-1 right-1 text-[#0052FF] text-xs font-mono animate-pulse">
                                 [CURRENT]
                               </div>
                             )}
@@ -528,231 +528,277 @@ export default function IdentityComponent() {
               </div>
 
               {/* Badges Section */}
-              <div className="mt-8 space-y-0 bg-black/90 backdrop-blur-lg p-6 relative">
-                {/* Separator Line */}
-                <div className="absolute top-0 left-4 right-4 h-[1px] bg-gradient-to-r from-transparent via-[#0052FF] to-transparent animate-pulse" />
-
+              <div className="mt-4 sm:mt-8 space-y-8">
                 {/* Total Badges Counter */}
-                <div className="backdrop-blur-lg bg-black/40 p-4 shadow-[0_0_15px_rgba(0,82,255,0.2)] border border-[#0052FF]/20">
-                  <div className="text-center flex items-center justify-center gap-4">
-                    <span className="text-2xl font-mono font-bold text-[#0052FF] animate-pulse">
-                      [BADGES_EARNED: {earnedBadges.length}/{BADGES.length}]
-                    </span>
-                    <div className="relative group">
-                      <button 
-                        className="px-4 py-2 bg-[#0052FF]/10 border border-[#0052FF]/50 text-[#0052FF] font-mono text-sm hover:bg-[#0052FF]/20 transition-all duration-300"
-                      >
-                        Claim your badges
+                <div className="backdrop-blur-lg bg-black/90 p-6 relative">
+                  <div className="absolute top-0 left-4 right-4 h-[1px] bg-gradient-to-r from-transparent via-[#0052FF] to-transparent animate-pulse" />
+                  <div className="backdrop-blur-lg bg-black/40 p-6 shadow-[0_0_15px_rgba(0,82,255,0.2)] border border-[#0052FF]/20">
+                    <div className="text-center flex flex-col sm:flex-row items-center justify-center gap-4">
+                      <span className="text-2xl font-mono font-bold text-[#0052FF] animate-pulse">
+                        [BADGES_EARNED: {earnedBadges.length}/{BADGES.length}]
+                      </span>
+                      <div className="relative group">
+                        <button 
+                          className="px-6 py-2 bg-[#0052FF]/10 border border-[#0052FF]/50 text-[#0052FF] font-mono text-sm hover:bg-[#0052FF]/20 transition-all duration-300"
+                        >
+                          Claim your badges
                       </button>
-                      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black/80 text-white text-xs font-mono rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
-                        SOON
-                      </div>
+                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black/80 text-white text-xs font-mono rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+                          SOON
                     </div>
                   </div>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-0 left-4 right-4 h-[1px] bg-gradient-to-r from-transparent via-[#0052FF] to-transparent animate-pulse" />
                 </div>
 
-                {/* Separator Line */}
-                <div className="h-[1px] my-6 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent animate-pulse" />
-
-                {/* Transaction Badges */}
-                <div className="backdrop-blur-lg bg-black/40 p-6 shadow-[0_0_15px_rgba(0,82,255,0.1)] border border-[#0052FF]/20">
-                  <h3 className="text-2xl font-mono font-bold mb-6 text-center text-[#0052FF]">
-                    &lt;TRANSACTION_MASTERY/&gt;
-                  </h3>
-                  <div className="grid grid-cols-6 gap-4">
-                    {groupedBadges.transactions.map((badge) => {
-                      const isEarned = badge.condition(stats);
-                      const glowStyle = isEarned ? {
-                        boxShadow: `0 0 ${badge.glowIntensity * 5}px ${badge.glowIntensity * 2}px rgba(0,82,255,${0.1 + badge.glowIntensity * 0.1})`
-                      } : {};
-                      
-                      return (
-                        <div
-                          key={badge.name}
-                          className={`relative group p-4 transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_20px_rgba(0,82,255,0.3)] backdrop-blur-lg ${
-                            isEarned ? 'border border-[#0052FF]/50' : 'border border-gray-800'
-                          }`}
-                          style={glowStyle}
-                        >
-                          <div className={`absolute inset-0 transition-all duration-300 ${
-                            isEarned ? 'bg-gradient-to-br from-[#0052FF]/10 to-[#0052FF]/5' : 'bg-black/50'
-                          }`} />
-                          <div className="relative z-10">
-                            <div className={`flex items-center justify-center mb-3 ${
-                              isEarned ? 'text-[#0052FF]' : 'text-gray-600'
-                            }`}>
-                              <i className={`fas fa-${badge.icon} text-4xl ${isEarned ? 'animate-pulse' : ''}`} />
-                            </div>
-                            <div className="text-xl font-mono font-bold text-center text-white mb-2">
-                              {badge.title}
-                            </div>
-                            <div className="text-sm font-mono text-center text-gray-400">
-                              {badge.description}
+                  {/* Transaction Badges */}
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-mono font-bold text-center text-[#0052FF]">
+                      &lt;TRANSACTION_MASTERY/&gt;
+                    </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {groupedBadges.transactions.map((badge) => {
+                        const isEarned = badge.condition(stats);
+                        return (
+                          <div
+                            key={badge.name}
+                            className={`relative group transition-all duration-300 transform hover:scale-[1.02] overflow-hidden badge-glass badge-hover ${
+                              isEarned ? 'badge-glow' : ''
+                            } ${
+                              isEarned ? 'bg-gradient-to-br from-[#0052FF]/10 to-[#0052FF]/5' : 'bg-black/50'
+                            } rounded-2xl`}
+                          >
+                            {/* Efekt szkła */}
+                            <div className="absolute inset-0 backdrop-blur-xl bg-white/5 rounded-2xl" />
+                            
+                            {/* Podświetlenie */}
+                            <div className={`absolute inset-0 ${
+                              isEarned ? 'bg-[#0052FF]/5' : 'bg-black/50'
+                            } transition-colors duration-300 rounded-2xl`} />
+                            
+                            {/* Border z gradientem */}
+                            <div className={`absolute inset-0 border ${
+                              isEarned ? 'border-[#0052FF]/30' : 'border-gray-800/30'
+                            } transition-colors duration-300 rounded-2xl`} />
+                            
+                            {/* Efekt glow przy hover */}
+                            <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                              isEarned ? 'badge-pulse' : ''
+                            }`} />
+                            
+                            {/* Zawartość badge'a */}
+                            <div className="relative p-4 z-10">
+                              <div className={`flex items-center justify-center mb-3 ${
+                                isEarned ? 'text-[#0052FF]' : 'text-gray-600'
+                              }`}>
+                                <i className={`fas fa-${badge.icon} text-3xl ${
+                                  isEarned ? 'animate-pulse' : ''
+                                }`} />
+                              </div>
+                              <div className="text-base font-mono font-bold text-center text-white mb-2">
+                                {badge.title}
+                              </div>
+                              <div className="text-xs font-mono text-center text-gray-400 min-h-[40px]">
+                                {badge.description}
+                              </div>
+                              {isEarned && (
+                                <div className="absolute top-2 right-2 text-[#0052FF] text-xs font-mono animate-pulse">
+                                  [VERIFIED]
+                                </div>
+                              )}
                             </div>
                           </div>
-                          {isEarned && (
-                            <div className="absolute top-2 right-2 text-[#0052FF] text-xs animate-pulse">
-                              [VERIFIED]
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                {/* Separator Line */}
-                <div className="h-[1px] my-6 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent animate-pulse" />
-
-                {/* Token Badges */}
-                <div className="backdrop-blur-lg bg-black/40 p-6 shadow-[0_0_15px_rgba(0,82,255,0.1)] border border-[#0052FF]/20">
-                  <h3 className="text-2xl font-mono font-bold mb-6 text-center text-[#0052FF]">
-                    &lt;TOKEN_EMPIRE/&gt;
-                  </h3>
-                  <div className="grid grid-cols-6 gap-4">
-                    {groupedBadges.tokens.map((badge) => {
-                      const isEarned = badge.condition(stats);
-                      const glowStyle = isEarned ? {
-                        boxShadow: `0 0 ${badge.glowIntensity * 5}px ${badge.glowIntensity * 2}px rgba(0,82,255,${0.1 + badge.glowIntensity * 0.1})`
-                      } : {};
-                      
-                      return (
-                        <div
-                          key={badge.name}
-                          className={`relative group p-4 transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_20px_rgba(0,82,255,0.3)] backdrop-blur-lg ${
-                            isEarned ? 'border border-[#0052FF]/50' : 'border border-gray-800'
-                          }`}
-                          style={glowStyle}
-                        >
-                          <div className={`absolute inset-0 transition-all duration-300 ${
-                            isEarned ? 'bg-gradient-to-br from-[#0052FF]/10 to-[#0052FF]/5' : 'bg-black/50'
-                          }`} />
-                          <div className="relative z-10">
-                            <div className={`flex items-center justify-center mb-3 ${
-                              isEarned ? 'text-[#0052FF]' : 'text-gray-600'
-                            }`}>
-                              <i className={`fas fa-${badge.icon} text-4xl ${isEarned ? 'animate-pulse' : ''}`} />
-                            </div>
-                            <div className="text-xl font-mono font-bold text-center text-white mb-2">
-                              {badge.title}
-                            </div>
-                            <div className="text-sm font-mono text-center text-gray-400">
-                              {badge.description}
+                  {/* Token Badges */}
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-mono font-bold text-center text-[#0052FF]">
+                      &lt;TOKEN_EMPIRE/&gt;
+                    </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {groupedBadges.tokens.map((badge) => {
+                        const isEarned = badge.condition(stats);
+                        return (
+                          <div
+                            key={badge.name}
+                            className={`relative group transition-all duration-300 transform hover:scale-[1.02] overflow-hidden badge-glass badge-hover ${
+                              isEarned ? 'badge-glow' : ''
+                            } ${
+                              isEarned ? 'bg-gradient-to-br from-[#0052FF]/10 to-[#0052FF]/5' : 'bg-black/50'
+                            } rounded-2xl`}
+                          >
+                            {/* Efekt szkła */}
+                            <div className="absolute inset-0 backdrop-blur-xl bg-white/5 rounded-2xl" />
+                            
+                            {/* Podświetlenie */}
+                            <div className={`absolute inset-0 ${
+                              isEarned ? 'bg-[#0052FF]/5' : 'bg-black/50'
+                            } transition-colors duration-300 rounded-2xl`} />
+                            
+                            {/* Border z gradientem */}
+                            <div className={`absolute inset-0 border ${
+                              isEarned ? 'border-[#0052FF]/30' : 'border-gray-800/30'
+                            } transition-colors duration-300 rounded-2xl`} />
+                            
+                            {/* Efekt glow przy hover */}
+                            <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                              isEarned ? 'badge-pulse' : ''
+                            }`} />
+                            
+                            {/* Zawartość badge'a */}
+                            <div className="relative p-4 z-10">
+                              <div className={`flex items-center justify-center mb-3 ${
+                                isEarned ? 'text-[#0052FF]' : 'text-gray-600'
+                              }`}>
+                                <i className={`fas fa-${badge.icon} text-3xl ${
+                                  isEarned ? 'animate-pulse' : ''
+                                }`} />
+                              </div>
+                              <div className="text-base font-mono font-bold text-center text-white mb-2">
+                                {badge.title}
+                              </div>
+                              <div className="text-xs font-mono text-center text-gray-400 min-h-[40px]">
+                                {badge.description}
+                              </div>
+                              {isEarned && (
+                                <div className="absolute top-2 right-2 text-[#0052FF] text-xs font-mono animate-pulse">
+                                  [VERIFIED]
+                                </div>
+                              )}
                             </div>
                           </div>
-                          {isEarned && (
-                            <div className="absolute top-2 right-2 text-[#0052FF] text-xs animate-pulse">
-                              [VERIFIED]
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                {/* Separator Line */}
-                <div className="h-[1px] my-6 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent animate-pulse" />
-
-                {/* NFT Badges */}
-                <div className="backdrop-blur-lg bg-black/40 p-6 shadow-[0_0_15px_rgba(0,82,255,0.1)] border border-[#0052FF]/20">
-                  <h3 className="text-2xl font-mono font-bold mb-6 text-center text-[#0052FF]">
-                    &lt;NFT_COLLECTION/&gt;
-                  </h3>
-                  <div className="grid grid-cols-6 gap-4">
-                    {groupedBadges.nfts.map((badge) => {
-                      const isEarned = badge.condition(stats);
-                      const glowStyle = isEarned ? {
-                        boxShadow: `0 0 ${badge.glowIntensity * 5}px ${badge.glowIntensity * 2}px rgba(0,82,255,${0.1 + badge.glowIntensity * 0.1})`
-                      } : {};
-                      
-                      return (
-                        <div
-                          key={badge.name}
-                          className={`relative group p-4 transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_20px_rgba(0,82,255,0.3)] backdrop-blur-lg ${
-                            isEarned ? 'border border-[#0052FF]/50' : 'border border-gray-800'
-                          }`}
-                          style={glowStyle}
-                        >
-                          <div className={`absolute inset-0 transition-all duration-300 ${
-                            isEarned ? 'bg-gradient-to-br from-[#0052FF]/10 to-[#0052FF]/5' : 'bg-black/50'
-                          }`} />
-                          <div className="relative z-10">
-                            <div className={`flex items-center justify-center mb-3 ${
-                              isEarned ? 'text-[#0052FF]' : 'text-gray-600'
-                            }`}>
-                              <i className={`fas fa-${badge.icon} text-4xl ${isEarned ? 'animate-pulse' : ''}`} />
-                            </div>
-                            <div className="text-xl font-mono font-bold text-center text-white mb-2">
-                              {badge.title}
-                            </div>
-                            <div className="text-sm font-mono text-center text-gray-400">
-                              {badge.description}
+                  {/* NFT Badges */}
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-mono font-bold text-center text-[#0052FF]">
+                      &lt;NFT_COLLECTION/&gt;
+                    </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {groupedBadges.nfts.map((badge) => {
+                        const isEarned = badge.condition(stats);
+                        return (
+                          <div
+                            key={badge.name}
+                            className={`relative group transition-all duration-300 transform hover:scale-[1.02] overflow-hidden badge-glass badge-hover ${
+                              isEarned ? 'badge-glow' : ''
+                            } ${
+                              isEarned ? 'bg-gradient-to-br from-[#0052FF]/10 to-[#0052FF]/5' : 'bg-black/50'
+                            } rounded-2xl`}
+                          >
+                            {/* Efekt szkła */}
+                            <div className="absolute inset-0 backdrop-blur-xl bg-white/5 rounded-2xl" />
+                            
+                            {/* Podświetlenie */}
+                            <div className={`absolute inset-0 ${
+                              isEarned ? 'bg-[#0052FF]/5' : 'bg-black/50'
+                            } transition-colors duration-300 rounded-2xl`} />
+                            
+                            {/* Border z gradientem */}
+                            <div className={`absolute inset-0 border ${
+                              isEarned ? 'border-[#0052FF]/30' : 'border-gray-800/30'
+                            } transition-colors duration-300 rounded-2xl`} />
+                            
+                            {/* Efekt glow przy hover */}
+                            <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                              isEarned ? 'badge-pulse' : ''
+                            }`} />
+                            
+                            {/* Zawartość badge'a */}
+                            <div className="relative p-4 z-10">
+                              <div className={`flex items-center justify-center mb-3 ${
+                                isEarned ? 'text-[#0052FF]' : 'text-gray-600'
+                              }`}>
+                                <i className={`fas fa-${badge.icon} text-3xl ${
+                                  isEarned ? 'animate-pulse' : ''
+                                }`} />
+                              </div>
+                              <div className="text-base font-mono font-bold text-center text-white mb-2">
+                                {badge.title}
+                              </div>
+                              <div className="text-xs font-mono text-center text-gray-400 min-h-[40px]">
+                                {badge.description}
+                              </div>
+                              {isEarned && (
+                                <div className="absolute top-2 right-2 text-[#0052FF] text-xs font-mono animate-pulse">
+                                  [VERIFIED]
+                                </div>
+                              )}
                             </div>
                           </div>
-                          {isEarned && (
-                            <div className="absolute top-2 right-2 text-[#0052FF] text-xs animate-pulse">
-                              [VERIFIED]
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                {/* Separator Line */}
-                <div className="h-[1px] my-6 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent animate-pulse" />
-
-                {/* Contract Badges */}
-                <div className="backdrop-blur-lg bg-black/40 p-6 shadow-[0_0_15px_rgba(0,82,255,0.1)] border border-[#0052FF]/20">
-                  <h3 className="text-2xl font-mono font-bold mb-6 text-center text-[#0052FF]">
-                    &lt;CONTRACT_EXPERTISE/&gt;
-                  </h3>
-                  <div className="grid grid-cols-6 gap-4">
-                    {groupedBadges.contracts.map((badge) => {
-                      const isEarned = badge.condition(stats);
-                      const glowStyle = isEarned ? {
-                        boxShadow: `0 0 ${badge.glowIntensity * 5}px ${badge.glowIntensity * 2}px rgba(0,82,255,${0.1 + badge.glowIntensity * 0.1})`
-                      } : {};
-                      
-                      return (
-                        <div
-                          key={badge.name}
-                          className={`relative group p-4 transition-all duration-300 transform hover:scale-105 hover:shadow-[0_0_20px_rgba(0,82,255,0.3)] backdrop-blur-lg ${
-                            isEarned ? 'border border-[#0052FF]/50' : 'border border-gray-800'
-                          }`}
-                          style={glowStyle}
-                        >
-                          <div className={`absolute inset-0 transition-all duration-300 ${
-                            isEarned ? 'bg-gradient-to-br from-[#0052FF]/10 to-[#0052FF]/5' : 'bg-black/50'
-                          }`} />
-                          <div className="relative z-10">
-                            <div className={`flex items-center justify-center mb-3 ${
-                              isEarned ? 'text-[#0052FF]' : 'text-gray-600'
-                            }`}>
-                              <i className={`fas fa-${badge.icon} text-4xl ${isEarned ? 'animate-pulse' : ''}`} />
-                            </div>
-                            <div className="text-xl font-mono font-bold text-center text-white mb-2">
-                              {badge.title}
-                            </div>
-                            <div className="text-sm font-mono text-center text-gray-400">
-                              {badge.description}
+                  {/* Contract Badges */}
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-mono font-bold text-center text-[#0052FF]">
+                      &lt;CONTRACT_EXPERTISE/&gt;
+                    </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {groupedBadges.contracts.map((badge) => {
+                        const isEarned = badge.condition(stats);
+                        return (
+                          <div
+                            key={badge.name}
+                            className={`relative group transition-all duration-300 transform hover:scale-[1.02] overflow-hidden badge-glass badge-hover ${
+                              isEarned ? 'badge-glow' : ''
+                            } ${
+                              isEarned ? 'bg-gradient-to-br from-[#0052FF]/10 to-[#0052FF]/5' : 'bg-black/50'
+                            } rounded-2xl`}
+                          >
+                            {/* Efekt szkła */}
+                            <div className="absolute inset-0 backdrop-blur-xl bg-white/5 rounded-2xl" />
+                            
+                            {/* Podświetlenie */}
+                            <div className={`absolute inset-0 ${
+                              isEarned ? 'bg-[#0052FF]/5' : 'bg-black/50'
+                            } transition-colors duration-300 rounded-2xl`} />
+                            
+                            {/* Border z gradientem */}
+                            <div className={`absolute inset-0 border ${
+                              isEarned ? 'border-[#0052FF]/30' : 'border-gray-800/30'
+                            } transition-colors duration-300 rounded-2xl`} />
+                            
+                            {/* Efekt glow przy hover */}
+                            <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                              isEarned ? 'badge-pulse' : ''
+                            }`} />
+                            
+                            {/* Zawartość badge'a */}
+                            <div className="relative p-4 z-10">
+                              <div className={`flex items-center justify-center mb-3 ${
+                                isEarned ? 'text-[#0052FF]' : 'text-gray-600'
+                              }`}>
+                                <i className={`fas fa-${badge.icon} text-3xl ${
+                                  isEarned ? 'animate-pulse' : ''
+                                }`} />
+                              </div>
+                              <div className="text-base font-mono font-bold text-center text-white mb-2">
+                                {badge.title}
+                              </div>
+                              <div className="text-xs font-mono text-center text-gray-400 min-h-[40px]">
+                                {badge.description}
+                              </div>
+                              {isEarned && (
+                                <div className="absolute top-2 right-2 text-[#0052FF] text-xs font-mono animate-pulse">
+                                  [VERIFIED]
+                                </div>
+                              )}
                             </div>
                           </div>
-                          {isEarned && (
-                            <div className="absolute top-2 right-2 text-[#0052FF] text-xs animate-pulse">
-                              [VERIFIED]
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 </div>
-
-                {/* Bottom Separator Line */}
-                <div className="h-[1px] mt-6 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent animate-pulse" />
               </div>
 
               {/* BaseScan Link */}

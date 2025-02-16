@@ -5,6 +5,20 @@ export async function POST(request: Request) {
     const { token, action } = await request.json();
     console.log('Received request:', { token: token.substring(0, 20) + '...', action });
 
+    // Sprawdź czy jesteśmy w środowisku deweloperskim (ngrok)
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isNgrok = request.headers.get('host')?.includes('ngrok');
+
+    // Jeśli jesteśmy w trybie dev i używamy ngrok, pomijamy weryfikację
+    if (isDevelopment && isNgrok) {
+      console.log('Development mode (ngrok) - skipping reCAPTCHA verification');
+      return NextResponse.json({
+        success: true,
+        score: 1,
+        reasons: []
+      });
+    }
+
     if (!token) {
       return NextResponse.json({ success: false, error: 'Token is required' }, { status: 400 });
     }
