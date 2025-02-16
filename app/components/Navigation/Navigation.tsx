@@ -85,7 +85,6 @@ export default function Navigation() {
     },
     { href: '/nft', label: 'NFT' },
     { href: '/messages', label: 'DM' },
-    { href: '/quotes', label: 'QUOTES' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ];
 
