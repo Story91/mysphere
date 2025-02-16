@@ -42,27 +42,7 @@ import FrameSDK from '@farcaster/frame-sdk'
 import farcasterFrame from '@farcaster/frame-wagmi-connector'
 import { wagmiConfig } from '../components/Web3Provider/wagmiConfig'
 import { connect } from 'wagmi/actions'
-
-function FarcasterFrameProvider({ children }: PropsWithChildren) {
-  useEffect(() => {
-    const init = async () => {
-      const context = await FrameSDK.context
-
-      // Autoconnect if running in a frame.
-      if (context?.client.clientFid) {
-        connect(wagmiConfig, { connector: farcasterFrame() })
-      }
-
-      // Hide splash screen after UI renders.
-      setTimeout(() => {
-        FrameSDK.actions.ready()
-      }, 500)
-    }
-    init()
-  }, [])
-
-  return <>{children}</>
-}
+import { FarcasterFrameProvider } from '../components/FarcasterFrameProvider/FarcasterFrameProvider';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -232,20 +212,20 @@ export default function BaseChat() {
   // Inicjalizacja Frame SDK
   useEffect(() => {
     const init = async () => {
-      const context = await FrameSDK.context
+      const context = await FrameSDK.context;
 
-      // Autoconnect if running in a frame.
+      // Autoconnect jeśli uruchomione w ramce
       if (context?.client.clientFid) {
-        connect(wagmiConfig, { connector: farcasterFrame() })
+        connect(wagmiConfig, { connector: farcasterFrame() });
       }
 
-      // Hide splash screen after UI renders.
+      // Ukryj splash screen po wyrenderowaniu UI
       setTimeout(() => {
-        FrameSDK.actions.ready()
-      }, 500)
-    }
-    init()
-  }, [])
+        FrameSDK.actions.ready();
+      }, 500);
+    };
+    init();
+  }, []);
 
   // Funkcja sprawdzająca czy użytkownik może tworzyć posty
   const canCreatePosts = Boolean(baseName);
@@ -1533,6 +1513,7 @@ export default function BaseChat() {
   };
 
   return (
+    <FarcasterFrameProvider>
       <BanPage>
         <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
         <div className="min-h-screen relative">
@@ -2966,5 +2947,6 @@ export default function BaseChat() {
         )}
       </AnimatePresence>
     </BanPage>
+  </FarcasterFrameProvider>
   );
 }

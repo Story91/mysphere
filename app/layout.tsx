@@ -18,12 +18,20 @@ export default function RootLayout({
       <head>
         <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-        <meta property="fc:frame" content="vNext" />
-        <meta property="fc:frame:image" content="https://mysphere.fun/images/frame-v2.png" />
-        <meta property="fc:frame:button:1" content="Open MySphere" />
-        <meta property="fc:frame:button:1:action" content="tx" />
-        <meta property="fc:frame:post_url" content="https://mysphere.fun/api/frame" />
-        <meta property="fc:frame:aspect_ratio" content="1.91:1" />
+        <meta name="fc:frame" content='{
+          "version": "next",
+          "imageUrl": "https://mysphere.fun/images/frame-v2.png",
+          "button": {
+            "title": "Open MySphere",
+            "action": {
+              "type": "launch_frame",
+              "name": "MySphere",
+              "url": "https://mysphere.fun/basechat",
+              "splashImageUrl": "https://mysphere.fun/favicon_io (1)/android-chrome-192x192.png",
+              "splashBackgroundColor": "#0F172A"
+            }
+          }
+        }' />
         <link rel="icon" type="image/x-icon" href="/favicon_io (1)/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io (1)/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io (1)/favicon-16x16.png" />

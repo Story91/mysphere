@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjM0MDY3OCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweEYxNDU5ZEIwOTI2OTg5RThkRjQyYkQ0MWQ3N0Q4MzIxMzRGYzc4Q2UifQ",
+    "payload": "eyJkb21haW4iOiJteXNwaGVyZS5mdW4ifQ",
+    "signature": "MHg3ODQxODM3NGM1OTI3MmVjNDc5ZjUyNWMzODY0YTY5ZjVhMjUyZWYzZGZkMmM4ZDlkMTdkMGI1ZTQ0NDlhZmMwNWJmNDdkOTM1MWFjM2UxYzU5MTQ0ZGJmMjM0YjQyMzUwMGM4NDg2OTViZWM0OGRhN2NjZDk0YjdhZGI1YzM4YTFi"
+  },
+  "frame": {
+    "version": "1",
+    "name": "MySphere",
+    "iconUrl": "https://mysphere.fun/favicon_io (1)/android-chrome-192x192.png",
+    "homeUrl": "https://mysphere.fun/basechat",
+    "imageUrl": "https://mysphere.fun/images/frame-v2.png",
+    "buttonTitle": "Open MySphere",
+    "splashImageUrl": "https://mysphere.fun/favicon_io (1)/android-chrome-192x192.png",
+    "splashBackgroundColor": "#0F172A",
+    "webhookUrl": "https://mysphere.fun/api/webhook"
+  }
+} 
