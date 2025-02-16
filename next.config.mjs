@@ -15,6 +15,38 @@ const nextConfig = {
     images: {
       unoptimized: true,
       domains: ['basebook.vercel.app', 'firebasestorage.googleapis.com', 'mysphere.fun']
+    },
+    async redirects() {
+      return [
+        {
+          source: '/',
+          destination: '/basechat',
+          permanent: true,
+        },
+        {
+          source: '//:path*',
+          has: [
+            {
+              type: 'host',
+              value: 'www.mysphere.fun',
+            },
+          ],
+          destination: 'https://mysphere.fun/:path*',
+          permanent: true,
+        },
+        {
+          source: '/:path*',
+          has: [
+            {
+              type: 'header',
+              key: 'x-forwarded-proto',
+              value: 'http',
+            },
+          ],
+          destination: 'https://mysphere.fun/:path*',
+          permanent: true,
+        }
+      ];
     }
   };
   

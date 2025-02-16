@@ -6,6 +6,7 @@ import { createContext, useContext, useState } from 'react';
 import { WagmiConfig } from 'wagmi';
 import { wagmiConfig } from './components/Web3Provider/wagmiConfig';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
 
 type ThemeMode = 'auto' | 'light' | 'dark';
 type ThemeStyle = 'default' | 'base' | 'cyberpunk' | 'hacker';
@@ -37,39 +38,41 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeContext.Provider value={{ mode, setMode, style, setStyle }}>
       <QueryClientProvider client={queryClient}>
         <WagmiConfig config={wagmiConfig}>
-          <OnchainKitProvider
-            apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-            chain={base}
-            config={{
-              appearance: {
-                name: 'BaseBook',
-                logo: '/android-chrome-192x192.png',
-                mode: 'dark',
-                theme: 'base',
-              },
-              wallet: {
-                display: 'modal',
-                termsUrl: 'https://basebook.xyz/terms',
-                privacyUrl: 'https://basebook.xyz/privacy',
-              },
-              // @ts-ignore
-              coinbaseWallet: {
-                appName: 'BaseBook',
-                appLogoUrl: '/android-chrome-192x192.png',
-                darkMode: true,
-                defaultChain: base,
-                chainId: 8453,
-                jsonRpcUrl: 'https://base-mainnet.public.blastapi.io',
-                fallbackRpcUrls: [
-                  'https://mainnet.base.org',
-                  'https://base.blockpi.network/v1/rpc/public'
-                ]
-              }
-            }}
-            projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
-          >
-            {children}
-          </OnchainKitProvider>
+          <FarcasterFrameProvider>
+            <OnchainKitProvider
+              apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+              chain={base}
+              config={{
+                appearance: {
+                  name: 'BaseBook',
+                  logo: '/android-chrome-192x192.png',
+                  mode: 'dark',
+                  theme: 'base',
+                },
+                wallet: {
+                  display: 'modal',
+                  termsUrl: 'https://basebook.xyz/terms',
+                  privacyUrl: 'https://basebook.xyz/privacy',
+                },
+                // @ts-ignore
+                coinbaseWallet: {
+                  appName: 'BaseBook',
+                  appLogoUrl: '/android-chrome-192x192.png',
+                  darkMode: true,
+                  defaultChain: base,
+                  chainId: 8453,
+                  jsonRpcUrl: 'https://base-mainnet.public.blastapi.io',
+                  fallbackRpcUrls: [
+                    'https://mainnet.base.org',
+                    'https://base.blockpi.network/v1/rpc/public'
+                  ]
+                }
+              }}
+              projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
+            >
+              {children}
+            </OnchainKitProvider>
+          </FarcasterFrameProvider>
         </WagmiConfig>
       </QueryClientProvider>
     </ThemeContext.Provider>
