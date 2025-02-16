@@ -21,7 +21,7 @@ export default function RootLayout({
         <meta property="fc:frame" content="vNext" />
         <meta property="fc:frame:image" content="https://mysphere.fun/images/frame-v2.png" />
         <meta property="fc:frame:button:1" content="Open MySphere" />
-        <meta property="fc:frame:button:1:action" content="post" />
+        <meta property="fc:frame:button:1:action" content="tx" />
         <meta property="fc:frame:post_url" content="https://mysphere.fun/api/frame" />
         <meta property="fc:frame:aspect_ratio" content="1.91:1" />
         <link rel="icon" type="image/x-icon" href="/favicon_io (1)/favicon.ico" />
