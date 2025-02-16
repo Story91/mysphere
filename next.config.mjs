@@ -14,7 +14,7 @@ const nextConfig = {
     },
     images: {
       unoptimized: true,
-      domains: ['basebook.vercel.app', 'firebasestorage.googleapis.com']
+      domains: ['basebook.vercel.app', 'firebasestorage.googleapis.com', 'mysphere.fun']
     }
   };
   
