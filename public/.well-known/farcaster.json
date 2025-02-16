@@ -5,8 +5,11 @@
     "signature": "MHg3ODQxODM3NGM1OTI3MmVjNDc5ZjUyNWMzODY0YTY5ZjVhMjUyZWYzZGZkMmM4ZDlkMTdkMGI1ZTQ0NDlhZmMwNWJmNDdkOTM1MWFjM2UxYzU5MTQ0ZGJmMjM0YjQyMzUwMGM4NDg2OTViZWM0OGRhN2NjZDk0YjdhZGI1YzM4YTFi"
   },
   "frame": {
-    "version": "1",
+    "version": "vNext",
     "name": "MySphere",
+    "description": "Social network on Base with integrated DeFi features",
+    "tags": ["social", "defi", "base", "web3"],
+    "category": "Social",
     "iconUrl": "https://mysphere.fun/favicon_io (1)/android-chrome-192x192.png",
     "homeUrl": "https://mysphere.fun/basechat",
     "imageUrl": "https://mysphere.fun/images/frame-v2.png",
