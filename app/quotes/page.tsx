@@ -826,9 +826,13 @@ export default function QuotesPage() {
     try {
       const response = await fetch(`https://api.pexels.com/v1/search?query=${searchQuery}&per_page=15`, {
         headers: {
-          'Authorization': `${process.env.NEXT_PUBLIC_PEXELS_API_KEY}`
+          'Authorization': process.env.NEXT_PUBLIC_PEXELS_API_KEY || '',
+          'Access-Control-Allow-Origin': '*'
         }
       });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
       setSearchResults(data.photos);
     } catch (error) {
@@ -840,8 +844,17 @@ export default function QuotesPage() {
 
   const fetchQuoteBackgroundImage = async () => {
     try {
+      if (!process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY) {
+        throw new Error('Unsplash access key is not defined');
+      }
       const response = await axios.get(
-        `https://api.unsplash.com/photos/random?query=nature&orientation=landscape&client_id=${process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY}`
+        `https://api.unsplash.com/photos/random?query=nature&orientation=landscape`,
+        {
+          headers: {
+            'Authorization': `Client-ID ${process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY}`,
+            'Access-Control-Allow-Origin': '*'
+          }
+        }
       );
       setIsCustomBackground(true);
       setQuoteBackgroundImage(response.data.urls.regular);
@@ -854,9 +867,14 @@ export default function QuotesPage() {
     try {
       const response = await fetch('https://api.pexels.com/v1/curated?per_page=80', {
         headers: {
-          'Authorization': `${process.env.NEXT_PUBLIC_PEXELS_API_KEY}`
+          'Authorization': process.env.NEXT_PUBLIC_PEXELS_API_KEY || ''
         }
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       if (data.photos && data.photos.length > 0) {
         const randomIndex = Math.floor(Math.random() * data.photos.length);
@@ -865,6 +883,7 @@ export default function QuotesPage() {
       }
     } catch (error) {
       console.error('Error fetching background from Pexels:', error);
+      alert('Nie udało się pobrać zdjęcia z Pexels. Spróbuj ponownie później.');
     }
   };
 
