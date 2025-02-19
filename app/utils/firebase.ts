@@ -1452,3 +1452,98 @@ export const refreshAllPosts = async () => {
     };
   }
 };
+
+// Interface for authorized quote
+export interface AuthorizedQuote {
+  id: string;
+  content: string;
+  submittedBy: string;
+  status: 'pending' | 'approved' | 'rejected';
+  timestamp: any;
+  category: string;
+  submitterName?: string;
+  isOwnQuote?: boolean;
+}
+
+// Submit a quote for authorization
+export const submitQuoteForAuthorization = async (quote: {
+  content: string;
+  submittedBy: string;
+  category: string;
+  isOwnQuote?: boolean;
+}): Promise<string> => {
+  try {
+    const quoteData = {
+      ...quote,
+      status: 'pending',
+      timestamp: serverTimestamp(),
+      isOwnQuote: quote.isOwnQuote || false
+    };
+
+    const docRef = await addDoc(collection(db, 'authorizedQuotes'), quoteData);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error submitting quote:', error);
+    throw error;
+  }
+};
+
+// Get pending quotes (admin only)
+export const getPendingQuotes = async (): Promise<AuthorizedQuote[]> => {
+  try {
+    const quotesRef = collection(db, 'authorizedQuotes');
+    const q = query(
+      quotesRef,
+      where('status', '==', 'pending'),
+      orderBy('timestamp', 'desc')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as AuthorizedQuote));
+  } catch (error) {
+    console.error('Error getting pending quotes:', error);
+    throw error;
+  }
+};
+
+// Update quote status (admin only)
+export const updateQuoteStatus = async (
+  quoteId: string, 
+  status: 'approved' | 'rejected'
+): Promise<void> => {
+  try {
+    const quoteRef = doc(db, 'authorizedQuotes', quoteId);
+    await updateDoc(quoteRef, {
+      status,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating quote status:', error);
+    throw error;
+  }
+};
+
+// Get approved quotes by category
+export const getApprovedQuotes = async (category: string): Promise<AuthorizedQuote[]> => {
+  try {
+    const quotesRef = collection(db, 'authorizedQuotes');
+    const q = query(
+      quotesRef,
+      where('status', '==', 'approved'),
+      where('category', '==', category),
+      orderBy('timestamp', 'desc')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as AuthorizedQuote));
+  } catch (error) {
+    console.error('Error getting approved quotes:', error);
+    throw error;
+  }
+};

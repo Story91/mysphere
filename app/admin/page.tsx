@@ -9,6 +9,7 @@ import UserManagement from './components/UserManagement';
 import ContentModeration from './components/ContentModeration';
 import Statistics from './components/Statistics';
 import { refreshAllPosts } from '../utils/firebase';
+import AdminQuotes from './quotes/page';
 
 // Usuwam stałą ADMIN_ADDRESS, bo importujemy ją z firebase.ts
 const ADMIN_BASENAME = "story91.base.eth";
@@ -18,7 +19,7 @@ export default function AdminPanel() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'content' | 'stats'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'content' | 'stats' | 'quotes'>('users');
   const [refreshStatus, setRefreshStatus] = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -103,6 +104,16 @@ export default function AdminPanel() {
           }`}
         >
           Statystyki
+        </button>
+        <button
+          onClick={() => setActiveTab('quotes')}
+          className={`px-4 py-2 rounded-lg ${
+            activeTab === 'quotes'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+          }`}
+        >
+          Cytaty
         </button>
       </div>
 
@@ -226,6 +237,7 @@ export default function AdminPanel() {
         {activeTab === 'users' && <UserManagement />}
         {activeTab === 'content' && <ContentModeration />}
         {activeTab === 'stats' && <Statistics />}
+        {activeTab === 'quotes' && <AdminQuotes />}
       </div>
     </div>
   );

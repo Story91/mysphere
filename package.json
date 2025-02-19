@@ -48,7 +48,9 @@
     "tailwindcss-animate": "^1.0.7",
     "utf-8-validate": "^5.0.10",
     "viem": "^2.22.19",
-    "wagmi": "^2.14.9"
+    "wagmi": "^2.14.9",
+    "html2canvas": "^1.4.1",
+    "ipfs-http-client": "^60.0.1"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^3.0.8",

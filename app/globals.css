@@ -477,3 +477,32 @@ h1, h2, h3, h4, h5, h6 {
   color: #111111 !important;
   stroke: #111111 !important;
 }
+
+/* Color Picker Styles */
+.react-colorful {
+  width: 100% !important;
+  height: 160px !important;
+  border-radius: 0.75rem;
+  background: transparent;
+}
+
+.react-colorful__saturation {
+  border-radius: 0.75rem;
+  border-bottom: none;
+  margin-bottom: 0.5rem;
+}
+
+.react-colorful__hue {
+  height: 24px !important;
+  border-radius: 0.75rem;
+}
+
+.react-colorful__pointer {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+.react-colorful__interactive:focus .react-colorful__pointer {
+  transform: translate(-50%, -50%) scale(1.1);
+}
