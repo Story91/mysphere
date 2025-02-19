@@ -1,3 +1,5 @@
+'use client';
+
 import '@coinbase/onchainkit/styles.css';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
@@ -5,10 +7,6 @@ import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Providers } from './providers';
 import Navigation from './components/Navigation/Navigation';
 import { ThemeProvider } from './context/ThemeContext';
-import dynamic from 'next/dynamic';
-
-// Wrapper dla komponentów klienckich
-const ClientWrapper = dynamic(() => import('./ClientWrapper'), { ssr: false });
 
 export default function RootLayout({
   children,
@@ -78,18 +76,16 @@ export default function RootLayout({
         <meta name="theme-color" content="#0052FF" />
       </head>
       <body className="min-h-screen bg-[#0F172A]">
-        <ClientWrapper>
-          <ThemeProvider>
-            <Providers>
-              <Navigation />
-              <main className="w-full">
-                {children}
-              </main>
-              <Analytics />
-              <SpeedInsights />
-            </Providers>
-          </ThemeProvider>
-        </ClientWrapper>
+        <ThemeProvider>
+          <Providers>
+            <Navigation />
+            <main className="w-full">
+              {children}
+            </main>
+            <Analytics />
+            <SpeedInsights />
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   );
