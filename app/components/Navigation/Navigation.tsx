@@ -35,7 +35,7 @@ export default function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-
+  
   useEffect(() => {
     if (address) {
       setIsAdmin(address.toLowerCase() === ADMIN_ADDRESS.toLowerCase());
@@ -74,7 +74,8 @@ export default function Navigation() {
   };
 
   const navLinks = [
-    { href: '/basechat', label: 'MySphere', icon: '/elo2.png' },
+    { href: '/basechat', label: 'MySphere' },
+    { href: '/quotes', label: 'Quotes' },
     { href: '/profile', label: 'Identity' },
     {
       label: 'Finance',
@@ -84,7 +85,6 @@ export default function Navigation() {
       ]
     },
     { href: '/nft', label: 'NFT' },
-    { href: '/messages', label: 'DM' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ];
 
@@ -165,17 +165,8 @@ export default function Navigation() {
                         : 'text-gray-100 hover:text-[#0052FF]'
                     }`}
                   >
-                    <span className="relative z-10 flex items-center">
+                    <span className="relative z-10">
                       {link.label}
-                      {link.icon && (
-                        <Image
-                          src={link.icon}
-                          alt={link.label}
-                          width={56}
-                          height={56}
-                          className="object-contain ml-2"
-                        />
-                      )}
                     </span>
                     <div className="absolute inset-0 rounded-xl bg-[#0052FF]/0 group-hover:bg-[#0052FF]/5 transition-all duration-300"></div>
                     {pathname === link.href && (
@@ -239,7 +230,7 @@ export default function Navigation() {
               </svg>
             </button>
             <div className="text-sm font-mono text-[#0052FF] animate-pulse hidden sm:block">
-              [BETA 0.9.1]
+              [BETA 1.9.1]
             </div>
               <Wallet>
                 <ConnectWallet className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2">
@@ -349,16 +340,7 @@ export default function Navigation() {
                   }`}
                 >
                   <span className="flex items-center">
-                    {link.label}
-                    {link.icon && (
-                      <Image
-                        src={link.icon}
-                        alt={link.label}
-                        width={24}
-                        height={24}
-                        className="ml-2"
-                      />
-                    )}
+                  {link.label}
                   </span>
                 </Link>
               )

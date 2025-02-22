@@ -1,28 +1,29 @@
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
-export async function POST(req: Request) {
-  return new NextResponse(
-    `<!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="fc:frame" content='{
-          "version": "next",
-          "imageUrl": "https://mysphere.fun/images/frame-v2.png",
-          "buttons": [
-            {
-              "label": "Connect Wallet",
-              "action": "post_redirect",
-              "target": "https://mysphere.fun/basechat"
-            }
-          ],
-          "postUrl": "https://mysphere.fun/api/frame"
-        }' />
-      </head>
-    </html>`,
+export async function POST(req: NextRequest) {
+  const data = await req.json();
+  
+  return new Response(
+    JSON.stringify({
+      version: 'vNext',
+      image: 'https://basebook.vercel.app/og-image.png',
+      buttons: [
+        {
+          label: 'Mint Quote',
+        },
+        {
+          label: 'View Collection',
+        },
+      ],
+      post_url: 'https://basebook.vercel.app/api/frame',
+    }),
     {
       headers: {
-        'Content-Type': 'text/html',
+        'Content-Type': 'application/json',
       },
+      status: 200,
     }
   );
-} 
+}
+
+export const dynamic = 'force-dynamic'; 

@@ -56,6 +56,7 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^3.0.8",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.12",
     "@openzeppelin/contracts": "^5.2.0",
     "@types/node": "^20",
     "@types/react": "^18",
@@ -69,6 +70,7 @@
     "eslint-plugin-react-hooks": "^5.1.0",
     "ethers": "^6.13.5",
     "hardhat": "^2.22.18",
+    "hardhat-contract-sizer": "^2.10.0",
     "postcss": "^8",
     "postcss-flexbugs-fixes": "^5.0.2",
     "postcss-import": "^15.1.0",

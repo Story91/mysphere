@@ -50,6 +50,15 @@ const config: Config = {
       backgroundImage: {
         'base-gradient': 'linear-gradient(90deg, #0052FF 0%, #00FF8F 100%)',
         'base-dark': 'linear-gradient(180deg, #0A0B0D 0%, #1E2025 100%)'
+      },
+      keyframes: {
+        glow: {
+          '0%, 100%': { boxShadow: '0 0 15px rgba(255, 0, 168, 0.7), 0 0 30px rgba(0, 255, 209, 0.7)' },
+          '50%': { boxShadow: '0 0 30px rgba(255, 0, 168, 0.9), 0 0 50px rgba(0, 255, 209, 0.9)' }
+        }
+      },
+      animation: {
+        'glow': 'glow 1.5s ease-in-out infinite'
       }
     },
   },

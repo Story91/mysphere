@@ -1,22 +1,27 @@
 export const BASE_CHAIN_ID = 8453; // Base mainnet
 
 // Adres kontraktu NFT Collection na Base mainnet
-export const mintContractAddress = '0x2B75b69BC2c213C17F1D13f1b90fA9167723c4B3';
+export const mintContractAddress = '0x9c44802843a670732383f62b2F3304f92EC1702b';
 
 // Opłata za mintowanie w ETH
-export const MINT_PRICE = "0.001"; // 0.001 ETH
+export const MINT_PRICE = "0.0001"; // 0.0001 ETH
 
 export const mintABI = [
+  {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
   {
     "inputs": [
       {
         "internalType": "address",
-        "name": "_to",
+        "name": "to",
         "type": "address"
       },
       {
         "internalType": "string",
-        "name": "_uri",
+        "name": "uri",
         "type": "string"
       }
     ],
@@ -28,6 +33,26 @@ export const mintABI = [
         "type": "uint256"
       }
     ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdraw",
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -45,41 +70,96 @@ export const mintABI = [
     "type": "function"
   },
   {
-    inputs: [],
-    name: "totalSupply",
-    outputs: [
+    "inputs": [],
+    "name": "totalSupply",
+    "outputs": [
       {
-        internalType: "uint256",
-        name: "",
-        type: "uint256"
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
-    stateMutability: "view",
-    type: "function"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    anonymous: false,
-    inputs: [
+    "inputs": [],
+    "name": "mintPrice",
+    "outputs": [
       {
-        indexed: true,
-        internalType: "address",
-        name: "owner",
-        type: "address"
-      },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "approved",
-        type: "address"
-      },
-      {
-        indexed: true,
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256"
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
-    name: "Approval",
-    type: "event"
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "royaltyFee",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_tokenId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_salePrice",
+        "type": "uint256"
+      }
+    ],
+    "name": "royaltyInfo",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "royaltyAmount",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "uri",
+        "type": "string"
+      }
+    ],
+    "name": "QuoteMinted",
+    "type": "event"
   }
 ] as const; 
