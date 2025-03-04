@@ -29,6 +29,7 @@
     "clsx": "^2.1.1",
     "dotenv": "^16.4.1",
     "ethers": "^6.11.1",
+    "firebase": "^11.4.0",
     "framer-motion": "^11.0.3",
     "hardhat": "^2.19.5",
     "lucide-react": "^0.477.0",
