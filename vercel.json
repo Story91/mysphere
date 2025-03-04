@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/flashblock/:path*",
+      "destination": "https://base-is-10x-faster.vercel.app/:path*"
+    }
+  ]
+} 
