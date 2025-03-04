@@ -3,8 +3,10 @@
 import { base } from 'viem/chains';
 import { OnchainKitProvider } from '@coinbase/onchainkit';
 import { createContext, useContext, useState } from 'react';
+import { createConfig, http } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
-import { wagmiConfig } from './components/Web3Provider/wagmiConfig';
+import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors';
+import { farcasterFrame } from '@farcaster/frame-wagmi-connector';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
 
@@ -30,6 +32,32 @@ export function useTheme() {
 
 const queryClient = new QueryClient();
 
+// Konfiguracja wagmi z obsługą Farcaster Frame
+const wagmiConfig = createConfig({
+  chains: [base],
+  transports: {
+    [base.id]: http('https://mainnet.base.org')
+  },
+  connectors: [
+    farcasterFrame(),
+    injected(),
+    coinbaseWallet({
+      appName: 'BaseBook',
+      appLogoUrl: '/android-chrome-192x192.png',
+      darkMode: true
+    }),
+    walletConnect({ 
+      projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '',
+      metadata: {
+        name: 'BaseBook',
+        description: 'Social network on Base',
+        url: 'https://mysphere.fun',
+        icons: ['https://mysphere.fun/android-chrome-192x192.png']
+      }
+    })
+  ]
+});
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>('auto');
   const [style, setStyle] = useState<ThemeStyle>('base');
@@ -53,19 +81,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
                   display: 'modal',
                   termsUrl: 'https://basebook.xyz/terms',
                   privacyUrl: 'https://basebook.xyz/privacy',
-                },
-                // @ts-ignore
-                coinbaseWallet: {
-                  appName: 'BaseBook',
-                  appLogoUrl: '/android-chrome-192x192.png',
-                  darkMode: true,
-                  defaultChain: base,
-                  chainId: 8453,
-                  jsonRpcUrl: 'https://base-mainnet.public.blastapi.io',
-                  fallbackRpcUrls: [
-                    'https://mainnet.base.org',
-                    'https://base.blockpi.network/v1/rpc/public'
-                  ]
                 }
               }}
               projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}

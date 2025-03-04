@@ -16,6 +16,14 @@ const nextConfig = {
       unoptimized: true,
       domains: ['basebook.vercel.app', 'firebasestorage.googleapis.com', 'mysphere.fun']
     },
+    async rewrites() {
+      return [
+        {
+          source: '/flashblock/:path*',
+          destination: 'https://base-is-10x-faster.vercel.app/:path*',
+        },
+      ];
+    },
     async redirects() {
       return [
         {

@@ -1,26 +1,44 @@
+'use client';
+
 import { PropsWithChildren, useEffect } from 'react';
 import FrameSDK from '@farcaster/frame-sdk';
+import { useConnect } from 'wagmi';
 import { farcasterFrame } from '@farcaster/frame-wagmi-connector';
-import { connect } from 'wagmi/actions';
-import { wagmiConfig } from '../Web3Provider/wagmiConfig';
 
 export function FarcasterFrameProvider({ children }: PropsWithChildren) {
+  const { connect } = useConnect();
+
   useEffect(() => {
+    let mounted = true;
+
     const init = async () => {
-      const context = await FrameSDK.context;
+      try {
+        const context = await FrameSDK.context;
 
-      // Autoconnect jeśli uruchomione w ramce
-      if (context?.client.clientFid) {
-        connect(wagmiConfig, { connector: farcasterFrame() });
+        if (!mounted) return;
+
+        // Autoconnect if running in frame
+        if (context?.client.clientFid) {
+          connect({ connector: farcasterFrame() });
+        }
+
+        // Hide splash screen after UI render
+        setTimeout(() => {
+          if (mounted) {
+            FrameSDK.actions.ready();
+          }
+        }, 500);
+      } catch (error) {
+        console.error('Failed to initialize Farcaster Frame:', error);
       }
-
-      // Ukryj splash screen po wyrenderowaniu UI
-      setTimeout(() => {
-        FrameSDK.actions.ready();
-      }, 500);
     };
+
     init();
-  }, []);
+
+    return () => {
+      mounted = false;
+    };
+  }, [connect]);
 
   return <>{children}</>;
 } 

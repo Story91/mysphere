@@ -40,7 +40,6 @@ import ReCaptcha from '../components/ReCaptcha/ReCaptcha';
 
 import FrameSDK from '@farcaster/frame-sdk'
 import farcasterFrame from '@farcaster/frame-wagmi-connector'
-import { wagmiConfig } from '../components/Web3Provider/wagmiConfig'
 import { connect } from 'wagmi/actions'
 import { FarcasterFrameProvider } from '../components/FarcasterFrameProvider/FarcasterFrameProvider';
 
@@ -208,24 +207,6 @@ export default function BaseChat() {
     address: address || '0x0000000000000000000000000000000000000000', 
     chain: base 
   });
-
-  // Inicjalizacja Frame SDK
-  useEffect(() => {
-    const init = async () => {
-      const context = await FrameSDK.context;
-
-      // Autoconnect jeśli uruchomione w ramce
-      if (context?.client.clientFid) {
-        connect(wagmiConfig, { connector: farcasterFrame() });
-      }
-
-      // Ukryj splash screen po wyrenderowaniu UI
-      setTimeout(() => {
-        FrameSDK.actions.ready();
-      }, 500);
-    };
-    init();
-  }, []);
 
   // Funkcja sprawdzająca czy użytkownik może tworzyć posty
   const canCreatePosts = Boolean(baseName);
@@ -451,8 +432,8 @@ export default function BaseChat() {
       // Sprawdzenie limitu postów dziennie
       if (dailyPostCount >= 5) {
         alert('You have reached the daily limit of 5 posts.');
-        return;
-      }
+      return;
+    }
       setDailyPostCount(prev => prev + 1);
 
       console.log('🚀 Starting post creation...');

@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "target": "es2020",
     "lib": [
       "dom",
       "dom.iterable",
@@ -18,7 +19,8 @@
     "incremental": true,
     "types": [
       "node",
-      "react"
+      "mocha",
+      "chai"
     ],
     "plugins": [
       {
@@ -26,10 +28,9 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }
+      "@/*": ["./*"]
+    },
+    "baseUrl": "."
   },
   "include": [
     "next-env.d.ts",
@@ -39,8 +40,9 @@
   ],
   "exclude": [
     "node_modules",
-    "**/*.spec.ts",
-    "**/*.test.ts",
-    ".next"
+    "app/basemorning/test/**/*",
+    "app/basemorning/scripts/**/*",
+    ".next",
+    "dist"
   ]
 }

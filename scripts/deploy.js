@@ -1,31 +1,37 @@
 const hre = require("hardhat");
 
 async function main() {
-  const MySphereAIQuotes = await hre.ethers.getContractFactory("MySphereAIQuotes");
-  const quotes = await MySphereAIQuotes.deploy();
-
-  await quotes.waitForDeployment();
-
-  const address = await quotes.getAddress();
-  console.log("MySphereAIQuotes deployed to:", address);
+  const platformAddress = process.env.PLATFORM_ADDRESS || "0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd";
   
-  // Czekamy na potwierdzenie bloków dla lepszej weryfikacji
-  await quotes.deploymentTransaction().wait(5);
+  console.log("Deploying contracts with platform address:", platformAddress);
+
+  const PostCoinFactory = await hre.ethers.getContractFactory("PostCoinFactory");
+  const factory = await PostCoinFactory.deploy(platformAddress);
   
+  await factory.waitForDeployment();
+  
+  const address = await factory.getAddress();
+  console.log("PostCoinFactory deployed to:", address);
+
   // Weryfikacja kontraktu
-  console.log("Rozpoczynam weryfikację kontraktu...");
+  console.log("Waiting for deployment confirmation...");
+  await factory.deploymentTransaction().wait(5);
+  
+  console.log("Verifying contract...");
   try {
     await hre.run("verify:verify", {
       address: address,
-      constructorArguments: [],
+      constructorArguments: [platformAddress],
     });
-    console.log("Kontrakt zweryfikowany pomyślnie!");
+    console.log("Contract verified successfully!");
   } catch (error) {
-    console.log("Błąd weryfikacji:", error);
+    console.error("Verification error:", error);
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-}); 
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

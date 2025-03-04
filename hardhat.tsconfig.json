@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "strict": false,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "declaration": true,
+    "noImplicitAny": false,
+    "types": ["node", "mocha", "chai"],
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
+    "skipLibCheck": true,
+    "isolatedModules": false,
+    "allowJs": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "*": ["node_modules/*"]
+    }
+  },
+  "ts-node": {
+    "files": true,
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "commonjs",
+      "resolveJsonModule": true,
+      "types": ["node", "mocha", "chai"]
+    }
+  },
+  "include": [
+    "hardhat.config.ts",
+    "./app/basemorning/scripts/**/*",
+    "./app/basemorning/test/**/*"
+  ],
+  "files": [
+    "./hardhat.config.ts"
+  ]
+} 
