@@ -32,6 +32,11 @@ export default function ProfilePage() {
     nftPoints: 0,
     contractPoints: 0
   });
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -71,10 +76,14 @@ export default function ProfilePage() {
       }
     }
 
-    if (address) {
+    if (address && isMounted) {
       fetchData();
     }
-  }, [address]);
+  }, [address, isMounted]);
+
+  if (!isMounted) {
+    return <div></div>;
+  }
 
   return (
     <div className="min-h-screen bg-black">

@@ -42,6 +42,7 @@ import FrameSDK from '@farcaster/frame-sdk'
 import farcasterFrame from '@farcaster/frame-wagmi-connector'
 import { connect } from 'wagmi/actions'
 import { FarcasterFrameProvider } from '../components/FarcasterFrameProvider/FarcasterFrameProvider';
+import { RefreshCw } from 'lucide-react';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -104,7 +105,11 @@ const isBaseName = (name: string) => {
 
 // Nowy komponent BanPage
 function BanPage({ children }: { children: React.ReactNode }) {
-  const { isBanned, reason, bannedAt } = useBanStatus();
+  const { isBanned, reason, bannedAt, isMounted } = useBanStatus();
+
+  if (!isMounted) {
+    return <div></div>;
+  }
 
   if (isBanned) {
     return (
@@ -131,7 +136,18 @@ const toEthereumAddress = (address: string): EthereumAddress => {
   return address as `0x${string}`;
 };
 
+// Komponent odznaki BaseName
+const BaseNameBadge = () => (
+  <span className="inline-flex items-center px-2 py-0.5 ml-2 text-xs font-medium rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white">
+    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+      <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+    </svg>
+    BaseName
+  </span>
+);
+
 export default function BaseChat() {
+  const [isMounted, setIsMounted] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
   // Stany dla generowania AI
   const [showAIModal, setShowAIModal] = useState(false);
@@ -208,8 +224,11 @@ export default function BaseChat() {
     chain: base 
   });
 
-  // Funkcja sprawdzająca czy użytkownik może tworzyć posty
-  const canCreatePosts = Boolean(baseName);
+  // Funkcja sprawdzająca czy użytkownik może tworzyć posty - dostępne dla wszystkich
+  const canCreatePosts = true; // Zmieniono z Boolean(baseName) na true, aby wszyscy mogli tworzyć posty
+
+  // Sprawdzenie czy użytkownik ma BaseName (do wyróżnienia w UI)
+  const userHasBaseName = Boolean(baseName);
 
   // Dodaj nowy stan dla tooltipa
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
@@ -242,8 +261,9 @@ export default function BaseChat() {
   // Funkcja pomocnicza do wyświetlania nazwy użytkownika z tooltipem
   const displayUserName = (userAddress: string, elementId: string) => {
     const userName = userNames[userAddress]?.name || userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
+    const hasBaseName = isBaseName(userName);
     
-  return (
+    return (
       <div className="relative inline-block">
         <div className="flex items-center">
           {userNames[userAddress]?.avatar ? (
@@ -267,7 +287,7 @@ export default function BaseChat() {
               setHoveredUser(null);
             }}
           >
-            <span className={`${isBaseName(userName) ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'}`}>
+            <span className={`${hasBaseName ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'}`}>
               {userName.endsWith('.sphere') ? (
                 <>
                   <span className="text-gray-900 dark:text-white">{userName.replace('.sphere', '')}</span>
@@ -277,6 +297,7 @@ export default function BaseChat() {
                 userName
               )}
             </span>
+            {hasBaseName && <BaseNameBadge />}
           </div>
         </div>
         
@@ -306,6 +327,18 @@ export default function BaseChat() {
                 <div className="text-sm font-medium">Total Points</div>
                 <div className="text-lg font-bold text-indigo-500">{userStats[userAddress].totalPoints}</div>
               </div>
+              {Boolean(
+                userStats[userAddress] && 
+                'hasBaseName' in userStats[userAddress] && 
+                userStats[userAddress].hasBaseName && 
+                'baseNameBonus' in userStats[userAddress]
+              ) && (
+                <div className="mt-1 text-center">
+                  <div className="text-xs text-green-500 font-medium">
+                    Includes +1000 BaseName Bonus
+                  </div>
+                </div>
+              )}
               <div className="mt-1 text-center">
                 <div className="text-sm font-medium">Badges Earned</div>
                 <div className="text-lg font-bold text-indigo-500">
@@ -620,6 +653,10 @@ export default function BaseChat() {
 
   // Dodaj nowy stan dla statusu ładowania
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  // Dodaj stan do śledzenia, czy dane zostały już odświeżone po starcie
+  const [initialRefreshDone, setInitialRefreshDone] = useState(false);
+  // Dodaj stan do śledzenia, czy można odświeżyć dane ręcznie
+  const [canManuallyRefresh, setCanManuallyRefresh] = useState(true);
 
   // Funkcja do szybkiego ładowania podstawowych danych
   const loadInitialData = useCallback(() => {
@@ -634,10 +671,10 @@ export default function BaseChat() {
         
       if (cachedNames) {
         setUserNames(JSON.parse(cachedNames));
-        }
+      }
     } catch (error) {
       console.error('Error loading cached data:', error);
-      }
+    }
   }, []);
 
   // Zmodyfikowana funkcja getActiveUsers
@@ -645,6 +682,9 @@ export default function BaseChat() {
     if (!db) return;
 
     try {
+      setIsLoadingUsers(true);
+      setCanManuallyRefresh(false); // Zablokuj możliwość ręcznego odświeżania podczas pobierania danych
+      
       const usersRef = collection(db, 'users');
       const usersSnap = await getDocs(usersRef);
 
@@ -654,17 +694,22 @@ export default function BaseChat() {
         // Zmieniona obsługa lastActive
         const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
         
-        const stats = {
-          posts: data.postsCount || 0,
-          likes: data.likesReceived || 0
-        };
-
-        // Oblicz punkty
-        const postPoints = stats.posts * 5;
-        const likePoints = stats.likes;
-        const basePoints = postPoints + likePoints;
-        const activityBonus = Math.round(basePoints * 0.25);
-        const totalPoints = basePoints + activityBonus;
+        // Pobierz punkty bezpośrednio z struktury baseChatPoints
+        let totalPoints = 0;
+        if (data.baseChatPoints && typeof data.baseChatPoints === 'object') {
+          totalPoints = data.baseChatPoints.totalPoints || 0;
+        } else {
+          // Oblicz punkty jeśli struktura baseChatPoints nie istnieje
+          const stats = {
+            posts: data.postsCount || 0,
+            likes: data.likesReceived || 0
+          };
+          const postPoints = stats.posts * 5;
+          const likePoints = stats.likes;
+          const basePoints = postPoints + likePoints;
+          const activityBonus = Math.round(basePoints * 0.25);
+          totalPoints = basePoints + activityBonus;
+        }
 
         // Aktualizuj nazwy użytkowników
         const userName = data.name || (data.baseName ? `${data.baseName}.base.eth` : doc.id.slice(0, 6) + '...' + doc.id.slice(-4));
@@ -679,7 +724,10 @@ export default function BaseChat() {
         return {
           address: doc.id,
           points: totalPoints,
-          stats: stats,
+          stats: {
+            posts: data.postsCount || 0,
+            likes: data.likesReceived || 0
+          },
           lastActive: lastActive,
           name: userName
         };
@@ -694,36 +742,52 @@ export default function BaseChat() {
 
       setActiveUsers(sortedUsers);
       setIsLoadingUsers(false);
+      setInitialRefreshDone(true);
+      
+      // Pozwól na ręczne odświeżenie po 10 sekundach
+      setTimeout(() => {
+        setCanManuallyRefresh(true);
+      }, 10000);
+      
+      console.log('Zaktualizowano listę aktywnych użytkowników:', sortedUsers.length);
     } catch (error) {
       console.error('Error fetching active users:', error);
       setIsLoadingUsers(false);
+      setCanManuallyRefresh(true);
     }
   }, [db]);
 
+  // Funkcja do ręcznego odświeżania danych
+  const handleManualRefresh = useCallback(() => {
+    if (canManuallyRefresh) {
+      getActiveUsers();
+    }
+  }, [canManuallyRefresh, getActiveUsers]);
+
   // Zmodyfikowane useEffect-y
   useEffect(() => {
-    // Natychmiast załaduj dane z cache
+    // Najpierw załaduj dane z localStorage
     loadInitialData();
     
-    // Natychmiast pobierz świeże dane
-    getActiveUsers();
-        
-    // Następnie odświeżaj co 30 sekund przez pierwsze 2 minuty
-    const quickRefreshInterval = setInterval(getActiveUsers, 30 * 1000);
+    // Po 15 sekundach pobierz aktualne dane z Firebase
+    const initialRefreshTimeout = setTimeout(() => {
+      getActiveUsers();
+    }, 15 * 1000);
+    
+    // Po pierwszym odświeżeniu, ustaw interwał co 2 minuty
+    const intervalTimeout = setTimeout(() => {
+      const refreshInterval = setInterval(getActiveUsers, 2 * 60 * 1000); // Co 2 minuty
       
-    // Po 2 minutach przełącz na odświeżanie co 5 minut
-    const slowRefreshTimeout = setTimeout(() => {
-      clearInterval(quickRefreshInterval);
-      const slowRefreshInterval = setInterval(getActiveUsers, 5 * 60 * 1000);
+      // Cleanup dla interwału
+      return () => {
+        clearInterval(refreshInterval);
+      };
+    }, 20 * 1000); // 20 sekund (15 na pierwsze odświeżenie + 5 sekund zapasu)
     
-      // Cleanup dla wolnego odświeżania
-      return () => clearInterval(slowRefreshInterval);
-    }, 2 * 60 * 1000);
-    
-    // Cleanup dla szybkiego odświeżania i timeoutu
+    // Cleanup dla timeoutów
     return () => {
-      clearInterval(quickRefreshInterval);
-      clearTimeout(slowRefreshTimeout);
+      clearTimeout(initialRefreshTimeout);
+      clearTimeout(intervalTimeout);
     };
   }, [loadInitialData, getActiveUsers]);
 
@@ -1492,6 +1556,24 @@ export default function BaseChat() {
       setIsGeneratingAI(false);
     }
   };
+
+  // Dodajemy useEffect do obsługi montowania komponentu
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Efekt uruchamiany przy montowaniu komponentu
+  useEffect(() => {
+    if (!isMounted) {
+      setIsMounted(true);
+      // Usunięto automatyczne wykonanie funkcji naprawiających strukturę baseChatPoints i dodających bonus BaseName
+    }
+  }, [isMounted]);
+
+  // Jeśli komponent nie jest zamontowany, zwracamy pusty div
+  if (!isMounted) {
+    return <div></div>;
+  }
 
   return (
     <FarcasterFrameProvider>
@@ -2626,10 +2708,20 @@ export default function BaseChat() {
 
               {/* Most Active Users */}
               <div className="mb-4 relative z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
-                <h2 className="text-lg font-semibold mb-3 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
-                  Most Active Users
-                  <div className="ml-2 text-2xl">👥</div>
-                </h2>
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className="text-lg font-semibold mb-0 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
+                    Most Active Users
+                    <div className="ml-2 text-2xl">👥</div>
+                  </h2>
+                  <button 
+                    onClick={handleManualRefresh} 
+                    disabled={!canManuallyRefresh}
+                    className={`text-xs ${canManuallyRefresh ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 cursor-not-allowed'} flex items-center`}
+                  >
+                    <RefreshCw className={`w-3 h-3 mr-1 ${isLoadingUsers ? 'animate-spin' : ''}`} />
+                    {isLoadingUsers ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
                 <div className="space-y-3">
                   {renderUserList()}
                   <div className="mt-4">
@@ -2655,8 +2747,8 @@ export default function BaseChat() {
                       </div>
                     </div>
                   </div>
+                </div>
               </div>
-            </div>
 
               {/* Trending Hashtags */}
               <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-xl p-4">

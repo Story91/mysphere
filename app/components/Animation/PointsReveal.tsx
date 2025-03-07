@@ -11,14 +11,25 @@ export const PointsReveal: React.FC<PointsRevealProps> = ({
   onComplete
 }) => {
   const [showPoints, setShowPoints] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    
     const timer = setTimeout(() => {
       setShowPoints(true);
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isMounted]);
+
+  if (!isMounted) {
+    return <div></div>;
+  }
 
   return (
     <div className="backdrop-blur-lg bg-black/40 p-8 border border-[#0052FF]/20 shadow-[0_0_15px_rgba(0,82,255,0.1)] relative">

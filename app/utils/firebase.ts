@@ -42,6 +42,123 @@ const convertTimestamp = (timestamp: Timestamp): number => {
   return timestamp.toMillis();
 };
 
+// Funkcja sprawdzająca czy użytkownik ma BaseName i dodająca bonus
+export const hasBaseName = async (userAddress: string): Promise<boolean> => {
+  try {
+    const usernameRef = doc(db, 'usernames', userAddress);
+    const usernameDoc = await getDoc(usernameRef);
+    
+    if (usernameDoc.exists()) {
+      const data = usernameDoc.data();
+      const isBaseNameUser = data.isBaseName === true;
+      
+      // Jeśli użytkownik ma BaseName, dodaj bonus 1000 punktów
+      if (isBaseNameUser) {
+        await addBaseNameBonusToUser(userAddress);
+      }
+      
+      return isBaseNameUser;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error checking BaseName status:', error);
+    return false;
+  }
+};
+
+// Funkcja dodająca bonus BaseName dla użytkownika
+const addBaseNameBonusToUser = async (userAddress: string): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', userAddress);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      
+      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
+      let baseChatPoints: any = userData.baseChatPoints;
+      
+      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
+      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
+        baseChatPoints = {
+          activityBonus: 0,
+          likePoints: 0,
+          postPoints: 0,
+          totalPoints: 0
+        };
+      }
+      
+      // Upewnij się, że wszystkie pola są liczbami
+      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
+      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
+      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
+      
+      // Dodaj baseNameBonus jako liczbę
+      baseChatPoints.baseNameBonus = 1000;
+      
+      // Przelicz totalPoints jako sumę wszystkich składników
+      baseChatPoints.totalPoints = 
+        baseChatPoints.activityBonus + 
+        baseChatPoints.likePoints + 
+        baseChatPoints.postPoints + 
+        baseChatPoints.baseNameBonus;
+      
+      // Zaktualizuj dokument użytkownika
+      await updateDoc(userRef, {
+        baseChatPoints: baseChatPoints,
+        lastUpdated: serverTimestamp()
+      });
+      
+      console.log(`Dodano baseNameBonus dla użytkownika ${userAddress}`);
+    }
+  } catch (error) {
+    console.error('Error adding BaseName bonus:', error);
+  }
+};
+
+// Funkcja dodająca bonus BaseName dla wszystkich użytkowników z BaseName
+export const addBaseNameBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
+  try {
+    console.log('Rozpoczynam dodawanie bonusu BaseName dla wszystkich użytkowników...');
+    
+    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isBaseName: true
+    const usernamesRef = collection(db, 'usernames');
+    const baseNameQuery = query(usernamesRef, where('isBaseName', '==', true));
+    const baseNameSnapshot = await getDocs(baseNameQuery);
+    
+    let updatedUsers = 0;
+    
+    // Przetwórz każdego użytkownika z BaseName
+    for (const usernameDoc of baseNameSnapshot.docs) {
+      const userAddress = usernameDoc.id;
+      
+      // Dodaj bonus BaseName dla użytkownika
+      await addBaseNameBonusToUser(userAddress);
+      updatedUsers++;
+      
+      // Loguj co 10 użytkowników
+      if (updatedUsers % 10 === 0) {
+        console.log(`Zaktualizowano ${updatedUsers} użytkowników...`);
+      }
+    }
+    
+    console.log(`Zakończono dodawanie bonusu BaseName:
+    - Zaktualizowano ${updatedUsers} użytkowników`);
+    
+    return {
+      success: true,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas dodawania bonusu BaseName:', error);
+    return {
+      success: false,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu BaseName'
+    };
+  }
+};
+
 // Zaawansowany system lajków
 export const toggleLike = async (postId: string, userId: string): Promise<boolean> => {
   try {
@@ -582,6 +699,11 @@ export const saveProfileName = async (address: string, name: string) => {
       name,
       lastUpdated: serverTimestamp()
     }, { merge: true });
+    
+    // Jeśli to BaseName, dodaj bonus 1000 punktów
+    if (isBaseName) {
+      await addBaseNameBonusToUser(address);
+    }
     
     return true;
   } catch (error) {
@@ -1347,9 +1469,13 @@ export const calculateUserStats = async (userAddress: string) => {
     const recentPostsSnapshot = await getDocs(recentPostsQuery);
     const recentActivityBonus = recentPostsSnapshot.size > 0 ? 1.25 : 1;
 
+    // Sprawdź czy użytkownik ma BaseName
+    const isBaseNameUser = await hasBaseName(userAddress);
+    const baseNameBonus = isBaseNameUser ? 1000 : 0;
+
     // Calculate total points
-    // Base formula: (posts * 5) + (likes * 1)
-    const points = ((totalPosts * 5) + totalLikes) * recentActivityBonus;
+    // Base formula: (posts * 5) + (likes * 1) + BaseName bonus
+    const points = ((totalPosts * 5) + totalLikes) * recentActivityBonus + baseNameBonus;
 
     // Update user statistics
     const userRef = doc(db, 'users', userAddress);
@@ -1359,14 +1485,18 @@ export const calculateUserStats = async (userAddress: string) => {
       lastCalculated: serverTimestamp(),
       'stats.posts': totalPosts,
       'stats.likes': totalLikes,
-      'stats.points': Math.round(points)
+      'stats.points': Math.round(points),
+      'stats.hasBaseName': isBaseNameUser,
+      'stats.baseNameBonus': baseNameBonus
     });
 
     return {
       posts: totalPosts,
       likes: totalLikes,
       points: Math.round(points),
-      hasRecentActivity: recentActivityBonus > 1
+      hasRecentActivity: recentActivityBonus > 1,
+      hasBaseName: isBaseNameUser,
+      baseNameBonus: baseNameBonus
     };
   } catch (error) {
     console.error('Error calculating user stats:', error);
@@ -1388,7 +1518,7 @@ export const refreshAllPosts = async () => {
     let updatedPosts = 0;
     
     // Mapa do śledzenia statystyk użytkowników
-    const userStats: { [key: string]: { posts: number, likes: number } } = {};
+    const userStats: { [key: string]: { posts: number, likes: number, hasBaseName: boolean } } = {};
     
     // Przetwórz każdy post
     for (const postDoc of postsSnapshot.docs) {
@@ -1411,7 +1541,9 @@ export const refreshAllPosts = async () => {
       
       // Aktualizuj statystyki użytkownika
       if (!userStats[post.author]) {
-        userStats[post.author] = { posts: 0, likes: 0 };
+        // Sprawdź czy użytkownik ma BaseName
+        const userHasBaseName = await hasBaseName(post.author);
+        userStats[post.author] = { posts: 0, likes: 0, hasBaseName: userHasBaseName };
       }
       userStats[post.author].posts++;
       userStats[post.author].likes += actualLikes;
@@ -1420,13 +1552,17 @@ export const refreshAllPosts = async () => {
     // Aktualizuj statystyki użytkowników
     for (const [userId, stats] of Object.entries(userStats)) {
       const userRef = doc(db, 'users', userId);
+      const baseNameBonus = stats.hasBaseName ? 1000 : 0;
+      
       batch.update(userRef, {
         postsCount: stats.posts,
         likesReceived: stats.likes,
         lastCalculated: serverTimestamp(),
         'stats.posts': stats.posts,
         'stats.likes': stats.likes,
-        'stats.points': Math.round((stats.posts * 5 + stats.likes) * 1.25)
+        'stats.hasBaseName': stats.hasBaseName,
+        'stats.baseNameBonus': baseNameBonus,
+        'stats.points': Math.round((stats.posts * 5 + stats.likes) * 1.25 + baseNameBonus)
       });
     }
     
@@ -1545,5 +1681,328 @@ export const getApprovedQuotes = async (category: string): Promise<AuthorizedQuo
   } catch (error) {
     console.error('Error getting approved quotes:', error);
     throw error;
+  }
+};
+
+// Funkcja do usuwania bonusu za BaseName dla wszystkich użytkowników
+export const removeBaseNameBonus = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
+  try {
+    console.log('Rozpoczynam usuwanie bonusu za BaseName dla wszystkich użytkowników...');
+    
+    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isBaseName: true
+    const usernamesRef = collection(db, 'usernames');
+    const baseNameQuery = query(usernamesRef, where('isBaseName', '==', true));
+    const baseNameSnapshot = await getDocs(baseNameQuery);
+    
+    let updatedUsers = 0;
+    const batch = writeBatch(db);
+    const batchSize = 500; // Firestore ma limit 500 operacji w jednym batchu
+    let batchCount = 0;
+    let currentBatch = batch;
+    
+    // Przetwórz każdego użytkownika z BaseName
+    for (const usernameDoc of baseNameSnapshot.docs) {
+      const userAddress = usernameDoc.id;
+      
+      // Pobierz dane użytkownika z kolekcji users
+      const userRef = doc(db, 'users', userAddress);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+        // Pobierz aktualną strukturę baseChatPoints
+        if (userData.baseChatPoints) {
+          const baseChatPoints = { ...userData.baseChatPoints };
+          
+          // Usuń baseNameBonus
+          delete baseChatPoints.baseNameBonus;
+          
+          // Przelicz totalPoints
+          const postPoints = baseChatPoints.postPoints || 0;
+          const likePoints = baseChatPoints.likePoints || 0;
+          const activityBonus = baseChatPoints.activityBonus || 0;
+          
+          // Suma wszystkich punktów bez baseNameBonus
+          baseChatPoints.totalPoints = postPoints + likePoints + activityBonus;
+          
+          // Zaktualizuj dokument użytkownika
+          currentBatch.update(userRef, {
+            baseChatPoints: baseChatPoints,
+            lastUpdated: serverTimestamp()
+          });
+          
+          updatedUsers++;
+          batchCount++;
+          
+          // Jeśli osiągnęliśmy limit batcha, wykonaj go i utwórz nowy
+          if (batchCount >= batchSize) {
+            await currentBatch.commit();
+            currentBatch = writeBatch(db);
+            batchCount = 0;
+            console.log(`Zaktualizowano ${updatedUsers} użytkowników. Tworzę nowy batch...`);
+          }
+        }
+      }
+    }
+    
+    // Wykonaj ostatni batch, jeśli zawiera jakieś operacje
+    if (batchCount > 0) {
+      await currentBatch.commit();
+    }
+    
+    console.log(`Zakończono usuwanie bonusu za BaseName:
+    - Zaktualizowano użytkowników: ${updatedUsers}`);
+    
+    return {
+      success: true,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas usuwania bonusu za BaseName:', error);
+    return {
+      success: false,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas usuwania bonusu za BaseName'
+    };
+  }
+};
+
+// Funkcja do aktualizacji daty dołączenia dla wszystkich użytkowników
+export const updateAllUserJoinDates = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
+  try {
+    console.log('Rozpoczynam aktualizację daty dołączenia dla wszystkich użytkowników...');
+    
+    // Pobierz wszystkich użytkowników
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
+    
+    let updatedUsers = 0;
+    const batch = writeBatch(db);
+    const batchSize = 500; // Firestore ma limit 500 operacji w jednym batchu
+    let batchCount = 0;
+    let currentBatch = batch;
+    
+    // Przetwórz każdego użytkownika
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+      const userAddress = userDoc.id;
+      
+      // Sprawdź czy użytkownik ma datę dołączenia
+      if (!userData.joinedAt) {
+        // Ustaw datę dołączenia na aktualny czas
+        const userRef = doc(db, 'users', userAddress);
+        currentBatch.update(userRef, {
+          joinedAt: serverTimestamp()
+        });
+        
+        updatedUsers++;
+        batchCount++;
+        
+        // Jeśli osiągnęliśmy limit batcha, wykonaj go i utwórz nowy
+        if (batchCount >= batchSize) {
+          await currentBatch.commit();
+          currentBatch = writeBatch(db);
+          batchCount = 0;
+          console.log(`Zaktualizowano ${updatedUsers} użytkowników. Tworzę nowy batch...`);
+        }
+      }
+    }
+    
+    // Wykonaj ostatni batch, jeśli zawiera jakieś operacje
+    if (batchCount > 0) {
+      await currentBatch.commit();
+    }
+    
+    console.log(`Zakończono aktualizację daty dołączenia:
+    - Zaktualizowano użytkowników: ${updatedUsers}`);
+    
+    return {
+      success: true,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas aktualizacji daty dołączenia:', error);
+    return {
+      success: false,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas aktualizacji daty dołączenia'
+    };
+  }
+};
+
+// Funkcja do aktualizacji bonusu za BaseName dla wszystkich użytkowników
+export const updateBaseNameBonus = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
+  try {
+    console.log('Rozpoczynam aktualizację bonusu za BaseName dla wszystkich użytkowników...');
+    
+    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isBaseName: true
+    const usernamesRef = collection(db, 'usernames');
+    const baseNameQuery = query(usernamesRef, where('isBaseName', '==', true));
+    const baseNameSnapshot = await getDocs(baseNameQuery);
+    
+    let updatedUsers = 0;
+    const batch = writeBatch(db);
+    const batchSize = 500; // Firestore ma limit 500 operacji w jednym batchu
+    let batchCount = 0;
+    let currentBatch = batch;
+    
+    // Przetwórz każdego użytkownika z BaseName
+    for (const usernameDoc of baseNameSnapshot.docs) {
+      const userAddress = usernameDoc.id;
+      
+      // Pobierz dane użytkownika z kolekcji users
+      const userRef = doc(db, 'users', userAddress);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+        // Pobierz aktualną strukturę baseChatPoints lub utwórz nową
+        const baseChatPoints = userData.baseChatPoints || {
+          activityBonus: 0,
+          likePoints: 0,
+          postPoints: 0,
+          totalPoints: 0
+        };
+        
+        // Dodaj baseNameBonus z wartością 1000
+        baseChatPoints.baseNameBonus = 1000;
+        
+        // Przelicz totalPoints
+        const postPoints = baseChatPoints.postPoints || 0;
+        const likePoints = baseChatPoints.likePoints || 0;
+        const activityBonus = baseChatPoints.activityBonus || 0;
+        const baseNameBonus = baseChatPoints.baseNameBonus || 0;
+        
+        // Suma wszystkich punktów
+        baseChatPoints.totalPoints = postPoints + likePoints + activityBonus + baseNameBonus;
+        
+        // Zaktualizuj dokument użytkownika
+        currentBatch.update(userRef, {
+          baseChatPoints: baseChatPoints,
+          lastUpdated: serverTimestamp()
+        });
+        
+        updatedUsers++;
+        batchCount++;
+        
+        // Jeśli osiągnęliśmy limit batcha, wykonaj go i utwórz nowy
+        if (batchCount >= batchSize) {
+          await currentBatch.commit();
+          currentBatch = writeBatch(db);
+          batchCount = 0;
+          console.log(`Zaktualizowano ${updatedUsers} użytkowników. Tworzę nowy batch...`);
+        }
+      }
+    }
+    
+    // Wykonaj ostatni batch, jeśli zawiera jakieś operacje
+    if (batchCount > 0) {
+      await currentBatch.commit();
+    }
+    
+    console.log(`Zakończono aktualizację bonusu za BaseName:
+    - Zaktualizowano użytkowników: ${updatedUsers}`);
+    
+    return {
+      success: true,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas aktualizacji bonusu za BaseName:', error);
+    return {
+      success: false,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas aktualizacji bonusu za BaseName'
+    };
+  }
+};
+
+// Funkcja naprawiająca strukturę baseChatPoints dla wszystkich użytkowników - wersja radykalna
+export const fixBaseChatPointsRadical = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
+  try {
+    console.log('Rozpoczynam radykalną naprawę struktury baseChatPoints dla wszystkich użytkowników...');
+    
+    // Pobierz wszystkich użytkowników
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
+    
+    let updatedUsers = 0;
+    const batch = writeBatch(db);
+    const batchSize = 500; // Firestore ma limit 500 operacji w jednym batchu
+    let batchCount = 0;
+    let currentBatch = batch;
+    
+    // Przetwórz każdego użytkownika
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+      const userAddress = userDoc.id;
+      
+      // Sprawdź, czy użytkownik ma BaseName
+      const hasBaseNameValue = await hasBaseName(userAddress);
+      
+      // Oblicz punkty na podstawie danych użytkownika
+      const likePoints = userData.likesReceived || 0;
+      const postPoints = (userData.postsCount || 0) * 5;
+      const activityBonus = Math.round((likePoints + postPoints) * 0.25); // 25% bonus za aktywność
+      
+      // Utwórz nową strukturę baseChatPoints
+      const newBaseChatPoints: {
+        likePoints: number;
+        postPoints: number;
+        activityBonus: number;
+        totalPoints: number;
+        baseNameBonus?: number;
+      } = {
+        likePoints: likePoints,
+        postPoints: postPoints,
+        activityBonus: activityBonus,
+        totalPoints: likePoints + postPoints + activityBonus
+      };
+      
+      // Dodaj baseNameBonus, jeśli użytkownik ma BaseName
+      if (hasBaseNameValue) {
+        newBaseChatPoints.baseNameBonus = 1000;
+        newBaseChatPoints.totalPoints += 1000;
+      }
+      
+      // Zaktualizuj dokument użytkownika
+      currentBatch.update(doc(db, 'users', userAddress), {
+        baseChatPoints: newBaseChatPoints,
+        lastUpdated: serverTimestamp()
+      });
+      
+      updatedUsers++;
+      batchCount++;
+      
+      // Jeśli osiągnęliśmy limit batcha, wykonaj go i utwórz nowy
+      if (batchCount >= batchSize) {
+        await currentBatch.commit();
+        currentBatch = writeBatch(db);
+        batchCount = 0;
+        console.log(`Zaktualizowano ${updatedUsers} użytkowników. Tworzę nowy batch...`);
+      }
+    }
+    
+    // Wykonaj ostatni batch, jeśli zawiera jakieś operacje
+    if (batchCount > 0) {
+      await currentBatch.commit();
+    }
+    
+    console.log(`Zakończono radykalną naprawę struktury baseChatPoints:
+    - Zaktualizowano ${updatedUsers} użytkowników`);
+    
+    return {
+      success: true,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas radykalnej naprawy struktury baseChatPoints:', error);
+    return {
+      success: false,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas radykalnej naprawy struktury baseChatPoints'
+    };
   }
 };

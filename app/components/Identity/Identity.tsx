@@ -115,6 +115,7 @@ export default function IdentityComponent() {
   const [showRankSystem, setShowRankSystem] = useState(false);
   const [showAnimation, setShowAnimation] = useState(false);
   const [animationData, setAnimationData] = useState<RankingStats | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Grupowanie odznak według kategorii
   const groupedBadges = {
@@ -123,6 +124,11 @@ export default function IdentityComponent() {
     nfts: BADGES.filter(badge => badge.name.toString().startsWith('NFT')),
     contracts: BADGES.filter(badge => badge.name.toString().startsWith('Contract'))
   };
+
+  // Dodajemy useEffect do obsługi montowania komponentu
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -158,20 +164,22 @@ export default function IdentityComponent() {
       }
     }
 
-    if (address) {
+    if (address && isMounted) {
       fetchData();
       // Odświeżaj co 5 sekund zamiast 5 minut
       const interval = setInterval(fetchData, REFRESH_INTERVAL);
       return () => clearInterval(interval);
     }
-  }, [address]);
+  }, [address, isMounted]);
 
   useEffect(() => {
+    if (!isMounted) return;
+    
     const hasSeenAnimation = localStorage.getItem(`sphere-animation-${address}`);
     if (hasSeenAnimation) {
       setShowAnimation(false);
     }
-  }, [address]);
+  }, [address, isMounted]);
 
   // Function to color the rank
   const getRankColor = (rank: UserRank) => {
@@ -193,6 +201,11 @@ export default function IdentityComponent() {
 
   // Calculate earned badges
   const earnedBadges = BADGES.filter(badge => badge.condition(stats));
+
+  // Jeśli komponent nie jest zamontowany, zwracamy pusty div
+  if (!isMounted) {
+    return <div></div>;
+  }
 
   return (
     <>

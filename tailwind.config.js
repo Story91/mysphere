@@ -93,11 +93,23 @@ module.exports = {
   				to: {
   					height: 0
   				}
-  			}
+  			},
+        'gradient-rotate': {
+          '0%': {
+            'background-position': '0% 0%'
+          },
+          '50%': {
+            'background-position': '100% 100%'
+          },
+          '100%': {
+            'background-position': '0% 0%'
+          }
+        }
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+        'gradient-rotate': 'gradient-rotate 2s linear infinite'
   		}
   	}
   },

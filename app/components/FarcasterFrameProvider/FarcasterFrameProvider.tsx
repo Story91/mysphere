@@ -1,14 +1,21 @@
 'use client';
 
-import { PropsWithChildren, useEffect } from 'react';
+import { PropsWithChildren, useEffect, useState } from 'react';
 import FrameSDK from '@farcaster/frame-sdk';
 import { useConnect } from 'wagmi';
 import { farcasterFrame } from '@farcaster/frame-wagmi-connector';
 
 export function FarcasterFrameProvider({ children }: PropsWithChildren) {
   const { connect } = useConnect();
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    
     let mounted = true;
 
     const init = async () => {
@@ -38,7 +45,11 @@ export function FarcasterFrameProvider({ children }: PropsWithChildren) {
     return () => {
       mounted = false;
     };
-  }, [connect]);
+  }, [connect, isMounted]);
+
+  if (!isMounted) {
+    return <>{children}</>;
+  }
 
   return <>{children}</>;
 } 

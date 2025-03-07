@@ -12,8 +12,15 @@ export const RankReveal: React.FC<RankRevealProps> = ({
 }) => {
   const [showRank, setShowRank] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    
     const rankTimer = setTimeout(() => {
       setShowRank(true);
     }, 1000);
@@ -31,7 +38,11 @@ export const RankReveal: React.FC<RankRevealProps> = ({
       clearTimeout(descriptionTimer);
       clearTimeout(completeTimer);
     };
-  }, []);
+  }, [isMounted, onComplete]);
+
+  if (!isMounted) {
+    return <div></div>;
+  }
 
   return (
     <div className="backdrop-blur-lg bg-black/40 p-8 border border-[#0052FF]/20 shadow-[0_0_15px_rgba(0,82,255,0.1)] relative">

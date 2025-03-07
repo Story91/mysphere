@@ -15,8 +15,15 @@ export function useBanStatus() {
   const { address } = useAccount();
   const [banStatus, setBanStatus] = useState<BanStatus>({ isBanned: false });
   const [loading, setLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    
     const checkBanStatus = async () => {
       if (!address) {
         setLoading(false);
@@ -46,7 +53,7 @@ export function useBanStatus() {
     };
 
     checkBanStatus();
-  }, [address]);
+  }, [address, isMounted]);
 
-  return { ...banStatus, loading };
+  return { ...banStatus, loading, isMounted };
 } 

@@ -17,7 +17,7 @@ export default function FlashBlockPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-blue-900 to-black text-white p-4">
       <h1 className="text-4xl font-bold mb-6">FLASHBLOCK</h1>
-      <p className="text-xl mb-8 text-center">Ładowanie aplikacji FlashBlock...</p>
+      <p className="text-xl mb-8 text-center">Loading FlashBlock application...</p>
       
       <div className="w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin"></div>
     </div>

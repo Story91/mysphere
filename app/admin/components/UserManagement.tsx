@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, setDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import { UserProfile } from '../../types';
 
 interface ExtendedUserProfile extends UserProfile {
   isBanned?: boolean;
   banReason?: string;
+  joinedAt?: number;
 }
 
 export default function UserManagement() {
@@ -15,10 +16,23 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<ExtendedUserProfile | null>(null);
   const [banReason, setBanReason] = useState('');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (users.length > 0) {
+      const sortedUsers = [...users].sort((a, b) => {
+        const aTime = a.joinedAt || 0;
+        const bTime = b.joinedAt || 0;
+        return sortOrder === 'newest' ? bTime - aTime : aTime - bTime;
+      });
+      setUsers(sortedUsers);
+    }
+  }, [sortOrder]);
 
   const fetchUsers = async () => {
     try {
@@ -34,19 +48,57 @@ export default function UserManagement() {
         bannedSnapshot.docs.map(doc => doc.id.toLowerCase())
       );
 
-      const usersData = usersSnapshot.docs.map(doc => ({
-        ...doc.data() as UserProfile,
-        id: doc.id,
-        isBanned: bannedAddresses.has(doc.id.toLowerCase()),
-      }));
+      const usersData = usersSnapshot.docs.map(doc => {
+        const userData = doc.data();
+        let joinedAt = 0;
+        if (userData.joinedAt) {
+          if (userData.joinedAt.toDate) {
+            joinedAt = userData.joinedAt.toDate().getTime();
+          } else if (typeof userData.joinedAt === 'number') {
+            joinedAt = userData.joinedAt;
+          }
+        }
+        
+        return {
+          ...userData as UserProfile,
+          id: doc.id,
+          isBanned: bannedAddresses.has(doc.id.toLowerCase()),
+          joinedAt: joinedAt
+        };
+      });
 
-      setUsers(usersData);
+      const sortedUsers = usersData.sort((a, b) => {
+        const aTime = a.joinedAt || 0;
+        const bTime = b.joinedAt || 0;
+        return sortOrder === 'newest' ? bTime - aTime : aTime - bTime;
+      });
+
+      setUsers(sortedUsers);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching users:', error);
       setLoading(false);
     }
   };
+
+  const formatDate = (timestamp?: number) => {
+    if (!timestamp) return 'Nieznana data';
+    return new Date(timestamp).toLocaleDateString('pl-PL', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const filteredUsers = users.filter(user => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (user.name && user.name.toLowerCase().includes(searchLower)) ||
+      (user.id && user.id.toLowerCase().includes(searchLower))
+    );
+  });
 
   const handleBanUser = async (user: ExtendedUserProfile) => {
     if (!user.id || !banReason) return;
@@ -59,7 +111,6 @@ export default function UserManagement() {
         bannedAt: new Date().toISOString(),
       });
 
-      // Aktualizuj lokalny stan
       setUsers(prevUsers =>
         prevUsers.map(u =>
           u.id === user.id ? { ...u, isBanned: true, banReason } : u
@@ -80,7 +131,6 @@ export default function UserManagement() {
       const bannedUserRef = doc(db, 'bannedUsers', user.id.toLowerCase());
       await deleteDoc(bannedUserRef);
 
-      // Aktualizuj lokalny stan
       setUsers(prevUsers =>
         prevUsers.map(u =>
           u.id === user.id ? { ...u, isBanned: false, banReason: undefined } : u
@@ -97,12 +147,49 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0 mb-4">
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setSortOrder('newest')}
+            className={`px-3 py-1 text-sm rounded ${
+              sortOrder === 'newest'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600'
+            }`}
+          >
+            Najnowsi
+          </button>
+          <button
+            onClick={() => setSortOrder('oldest')}
+            className={`px-3 py-1 text-sm rounded ${
+              sortOrder === 'oldest'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600'
+            }`}
+          >
+            Najstarsi
+          </button>
+        </div>
+        <div className="w-full md:w-auto">
+          <input
+            type="text"
+            placeholder="Szukaj użytkownika..."
+            className="px-4 py-2 border rounded-lg w-full md:w-64 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Użytkownik
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Data dołączenia
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Status
@@ -113,7 +200,7 @@ export default function UserManagement() {
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-            {users.map((user) => (
+            {filteredUsers.map((user) => (
               <tr key={user.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -126,6 +213,9 @@ export default function UserManagement() {
                       </div>
                     </div>
                   </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {formatDate(user.joinedAt)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -159,7 +249,6 @@ export default function UserManagement() {
         </table>
       </div>
 
-      {/* Modal do banowania */}
       {selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">

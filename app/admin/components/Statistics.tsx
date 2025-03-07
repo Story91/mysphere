@@ -4,6 +4,13 @@ import { useState, useEffect } from 'react';
 import { collection, query, getDocs, where, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 
+interface UserWithJoinDate {
+  address: string;
+  name?: string;
+  joinedAt: number;
+  lastActive?: number;
+}
+
 interface Stats {
   users: {
     total: number;
@@ -23,16 +30,32 @@ interface Stats {
     posts: number;
     comments: number;
   }>;
+  recentUsers?: UserWithJoinDate[];
 }
 
 export default function Statistics() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<'24h' | '7d' | '30d'>('24h');
+  const [userSortOrder, setUserSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [showingUsers, setShowingUsers] = useState<number>(10);
 
   useEffect(() => {
     fetchStats();
   }, [timeframe]);
+
+  // Dodaj efekt, który będzie aktualizował listę użytkowników po zmianie sortowania
+  useEffect(() => {
+    if (stats && stats.recentUsers) {
+      const sortedUsers = [...stats.recentUsers].sort(
+        (a, b) => userSortOrder === 'newest' ? b.joinedAt - a.joinedAt : a.joinedAt - b.joinedAt
+      );
+      setStats({
+        ...stats,
+        recentUsers: sortedUsers
+      });
+    }
+  }, [userSortOrder]);
 
   const fetchStats = async () => {
     try {
@@ -91,6 +114,21 @@ export default function Statistics() {
         .sort((a, b) => (b.posts + b.comments) - (a.posts + a.comments))
         .slice(0, 10);
 
+      // Pobierz użytkowników z datą dołączenia
+      const usersWithJoinDate: UserWithJoinDate[] = usersSnapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          return {
+            address: doc.id,
+            name: data.name,
+            joinedAt: data.joinedAt ? (data.joinedAt.toDate ? data.joinedAt.toDate().getTime() : data.joinedAt) : 0,
+            lastActive: data.lastActive ? (data.lastActive.toDate ? data.lastActive.toDate().getTime() : data.lastActive) : 0
+          };
+        })
+        .filter(user => user.joinedAt)
+        .sort((a, b) => userSortOrder === 'newest' ? b.joinedAt - a.joinedAt : a.joinedAt - b.joinedAt)
+        .slice(0, showingUsers);
+
       // Oblicz statystyki
       const stats: Stats = {
         users: {
@@ -114,6 +152,7 @@ export default function Statistics() {
           ).reduce((acc, doc) => acc + (doc.data().comments?.length || 0), 0),
         },
         topUsers,
+        recentUsers: usersWithJoinDate
       };
 
       setStats(stats);
@@ -122,6 +161,18 @@ export default function Statistics() {
       console.error('Error fetching stats:', error);
       setLoading(false);
     }
+  };
+
+  // Funkcja do formatowania daty
+  const formatDate = (timestamp: number) => {
+    if (!timestamp) return 'Nieznana data';
+    return new Date(timestamp).toLocaleDateString('pl-PL', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (loading) {
@@ -190,6 +241,87 @@ export default function Statistics() {
           </div>
         </div>
       </div>
+
+      {/* Lista użytkowników według daty dołączenia */}
+      {stats.recentUsers && stats.recentUsers.length > 0 && (
+        <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Użytkownicy według daty dołączenia
+            </h3>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setUserSortOrder('newest')}
+                className={`px-3 py-1 text-sm rounded ${
+                  userSortOrder === 'newest'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-500'
+                }`}
+              >
+                Najnowsi
+              </button>
+              <button
+                onClick={() => setUserSortOrder('oldest')}
+                className={`px-3 py-1 text-sm rounded ${
+                  userSortOrder === 'oldest'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-500'
+                }`}
+              >
+                Najstarsi
+              </button>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Adres
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Nazwa
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Data dołączenia
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Ostatnia aktywność
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-800">
+                {stats.recentUsers.map((user) => (
+                  <tr key={user.address} className="hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-gray-100">
+                      {user.address.slice(0, 6)}...{user.address.slice(-4)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {user.name || 'Brak nazwy'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {formatDate(user.joinedAt)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {user.lastActive ? formatDate(user.lastActive) : 'Brak aktywności'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => setShowingUsers(prev => prev + 10)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              Pokaż więcej
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Top użytkownicy */}
       <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">

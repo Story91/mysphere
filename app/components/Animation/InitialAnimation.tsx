@@ -36,6 +36,7 @@ export const InitialAnimation: React.FC<InitialAnimationProps> = ({
 }) => {
   const [animationStep, setAnimationStep] = useState(0);
   const [showControls, setShowControls] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   const ANIMATION_STEPS = {
     WELCOME: 0,
@@ -46,6 +47,10 @@ export const InitialAnimation: React.FC<InitialAnimationProps> = ({
     FAREWELL: 5,
     COMPLETE: 6
   };
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const nextStep = () => {
     if (animationStep < ANIMATION_STEPS.COMPLETE) {
@@ -65,16 +70,22 @@ export const InitialAnimation: React.FC<InitialAnimationProps> = ({
   };
 
   useEffect(() => {
+    if (!isMounted) return;
+    
     if (animationStep === ANIMATION_STEPS.WELCOME) {
       const timer = setTimeout(() => nextStep(), 2500);
       return () => clearTimeout(timer);
     }
-  }, [animationStep]);
+  }, [animationStep, isMounted]);
 
   const handleStatsComplete = () => setTimeout(() => nextStep(), 2500);
   const handlePointsComplete = () => setTimeout(() => nextStep(), 2000);
   const handleRankComplete = () => setTimeout(() => nextStep(), 2000);
   const handleBadgesComplete = () => setTimeout(() => nextStep(), 2000);
+
+  if (!isMounted) {
+    return <div></div>;
+  }
 
   return (
     <div className="fixed inset-0 bg-black/95 backdrop-blur-lg z-50 flex items-center justify-center">
@@ -98,22 +109,13 @@ export const InitialAnimation: React.FC<InitialAnimationProps> = ({
               <div className="relative h-12 mx-auto">
                 <Image
                   src="/brand-kit/base/logo/wordmark/Base_Wordmark_White.png"
-                  alt="Base Network"
-                  width={200}
+                  alt="Base Logo"
+                  width={120}
                   height={48}
-                  className="object-contain mx-auto"
+                  className="object-contain"
                 />
               </div>
-              <h2 className="text-4xl font-mono font-bold text-white mt-4">
-                WELCOME ON NETWORK
-              </h2>
-            </div>
-
-            {/* Tekst inicjalizacji */}
-            <div className="mt-8 animate-fadeIn animate-delay-400">
-              <p className="text-lg font-mono text-gray-400">
-                Initializing your Base Network profile analysis...
-              </p>
+              <h2 className="text-2xl font-bold text-white">Analyzing your on-chain activity...</h2>
             </div>
           </div>
         )}

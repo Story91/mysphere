@@ -7,6 +7,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Providers } from './providers';
 import Navigation from './components/Navigation/Navigation';
 import { ThemeProvider } from './context/ThemeContext';
+import ClientOnly from './components/ClientOnly';
 
 export default function RootLayout({
   children,
@@ -78,10 +79,17 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#0F172A]">
         <ThemeProvider>
           <Providers>
-            <Navigation />
-            <main className="w-full">
-              {children}
-            </main>
+            <ClientOnly fallback={
+              <div className="min-h-screen flex flex-col items-center justify-center text-white">
+                <div className="text-2xl font-bold mb-4">Connecting with Base...</div>
+                <div className="w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin"></div>
+              </div>
+            }>
+              <Navigation />
+              <main className="w-full">
+                {children}
+              </main>
+            </ClientOnly>
             <Analytics />
             <SpeedInsights />
           </Providers>
