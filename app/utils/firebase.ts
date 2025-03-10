@@ -480,7 +480,8 @@ export const fetchPosts = async (options: {
       tags: postData.tags || [],
       mentions: postData.mentions || [],
       shares: postData.shares || 0,
-      visibility: postData.visibility || 'public'
+      visibility: postData.visibility || 'public',
+      txHash: postData.txHash || null
     };
   }));
 

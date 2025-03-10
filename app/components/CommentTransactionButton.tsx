@@ -96,7 +96,10 @@ export default function CommentTransactionButton({
 
   // Obsługa statusu transakcji
   const handleTransactionStatus = useCallback((status: any) => {
-    console.log('Comment transaction status:', status);
+    // Loguj tylko istotne statusy (nie loguj 'init')
+    if (status.statusName !== 'init') {
+      console.log('Comment transaction status:', status);
+    }
     
     if (status.statusName === 'success') {
       const txHash = status.statusData?.transactionReceipts?.[0]?.transactionHash;

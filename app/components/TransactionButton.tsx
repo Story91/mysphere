@@ -101,7 +101,10 @@ export default function TransactionButtonWrapper({
 
   // Obsługa statusu transakcji
   const handleTransactionStatus = useCallback((status: any) => {
-    console.log('Transaction status:', status);
+    // Loguj tylko istotne statusy (nie loguj 'init')
+    if (status.statusName !== 'init') {
+      console.log('Transaction status:', status);
+    }
     
     if (status.statusName === 'success') {
       // W przypadku sukcesu, pobierz hash transakcji z danych statusu
