@@ -22,7 +22,8 @@ import {
   getProfileName,
   editComment,
   deleteComment,
-  addCommentReply
+  addCommentReply,
+  ADMIN_ADDRESS
 } from '../utils/firebase';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp } from 'firebase/firestore';
 import { Post, Comment, UserProfile, Stats } from '../types';
@@ -43,6 +44,9 @@ import farcasterFrame from '@farcaster/frame-wagmi-connector'
 import { connect } from 'wagmi/actions'
 import { FarcasterFrameProvider } from '../components/FarcasterFrameProvider/FarcasterFrameProvider';
 import { RefreshCw } from 'lucide-react';
+import TransactionButton from '../components/TransactionButton';
+import CommentTransactionButton from '../components/CommentTransactionButton';
+import { toast } from 'react-hot-toast';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -457,16 +461,46 @@ export default function BaseChat() {
     }
   }, [isConnected, address]);
 
-  // Modify handleCreatePost
-  const handleCreatePost = async () => {
-    if (!isConnected || !address || !newPost.trim()) return;
-
-    try {
-      // Sprawdzenie limitu postów dziennie
-      if (dailyPostCount >= 5) {
-        alert('You have reached the daily limit of 5 posts.');
+  // Dodaj stan dla przechowywania hash transakcji i flagi blokującej wielokrotne tworzenie postów
+  const [storedTxHash, setStoredTxHash] = useState<string | null>(null);
+  const [isCreatingPost, setIsCreatingPost] = useState(false);
+  
+  // Obsługa sukcesu transakcji
+  const handleTransactionSuccess = (txHash: string) => {
+    // Jeśli już trwa tworzenie posta, nie wywołuj ponownie
+    if (isCreatingPost) {
+      console.log('Post creation already in progress, ignoring duplicate transaction success');
       return;
     }
+    
+    setStoredTxHash(txHash);
+    // Automatycznie wywołaj handleCreatePost po udanej transakcji
+    handleCreatePost(txHash);
+  };
+
+  // Modyfikacja handleCreatePost, aby odświeżał posty po dodaniu nowego posta
+  const handleCreatePost = async (txHash?: string) => {
+    if (!isConnected || !address || !newPost.trim()) return;
+    
+    // Jeśli już trwa tworzenie posta, nie kontynuuj
+    if (isCreatingPost) {
+      console.log('Post creation already in progress, ignoring duplicate request');
+      return;
+    }
+    
+    // Ustaw flagę blokującą wielokrotne tworzenie postów
+    setIsCreatingPost(true);
+
+    try {
+      // Sprawdzenie czy użytkownik jest adminem
+      const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
+      
+      // Sprawdzenie limitu postów dziennie (tylko dla zwykłych użytkowników)
+      if (!isAdmin && dailyPostCount >= 5) {
+        alert('You have reached the daily limit of 5 posts.');
+        setIsCreatingPost(false); // Resetuj flagę
+        return;
+      }
       setDailyPostCount(prev => prev + 1);
 
       console.log('🚀 Starting post creation...');
@@ -477,6 +511,7 @@ export default function BaseChat() {
       
       if (!verificationToken) {
         console.error('❌ reCAPTCHA verification failed');
+        setIsCreatingPost(false); // Resetuj flagę
         return;
       }
       
@@ -528,14 +563,13 @@ export default function BaseChat() {
         }
       }
 
-      // Detect hashtags and mentions
+      // Extract hashtags and mentions
       const hashtagRegex = /#(\w+)/g;
-      const tags = Array.from(new Set((newPost.match(hashtagRegex) || []).map(tag => tag.slice(1))));
-
       const mentionRegex = /@(\w+)/g;
+      const tags = Array.from(new Set((newPost.match(hashtagRegex) || []).map(tag => tag.slice(1))));
       const mentions = Array.from(new Set((newPost.match(mentionRegex) || []).map(mention => mention.slice(1))));
 
-      // Create post with media
+      // Create post with media and transaction hash
       await createPost({
         author: address,
         content: newPost,
@@ -544,25 +578,41 @@ export default function BaseChat() {
         video: videoUrl,
         tags: tags,
         mentions: mentions,
-        visibility: 'public'
+        visibility: 'public',
+        txHash: txHash || (storedTxHash || undefined) // Naprawienie błędu typowania
       });
 
-      // Reset states
+      // Odświeżenie postów po dodaniu nowego posta
       const updatedPosts = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
+
+      // Reset form
       setNewPost('');
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
       setUploadProgress(0);
-      setShowDailyPostOverlay(true);
-      setTimeout(() => setShowDailyPostOverlay(false), 3000);
-    } catch (error) {
+      
+      // Show success message
+      toast.success('Post created successfully!');
+      
+      // Show daily post overlay with delay (7 seconds instead of immediate)
+      setTimeout(() => {
+        setShowDailyPostOverlay(true);
+        setTimeout(() => setShowDailyPostOverlay(false), 3000);
+      }, 7000);
+      
+      // Reset transaction hash after post is created
+      setStoredTxHash(null);
+    } catch (error: any) {
       console.error('Error creating post:', error);
-      alert('Error creating post. Please try again.');
+      toast.error(`Error: ${error.message}`);
+    } finally {
+      // Zawsze resetuj flagę blokującą, nawet w przypadku błędu
+      setIsCreatingPost(false);
     }
   };
 
-  const handleAddComment = async (postId: string) => {
+  const handleAddComment = async (postId: string, txHash?: string) => {
     if (!isConnected || !address || !newComments[postId]?.trim()) return;
 
     try {
@@ -579,7 +629,8 @@ export default function BaseChat() {
         timestamp: Date.now(),
         likes: 0,
         likedBy: [],
-        mentions: mentions
+        mentions: mentions,
+        txHash: txHash || null // Dodajemy hash transakcji, jeśli istnieje
       };
 
       await addComment(postId, comment);
@@ -588,8 +639,11 @@ export default function BaseChat() {
       setNewComments(prev => ({...prev, [postId]: ''}));
       const updatedPosts = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
+      
+      toast.success('Comment added successfully!');
     } catch (error) {
       console.error('Error adding comment:', error);
+      toast.error('Failed to add comment');
     }
   };
 
@@ -1479,6 +1533,23 @@ export default function BaseChat() {
     fetchDailyPostCount();
   }, [address, isConnected]);
 
+  // Funkcja do ręcznego odświeżania licznika dziennych postów
+  const resetDailyPostCount = async () => {
+    if (!isConnected || !address) return;
+    try {
+      const postsRef = collection(db, 'posts');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const q = query(postsRef, where('author', '==', address), where('timestamp', '>=', Timestamp.fromDate(today)));
+      const postsSnap = await getDocs(q);
+      setDailyPostCount(postsSnap.size);
+      toast.success('Post limit refreshed!');
+    } catch (error) {
+      console.error('Error refreshing daily post count:', error);
+      toast.error('Failed to refresh post limit');
+    }
+  };
+
   const handleGenerateAIPost = async () => {
     if (!aiPrompt.trim() || !address || isGeneratingAI) return;
     
@@ -2024,43 +2095,45 @@ export default function BaseChat() {
                   </div>
                 )}
 
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 sm:space-x-4">
                     <button
                       onClick={() => document.getElementById('fileInput')?.click()}
-                      className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                      className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      <span>Add photo/video</span>
+                      <span className="hidden xs:inline">Add photo/video</span>
+                      <span className="inline xs:hidden">Photo</span>
                     </button>
 
                     <button
                       onClick={() => setShowAIModal(true)}
-                      className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                      className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      <span>Generate AI Post</span>
+                      <span className="hidden xs:inline">Generate AI Post</span>
+                      <span className="inline xs:hidden">AI</span>
                     </button>
                   </div>
-                  <input
-                    id="fileInput"
-                    type="file"
-                    accept="image/*,video/*"
-                    onChange={handlePostFileSelect}
-                    className="hidden"
-                  />
-                  <button
-                    onClick={handleCreatePost}
+                  
+                  <TransactionButton 
+                    content={newPost}
+                    onTransactionSuccess={handleTransactionSuccess}
                     disabled={!newPost.trim()}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Post
-                  </button>
+                    autoPost={true}
+                  />
                 </div>
+                <input
+                  id="fileInput"
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handlePostFileSelect}
+                  className="hidden"
+                />
               </div>
           ) : (
             <div className="bg-white rounded-xl p-6 text-center shadow-lg mb-6 border border-[#0052FF]/20 relative overflow-hidden">
@@ -2186,8 +2259,18 @@ export default function BaseChat() {
                         {displayUserName(post.author, `post-${post.id}`)}
                     <div className="text-xs text-gray-500">
                         {formatTimestamp(post.timestamp)}
-                      </div>
                     </div>
+                    {post.txHash && (
+                      <div className="flex items-center text-xs text-blue-500" title="Saved on blockchain">
+                        <img 
+                          src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png" 
+                          alt="Base Logo" 
+                          className="w-3 h-3 mr-1"
+                        />
+                        <span className="hidden sm:inline">Onchain</span>
+                      </div>
+                    )}
+                  </div>
                   
                   {/* Opcje posta dla autora */}
                   {post.author === address && (
@@ -2319,6 +2402,16 @@ export default function BaseChat() {
                             <div className="text-xs text-gray-500">
                               {formatTimestamp(comment.timestamp)}
                             </div>
+                            {comment.txHash && (
+                              <div className="flex items-center text-xs text-blue-500" title="Saved on blockchain">
+                                <img 
+                                  src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png" 
+                                  alt="Base Logo" 
+                                  className="w-3 h-3 mr-1"
+                                />
+                                <span className="hidden sm:inline">Onchain</span>
+                              </div>
+                            )}
                           </div>
                           
                           <div className="flex items-center space-x-2">
@@ -2565,13 +2658,12 @@ export default function BaseChat() {
                               className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
-                            <button
-                            onClick={() => handleAddComment(post.id)}
-                            disabled={!newComments[post.id]?.trim()}
-                            className="px-3 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                            Comment
-                            </button>
+                            <CommentTransactionButton
+                              content={newComments[post.id] || ''}
+                              onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
+                              disabled={!newComments[post.id]?.trim()}
+                              autoPost={true}
+                            />
       </>
                     ) : (
                       <p className="text-sm text-gray-500 italic">Get BaseName to comment on posts</p>
@@ -2878,12 +2970,21 @@ export default function BaseChat() {
       </div>
       <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
           {showDailyPostOverlay && (
-            <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
-              <div className="px-4 py-2 bg-black bg-opacity-50 text-white rounded">
-                {dailyPostCount}/5 posts today
+            <div className="fixed bottom-20 left-0 right-0 flex items-center justify-center z-40 pointer-events-auto">
+              <div className="px-4 py-2 bg-black bg-opacity-80 text-white rounded-lg flex items-center gap-2 shadow-lg">
+                <span>{dailyPostCount}/5 posts today</span>
+                <button 
+                  onClick={resetDailyPostCount}
+                  className="ml-2 p-1 bg-[#0052FF] rounded-md text-xs flex items-center hover:bg-[#0047E1] transition-colors"
+                >
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
               </div>
-          </div>
-        )}
+            </div>
+          )}
 
       {/* Mobile footer */}
       <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-t border-[#0052FF]/20 z-50">

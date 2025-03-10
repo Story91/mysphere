@@ -13,6 +13,7 @@ export interface Post {
   mentions?: string[];
   visibility?: 'public' | 'followers' | 'private';
   pollId?: string;
+  txHash?: string;
 }
 
 export interface Comment {
@@ -26,6 +27,7 @@ export interface Comment {
   likedBy: string[];
   mentions: string[];
   replyTo?: string;
+  txHash?: string;
   tip?: {
     amount: number;
     currency: string;

@@ -3,3 +3,5 @@
 /* eslint-disable */
 export type { BaseElementNFT } from "./BaseElementNFT";
 export type { BaseMorningGame } from "./BaseMorningGame";
+export type { PostContract } from "./PostContract";
+export type { PostContract2 } from "./PostContract2";

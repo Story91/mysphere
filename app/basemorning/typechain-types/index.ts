@@ -18,6 +18,8 @@ export type { IAccessControl } from "./@openzeppelin/contracts/access/IAccessCon
 export { IAccessControl__factory } from "./factories/@openzeppelin/contracts/access/IAccessControl__factory";
 export type { Ownable } from "./@openzeppelin/contracts/access/Ownable";
 export { Ownable__factory } from "./factories/@openzeppelin/contracts/access/Ownable__factory";
+export type { Pausable } from "./@openzeppelin/contracts/security/Pausable";
+export { Pausable__factory } from "./factories/@openzeppelin/contracts/security/Pausable__factory";
 export type { ERC721 } from "./@openzeppelin/contracts/token/ERC721/ERC721";
 export { ERC721__factory } from "./factories/@openzeppelin/contracts/token/ERC721/ERC721__factory";
 export type { IERC721Metadata } from "./@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata";
@@ -34,3 +36,7 @@ export type { BaseElementNFT } from "./app/basemorning/contracts/BaseElementNFT"
 export { BaseElementNFT__factory } from "./factories/app/basemorning/contracts/BaseElementNFT__factory";
 export type { BaseMorningGame } from "./app/basemorning/contracts/BaseMorningGame";
 export { BaseMorningGame__factory } from "./factories/app/basemorning/contracts/BaseMorningGame__factory";
+export type { PostContract } from "./app/basemorning/contracts/PostContract";
+export { PostContract__factory } from "./factories/app/basemorning/contracts/PostContract__factory";
+export type { PostContract2 } from "./app/basemorning/contracts/PostContract2";
+export { PostContract2__factory } from "./factories/app/basemorning/contracts/PostContract2__factory";

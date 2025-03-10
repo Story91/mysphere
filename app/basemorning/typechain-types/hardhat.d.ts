@@ -34,6 +34,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.Ownable__factory>;
     getContractFactory(
+      name: "Pausable",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.Pausable__factory>;
+    getContractFactory(
       name: "ERC721",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.ERC721__factory>;
@@ -65,6 +69,14 @@ declare module "hardhat/types/runtime" {
       name: "BaseMorningGame",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.BaseMorningGame__factory>;
+    getContractFactory(
+      name: "PostContract",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.PostContract__factory>;
+    getContractFactory(
+      name: "PostContract2",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.PostContract2__factory>;
 
     getContractAt(
       name: "VRFCoordinatorV2Interface",
@@ -91,6 +103,11 @@ declare module "hardhat/types/runtime" {
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.Ownable>;
+    getContractAt(
+      name: "Pausable",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.Pausable>;
     getContractAt(
       name: "ERC721",
       address: string | ethers.Addressable,
@@ -131,6 +148,16 @@ declare module "hardhat/types/runtime" {
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.BaseMorningGame>;
+    getContractAt(
+      name: "PostContract",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.PostContract>;
+    getContractAt(
+      name: "PostContract2",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.PostContract2>;
 
     deployContract(
       name: "VRFCoordinatorV2Interface",
@@ -152,6 +179,10 @@ declare module "hardhat/types/runtime" {
       name: "Ownable",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.Ownable>;
+    deployContract(
+      name: "Pausable",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.Pausable>;
     deployContract(
       name: "ERC721",
       signerOrOptions?: ethers.Signer | DeployContractOptions
@@ -184,6 +215,14 @@ declare module "hardhat/types/runtime" {
       name: "BaseMorningGame",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.BaseMorningGame>;
+    deployContract(
+      name: "PostContract",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.PostContract>;
+    deployContract(
+      name: "PostContract2",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.PostContract2>;
 
     deployContract(
       name: "VRFCoordinatorV2Interface",
@@ -210,6 +249,11 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.Ownable>;
+    deployContract(
+      name: "Pausable",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.Pausable>;
     deployContract(
       name: "ERC721",
       args: any[],
@@ -250,6 +294,16 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.BaseMorningGame>;
+    deployContract(
+      name: "PostContract",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.PostContract>;
+    deployContract(
+      name: "PostContract2",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.PostContract2>;
 
     // default types
     getContractFactory(

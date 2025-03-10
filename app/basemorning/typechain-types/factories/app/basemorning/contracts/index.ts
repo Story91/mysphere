@@ -3,3 +3,5 @@
 /* eslint-disable */
 export { BaseElementNFT__factory } from "./BaseElementNFT__factory";
 export { BaseMorningGame__factory } from "./BaseMorningGame__factory";
+export { PostContract__factory } from "./PostContract__factory";
+export { PostContract2__factory } from "./PostContract2__factory";

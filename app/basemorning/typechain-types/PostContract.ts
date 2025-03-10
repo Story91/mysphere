@@ -3,6 +3,7 @@
 /* eslint-disable */
 import type {
   BaseContract,
+  BigNumberish,
   BytesLike,
   FunctionFragment,
   Result,
@@ -20,42 +21,60 @@ import type {
   TypedLogDescription,
   TypedListener,
   TypedContractMethod,
-} from "../../../common";
+} from "./common";
 
-export interface OwnableInterface extends Interface {
+export interface PostContractInterface extends Interface {
   getFunction(
-    nameOrSignature: "owner" | "renounceOwnership" | "transferOwnership"
+    nameOrSignature:
+      | "createPost"
+      | "getPostCount"
+      | "totalPosts"
+      | "userPostCount"
   ): FunctionFragment;
 
-  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "PostCreated"): EventFragment;
 
-  encodeFunctionData(functionFragment: "owner", values?: undefined): string;
+  encodeFunctionData(functionFragment: "createPost", values: [string]): string;
   encodeFunctionData(
-    functionFragment: "renounceOwnership",
+    functionFragment: "getPostCount",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "totalPosts",
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "transferOwnership",
+    functionFragment: "userPostCount",
     values: [AddressLike]
   ): string;
 
-  decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "createPost", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "renounceOwnership",
+    functionFragment: "getPostCount",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "totalPosts", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "transferOwnership",
+    functionFragment: "userPostCount",
     data: BytesLike
   ): Result;
 }
 
-export namespace OwnershipTransferredEvent {
-  export type InputTuple = [previousOwner: AddressLike, newOwner: AddressLike];
-  export type OutputTuple = [previousOwner: string, newOwner: string];
+export namespace PostCreatedEvent {
+  export type InputTuple = [
+    creator: AddressLike,
+    contentHash: string,
+    timestamp: BigNumberish
+  ];
+  export type OutputTuple = [
+    creator: string,
+    contentHash: string,
+    timestamp: bigint
+  ];
   export interface OutputObject {
-    previousOwner: string;
-    newOwner: string;
+    creator: string;
+    contentHash: string;
+    timestamp: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -63,11 +82,11 @@ export namespace OwnershipTransferredEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export interface Ownable extends BaseContract {
-  connect(runner?: ContractRunner | null): Ownable;
+export interface PostContract extends BaseContract {
+  connect(runner?: ContractRunner | null): PostContract;
   waitForDeployment(): Promise<this>;
 
-  interface: OwnableInterface;
+  interface: PostContractInterface;
 
   queryFilter<TCEvent extends TypedContractEvent>(
     event: TCEvent,
@@ -106,48 +125,49 @@ export interface Ownable extends BaseContract {
     event?: TCEvent
   ): Promise<this>;
 
-  owner: TypedContractMethod<[], [string], "view">;
+  createPost: TypedContractMethod<[contentHash: string], [void], "nonpayable">;
 
-  renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
+  getPostCount: TypedContractMethod<[user: AddressLike], [bigint], "view">;
 
-  transferOwnership: TypedContractMethod<
-    [newOwner: AddressLike],
-    [void],
-    "nonpayable"
-  >;
+  totalPosts: TypedContractMethod<[], [bigint], "view">;
+
+  userPostCount: TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
 
   getFunction<T extends ContractMethod = ContractMethod>(
     key: string | FunctionFragment
   ): T;
 
   getFunction(
-    nameOrSignature: "owner"
-  ): TypedContractMethod<[], [string], "view">;
+    nameOrSignature: "createPost"
+  ): TypedContractMethod<[contentHash: string], [void], "nonpayable">;
   getFunction(
-    nameOrSignature: "renounceOwnership"
-  ): TypedContractMethod<[], [void], "nonpayable">;
+    nameOrSignature: "getPostCount"
+  ): TypedContractMethod<[user: AddressLike], [bigint], "view">;
   getFunction(
-    nameOrSignature: "transferOwnership"
-  ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
+    nameOrSignature: "totalPosts"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "userPostCount"
+  ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
 
   getEvent(
-    key: "OwnershipTransferred"
+    key: "PostCreated"
   ): TypedContractEvent<
-    OwnershipTransferredEvent.InputTuple,
-    OwnershipTransferredEvent.OutputTuple,
-    OwnershipTransferredEvent.OutputObject
+    PostCreatedEvent.InputTuple,
+    PostCreatedEvent.OutputTuple,
+    PostCreatedEvent.OutputObject
   >;
 
   filters: {
-    "OwnershipTransferred(address,address)": TypedContractEvent<
-      OwnershipTransferredEvent.InputTuple,
-      OwnershipTransferredEvent.OutputTuple,
-      OwnershipTransferredEvent.OutputObject
+    "PostCreated(address,string,uint256)": TypedContractEvent<
+      PostCreatedEvent.InputTuple,
+      PostCreatedEvent.OutputTuple,
+      PostCreatedEvent.OutputObject
     >;
-    OwnershipTransferred: TypedContractEvent<
-      OwnershipTransferredEvent.InputTuple,
-      OwnershipTransferredEvent.OutputTuple,
-      OwnershipTransferredEvent.OutputObject
+    PostCreated: TypedContractEvent<
+      PostCreatedEvent.InputTuple,
+      PostCreatedEvent.OutputTuple,
+      PostCreatedEvent.OutputObject
     >;
   };
 }

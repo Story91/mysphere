@@ -374,6 +374,7 @@ export const createPost = async (post: {
   tags?: string[];
   mentions?: string[];
   visibility?: 'public' | 'followers' | 'private';
+  txHash?: string;
 }): Promise<string> => {
   const postsRef = collection(db, 'posts');
   
@@ -408,7 +409,8 @@ export const createPost = async (post: {
     mentions: mentions,
     visibility: post.visibility || 'public',
     image: post.image || null,
-    video: post.video || null
+    video: post.video || null,
+    txHash: post.txHash || null
   });
 
   // Aktualizuj statystyki użytkownika
@@ -528,6 +530,7 @@ export const addComment = async (postId: string, comment: {
   likes: number;
   likedBy: string[];
   mentions: string[];
+  txHash?: string | null;
 }): Promise<void> => {
   // Pobierz nazwę autora komentarza
   const authorName = await getUserName(comment.author);
@@ -541,7 +544,9 @@ export const addComment = async (postId: string, comment: {
     timestamp: serverTimestamp(),
     likes: 0,
     likedBy: [],
-    mentions: []
+    mentions: [],
+    txHash: comment.txHash || null, // Dodaj hash transakcji
+    onchain: comment.txHash ? true : false // Oznacz, czy komentarz jest na blockchainie
   });
 
   // Dodaj komentarz do tablicy comments w dokumencie posta

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { collection, query, getDocs, where, orderBy, limit, Timestamp } from 'firebase/firestore';
-import { db } from '../../utils/firebase';
+import { db, updateAllUserJoinDates, addBaseNameBonusToAllUsers, fixBaseChatPointsRadical, refreshAllPosts } from '../../utils/firebase';
 
 interface UserWithJoinDate {
   address: string;
@@ -37,6 +37,14 @@ export default function Statistics() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<'24h' | '7d' | '30d'>('24h');
+  const [isAddingBaseNameBonusToAll, setIsAddingBaseNameBonusToAll] = useState(false);
+  const [addToAllResult, setAddToAllResult] = useState<{success: boolean, updatedUsers: number, error?: string} | null>(null);
+  const [isFixingBaseChatPointsRadical, setIsFixingBaseChatPointsRadical] = useState(false);
+  const [fixBaseChatPointsRadicalResult, setFixBaseChatPointsRadicalResult] = useState<{success: boolean, updatedUsers: number, error?: string} | null>(null);
+  const [isUpdatingJoinDates, setIsUpdatingJoinDates] = useState(false);
+  const [updateJoinDatesResult, setUpdateJoinDatesResult] = useState<{success: boolean, updatedUsers: number, error?: string} | null>(null);
+  const [isRefreshingAllPosts, setIsRefreshingAllPosts] = useState(false);
+  const [refreshAllPostsResult, setRefreshAllPostsResult] = useState<{success: boolean, processedPosts: number, updatedPosts: number, updatedUsers: number, error?: string} | null>(null);
   const [userSortOrder, setUserSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [showingUsers, setShowingUsers] = useState<number>(10);
 
@@ -175,6 +183,84 @@ export default function Statistics() {
     });
   };
 
+  const handleAddBaseNameBonusToAll = async () => {
+    try {
+      setIsAddingBaseNameBonusToAll(true);
+      setAddToAllResult(null);
+      
+      const result = await addBaseNameBonusToAllUsers();
+      setAddToAllResult(result);
+    } catch (error) {
+      console.error('Error adding BaseName bonus to all users:', error);
+      setAddToAllResult({
+        success: false,
+        updatedUsers: 0,
+        error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu BaseName dla wszystkich użytkowników'
+      });
+    } finally {
+      setIsAddingBaseNameBonusToAll(false);
+    }
+  };
+
+  const handleFixBaseChatPointsRadical = async () => {
+    try {
+      setIsFixingBaseChatPointsRadical(true);
+      setFixBaseChatPointsRadicalResult(null);
+      
+      const result = await fixBaseChatPointsRadical();
+      setFixBaseChatPointsRadicalResult(result);
+    } catch (error) {
+      console.error('Error fixing baseChatPoints radically for all users:', error);
+      setFixBaseChatPointsRadicalResult({
+        success: false,
+        updatedUsers: 0,
+        error: error instanceof Error ? error.message : 'Nieznany błąd podczas radykalnej naprawy struktury baseChatPoints'
+      });
+    } finally {
+      setIsFixingBaseChatPointsRadical(false);
+    }
+  };
+
+  const handleUpdateJoinDates = async () => {
+    try {
+      setIsUpdatingJoinDates(true);
+      setUpdateJoinDatesResult(null);
+      
+      const result = await updateAllUserJoinDates();
+      setUpdateJoinDatesResult(result);
+    } catch (error) {
+      console.error('Error updating join dates:', error);
+      setUpdateJoinDatesResult({
+        success: false,
+        updatedUsers: 0,
+        error: error instanceof Error ? error.message : 'Nieznany błąd podczas aktualizacji dat dołączenia'
+      });
+    } finally {
+      setIsUpdatingJoinDates(false);
+    }
+  };
+
+  const handleRefreshAllPosts = async () => {
+    try {
+      setIsRefreshingAllPosts(true);
+      setRefreshAllPostsResult(null);
+      
+      const result = await refreshAllPosts();
+      setRefreshAllPostsResult(result);
+    } catch (error) {
+      console.error('Error refreshing all posts:', error);
+      setRefreshAllPostsResult({
+        success: false,
+        processedPosts: 0,
+        updatedPosts: 0,
+        updatedUsers: 0,
+        error: error instanceof Error ? error.message : 'Nieznany błąd podczas odświeżania wszystkich postów'
+      });
+    } finally {
+      setIsRefreshingAllPosts(false);
+    }
+  };
+
   if (loading) {
     return <div>Ładowanie statystyk...</div>;
   }
@@ -217,6 +303,84 @@ export default function Statistics() {
         >
           30 dni
         </button>
+      </div>
+
+      {/* Akcje administratora */}
+      <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
+        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Akcje administratora</h3>
+        <div className="space-y-4">
+          <div>
+            <button
+              onClick={handleRefreshAllPosts}
+              disabled={isRefreshingAllPosts}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+            >
+              {isRefreshingAllPosts ? 'Odświeżanie...' : 'Odśwież wszystkie posty i przelicz punkty użytkowników'}
+            </button>
+            
+            {refreshAllPostsResult && (
+              <div className={`mt-2 p-2 rounded ${refreshAllPostsResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {refreshAllPostsResult.success 
+                  ? `Sukces! Przetworzono ${refreshAllPostsResult.processedPosts} postów, zaktualizowano ${refreshAllPostsResult.updatedPosts} postów i ${refreshAllPostsResult.updatedUsers} użytkowników.` 
+                  : `Błąd: ${refreshAllPostsResult.error}`}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <button
+              onClick={handleFixBaseChatPointsRadical}
+              disabled={isFixingBaseChatPointsRadical}
+              className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:opacity-50"
+            >
+              {isFixingBaseChatPointsRadical ? 'Naprawianie...' : 'RADYKALNIE napraw strukturę baseChatPoints dla wszystkich użytkowników'}
+            </button>
+            
+            {fixBaseChatPointsRadicalResult && (
+              <div className={`mt-2 p-2 rounded ${fixBaseChatPointsRadicalResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {fixBaseChatPointsRadicalResult.success 
+                  ? `Sukces! Zaktualizowano ${fixBaseChatPointsRadicalResult.updatedUsers} użytkowników.` 
+                  : `Błąd: ${fixBaseChatPointsRadicalResult.error}`}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <button
+              onClick={handleAddBaseNameBonusToAll}
+              disabled={isAddingBaseNameBonusToAll}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {isAddingBaseNameBonusToAll ? 'Dodawanie...' : 'Jednorazowo dodaj baseNameBonus (1000 punktów) dla wszystkich użytkowników z BaseName'}
+            </button>
+            
+            {addToAllResult && (
+              <div className={`mt-2 p-2 rounded ${addToAllResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {addToAllResult.success 
+                  ? `Sukces! Zaktualizowano ${addToAllResult.updatedUsers} użytkowników.` 
+                  : `Błąd: ${addToAllResult.error}`}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <button
+              onClick={handleUpdateJoinDates}
+              disabled={isUpdatingJoinDates}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isUpdatingJoinDates ? 'Aktualizowanie...' : 'Aktualizuj daty dołączenia użytkowników'}
+            </button>
+            
+            {updateJoinDatesResult && (
+              <div className={`mt-2 p-2 rounded ${updateJoinDatesResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {updateJoinDatesResult.success 
+                  ? `Sukces! Zaktualizowano ${updateJoinDatesResult.updatedUsers} użytkowników.` 
+                  : `Błąd: ${updateJoinDatesResult.error}`}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Statystyki użytkowników */}
