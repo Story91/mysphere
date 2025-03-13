@@ -53,12 +53,8 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
 
           const { access_token } = await tokenResponse.json();
 
-          // Get user info
-          const userResponse = await fetch('https://api.twitter.com/2/users/me', {
-            headers: {
-              'Authorization': `Bearer ${access_token}`
-            }
-          });
+          // Get user info through our API route
+          const userResponse = await fetch(`/api/x/user?access_token=${access_token}`);
 
           if (!userResponse.ok) {
             throw new Error('Failed to get user info');

@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { code } = await request.json();
+    const { code, code_verifier } = await request.json();
 
     if (!code) {
       return NextResponse.json({ error: 'Authorization code is required' }, { status: 400 });
+    }
+
+    if (!code_verifier) {
+      return NextResponse.json({ error: 'Code verifier is required' }, { status: 400 });
     }
 
     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
@@ -18,7 +22,7 @@ export async function POST(request: Request) {
         grant_type: 'authorization_code',
         code,
         redirect_uri: process.env.NEXT_PUBLIC_X_REDIRECT_URI!,
-        code_verifier: 'challenge'
+        code_verifier
       }).toString(),
     });
 
