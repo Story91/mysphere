@@ -45,61 +45,42 @@ export default function YapsChecker() {
     }
   };
 
-  const renderMetric = (label: string, value: number, icon: string, change?: number) => (
+  const renderMetric = (label: string, value: number, icon: string) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-[#111318] rounded-xl p-6 hover:bg-[#161922] transition-all duration-300 border border-[#2DFADA]/10"
+      className="bg-gray-800/50 p-4 rounded-xl border border-gray-700"
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2DFADA] to-[#1A8F88] p-[1px]">
-            <div className="w-full h-full rounded-full bg-[#111318] flex items-center justify-center">
-              <span className="text-2xl">{icon}</span>
-            </div>
-          </div>
-          <div>
-            <h3 className="text-[#8B8F97] text-sm">{label}</h3>
-            <p className="text-2xl font-bold text-white">
-              {value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-            </p>
-          </div>
-        </div>
-        {change !== undefined && (
-          <div className={`text-sm font-medium ${change >= 0 ? 'text-[#2DFADA]' : 'text-red-500'}`}>
-            {change >= 0 ? '+' : ''}{change.toFixed(2)}%
-          </div>
-        )}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xl">{icon}</span>
+        <h3 className="text-gray-400 text-sm">{label}</h3>
       </div>
+      <p className="text-xl font-semibold text-white">
+        {value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+      </p>
     </motion.div>
   );
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6">
-      <div className="relative mb-12">
-        <div className="absolute inset-0 bg-gradient-to-r from-[#2DFADA] to-[#1A8F88] opacity-10 blur-xl" />
-        <div className="relative text-center z-10">
-          <h2 className="text-4xl font-bold text-white mb-3">Check Yaps Score</h2>
-          <p className="text-[#8B8F97] text-lg">Enter an X (Twitter) username to check their Yaps metrics</p>
-        </div>
+    <div className="w-full max-w-2xl mx-auto p-6">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-white mb-2">Check Yaps Score</h2>
+        <p className="text-gray-400">Enter an X (Twitter) username to check their Yaps metrics</p>
       </div>
 
-      <form onSubmit={handleCheck} className="mb-12">
-        <div className="flex gap-3 max-w-2xl mx-auto">
-          <div className="relative flex-1">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#2DFADA] to-[#1A8F88] rounded-xl opacity-20 blur-sm" />
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter X username (without @)"
-              className="relative w-full bg-[#111318] border border-[#2DFADA]/20 rounded-xl px-6 py-4 text-white placeholder-[#8B8F97] focus:outline-none focus:border-[#2DFADA]/40 focus:ring-2 focus:ring-[#2DFADA]/10"
-            />
-          </div>
+      <form onSubmit={handleCheck} className="mb-8">
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter X username (without @)"
+            className="flex-1 bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+          />
           <button
             type="submit"
             disabled={isLoading || !username.trim()}
-            className="px-8 py-4 bg-gradient-to-r from-[#2DFADA] to-[#1A8F88] rounded-xl text-black font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-[#2DFADA]/10"
+            className="px-6 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isLoading ? (
               <>
@@ -122,43 +103,32 @@ export default function YapsChecker() {
       </form>
 
       {error && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-2xl mx-auto mb-8 bg-red-500/10 border border-red-500/20 rounded-xl p-4"
-        >
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6">
           <p className="text-sm text-red-500">{error}</p>
-        </motion.div>
+        </div>
       )}
 
       {metrics && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="space-y-8"
+          className="space-y-6"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-[#111318] rounded-xl border border-[#2DFADA]/10 p-8 mb-8"
-          >
-            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-[#2DFADA] to-[#1A8F88] rounded-full p-[1px]">
-                <div className="w-full h-full rounded-full bg-[#111318] flex items-center justify-center">
-                  <span className="text-3xl">@</span>
-                </div>
+          <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-2xl">@</span>
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-white mb-1">@{metrics.username}</h3>
-                <p className="text-[#8B8F97]">User ID: {metrics.user_id}</p>
+                <h3 className="text-xl font-semibold text-white">@{metrics.username}</h3>
+                <p className="text-gray-400 text-sm">User ID: {metrics.user_id}</p>
               </div>
             </div>
-          </motion.div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {renderMetric('Total Yaps', metrics.yaps_all, '🏆')}
-            {renderMetric('Last 24h', metrics.yaps_l24h, '⚡', 
-              metrics.yaps_l48h > 0 ? ((metrics.yaps_l24h - metrics.yaps_l48h) / metrics.yaps_l48h) * 100 : 0)}
+            {renderMetric('Last 24h', metrics.yaps_l24h, '⚡')}
             {renderMetric('Last 7 Days', metrics.yaps_l7d, '📈')}
             {renderMetric('Last 30 Days', metrics.yaps_l30d, '📊')}
           </div>
