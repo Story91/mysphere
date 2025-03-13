@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { generateCodeVerifier, generateCodeChallenge } from '../utils/pkce';
 
 interface ConnectXProps {
   onConnect: (username: string, accessToken: string) => void;
@@ -24,50 +25,89 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
         throw new Error('X API configuration is missing');
       }
 
-      // Initialize X authentication flow
+      // Generate PKCE values
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+      // Store code verifier for later use
+      sessionStorage.setItem('code_verifier', codeVerifier);
+
+      // Initialize X authentication flow with mysphere.fun callback
       const authWindow = window.open(
-        `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read%20offline.access&state=state&code_challenge=challenge&code_challenge_method=plain`,
+        `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read%20offline.access&state=state&code_challenge=${codeChallenge}&code_challenge_method=S256`,
         'X Authentication',
         'width=600,height=600'
       );
 
+      if (!authWindow) {
+        throw new Error('Failed to open authentication window');
+      }
+
       // Listen for the redirect with auth code
-      window.addEventListener('message', async (event) => {
+      const handleMessage = async (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         
         if (event.data.type === 'X_AUTH_SUCCESS') {
           const { code } = event.data;
+          const codeVerifier = sessionStorage.getItem('code_verifier');
           
-          // Exchange code for access token
-          const tokenResponse = await fetch('/api/x/token', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ code })
-          });
-
-          if (!tokenResponse.ok) {
-            throw new Error('Failed to get access token');
+          if (!codeVerifier) {
+            throw new Error('Code verifier not found');
           }
 
-          const { access_token } = await tokenResponse.json();
+          try {
+            // Exchange code for access token
+            const tokenResponse = await fetch('/api/x/token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ 
+                code,
+                code_verifier: codeVerifier
+              })
+            });
 
-          // Get user info through our API route
-          const userResponse = await fetch(`/api/x/user?access_token=${access_token}`);
+            if (!tokenResponse.ok) {
+              throw new Error('Failed to get access token');
+            }
 
-          if (!userResponse.ok) {
-            throw new Error('Failed to get user info');
+            const { access_token } = await tokenResponse.json();
+
+            // Clean up
+            sessionStorage.removeItem('code_verifier');
+            window.removeEventListener('message', handleMessage);
+
+            // Get user info through our API route
+            const userResponse = await fetch(`/api/x/user?access_token=${access_token}`);
+
+            if (!userResponse.ok) {
+              throw new Error('Failed to get user info');
+            }
+
+            const userData = await userResponse.json();
+            onConnect(userData.data.username, access_token);
+          } catch (err) {
+            console.error('X auth error:', err);
+            setError('Authentication failed. Please try again.');
+            setIsAuthenticating(false);
           }
-
-          const userData = await userResponse.json();
-          onConnect(userData.data.username, access_token);
         }
-      });
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      // Clean up if the auth window is closed
+      const checkWindow = setInterval(() => {
+        if (authWindow.closed) {
+          clearInterval(checkWindow);
+          window.removeEventListener('message', handleMessage);
+          setIsAuthenticating(false);
+        }
+      }, 1000);
     } catch (err) {
-      setError('Authentication failed. Please try again.');
       console.error('X auth error:', err);
-    } finally {
+      setError('Authentication failed. Please try again.');
       setIsAuthenticating(false);
     }
   };

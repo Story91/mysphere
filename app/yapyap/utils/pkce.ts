@@ -13,9 +13,9 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
   return base64URLEncode(new Uint8Array(digest));
 }
 
-// Base64URL encoding function
+// Helper function to encode bytes as base64URL
 function base64URLEncode(buffer: Uint8Array): string {
-  return btoa(String.fromCharCode(...buffer))
+  return btoa(String.fromCharCode.apply(null, Array.from(buffer)))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');

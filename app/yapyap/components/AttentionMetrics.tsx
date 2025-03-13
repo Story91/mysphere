@@ -15,21 +15,16 @@ interface TweetMetrics {
 }
 
 interface YapsMetrics {
-  total_score: number;
-  time_periods: {
-    last_24h: number;
-    last_48h: number;
-    last_7d: number;
-    last_30d: number;
-    last_3m: number;
-    last_6m: number;
-    last_12m: number;
-  };
-  changes: {
-    daily: number;
-    weekly: number;
-    monthly: number;
-  };
+  user_id: string;
+  username: string;
+  yaps_all: number;
+  yaps_l24h: number;
+  yaps_l48h: number;
+  yaps_l7d: number;
+  yaps_l30d: number;
+  yaps_l3m: number;
+  yaps_l6m: number;
+  yaps_l12m: number;
 }
 
 interface AttentionMetric {
@@ -114,27 +109,35 @@ export default function AttentionMetrics({ username, accessToken }: AttentionMet
         const calculatedMetrics: AttentionMetric[] = [
           // Yaps Metrics
           {
-            name: 'Total Yaps Score',
-            value: yapsData.total_score,
-            change: yapsData.changes.monthly,
+            name: 'Total Yaps',
+            value: yapsData.yaps_all,
+            change: yapsData.yaps_l30d > 0 ? ((yapsData.yaps_all - yapsData.yaps_l30d) / yapsData.yaps_l30d) * 100 : 0,
             icon: '🏆',
-            description: 'Your overall Yaps score reflecting attention and influence',
+            description: 'Your total Yaps score reflecting overall attention and influence',
             category: 'yaps'
           },
           {
             name: '24h Yaps',
-            value: yapsData.time_periods.last_24h,
-            change: yapsData.changes.daily,
+            value: yapsData.yaps_l24h,
+            change: yapsData.yaps_l48h > 0 ? ((yapsData.yaps_l24h - yapsData.yaps_l48h) / yapsData.yaps_l48h) * 100 : 0,
             icon: '⚡',
             description: 'Yaps earned in the last 24 hours',
             category: 'yaps'
           },
           {
             name: '7d Yaps',
-            value: yapsData.time_periods.last_7d,
-            change: yapsData.changes.weekly,
+            value: yapsData.yaps_l7d,
+            change: yapsData.yaps_l30d > 0 ? ((yapsData.yaps_l7d - yapsData.yaps_l30d) / yapsData.yaps_l30d) * 100 : 0,
             icon: '📈',
             description: 'Yaps earned in the last 7 days',
+            category: 'yaps'
+          },
+          {
+            name: '30d Yaps',
+            value: yapsData.yaps_l30d,
+            change: yapsData.yaps_l3m > 0 ? ((yapsData.yaps_l30d - yapsData.yaps_l3m) / yapsData.yaps_l3m) * 100 : 0,
+            icon: '📊',
+            description: 'Yaps earned in the last 30 days',
             category: 'yaps'
           },
           // Engagement Metrics

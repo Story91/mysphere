@@ -12,6 +12,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Code verifier is required' }, { status: 400 });
     }
 
+    const redirectUri = process.env.NEXT_PUBLIC_X_REDIRECT_URI;
+    if (!redirectUri) {
+      return NextResponse.json({ error: 'Redirect URI is not configured' }, { status: 500 });
+    }
+
     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
       method: 'POST',
       headers: {
@@ -21,7 +26,7 @@ export async function POST(request: Request) {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: process.env.NEXT_PUBLIC_X_REDIRECT_URI!,
+        redirect_uri: redirectUri,
         code_verifier
       }).toString(),
     });

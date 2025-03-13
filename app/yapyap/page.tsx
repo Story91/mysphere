@@ -5,6 +5,7 @@ import { useAccount } from 'wagmi';
 import { motion, AnimatePresence } from 'framer-motion';
 import AttentionMetrics from './components/AttentionMetrics';
 import ConnectX from './components/ConnectX';
+import YapsChecker from './components/YapsChecker';
 
 interface XAuthState {
   username: string;
@@ -28,7 +29,8 @@ export default function YapYap() {
   };
 
   return (
-    <>
+    <main className="min-h-screen bg-gray-900 text-white">
+      {!xAuth && <YapsChecker />}
       <div className="min-h-screen bg-gradient-to-b from-black to-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
           {/* Hero Section */}
@@ -184,6 +186,6 @@ const response = await fetch('https://api.x.com/2/users/me/tweets', {
           />
         )}
       </AnimatePresence>
-    </>
+    </main>
   );
 } 
