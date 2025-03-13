@@ -9,6 +9,13 @@ interface ConnectXProps {
   onCancel: () => void;
 }
 
+const SCOPES = [
+  'tweet.read',
+  'tweet.write',
+  'users.read',
+  'offline.access'
+].join(' ');
+
 export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,11 +29,12 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
         setError(null);
 
         try {
-          const codeVerifier = sessionStorage.getItem('code_verifier');
+          const codeVerifier = localStorage.getItem('codeVerifier');
           if (!codeVerifier) {
             throw new Error('Code verifier not found');
           }
 
+          console.log('Exchanging code for token...');
           // Exchange code for access token
           const tokenResponse = await fetch('/api/x/token', {
             method: 'POST',
@@ -40,27 +48,33 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
           });
 
           if (!tokenResponse.ok) {
-            throw new Error('Failed to get access token');
+            const errorData = await tokenResponse.json();
+            console.error('Token exchange error:', errorData);
+            throw new Error(`Failed to get access token: ${errorData.error || 'Unknown error'}`);
           }
 
           const { access_token } = await tokenResponse.json();
+          console.log('Got access token, fetching user info...');
 
           // Clean up storage
           localStorage.removeItem('x_auth_code');
           localStorage.removeItem('x_auth_state');
-          sessionStorage.removeItem('code_verifier');
+          localStorage.removeItem('codeVerifier');
 
           // Get user info
           const userResponse = await fetch(`/api/x/user?access_token=${access_token}`);
           if (!userResponse.ok) {
-            throw new Error('Failed to get user info');
+            const errorData = await userResponse.json();
+            console.error('User info error:', errorData);
+            throw new Error(`Failed to get user info: ${errorData.error || 'Unknown error'}`);
           }
 
           const userData = await userResponse.json();
+          console.log('Authentication successful!');
           onConnect(userData.data.username, access_token);
         } catch (err) {
           console.error('X auth error:', err);
-          setError('Authentication failed. Please try again.');
+          setError(err instanceof Error ? err.message : 'Authentication failed. Please try again.');
         } finally {
           setIsAuthenticating(false);
         }
@@ -70,108 +84,34 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
     checkMobileAuth();
   }, [onConnect]);
 
-  const handleXAuth = async () => {
-    setIsAuthenticating(true);
-    setError(null);
-
+  const handleConnect = async () => {
     try {
-      const clientId = process.env.NEXT_PUBLIC_X_CLIENT_ID;
-      const redirectUri = process.env.NEXT_PUBLIC_X_REDIRECT_URI;
+      setIsAuthenticating(true);
+      setError(null);
 
-      if (!clientId || !redirectUri) {
-        throw new Error('X API configuration is missing');
-      }
+      // Generate PKCE challenge
+      const verifier = generateCodeVerifier();
+      const challenge = await generateCodeChallenge(verifier);
+      
+      // Store verifier for later use
+      localStorage.setItem('codeVerifier', verifier);
 
-      // Generate PKCE values
-      const codeVerifier = generateCodeVerifier();
-      const codeChallenge = await generateCodeChallenge(codeVerifier);
+      // Build authorization URL with required scopes
+      const authUrl = new URL('https://twitter.com/i/oauth2/authorize');
+      authUrl.searchParams.append('response_type', 'code');
+      authUrl.searchParams.append('client_id', process.env.NEXT_PUBLIC_X_CLIENT_ID || '');
+      authUrl.searchParams.append('redirect_uri', process.env.NEXT_PUBLIC_X_REDIRECT_URI || '');
+      authUrl.searchParams.append('scope', SCOPES);
+      authUrl.searchParams.append('state', 'state');
+      authUrl.searchParams.append('code_challenge', challenge);
+      authUrl.searchParams.append('code_challenge_method', 'S256');
 
-      // Store code verifier for later use
-      sessionStorage.setItem('code_verifier', codeVerifier);
-
-      // Check if running on mobile
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-      if (isMobile) {
-        // Redirect directly for mobile
-        window.location.href = `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read%20offline.access&state=state&code_challenge=${codeChallenge}&code_challenge_method=S256`;
-      } else {
-        // Open popup for desktop
-        const authWindow = window.open(
-          `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read%20offline.access&state=state&code_challenge=${codeChallenge}&code_challenge_method=S256`,
-          'X Authentication',
-          'width=600,height=600'
-        );
-
-        if (!authWindow) {
-          throw new Error('Failed to open authentication window');
-        }
-
-        // Listen for the redirect with auth code
-        const handleMessage = async (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) return;
-          
-          if (event.data.type === 'X_AUTH_SUCCESS') {
-            const { code } = event.data;
-            const codeVerifier = sessionStorage.getItem('code_verifier');
-            
-            if (!codeVerifier) {
-              throw new Error('Code verifier not found');
-            }
-
-            try {
-              // Exchange code for access token
-              const tokenResponse = await fetch('/api/x/token', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                  code,
-                  code_verifier: codeVerifier
-                })
-              });
-
-              if (!tokenResponse.ok) {
-                throw new Error('Failed to get access token');
-              }
-
-              const { access_token } = await tokenResponse.json();
-
-              // Clean up
-              sessionStorage.removeItem('code_verifier');
-              window.removeEventListener('message', handleMessage);
-
-              // Get user info
-              const userResponse = await fetch(`/api/x/user?access_token=${access_token}`);
-              if (!userResponse.ok) {
-                throw new Error('Failed to get user info');
-              }
-
-              const userData = await userResponse.json();
-              onConnect(userData.data.username, access_token);
-            } catch (err) {
-              console.error('X auth error:', err);
-              setError('Authentication failed. Please try again.');
-              setIsAuthenticating(false);
-            }
-          }
-        };
-
-        window.addEventListener('message', handleMessage);
-
-        // Clean up if the auth window is closed
-        const checkWindow = setInterval(() => {
-          if (authWindow.closed) {
-            clearInterval(checkWindow);
-            window.removeEventListener('message', handleMessage);
-            setIsAuthenticating(false);
-          }
-        }, 1000);
-      }
+      // Redirect to X auth page
+      window.location.href = authUrl.toString();
     } catch (err) {
-      console.error('X auth error:', err);
-      setError('Authentication failed. Please try again.');
+      console.error('Connect error:', err);
+      setError('Failed to connect to X');
+    } finally {
       setIsAuthenticating(false);
     }
   };
@@ -222,7 +162,7 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
               Cancel
             </button>
             <button
-              onClick={handleXAuth}
+              onClick={handleConnect}
               disabled={isAuthenticating}
               className="px-6 py-2 bg-black text-white rounded-xl flex items-center space-x-2 hover:bg-black/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >

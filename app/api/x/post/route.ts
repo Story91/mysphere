@@ -11,6 +11,7 @@ export async function POST(request: Request) {
       );
     }
 
+    console.log('Attempting to post tweet...');
     const response = await fetch('https://api.twitter.com/2/tweets', {
       method: 'POST',
       headers: {
@@ -20,20 +21,29 @@ export async function POST(request: Request) {
       body: JSON.stringify({ text }),
     });
 
+    const responseData = await response.json();
+    console.log('Twitter API response:', responseData);
+
     if (!response.ok) {
-      const error = await response.json();
+      console.error('Failed to post tweet:', responseData);
       return NextResponse.json(
-        { error: 'Failed to post tweet', details: error },
+        { 
+          error: 'Failed to post tweet', 
+          details: responseData,
+          message: responseData.detail || responseData.message || 'Unknown error'
+        },
         { status: response.status }
       );
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Error posting tweet:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
