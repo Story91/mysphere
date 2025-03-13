@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { generateCodeVerifier, generateCodeChallenge } from '../utils/pkce';
 
@@ -12,6 +12,63 @@ interface ConnectXProps {
 export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Check for mobile auth completion
+  useEffect(() => {
+    const checkMobileAuth = async () => {
+      const code = localStorage.getItem('x_auth_code');
+      if (code) {
+        setIsAuthenticating(true);
+        setError(null);
+
+        try {
+          const codeVerifier = sessionStorage.getItem('code_verifier');
+          if (!codeVerifier) {
+            throw new Error('Code verifier not found');
+          }
+
+          // Exchange code for access token
+          const tokenResponse = await fetch('/api/x/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+              code,
+              code_verifier: codeVerifier
+            })
+          });
+
+          if (!tokenResponse.ok) {
+            throw new Error('Failed to get access token');
+          }
+
+          const { access_token } = await tokenResponse.json();
+
+          // Clean up storage
+          localStorage.removeItem('x_auth_code');
+          localStorage.removeItem('x_auth_state');
+          sessionStorage.removeItem('code_verifier');
+
+          // Get user info
+          const userResponse = await fetch(`/api/x/user?access_token=${access_token}`);
+          if (!userResponse.ok) {
+            throw new Error('Failed to get user info');
+          }
+
+          const userData = await userResponse.json();
+          onConnect(userData.data.username, access_token);
+        } catch (err) {
+          console.error('X auth error:', err);
+          setError('Authentication failed. Please try again.');
+        } finally {
+          setIsAuthenticating(false);
+        }
+      }
+    };
+
+    checkMobileAuth();
+  }, [onConnect]);
 
   const handleXAuth = async () => {
     setIsAuthenticating(true);
@@ -32,79 +89,86 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
       // Store code verifier for later use
       sessionStorage.setItem('code_verifier', codeVerifier);
 
-      // Initialize X authentication flow with mysphere.fun callback
-      const authWindow = window.open(
-        `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read%20offline.access&state=state&code_challenge=${codeChallenge}&code_challenge_method=S256`,
-        'X Authentication',
-        'width=600,height=600'
-      );
+      // Check if running on mobile
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-      if (!authWindow) {
-        throw new Error('Failed to open authentication window');
-      }
+      if (isMobile) {
+        // Redirect directly for mobile
+        window.location.href = `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read%20offline.access&state=state&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+      } else {
+        // Open popup for desktop
+        const authWindow = window.open(
+          `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read%20offline.access&state=state&code_challenge=${codeChallenge}&code_challenge_method=S256`,
+          'X Authentication',
+          'width=600,height=600'
+        );
 
-      // Listen for the redirect with auth code
-      const handleMessage = async (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
-        
-        if (event.data.type === 'X_AUTH_SUCCESS') {
-          const { code } = event.data;
-          const codeVerifier = sessionStorage.getItem('code_verifier');
+        if (!authWindow) {
+          throw new Error('Failed to open authentication window');
+        }
+
+        // Listen for the redirect with auth code
+        const handleMessage = async (event: MessageEvent) => {
+          if (event.origin !== window.location.origin) return;
           
-          if (!codeVerifier) {
-            throw new Error('Code verifier not found');
+          if (event.data.type === 'X_AUTH_SUCCESS') {
+            const { code } = event.data;
+            const codeVerifier = sessionStorage.getItem('code_verifier');
+            
+            if (!codeVerifier) {
+              throw new Error('Code verifier not found');
+            }
+
+            try {
+              // Exchange code for access token
+              const tokenResponse = await fetch('/api/x/token', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                  code,
+                  code_verifier: codeVerifier
+                })
+              });
+
+              if (!tokenResponse.ok) {
+                throw new Error('Failed to get access token');
+              }
+
+              const { access_token } = await tokenResponse.json();
+
+              // Clean up
+              sessionStorage.removeItem('code_verifier');
+              window.removeEventListener('message', handleMessage);
+
+              // Get user info
+              const userResponse = await fetch(`/api/x/user?access_token=${access_token}`);
+              if (!userResponse.ok) {
+                throw new Error('Failed to get user info');
+              }
+
+              const userData = await userResponse.json();
+              onConnect(userData.data.username, access_token);
+            } catch (err) {
+              console.error('X auth error:', err);
+              setError('Authentication failed. Please try again.');
+              setIsAuthenticating(false);
+            }
           }
+        };
 
-          try {
-            // Exchange code for access token
-            const tokenResponse = await fetch('/api/x/token', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ 
-                code,
-                code_verifier: codeVerifier
-              })
-            });
+        window.addEventListener('message', handleMessage);
 
-            if (!tokenResponse.ok) {
-              throw new Error('Failed to get access token');
-            }
-
-            const { access_token } = await tokenResponse.json();
-
-            // Clean up
-            sessionStorage.removeItem('code_verifier');
+        // Clean up if the auth window is closed
+        const checkWindow = setInterval(() => {
+          if (authWindow.closed) {
+            clearInterval(checkWindow);
             window.removeEventListener('message', handleMessage);
-
-            // Get user info through our API route
-            const userResponse = await fetch(`/api/x/user?access_token=${access_token}`);
-
-            if (!userResponse.ok) {
-              throw new Error('Failed to get user info');
-            }
-
-            const userData = await userResponse.json();
-            onConnect(userData.data.username, access_token);
-          } catch (err) {
-            console.error('X auth error:', err);
-            setError('Authentication failed. Please try again.');
             setIsAuthenticating(false);
           }
-        }
-      };
-
-      window.addEventListener('message', handleMessage);
-
-      // Clean up if the auth window is closed
-      const checkWindow = setInterval(() => {
-        if (authWindow.closed) {
-          clearInterval(checkWindow);
-          window.removeEventListener('message', handleMessage);
-          setIsAuthenticating(false);
-        }
-      }, 1000);
+        }, 1000);
+      }
     } catch (err) {
       console.error('X auth error:', err);
       setError('Authentication failed. Please try again.');

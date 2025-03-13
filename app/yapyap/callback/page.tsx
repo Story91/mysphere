@@ -1,18 +1,19 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function XCallback() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   useEffect(() => {
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     
     if (code) {
-      // Send the auth code back to the parent window
       if (window.opener) {
+        // Desktop flow - send message to opener and close popup
         window.opener.postMessage(
           {
             type: 'X_AUTH_SUCCESS',
@@ -20,11 +21,17 @@ export default function XCallback() {
           },
           window.location.origin
         );
-        // Close the popup window
         window.close();
+      } else {
+        // Mobile flow - redirect back to main page
+        // Store the auth code in localStorage
+        localStorage.setItem('x_auth_code', code);
+        localStorage.setItem('x_auth_state', state || '');
+        // Redirect back to the main page
+        router.push('/yapyap');
       }
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
