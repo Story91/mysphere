@@ -21,6 +21,7 @@ import {
   deleteField,
   deleteDoc
 } from 'firebase/firestore';
+import { getAuth, TwitterAuthProvider } from 'firebase/auth';
 import { UserProfile } from '../types';
 
 // Stała z adresem admina
@@ -37,6 +38,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
+export const twitterProvider = new TwitterAuthProvider();
 
 const convertTimestamp = (timestamp: Timestamp): number => {
   return timestamp.toMillis();
