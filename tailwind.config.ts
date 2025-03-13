@@ -34,7 +34,8 @@ const config: Config = {
         'screen-lg': '922px',   // Zmniejszone z 1024px
       },
       fontFamily: {
-        'coin-base': ['coin-base-sans', 'sans-serif']
+        'coin-base': ['coin-base-sans', 'sans-serif'],
+        'coinbase': ['Coinbase Display', 'sans-serif']
       },
       colors: {
         base: {

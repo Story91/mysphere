@@ -112,7 +112,8 @@ export default function Navigation() {
       label: 'Finance',
       dropdownItems: [
         { href: '/buy', label: 'Buy&Swap' },
-        { href: '/bridge', label: 'Bridge' }
+        { href: '/bridge', label: 'Bridge' },
+        { href: '/earn', label: 'Earn' }
       ]
     },
     { href: '/nft', label: 'NFT' },

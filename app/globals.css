@@ -21,11 +21,13 @@
   font-style: normal;
 }
 
+/* Coinbase Display Font */
 @font-face {
   font-family: 'Coinbase Display';
   src: url('/brand-kit/base/fonts/Coinbase-Display/Coinbase_Display-Regular-web-1.32.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -33,6 +35,31 @@
   src: url('/brand-kit/base/fonts/Coinbase-Display/Coinbase_Display-Medium-web-1.32.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Coinbase Display';
+  src: url('/brand-kit/base/fonts/Coinbase-Display/Coinbase_Display-Bold-web-1.32.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Coinbase Display';
+  src: url('/brand-kit/base/fonts/Coinbase-Display/Coinbase_Display-Light-web-1.32.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Coinbase Display';
+  src: url('/brand-kit/base/fonts/Coinbase-Display/Coinbase_Display-Extra_Light-web-1.32.woff2') format('woff2');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
 }
 
 /* Efekty dla badge'y */
@@ -542,8 +569,6 @@ h1, h2, h3, h4, h5, h6 {
 .react-colorful__interactive:focus .react-colorful__pointer {
   transform: translate(-50%, -50%) scale(1.1);
 }
-
-
 
 @layer base {
   * {
