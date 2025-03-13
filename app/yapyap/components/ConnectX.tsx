@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { generateCodeVerifier, generateCodeChallenge } from '../utils/pkce';
 
 interface ConnectXProps {
-  onConnect: (username: string, accessToken: string) => void;
+  onConnect: (username: string) => void;
   onCancel: () => void;
 }
 
@@ -57,7 +57,7 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
           }
 
           const userData = await userResponse.json();
-          onConnect(userData.data.username, access_token);
+          onConnect(userData.data.username);
         } catch (err) {
           console.error('X auth error:', err);
           setError('Authentication failed. Please try again.');
@@ -79,6 +79,7 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
       const redirectUri = process.env.NEXT_PUBLIC_X_REDIRECT_URI;
 
       if (!clientId || !redirectUri) {
+        console.error('Missing config:', { clientId: !!clientId, redirectUri: !!redirectUri });
         throw new Error('X API configuration is missing');
       }
 
@@ -92,13 +93,16 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
       // Check if running on mobile
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+      const authUrl = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read&state=state&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+      console.log('Auth URL:', authUrl);
+
       if (isMobile) {
         // Redirect directly for mobile
-        window.location.href = `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read%20offline.access&state=state&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+        window.location.href = authUrl;
       } else {
         // Open popup for desktop
         const authWindow = window.open(
-          `https://twitter.com/i/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20users.read%20offline.access&state=state&code_challenge=${codeChallenge}&code_challenge_method=S256`,
+          authUrl,
           'X Authentication',
           'width=600,height=600'
         );
@@ -109,7 +113,10 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
 
         // Listen for the redirect with auth code
         const handleMessage = async (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) return;
+          if (event.origin !== window.location.origin) {
+            console.log('Ignoring message from different origin:', event.origin);
+            return;
+          }
           
           if (event.data.type === 'X_AUTH_SUCCESS') {
             const { code } = event.data;
@@ -120,6 +127,7 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
             }
 
             try {
+              console.log('Exchanging code for token...');
               // Exchange code for access token
               const tokenResponse = await fetch('/api/x/token', {
                 method: 'POST',
@@ -133,10 +141,13 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
               });
 
               if (!tokenResponse.ok) {
+                const errorText = await tokenResponse.text();
+                console.error('Token exchange error:', errorText);
                 throw new Error('Failed to get access token');
               }
 
               const { access_token } = await tokenResponse.json();
+              console.log('Got access token, fetching user info...');
 
               // Clean up
               sessionStorage.removeItem('code_verifier');
@@ -145,11 +156,14 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
               // Get user info
               const userResponse = await fetch(`/api/x/user?access_token=${access_token}`);
               if (!userResponse.ok) {
+                const errorText = await userResponse.text();
+                console.error('User info error:', errorText);
                 throw new Error('Failed to get user info');
               }
 
               const userData = await userResponse.json();
-              onConnect(userData.data.username, access_token);
+              console.log('Got user data:', userData);
+              onConnect(userData.data.username);
             } catch (err) {
               console.error('X auth error:', err);
               setError('Authentication failed. Please try again.');
@@ -203,7 +217,7 @@ export default function ConnectX({ onConnect, onCancel }: ConnectXProps) {
 
         <div className="space-y-4">
           <p className="text-gray-300 text-sm">
-            Connect your X account to access your attention metrics. We'll only read your public profile information.
+            Connect your X account to access your Yaps metrics. We'll only read your public profile information.
           </p>
 
           {error && (

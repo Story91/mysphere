@@ -9,13 +9,10 @@ import YapsChecker from './components/YapsChecker';
 
 interface XAuthState {
   username: string;
-  accessToken: string;
 }
 
 export default function YapYap() {
   const { address } = useAccount();
-  const [isLoading, setIsLoading] = useState(false);
-  const [yapData, setYapData] = useState(null);
   const [xAuth, setXAuth] = useState<XAuthState | null>(null);
   const [showConnectX, setShowConnectX] = useState(false);
 
@@ -23,8 +20,8 @@ export default function YapYap() {
     setShowConnectX(true);
   };
 
-  const handleXConnected = (username: string, accessToken: string) => {
-    setXAuth({ username, accessToken });
+  const handleXConnected = (username: string) => {
+    setXAuth({ username });
     setShowConnectX(false);
   };
 
@@ -44,7 +41,7 @@ export default function YapYap() {
               YapYap
             </h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Connect your X account to explore your tokenized attention metrics with Kaito Yaps Protocol.
+              Connect your X account to explore your Yaps metrics with Kaito Yaps Protocol.
             </p>
           </motion.div>
 
@@ -67,7 +64,7 @@ export default function YapYap() {
             </div>
           </motion.div>
 
-          {/* Attention Metrics Dashboard */}
+          {/* Yaps Metrics Dashboard */}
           {address && xAuth && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -75,8 +72,8 @@ export default function YapYap() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="mb-12"
             >
-              <h2 className="text-2xl font-semibold mb-6 text-white">Your Attention Metrics</h2>
-              <AttentionMetrics username={xAuth.username} accessToken={xAuth.accessToken} />
+              <h2 className="text-2xl font-semibold mb-6 text-white">Your Yaps Metrics</h2>
+              <AttentionMetrics username={xAuth.username} />
             </motion.div>
           )}
 
@@ -107,7 +104,7 @@ export default function YapYap() {
                   <svg className="w-6 h-6 text-blue-500 mt-1 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-gray-300">View your tokenized attention metrics</span>
+                  <span className="text-gray-300">View your Yaps metrics</span>
                 </li>
               </ul>
             </motion.div>
@@ -123,10 +120,10 @@ export default function YapYap() {
               <div className="space-y-4">
                 <p className="text-gray-300">
                   {!address 
-                    ? 'Connect your wallet to begin exploring your attention metrics.'
+                    ? 'Connect your wallet to begin exploring your Yaps metrics.'
                     : !xAuth 
                       ? 'Authenticate with your X account to view your Yaps score.'
-                      : 'You\'re all set! View your attention metrics above.'}
+                      : 'You\'re all set! View your Yaps metrics above.'}
                 </p>
                 {!address ? (
                   <button
@@ -138,7 +135,7 @@ export default function YapYap() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
                   </button>
-                ) : !xAuth ? (
+                ) : !xAuth && (
                   <button
                     onClick={handleConnectX}
                     className="w-full py-3 px-6 bg-black hover:bg-black/90 text-white rounded-xl transition-colors duration-200 flex items-center justify-center space-x-2"
@@ -148,32 +145,10 @@ export default function YapYap() {
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
                   </button>
-                ) : null}
+                )}
               </div>
             </motion.div>
           </div>
-
-          {/* API Integration Preview */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-            className="mt-12 bg-gray-800/50 p-6 rounded-2xl border border-gray-700"
-          >
-            <h2 className="text-2xl font-semibold mb-4 text-white">API Integration</h2>
-            <div className="bg-black/50 p-4 rounded-xl">
-              <pre className="text-sm text-gray-300 overflow-x-auto">
-                <code>{`// Example X API Integration
-const response = await fetch('https://api.x.com/2/users/me/tweets', {
-  method: 'GET',
-  headers: {
-    'Authorization': 'Bearer ${xAuth?.accessToken || 'your_access_token'}',
-    'Content-Type': 'application/json'
-  }
-});`}</code>
-              </pre>
-            </div>
-          </motion.div>
         </div>
       </div>
 
