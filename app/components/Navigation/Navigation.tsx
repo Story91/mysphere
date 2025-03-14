@@ -21,7 +21,7 @@ import {
   Identity,
   EthBalance,
 } from '@coinbase/onchainkit/identity';
-import { useAccount } from 'wagmi';
+import { useAccount, useDisconnect } from 'wagmi';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
 import { AppKitButton } from '../AppKitButton';
@@ -60,6 +60,7 @@ export default function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const { disconnect: wagmiDisconnect } = useDisconnect();
   
   useEffect(() => {
     if (address) {
@@ -68,6 +69,14 @@ export default function Navigation() {
       setIsAdmin(false);
     }
   }, [address]);
+
+  // Dodaj efekt do synchronizacji z AppKit
+  useEffect(() => {
+    if (!isConnected) {
+      // Jeśli OnchainKit jest rozłączony, rozłącz też wagmi
+      wagmiDisconnect();
+    }
+  }, [isConnected, wagmiDisconnect]);
 
   const navLinks: (NavLink | NavLinkWithDropdown)[] = [
     { href: '/basechat', label: 'MySphere' },
