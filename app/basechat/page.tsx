@@ -47,6 +47,7 @@ import { RefreshCw } from 'lucide-react';
 import TransactionButton from '../components/TransactionButton';
 import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
+import YapsMetrics from '../yapyap/components/YapsMetrics';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -1826,16 +1827,28 @@ export default function BaseChat() {
               </div>
             </div>
 
+                      {/* YapYap Integration - moved outside About Me */}
+                      {address && (
+                        <div className="mb-4">
+                          <div className="bg-[#1c2c2c] rounded-xl p-4 shadow-lg border border-[#2a3a3a]">
+                            <YapsMetrics address={address} />
+                            <div className="mt-3 pt-2 border-t border-[#2a3a3a] flex items-center justify-end">
+                              <span className="text-xs text-gray-500">Powered by Kaito.ai</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Bio Section - Moved and restyled */}
                       <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
                         <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2">
                             <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
                             <div className="text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">About Me</div>
-                      </div>
-                <button
+                          </div>
+                          <button
                             onClick={async () => {
                               if (!address) return;
                               
@@ -1863,13 +1876,13 @@ export default function BaseChat() {
                               }
                             }}
                             className="flex items-center space-x-1 text-sm text-blue-500 hover:text-blue-600 transition-colors duration-200"
-                  >
+                          >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
+                            </svg>
                             <span>Edit</span>
-                      </button>
-                    </div>
+                          </button>
+                        </div>
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
                           <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
                             {userProfile.bio || 
@@ -1880,96 +1893,96 @@ export default function BaseChat() {
                                 <span>Click Edit to add your bio</span>
                               </span>
                             }
-              </div>
-                    </div>
-                  </div>
+                          </div>
+                        </div>
+                      </div>
 
-                  {/* Stats Grid - Network Activity */}
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                      <div className="text-blue-500 text-2xl font-bold">{stats.transactions}</div>
-                      <div className="text-sm text-gray-500">Transactions</div>
-                      <div className="text-xs text-gray-400">{stats.transactionPoints} points</div>
-                    </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                      <div className="text-green-500 text-2xl font-bold">{stats.tokens}</div>
-                      <div className="text-sm text-gray-500">Tokens</div>
-                      <div className="text-xs text-gray-400">{stats.tokenPoints} points</div>
-                    </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                      <div className="text-purple-500 text-2xl font-bold">{stats.nfts}</div>
-                      <div className="text-sm text-gray-500">NFTs</div>
-                      <div className="text-xs text-gray-400">{stats.nftPoints} points</div>
-                    </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                      <div className="text-yellow-500 text-2xl font-bold">{stats.contracts}</div>
-                      <div className="text-sm text-gray-500">Contracts</div>
-                      <div className="text-xs text-gray-400">{stats.contractPoints} points</div>
-                    </div>
-                  </div>
+                      {/* Stats Grid - Network Activity */}
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                          <div className="text-blue-500 text-2xl font-bold">{stats.transactions}</div>
+                          <div className="text-sm text-gray-500">Transactions</div>
+                          <div className="text-xs text-gray-400">{stats.transactionPoints} points</div>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                          <div className="text-green-500 text-2xl font-bold">{stats.tokens}</div>
+                          <div className="text-sm text-gray-500">Tokens</div>
+                          <div className="text-xs text-gray-400">{stats.tokenPoints} points</div>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                          <div className="text-purple-500 text-2xl font-bold">{stats.nfts}</div>
+                          <div className="text-sm text-gray-500">NFTs</div>
+                          <div className="text-xs text-gray-400">{stats.nftPoints} points</div>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                          <div className="text-yellow-500 text-2xl font-bold">{stats.contracts}</div>
+                          <div className="text-sm text-gray-500">Contracts</div>
+                          <div className="text-xs text-gray-400">{stats.contractPoints} points</div>
+                        </div>
+                      </div>
 
-                  {/* Stats Grid - Posts and Likes */}
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                      <div className="text-blue-500 text-2xl font-bold">{userProfile.postCount}</div>
-                      <div className="text-sm text-gray-500">Posts</div>
-                    </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                      <div className="text-pink-500 text-2xl font-bold">{userProfile.likesReceived}</div>
-                      <div className="text-sm text-gray-500">Likes Received</div>
-                    </div>
-                  </div>
+                      {/* Stats Grid - Posts and Likes */}
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                          <div className="text-blue-500 text-2xl font-bold">{userProfile.postCount}</div>
+                          <div className="text-sm text-gray-500">Posts</div>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                          <div className="text-pink-500 text-2xl font-bold">{userProfile.likesReceived}</div>
+                          <div className="text-sm text-gray-500">Likes Received</div>
+                        </div>
+                      </div>
 
-                  {/* Total Points Section */}
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                        Total Points
-                      </div>
-                      <div className="text-2xl font-bold text-indigo-500">
-                        {stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints}
-                      </div>
-                    </div>
+                      {/* Total Points Section */}
+                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
+                        <div className="flex justify-between items-center mb-4">
+                          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                            Total Points
+                          </div>
+                          <div className="text-2xl font-bold text-indigo-500">
+                            {stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints}
+                          </div>
+                        </div>
 
-                    <div className="space-y-2 mb-4">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Current Rank:</span>
-                        <span className="text-green-500 font-semibold">{currentRank}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Next Rank:</span>
-                        <span className="text-blue-500 font-semibold">{nextRank}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Progress:</span>
-                        <span className="text-purple-500 font-semibold">{Math.round(progress)}%</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Badges Earned:</span>
-                        <span className="text-orange-500 font-semibold">
-                          {BADGES.filter(badge => badge.condition({
-                            totalPoints: stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints,
-                            rank: currentRank,
-                            percentile: 0,
-                            breakdown: {
-                              transactionPoints: stats.transactionPoints,
-                              tokenPoints: stats.tokenPoints,
-                              nftPoints: stats.nftPoints,
-                              uniqueContractPoints: stats.contractPoints
-                            },
-                            stats: {
-                              transactions: stats.transactions,
-                              tokens: stats.tokens,
-                              nfts: stats.nfts,
-                              contracts: stats.contracts
-                            }
-                          })).length}/24
-                        </span>
-                      </div>
-                    </div>
+                        <div className="space-y-2 mb-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Current Rank:</span>
+                            <span className="text-green-500 font-semibold">{currentRank}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Next Rank:</span>
+                            <span className="text-blue-500 font-semibold">{nextRank}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Progress:</span>
+                            <span className="text-purple-500 font-semibold">{Math.round(progress)}%</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Badges Earned:</span>
+                            <span className="text-orange-500 font-semibold">
+                              {BADGES.filter(badge => badge.condition({
+                                totalPoints: stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints,
+                                rank: currentRank,
+                                percentile: 0,
+                                breakdown: {
+                                  transactionPoints: stats.transactionPoints,
+                                  tokenPoints: stats.tokenPoints,
+                                  nftPoints: stats.nftPoints,
+                                  uniqueContractPoints: stats.contractPoints
+                                },
+                                stats: {
+                                  transactions: stats.transactions,
+                                  tokens: stats.tokens,
+                                  nfts: stats.nfts,
+                                  contracts: stats.contracts
+                                }
+                              })).length}/24
+                            </span>
+                          </div>
+                        </div>
 
-                    <div className="relative pt-1">
-                      <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-gray-200 dark:bg-gray-600">
+                        <div className="relative pt-1">
+                          <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-gray-200 dark:bg-gray-600">
         <div 
                               style={{ width: `${progress}%` }}
                               className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300"
@@ -2876,6 +2889,38 @@ export default function BaseChat() {
                         </div>
                       </div>
                     ))}
+                </div>
+              </div>
+
+              {/* Yaps Stats Widget */}
+              <div className="mb-4">
+                <div className="bg-black/90 backdrop-blur-lg p-4 rounded-xl border border-[#0052FF]/20 shadow-[0_0_15px_rgba(0,82,255,0.1)]">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[#0052FF] font-mono font-bold flex items-center gap-2">
+                      <span className="text-xl">🔥</span>
+                      YAPS STATS
+                    </span>
+                    <a href="/yapyap" className="text-xs text-[#0052FF]/70 hover:text-[#0052FF] transition-colors duration-200">
+                      View All →
+                    </a>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-black/40 backdrop-blur-lg p-3 rounded-lg border border-[#0052FF]/10">
+                      <div className="text-xs text-gray-400 font-mono mb-1">24H</div>
+                      <div className="text-xl font-mono font-bold text-white">42</div>
+                    </div>
+                    
+                    <div className="bg-black/40 backdrop-blur-lg p-3 rounded-lg border border-[#0052FF]/10">
+                      <div className="text-xs text-gray-400 font-mono mb-1">7D</div>
+                      <div className="text-xl font-mono font-bold text-white">156</div>
+                    </div>
+                    
+                    <div className="bg-black/40 backdrop-blur-lg p-3 rounded-lg border border-[#0052FF]/10">
+                      <div className="text-xs text-gray-400 font-mono mb-1">30D</div>
+                      <div className="text-xl font-mono font-bold text-white">498</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
