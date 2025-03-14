@@ -216,6 +216,8 @@ html {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+    --w3m-z-index: 1000;
+    --w3m-accent: #0052FF;
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -577,4 +579,20 @@ h1, h2, h3, h4, h5, h6 {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+appkit-button {
+  display: inline-block;
+}
+
+appkit-button::part(button) {
+  background: #FF4B26;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  color: white;
+  transition: all 0.3s;
+}
+
+appkit-button::part(button):hover {
+  background: rgba(255, 75, 38, 0.9);
 }

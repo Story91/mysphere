@@ -8,6 +8,7 @@ import { Providers } from './providers';
 import Navigation from './components/Navigation/Navigation';
 import { ThemeProvider } from './context/ThemeContext';
 import ClientOnly from './components/ClientOnly';
+import ContextProvider from '@/context';
 
 export default function RootLayout({
   children,
@@ -20,7 +21,7 @@ export default function RootLayout({
         <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         
-        {/* Frame v1 compatibility tags */}
+        {/* Frame compatibility tags */}
         <meta property="fc:frame" content="vNext" />
         <meta property="fc:frame:image" content="https://mysphere.fun/images/frame-v2.png" />
         <meta property="fc:frame:button:1" content="Open MySphere" />
@@ -28,7 +29,7 @@ export default function RootLayout({
         <meta property="fc:frame:button:1:target" content="https://mysphere.fun/basechat" />
         <meta property="fc:frame:aspect_ratio" content="1.91:1" />
         
-        {/* Frame v2 tag */}
+        {/* Frame v2 tags */}
         <meta name="fc:frame" content='{
           "version": "next",
           "imageUrl": "https://mysphere.fun/images/frame-v2.png",
@@ -41,8 +42,6 @@ export default function RootLayout({
           ],
           "postUrl": "https://mysphere.fun/api/frame"
         }' />
-
-        {/* Frame v2 tag dla root URL */}
         <meta name="fc:frame:root" content='{
           "version": "next",
           "imageUrl": "https://mysphere.fun/images/frame-v2.png",
@@ -55,8 +54,6 @@ export default function RootLayout({
           ],
           "postUrl": "https://mysphere.fun/api/frame"
         }' />
-
-        {/* Frame v2 tag dla www */}
         <meta name="fc:frame:www" content='{
           "version": "next",
           "imageUrl": "https://mysphere.fun/images/frame-v2.png",
@@ -78,21 +75,23 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-[#0F172A]">
         <ThemeProvider>
-          <Providers>
-            <ClientOnly fallback={
-              <div className="min-h-screen flex flex-col items-center justify-center text-white">
-                <div className="text-2xl font-bold mb-4">Connecting with Base...</div>
-                <div className="w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin"></div>
-              </div>
-            }>
-              <Navigation />
-              <main className="w-full">
-                {children}
-              </main>
-            </ClientOnly>
-            <Analytics />
-            <SpeedInsights />
-          </Providers>
+          <ContextProvider>
+            <Providers>
+              <ClientOnly fallback={
+                <div className="min-h-screen flex flex-col items-center justify-center text-white">
+                  <div className="text-2xl font-bold mb-4">Connecting with Base...</div>
+                  <div className="w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin"></div>
+                </div>
+              }>
+                <Navigation />
+                <main className="w-full">
+                  {children}
+                </main>
+              </ClientOnly>
+              <Analytics />
+              <SpeedInsights />
+            </Providers>
+          </ContextProvider>
         </ThemeProvider>
       </body>
     </html>
