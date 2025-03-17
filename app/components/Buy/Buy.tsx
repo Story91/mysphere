@@ -33,12 +33,13 @@ export default function BuyComponent() {
 
   const getTokenDescription = (symbol: string) => {
     switch (symbol) {
-      case 'DEGEN':
+      case 'AIS':
         return {
-          description: "DEGEN is the governance token of the Base ecosystem. Holders can participate in protocol governance and earn rewards for contributing to the network's growth.",
-          features: ["Governance voting rights", "Community rewards", "Protocol fee sharing", "Exclusive access to features"],
-          useCase: "Governance & Rewards",
-          paymentMethods: ["Coinbase Account", "Apple Pay", "Debit Card", "ETH", "USDC"]
+          description: "All I See Is Base – no hype, just pure potential. This is where the future begins. Base is the foundation, the game-changer. Get in, stay ahead!",
+          features: ["MEMECOIN", "ALL I SEE IS BASE", "BASED"],
+          useCase: "AI & Governance",
+          paymentMethods: ["Coinbase Account", "Apple Pay", "Debit Card", "ETH", "USDC"],
+          contractAddress: "0x26F732eD652A63aE66F365936fdDD2389c051B31"
         };
       case 'USDC':
         return {
@@ -66,28 +67,12 @@ export default function BuyComponent() {
 
   const tokens: Token[] = [
     {
-      name: 'DEGEN',
-      address: '0x4ed4e862860bed51a9570b96d89af5e1b0efefed',
-      symbol: 'DEGEN',
+      name: 'All I See Is Base',
+      address: '0x26F732eD652A63aE66F365936fdDD2389c051B31',
+      symbol: 'AIS',
       decimals: 18,
       chainId: 8453,
-      image: 'https://d3r81g40ycuhqg.cloudfront.net/wallet/wais/3b/bf/3bbf118b5e6dc2f9e7fc607a6e7526647b4ba8f0bea87125f971446d57b296d2-MDNmNjY0MmEtNGFiZi00N2I0LWIwMTItMDUyMzg2ZDZhMWNm'
-    },
-    {
-      name: 'USD Coin',
-      address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-      symbol: 'USDC',
-      decimals: 6,
-      chainId: 8453,
-      image: 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png'
-    },
-    {
-      name: 'Coinbase Wrapped Staked ETH',
-      address: '0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22',
-      symbol: 'cbETH',
-      decimals: 18,
-      chainId: 8453,
-      image: 'https://assets.coingecko.com/coins/images/27008/large/cbeth.png'
+      image: '/aislogo.png'
     }
   ];
 
@@ -156,7 +141,7 @@ export default function BuyComponent() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-1 md:grid-cols-3 gap-8"
+        className="w-full"
       >
         {tokens.map((token) => {
           const tokenInfo = getTokenDescription(token.symbol);
@@ -164,46 +149,15 @@ export default function BuyComponent() {
             <motion.div
               key={token.address}
               variants={itemVariants}
-              className="group relative"
+              className="group relative w-full"
             >
-              {/* Tooltip */}
-              <div className="tooltip opacity-0 group-hover:opacity-100 transition-all duration-300 absolute -top-16 left-1/2 transform -translate-x-1/2 bg-[#0052FF]/10 text-white text-xs font-['Share_Tech_Mono'] px-4 py-2 rounded-full border border-[#0052FF]/20 backdrop-blur-xl z-50 shadow-lg shadow-[#0052FF]/20 w-auto min-w-[200px] whitespace-nowrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-[#0052FF]">💳</span>
-                  <div className="flex flex-wrap gap-1">
-                    {tokenInfo.paymentMethods.map((method, index) => (
-                      <span key={index} className="text-[#0052FF]">
-                        {index > 0 ? ' • ' : ''}{method}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Card glow effect */}
-              <div className="absolute -inset-[1px] bg-gradient-to-r from-blue-500/50 via-cyan-500/50 to-blue-500/50 rounded-xl blur-md group-hover:blur-xl transition-all duration-300 opacity-20 group-hover:opacity-30"></div>
-
               {/* Card content */}
-              <div className="h-[400px] bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-blue-500/30 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl group-hover:shadow-blue-500/20 p-6 relative flex flex-col">
-                {/* Background Image */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-transparent">
-                  <img
-                    src={getTokenImage(token)}
-                    alt=""
-                    className="w-full h-full object-contain opacity-20 scale-[1.5] blur-lg"
-                  />
-                </div>
-
-                {/* Hover overlay */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl blur-xl"></div>
-                </div>
-
+              <div className="bg-white/70 backdrop-blur-xl rounded-xl overflow-hidden transition-all duration-300 group-hover:scale-[1.02] p-6 relative flex flex-col border border-blue-100">
                 {/* Content */}
                 <div className="relative z-10 flex flex-col flex-grow">
                   <div className="flex-grow flex flex-col items-center justify-start text-center space-y-3">
                     {/* Token Image */}
-                    <div className="w-16 h-16 relative mb-2">
+                    <div className="w-24 h-24 relative mb-4">
                       <img
                         src={getTokenImage(token)}
                         alt={token.name}
@@ -212,59 +166,46 @@ export default function BuyComponent() {
                     </div>
 
                     {/* Token Name and Symbol */}
-                    <div className="space-y-1">
-                      <h3 className="text-xl font-bold text-white">{token.name}</h3>
-                      <p className="text-blue-400 text-sm">{token.symbol}</p>
+                    <div className="space-y-2">
+                      <h3 className="text-3xl font-bold text-blue-900">{token.name}</h3>
+                      <p className="text-blue-600 text-xl">${token.symbol}</p>
                     </div>
 
                     {/* Token Description */}
-                    <div className="text-gray-400 text-sm leading-relaxed mt-2">
+                    <div className="text-blue-800 text-lg leading-relaxed mt-4">
                       {tokenInfo.description}
                     </div>
 
+                    {/* Contract Address */}
+                    {tokenInfo.contractAddress && (
+                      <div className="mt-4 flex items-center justify-center">
+                        <div className="flex items-center bg-blue-50 rounded-lg px-3 py-1 border border-blue-200">
+                          <code className="text-sm text-blue-800">{tokenInfo.contractAddress}</code>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(tokenInfo.contractAddress);
+                            }}
+                            className="ml-2 text-blue-500 hover:text-blue-600 focus:outline-none"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Features List */}
-                    <div className="flex flex-wrap justify-center gap-2 mt-2">
+                    <div className="flex flex-wrap justify-center gap-2 mt-4">
                       {tokenInfo.features.map((feature, index) => (
                         <span
                           key={index}
-                          className="text-xs px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                          className="text-sm px-4 py-2 rounded-full bg-blue-50 text-blue-600 border border-blue-200"
                         >
                           {feature}
                         </span>
                       ))}
                     </div>
-
-                    {/* Use Cases */}
-                    <div className="text-sm text-gray-400 mt-2">
-                      {tokenInfo.useCase}
-                    </div>
-
-                    {/* Staking Link dla cbETH */}
-                    {token.symbol === 'cbETH' && (
-                      <a 
-                        href="https://www.coinbase.com/pl/earn/staking/coinbase-wrapped-staked-eth"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-[#0052FF] hover:text-blue-400 mt-4 group transition-all duration-300"
-                      >
-                        <span className="text-sm font-['Share_Tech_Mono'] border-b border-[#0052FF]/0 group-hover:border-[#0052FF] transition-all duration-300">
-                          STAKE your cbETH
-                        </span>
-                        <svg 
-                          className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            strokeWidth={2} 
-                            d="M13 7l5 5m0 0l-5 5m5-5H6" 
-                          />
-                        </svg>
-                      </a>
-                    )}
                   </div>
                 </div>
               </div>
@@ -273,36 +214,38 @@ export default function BuyComponent() {
         })}
       </motion.div>
 
-      {/* Buy Buttons Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
+      {/* Buy Button */}
+      <div className="w-full mt-8">
         {tokens.map((token) => (
-          <div key={token.address}>
+          <div key={token.address} className="w-full">
             <Buy 
               toToken={token}
               isSponsored
               className="w-full 
-                [&_input]:!h-14 
-                [&_input]:!text-lg 
+                [&_input]:!h-16 
+                [&_input]:!text-xl 
                 [&_input]:!rounded-xl 
-                [&_input]:!border-gray-200
+                [&_input]:!border-blue-200
                 [&_input]:!bg-white
-                [&_input]:!text-gray-900
-                [&_input]:!placeholder-gray-400
-                [&_input]:!shadow-sm
-                [&_input]:!pl-4
+                [&_input]:!text-blue-900
+                [&_input]:!placeholder-blue-400
+                [&_input]:!shadow-none
+                [&_input]:!pl-6
                 [&_input]:hover:!border-blue-400
                 [&_input]:focus:!border-blue-500
                 [&_input]:focus:!ring-2
                 [&_input]:focus:!ring-blue-500/20
                 [&_input]:!transition-all
                 [&_input]:!duration-300
-                [&_button]:!h-14 
-                [&_button]:!text-lg 
+                [&_button]:!h-16 
+                [&_button]:!text-xl 
                 [&_button]:!rounded-xl 
                 [&_button]:!bg-blue-500 
                 [&_button]:!hover:bg-blue-600 
                 [&_button]:!text-white 
-                [&_button]:!font-['Share_Tech_Mono']
+                [&_button]:!font-bold
+                [&_button]:!shadow-lg
+                [&_button]:hover:!shadow-blue-500/25
                 [&_div]:!bg-transparent
                 [&_div]:!border-none
                 [&_div]:!shadow-none

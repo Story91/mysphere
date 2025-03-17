@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Swap, SwapAmountInput, SwapButton, SwapMessage, SwapToast, SwapToggleButton } from '@coinbase/onchainkit/swap';
+import { SwapDefault } from '@coinbase/onchainkit/swap';
 import type { Token } from '@coinbase/onchainkit/token';
 
 type Theme = 'base' | 'cyberpunk' | 'matrix' | 'minimal';
@@ -27,12 +27,12 @@ export default function SwapComponent() {
       image: 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png'
     },
     {
-      name: 'DEGEN',
-      address: '0x4ed4e862860bed51a9570b96d89af5e1b0efefed',
-      symbol: 'DEGEN',
+      name: 'All I See Is Base',
+      address: '0x26F732eD652A63aE66F365936fdDD2389c051B31',
+      symbol: 'AIS',
       decimals: 18,
       chainId: 8453,
-      image: 'https://d3r81g40ycuhqg.cloudfront.net/wallet/wais/3b/bf/3bbf118b5e6dc2f9e7fc607a6e7526647b4ba8f0bea87125f971446d57b296d2-MDNmNjY0MmEtNGFiZi00N2I0LWIwMTItMDUyMzg2ZDZhMWNm'
+      image: '/aislogo.png'
     }
   ];
 
@@ -110,36 +110,11 @@ export default function SwapComponent() {
 
       {/* Swap Interface */}
       <div className="w-full">
-        <Swap isSponsored className="w-full">
-          <SwapAmountInput
-            label="Sell"
-            swappableTokens={tokens}
-            token={tokens[0]}
-            type="from"
-            className="w-full"
-          />
-          <SwapToggleButton className="my-2 w-full" />
-          <SwapAmountInput
-            label="Buy"
-            swappableTokens={tokens}
-            token={tokens[1]}
-            type="to"
-            className="w-full"
-          />
-          <div className="w-full mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div className="flex justify-between text-sm text-gray-500">
-              <span>Estimated Gas Fee:</span>
-              <span>~0.0001 ETH</span>
-            </div>
-            <div className="flex justify-between text-sm text-gray-500 mt-1">
-              <span>Price Impact:</span>
-              <span className="text-green-500">{'<0.01%'}</span>
-            </div>
-          </div>
-          <SwapButton className={`w-full mt-4 ${styles.button}`} />
-          <SwapMessage className="mt-2 w-full" />
-          <SwapToast />
-        </Swap>
+        <SwapDefault
+          from={tokens} // Wszystkie tokeny dostępne jako źródło
+          to={tokens} // Wszystkie tokeny dostępne jako cel
+          className="w-full"
+        />
       </div>
     </div>
   );

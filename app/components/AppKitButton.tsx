@@ -4,13 +4,11 @@ import { useAppKit, createAppKit } from '@reown/appkit/react'
 import { wagmiAdapter, projectId, metadata } from '@/config/appkit'
 import { base } from '@wagmi/core/chains'
 import { useEffect, useState } from 'react'
-import { useAccount, useDisconnect } from 'wagmi'
+import { useAccount } from 'wagmi'
 
 export const AppKitButton = () => {
   const [isInitialized, setIsInitialized] = useState(false)
   const { isConnected } = useAccount()
-  const { disconnect: wagmiDisconnect } = useDisconnect()
-  const [appkitInstance, setAppkitInstance] = useState<any>(null)
 
   useEffect(() => {
     const appkit = createAppKit({
@@ -19,7 +17,6 @@ export const AppKitButton = () => {
       projectId,
       metadata
     })
-    setAppkitInstance(appkit)
     setIsInitialized(true)
 
     // Cleanup function to handle component unmount
@@ -28,39 +25,19 @@ export const AppKitButton = () => {
     }
   }, [])
 
-  // Synchronizacja z OnchainKit
-  useEffect(() => {
-    if (!isConnected && appkitInstance) {
-      appkitInstance.disconnect()
-    }
-  }, [isConnected, appkitInstance])
-
   if (!isInitialized) {
     return null
   }
 
   const { open } = useAppKit()
 
-  const handleClick = async () => {
-    if (isConnected) {
-      // Rozłącz oba portfele
-      wagmiDisconnect()
-      if (appkitInstance) {
-        appkitInstance.disconnect()
-      }
-    } else {
-      // Połącz przez AppKit
-      open()
-    }
-  }
-
   return (
     <div className="relative group">
       <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4B26] to-[#FF8126] rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
       <button 
-        onClick={handleClick}
+        onClick={() => open()}
         className="relative bg-[#FF4B26] hover:bg-[#FF4B26]/90 rounded-xl p-2.5 text-white shadow-lg shadow-[#FF4B26]/20 transition-all duration-300 hover:scale-105"
-        aria-label={isConnected ? "Disconnect Wallet" : "Connect Wallet"}
+        aria-label="Connect Wallet"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M18.04 13.55C17.62 13.96 17.38 14.55 17.44 15.18C17.53 16.26 18.52 17.05 19.6 17.05H21.5V18.24C21.5 20.31 19.81 22 17.74 22H6.26C4.19 22 2.5 20.31 2.5 18.24V11.51C2.5 9.44001 4.19 7.75 6.26 7.75H17.74C19.81 7.75 21.5 9.44001 21.5 11.51V12.95H19.48C18.92 12.95 18.41 13.17 18.04 13.55Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
