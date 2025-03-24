@@ -6,12 +6,89 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import OnchainkitSvg from './svg/OnchainKit';
+import HomeNeonBackground from './components/Backgrounds/HomeNeonBackground';
+import { getGlobalStats } from './utils/firebase';
+import { FiUsers, FiFileText, FiMessageCircle, FiHeart } from 'react-icons/fi';
+import { BiGasPump } from 'react-icons/bi';
+import { FaEthereum } from 'react-icons/fa';
+import { MdOutlineStackedLineChart } from 'react-icons/md';
+import { CircularProgress } from '@mui/material';
+
+// Ikony dla sekcji community
+import { FaTwitter as Twitter, FaDiscord as Discord, FaBook as Book, FaBlog as Blog } from 'react-icons/fa';
 
 const themes = [
   { id: 'base', name: 'Base', gradient: 'from-[#0052FF] via-[#1E4DD8] to-[#4C8FFF]' },
   { id: 'cyberpunk', name: 'Cyberpunk', gradient: 'from-[#FF00FF] via-[#FF00CC] to-[#FF0099]' },
   { id: 'hacker', name: 'Hacker', gradient: 'from-[#00FF00] via-[#00CC00] to-[#008800]' },
 ];
+
+// Linki do zasobów społecznościowych
+const communityLinks = [
+  { 
+    icon: Book, 
+    title: 'Read the Docs', 
+    description: 'Learn about the MySphere.', 
+    url: '/docs',
+    bgClass: 'bg-black/80 hover:bg-black/90 backdrop-blur-md border border-gray-800 hover:border-blue-500'
+  },
+  { 
+    icon: Twitter, 
+    title: 'Follow @MySphereAI', 
+    description: 'Announcements about MySphere .', 
+    url: 'https://twitter.com/mysphereai',
+    bgClass: 'bg-black/80 hover:bg-black/90 backdrop-blur-md border border-gray-800 hover:border-blue-500'
+  },
+  { 
+    icon: Discord, 
+    title: 'Join Discord', 
+    description: 'Connect with the SPHERE community.', 
+    url: 'https://discord.com/invite/TGJpz5SH48',
+    bgClass: 'bg-black/80 hover:bg-black/90 backdrop-blur-md border border-gray-800 hover:border-blue-500'
+  },
+  { 
+    icon: Blog, 
+    title: 'SPHERE Blog', 
+    description: 'Stay updated on all things MySphere.', 
+    url: '#',
+    disabled: true,
+    bgClass: 'bg-black/80 backdrop-blur-md border border-gray-700 opacity-50 cursor-not-allowed'
+  }
+];
+
+// Navigation links to include in the Join Community section
+const navigationLinks = {
+  main: [
+    { title: 'MySphere', url: '/basechat' },
+    { title: 'Identity', url: '/profile' }
+  ]
+};
+
+// Linki do zasobów dla deweloperów i zarządzania
+const resourceLinks = {
+  finance: [
+    { title: 'Bridge', url: '/bridge' },
+    { title: 'Earn', url: '/earn' },
+    { title: 'Buy $AIS', url: '/ais' },
+  ],
+  nft: [
+    { title: 'SphereGenesis', url: '/nft' },
+    { title: 'Quotes on Base', url: '/quotes' },
+  ],
+  tools: [
+    { title: 'FLASHBLOCK', url: '/flashblock' },
+  ],
+  governance: [
+    { title: 'Docs', url: '/Docs' },
+    { title: 'Forum', url: '#', disabled: true },
+  ],
+  community: [
+    { title: 'Follow @MySphereAI', url: 'https://twitter.com/mysphereai' },
+    { title: 'Join Discord', url: 'https://discord.com/invite/TGJpz5SH48' },
+    { title: 'MySphere Blog', url: '#', disabled: true },
+    { title: 'Follow us on Farcaster', url: '#', disabled: true },
+  ]
+};
 
 const tailwindConfig = {
   theme: {
@@ -38,6 +115,18 @@ export default function HomePage() {
   const [gasPriceStatus, setGasPriceStatus] = useState<string>('');
   const [lastBlock, setLastBlock] = useState<number | null>(null);
   const [blockTime, setBlockTime] = useState(0);
+  const [userCount, setUserCount] = useState(0);
+  const [postsCount, setPostsCount] = useState(0);
+  const [transactionsCount, setTransactionsCount] = useState(0);
+  const [likesCount, setLikesCount] = useState(0);
+  const [commentsCount, setCommentsCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [updateTrigger, setUpdateTrigger] = useState<{ [key: string]: boolean }>({
+    users: false,
+    posts: false,
+    comments: false,
+    likes: false
+  });
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -57,18 +146,47 @@ export default function HomePage() {
     }
   };
 
+  // Funkcja do animowania aktualizacji
+  const triggerUpdate = (statType: string) => {
+    setUpdateTrigger(prev => ({...prev, [statType]: true}));
+    setTimeout(() => {
+      setUpdateTrigger(prev => ({...prev, [statType]: false}));
+    }, 1000);
+  };
+
   useEffect(() => {
+    const fetchGlobalStats = async () => {
+      try {
+        // Pobierz dane globalne z Firebase
+        const stats = await getGlobalStats();
+        
+        // Symulacja aktualizacji na żywo - triggery animacji
+        if (userCount !== 0 && userCount !== stats.userCount) triggerUpdate('users');
+        if (postsCount !== 0 && postsCount !== stats.postsCount) triggerUpdate('posts');
+        if (commentsCount !== 0 && commentsCount !== stats.commentsCount) triggerUpdate('comments');
+        if (likesCount !== 0 && likesCount !== stats.likesCount) triggerUpdate('likes');
+        
+        setUserCount(stats.userCount);
+        setPostsCount(stats.postsCount);
+        setTransactionsCount(stats.transactionsCount);
+        setLikesCount(stats.likesCount);
+        setCommentsCount(stats.commentsCount);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching global stats:', error);
+        setIsLoading(false);
+      }
+    };
+
     const fetchData = async () => {
       try {
+        // Pobierz cenę ETH
         const ethResponse = await fetch('/api/eth-price');
-
-        if (!ethResponse.ok) {
-          throw new Error(`HTTP error! status: ${ethResponse.status}`);
-        }
-
+        if (ethResponse.ok) {
         const ethData = await ethResponse.json();
         setEthPrice(Number(ethData.ethereum.usd.toFixed(2)));
         setEthPriceChange(Number(ethData.ethereum.usd_24h_change.toFixed(2)));
+        }
         
         const feeHistoryResponse = await fetch('https://mainnet.base.org', {
           method: 'POST',
@@ -160,36 +278,37 @@ export default function HomePage() {
       }
     };
     
-    fetchData();
+    fetchGlobalStats(); // Pobierz dane z Firebase
+    fetchData(); // Pobierz pozostałe dane
+    
     const interval = setInterval(fetchData, 60000);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
 
   return (
-    <div className="min-h-screen bg-black">
-      {/* Background overlay */}
-      <div className="fixed inset-0 bg-black/90"></div>
-
-      {/* Cyber grid background */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.1)_0%,transparent_70%)]"></div>
-      <div className="absolute inset-0" style={{
-        backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(0, 82, 255, 0.05) 25%, rgba(0, 82, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 82, 255, 0.05) 75%, rgba(0, 82, 255, 0.05) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(0, 82, 255, 0.05) 25%, rgba(0, 82, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 82, 255, 0.05) 75%, rgba(0, 82, 255, 0.05) 76%, transparent 77%, transparent)',
-        backgroundSize: '50px 50px'
-      }}></div>
-
-      {/* Glowing orbs */}
-      <div className="absolute top-0 left-1/3 w-96 h-96 bg-[#0052FF]/20 rounded-full filter blur-3xl animate-pulse"></div>
-      <div className="absolute top-0 right-1/3 w-96 h-96 bg-[#0052FF]/20 rounded-full filter blur-3xl animate-pulse delay-700"></div>
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-[#4C8FFF]/30 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
+    <div className="min-h-screen bg-[#0F172A] text-white">
+      <div className="absolute top-4 right-4 z-50">
+        <Link href="/basechat">
+          <button className="relative overflow-hidden backdrop-blur-md bg-[#0052FF]/20 text-white font-bold py-2 px-8 rounded-full transition-all duration-500 flex items-center justify-center group hover:bg-[#0052FF]/30 hover:shadow-[0_0_15px_rgba(0,82,255,0.8)] group">
+            {/* Animowana ramka */}
+            <div className="absolute -inset-[1px] rounded-full bg-gradient-to-r from-[#0052FF] via-[#4C8FFF] to-[#0052FF] opacity-70 group-hover:opacity-100 animate-[spin_4s_linear_infinite] z-0"></div>
+            {/* Wewnętrzne tło */}
+            <div className="absolute inset-[1px] rounded-full bg-black/80 z-0"></div>
+            {/* Tekst */}
+            <span className="relative z-10">Launch App</span>
+            {/* Glow effect */}
+            <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#0052FF]/60 to-[#4C8FFF]/60 blur-md opacity-50 group-hover:opacity-80 transition-opacity duration-300 z-0"></div>
+            {/* Shimmer animation */}
+            <div className="absolute -inset-[100%] w-[300%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 group-hover:opacity-100 group-hover:animate-[shimmer_2s_infinite] transition-opacity z-0"></div>
+          </button>
+        </Link>
+      </div>
       
-      <div className="absolute top-1/2 left-1/4 w-80 h-80 bg-[#0052FF]/15 rounded-full filter blur-3xl animate-pulse delay-300"></div>
-      <div className="absolute top-1/2 right-1/4 w-80 h-80 bg-[#0052FF]/15 rounded-full filter blur-3xl animate-pulse delay-800"></div>
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 w-72 h-72 bg-[#0052FF]/10 rounded-full filter blur-3xl animate-pulse delay-500"></div>
-      
-      <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-[#0052FF]/10 rounded-full filter blur-3xl animate-pulse delay-200"></div>
-      <div className="absolute bottom-0 right-1/3 w-96 h-96 bg-[#0052FF]/10 rounded-full filter blur-3xl animate-pulse delay-600"></div>
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-[#0052FF]/5 rounded-full filter blur-3xl animate-pulse delay-900"></div>
+      {/* Background elements - neonowe tło z MySphere */}
+      <HomeNeonBackground intensity={2.0} />
 
       {/* Main content */}
       <div className="relative z-10">
@@ -197,10 +316,9 @@ export default function HomePage() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8 relative"
+          className="text-center mb-24 relative pt-12"
         >
-          <div className={`absolute inset-0 bg-gradient-to-r ${activeTheme.gradient} opacity-5 blur-3xl -z-10`}></div>
-          <div className="flex items-center justify-center mt-2 mb-4">
+          <div className="flex items-center justify-center mt-8 mb-4">
             <div className="transform hover:scale-105 transition-transform duration-300 px-4 md:px-0">
               <Image
                 src="/elo2.png"
@@ -213,50 +331,38 @@ export default function HomePage() {
               />
             </div>
           </div>
-          <p className="font-['Coinbase_Display'] text-[#0052FF] text-base md:text-xl text-center mt-2 mb-1 animate-pulse px-4">Your gateway to the Base ecosystem</p>
-          <p className="font-['Share_Tech_Mono'] text-xs md:text-sm text-[#0052FF] text-center mb-4">[BETA 0.9.1]</p>
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-3xl md:text-5xl font-bold text-white mb-4 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
+          >
+            The onchain <span className="text-[#0052FF]">social Dapp</span>
+          </motion.h1>
+          <p className="font-['Coinbase_Display'] text-gray-100 text-base md:text-xl text-center mt-2 mb-4 px-4 filter drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+            Build, grow, and <span className="text-[#0052FF] font-semibold">own</span> your digital sphere
+          </p>
+          <p className="font-['Share_Tech_Mono'] text-xs md:text-sm text-[#0052FF] text-center mb-4">[BETA 2.9.1]</p>
           <div className="h-0.5 w-32 mx-auto bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mt-6 mb-6"></div>
         </motion.div>
 
         {/* Main features */}
-        <div className="relative -mt-2 px-4 md:px-8 max-w-7xl mx-auto">
+        <div className="relative px-4 md:px-8 max-w-7xl mx-auto">
           <AnimatePresence>
             <motion.div
               key="features-container"
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 auto-rows-fr mb-8 w-full"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 auto-rows-fr mb-28 w-full"
             >
               {/* BaseChat Card - przeniesiony na początek */}
               <motion.div key="basechat-card" variants={itemVariants} className="group">
                 <Link href="/basechat" className="block h-full">
-                  <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border-2 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
-                    activeTheme.id === 'base'
-                      ? 'border-white/50 shadow-[0_0_30px_rgba(255,255,255,0.4)]'
-                      : activeTheme.id === 'cyberpunk'
-                      ? 'border-[#FF00FF]/50 shadow-[0_0_30px_rgba(255,0,255,0.3)]'
-                      : 'border-[#00FF00]/50 shadow-[0_0_30px_rgba(0,255,0,0.3)]'
-                  }`}>
-                    {/* Intensywny biały gradient */}
-                    <div className="absolute inset-0">
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-white/5 to-transparent rounded-xl animate-[pulse_8s_ease-in-out_infinite]"></div>
-                    </div>
-                    {/* Niebieski gradient */}
-                    <div className="absolute inset-0">
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 via-[#1E4DD8]/15 to-[#0052FF]/20 rounded-xl blur-xl animate-[pulse_6s_ease-in-out_infinite]"></div>
-                    </div>
-                    {/* Intensywne białe światło */}
-                    <div className="absolute inset-0">
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.5)_0%,transparent_60%)] blur-2xl animate-[pulse_4s_ease-in-out_infinite_1s]"></div>
-                    </div>
-                    {/* Niebieski akcent */}
-                    <div className="absolute inset-0">
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#0052FF]/15 via-[#4C8FFF]/10 to-[#0052FF]/15 rounded-xl blur-xl animate-[pulse_7s_ease-in-out_infinite_2s]"></div>
-                    </div>
-                    {/* Świecące krawędzie */}
-                    <div className="absolute inset-0">
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-white/40 rounded-xl animate-[pulse_5s_ease-in-out_infinite_3s]"></div>
+                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
+                    {/* Hover efekt */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                     </div>
                     
                     {/* Content */}
@@ -285,16 +391,10 @@ export default function HomePage() {
               {/* Identity Card (wcześniej Profile) */}
               <motion.div key="identity-card" variants={itemVariants} className="group">
                 <Link href="/profile" className="block h-full">
-                  <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
-                    activeTheme.id === 'base'
-                      ? 'border-[#0052FF]/30 group-hover:shadow-[#0052FF]/20'
-                      : activeTheme.id === 'cyberpunk'
-                      ? 'border-[#FF00FF]/30 group-hover:shadow-[#FF00FF]/20'
-                      : 'border-[#00FF00]/30 group-hover:shadow-[#00FF00]/20'
-                  }`}>
+                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
                     {/* Hover overlay */}
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className={`absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300`}></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                     </div>
                     
                     {/* Content */}
@@ -310,104 +410,80 @@ export default function HomePage() {
                 </Link>
               </motion.div>
 
-              {/* Buy&Swap Card */}
-              <motion.div key="buyswap-card" variants={itemVariants} className="group">
-                <Link href="/buy" className="block h-full">
-                  <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
-                    activeTheme.id === 'base'
-                      ? 'border-[#0052FF]/30 group-hover:shadow-[#0052FF]/20'
-                      : activeTheme.id === 'cyberpunk'
-                      ? 'border-[#FF00FF]/30 group-hover:shadow-[#FF00FF]/20'
-                      : 'border-[#00FF00]/30 group-hover:shadow-[#00FF00]/20'
-                  }`}>
+              {/* Buy&Swap Card - Changed to Docs */}
+              <motion.div key="docs-card" variants={itemVariants} className="group">
+                <Link href="/Docs" className="block h-full">
+                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
                     {/* Hover overlay */}
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className={`absolute inset-0 bg-gradient-to-r from-[#00FF00]/20 to-[#66FF66]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300`}></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-green-500/10 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                     </div>
                     
                     {/* Content */}
                     <div className="relative z-10">
                       <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Buy&Swap</h2>
+                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Docs</h2>
                       </div>
                       <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                        Purchase and swap tokens directly using various payment methods. Easy and secure way to enter the Base ecosystem.
+                        Learn everything about MySphere platform features, how it works, and how to get the most out of your social experience.
                       </p>
                     </div>
                   </div>
                 </Link>
               </motion.div>
 
-              {/* Bridge Card */}
-              <motion.div key="bridge-card" variants={itemVariants} className="group">
-                <Link href="/bridge" className="block h-full">
-                  <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
-                    activeTheme.id === 'base'
-                      ? 'border-[#0052FF]/30 group-hover:shadow-[#0052FF]/20'
-                      : activeTheme.id === 'cyberpunk'
-                      ? 'border-[#FF00FF]/30 group-hover:shadow-[#FF00FF]/20'
-                      : 'border-[#00FF00]/30 group-hover:shadow-[#00FF00]/20'
-                  }`}>
+              {/* Bridge Card - Changed to GenesisNFT */}
+              <motion.div key="genesis-nft-card" variants={itemVariants} className="group">
+                <Link href="/nft" className="block h-full">
+                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
                     {/* Hover overlay */}
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className={`absolute inset-0 bg-gradient-to-r from-[#FFD700]/20 to-[#FFA500]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300`}></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-yellow-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                     </div>
                     
                     {/* Content */}
                     <div className="relative z-10">
                       <div className="flex items-center justify-between mb-3">
                         <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">
-                          Bridge
+                          Sphere Genesis
                         </h2>
                       </div>
                       <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                        Bridge your assets between Ethereum and Base network. Fast and secure cross-chain transfers.
+                        Get your exclusive Sphere Genesis NFT collection. Early supporters receive special benefits and access to premium features.
                       </p>
                     </div>
                   </div>
                 </Link>
               </motion.div>
 
-              {/* NFT Card */}
-              <motion.div key="nft-card" variants={itemVariants} className="group">
-                <Link href="/nft" className="block h-full">
-                  <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
-                    activeTheme.id === 'base'
-                      ? 'border-[#0052FF]/30 group-hover:shadow-[#0052FF]/20'
-                      : activeTheme.id === 'cyberpunk'
-                      ? 'border-[#FF00FF]/30 group-hover:shadow-[#FF00FF]/20'
-                      : 'border-[#00FF00]/30 group-hover:shadow-[#00FF00]/20'
-                  }`}>
+              {/* NFT Card - Changed to $AIS Utilities */}
+              <motion.div key="ais-utilities-card" variants={itemVariants} className="group">
+                <Link href="/ais" className="block h-full">
+                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
                     {/* Hover overlay */}
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className={`absolute inset-0 bg-gradient-to-r from-[#FF4500]/20 to-[#FF6347]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300`}></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                     </div>
                     
                     {/* Content */}
                     <div className="relative z-10">
                       <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">NFT</h2>
+                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">$AIS Utilities</h2>
                       </div>
                       <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                        Explore, collect, and mint NFTs on Base. View trending collections and manage your NFT portfolio.
+                        Explore $AIS token utilities. DAO governance and staking features coming soon to enhance your MySphere experience.
                       </p>
                     </div>
                   </div>
                 </Link>
               </motion.div>
 
-              {/* Get Started Card */}
+              {/* Get Started Card - Updated description */}
               <motion.div key="getstarted-card" variants={itemVariants} className="group">
-                <div className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${
-                  activeTheme.id === 'base'
-                    ? 'border-[#0052FF]/30 group-hover:shadow-[#0052FF]/20'
-                    : activeTheme.id === 'cyberpunk'
-                    ? 'border-[#FF00FF]/30 group-hover:shadow-[#FF00FF]/20'
-                    : 'border-[#00FF00]/30 group-hover:shadow-[#00FF00]/20'
-                }`}>
+                <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
                   {/* Hover overlay */}
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className={`absolute inset-0 bg-gradient-to-r from-[#8A2BE2]/20 to-[#9370DB]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300`}></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-violet-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                   </div>
                   
                   {/* Content */}
@@ -416,17 +492,11 @@ export default function HomePage() {
                       <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Get Started</h2>
                     </div>
                     <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed mb-4">
-                      Connect your wallet to access all features and start your journey on Base.
+                      Click 'Launch App' in the top right corner to access the platform and begin your journey on MySphere.
                     </p>
                     {!address && (
-                      <div className={`text-sm rounded-lg p-3 ${
-                        activeTheme.id === 'base'
-                          ? 'bg-[#0052FF]/10 text-[#0052FF]'
-                          : activeTheme.id === 'cyberpunk'
-                          ? 'bg-[#FF00FF]/10 text-[#FF00FF]'
-                          : 'bg-[#00FF00]/10 text-[#00FF00]'
-                      }`}>
-                        Use the wallet button in the top right to connect
+                      <div className="text-sm rounded-lg p-3 bg-[#0052FF]/10 text-[#0052FF]">
+                        Use the wallet button to connect after launching the app
                       </div>
                     )}
                   </div>
@@ -436,32 +506,328 @@ export default function HomePage() {
           </AnimatePresence>
         </div>
 
-        {/* Linia rozdzielająca przed BASE NETWORK STATUS */}
-        <div className="h-0.5 w-32 mx-auto bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mt-4 mb-4"></div>
-        <h2 className="text-lg md:text-2xl font-['Coinbase_Display'] font-medium text-center mb-3 text-[#0052FF]">BASE NETWORK STATUS</h2>
+        {/* Stats Section - moved below features */}
+        <section className="max-w-6xl mx-auto px-4 mb-28">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {/* Users - Niebieski */}
+            <div className={`bg-gradient-to-br from-black to-blue-950/40 backdrop-blur-md rounded-xl p-6 border ${updateTrigger.users ? 'border-blue-500 shadow-[0_0_20px_rgba(0,82,255,0.8)]' : 'border-blue-900/50'} transition-all duration-500 relative overflow-hidden group hover:border-blue-500 hover:shadow-[0_0_25px_rgba(0,82,255,0.5)]`}>
+              {/* Efekt poświaty w tle */}
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-blue-500/30 rounded-full blur-3xl opacity-70 group-hover:opacity-90 transition-opacity"></div>
+              
+              {/* Wskaźnik live data */}
+              <div className="absolute top-3 right-3 flex items-center">
+                <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse mr-1 shadow-[0_0_5px_rgba(0,82,255,0.7)]"></span>
+                <span className="text-xs text-blue-300 opacity-0 group-hover:opacity-100 transition-opacity">live</span>
+              </div>
+              
+              {/* Efekt błysku przy aktualizacji */}
+              {updateTrigger.users && (
+                <div className="absolute inset-0 bg-blue-500/20 animate-[pulse_1s_ease-in-out]"></div>
+              )}
+              
+              {/* Gradient w tle animowany */}
+              <div className="absolute -inset-[100%] bg-gradient-to-r from-transparent via-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 animate-[shimmer_3s_infinite] transition-opacity"></div>
+              
+              <h3 className="text-blue-300 text-sm font-semibold mb-2 relative filter drop-shadow-[0_0_3px_rgba(59,130,246,0.5)]">Active Users</h3>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="w-5 h-5 border-t-2 border-blue-500 rounded-full animate-spin mr-2"></div>
+                  <p className="text-3xl md:text-4xl font-bold text-white">Loading...</p>
+                </div>
+              ) : (
+                <p className={`text-3xl md:text-4xl font-bold ${updateTrigger.users ? 'text-blue-400' : 'text-white'} transition-colors duration-500 filter drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]`}>
+                  {userCount.toLocaleString()}
+                </p>
+              )}
+            </div>
+            
+            {/* Posts - Fioletowy */}
+            <div className={`bg-gradient-to-br from-black to-purple-950/40 backdrop-blur-md rounded-xl p-6 border ${updateTrigger.posts ? 'border-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.8)]' : 'border-purple-900/50'} transition-all duration-500 relative overflow-hidden group hover:border-purple-500 hover:shadow-[0_0_25px_rgba(147,51,234,0.5)]`}>
+              {/* Efekt poświaty w tle */}
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-purple-500/30 rounded-full blur-3xl opacity-70 group-hover:opacity-90 transition-opacity"></div>
+              
+              {/* Wskaźnik live data */}
+              <div className="absolute top-3 right-3 flex items-center">
+                <span className="inline-block w-2 h-2 rounded-full bg-purple-500 animate-pulse mr-1 shadow-[0_0_5px_rgba(147,51,234,0.7)]"></span>
+                <span className="text-xs text-purple-300 opacity-0 group-hover:opacity-100 transition-opacity">live</span>
+              </div>
+              
+              {/* Efekt błysku przy aktualizacji */}
+              {updateTrigger.posts && (
+                <div className="absolute inset-0 bg-purple-500/20 animate-[pulse_1s_ease-in-out]"></div>
+              )}
+              
+              {/* Gradient w tle animowany */}
+              <div className="absolute -inset-[100%] bg-gradient-to-r from-transparent via-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 animate-[shimmer_3s_infinite] transition-opacity"></div>
+              
+              <h3 className="text-purple-300 text-sm font-semibold mb-2 relative filter drop-shadow-[0_0_3px_rgba(147,51,234,0.5)]">Total Posts</h3>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="w-5 h-5 border-t-2 border-purple-500 rounded-full animate-spin mr-2"></div>
+                  <p className="text-3xl md:text-4xl font-bold text-white">Loading...</p>
+                </div>
+              ) : (
+                <p className={`text-3xl md:text-4xl font-bold ${updateTrigger.posts ? 'text-purple-400' : 'text-white'} transition-colors duration-500 filter drop-shadow-[0_0_8px_rgba(147,51,234,0.5)]`}>
+                  {postsCount.toLocaleString()}
+                </p>
+              )}
+            </div>
+            
+            {/* Comments - Zielony */}
+            <div className={`bg-gradient-to-br from-black to-emerald-950/40 backdrop-blur-md rounded-xl p-6 border ${updateTrigger.comments ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.8)]' : 'border-emerald-900/50'} transition-all duration-500 relative overflow-hidden group hover:border-emerald-500 hover:shadow-[0_0_25px_rgba(16,185,129,0.5)]`}>
+              {/* Efekt poświaty w tle */}
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-emerald-500/30 rounded-full blur-3xl opacity-70 group-hover:opacity-90 transition-opacity"></div>
+              
+              {/* Wskaźnik live data */}
+              <div className="absolute top-3 right-3 flex items-center">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1 shadow-[0_0_5px_rgba(16,185,129,0.7)]"></span>
+                <span className="text-xs text-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity">live</span>
+              </div>
+              
+              {/* Efekt błysku przy aktualizacji */}
+              {updateTrigger.comments && (
+                <div className="absolute inset-0 bg-emerald-500/20 animate-[pulse_1s_ease-in-out]"></div>
+              )}
+              
+              {/* Gradient w tle animowany */}
+              <div className="absolute -inset-[100%] bg-gradient-to-r from-transparent via-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 animate-[shimmer_3s_infinite] transition-opacity"></div>
+              
+              <h3 className="text-emerald-300 text-sm font-semibold mb-2 relative filter drop-shadow-[0_0_3px_rgba(16,185,129,0.5)]">Comments</h3>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="w-5 h-5 border-t-2 border-emerald-500 rounded-full animate-spin mr-2"></div>
+                  <p className="text-3xl md:text-4xl font-bold text-white">Loading...</p>
+                </div>
+              ) : (
+                <p className={`text-3xl md:text-4xl font-bold ${updateTrigger.comments ? 'text-emerald-400' : 'text-white'} transition-colors duration-500 filter drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]`}>
+                  {commentsCount.toLocaleString()}
+                </p>
+              )}
+            </div>
+            
+            {/* Likes - Różowy */}
+            <div className={`bg-gradient-to-br from-black to-pink-950/40 backdrop-blur-md rounded-xl p-6 border ${updateTrigger.likes ? 'border-pink-500 shadow-[0_0_20px_rgba(236,72,153,0.8)]' : 'border-pink-900/50'} transition-all duration-500 relative overflow-hidden group hover:border-pink-500 hover:shadow-[0_0_25px_rgba(236,72,153,0.5)]`}>
+              {/* Efekt poświaty w tle */}
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-pink-500/30 rounded-full blur-3xl opacity-70 group-hover:opacity-90 transition-opacity"></div>
+              
+              {/* Wskaźnik live data */}
+              <div className="absolute top-3 right-3 flex items-center">
+                <span className="inline-block w-2 h-2 rounded-full bg-pink-500 animate-pulse mr-1 shadow-[0_0_5px_rgba(236,72,153,0.7)]"></span>
+                <span className="text-xs text-pink-300 opacity-0 group-hover:opacity-100 transition-opacity">live</span>
+              </div>
+              
+              {/* Efekt błysku przy aktualizacji */}
+              {updateTrigger.likes && (
+                <div className="absolute inset-0 bg-pink-500/20 animate-[pulse_1s_ease-in-out]"></div>
+              )}
+              
+              {/* Gradient w tle animowany */}
+              <div className="absolute -inset-[100%] bg-gradient-to-r from-transparent via-pink-500/10 to-transparent opacity-0 group-hover:opacity-100 animate-[shimmer_3s_infinite] transition-opacity"></div>
+              
+              <h3 className="text-pink-300 text-sm font-semibold mb-2 relative filter drop-shadow-[0_0_3px_rgba(236,72,153,0.5)]">Total Likes</h3>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="w-5 h-5 border-t-2 border-pink-500 rounded-full animate-spin mr-2"></div>
+                  <p className="text-3xl md:text-4xl font-bold text-white">Loading...</p>
+                </div>
+              ) : (
+                <p className={`text-3xl md:text-4xl font-bold ${updateTrigger.likes ? 'text-pink-400' : 'text-white'} transition-colors duration-500 filter drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]`}>
+                  {likesCount.toLocaleString()}
+                </p>
+              )}
+            </div>
+
+            {/* Transactions - Pomarańczowy (zablokowany z kłódką) */}
+            <div className="bg-gradient-to-br from-black to-orange-950/40 backdrop-blur-md rounded-xl p-6 border border-orange-900/30 relative overflow-hidden group">
+              {/* Efekt poświaty w tle */}
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-orange-500/20 rounded-full blur-3xl opacity-50"></div>
+              
+              {/* Ikona kłódki */}
+              <div className="absolute top-3 right-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              
+              {/* Przezroczystość dla zablokowania */}
+              <div className="absolute inset-0 bg-black/40"></div>
+              
+              <div className="relative z-10">
+                <h3 className="text-orange-300/80 text-sm font-semibold mb-2 relative">Transactions</h3>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-3xl md:text-4xl font-bold text-white/60">
+                    --
+                  </p>
+                  <span className="bg-orange-900/20 text-orange-400/80 text-xs px-2 py-1 rounded">Coming Soon</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* ETH Revenue - Żółty (zablokowany z kłódką) */}
+            <div className="bg-gradient-to-br from-black to-yellow-950/40 backdrop-blur-md rounded-xl p-6 border border-yellow-900/30 relative overflow-hidden group">
+              {/* Efekt poświaty w tle */}
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-yellow-500/20 rounded-full blur-3xl opacity-50"></div>
+              
+              {/* Ikona kłódki */}
+              <div className="absolute top-3 right-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              
+              {/* Przezroczystość dla zablokowania */}
+              <div className="absolute inset-0 bg-black/40"></div>
+              
+              <div className="relative z-10">
+                <h3 className="text-yellow-300/80 text-sm font-semibold mb-2 relative">ETH Revenue</h3>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-3xl md:text-4xl font-bold text-white/60">
+                    --
+                  </p>
+                  <span className="bg-yellow-900/20 text-yellow-400/80 text-xs px-2 py-1 rounded">Coming Soon</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Smart Contracts - Indigo (zablokowany z kłódką) */}
+            <div className="bg-gradient-to-br from-black to-indigo-950/40 backdrop-blur-md rounded-xl p-6 border border-indigo-900/30 relative overflow-hidden group">
+              {/* Efekt poświaty w tle */}
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl opacity-50"></div>
+              
+              {/* Ikona kłódki */}
+              <div className="absolute top-3 right-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              
+              {/* Przezroczystość dla zablokowania */}
+              <div className="absolute inset-0 bg-black/40"></div>
+              
+              <div className="relative z-10">
+                <h3 className="text-indigo-300/80 text-sm font-semibold mb-2 relative">Smart Contracts</h3>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-3xl md:text-4xl font-bold text-white/60">
+                    --
+                  </p>
+                  <span className="bg-indigo-900/20 text-indigo-400/80 text-xs px-2 py-1 rounded">Coming Soon</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* MySphere Treasury - Cyjan/Turkusowy (zablokowany z kłódką) */}
+            <div className="bg-gradient-to-br from-black to-cyan-950/40 backdrop-blur-md rounded-xl p-6 border border-cyan-900/30 relative overflow-hidden group">
+              {/* Efekt poświaty w tle */}
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-cyan-500/20 rounded-full blur-3xl opacity-50"></div>
+              
+              {/* Ikona kłódki */}
+              <div className="absolute top-3 right-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              
+              {/* Przezroczystość dla zablokowania */}
+              <div className="absolute inset-0 bg-black/40"></div>
+              
+              <div className="relative z-10">
+                <h3 className="text-cyan-300/80 text-sm font-semibold mb-2 relative">MySphere Treasury</h3>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-3xl md:text-4xl font-bold text-white/60">
+                    --
+                  </p>
+                  <span className="bg-cyan-900/20 text-cyan-400/80 text-xs px-2 py-1 rounded">Coming Soon</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Features Section - The MySphere Stack */}
+        <section className="max-w-7xl mx-auto px-4 mb-32">
+          <motion.h2 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-3xl md:text-4xl font-bold text-center mb-12 text-white"
+          >
+            The <span className="text-[#0052FF]">MySphere</span> Stack
+          </motion.h2>
+          
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Feature 1 */}
+            <div className="relative bg-black/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 hover:border-[#0052FF]/40 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,82,255,0.3)] group">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl blur-md"></div>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl md:text-2xl font-bold mb-4 text-white group-hover:text-[#0052FF] transition-colors filter drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">AI-Powered Content Creation</h3>
+                <p className="text-gray-300 text-lg filter drop-shadow-[0_0_3px_rgba(255,255,255,0.3)]">
+                  Advanced generative AI technology enables users to create high-quality posts and crypto quotes, enhancing creativity and productivity while maintaining the personal touch of human creators.
+                </p>
+              </div>
+            </div>
+            
+            {/* Feature 2 */}
+            <div className="relative bg-black/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 hover:border-[#0052FF]/40 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,82,255,0.2)] group">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl blur-md"></div>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl md:text-2xl font-bold mb-4 text-white group-hover:text-[#0052FF] transition-colors">Onchain Social Identity</h3>
+                <p className="text-gray-400 text-lg">
+                  All posts and user interactions are recorded on the Base blockchain, creating permanent, verifiable digital footprints and reputation that travels with users across the Web3 ecosystem.
+                </p>
+              </div>
+            </div>
+            
+            {/* Feature 3 */}
+            <div className="relative bg-black/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 hover:border-[#0052FF]/40 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,82,255,0.2)] group">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl blur-md"></div>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl md:text-2xl font-bold mb-4 text-white group-hover:text-[#0052FF] transition-colors">Tokenized Social Graph</h3>
+                <p className="text-gray-400 text-lg">
+                  Social connections and influential content can be tokenized as NFTs, allowing creators to directly monetize their contributions and followers to invest in growing communities.
+                </p>
+              </div>
+            </div>
+            
+            {/* Feature 4 */}
+            <div className="relative bg-black/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 hover:border-[#0052FF]/40 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,82,255,0.2)] group">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl blur-md"></div>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl md:text-2xl font-bold mb-4 text-white group-hover:text-[#0052FF] transition-colors">Integrated DeFi Ecosystem</h3>
+                <p className="text-gray-400 text-lg">
+                  Seamless finance features including Bridge, Earn and Morpho Vaults empower users to manage crypto assets without leaving the social environment, bringing together conversation and value in one place.
+                </p>
+              </div>
+            </div>
+            
+            {/* Feature 5 */}
+            <div className="relative bg-black/50 backdrop-blur-sm rounded-xl p-6 border border-gray-800 hover:border-[#0052FF]/40 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,82,255,0.2)] md:col-span-2 group">
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl blur-md"></div>
+              </div>
+              <div className="relative z-10 md:max-w-3xl md:mx-auto">
+                <h3 className="text-xl md:text-2xl font-bold mb-4 text-white group-hover:text-[#0052FF] transition-colors">Multi-layer Reputation System</h3>
+                <p className="text-gray-400 text-lg">
+                  Comprehensive onchain reputation metrics combine community engagement, content quality, and blockchain activity to create a trustworthy social environment that rewards valuable contributions.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* Network Stats */}
-        <div className="max-w-4xl mx-auto px-4 md:px-8 mb-24">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-            <div className="bg-black/50 backdrop-blur-xl rounded-xl p-4 border border-[#0052FF]/30 max-w-sm mx-auto w-full">
-              <h3 className="text-[#0052FF] text-sm font-['Coinbase_Display'] font-medium mb-2">ETH PRICE</h3>
-              <p className="text-white text-xl font-['Coinbase_Display']">
-                {ethPrice ? (
-                  <>
-                    ${ethPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    <span className={`ml-2 text-sm ${ethPriceChange && ethPriceChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {ethPriceChange ? `${ethPriceChange.toFixed(2)}%` : ''}
-                    </span>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-[#0052FF] border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-gray-400">Loading...</span>
-                  </div>
-                )}
-              </p>
-            </div>
-            <div className="bg-black/50 backdrop-blur-xl rounded-xl p-4 border border-[#0052FF]/30 max-w-sm mx-auto w-full">
+        <div className="max-w-4xl mx-auto px-4 md:px-8 mb-32">
+          <h2 className="text-xl md:text-3xl font-bold text-center mb-6 text-white">
+            <span className="text-[#0052FF]">BASE</span> NETWORK STATUS
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-gray-800 hover:border-[#0052FF]/50 transition-colors">
               <h3 className="text-[#0052FF] text-sm font-['Coinbase_Display'] font-medium mb-2">GAS PRICE</h3>
               <p className="text-white text-xl font-['Coinbase_Display']">
                 {gasPrice ? (
@@ -484,7 +850,7 @@ export default function HomePage() {
                 )}
               </p>
             </div>
-            <div className="bg-black/50 backdrop-blur-xl rounded-xl p-4 border border-[#0052FF]/30 max-w-sm mx-auto w-full">
+            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-gray-800 hover:border-[#0052FF]/50 transition-colors">
               <h3 className="text-[#0052FF] text-sm font-['Coinbase_Display'] font-medium mb-2">LATEST BLOCK</h3>
               <p className="text-white text-xl font-['Coinbase_Display']">
                 {lastBlock ? (
@@ -497,27 +863,215 @@ export default function HomePage() {
                 )}
               </p>
             </div>
+            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-gray-800 hover:border-[#0052FF]/50 transition-colors">
+              <h3 className="text-[#0052FF] text-sm font-['Coinbase_Display'] font-medium mb-2">ETH PRICE</h3>
+              <p className="text-white text-xl font-['Coinbase_Display']">
+                {ethPrice ? (
+                  <>
+                    ${ethPrice.toLocaleString()}
+                    <span className={`ml-2 text-sm ${ethPriceChange && ethPriceChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {ethPriceChange ? `${ethPriceChange >= 0 ? '+' : ''}${ethPriceChange.toFixed(2)}%` : ''}
+                    </span>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-[#0052FF] border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-gray-400">Loading...</span>
+                  </div>
+                )}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Built on Base section */}
-      <div className="fixed bottom-4 md:bottom-6 left-0 right-0 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-none bg-black/20 backdrop-blur-sm border border-[#0052FF]/20 hover:bg-black/40 transition-all shadow-[0_0_10px_rgba(0,82,255,0.15)] hover:shadow-[0_0_20px_rgba(0,82,255,0.4)] opacity-60 hover:opacity-100">
-          <span className="font-['Coinbase_Display'] text-base font-medium text-white/70">Built on</span>
-          <Link href="https://base.org" target="_blank" className="group flex items-center hover:opacity-90 transition-opacity">
-            <Image 
-              src="/brand-kit/base/logo/wordmark/Base_Wordmark_White.png"
-              alt="Base Logo"
-              width={60}
-              height={20}
-              className="group-hover:scale-105 transition-transform w-[60px] h-auto"
+      {/* Dodajemy sekcję Join the Community */}
+      <section className="relative py-28 overflow-hidden">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-5xl font-bold mb-4 text-white filter drop-shadow-[0_0_12px_rgba(255,255,255,0.5)]">Join the Community</h2>
+            <p className="text-xl text-gray-100 max-w-2xl mx-auto filter drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">
+              Get involved with the SPHERE developer community
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-16">
+            {communityLinks.map((link, index) => (
+              link.disabled ? (
+                <div 
+                  key={index}
+                  className={`${link.bgClass} rounded-xl p-6 group relative`}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 rounded-lg bg-gray-500/20 text-gray-400">
+                      <link.icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center">
+                        <h3 className="text-xl font-semibold text-gray-400 mb-1">{link.title}</h3>
+                        <span className="ml-2 text-gray-500">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </span>
+                      </div>
+                      <p className="text-gray-500">{link.description}</p>
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                    <span className="text-gray-400 text-sm bg-black/60 px-3 py-1 rounded-full">Coming soon</span>
+                  </div>
+                </div>
+              ) : (
+                <Link 
+                  key={index} 
+                  href={link.url}
+                  className={`${link.bgClass} rounded-xl p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(0,82,255,0.3)] group`}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 rounded-lg bg-blue-500/20 text-blue-500 filter drop-shadow-[0_0_8px_rgba(0,82,255,0.5)]">
+                      <link.icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-white mb-1 group-hover:text-blue-400 filter drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">{link.title}</h3>
+                      <p className="text-gray-300">{link.description}</p>
+                    </div>
+                  </div>
+                </Link>
+              )
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-white mt-16">
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-blue-400 filter drop-shadow-[0_0_8px_rgba(0,82,255,0.5)]">Main Features</h3>
+              <ul className="space-y-2">
+                {navigationLinks.main.map((link, index) => (
+                  <li key={index}>
+                    <Link href={link.url || "#"} className="text-gray-300 hover:text-white transition-colors hover:drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+                      {link.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-green-400">Finance</h3>
+              <ul className="space-y-2">
+                {resourceLinks.finance.map((link, index) => (
+                  <li key={index}>
+                    <Link href={link.url || "#"} className="text-gray-400 hover:text-white transition-colors">
+                      {link.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              
+              <h3 className="text-xl font-bold mb-4 mt-8 text-purple-400">NFT</h3>
+              <ul className="space-y-2">
+                {resourceLinks.nft.map((link, index) => (
+                  <li key={index}>
+                    <Link href={link.url || "#"} className="text-gray-400 hover:text-white transition-colors">
+                      {link.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-indigo-400">Tools</h3>
+              <ul className="space-y-2">
+                {resourceLinks.tools.map((link, index) => (
+                  <li key={index}>
+                    <Link href={link.url || "#"} className="text-gray-400 hover:text-white transition-colors">
+                      {link.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              
+              <h3 className="text-xl font-bold mb-4 mt-8 text-yellow-400">Governance</h3>
+              <ul className="space-y-2">
+                {resourceLinks.governance.map((link, index) => (
+                  <li key={index}>
+                    {link.disabled ? (
+                      <div className="flex items-center text-gray-500 opacity-60 cursor-not-allowed">
+                        {link.title}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <Link href={link.url || "#"} className="text-gray-400 hover:text-white transition-colors">
+                        {link.title}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-orange-400">Community</h3>
+              <ul className="space-y-2">
+                {resourceLinks.community.map((link, index) => (
+                  <li key={index}>
+                    {link.disabled ? (
+                      <div className="flex items-center text-gray-500 opacity-60 cursor-not-allowed">
+                        {link.title}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <Link href={link.url || "#"} className="text-gray-400 hover:text-white transition-colors">
+                        {link.title}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer moved to bottom */}
+      <div className="relative z-10 border-t border-gray-800 py-6">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
+          {/* Sphere logo po lewej */}
+          <div className="flex items-center mb-4 md:mb-0">
+            <Image
+              src="/elo2.png"
+              alt="SPHERE"
+              width={80}
+              height={24}
+              className="h-6 w-auto opacity-70 hover:opacity-100 transition-opacity"
             />
-          </Link>
-          <span className="font-['Coinbase_Display'] text-base font-medium text-white/70">with</span>
-          <Link href="https://github.com/coinbase/onchainkit" target="_blank" className="group flex items-center gap-1 hover:opacity-90 transition-opacity">
-            <OnchainkitSvg className="w-20 h-5 text-[#0052FF]/80 group-hover:text-[#0052FF] group-hover:scale-105 transition-all" />
-          </Link>
+          </div>
+
+          {/* Base logo na środku */}
+          <div className="md:absolute md:left-1/2 md:transform md:-translate-x-1/2 mb-4 md:mb-0">
+            <Link href="https://base.org" target="_blank" className="opacity-70 hover:opacity-100 transition-opacity">
+              <Image 
+                src="/brand-kit/base/logo/wordmark/Base_Wordmark_White.png"
+                alt="Base Logo"
+                width={60}
+                height={24}
+                className="h-6 w-auto"
+              />
+            </Link>
+          </div>
+          
+          {/* Copyright i built with po prawej */}
+          <div className="text-sm text-gray-500 flex items-center">
+            <span>© 2024 mySphere.fun - Built with</span>
+            <Link href="https://github.com/coinbase/onchainkit" target="_blank" className="ml-2 inline-flex items-center hover:opacity-90 transition-opacity">
+              <OnchainkitSvg className="w-20 h-4 text-[#0052FF]/80 hover:text-[#0052FF] transition-colors" />
+            </Link>
+          </div>
         </div>
       </div>
     </div>

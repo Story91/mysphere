@@ -44,7 +44,18 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
     // Znajdź wszystkie linki w tekście
     const foundLinks = linkifyjs.find(content || '');
     const uniqueLinks = Array.from(new Set(foundLinks.map((link: LinkifyMatch) => link.value)));
-    setLinks(uniqueLinks);
+    
+    // Filtruj tylko prawidłowe URL przed ustawieniem
+    const validLinks = uniqueLinks.filter(link => {
+      try {
+        new URL(link);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    
+    setLinks(validLinks);
   }, [content]);
 
   useEffect(() => {
@@ -52,18 +63,50 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
     const fetchPreviews = async () => {
       const newPreviews: {[key: string]: LinkPreview} = {};
       
-      for (const link of links) {
-        try {
-          // Pobierz podstawowe metadane (tytuł, opis, obrazek)
-          const response = await fetch(`/api/link-preview?url=${encodeURIComponent(link)}`);
-          const data = await response.json();
-          newPreviews[link] = data;
-        } catch (error) {
-          console.error('Błąd podczas pobierania podglądu:', error);
-        }
+      // Ograniczamy liczbę równoczesnych zapytań do API
+      const MAX_CONCURRENT_REQUESTS = 3;
+      const chunks = [];
+      
+      // Dzielimy linki na mniejsze grupy, aby uniknąć zbyt wielu równoczesnych żądań
+      for (let i = 0; i < links.length; i += MAX_CONCURRENT_REQUESTS) {
+        chunks.push(links.slice(i, i + MAX_CONCURRENT_REQUESTS));
       }
       
-      setPreviews(newPreviews);
+      // Przetwarzaj każdą grupę linków sekwencyjnie
+      for (const chunk of chunks) {
+        // Ale linki w grupie przetwarzaj równolegle
+        await Promise.all(chunk.map(async (link) => {
+          try {
+            // Ustaw podstawowe domyślne wartości
+            const defaultPreview = {
+              title: new URL(link).hostname,
+              description: 'Loading preview...',
+              image: '',
+              siteName: new URL(link).hostname
+            };
+            
+            // Na początku ustaw domyślne wartości, aby użytkownik widział coś od razu
+            newPreviews[link] = defaultPreview;
+            setPreviews(prev => ({...prev, [link]: defaultPreview}));
+            
+            // Pobierz metadane z API
+            const response = await fetch(`/api/link-preview?url=${encodeURIComponent(link)}`, {
+              // Dodaj timeout do fetch
+              signal: AbortSignal.timeout(6000)
+            });
+            
+            const data = await response.json();
+            
+            // Aktualizuj podgląd tylko jeśli dostaliśmy sensowne dane
+            if (data && data.title) {
+              newPreviews[link] = data;
+              setPreviews(prev => ({...prev, [link]: data}));
+            }
+          } catch {
+            // Cicha obsługa błędów - domyślne wartości już zostały ustawione
+          }
+        }));
+      }
     };
 
     if (links.length > 0) {

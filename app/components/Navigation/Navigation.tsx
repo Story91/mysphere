@@ -71,23 +71,38 @@ export default function Navigation() {
 
   const navLinks: (NavLink | NavLinkWithDropdown)[] = [
     { href: '/basechat', label: 'MySphere' },
-    { 
-      href: '/flashblock', 
-      label: 'FLASHBLOCK',
-      isHighlighted: true,
-      isFlashBlock: true
-    },
-    { href: '/quotes', label: 'Quotes' },
     { href: '/profile', label: 'Identity' },
-    { href: '/ais', label: 'Buy $AIS' },
     {
       label: 'Finance',
       dropdownItems: [
         { href: '/bridge', label: 'Bridge' },
-        { href: '/earn', label: 'Earn' }
+        { href: '/earn', label: 'Earn' },
+        { href: '/ais', label: 'Buy $AIS' }
       ]
     },
-    { href: '/nft', label: 'NFT' },
+    {
+      label: 'NFT',
+      dropdownItems: [
+        { href: '/nft', label: 'SphereGenesis' },
+        { href: '/quotes', label: 'Quotes on Base' }
+      ]
+    },
+    {
+      label: 'Tools',
+      dropdownItems: [
+        { 
+          href: '/flashblock', 
+          label: 'FLASHBLOCK',
+          isHighlighted: true,
+          isFlashBlock: true
+        },
+        {
+          href: '/yapscan',
+          label: 'YapScan'
+        }
+      ]
+    },
+    { href: '/Docs', label: 'Docs' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : [])
   ];
 
@@ -104,15 +119,16 @@ export default function Navigation() {
           <div className="flex items-center">
             <Link 
               href="/"
-              className="hover:scale-105 transition-transform duration-300 relative group mr-4"
+              className="hover:scale-105 transition-transform duration-300 relative group mr-6"
             >
               <div className="absolute -inset-2 bg-gradient-to-r from-[#0052FF] to-[#00A3FF] opacity-0 group-hover:opacity-20 rounded-xl blur transition-all duration-300"></div>
               <Image
                 src="/android-chrome-192x192.png"
-                alt="BaseBook"
-                width={40}
-                height={40}
+                alt="MySphere"
+                width={32}
+                height={32}
                 className="rounded-xl relative"
+                priority
               />
             </Link>
             
@@ -230,29 +246,26 @@ export default function Navigation() {
             </button>
           </div>
           <div className="flex items-center space-x-4">
-            <AppKitButton />
-            <div className="hidden md:flex items-center space-x-4">
-              <Link
-                href="https://x.com/MySphereAI"
-                target="_blank"
-                className="relative group p-2 rounded-xl transition-all duration-300 bg-black text-white hover:bg-black/90 flex items-center justify-center"
-                title="Follow us on X (Twitter)"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                </svg>
-              </Link>
-              <Link
-                href="https://discord.gg/WDdzSnjpjt"
-                target="_blank"
-                className="relative group p-2 rounded-xl transition-all duration-300 bg-[#5865F2] text-white hover:bg-[#5865F2]/90 flex items-center justify-center"
-                title="Join our Discord"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
-                </svg>
-              </Link>
+            {/* Ultra Modern Spherian Button */}
+            <div className="relative group cursor-not-allowed scale-80">
+              <div className="absolute -inset-[2px] bg-gradient-to-r from-[#00F0FF] via-[#00A3FF] to-[#0047FF] rounded-xl blur-lg opacity-75 group-hover:opacity-100 animate-gradient-shift transition duration-1000 group-hover:duration-200"></div>
+              <div className="relative px-5 py-1.5 bg-white rounded-xl overflow-hidden">
+                {/* Animated lines in background */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#0047FF0f_1px,transparent_1px),linear-gradient(to_bottom,#0047FF0f_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#fff_70%,transparent_100%)]"></div>
+                
+                {/* Radial gradient overlay */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle_500px_at_50%_50%,#00A3FF15,transparent)]"></div>
+
+                {/* Text with gradient and animation */}
+                <span className="relative font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#00F0FF] via-[#00A3FF] to-[#0047FF] animate-gradient-shift">
+                  Spherian
+                </span>
+
+                {/* Shine effect */}
+                <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000"></div>
+              </div>
             </div>
+            <AppKitButton />
             <Wallet>
               <ConnectWallet className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2">
                 <ConnectWalletText>Log In</ConnectWalletText>

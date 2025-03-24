@@ -49,6 +49,11 @@ export interface UserProfile {
     likes: number;
     comments: number;
   };
+  socialLinks?: {
+    twitter?: string;
+    farcaster?: string;
+    discord?: string;
+  };
 }
 
 export interface Stats {

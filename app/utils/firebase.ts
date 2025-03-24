@@ -581,8 +581,9 @@ export const addComment = async (postId: string, comment: {
 };
 
 // Funkcja do pobierania profilu użytkownika
-export const fetchUserProfile = async (address: string): Promise<UserProfile | null> => {
+export const fetchUserProfile = async (address: string, options: { loadSocialLinks?: boolean } = {}): Promise<UserProfile | null> => {
   try {
+    const { loadSocialLinks = false } = options;
     const userRef = doc(db, 'users', address);
     const userDoc = await getDoc(userRef);
     
@@ -594,6 +595,7 @@ export const fetchUserProfile = async (address: string): Promise<UserProfile | n
     
     if (userDoc.exists()) {
       const data = userDoc.data();
+      console.log("Loaded user profile from Firebase:", data);
       return {
         id: userDoc.id,
         name: data.name,
@@ -604,6 +606,11 @@ export const fetchUserProfile = async (address: string): Promise<UserProfile | n
         joinedAt: data.joinedAt,
         lastActive: data.lastActive,
         bio: data.bio,
+        socialLinks: loadSocialLinks ? data.socialLinks || {
+          twitter: '',
+          farcaster: '',
+          discord: ''
+        } : undefined,
         stats: {
           posts: actualPostsCount, // Update stats as well
           likes: data.stats?.likes || 0,
@@ -621,6 +628,11 @@ export const fetchUserProfile = async (address: string): Promise<UserProfile | n
       likesReceived: 0,
       joinedAt: Date.now(),
       lastActive: Date.now(),
+      socialLinks: loadSocialLinks ? {
+        twitter: '',
+        farcaster: '',
+        discord: ''
+      } : undefined,
       stats: {
         posts: actualPostsCount,
         likes: 0,
@@ -2012,6 +2024,63 @@ export const fixBaseChatPointsRadical = async (): Promise<{success: boolean, upd
       success: false,
       updatedUsers: 0,
       error: error instanceof Error ? error.message : 'Nieznany błąd podczas radykalnej naprawy struktury baseChatPoints'
+    };
+  }
+};
+
+// Funkcja do pobierania globalnych statystyk dla strony głównej
+export const getGlobalStats = async () => {
+  try {
+    // Pobierz liczbę użytkowników
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const userCount = usersSnapshot.size;
+
+    // Pobierz posty
+    const postsSnapshot = await getDocs(collection(db, 'posts'));
+    const postsCount = postsSnapshot.size;
+
+    // Oblicz łączną liczbę like'ów i komentarzy
+    let totalLikes = 0;
+    let totalComments = 0;
+    
+    for (const doc of postsSnapshot.docs) {
+      const postData = doc.data();
+      // Dodaj like'i
+      if (postData.likes) {
+        totalLikes += postData.likes;
+      }
+      
+      // Dodaj komentarze
+      if (postData.comments && Array.isArray(postData.comments)) {
+        totalComments += postData.comments.length;
+      } else if (postData.commentsCount) {
+        totalComments += postData.commentsCount;
+      }
+    }
+
+    // Oblicz szacowaną liczbę transakcji
+    // Jest to przybliżenie oparte na postach, komentarzach i transakcjach systemowych
+    let transactionsCount = postsCount + totalComments;
+    
+    // Dodaj szacowane transakcje systemowe (np. 10% więcej)
+    transactionsCount = Math.floor(transactionsCount * 1.1);
+
+    return {
+      userCount,
+      postsCount,
+      transactionsCount,
+      likesCount: totalLikes,
+      commentsCount: totalComments
+    };
+  } catch (error) {
+    console.error('Error fetching global stats:', error);
+    // Zwróć domyślne wartości w przypadku błędu
+    return {
+      userCount: 0,
+      postsCount: 0,
+      transactionsCount: 0,
+      likesCount: 0,
+      commentsCount: 0
     };
   }
 };

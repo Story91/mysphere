@@ -22,15 +22,14 @@ const nextConfig = {
           source: '/flashblock/:path*',
           destination: 'https://base-is-10x-faster.vercel.app/:path*',
         },
+        {
+          source: '/docs/:path*',
+          destination: '/Docs/:path*',
+        },
       ];
     },
     async redirects() {
       return [
-        {
-          source: '/',
-          destination: '/basechat',
-          permanent: true,
-        },
         {
           source: '//:path*',
           has: [

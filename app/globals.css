@@ -596,3 +596,21 @@ appkit-button::part(button) {
 appkit-button::part(button):hover {
   background: rgba(255, 75, 38, 0.9);
 }
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}

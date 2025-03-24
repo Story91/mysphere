@@ -25,7 +25,7 @@ import {
   addCommentReply,
   ADMIN_ADDRESS
 } from '../utils/firebase';
-import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy } from 'firebase/firestore';
 import { Post, Comment, UserProfile, Stats } from '../types';
 import { calculateRanking, UserRank, RANK_DESCRIPTIONS, BADGES } from '../utils/ranking';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
@@ -47,7 +47,8 @@ import { RefreshCw } from 'lucide-react';
 import TransactionButton from '../components/TransactionButton';
 import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
-import YapsMetrics from '../yapyap/components/YapsMetrics';
+import YapsMetrics from '../yapscan/components/YapsMetrics';
+import ProfileSocials from './components/ProfileSocials';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -70,6 +71,11 @@ interface LocalUserProfile {
   postCount: number;
   likesReceived: number;
   address?: string;
+  socialLinks?: {
+    twitter?: string;
+    farcaster?: string;
+    discord?: string;
+  };
 }
 
 interface ExtendedPost extends Post {
@@ -154,6 +160,30 @@ const BaseNameBadge = () => (
 export default function BaseChat() {
   const [isMounted, setIsMounted] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
+  const [activeMainPanel, setActiveMainPanel] = useState('feed');
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [selectedBuilderProfile, setSelectedBuilderProfile] = useState<{
+    address: string;
+    name: string;
+    avatar?: string;
+    bio?: string;
+    postCount?: number;
+    likesReceived?: number;
+    socialLinks?: {
+      twitter?: string;
+      farcaster?: string;
+      discord?: string;
+    };
+    stats?: {
+      transactions: number;
+      tokens: number;
+      nfts: number;
+      contracts: number;
+    };
+    totalPoints?: number;
+    currentRank?: UserRank;
+  } | null>(null);
+  
   // Stany dla generowania AI
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -172,7 +202,12 @@ export default function BaseChat() {
     avatar: undefined,
     postCount: 0,
     likesReceived: 0,
-    address: ''
+    address: '',
+    socialLinks: {
+      twitter: '',
+      farcaster: '',
+      discord: ''
+    }
   });
   const [stats, setStats] = useState<Stats>({
     transactions: 0,
@@ -265,6 +300,7 @@ export default function BaseChat() {
 
   // Funkcja pomocnicza do wyświetlania nazwy użytkownika z tooltipem
   const displayUserName = (userAddress: string, elementId: string) => {
+    // Sprawdź, czy mamy już nazwę w cache
     const userName = userNames[userAddress]?.name || userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
     const hasBaseName = isBaseName(userName);
     
@@ -280,8 +316,9 @@ export default function BaseChat() {
           ) : (
             <Avatar address={toEthereumAddress(userAddress)} className="w-6 h-6 rounded-full mr-2" />
           )}
-          <div
-            className="cursor-pointer"
+          <div 
+            className="cursor-pointer group relative"
+            onClick={() => handleViewBuilderProfile(userAddress)}
             onMouseEnter={() => {
               setHoveredElement(elementId);
               setHoveredUser(userAddress);
@@ -292,7 +329,7 @@ export default function BaseChat() {
               setHoveredUser(null);
             }}
           >
-            <span className={`${hasBaseName ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'}`}>
+            <span className={`${hasBaseName ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'} text-sm`}>
               {userName.endsWith('.sphere') ? (
                 <>
                   <span className="text-gray-900 dark:text-white">{userName.replace('.sphere', '')}</span>
@@ -302,7 +339,10 @@ export default function BaseChat() {
                 userName
               )}
             </span>
-            {hasBaseName && <BaseNameBadge />}
+            {/* Podpowiedź nad nazwą zamiast pod nią */}
+            <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 text-[9px] text-blue-400 bg-white/80 dark:bg-gray-800/80 px-2 py-0.5 rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+              Click to view profile
+            </div>
           </div>
         </div>
         
@@ -927,35 +967,40 @@ export default function BaseChat() {
   useEffect(() => {
     if (isConnected && address) {
       const loadUserProfile = async () => {
+        if (!address) return;
+        
         try {
           // Pobierz profil z Firebase
-          const profile = await fetchUserProfile(address);
-          
-          // Pobierz nazwę z Firebase
-          const savedName = await getProfileName(address);
+          const profile = await fetchUserProfile(address, { loadSocialLinks: true });
           
           if (profile) {
-            // Ustaw profil z odpowiednią nazwą
-            setUserProfile({
-              name: baseName || savedName || profile.name || `${address.slice(0, 6)}...${address.slice(-4)}`,
-              avatar: profile.avatar,
-              postCount: profile.postsCount || 0,
-              likesReceived: profile.likesReceived || 0,
-              address: address,
-              bio: profile.bio
-            });
+            // Pobierz nazwę z Firebase
+            const savedName = await getProfileName(address);
             
-            // Jeśli mamy BaseName, zapisz go do Firebase wraz z avatarem
-            if (baseName) {
-              await saveProfileName(address, baseName);
-              // Zaktualizuj userNames dla aktualnego użytkownika
-              setUserNames(prev => ({
-                ...prev,
-                [address]: {
-                  name: baseName,
-                  avatar: profile.avatar
-                }
-      }));
+            if (profile) {
+              // Ustaw profil z odpowiednią nazwą
+              setUserProfile({
+                name: baseName || savedName || profile.name || `${address.slice(0, 6)}...${address.slice(-4)}`,
+                avatar: profile.avatar,
+                postCount: profile.postsCount || 0,
+                likesReceived: profile.likesReceived || 0,
+                address: address,
+                bio: profile.bio,
+                socialLinks: profile.socialLinks
+              });
+              
+              // Jeśli mamy BaseName, zapisz go do Firebase wraz z avatarem
+              if (baseName) {
+                await saveProfileName(address, baseName);
+                // Zaktualizuj userNames dla aktualnego użytkownika
+                setUserNames(prev => ({
+                  ...prev,
+                  [address]: {
+                    name: baseName,
+                    avatar: profile.avatar
+                  }
+                }));
+              }
             }
           }
         } catch (error) {
@@ -977,7 +1022,12 @@ export default function BaseChat() {
           avatar: undefined,
           postCount: 0,
           likesReceived: 0,
-          address: ''
+          address: '',
+          socialLinks: {
+            twitter: '',
+            farcaster: '',
+            discord: ''
+          }
         });
         setPreviewImage(null);
         setUserStats({}); // Reset statystyk użytkowników
@@ -1642,10 +1692,79 @@ export default function BaseChat() {
     }
   }, [isMounted]);
 
+  // Dodaję styl dla animacji gradientu
+  useEffect(() => {
+    // Dodaj style do głównego dokumentu dla animacji gradientu
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes gradient-x {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      .animate-gradient-x {
+        background-size: 200% 200%;
+        animation: gradient-x 3s ease infinite;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   // Jeśli komponent nie jest zamontowany, zwracamy pusty div
   if (!isMounted) {
     return <div></div>;
   }
+
+  // Funkcja do ładowania profilu użytkownika i przełączenia panelu
+  const handleViewBuilderProfile = async (userAddress: string) => {
+    if (!userAddress) return;
+    
+    try {
+      // Pobierz profil z Firebase
+      const profile = await fetchUserProfile(userAddress, { loadSocialLinks: true });
+      
+      if (profile) {
+        // Pobierz dodatkowe dane o użytkowniku z referencji
+        const userRef = doc(db, 'users', userAddress);
+        const userDoc = await getDoc(userRef);
+        const userData = userDoc.data();
+        
+        // Ustaw wybrany profil
+        setSelectedBuilderProfile({
+          address: userAddress,
+          name: userNames[userAddress]?.name || profile.name || `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`,
+          avatar: userNames[userAddress]?.avatar || profile.avatar,
+          bio: profile.bio,
+          postCount: profile.postsCount || 0,
+          likesReceived: profile.likesReceived || 0,
+          socialLinks: profile.socialLinks,
+          stats: userData?.stats as {
+            transactions: number;
+            tokens: number;
+            nfts: number;
+            contracts: number;
+          },
+          totalPoints: userData?.totalPoints as number,
+          currentRank: userData?.currentRank as UserRank
+        });
+        
+        // Przełącz panel
+        setActiveMainPanel('builders');
+      }
+    } catch (error) {
+      console.error('Error loading builder profile:', error);
+    }
+  };
+
+  // Funkcja do powrotu do panelu feed
+  const handleBackToFeed = () => {
+    setActiveMainPanel('feed');
+    setSelectedBuilderProfile(null);
+  };
 
   return (
     <FarcasterFrameProvider>
@@ -1823,17 +1942,41 @@ export default function BaseChat() {
                             )}
                             <div className="text-sm text-gray-500 break-all mt-2">
                               <Address address={address} />
-              </div>
+                              {address && (
+                                <ProfileSocials 
+                                  address={address}
+                                  initialLinks={userProfile.socialLinks}
+                                  lazyLoad={false} // User's own profile, load immediately
+                                  isOwner={true}
+                                  onSave={(newLinks) => {
+                                    console.log("Updating userProfile with new social links:", newLinks);
+                                    setUserProfile(prev => ({
+                                      ...prev,
+                                      socialLinks: newLinks
+                                    }));
+                                  }}
+                                />
+                              )}
+                            </div>
               </div>
             </div>
 
                       {/* YapYap Integration - moved outside About Me */}
                       {address && (
                         <div className="mb-4">
-                          <div className="bg-[#1c2c2c] rounded-xl p-4 shadow-lg border border-[#2a3a3a]">
+                          <div className="bg-white dark:bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                             <YapsMetrics address={address} />
-                            <div className="mt-3 pt-2 border-t border-[#2a3a3a] flex items-center justify-end">
-                              <span className="text-xs text-gray-500">Powered by Kaito.ai</span>
+                            <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-center">
+                              <div className="flex items-center">
+                                <div className="text-xs text-gray-400 mr-1">Powered by</div>
+                                <div className="text-xs font-medium text-blue-600 flex items-center">
+                                  <svg className="w-4 h-4 mx-1" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="12" r="10" fill="currentColor" />
+                                    <path d="M12 8v4M12 16h.01" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                                  </svg>
+                                  Kaito.ai
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -2021,14 +2164,24 @@ export default function BaseChat() {
                   {/* Filters row */}
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setShowOnlyUserPosts(false)}
-                      className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${!showOnlyUserPosts ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                      onClick={() => {
+                        setShowOnlyUserPosts(false);
+                        setSelectedTag('');
+                        setSelectedAuthor('');
+                        setActiveMainPanel('feed');
+                      }}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${!showOnlyUserPosts && activeMainPanel === 'feed' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
                     >
                       All Posts
                     </button>
                     <button
-                      onClick={() => setShowOnlyUserPosts(true)}
-                      className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${showOnlyUserPosts ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                      onClick={() => {
+                        setShowOnlyUserPosts(true);
+                        setSelectedTag('');
+                        setSelectedAuthor('');
+                        setActiveMainPanel('feed');
+                      }}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${showOnlyUserPosts && activeMainPanel === 'feed' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
                     >
                       My Posts
                     </button>
@@ -2038,487 +2191,648 @@ export default function BaseChat() {
                     >
                       {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
                     </button>
+                    <button
+                      onClick={() => {
+                        if (address) {
+                          handleViewBuilderProfile(address);
+                        } else {
+                          toast.error('Connect your wallet to view builder profiles');
+                        }
+                      }}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${
+                        activeMainPanel === 'builders' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                      } flex items-center justify-center`}
+                    >
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      Builders
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {/* New post creation */}
-              {isConnected ? (
-    <>
-                    {canCreatePosts ? (
-                      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow mb-6">
-                        <div className="flex items-center space-x-3 mb-4">
-                          {userProfile.avatar ? (
-                            <img
-                              src={userProfile.avatar}
-                              alt="Profile"
-                              className="w-10 h-10 rounded-full object-cover"
-                            />
-                          ) : (
-                            <Avatar address={address} className="w-10 h-10 rounded-full" />
-            )}
-                          <div className="flex-1">
-                            <textarea
-                              value={newPost}
-                              onChange={(e) => setNewPost(e.target.value)}
-                              placeholder="What's happening on Base?"
-                              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                              rows={3}
-                            />
-                </div>
-              </div>
-
-                        {/* Media preview in post */}
-                {(postPreviewImage || postPreviewVideo) && (
-                        <div className="mb-4 relative">
-                          {postPreviewImage ? (
-                    <img
-                      src={postPreviewImage}
-                        alt="Preview"
-                              className="max-h-60 rounded-lg object-cover"
-                    />
-                          ) : postPreviewVideo && (
-                      <video
-                        src={postPreviewVideo}
-                              className="max-h-60 rounded-lg w-full"
-                        controls
-                            >
-                              Your browser does not support video playback.
-                            </video>
-                    )}
-                    <button
-                  onClick={() => {
-                        setPostPreviewImage(null);
-                        setPostPreviewVideo(null);
-              }}
-                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                          {uploadProgress > 0 && uploadProgress < 100 && (
-                            <div className="absolute bottom-2 left-2 right-2 bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress}%` }}
+              {/* Dodaj warunek wyświetlania panelu Builders lub feed */}
+              {activeMainPanel === 'builders' ? (
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden border border-blue-100 dark:border-blue-900">
+                  {/* Builder Panel Header with Back Button - nowoczesny gradient */}
+                  <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-700 p-5 relative overflow-hidden">
+                    {/* Dodajemy efekt połysku */}
+                    <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-30"></div>
+                    <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-400 rounded-full filter blur-3xl opacity-20"></div>
+                    <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-400 rounded-full filter blur-3xl opacity-10"></div>
+                    
+                    <div className="flex items-center justify-between relative z-10">
+                      <button 
+                        onClick={handleBackToFeed}
+                        className="flex items-center text-white bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 transition-all duration-300 hover:bg-white/20 hover:scale-105 border border-white/10"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Back to Feed
+                      </button>
+                      <div className="text-xl font-light text-white font-['Coinbase_Display']">Builder Profile</div>
+                      <div className="w-24"></div> {/* Placeholder dla wyrównania */}
+                    </div>
+                  </div>
+                  
+                  {/* Builder Profile Content */}
+                  {selectedBuilderProfile ? (
+                    <div className="p-6 font-['Coinbase_Display']">
+                      {/* User Info Section - nowoczesna karta z cieniem */}
+                      <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-6 p-6 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-sm border border-blue-50 dark:border-blue-900/30">
+                        <div className="flex flex-col items-center">
+                          <div className="w-24 h-24 rounded-full overflow-hidden mr-0 md:mr-4 flex-shrink-0 ring-4 ring-white dark:ring-gray-800 shadow-lg relative">
+                            {selectedBuilderProfile.avatar ? (
+                              <img 
+                                src={selectedBuilderProfile.avatar} 
+                                alt="Profile" 
+                                className="w-full h-full object-cover"
                               />
-          </div>
-                )}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 sm:space-x-4">
-                    <button
-                      onClick={() => document.getElementById('fileInput')?.click()}
-                      className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
-                    >
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <span className="hidden xs:inline">Add photo/video</span>
-                      <span className="inline xs:hidden">Photo</span>
-                    </button>
-
-                    <button
-                      onClick={() => setShowAIModal(true)}
-                      className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
-                    >
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      <span className="hidden xs:inline">Generate AI Post</span>
-                      <span className="inline xs:hidden">AI</span>
-                    </button>
-                  </div>
-                  
-                  <TransactionButton 
-                    content={newPost}
-                    onTransactionSuccess={handleTransactionSuccess}
-                    disabled={!newPost.trim()}
-                    autoPost={true}
-                  />
-                </div>
-                <input
-                  id="fileInput"
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={handlePostFileSelect}
-                  className="hidden"
-                />
-              </div>
-          ) : (
-            <div className="bg-white rounded-xl p-6 text-center shadow-lg mb-6 border border-[#0052FF]/20 relative overflow-hidden">
-              {/* Usuwam linię z matrix-code.png i zastępuję ją gradientem */}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/80 to-black/40"></div>
-              <div className="relative z-10">
-                <div className="text-xl font-['Share_Tech_Mono'] text-[#0052FF] mb-3 tracking-[0.2em] animate-glitch">
-                  {'>'} SYSTEM_BASECHAT_DETECTED
-                </div>
-                
-                <div className="font-['Share_Tech_Mono'] text-[#0052FF]/80 mb-4 tracking-[0.15em] text-base typewriter">
-                  {'>'} INITIALIZING_ONCHAIN_PROTOCOL
-                  <span className="animate-blink ml-1">_</span>
-                </div>
-
-                <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mb-4 animate-scan"></div>
-
-                <div className="font-['Share_Tech_Mono'] text-[#0052FF] mb-4 tracking-[0.15em] text-lg animate-glitch-2">
-                  {'>'} BRING_NEW_PEOPLE_ONCHAIN
-                </div>
-
-                <div className="flex justify-center mb-4">
-                  <div className="w-16 h-px bg-[#0052FF]/50"></div>
-                </div>
-
-                <div className="font-['Share_Tech_Mono'] text-[#0052FF]/80 mb-4 tracking-[0.15em] text-base">
-                  {'>'} BASENAME_REQUIRED
-                  <span className="animate-blink ml-1">_</span>
-                </div>
-
-                <a href="https://www.base.org/names" target="_blank" rel="noopener noreferrer" 
-                  className="inline-flex items-center px-6 py-2.5 bg-gradient-to-r from-[#0052FF] to-[#0040CC] text-white text-sm font-medium rounded-full transition-all duration-200 transform hover:scale-[1.02] shadow-[0_8px_16px_-3px_rgba(0,82,255,0.5)] hover:shadow-[0_12px_20px_-3px_rgba(0,82,255,0.6)] relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 group-hover:animate-shine"></div>
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                  Claim Basename
-                  <span className="ml-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-xs px-1.5 py-0.5 rounded-full font-bold animate-gradient">NEW</span>
-                </a>
-              </div>
-
-              <style jsx>{`
-                @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-
-                @keyframes matrix {
-                  0% { background-position: 0% 0%; }
-                  100% { background-position: 0% 100%; }
-                }
-                @keyframes scan {
-                  0% { transform: scaleX(0); opacity: 0.3; }
-                  50% { transform: scaleX(1); opacity: 0.8; }
-                  100% { transform: scaleX(0); opacity: 0.3; }
-                }
-                @keyframes glitch {
-                  0% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
-                  25% { transform: translate(-2px,2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
-                  50% { transform: translate(2px,-2px); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
-                  75% { transform: translate(-2px,-2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
-                  100% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
-                }
-                @keyframes glitch-2 {
-                  0% { transform: translate(0); }
-                  20% { transform: translate(-1px,1px); }
-                  40% { transform: translate(-1px,-1px); }
-                  60% { transform: translate(1px,1px); }
-                  80% { transform: translate(1px,-1px); }
-                  100% { transform: translate(0); }
-                }
-                @keyframes shine {
-                  from { left: -100%; }
-                  to { left: 100%; }
-                }
-                .animate-matrix {
-                  animation: matrix 20s linear infinite;
-                }
-                .animate-scan {
-                  animation: scan 3s ease-in-out infinite;
-                }
-                .animate-glitch {
-                  animation: glitch 3s infinite;
-                }
-                .animate-glitch-2 {
-                  animation: glitch-2 2s infinite;
-                }
-                .animate-shine {
-                  animation: shine 1.5s linear infinite;
-                }
-                .animate-gradient {
-                  background-size: 200% 200%;
-                  animation: gradient 3s ease infinite;
-                }
-                .typewriter {
-                  overflow: hidden;
-                  white-space: nowrap;
-                  animation: typing 3.5s steps(40, end);
-                }
-                @keyframes blink-fast {
-                  0%, 100% { opacity: 0; }
-                  50% { opacity: 1; }
-                }
-                .animate-blink-fast {
-                  animation: blink-fast 0.5s step-end infinite;
-                    }
-                  `}</style>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center shadow mb-6">
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                Connect your wallet to start posting and interacting with the community
-              </p>
-              <ConnectWallet />
-            </div>
-          )}
-
-          {/* Lista postów */}
-          <div className="space-y-6">
-            {displayedPosts.map((post) => (
-              <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                        {displayUserName(post.author, `post-${post.id}`)}
-                    <div className="text-xs text-gray-500">
-                        {formatTimestamp(post.timestamp)}
-                    </div>
-                    {post.txHash && (
-                      <div className="flex items-center text-xs text-blue-500" title="Saved on blockchain">
-                        <img 
-                          src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png" 
-                          alt="Base Logo" 
-                          className="w-3 h-3 mr-1"
-                        />
-                        <span className="hidden sm:inline">Onchain</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Opcje posta dla autora */}
-                  {post.author === address && (
-                    <div className="relative">
-                    <button
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-                        onClick={() => setEditingPost(editingPost === post.id ? null : post.id)}
-                    >
-                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
-                    </button>
-                      
-                      {editingPost === post.id && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 border border-gray-200 dark:border-gray-700">
-                          <button
-                            onClick={() => {
-                              setEditingPost(post.id);
-                              setEditedContent(post.content);
-                  }}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          >
-                            Edytuj post
-                          </button>
-                          <button
-                            onClick={() => handleDeletePost(post.id)}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                            Usuń post
-                          </button>
+                            ) : (
+                              <Avatar address={toEthereumAddress(selectedBuilderProfile.address)} className="w-24 h-24" />
+                            )}
+                            {/* Dodajemy subtelny efekt ramki z gradientem */}
+                            <div className="absolute inset-0 rounded-full border border-white/20 bg-gradient-to-br from-transparent via-blue-100/10 to-blue-200/20 opacity-50"></div>
+                          </div>
+                          
+                          {/* Przeniesione linki społecznościowe pod avatar */}
+                          {selectedBuilderProfile.address && (
+                            <div className="mt-3 w-full">
+                              <ProfileSocials 
+                                address={toEthereumAddress(selectedBuilderProfile.address)}
+                                initialLinks={selectedBuilderProfile.socialLinks}
+                                lazyLoad={false}
+                                isOwner={address === selectedBuilderProfile.address}
+                                onSave={address === selectedBuilderProfile.address ? (newLinks) => {
+                                  console.log("Updating socialLinks:", newLinks);
+                                  setSelectedBuilderProfile(prev => ({
+                                    ...prev!,
+                                    socialLinks: newLinks
+                                  }));
+                                } : undefined}
+                              />
+                            </div>
+                          )}
                         </div>
-                  )}
-                </div>
-                  )}
-                </div>
 
-                {editingPost === post.id ? (
-                  <div className="mb-4">
-                    <textarea
-                      value={editedContent}
-                      onChange={(e) => setEditedContent(e.target.value)}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-gray-100"
-                      rows={3}
-                    />
-                    <div className="flex justify-end space-x-2 mt-2">
-                      <button
-                        onClick={() => {
-                          setEditingPost(null);
-                          setEditedContent('');
-                        }}
-                        className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleEditPost(post.id, editedContent)}
-                        className="px-3 py-1 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mb-4">
-                    <div className="whitespace-pre-wrap break-words text-gray-900 dark:text-white">
-                      {expandedPosts[post.id] ? post.content : 
-                        post.content.length > 280 ? 
-                          `${post.content.slice(0, 280)}...` : 
-                          post.content
-                      }
-                      {post.content.length > 280 && (
-                        <button
-                          onClick={() => setExpandedPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
-                          className="block text-blue-500 hover:text-blue-600 text-sm mt-2"
-                        >
-                          {expandedPosts[post.id] ? 'Show less' : 'Show more'}
-                        </button>
+                        <div className="flex-1">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
+                            <div className="flex flex-col">
+                              <div className="text-2xl font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text">
+                                {selectedBuilderProfile.name.endsWith('.eth') ? (
+                                  selectedBuilderProfile.name
+                                ) : selectedBuilderProfile.name.endsWith('.base.eth') ? (
+                                  <>
+                                    <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text">{selectedBuilderProfile.name}</span>
+                                    <span className="ml-1.5 text-sm bg-blue-100 dark:bg-blue-900 text-blue-500 px-1.5 py-0.5 rounded-md">BaseName</span>
+                                  </>
+                                ) : (
+                                  selectedBuilderProfile.name
+                                )}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(selectedBuilderProfile.address);
+                                  toast.success('Address copied to clipboard!');
+                                }}
+                                className="flex items-center text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md mt-1 w-fit"
+                              >
+                                <span className="mr-1.5 font-mono">{selectedBuilderProfile.address.slice(0,6)}...{selectedBuilderProfile.address.slice(-4)}</span>
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </button>
+                            </div>
+
+                            <div className="flex items-center mt-2 md:mt-0">
+                              {address === selectedBuilderProfile.address && (
+                                <button
+                                  onClick={() => document.getElementById('edit-profile-modal')?.classList.remove('hidden')}
+                                  className="flex items-center text-xs text-blue-500 hover:text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-md"
+                                >
+                                  <span className="mr-1">Edit Profile</span>
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Usunięte stąd linki społecznościowe */}
+                        </div>
+                      </div>
+                      
+                      {/* Bio Section - nowoczesne karty */}
+                      <div className="mb-6 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-sm p-6 border border-blue-50 dark:border-blue-900/30">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-light text-xl text-gray-900 dark:text-white">About</h3>
+                          {address === selectedBuilderProfile.address && (
+                            <button
+                              onClick={() => setIsEditingBio(true)}
+                              className="text-xs text-blue-500 hover:text-blue-600 flex items-center bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full transition-all duration-300 hover:scale-105"
+                            >
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+                        <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl p-5 border border-blue-100/20 dark:border-blue-900/20">
+                          <div className="text-gray-700 dark:text-gray-300 leading-relaxed font-light">
+                            {selectedBuilderProfile.bio || 
+                              <span className="text-gray-400 italic">
+                                {address === selectedBuilderProfile.address ? 
+                                  "Click Edit to add your bio" : 
+                                  "This builder hasn't added a bio yet"}
+                              </span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Stats Grid - nowoczesne karty */}
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-6 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
+                          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 mb-3">
+                            <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                          </div>
+                          <div className="text-blue-500 text-3xl font-light">{selectedBuilderProfile.postCount || 0}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 font-light mt-1">Posts</div>
+                        </div>
+                        <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-6 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
+                          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-pink-100 dark:bg-pink-900/30 mb-3">
+                            <svg className="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                            </svg>
+                          </div>
+                          <div className="text-pink-500 text-3xl font-light">{selectedBuilderProfile.likesReceived || 0}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 font-light mt-1">Likes Received</div>
+                        </div>
+                      </div>
+                      
+                      {/* On-chain Stats - nowoczesne karty */}
+                      {selectedBuilderProfile.stats && (
+                        <div className="mb-6 overflow-hidden">
+                          <h3 className="font-light text-xl text-gray-900 dark:text-white mb-4">On-chain Activity</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-4 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
+                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 mb-2">
+                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                              </div>
+                              <div className="text-blue-500 text-2xl font-light">{selectedBuilderProfile.stats.transactions || 0}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-light mt-1">Transactions</div>
+                            </div>
+                            <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-4 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
+                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 mb-2">
+                                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </div>
+                              <div className="text-green-500 text-2xl font-light">{selectedBuilderProfile.stats.tokens || 0}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-light mt-1">Tokens</div>
+                            </div>
+                            <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-4 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
+                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 mb-2">
+                                <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                              <div className="text-purple-500 text-2xl font-light">{selectedBuilderProfile.stats.nfts || 0}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-light mt-1">NFTs</div>
+                            </div>
+                            <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-4 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
+                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 mb-2">
+                                <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              </div>
+                              <div className="text-yellow-500 text-2xl font-light">{selectedBuilderProfile.stats.contracts || 0}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-light mt-1">Contracts</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Builder Rank - nowoczesna karta */}
+                      {selectedBuilderProfile.currentRank && (
+                        <div className="mb-6 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-sm p-6 border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.01] relative overflow-hidden">
+                          {/* Dodajemy efekt świecenia */}
+                          <div className="absolute -top-10 right-0 w-32 h-32 bg-blue-400 rounded-full filter blur-3xl opacity-10"></div>
+                          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-400 rounded-full filter blur-3xl opacity-10"></div>
+                          
+                          <div className="text-center relative z-10">
+                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 mb-4 shadow-lg">
+                              <span className="text-white text-2xl">✨</span>
+                            </div>
+                            <div className="text-2xl font-light bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 text-transparent bg-clip-text">
+                              {selectedBuilderProfile.currentRank}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md mx-auto font-light">
+                              {selectedBuilderProfile.currentRank ? RANK_DESCRIPTIONS[selectedBuilderProfile.currentRank] : ''}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Points - nowoczesna karta z gradientem */}
+                      {selectedBuilderProfile.totalPoints !== undefined && (
+                        <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl shadow-lg p-6 relative overflow-hidden">
+                          {/* Dodajemy efekt świecenia */}
+                          <div className="absolute -top-10 right-0 w-32 h-32 bg-blue-300 rounded-full filter blur-3xl opacity-20"></div>
+                          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-300 rounded-full filter blur-3xl opacity-20"></div>
+                          
+                          <div className="flex justify-between items-center relative z-10">
+                            <div className="text-xl font-light text-white">
+                              Total Points
+                            </div>
+                            <div className="text-3xl font-light text-white flex items-center">
+                              <span>{selectedBuilderProfile.totalPoints}</span>
+                              <span className="ml-2 text-lg">⚡</span>
+                            </div>
+                          </div>
+                          
+                          {/* Dodajemy pasek postępu */}
+                          <div className="mt-4 w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-white rounded-full"
+                              style={{ width: `${Math.min(100, (selectedBuilderProfile.totalPoints / 2000) * 100)}%` }}
+                            ></div>
+                          </div>
+                          <div className="mt-2 text-xs text-white/70 text-right font-light">
+                            {Math.min(100, Math.round((selectedBuilderProfile.totalPoints / 2000) * 100))}% to next level
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="mt-2">
-                      <LinkPreview 
-                        content={post.content}
-                        media={post.image ? {
-                          type: 'image',
-                          url: post.image
-                        } : post.video ? {
-                          type: 'video',
-                          url: post.video
-                        } : undefined}
-                      />
+                  ) : (
+                    <div className="p-6 text-center">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/20 mb-4">
+                        <svg className="w-8 h-8 text-blue-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </div>
+                      <p className="text-gray-500 dark:text-gray-400 font-['Coinbase_Display'] font-light">
+                        Loading builder profile...
+                      </p>
                     </div>
-                  </div>
-                )}
-
-                <div className="flex items-center space-x-4 mb-4">
-                  <button
-                    onClick={() => handleToggleLike(post.id)}
-                    className={`flex items-center space-x-1 ${
-                      post.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-            }`}
-          >
-                    <svg 
-                      className="w-5 h-5" 
-                      fill={post.likedBy?.includes(address || '') ? "currentColor" : "none"}
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                      />
-                    </svg>
-                    <span>{post.likes}</span>
-                  </button>
+                  )}
                 </div>
-                
-                {/* Comments section */}
-                <div className="space-y-4">
-                  {/* Wyświetl komentarze */}
-                  {(expandedComments[post.id] ? post.comments : post.comments.slice(0, 5))
-                    .filter(comment => !comment.replyTo) // Filtruj tylko główne komentarze
-                    .map(comment => (
-                      <div key={comment.id} className="mt-4 border-t dark:border-gray-700 pt-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            {displayUserName(comment.author, `comment-${post.id}-${comment.id}`)}
-                            <div className="text-xs text-gray-500">
-                              {formatTimestamp(comment.timestamp)}
+              ) : (
+                <>
+                  {/* New post creation */}
+                  {isConnected ? (
+                    <>
+                      {canCreatePosts ? (
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow mb-6">
+                          <div className="flex items-center space-x-3 mb-4">
+                            {userProfile.avatar ? (
+                              <img
+                                src={userProfile.avatar}
+                                alt="Profile"
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <Avatar address={address} className="w-10 h-10 rounded-full" />
+                            )}
+                            <div className="flex-1">
+                              <textarea
+                                value={newPost}
+                                onChange={(e) => setNewPost(e.target.value)}
+                                placeholder="What's happening on Base?"
+                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                rows={3}
+                              />
                             </div>
-                            {comment.txHash && (
-                              <div className="flex items-center text-xs text-blue-500" title="Saved on blockchain">
+                          </div>
+
+                          {/* Media preview in post */}
+                          {(postPreviewImage || postPreviewVideo) && (
+                            <div className="mb-4 relative">
+                              {postPreviewImage ? (
+                                <img
+                                  src={postPreviewImage}
+                                  alt="Preview"
+                                  className="max-h-60 rounded-lg object-cover"
+                                />
+                              ) : postPreviewVideo && (
+                                <video
+                                  src={postPreviewVideo}
+                                  className="max-h-60 rounded-lg w-full"
+                                  controls
+                                >
+                                  Your browser does not support video playback.
+                                </video>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setPostPreviewImage(null);
+                                  setPostPreviewVideo(null);
+                                }}
+                                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                              {uploadProgress > 0 && uploadProgress < 100 && (
+                                <div className="absolute bottom-2 left-2 right-2 bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${uploadProgress}%` }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2 sm:space-x-4">
+                              <button 
+                                onClick={() => document.getElementById('fileInput')?.click()}
+                                className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
+                              >
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span className="hidden xs:inline">Add photo/video</span>
+                                <span className="inline xs:hidden">Photo</span>
+                              </button>
+
+                              <button
+                                onClick={() => setShowAIModal(true)}
+                                className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
+                              >
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                <span className="hidden xs:inline">Generate AI Post</span>
+                                <span className="inline xs:hidden">AI</span>
+                              </button>
+                            </div>
+                            
+                            <TransactionButton 
+                              content={newPost}
+                              onTransactionSuccess={handleTransactionSuccess}
+                              disabled={!newPost.trim()}
+                              autoPost={true}
+                            />
+                          </div>
+                          <input
+                            id="fileInput"
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={handlePostFileSelect}
+                            className="hidden"
+                          />
+                        </div>
+                      ) : (
+                        <div className="bg-white rounded-xl p-6 text-center shadow-lg mb-6 border border-[#0052FF]/20 relative overflow-hidden">
+                          {/* Usuwam linię z matrix-code.png i zastępuję ją gradientem */}
+                          <div className="absolute inset-0 bg-gradient-to-b from-black/80 to-black/40"></div>
+                          <div className="relative z-10">
+                            <div className="text-xl font-['Share_Tech_Mono'] text-[#0052FF] mb-3 tracking-[0.2em] animate-glitch">
+                              {'>'} SYSTEM_BASECHAT_DETECTED
+                            </div>
+                            
+                            <div className="font-['Share_Tech_Mono'] text-[#0052FF]/80 mb-4 tracking-[0.15em] text-base typewriter">
+                              {'>'} INITIALIZING_ONCHAIN_PROTOCOL
+                              <span className="animate-blink ml-1">_</span>
+                            </div>
+
+                            <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mb-4 animate-scan"></div>
+
+                            <div className="font-['Share_Tech_Mono'] text-[#0052FF] mb-4 tracking-[0.15em] text-lg animate-glitch-2">
+                              {'>'} BRING_NEW_PEOPLE_ONCHAIN
+                            </div>
+
+                            <div className="flex justify-center mb-4">
+                              <div className="w-16 h-px bg-[#0052FF]/50"></div>
+                            </div>
+
+                            <div className="font-['Share_Tech_Mono'] text-[#0052FF]/80 mb-4 tracking-[0.15em] text-base">
+                              {'>'} BASENAME_REQUIRED
+                              <span className="animate-blink ml-1">_</span>
+                            </div>
+
+                            <a href="https://www.base.org/names" target="_blank" rel="noopener noreferrer" 
+                              className="inline-flex items-center px-6 py-2.5 bg-gradient-to-r from-[#0052FF] to-[#0040CC] text-white text-sm font-medium rounded-full transition-all duration-200 transform hover:scale-[1.02] shadow-[0_8px_16px_-3px_rgba(0,82,255,0.5)] hover:shadow-[0_12px_20px_-3px_rgba(0,82,255,0.6)] relative overflow-hidden group">
+                              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 group-hover:animate-shine"></div>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                              </svg>
+                              Claim Basename
+                              <span className="ml-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-xs px-1.5 py-0.5 rounded-full font-bold animate-gradient">NEW</span>
+                            </a>
+                          </div>
+
+                          <style jsx>{`
+                            @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+                            @keyframes matrix {
+                              0% { background-position: 0% 0%; }
+                              100% { background-position: 0% 100%; }
+                            }
+                            @keyframes scan {
+                              0% { transform: scaleX(0); opacity: 0.3; }
+                              50% { transform: scaleX(1); opacity: 0.8; }
+                              100% { transform: scaleX(0); opacity: 0.3; }
+                            }
+                            @keyframes glitch {
+                              0% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
+                              25% { transform: translate(-2px,2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
+                              50% { transform: translate(2px,-2px); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
+                              75% { transform: translate(-2px,-2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
+                              100% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
+                            }
+                            @keyframes glitch-2 {
+                              0% { transform: translate(0); }
+                              20% { transform: translate(-1px,1px); }
+                              40% { transform: translate(-1px,-1px); }
+                              60% { transform: translate(1px,1px); }
+                              80% { transform: translate(1px,-1px); }
+                              100% { transform: translate(0); }
+                            }
+                            @keyframes shine {
+                              from { left: -100%; }
+                              to { left: 100%; }
+                            }
+                            .animate-matrix {
+                              animation: matrix 20s linear infinite;
+                            }
+                            .animate-scan {
+                              animation: scan 3s ease-in-out infinite;
+                            }
+                            .animate-glitch {
+                              animation: glitch 3s infinite;
+                            }
+                            .animate-glitch-2 {
+                              animation: glitch-2 2s infinite;
+                            }
+                            .animate-shine {
+                              animation: shine 1.5s linear infinite;
+                            }
+                            .animate-gradient {
+                              background-size: 200% 200%;
+                              animation: gradient 3s ease infinite;
+                            }
+                            .typewriter {
+                              overflow: hidden;
+                              white-space: nowrap;
+                              animation: typing 3.5s steps(40, end);
+                            }
+                            @keyframes blink-fast {
+                              0%, 100% { opacity: 0; }
+                              50% { opacity: 1; }
+                            }
+                            .animate-blink-fast {
+                              animation: blink-fast 0.5s step-end infinite;
+                            }
+                          `}</style>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center shadow mb-6">
+                      <p className="text-gray-600 dark:text-gray-300 mb-4">
+                        Connect your wallet to start posting and interacting with the community
+                      </p>
+                      <ConnectWallet />
+                    </div>
+                  )}
+
+                  {/* Lista postów */}
+                  <div className="space-y-6">
+                    {displayedPosts.map((post) => (
+                      <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            {displayUserName(post.author, `post-${post.id}`)}
+                            <div className="text-xs text-gray-500">
+                              {formatTimestamp(post.timestamp)}
+                            </div>
+                            {post.txHash && (
+                              <div className="flex items-center text-xs font-medium text-blue-500 ml-1" title="Saved on blockchain">
                                 <img 
                                   src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png" 
                                   alt="Base Logo" 
-                                  className="w-3 h-3 mr-1"
+                                  className="w-3.5 h-3.5 mr-1"
                                 />
                                 <span className="hidden sm:inline">Onchain</span>
                               </div>
                             )}
                           </div>
                           
-                          <div className="flex items-center space-x-2">
-                            {/* Przycisk odpowiedzi */}
-                            {canCreatePosts ? (
+                          {/* Opcje posta dla autora */}
+                          {post.author === address && (
+                            <div className="relative">
                               <button
-                                onClick={() => setReplyingTo(replyingTo?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
-                                className="text-sm text-gray-500 hover:text-blue-500 flex items-center space-x-1"
+                                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+                                onClick={() => setEditingPost(editingPost === post.id ? null : post.id)}
                               >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                                 </svg>
-                                <span>Reply</span>
                               </button>
-                            ) : (
-                              <span className="text-sm text-gray-500 italic">Get BaseName to reply</span>
-                            )}
-                            
-                            {/* Opcje komentarza dla autora */}
-                            {comment.author === address && (
-                              <div className="relative">
-                                <button
-                                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
-                                  onClick={() => setEditingComment(editingComment?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
-                      >
-                                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-              </svg>
+                              
+                              {editingPost === post.id && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 border border-gray-200 dark:border-gray-700">
+                                  <button
+                                    onClick={() => {
+                                      setEditingPost(post.id);
+                                      setEditedContent(post.content);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  >
+                                    Edytuj post
                                   </button>
-                                  
-                                  {editingComment?.commentId === comment.id && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
-                                      <button
-                                        onClick={() => {
-                                          setEditingComment({ postId: post.id, commentId: comment.id });
-                                          setEditedCommentContent(comment.content);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteComment(post.id, comment.id)}
-                                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                      >
-                                        Delete
-              </button>
-                                    </div>
-                                  )}
+                                  <button
+                                    onClick={() => handleDeletePost(post.id)}
+                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  >
+                                    Usuń post
+                                  </button>
                                 </div>
                               )}
                             </div>
-                          </div>
+                          )}
+                        </div>
 
-                        {editingComment?.commentId === comment.id ? (
-                          <div>
+                        {editingPost === post.id ? (
+                          <div className="mb-4">
                             <textarea
-                              value={editedCommentContent}
-                              onChange={(e) => setEditedCommentContent(e.target.value)}
-                              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={editedContent}
+                              onChange={(e) => setEditedContent(e.target.value)}
+                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-gray-100"
+                              rows={3}
                             />
                             <div className="flex justify-end space-x-2 mt-2">
-          <button
-            onClick={() => {
-                                    setEditingComment(null);
-                                    setEditedCommentContent('');
-              }}
-                                    className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    onClick={() => handleEditComment(post.id, comment.id, editedCommentContent)}
-                                    className="px-3 py-1 text-xs text-white bg-blue-500 hover:bg-blue-600 rounded"
-                                  >
-                                    Save
-          </button>
+                              <button
+                                onClick={() => {
+                                  setEditingPost(null);
+                                  setEditedContent('');
+                                }}
+                                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleEditPost(post.id, editedContent)}
+                                className="px-3 py-1 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded"
+                              >
+                                Save
+                              </button>
                             </div>
                           </div>
                         ) : (
-                          <>
-                        <p className="text-sm text-gray-800 dark:text-gray-200">{comment.content}</p>
+                          <div className="mb-4">
+                            <div className="whitespace-pre-wrap break-words text-gray-900 dark:text-white">
+                              {expandedPosts[post.id] ? post.content : 
+                                post.content.length > 280 ? 
+                                  `${post.content.slice(0, 280)}...` : 
+                                  post.content
+                              }
+                              {post.content.length > 280 && (
+                                <button
+                                  onClick={() => setExpandedPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
+                                  className="block text-blue-500 hover:text-blue-600 text-sm mt-2"
+                                >
+                                  {expandedPosts[post.id] ? 'Show less' : 'Show more'}
+                                </button>
+                              )}
+                            </div>
+                            <div className="mt-2">
+                              <LinkPreview 
+                                content={post.content}
+                                media={post.image ? {
+                                  type: 'image',
+                                  url: post.image
+                                } : post.video ? {
+                                  type: 'video',
+                                  url: post.video
+                                } : undefined}
+                              />
+                            </div>
+                          </div>
+                        )}
 
-                            {/* Przyciski akcji komentarza */}
-                        <div className="flex items-center space-x-4 mt-2">
+                        <div className="flex items-center space-x-4 mb-4">
                           <button
-                            onClick={() => handleToggleCommentLike(post.id, comment.id)}
+                            onClick={() => handleToggleLike(post.id)}
                             className={`flex items-center space-x-1 ${
-                              comment.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
+                              post.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
                             }`}
                           >
                             <svg 
-                              className="w-4 h-4" 
-                              fill={comment.likedBy?.includes(address || '') ? "currentColor" : "none"}
+                              className="w-5 h-5" 
+                              fill={post.likedBy?.includes(address || '') ? "currentColor" : "none"}
                               stroke="currentColor" 
                               viewBox="0 0 24 24"
                             >
@@ -2529,164 +2843,297 @@ export default function BaseChat() {
                                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
                               />
                             </svg>
-                            <span className="text-xs">{comment.likes || 0}</span>
+                            <span>{post.likes}</span>
                           </button>
                         </div>
-                          </>
-                        )}
-
-                        {/* Formularz odpowiedzi */}
-                        {replyingTo?.commentId === comment.id && (
-                          <div className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
-                            <textarea
-                              value={replyContent}
-                              onChange={(e) => setReplyContent(e.target.value)}
-                              placeholder="Write a reply..."
-                              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <div className="flex justify-end space-x-2 mt-2">
-                              <button
-                                onClick={() => {
-                                  setReplyingTo(null);
-                                  setReplyContent('');
-                                }}
-                                className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                onClick={() => handleAddReply(post.id, comment.id)}
-                                className="px-3 py-1 text-xs text-white bg-blue-500 hover:bg-blue-600 rounded"
-                              >
-                                Reply
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Wyświetl odpowiedzi */}
-                        {post.comments
-                          .filter(reply => reply.replyTo === comment.id)
-                          .map(reply => (
-                            <div key={reply.id} className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center space-x-2">
-                                  {displayUserName(reply.author, `reply-${post.id}-${reply.id}`)}
-                                  <div className="text-xs text-gray-500">
-                                    {formatTimestamp(reply.timestamp)}
+                        
+                        {/* Comments section */}
+                        <div className="space-y-4">
+                          {/* Wyświetl komentarze */}
+                          {(expandedComments[post.id] ? post.comments : post.comments.slice(0, 5))
+                            .filter(comment => !comment.replyTo) // Filtruj tylko główne komentarze
+                            .map(comment => (
+                              <div key={comment.id} className="mt-4 border-t dark:border-gray-700 pt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center space-x-2">
+                                    {displayUserName(comment.author, `comment-${post.id}-${comment.id}`)}
+                                    <div className="text-xs text-gray-500">
+                                      {formatTimestamp(comment.timestamp)}
+                                    </div>
+                                    {comment.txHash && (
+                                      <div className="flex items-center text-xs font-medium text-blue-500 ml-1" title="Saved on blockchain">
+                                        <img 
+                                          src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png" 
+                                          alt="Base Logo" 
+                                          className="w-3.5 h-3.5 mr-1"
+                                        />
+                                        <span className="hidden sm:inline">Onchain</span>
+                                      </div>
+                                    )}
                                   </div>
-                              </div>
+                                  
+                                  <div className="flex items-center space-x-2">
+                                    {/* Przycisk odpowiedzi */}
+                                    {canCreatePosts ? (
+                                      <button
+                                        onClick={() => setReplyingTo(replyingTo?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
+                                        className="text-sm text-gray-500 hover:text-blue-500 flex items-center space-x-1"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                        </svg>
+                                        <span>Reply</span>
+                                      </button>
+                                    ) : (
+                                      <span className="text-sm text-gray-500 italic">Get BaseName to reply</span>
+                                    )}
+                                    
+                                    {/* Opcje komentarza dla autora */}
+                                    {comment.author === address && (
+                                      <div className="relative">
+                                        <button
+                                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
+                                          onClick={() => setEditingComment(editingComment?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
+                                        >
+                                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                          </svg>
+                                        </button>
+                                        
+                                        {editingComment?.commentId === comment.id && (
+                                          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
+                                            <button
+                                              onClick={() => {
+                                                setEditingComment({ postId: post.id, commentId: comment.id });
+                                                setEditedCommentContent(comment.content);
+                                              }}
+                                              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                              Edit
+                                            </button>
+                                            <button
+                                              onClick={() => handleDeleteComment(post.id, comment.id)}
+                                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                              Delete
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
 
-                              {reply.author === address && (
-                                <div className="relative">
-                                  <button
-                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
-                                    onClick={() => setEditingComment(editingComment?.commentId === reply.id ? null : { postId: post.id, commentId: reply.id })}
-                                  >
-                                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                    </svg>
-                                  </button>
-
-                                  {editingComment?.commentId === reply.id && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
+                                {editingComment?.commentId === comment.id ? (
+                                  <div>
+                                    <textarea
+                                      value={editedCommentContent}
+                                      onChange={(e) => setEditedCommentContent(e.target.value)}
+                                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <div className="flex justify-end space-x-2 mt-2">
                                       <button
                                         onClick={() => {
-                                          setEditingComment({ postId: post.id, commentId: reply.id });
-                                          setEditedCommentContent(reply.content);
+                                          setEditingComment(null);
+                                          setEditedCommentContent('');
                                         }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                                       >
-                                        Edit
+                                        Cancel
                                       </button>
                                       <button
-                                        onClick={() => handleDeleteComment(post.id, reply.id)}
-                                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        onClick={() => handleEditComment(post.id, comment.id, editedCommentContent)}
+                                        className="px-3 py-1 text-xs text-white bg-blue-500 hover:bg-blue-600 rounded"
                                       >
-                                        Delete
+                                        Save
                                       </button>
                                     </div>
-                                  )}
-                                </div>
-                              )}
-                              </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="text-sm text-gray-800 dark:text-gray-200">{comment.content}</p>
 
-                              <p className="text-sm text-gray-800 dark:text-gray-200">{reply.content}</p>
+                                    {/* Przyciski akcji komentarza */}
+                                    <div className="flex items-center space-x-4 mt-2">
+                                      <button
+                                        onClick={() => handleToggleCommentLike(post.id, comment.id)}
+                                        className={`flex items-center space-x-1 ${
+                                          comment.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
+                                        }`}
+                                      >
+                                        <svg 
+                                          className="w-4 h-4" 
+                                          fill={comment.likedBy?.includes(address || '') ? "currentColor" : "none"}
+                                          stroke="currentColor" 
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path 
+                                            strokeLinecap="round" 
+                                            strokeLinejoin="round" 
+                                            strokeWidth={2} 
+                                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                                          />
+                                        </svg>
+                                        <span className="text-xs">{comment.likes || 0}</span>
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
 
-                              <div className="flex items-center space-x-4 mt-2">
-                                <button
-                                  onClick={() => handleToggleCommentLike(post.id, reply.id)}
-                                  className={`flex items-center space-x-1 ${
-                                    reply.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-                                  }`}
-                                >
-                                  <svg 
-                                    className="w-4 h-4" 
-                                    fill={reply.likedBy?.includes(address || '') ? "currentColor" : "none"}
-                                    stroke="currentColor" 
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path 
-                                      strokeLinecap="round" 
-                                      strokeLinejoin="round" 
-                                      strokeWidth={2} 
-                                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                                {/* Formularz odpowiedzi */}
+                                {replyingTo?.commentId === comment.id && (
+                                  <div className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
+                                    <textarea
+                                      value={replyContent}
+                                      onChange={(e) => setReplyContent(e.target.value)}
+                                      placeholder="Write a reply..."
+                                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
-                                  </svg>
-                                  <span className="text-xs">{reply.likes || 0}</span>
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                        ))}
+                                    <div className="flex justify-end space-x-2 mt-2">
+                                      <button
+                                        onClick={() => {
+                                          setReplyingTo(null);
+                                          setReplyContent('');
+                                        }}
+                                        className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        onClick={() => handleAddReply(post.id, comment.id)}
+                                        className="px-3 py-1 text-xs text-white bg-blue-500 hover:bg-blue-600 rounded"
+                                      >
+                                        Reply
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Wyświetl odpowiedzi */}
+                                {post.comments
+                                  .filter(reply => reply.replyTo === comment.id)
+                                  .map(reply => (
+                                    <div key={reply.id} className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center space-x-2">
+                                          {displayUserName(reply.author, `reply-${post.id}-${reply.id}`)}
+                                          <div className="text-xs text-gray-500">
+                                            {formatTimestamp(reply.timestamp)}
+                                          </div>
+                                        </div>
 
-                  {post.comments.length > 5 && (
-                          <button
-                      onClick={() => setExpandedComments(prev => ({
-                        ...prev,
-                        [post.id]: !prev[post.id]
-                      }))}
-                      className="w-full text-sm text-blue-500 hover:text-blue-600 py-2"
-                          >
-                      {expandedComments[post.id] ? 
-                        `Hide comments (${post.comments.length - 5})` : 
-                        `Show more comments (${post.comments.length - 5})`
-                      }
-                          </button>
-                  )}
-                  
-                  {/* New comment input */}
-                  {isConnected && (
-                    <div className="flex items-center space-x-2">
-                      {canCreatePosts ? (
-                        <>
-                          <Avatar address={address} className="w-6 h-6 rounded-full" />
-                          <div className="flex-1">
-                            <input
-                              type="text"
-                              placeholder="Write a comment..."
-                              value={newComments[post.id] || ''}
-                              onChange={(e) => setNewComments(prev => ({...prev, [post.id]: e.target.value}))}
-                              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                            <CommentTransactionButton
-                              content={newComments[post.id] || ''}
-                              onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                              disabled={!newComments[post.id]?.trim()}
-                              autoPost={true}
-                            />
-      </>
-                    ) : (
-                      <p className="text-sm text-gray-500 italic">Get BaseName to comment on posts</p>
-                    )}
+                                        {reply.author === address && (
+                                          <div className="relative">
+                                            <button
+                                              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
+                                              onClick={() => setEditingComment(editingComment?.commentId === reply.id ? null : { postId: post.id, commentId: reply.id })}
+                                            >
+                                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                              </svg>
+                                            </button>
+
+                                            {editingComment?.commentId === reply.id && (
+                                              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
+                                                <button
+                                                  onClick={() => {
+                                                    setEditingComment({ postId: post.id, commentId: reply.id });
+                                                    setEditedCommentContent(reply.content);
+                                                  }}
+                                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  onClick={() => handleDeleteComment(post.id, reply.id)}
+                                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                >
+                                                  Delete
+                                                </button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <p className="text-sm text-gray-800 dark:text-gray-200">{reply.content}</p>
+
+                                      <div className="flex items-center space-x-4 mt-2">
+                                        <button
+                                          onClick={() => handleToggleCommentLike(post.id, reply.id)}
+                                          className={`flex items-center space-x-1 ${
+                                            reply.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
+                                          }`}
+                                        >
+                                          <svg 
+                                            className="w-4 h-4" 
+                                            fill={reply.likedBy?.includes(address || '') ? "currentColor" : "none"}
+                                            stroke="currentColor" 
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <path 
+                                              strokeLinecap="round" 
+                                              strokeLinejoin="round" 
+                                              strokeWidth={2} 
+                                              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                                            />
+                                          </svg>
+                                          <span className="text-xs">{reply.likes || 0}</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            ))}
+
+                          {post.comments.length > 5 && (
+                            <button
+                              onClick={() => setExpandedComments(prev => ({
+                                ...prev,
+                                [post.id]: !prev[post.id]
+                              }))}
+                              className="w-full text-sm text-blue-500 hover:text-blue-600 py-2"
+                            >
+                              {expandedComments[post.id] ? 
+                                `Hide comments (${post.comments.length - 5})` : 
+                                `Show more comments (${post.comments.length - 5})`
+                              }
+                            </button>
+                          )}
+                          
+                          {/* New comment input */}
+                          {isConnected && (
+                            <div className="flex items-center space-x-2">
+                              {canCreatePosts ? (
+                                <>
+                                  <Avatar address={address} className="w-6 h-6 rounded-full" />
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      placeholder="Write a comment..."
+                                      value={newComments[post.id] || ''}
+                                      onChange={(e) => setNewComments(prev => ({...prev, [post.id]: e.target.value}))}
+                                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                  </div>
+                                  <CommentTransactionButton
+                                    content={newComments[post.id] || ''}
+                                    onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
+                                    disabled={!newComments[post.id]?.trim()}
+                                    autoPost={true}
+                                  />
+                                </>
+                              ) : (
+                                <p className="text-sm text-gray-500 italic">Get BaseName to comment on posts</p>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                        ))}
-              </div>
+                </>
+              )}
             </div>
 
             {/* Right panel (Trends & Global Statistics) */}
@@ -2894,34 +3341,17 @@ export default function BaseChat() {
 
               {/* Yaps Stats Widget */}
               <div className="mb-4">
-                <div className="bg-black/90 backdrop-blur-lg p-4 rounded-xl border border-[#0052FF]/20 shadow-[0_0_15px_rgba(0,82,255,0.1)]">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[#0052FF] font-mono font-bold flex items-center gap-2">
-                      <span className="text-xl">🔥</span>
-                      YAPS STATS
-                    </span>
-                    <a href="/yapyap" className="text-xs text-[#0052FF]/70 hover:text-[#0052FF] transition-colors duration-200">
-                      View All →
-                    </a>
+                <a 
+                  href="/yapscan" 
+                  className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-600 font-medium">YapScan</span>
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
                   </div>
-                  
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-black/40 backdrop-blur-lg p-3 rounded-lg border border-[#0052FF]/10">
-                      <div className="text-xs text-gray-400 font-mono mb-1">24H</div>
-                      <div className="text-xl font-mono font-bold text-white">42</div>
-                    </div>
-                    
-                    <div className="bg-black/40 backdrop-blur-lg p-3 rounded-lg border border-[#0052FF]/10">
-                      <div className="text-xs text-gray-400 font-mono mb-1">7D</div>
-                      <div className="text-xl font-mono font-bold text-white">156</div>
-                    </div>
-                    
-                    <div className="bg-black/40 backdrop-blur-lg p-3 rounded-lg border border-[#0052FF]/10">
-                      <div className="text-xs text-gray-400 font-mono mb-1">30D</div>
-                      <div className="text-xl font-mono font-bold text-white">498</div>
-                    </div>
-                  </div>
-                </div>
+                </a>
               </div>
             </div>
               </div>

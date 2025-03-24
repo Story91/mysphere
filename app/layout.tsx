@@ -9,12 +9,16 @@ import Navigation from './components/Navigation/Navigation';
 import { ThemeProvider } from './context/ThemeContext';
 import ClientOnly from './components/ClientOnly';
 import ContextProvider from '@/context';
+import { usePathname } from 'next/navigation';
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const isHomepage = pathname === '/';
+
   return (
     <html lang="pl">
       <head>
@@ -83,7 +87,7 @@ export default function RootLayout({
                   <div className="w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin"></div>
                 </div>
               }>
-                <Navigation />
+                {!isHomepage && <Navigation />}
                 <main className="w-full">
                   {children}
                 </main>

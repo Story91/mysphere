@@ -72,13 +72,13 @@ export default function YapsMetrics({ address }: YapsMetricsProps) {
       <div className="relative mb-4">
         <form onSubmit={handleSubmit}>
           <div className="relative w-full">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#2DFADA]/20 to-purple-500/20 rounded-2xl blur"></div>
+            <div className="absolute inset-0 rounded-2xl bg-gray-400/30 backdrop-blur-sm"></div>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="X Username without @"
-              className="relative w-full bg-black/40 backdrop-blur-xl border border-[#2DFADA]/20 rounded-2xl px-6 pr-32 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#2DFADA]/50 focus:ring-2 focus:ring-[#2DFADA]/20 transition-all duration-300"
+              className="relative w-full bg-transparent border-none rounded-2xl px-6 pr-32 py-3 text-gray-700 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-0 transition-all duration-300"
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
               <motion.button
@@ -86,11 +86,11 @@ export default function YapsMetrics({ address }: YapsMetricsProps) {
                 disabled={!username || isLoading}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="px-4 py-1.5 bg-gradient-to-r from-[#2DFADA] to-[#2DFADA]/80 rounded-xl text-black text-sm font-semibold shadow-lg shadow-[#2DFADA]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                className="px-4 py-1.5 bg-white text-blue-600 font-semibold rounded-xl shadow-sm text-sm border border-blue-100"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-4 w-4 text-blue-600" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
@@ -165,8 +165,8 @@ export default function YapsMetrics({ address }: YapsMetricsProps) {
               
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400 text-sm">Total Score:</span>
-                  <span className="text-white text-sm font-medium">{formatNumber(yapsData.yaps_all)}</span>
+                  <span className="text-black dark:text-white text-sm font-medium">Total Score:</span>
+                  <span className="text-black dark:text-white text-sm font-medium">{formatNumber(yapsData.yaps_all)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">24h Change:</span>
