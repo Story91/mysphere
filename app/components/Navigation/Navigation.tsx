@@ -247,7 +247,7 @@ export default function Navigation() {
           </div>
           <div className="flex items-center space-x-4">
             {/* Ultra Modern Spherian Button */}
-            <div className="relative group cursor-not-allowed scale-80">
+            <Link href="/ai-agent" className="relative group scale-80">
               <div className="absolute -inset-[2px] bg-gradient-to-r from-[#00F0FF] via-[#00A3FF] to-[#0047FF] rounded-xl blur-lg opacity-75 group-hover:opacity-100 animate-gradient-shift transition duration-1000 group-hover:duration-200"></div>
               <div className="relative px-5 py-1.5 bg-white rounded-xl overflow-hidden">
                 {/* Animated lines in background */}
@@ -264,7 +264,7 @@ export default function Navigation() {
                 {/* Shine effect */}
                 <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000"></div>
               </div>
-            </div>
+            </Link>
             <AppKitButton />
             <Wallet>
               <ConnectWallet className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2">
