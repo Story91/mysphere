@@ -284,7 +284,7 @@ export default function NFTComponent() {
                         className="aspect-square group relative"
                       >
                         <NFTCard
-                          contractAddress={nft.contractAddress}
+                          contractAddress={`0x${nft.contractAddress.substring(2)}`}
                           tokenId={nft.tokenID}
                           className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border transition-all duration-300 group-hover:scale-105 group-hover:shadow-xl ${
                             activeTheme.id === 'base'
@@ -313,10 +313,9 @@ export default function NFTComponent() {
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 overflow-hidden rounded-xl">
                           {/* Rozmazane NFT w tle */}
                           <NFTCard
-                            contractAddress={nft.contractAddress}
+                            contractAddress={`0x${nft.contractAddress.substring(2)}`}
                             tokenId={nft.tokenID}
                             className="absolute inset-0"
-                            theme={activeTheme.id}
                           >
                             <NFTMedia square={true} className="w-full h-full object-cover filter blur-sm opacity-70" />
                           </NFTCard>
@@ -324,9 +323,8 @@ export default function NFTComponent() {
                           {/* Informacje ze świecącym tekstem */}
                           <div className="absolute inset-0 flex items-center justify-center">
                             <NFTCard
-                              contractAddress={nft.contractAddress}
+                              contractAddress={`0x${nft.contractAddress.substring(2)}`}
                               tokenId={nft.tokenID}
-                              theme={activeTheme.id}
                             >
                               <div className="space-y-2">
                                 <NFTTitle className={`text-lg font-bold ${
@@ -516,9 +514,9 @@ export default function NFTComponent() {
                 <NFTMintButton 
                   className="!bg-transparent !text-[#0052FF] !border-2 !border-[#0052FF] hover:!bg-[#0052FF]/10 font-semibold px-6 py-3 rounded-xl transform -translate-x-[2px] -translate-y-[2px] transition-all duration-300 shadow-[4px_4px_0_#0052FF] hover:shadow-[8px_8px_0_#0052FF] hover:-translate-x-[4px] hover:-translate-y-[4px] active:shadow-none active:translate-x-0 active:translate-y-0"
                   disabled={false}
-                  pendingOverride="Transaction in progress..."
-                  successOverride="Success!"
-                  errorOverride="Transaction failed"
+                  pendingOverride={{ text: "Transaction in progress..." }}
+                  successOverride={{ text: "Success!" }}
+                  errorOverride={{ text: "Transaction failed" }}
                 />
               </NFTMintCard>
             </div>
@@ -538,9 +536,9 @@ export default function NFTComponent() {
                 <NFTMintButton 
                   className="!bg-transparent !text-[#0052FF] !border-2 !border-[#0052FF] hover:!bg-[#0052FF]/10 font-semibold px-6 py-3 rounded-xl transform -translate-x-[2px] -translate-y-[2px] transition-all duration-300 shadow-[4px_4px_0_#0052FF] hover:shadow-[8px_8px_0_#0052FF] hover:-translate-x-[4px] hover:-translate-y-[4px] active:shadow-none active:translate-x-0 active:translate-y-0"
                   disabled={false}
-                  pendingOverride="Transaction in progress..."
-                  successOverride="Success!"
-                  errorOverride="Transaction failed"
+                  pendingOverride={{ text: "Transaction in progress..." }}
+                  successOverride={{ text: "Success!" }}
+                  errorOverride={{ text: "Transaction failed" }}
                 />
               </NFTMintCard>
             </div>
@@ -560,9 +558,9 @@ export default function NFTComponent() {
                 <NFTMintButton 
                   className="!bg-transparent !text-[#0052FF] !border-2 !border-[#0052FF] hover:!bg-[#0052FF]/10 font-semibold px-6 py-3 rounded-xl transform -translate-x-[2px] -translate-y-[2px] transition-all duration-300 shadow-[4px_4px_0_#0052FF] hover:shadow-[8px_8px_0_#0052FF] hover:-translate-x-[4px] hover:-translate-y-[4px] active:shadow-none active:translate-x-0 active:translate-y-0"
                   disabled={false}
-                  pendingOverride="Transaction in progress..."
-                  successOverride="Success!"
-                  errorOverride="Transaction failed"
+                  pendingOverride={{ text: "Transaction in progress..." }}
+                  successOverride={{ text: "Success!" }}
+                  errorOverride={{ text: "Transaction failed" }}
                 />
               </NFTMintCard>
             </div>

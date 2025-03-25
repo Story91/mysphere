@@ -6,7 +6,7 @@ import { base } from 'wagmi/chains';
 import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
 import { ConnectWallet } from '@coinbase/onchainkit/wallet';
 import { parseEther } from 'viem';
-import { 
+import {
   saveUserProfile, 
   createPost, 
   addComment, 
@@ -38,6 +38,7 @@ import { useBanStatus } from '../hooks/useBanStatus';
 import LinkPreview from './components/LinkPreview';
 import { useReCaptcha } from '../hooks/useReCaptcha';
 import ReCaptcha from '../components/ReCaptcha/ReCaptcha';
+import BuilderProfile from './components/BuilderProfile';
 
 import FrameSDK from '@farcaster/frame-sdk'
 import farcasterFrame from '@farcaster/frame-wagmi-connector'
@@ -1764,6 +1765,9 @@ export default function BaseChat() {
   const handleBackToFeed = () => {
     setActiveMainPanel('feed');
     setSelectedBuilderProfile(null);
+    // Resetowanie tooltipów
+    setHoveredElement(null);
+    setHoveredUser(null);
   };
 
   return (
@@ -2215,263 +2219,20 @@ export default function BaseChat() {
               {/* Dodaj warunek wyświetlania panelu Builders lub feed */}
               {activeMainPanel === 'builders' ? (
                 <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden border border-blue-100 dark:border-blue-900">
-                  {/* Builder Panel Header with Back Button - nowoczesny gradient */}
-                  <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-700 p-5 relative overflow-hidden">
-                    {/* Dodajemy efekt połysku */}
-                    <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-30"></div>
-                    <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-400 rounded-full filter blur-3xl opacity-20"></div>
-                    <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-400 rounded-full filter blur-3xl opacity-10"></div>
-                    
-                    <div className="flex items-center justify-between relative z-10">
-                      <button 
-                        onClick={handleBackToFeed}
-                        className="flex items-center text-white bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 transition-all duration-300 hover:bg-white/20 hover:scale-105 border border-white/10"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                        Back to Feed
-                      </button>
-                      <div className="text-xl font-light text-white font-['Coinbase_Display']">Builder Profile</div>
-                      <div className="w-24"></div> {/* Placeholder dla wyrównania */}
-                    </div>
-                  </div>
-                  
                   {/* Builder Profile Content */}
                   {selectedBuilderProfile ? (
-                    <div className="p-6 font-['Coinbase_Display']">
-                      {/* User Info Section - nowoczesna karta z cieniem */}
-                      <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-6 p-6 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-sm border border-blue-50 dark:border-blue-900/30">
-                        <div className="flex flex-col items-center">
-                          <div className="w-24 h-24 rounded-full overflow-hidden mr-0 md:mr-4 flex-shrink-0 ring-4 ring-white dark:ring-gray-800 shadow-lg relative">
-                            {selectedBuilderProfile.avatar ? (
-                              <img 
-                                src={selectedBuilderProfile.avatar} 
-                                alt="Profile" 
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <Avatar address={toEthereumAddress(selectedBuilderProfile.address)} className="w-24 h-24" />
-                            )}
-                            {/* Dodajemy subtelny efekt ramki z gradientem */}
-                            <div className="absolute inset-0 rounded-full border border-white/20 bg-gradient-to-br from-transparent via-blue-100/10 to-blue-200/20 opacity-50"></div>
-                          </div>
-                          
-                          {/* Przeniesione linki społecznościowe pod avatar */}
-                          {selectedBuilderProfile.address && (
-                            <div className="mt-3 w-full">
-                              <ProfileSocials 
-                                address={toEthereumAddress(selectedBuilderProfile.address)}
-                                initialLinks={selectedBuilderProfile.socialLinks}
-                                lazyLoad={false}
-                                isOwner={address === selectedBuilderProfile.address}
-                                onSave={address === selectedBuilderProfile.address ? (newLinks) => {
-                                  console.log("Updating socialLinks:", newLinks);
-                                  setSelectedBuilderProfile(prev => ({
-                                    ...prev!,
-                                    socialLinks: newLinks
-                                  }));
-                                } : undefined}
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex-1">
-                          <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
-                            <div className="flex flex-col">
-                              <div className="text-2xl font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text">
-                                {selectedBuilderProfile.name.endsWith('.eth') ? (
-                                  selectedBuilderProfile.name
-                                ) : selectedBuilderProfile.name.endsWith('.base.eth') ? (
-                                  <>
-                                    <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text">{selectedBuilderProfile.name}</span>
-                                    <span className="ml-1.5 text-sm bg-blue-100 dark:bg-blue-900 text-blue-500 px-1.5 py-0.5 rounded-md">BaseName</span>
-                                  </>
-                                ) : (
-                                  selectedBuilderProfile.name
-                                )}
-                              </div>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(selectedBuilderProfile.address);
-                                  toast.success('Address copied to clipboard!');
-                                }}
-                                className="flex items-center text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md mt-1 w-fit"
-                              >
-                                <span className="mr-1.5 font-mono">{selectedBuilderProfile.address.slice(0,6)}...{selectedBuilderProfile.address.slice(-4)}</span>
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                              </button>
-                            </div>
-
-                            <div className="flex items-center mt-2 md:mt-0">
-                              {address === selectedBuilderProfile.address && (
-                                <button
-                                  onClick={() => document.getElementById('edit-profile-modal')?.classList.remove('hidden')}
-                                  className="flex items-center text-xs text-blue-500 hover:text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-md"
-                                >
-                                  <span className="mr-1">Edit Profile</span>
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Usunięte stąd linki społecznościowe */}
-                        </div>
-                      </div>
-                      
-                      {/* Bio Section - nowoczesne karty */}
-                      <div className="mb-6 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-sm p-6 border border-blue-50 dark:border-blue-900/30">
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="font-light text-xl text-gray-900 dark:text-white">About</h3>
-                          {address === selectedBuilderProfile.address && (
-                            <button
-                              onClick={() => setIsEditingBio(true)}
-                              className="text-xs text-blue-500 hover:text-blue-600 flex items-center bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full transition-all duration-300 hover:scale-105"
-                            >
-                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                              <span>Edit</span>
-                            </button>
-                          )}
-                        </div>
-                        <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl p-5 border border-blue-100/20 dark:border-blue-900/20">
-                          <div className="text-gray-700 dark:text-gray-300 leading-relaxed font-light">
-                            {selectedBuilderProfile.bio || 
-                              <span className="text-gray-400 italic">
-                                {address === selectedBuilderProfile.address ? 
-                                  "Click Edit to add your bio" : 
-                                  "This builder hasn't added a bio yet"}
-                              </span>
-                            }
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Stats Grid - nowoczesne karty */}
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-6 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
-                          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 mb-3">
-                            <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                            </svg>
-                          </div>
-                          <div className="text-blue-500 text-3xl font-light">{selectedBuilderProfile.postCount || 0}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 font-light mt-1">Posts</div>
-                        </div>
-                        <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-6 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
-                          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-pink-100 dark:bg-pink-900/30 mb-3">
-                            <svg className="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                            </svg>
-                          </div>
-                          <div className="text-pink-500 text-3xl font-light">{selectedBuilderProfile.likesReceived || 0}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 font-light mt-1">Likes Received</div>
-                        </div>
-                      </div>
-                      
-                      {/* On-chain Stats - nowoczesne karty */}
-                      {selectedBuilderProfile.stats && (
-                        <div className="mb-6 overflow-hidden">
-                          <h3 className="font-light text-xl text-gray-900 dark:text-white mb-4">On-chain Activity</h3>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-4 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
-                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 mb-2">
-                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                              </div>
-                              <div className="text-blue-500 text-2xl font-light">{selectedBuilderProfile.stats.transactions || 0}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 font-light mt-1">Transactions</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-4 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
-                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 mb-2">
-                                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                              </div>
-                              <div className="text-green-500 text-2xl font-light">{selectedBuilderProfile.stats.tokens || 0}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 font-light mt-1">Tokens</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-4 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
-                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 mb-2">
-                                <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                              <div className="text-purple-500 text-2xl font-light">{selectedBuilderProfile.stats.nfts || 0}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 font-light mt-1">NFTs</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-4 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
-                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 mb-2">
-                                <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                              </div>
-                              <div className="text-yellow-500 text-2xl font-light">{selectedBuilderProfile.stats.contracts || 0}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 font-light mt-1">Contracts</div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Builder Rank - nowoczesna karta */}
-                      {selectedBuilderProfile.currentRank && (
-                        <div className="mb-6 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-sm p-6 border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.01] relative overflow-hidden">
-                          {/* Dodajemy efekt świecenia */}
-                          <div className="absolute -top-10 right-0 w-32 h-32 bg-blue-400 rounded-full filter blur-3xl opacity-10"></div>
-                          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-400 rounded-full filter blur-3xl opacity-10"></div>
-                          
-                          <div className="text-center relative z-10">
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 mb-4 shadow-lg">
-                              <span className="text-white text-2xl">✨</span>
-                            </div>
-                            <div className="text-2xl font-light bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 text-transparent bg-clip-text">
-                              {selectedBuilderProfile.currentRank}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md mx-auto font-light">
-                              {selectedBuilderProfile.currentRank ? RANK_DESCRIPTIONS[selectedBuilderProfile.currentRank] : ''}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Points - nowoczesna karta z gradientem */}
-                      {selectedBuilderProfile.totalPoints !== undefined && (
-                        <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl shadow-lg p-6 relative overflow-hidden">
-                          {/* Dodajemy efekt świecenia */}
-                          <div className="absolute -top-10 right-0 w-32 h-32 bg-blue-300 rounded-full filter blur-3xl opacity-20"></div>
-                          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-300 rounded-full filter blur-3xl opacity-20"></div>
-                          
-                          <div className="flex justify-between items-center relative z-10">
-                            <div className="text-xl font-light text-white">
-                              Total Points
-                            </div>
-                            <div className="text-3xl font-light text-white flex items-center">
-                              <span>{selectedBuilderProfile.totalPoints}</span>
-                              <span className="ml-2 text-lg">⚡</span>
-                            </div>
-                          </div>
-                          
-                          {/* Dodajemy pasek postępu */}
-                          <div className="mt-4 w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-white rounded-full"
-                              style={{ width: `${Math.min(100, (selectedBuilderProfile.totalPoints / 2000) * 100)}%` }}
-                            ></div>
-                          </div>
-                          <div className="mt-2 text-xs text-white/70 text-right font-light">
-                            {Math.min(100, Math.round((selectedBuilderProfile.totalPoints / 2000) * 100))}% to next level
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <BuilderProfile 
+                      userAddress={selectedBuilderProfile.address}
+                      currentUserAddress={address}
+                      profile={selectedBuilderProfile}
+                      onBackToFeed={handleBackToFeed}
+                      onSocialLinksUpdate={(newLinks) => {
+                        setSelectedBuilderProfile(prev => ({
+                          ...prev!,
+                          socialLinks: newLinks
+                        }));
+                      }}
+                    />
                   ) : (
                     <div className="p-6 text-center">
                       <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/20 mb-4">
@@ -2479,9 +2240,7 @@ export default function BaseChat() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                       </div>
-                      <p className="text-gray-500 dark:text-gray-400 font-['Coinbase_Display'] font-light">
-                        Loading builder profile...
-                      </p>
+                      <p className="text-gray-500 dark:text-gray-400">Loading builder profile...</p>
                     </div>
                   )}
                 </div>
