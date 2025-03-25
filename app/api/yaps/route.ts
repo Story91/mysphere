@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+// Informujemy NextJS, że ten endpoint ma być zawsze dynamiczny
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const username = searchParams.get('username');
