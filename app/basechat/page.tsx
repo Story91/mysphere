@@ -1780,9 +1780,9 @@ export default function BaseChat() {
             <div className="absolute inset-0 bg-black opacity-90">
               {/* Usunięto odwołanie do matrix.png */}
             </div>
-            {/* Glowing Coinbase orb */}
+            {/* Glowing Coinbase orb - statyczny, bez animacji */}
             <div className="absolute inset-0">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-[#0052FF] blur-[150px] opacity-20 animate-pulse"></div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-[#0052FF] blur-[150px] opacity-20"></div>
             </div>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.1)_0%,transparent_70%)]"></div>
             <div className="absolute inset-0" style={{
