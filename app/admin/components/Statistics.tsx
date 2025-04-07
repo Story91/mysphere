@@ -1,14 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, where, orderBy, limit, Timestamp } from 'firebase/firestore';
-import { db, updateAllUserJoinDates, addBaseNameBonusToAllUsers, fixBaseChatPointsRadical, refreshAllPosts } from '../../utils/firebase';
+import { collection, query, getDocs, where, orderBy, limit, Timestamp, getDoc, doc } from 'firebase/firestore';
+import { db, updateAllUserJoinDates, addBaseNameBonusToAllUsers, fixBaseChatPointsRadical, refreshAllPosts, saveProfileName } from '../../utils/firebase';
+import { useName } from '@coinbase/onchainkit/identity';
+import { base } from 'wagmi/chains';
 
 interface UserWithJoinDate {
   address: string;
   name?: string;
   joinedAt: number;
   lastActive?: number;
+}
+
+interface RefreshAllPostsResult {
+  success: boolean;
+  processedPosts?: number;
+  updatedPosts?: number;
+  updatedUsers?: number;
+  error?: string;
 }
 
 interface Stats {
@@ -44,9 +54,12 @@ export default function Statistics() {
   const [isUpdatingJoinDates, setIsUpdatingJoinDates] = useState(false);
   const [updateJoinDatesResult, setUpdateJoinDatesResult] = useState<{success: boolean, updatedUsers: number, error?: string} | null>(null);
   const [isRefreshingAllPosts, setIsRefreshingAllPosts] = useState(false);
-  const [refreshAllPostsResult, setRefreshAllPostsResult] = useState<{success: boolean, processedPosts: number, updatedPosts: number, updatedUsers: number, error?: string} | null>(null);
+  const [refreshAllPostsResult, setRefreshAllPostsResult] = useState<RefreshAllPostsResult | null>(null);
   const [userSortOrder, setUserSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [showingUsers, setShowingUsers] = useState<number>(10);
+  const [isRefreshingBaseNames, setIsRefreshingBaseNames] = useState(false);
+  const [refreshBaseNamesResult, setRefreshBaseNamesResult] = useState<{success: boolean, processedUsers: number, updatedUsers: number, error?: string} | null>(null);
+  const [currentUserAddress, setCurrentUserAddress] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
@@ -261,6 +274,104 @@ export default function Statistics() {
     }
   };
 
+  const handleRefreshAllBaseNames = async () => {
+    try {
+      setIsRefreshingBaseNames(true);
+      setRefreshBaseNamesResult(null);
+      
+      // Pobranie wszystkich użytkowników
+      const usersRef = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersRef);
+      
+      let processedUsers = 0;
+      let updatedUsers = 0;
+      
+      // Iteruj po wszystkich użytkownikach
+      for (const userDoc of usersSnapshot.docs) {
+        processedUsers++;
+        const userAddress = userDoc.id;
+        
+        // Ustaw aktualnie przetwarzany adres
+        setCurrentUserAddress(userAddress);
+        
+        // Poczekaj krótko, aby hook useName mógł pobrać dane
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Pobierz BaseName używając onchainkit (musi być w komponencie)
+        const baseName = await getBaseNameForAddress(userAddress);
+        
+        if (baseName) {
+          // Aktualizuj bazę danych, jeśli znaleziono BaseName
+          await saveProfileName(userAddress, baseName);
+          updatedUsers++;
+        }
+      }
+      
+      setRefreshBaseNamesResult({
+        success: true,
+        processedUsers,
+        updatedUsers
+      });
+      
+      // Odśwież statystyki po zakończeniu
+      fetchStats();
+      
+    } catch (error) {
+      console.error('Error refreshing all BaseNames:', error);
+      setRefreshBaseNamesResult({
+        success: false,
+        processedUsers: 0,
+        updatedUsers: 0,
+        error: error instanceof Error ? error.message : 'Nieznany błąd podczas odświeżania nazw BaseName'
+      });
+    } finally {
+      setIsRefreshingBaseNames(false);
+      setCurrentUserAddress(null);
+    }
+  };
+
+  // Komponent do pobierania BaseName dla pojedynczego adresu
+  function BaseNameFetcher() {
+    const fallbackAddress = '0x0000000000000000000000000000000000000000';
+    const addressToCheck = (currentUserAddress ? currentUserAddress as `0x${string}` : fallbackAddress as `0x${string}`);
+    
+    const { data: baseName } = useName({ 
+      address: addressToCheck, 
+      chain: base 
+    });
+    
+    // Efekt, który aktualizuje BaseName w komponencie nadrzędnym
+    useEffect(() => {
+      if (baseName && currentUserAddress && window.localStorage) {
+        // Przechowaj BaseName w localStorage
+        window.localStorage.setItem(`baseName_${currentUserAddress}`, baseName);
+      }
+    }, [baseName, currentUserAddress]);
+    
+    // Renderuj pusty div - to jest komponent pomocniczy
+    return <div className="hidden"></div>;
+  }
+
+  // Funkcja pomocnicza do pobierania BaseName
+  const getBaseNameForAddress = async (address: string): Promise<string | null> => {
+    // Najpierw sprawdź, czy mamy już BaseName w localStorage
+    if (window.localStorage) {
+      const cached = window.localStorage.getItem(`baseName_${address}`);
+      if (cached) return cached;
+    }
+    
+    // Daj trochę czasu na pobranie danych przez hook
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Spróbuj pobrać z localStorage po odczekaniu
+    if (window.localStorage) {
+      const updated = window.localStorage.getItem(`baseName_${address}`);
+      if (updated) return updated;
+    }
+    
+    return null;
+  };
+
   if (loading) {
     return <div>Ładowanie statystyk...</div>;
   }
@@ -271,6 +382,9 @@ export default function Statistics() {
 
   return (
     <div className="space-y-8">
+      {/* Renderuj komponent pomocniczy */}
+      <BaseNameFetcher />
+      
       {/* Przyciski wyboru okresu */}
       <div className="flex space-x-4">
         <button
@@ -377,6 +491,30 @@ export default function Statistics() {
                 {updateJoinDatesResult.success 
                   ? `Sukces! Zaktualizowano ${updateJoinDatesResult.updatedUsers} użytkowników.` 
                   : `Błąd: ${updateJoinDatesResult.error}`}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <button
+              onClick={handleRefreshAllBaseNames}
+              disabled={isRefreshingBaseNames}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isRefreshingBaseNames ? 'Odświeżanie nazw BaseName...' : 'Odśwież wszystkie nazwy BaseName użytkowników'}
+            </button>
+            
+            {refreshBaseNamesResult && (
+              <div className={`mt-2 p-2 rounded ${refreshBaseNamesResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {refreshBaseNamesResult.success 
+                  ? `Sukces! Przetworzono ${refreshBaseNamesResult.processedUsers} użytkowników, zaktualizowano ${refreshBaseNamesResult.updatedUsers} nazw.` 
+                  : `Błąd: ${refreshBaseNamesResult.error}`}
+              </div>
+            )}
+            
+            {isRefreshingBaseNames && currentUserAddress && (
+              <div className="mt-2 p-2 bg-blue-100 text-blue-800 rounded">
+                Przetwarzanie: {currentUserAddress.slice(0, 8)}...{currentUserAddress.slice(-6)}
               </div>
             )}
           </div>

@@ -24,13 +24,15 @@ interface TransactionButtonProps {
   onTransactionSuccess: (txHash: string) => void;
   disabled?: boolean;
   autoPost?: boolean;
+  onPostAdded?: () => Promise<void>;
 }
 
 export default function TransactionButtonWrapper({ 
   content, 
   onTransactionSuccess,
   disabled = false,
-  autoPost = true
+  autoPost = true,
+  onPostAdded
 }: TransactionButtonProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -123,6 +125,11 @@ export default function TransactionButtonWrapper({
         if (autoPost) {
           toast.success('Automatically saving post to database...');
           onTransactionSuccess(txHash);
+          if (onPostAdded) {
+            onPostAdded().catch(error => {
+              console.error('Error in onPostAdded callback:', error);
+            });
+          }
         } else {
           toast.success('Transaction confirmed! Click "Post" to save your post to the database.');
           onTransactionSuccess(txHash);
@@ -147,7 +154,7 @@ export default function TransactionButtonWrapper({
     } else if (status.statusName === 'buildingTransaction') {
       console.log('Building transaction...');
     }
-  }, [onTransactionSuccess, autoPost]);
+  }, [onTransactionSuccess, autoPost, onPostAdded]);
 
   // Przygotowanie wywołania kontraktu
   const getCalls = useCallback(() => {

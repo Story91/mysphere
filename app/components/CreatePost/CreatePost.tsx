@@ -1,15 +1,13 @@
 'use client';
 
+import React from 'react';
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import BanRestriction from '../../admin/components/BanRestriction';
-import { useReCaptcha } from '../../hooks/useReCaptcha';
-import ReCaptcha from '../ReCaptcha/ReCaptcha';
 
 export default function CreatePost() {
   const [content, setContent] = useState('');
   const { address } = useAccount();
-  const { startVerification, token, isVerifying, error } = useReCaptcha();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,15 +20,6 @@ export default function CreatePost() {
     }
     
     try {
-      console.log('🔍 Rozpoczynam weryfikację reCAPTCHA...');
-      const verificationToken = await startVerification('create_post');
-      console.log('✅ Otrzymano token weryfikacji:', verificationToken?.substring(0, 20) + '...');
-      
-      if (!verificationToken) {
-        console.error('❌ Brak tokena reCAPTCHA - przerywam');
-        return;
-      }
-
       console.log('📤 Wysyłam post do API...');
       const response = await fetch('/api/posts/create', {
         method: 'POST',
@@ -39,7 +28,6 @@ export default function CreatePost() {
         },
         body: JSON.stringify({
           content,
-          recaptchaToken: verificationToken,
         }),
       });
 
@@ -67,9 +55,6 @@ export default function CreatePost() {
   console.log('🔄 Renderowanie komponentu CreatePost');
   console.log('📝 Stan:', {
     content: content ? 'wypełnione' : 'puste',
-    isVerifying,
-    hasError: !!error,
-    hasToken: !!token
   });
 
   return (
@@ -95,18 +80,12 @@ export default function CreatePost() {
             <button
               type="submit"
               className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
-              disabled={!content.trim() || isVerifying}
+              disabled={!content.trim()}
             >
-              {isVerifying ? 'Weryfikacja...' : 'Opublikuj'}
+              Opublikuj
             </button>
           </div>
-          {error && (
-            <div className="mt-2 text-red-500 text-sm">
-              {error.message}
-            </div>
-          )}
         </form>
-        <ReCaptcha action="create_post" />
       </div>
     </BanRestriction>
   );

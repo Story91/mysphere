@@ -36,8 +36,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
 import { useBanStatus } from '../hooks/useBanStatus';
 import LinkPreview from './components/LinkPreview';
-import { useReCaptcha } from '../hooks/useReCaptcha';
-import ReCaptcha from '../components/ReCaptcha/ReCaptcha';
 import BuilderProfile from './components/BuilderProfile';
 
 import FrameSDK from '@farcaster/frame-sdk'
@@ -50,6 +48,7 @@ import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
 import YapsMetrics from '../yapscan/components/YapsMetrics';
 import ProfileSocials from './components/ProfileSocials';
+import PostList from './components/PostList';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -255,7 +254,6 @@ export default function BaseChat() {
   const [selectedTag, setSelectedTag] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [selectedAuthor, setSelectedAuthor] = useState('');
-  const { startVerification, isVerifying } = useReCaptcha();
   const [dailyPostCount, setDailyPostCount] = useState(0);
   const [showDailyPostOverlay, setShowDailyPostOverlay] = useState(false);
   
@@ -312,10 +310,10 @@ export default function BaseChat() {
             <img
               src={userNames[userAddress].avatar}
               alt="Profile"
-              className="w-6 h-6 rounded-full mr-2"
+              className="w-10 h-10 rounded-full mr-2"
             />
           ) : (
-            <Avatar address={toEthereumAddress(userAddress)} className="w-6 h-6 rounded-full mr-2" />
+            <Avatar address={toEthereumAddress(userAddress)} className="w-10 h-10 rounded-full mr-2" />
           )}
           <div 
             className="cursor-pointer group relative"
@@ -330,7 +328,7 @@ export default function BaseChat() {
               setHoveredUser(null);
             }}
           >
-            <span className={`${hasBaseName ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'} text-sm`}>
+            <span className={`${hasBaseName ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'} text-base`}>
               {userName.endsWith('.sphere') ? (
                 <>
                   <span className="text-gray-900 dark:text-white">{userName.replace('.sphere', '')}</span>
@@ -488,15 +486,21 @@ export default function BaseChat() {
     }
   };
 
-  // Add new useEffect for fetching posts
+  // Dodaj nowy stan isLoadingPosts do głównego komponentu, niedaleko innych deklaracji stanów
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+
+  // Zmodyfikuj useEffect, który pobiera posty, aby obsługiwał stan ładowania
   useEffect(() => {
     if (isConnected && address) {
       const loadPosts = async () => {
         try {
-          const fetchedPosts = await fetchPosts({ userId: address });
+          setIsLoadingPosts(true); // Ustaw ładowanie na true przed rozpoczęciem pobierania
+          const { posts: fetchedPosts } = await fetchPosts({ userId: address });
           setPosts(fetchedPosts);
         } catch (error) {
           console.error('Error fetching posts:', error);
+        } finally {
+          setIsLoadingPosts(false); // Ustaw ładowanie na false po zakończeniu
         }
       };
       loadPosts();
@@ -547,18 +551,8 @@ export default function BaseChat() {
 
       console.log('🚀 Starting post creation...');
       
-      // reCAPTCHA verification
-      console.log('🔍 Starting reCAPTCHA verification...');
-      const verificationToken = await startVerification('create_post');
+      // Usunięto weryfikację reCAPTCHA
       
-      if (!verificationToken) {
-        console.error('❌ reCAPTCHA verification failed');
-        setIsCreatingPost(false); // Resetuj flagę
-        return;
-      }
-      
-      console.log('✅ reCAPTCHA verification completed');
-
       let imageUrl = null;
       let videoUrl = null;
       
@@ -611,6 +605,26 @@ export default function BaseChat() {
       const tags = Array.from(new Set((newPost.match(hashtagRegex) || []).map(tag => tag.slice(1))));
       const mentions = Array.from(new Set((newPost.match(mentionRegex) || []).map(mention => mention.slice(1))));
 
+      // Dodaj tymczasowy post do UI - optymistyczny update (podobny do komentarzy)
+      const tempPost: ExtendedPost = {
+        id: `temp-${Date.now()}`,
+        author: address,
+        content: newPost,
+        timestamp: Date.now(),
+        image: imageUrl,
+        video: videoUrl,
+        tags: tags,
+        mentions: mentions,
+        visibility: 'public',
+        txHash: txHash || storedTxHash || undefined,
+        likes: 0,
+        likedBy: [],
+        comments: []
+      };
+      
+      // Dodaj tymczasowy post do UI przed zapisem w Firebase
+      setPosts(currentPosts => [tempPost, ...currentPosts]);
+
       // Create post with media and transaction hash
       await createPost({
         author: address,
@@ -621,11 +635,11 @@ export default function BaseChat() {
         tags: tags,
         mentions: mentions,
         visibility: 'public',
-        txHash: txHash || (storedTxHash || undefined) // Naprawienie błędu typowania
+        txHash: txHash || storedTxHash || undefined // Naprawienie błędu typowania
       });
 
-      // Odświeżenie postów po dodaniu nowego posta
-      const updatedPosts = await fetchPosts({ userId: address });
+      // Odświeżenie postów po dodaniu nowego posta, aby pobrać prawdziwe ID z Firebase
+      const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
 
       // Reset form
@@ -633,7 +647,7 @@ export default function BaseChat() {
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
       setUploadProgress(0);
-      
+
       // Show success message
       toast.success('Post created successfully!');
       
@@ -679,7 +693,7 @@ export default function BaseChat() {
       
       // Clear comment input and refresh posts
       setNewComments(prev => ({...prev, [postId]: ''}));
-      const updatedPosts = await fetchPosts({ userId: address });
+      const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
       
       toast.success('Comment added successfully!');
@@ -696,7 +710,7 @@ export default function BaseChat() {
     try {
       await toggleLike(postId, address);
       // Odśwież posty po zmianie polubienia
-      const updatedPosts = await fetchPosts({ userId: address });
+      const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
       await fetchUserStats(address);
     } catch (error) {
@@ -956,7 +970,7 @@ export default function BaseChat() {
       if (confirm('Are you sure you want to delete this post?')) {
         await deletePost(postId, address);
         // Odśwież posty po usunięciu
-        const updatedPosts = await fetchPosts({ userId: address });
+        const { posts: updatedPosts } = await fetchPosts({ userId: address });
         setPosts(updatedPosts);
       }
     } catch (error) {
@@ -1331,7 +1345,7 @@ export default function BaseChat() {
       });
       
       // Odśwież posty
-      const updatedPosts = await fetchPosts({ userId: address });
+      const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
       setEditingPost(null);
       setEditedContent('');
@@ -1349,7 +1363,7 @@ export default function BaseChat() {
       await editComment(postId, commentId, newContent);
       
       // Odśwież posty
-      const updatedPosts = await fetchPosts({ userId: address });
+      const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
       setEditingComment(null);
       setEditedCommentContent('');
@@ -1368,7 +1382,7 @@ export default function BaseChat() {
         await deleteComment(postId, commentId);
         
         // Odśwież posty
-        const updatedPosts = await fetchPosts({ userId: address });
+        const { posts: updatedPosts } = await fetchPosts({ userId: address });
         setPosts(updatedPosts);
       }
     } catch (error) {
@@ -1385,7 +1399,7 @@ export default function BaseChat() {
       await toggleCommentLike(postId, commentId, address);
       
       // Odśwież posty
-      const updatedPosts = await fetchPosts({ userId: address });
+      const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
     } catch (error) {
       console.error('Error toggling comment like:', error);
@@ -1403,7 +1417,7 @@ export default function BaseChat() {
       });
       
       // Odśwież posty
-      const updatedPosts = await fetchPosts({ userId: address });
+      const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
       
       // Wyczyść formularz
@@ -2391,506 +2405,41 @@ export default function BaseChat() {
                               <span className="ml-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-xs px-1.5 py-0.5 rounded-full font-bold animate-gradient">NEW</span>
                             </a>
                           </div>
-
-                          <style jsx>{`
-                            @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-
-                            @keyframes matrix {
-                              0% { background-position: 0% 0%; }
-                              100% { background-position: 0% 100%; }
-                            }
-                            @keyframes scan {
-                              0% { transform: scaleX(0); opacity: 0.3; }
-                              50% { transform: scaleX(1); opacity: 0.8; }
-                              100% { transform: scaleX(0); opacity: 0.3; }
-                            }
-                            @keyframes glitch {
-                              0% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
-                              25% { transform: translate(-2px,2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
-                              50% { transform: translate(2px,-2px); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
-                              75% { transform: translate(-2px,-2px); text-shadow: -2px 0 #0052FF, 2px 0 #00ff00; }
-                              100% { transform: translate(0); text-shadow: 2px 0 #0052FF, -2px 0 #00ff00; }
-                            }
-                            @keyframes glitch-2 {
-                              0% { transform: translate(0); }
-                              20% { transform: translate(-1px,1px); }
-                              40% { transform: translate(-1px,-1px); }
-                              60% { transform: translate(1px,1px); }
-                              80% { transform: translate(1px,-1px); }
-                              100% { transform: translate(0); }
-                            }
-                            @keyframes shine {
-                              from { left: -100%; }
-                              to { left: 100%; }
-                            }
-                            .animate-matrix {
-                              animation: matrix 20s linear infinite;
-                            }
-                            .animate-scan {
-                              animation: scan 3s ease-in-out infinite;
-                            }
-                            .animate-glitch {
-                              animation: glitch 3s infinite;
-                            }
-                            .animate-glitch-2 {
-                              animation: glitch-2 2s infinite;
-                            }
-                            .animate-shine {
-                              animation: shine 1.5s linear infinite;
-                            }
-                            .animate-gradient {
-                              background-size: 200% 200%;
-                              animation: gradient 3s ease infinite;
-                            }
-                            .typewriter {
-                              overflow: hidden;
-                              white-space: nowrap;
-                              animation: typing 3.5s steps(40, end);
-                            }
-                            @keyframes blink-fast {
-                              0%, 100% { opacity: 0; }
-                              50% { opacity: 1; }
-                            }
-                            .animate-blink-fast {
-                              animation: blink-fast 0.5s step-end infinite;
-                            }
-                          `}</style>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center shadow mb-6">
-                      <p className="text-gray-600 dark:text-gray-300 mb-4">
-                        Connect your wallet to start posting and interacting with the community
-                      </p>
-                      <ConnectWallet />
                     </div>
                   )}
 
-                  {/* Lista postów */}
-                  <div className="space-y-6">
-                    {displayedPosts.map((post) => (
-                      <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
-                            {displayUserName(post.author, `post-${post.id}`)}
-                            <div className="text-xs text-gray-500">
-                              {formatTimestamp(post.timestamp)}
-                            </div>
-                            {post.txHash && (
-                              <div className="flex items-center text-xs font-medium text-blue-500 ml-1" title="Saved on blockchain">
-                                <img 
-                                  src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png" 
-                                  alt="Base Logo" 
-                                  className="w-3.5 h-3.5 mr-1"
-                                />
-                                <span className="hidden sm:inline">Onchain</span>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Opcje posta dla autora */}
-                          {post.author === address && (
-                            <div className="relative">
-                              <button
-                                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-                                onClick={() => setEditingPost(editingPost === post.id ? null : post.id)}
-                              >
-                                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                </svg>
-                              </button>
-                              
-                              {editingPost === post.id && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 border border-gray-200 dark:border-gray-700">
-                                  <button
-                                    onClick={() => {
-                                      setEditingPost(post.id);
-                                      setEditedContent(post.content);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                  >
-                                    Edytuj post
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeletePost(post.id)}
-                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                  >
-                                    Usuń post
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {editingPost === post.id ? (
-                          <div className="mb-4">
-                            <textarea
-                              value={editedContent}
-                              onChange={(e) => setEditedContent(e.target.value)}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-gray-100"
-                              rows={3}
-                            />
-                            <div className="flex justify-end space-x-2 mt-2">
-                              <button
-                                onClick={() => {
-                                  setEditingPost(null);
-                                  setEditedContent('');
-                                }}
-                                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                onClick={() => handleEditPost(post.id, editedContent)}
-                                className="px-3 py-1 text-sm text-white bg-blue-500 hover:bg-blue-600 rounded"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mb-4">
-                            <div className="whitespace-pre-wrap break-words text-gray-900 dark:text-white">
-                              {expandedPosts[post.id] ? post.content : 
-                                post.content.length > 280 ? 
-                                  `${post.content.slice(0, 280)}...` : 
-                                  post.content
-                              }
-                              {post.content.length > 280 && (
-                                <button
-                                  onClick={() => setExpandedPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
-                                  className="block text-blue-500 hover:text-blue-600 text-sm mt-2"
-                                >
-                                  {expandedPosts[post.id] ? 'Show less' : 'Show more'}
-                                </button>
-                              )}
-                            </div>
-                            <div className="mt-2">
-                              <LinkPreview 
-                                content={post.content}
-                                media={post.image ? {
-                                  type: 'image',
-                                  url: post.image
-                                } : post.video ? {
-                                  type: 'video',
-                                  url: post.video
-                                } : undefined}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center space-x-4 mb-4">
-                          <button
-                            onClick={() => handleToggleLike(post.id)}
-                            className={`flex items-center space-x-1 ${
-                              post.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-                            }`}
-                          >
-                            <svg 
-                              className="w-5 h-5" 
-                              fill={post.likedBy?.includes(address || '') ? "currentColor" : "none"}
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth={2} 
-                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                              />
-                            </svg>
-                            <span>{post.likes}</span>
-                          </button>
-                        </div>
-                        
-                        {/* Comments section */}
-                        <div className="space-y-4">
-                          {/* Wyświetl komentarze */}
-                          {(expandedComments[post.id] ? post.comments : post.comments.slice(0, 5))
-                            .filter(comment => !comment.replyTo) // Filtruj tylko główne komentarze
-                            .map(comment => (
-                              <div key={comment.id} className="mt-4 border-t dark:border-gray-700 pt-4">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center space-x-2">
-                                    {displayUserName(comment.author, `comment-${post.id}-${comment.id}`)}
-                                    <div className="text-xs text-gray-500">
-                                      {formatTimestamp(comment.timestamp)}
-                                    </div>
-                                    {comment.txHash && (
-                                      <div className="flex items-center text-xs font-medium text-blue-500 ml-1" title="Saved on blockchain">
-                                        <img 
-                                          src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png" 
-                                          alt="Base Logo" 
-                                          className="w-3.5 h-3.5 mr-1"
-                                        />
-                                        <span className="hidden sm:inline">Onchain</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                  
-                                  <div className="flex items-center space-x-2">
-                                    {/* Przycisk odpowiedzi */}
-                                    {canCreatePosts ? (
-                                      <button
-                                        onClick={() => setReplyingTo(replyingTo?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
-                                        className="text-sm text-gray-500 hover:text-blue-500 flex items-center space-x-1"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                        </svg>
-                                        <span>Reply</span>
-                                      </button>
-                                    ) : (
-                                      <span className="text-sm text-gray-500 italic">Get BaseName to reply</span>
-                                    )}
-                                    
-                                    {/* Opcje komentarza dla autora */}
-                                    {comment.author === address && (
-                                      <div className="relative">
-                                        <button
-                                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
-                                          onClick={() => setEditingComment(editingComment?.commentId === comment.id ? null : { postId: post.id, commentId: comment.id })}
-                                        >
-                                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                          </svg>
-                                        </button>
-                                        
-                                        {editingComment?.commentId === comment.id && (
-                                          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
-                                            <button
-                                              onClick={() => {
-                                                setEditingComment({ postId: post.id, commentId: comment.id });
-                                                setEditedCommentContent(comment.content);
-                                              }}
-                                              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                            >
-                                              Edit
-                                            </button>
-                                            <button
-                                              onClick={() => handleDeleteComment(post.id, comment.id)}
-                                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                            >
-                                              Delete
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {editingComment?.commentId === comment.id ? (
-                                  <div>
-                                    <textarea
-                                      value={editedCommentContent}
-                                      onChange={(e) => setEditedCommentContent(e.target.value)}
-                                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <div className="flex justify-end space-x-2 mt-2">
-                                      <button
-                                        onClick={() => {
-                                          setEditingComment(null);
-                                          setEditedCommentContent('');
-                                        }}
-                                        className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                                      >
-                                        Cancel
-                                      </button>
-                                      <button
-                                        onClick={() => handleEditComment(post.id, comment.id, editedCommentContent)}
-                                        className="px-3 py-1 text-xs text-white bg-blue-500 hover:bg-blue-600 rounded"
-                                      >
-                                        Save
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <p className="text-sm text-gray-800 dark:text-gray-200">{comment.content}</p>
-
-                                    {/* Przyciski akcji komentarza */}
-                                    <div className="flex items-center space-x-4 mt-2">
-                                      <button
-                                        onClick={() => handleToggleCommentLike(post.id, comment.id)}
-                                        className={`flex items-center space-x-1 ${
-                                          comment.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-                                        }`}
-                                      >
-                                        <svg 
-                                          className="w-4 h-4" 
-                                          fill={comment.likedBy?.includes(address || '') ? "currentColor" : "none"}
-                                          stroke="currentColor" 
-                                          viewBox="0 0 24 24"
-                                        >
-                                          <path 
-                                            strokeLinecap="round" 
-                                            strokeLinejoin="round" 
-                                            strokeWidth={2} 
-                                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                                          />
-                                        </svg>
-                                        <span className="text-xs">{comment.likes || 0}</span>
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-
-                                {/* Formularz odpowiedzi */}
-                                {replyingTo?.commentId === comment.id && (
-                                  <div className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
-                                    <textarea
-                                      value={replyContent}
-                                      onChange={(e) => setReplyContent(e.target.value)}
-                                      placeholder="Write a reply..."
-                                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <div className="flex justify-end space-x-2 mt-2">
-                                      <button
-                                        onClick={() => {
-                                          setReplyingTo(null);
-                                          setReplyContent('');
-                                        }}
-                                        className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                                      >
-                                        Cancel
-                                      </button>
-                                      <button
-                                        onClick={() => handleAddReply(post.id, comment.id)}
-                                        className="px-3 py-1 text-xs text-white bg-blue-500 hover:bg-blue-600 rounded"
-                                      >
-                                        Reply
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {/* Wyświetl odpowiedzi */}
-                                {post.comments
-                                  .filter(reply => reply.replyTo === comment.id)
-                                  .map(reply => (
-                                    <div key={reply.id} className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-gray-500">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center space-x-2">
-                                          {displayUserName(reply.author, `reply-${post.id}-${reply.id}`)}
-                                          <div className="text-xs text-gray-500">
-                                            {formatTimestamp(reply.timestamp)}
-                                          </div>
-                                        </div>
-
-                                        {reply.author === address && (
-                                          <div className="relative">
-                                            <button
-                                              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
-                                              onClick={() => setEditingComment(editingComment?.commentId === reply.id ? null : { postId: post.id, commentId: reply.id })}
-                                            >
-                                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                              </svg>
-                                            </button>
-
-                                            {editingComment?.commentId === reply.id && (
-                                              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10">
-                                                <button
-                                                  onClick={() => {
-                                                    setEditingComment({ postId: post.id, commentId: reply.id });
-                                                    setEditedCommentContent(reply.content);
-                                                  }}
-                                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                                >
-                                                  Edit
-                                                </button>
-                                                <button
-                                                  onClick={() => handleDeleteComment(post.id, reply.id)}
-                                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                                >
-                                                  Delete
-                                                </button>
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      <p className="text-sm text-gray-800 dark:text-gray-200">{reply.content}</p>
-
-                                      <div className="flex items-center space-x-4 mt-2">
-                                        <button
-                                          onClick={() => handleToggleCommentLike(post.id, reply.id)}
-                                          className={`flex items-center space-x-1 ${
-                                            reply.likedBy?.includes(address || '') ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'
-                                          }`}
-                                        >
-                                          <svg 
-                                            className="w-4 h-4" 
-                                            fill={reply.likedBy?.includes(address || '') ? "currentColor" : "none"}
-                                            stroke="currentColor" 
-                                            viewBox="0 0 24 24"
-                                          >
-                                            <path 
-                                              strokeLinecap="round" 
-                                              strokeLinejoin="round" 
-                                              strokeWidth={2} 
-                                              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                                            />
-                                          </svg>
-                                          <span className="text-xs">{reply.likes || 0}</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                              </div>
-                            ))}
-
-                          {post.comments.length > 5 && (
-                            <button
-                              onClick={() => setExpandedComments(prev => ({
-                                ...prev,
-                                [post.id]: !prev[post.id]
-                              }))}
-                              className="w-full text-sm text-blue-500 hover:text-blue-600 py-2"
-                            >
-                              {expandedComments[post.id] ? 
-                                `Hide comments (${post.comments.length - 5})` : 
-                                `Show more comments (${post.comments.length - 5})`
-                              }
-                            </button>
-                          )}
-                          
-                          {/* New comment input */}
-                          {isConnected && (
-                            <div className="flex items-center space-x-2">
-                              {canCreatePosts ? (
-                                <>
-                                  <Avatar address={address} className="w-6 h-6 rounded-full" />
-                                  <div className="flex-1">
-                                    <input
-                                      type="text"
-                                      placeholder="Write a comment..."
-                                      value={newComments[post.id] || ''}
-                                      onChange={(e) => setNewComments(prev => ({...prev, [post.id]: e.target.value}))}
-                                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                  </div>
-                                  <CommentTransactionButton
-                                    content={newComments[post.id] || ''}
-                                    onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                                    disabled={!newComments[post.id]?.trim()}
-                                    autoPost={true}
-                                  />
+                      {/* Tutaj zastępuję kod wyświetlający posty komponentem PostList */}
+                      <PostList 
+                        showOnlyUserPosts={showOnlyUserPosts}
+                        searchTerm={searchTerm}
+                        sortOrder={sortOrder}
+                        selectedTag={selectedTag}
+                        selectedAuthor={selectedAuthor}
+                        onRefreshPosts={async () => {
+                          if (address) {
+                            const { posts: updatedPosts } = await fetchPosts({ userId: address });
+                            setPosts(updatedPosts);
+                            // Odśwież również inne dane
+                            fetchGlobalStats();
+                            calculateAndSaveBaseChatPoints();
+                          }
+                        }}
+                        displayUserName={displayUserName}
+                        userNames={userNames}
+                        posts={posts} // Dodajemy przekazywanie postów jako prop
+                        isLoading={isLoadingPosts} // Przekaż stan ładowania do PostList
+                      />
                                 </>
                               ) : (
-                                <p className="text-sm text-gray-500 italic">Get BaseName to comment on posts</p>
-                              )}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm text-center">
+                      <div className="text-4xl mb-4">👋</div>
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Connect your wallet</h3>
+                      <p className="text-gray-500 dark:text-gray-400 mb-4">
+                        Connect your wallet to start posting and interacting with the community.
+                      </p>
+                      <ConnectWallet />
                             </div>
                           )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </>
               )}
             </div>
@@ -3182,21 +2731,6 @@ export default function BaseChat() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ReCaptcha component as small button */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2">
-        <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-full border border-gray-200 dark:border-gray-700 shadow-lg shadow-blue-500/20 hover:bg-white hover:dark:bg-gray-800 transition-all duration-300">
-          <div className="px-4 py-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Protected by</span>
-              <span className="text-xs font-medium bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">reCAPTCHA</span>
-              <span className="text-xs text-gray-500">with</span>
-              <span className="text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-transparent bg-clip-text">Google</span>
-              <ReCaptcha action="create_post" isVerifying={isVerifying} />
-            </div>
-          </div>
-            </div>
-          </div>
 
       {/* Add small padding */}
       <div className="pb-8">

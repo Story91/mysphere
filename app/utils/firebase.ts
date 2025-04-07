@@ -10,19 +10,22 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
+  orderBy as firestoreOrderBy,
   serverTimestamp,
   increment,
   Timestamp,
   arrayUnion,
   arrayRemove,
-  limit,
+  limit as firestoreLimit,
   writeBatch,
   deleteField,
-  deleteDoc
+  deleteDoc,
+  startAfter as firestoreStartAfter,
+  QueryDocumentSnapshot,
+  runTransaction
 } from 'firebase/firestore';
 import { getAuth, TwitterAuthProvider } from 'firebase/auth';
-import { UserProfile } from '../types';
+import { UserProfile, Post, Comment } from '../types';
 
 // Stała z adresem admina
 export const ADMIN_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd'.toLowerCase();
@@ -166,46 +169,54 @@ export const addBaseNameBonusToAllUsers = async (): Promise<{success: boolean, u
 export const toggleLike = async (postId: string, userId: string): Promise<boolean> => {
   try {
     const postRef = doc(db, 'posts', postId);
-    const postDoc = await getDoc(postRef);
 
-    if (!postDoc.exists()) {
-      throw new Error('Post nie istnieje');
-    }
+    // Użyj transakcji zamiast batcha - jest szybsza i bardziej niezawodna
+    return await runTransaction(db, async (transaction) => {
+      const postDoc = await transaction.get(postRef);
 
-    const postData = postDoc.data();
-    const authorRef = doc(db, 'users', postData.author);
-    const likedBy = postData.likedBy || [];
-    const isLiked = likedBy.includes(userId);
-    
-    const batch = writeBatch(db);
+      if (!postDoc.exists()) {
+        throw new Error('Post nie istnieje');
+      }
 
-    if (isLiked) {
-      // Usuń lajka
-      batch.update(postRef, {
-        likes: increment(-1),
-        likedBy: arrayRemove(userId)
-      });
-      batch.update(authorRef, {
-        likesReceived: increment(-1),
-        lastActive: serverTimestamp()
-      });
-      
-      await batch.commit();
-      return false;
-    } else {
-      // Dodaj lajka
-      batch.update(postRef, {
-        likes: increment(1),
-        likedBy: arrayUnion(userId)
-      });
-      batch.update(authorRef, {
-        likesReceived: increment(1),
-        lastActive: serverTimestamp()
-      });
-      
-      await batch.commit();
-      return true;
-    }
+      const postData = postDoc.data();
+      const authorRef = doc(db, 'users', postData.author);
+      const likedBy = postData.likedBy || [];
+      const isLiked = likedBy.includes(userId);
+
+      if (isLiked) {
+        // Usuń lajka
+        transaction.update(postRef, {
+          likes: increment(-1),
+          likedBy: arrayRemove(userId)
+        });
+        
+        // Zaktualizuj profil autora tylko jeśli autor != lajkujący (optymalizacja)
+        if (postData.author !== userId) {
+          transaction.update(authorRef, {
+            likesReceived: increment(-1),
+            lastActive: serverTimestamp()
+          });
+        }
+        
+        return false;
+      } else {
+        // Dodaj lajka
+        transaction.update(postRef, {
+          likes: increment(1),
+          likedBy: arrayUnion(userId)
+        });
+        
+        // Zaktualizuj profil autora tylko jeśli autor != lajkujący (optymalizacja)
+        if (postData.author !== userId) {
+          transaction.update(authorRef, {
+            likesReceived: increment(1),
+            lastActive: serverTimestamp()
+          });
+        }
+        
+        return true;
+      }
+    });
   } catch (error) {
     console.error('Error toggling like:', error);
     throw error;
@@ -347,8 +358,8 @@ export const fetchUnreadNotifications = async (userId: string) => {
   const q = query(
     notificationsRef,
     where('read', '==', false),
-    orderBy('timestamp', 'desc'),
-    limit(20)
+    firestoreOrderBy('timestamp', 'desc'),
+    firestoreLimit(20)
   );
   
   const snapshot = await getDocs(q);
@@ -427,68 +438,132 @@ export const createPost = async (post: {
   return docRef.id;
 };
 
-// Pobierz wszystkie posty z zaawansowaną filtracją
-export const fetchPosts = async (options: {
+// Interfejs dla parametrów funkcji fetchPosts
+interface FetchPostsParams {
   userId?: string;
-  tag?: string;
-  author?: string;
   limit?: number;
-  startAfter?: number;
-} = {}) => {
-  const postsRef = collection(db, 'posts');
-  let constraints: any[] = [orderBy('timestamp', 'desc')];
+  startAfter?: QueryDocumentSnapshot | null;
+  orderBy?: 'newest' | 'oldest';
+  authorFilter?: string | null;
+  tagFilter?: string | null;
+  searchTerm?: string | null;
+}
 
-  if (options.tag) {
-    constraints.push(where('tags', 'array-contains', options.tag));
-  }
+// Interfejs zwracany przez funkcję fetchPosts
+interface FetchPostsResult {
+  posts: ExtendedPost[];
+  lastVisible: QueryDocumentSnapshot | null;
+}
 
-  if (options.author) {
-    constraints.push(where('author', '==', options.author));
-  }
-
-  if (options.limit) {
-    constraints.push(limit(options.limit));
-  }
-
-  const q = query(postsRef, ...constraints);
-  const snapshot = await getDocs(q);
-  
-  const posts = await Promise.all(snapshot.docs.map(async (doc) => {
-    const postData = doc.data();
-    const likedBy = postData.likedBy || [];
+// Funkcja do pobierania postów z Firestore
+export const fetchPosts = async ({ 
+  userId, 
+  limit = 50,  // Zwiększam domyślny limit z 20 do 50 postów
+  startAfter = null, 
+  orderBy = 'newest',
+  authorFilter = null,
+  tagFilter = null,
+  searchTerm = null
+}: FetchPostsParams = {}): Promise<FetchPostsResult> => {
+  try {
+    const postsCollection = collection(db, 'posts');
+    const queryConstraints = [];
     
-    // Pobierz nazwę autora posta
-    const authorName = await getUserName(postData.author);
+    // Sortowanie postów
+    if (orderBy === 'newest') {
+      queryConstraints.push(firestoreOrderBy('timestamp', 'desc'));
+    } else {
+      queryConstraints.push(firestoreOrderBy('timestamp', 'asc'));
+    }
     
-    // Pobierz nazwy autorów komentarzy
-    const comments = await Promise.all((postData.comments || []).map(async (comment: any) => {
-      const commentAuthorName = await getUserName(comment.author);
-      return {
-        ...comment,
-        authorName: commentAuthorName
-      };
-    }));
-
-    return {
-      id: doc.id,
-      author: postData.author,
-      authorName: authorName,
-      content: postData.content,
-      likes: postData.likes || 0,
-      likedBy: likedBy,
-      image: postData.image || null,
-      video: postData.video || null,
-      timestamp: convertTimestamp(postData.timestamp as Timestamp),
-      comments: comments,
-      tags: postData.tags || [],
-      mentions: postData.mentions || [],
-      shares: postData.shares || 0,
-      visibility: postData.visibility || 'public',
-      txHash: postData.txHash || null
+    // Filtrowanie postów
+    if (authorFilter) {
+      queryConstraints.push(where('author', '==', authorFilter));
+    }
+    
+    if (tagFilter) {
+      queryConstraints.push(where('tags', 'array-contains', tagFilter));
+    }
+    
+    // Ograniczenie liczby postów
+    queryConstraints.push(firestoreLimit(limit));
+    
+    // Paginacja - jeśli startAfter jest zdefiniowany
+    if (startAfter) {
+      queryConstraints.push(firestoreStartAfter(startAfter));
+    }
+    
+    // Wykonaj zapytanie
+    const postsQuery = query(postsCollection, ...queryConstraints);
+    const postsSnapshot = await getDocs(postsQuery);
+    
+    // Pobierz dokumenty
+    const posts: ExtendedPost[] = [];
+    
+    // Referencja do ostatniego dokumentu dla paginacji
+    let lastVisible: QueryDocumentSnapshot | null = null;
+    
+    if (!postsSnapshot.empty) {
+      lastVisible = postsSnapshot.docs[postsSnapshot.docs.length - 1];
+      
+      // Iteruj po dokumentach i twórz obiekty postów
+      for (const postDoc of postsSnapshot.docs) {
+        const postData = postDoc.data();
+        const post: ExtendedPost = {
+          id: postDoc.id,
+          author: postData.author,
+          content: postData.content,
+          timestamp: postData.timestamp instanceof Timestamp 
+            ? postData.timestamp.toMillis() 
+            : (postData.timestamp || Date.now()),
+          likes: postData.likes || 0,
+          likedBy: postData.likedBy || [],
+          comments: postData.comments || [], // Użyj już zapisanych komentarzy zamiast ponownego pobierania
+          tags: postData.tags || [],
+          mentions: postData.mentions || [],
+          image: postData.image || null,
+          video: postData.video || null,
+          txHash: postData.txHash || null,
+          lastEdited: postData.lastEdited || null,
+        };
+        
+        // Dodatkowe filtrowanie po stronie klienta dla wyszukiwania (jeśli potrzebne)
+        if (searchTerm && typeof post.content === 'string' && 
+            !post.content.toLowerCase().includes(searchTerm.toLowerCase())) {
+          continue; // Pomiń post, jeśli nie zawiera szukanej frazy
+        }
+        
+        posts.push(post);
+      }
+    }
+    
+    // Zwróć posty wraz z informacją o ostatnim widocznym dokumencie do paginacji
+    return { 
+      posts, 
+      lastVisible 
     };
-  }));
+    
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    throw error;
+  }
+};
 
-  return posts;
+// Funkcja do pobierania postów (wersja uproszczona)
+export const fetchPostsSimple = async () => {
+  try {
+    const postsCollection = collection(db, 'posts');
+    const q = query(
+      postsCollection, 
+      firestoreOrderBy('timestamp', 'desc'),
+      firestoreLimit(20)
+    );
+    const postSnapshots = await getDocs(q);
+    
+    // ... existing code ...
+  } catch (error) {
+    // ... existing code ...
+  }
 };
 
 // Zapisz profil użytkownika
@@ -771,18 +846,26 @@ export const getBulkUserNames = async (addresses: string[]): Promise<{[key: stri
       
       let name = '';
       let avatar = undefined;
+      let isBaseName = false;
       
-      // Sprawdź czy użytkownik ma BaseName
+      // Sprawdź czy użytkownik ma BaseName - ma najwyższy priorytet
       if (usernameDoc.exists() && usernameDoc.data().isBaseName) {
         name = usernameDoc.data().name;
+        isBaseName = true;
+        // Usuwam log: console.log(`User ${address} has BaseName: ${name}`);
       }
       
       // Pobierz dane z profilu użytkownika
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        if (!name) {
+        
+        // Użyj nazwy z users tylko jeśli użytkownik NIE ma BaseName
+        if (!isBaseName && userData.name) {
           name = userData.name;
+          // Usuwam log: console.log(`User ${address} has regular name: ${name}`);
         }
+        
+        // Zawsze pobierz avatar
         avatar = userData.avatar;
       }
       
@@ -792,6 +875,13 @@ export const getBulkUserNames = async (addresses: string[]): Promise<{[key: stri
       }
       
       userInfo[address] = { name, avatar };
+      
+      // Dodaj informację o BaseName do konsoli dla debugowania - tylko dla wyjątkowych przypadków
+      /*
+      if (isBaseName) {
+        console.log(`Returning BaseName for ${address}: ${name}`);
+      }
+      */
     }
     
     return userInfo;
@@ -839,25 +929,66 @@ export const editComment = async (postId: string, commentId: string, newContent:
 // Funkcja do usuwania komentarza
 export const deleteComment = async (postId: string, commentId: string) => {
   try {
+    console.log(`[DEBUG] Usuwanie komentarza ${commentId} z posta ${postId}`);
+    
+    // 1. Przygotuj batch do operacji atomowych
+    const batch = writeBatch(db);
+    
+    // 2. Pobierz post
     const postRef = doc(db, 'posts', postId);
     const postDoc = await getDoc(postRef);
     
     if (!postDoc.exists()) {
+      console.error(`[DEBUG] Post ${postId} nie istnieje!`);
       throw new Error('Post not found');
     }
     
     const postData = postDoc.data();
     const comments = postData.comments || [];
     
-    // Usuń komentarz z tablicy
-    const updatedComments = comments.filter((c: any) => c.id !== commentId);
+    console.log(`[DEBUG] Znaleziono ${comments.length} komentarzy w poście ${postId}`);
     
-    // Zapisz zaktualizowane komentarze
-    await updateDoc(postRef, { comments: updatedComments });
+    // 3. Znajdź odpowiedzi do usuwanego komentarza
+    const repliesToDelete = comments.filter((c: any) => c.replyTo === commentId);
+    console.log(`[DEBUG] Znaleziono ${repliesToDelete.length} odpowiedzi do usuwanego komentarza`);
+    
+    // 4. Usuń główny komentarz z kolekcji comments
+    try {
+      const commentRef = doc(db, 'comments', commentId);
+      batch.delete(commentRef);
+    } catch (error) {
+      console.error(`[DEBUG] Błąd podczas usuwania komentarza z głównej kolekcji:`, error);
+    }
+    
+    // 5. Usuń odpowiedzi z kolekcji comments
+    for (const reply of repliesToDelete) {
+      try {
+        const replyRef = doc(db, 'comments', reply.id);
+        batch.delete(replyRef);
+      } catch (error) {
+        console.error(`[DEBUG] Błąd podczas usuwania odpowiedzi ${reply.id}:`, error);
+      }
+    }
+    
+    // 6. Przygotuj zaktualizowaną tablicę komentarzy w poście (bez głównego komentarza i jego odpowiedzi)
+    const replyIds = repliesToDelete.map((r: any) => r.id);
+    const updatedComments = comments.filter((c: any) => 
+      c.id !== commentId && !replyIds.includes(c.id)
+    );
+    
+    console.log(`[DEBUG] Po usunięciu zostało ${updatedComments.length} komentarzy (usunięto ${comments.length - updatedComments.length})`);
+    
+    // 7. Zaktualizuj tablicę komentarzy w dokumencie posta
+    batch.update(postRef, { comments: updatedComments });
+    
+    // 8. Wykonaj wszystkie operacje atomowo
+    await batch.commit();
+    
+    console.log(`[DEBUG] Komentarz ${commentId} i ${repliesToDelete.length} odpowiedzi zostały usunięte`);
     
     return true;
   } catch (error) {
-    console.error('Error deleting comment:', error);
+    console.error('[DEBUG] Error deleting comment:', error);
     throw error;
   }
 };
@@ -865,27 +996,34 @@ export const deleteComment = async (postId: string, commentId: string) => {
 // Funkcja do przełączania polubienia komentarza
 export const toggleCommentLike = async (postId: string, commentId: string, userId: string) => {
   try {
+    // Pobierz referencję do dokumentu posta
     const postRef = doc(db, 'posts', postId);
+    
+    // Pobierz dane posta
     const postDoc = await getDoc(postRef);
     
     if (!postDoc.exists()) {
       throw new Error('Post not found');
     }
     
+    // Pobierz tablicę komentarzy z dokumentu posta
     const postData = postDoc.data();
     const comments = postData.comments || [];
+    
+    // Znajdź indeks komentarza w tablicy
     const commentIndex = comments.findIndex((c: any) => c.id === commentId);
     
     if (commentIndex === -1) {
       throw new Error('Comment not found');
     }
     
+    // Pobierz dane komentarza
     const comment = comments[commentIndex];
     const likedBy = comment.likedBy || [];
     const isLiked = likedBy.includes(userId);
     
-    // Aktualizuj komentarz
-    comments[commentIndex] = {
+    // Przygotuj zaktualizowaną wersję komentarza
+    const updatedComment = {
       ...comment,
       likes: (comment.likes || 0) + (isLiked ? -1 : 1),
       likedBy: isLiked 
@@ -893,8 +1031,38 @@ export const toggleCommentLike = async (postId: string, commentId: string, userI
         : [...likedBy, userId]
     };
     
-    // Zapisz zaktualizowane komentarze
-    await updateDoc(postRef, { comments });
+    // Utwórz nową tablicę komentarzy z zaktualizowanym komentarzem
+    comments[commentIndex] = updatedComment;
+    
+    // Zapisz zaktualizowaną tablicę komentarzy w dokumencie posta
+    await updateDoc(postRef, { 
+      comments: comments,
+      lastUpdated: serverTimestamp()
+    });
+    
+    // Sprawdź, czy komentarz istnieje również w kolekcji comments
+    const commentRef = doc(db, 'comments', commentId);
+    const commentDoc = await getDoc(commentRef);
+    
+    // Jeśli komentarz istnieje w kolekcji comments, zaktualizuj go również tam
+    if (commentDoc.exists()) {
+      const commentData = commentDoc.data();
+      const commentLikedBy = commentData.likedBy || [];
+      const isCommentLiked = commentLikedBy.includes(userId);
+      
+      await updateDoc(commentRef, {
+        likes: (commentData.likes || 0) + (isCommentLiked ? -1 : 1),
+        likedBy: isCommentLiked 
+          ? commentLikedBy.filter((id: string) => id !== userId)
+          : [...commentLikedBy, userId],
+        lastUpdated: serverTimestamp()
+      });
+    }
+    
+    // Logowanie dla diagnostyki
+    console.log('Comment like toggled successfully');
+    console.log('New likes count:', updatedComment.likes);
+    console.log('New likedBy array:', updatedComment.likedBy);
     
     return true;
   } catch (error) {
@@ -1037,28 +1205,27 @@ export const saveUserAvatar = async (address: string, avatarUrl: string) => {
 
 // Funkcje do obsługi wiadomości bezpośrednich
 export const searchUsers = async (searchQuery?: string) => {
-  const usersRef = collection(db, 'usernames');
-  let queryRef;
-
-  if (searchQuery && searchQuery.length >= 3) {
-    // Wyszukiwanie po frazie
-    queryRef = query(
+  const usersRef = collection(db, 'users');
+  let usersQuery;
+  
+  if (searchQuery && searchQuery.trim() !== '') {
+    // Wyszukiwanie użytkowników po nazwie
+    usersQuery = query(
       usersRef,
-      where('isBaseName', '==', true),
       where('name', '>=', searchQuery),
       where('name', '<=', searchQuery + '\uf8ff'),
-      limit(10)
+      firestoreLimit(10)
     );
   } else {
     // Pobierz wszystkich użytkowników z BaseName i wybierz losowych 10
-    queryRef = query(
+    usersQuery = query(
       usersRef,
       where('isBaseName', '==', true),
-      limit(50) // Pobieramy więcej, żeby potem wylosować z nich 10
+      firestoreLimit(50) // Pobieramy więcej, żeby potem wylosować z nich 10
     );
   }
   
-  const snapshot = await getDocs(queryRef);
+  const snapshot = await getDocs(usersQuery);
   let users = snapshot.docs.map(doc => {
     const data = doc.data();
     return {
@@ -1121,11 +1288,11 @@ export const sendMessage = async (chatId: string, message: {
 };
 
 export const getMessages = async (chatId: string, messageLimit = 50) => {
-  const messagesRef = collection(db, `chats/${chatId}/messages`);
+  const messagesRef = collection(db, 'chatRooms', chatId, 'messages');
   const queryRef = query(
     messagesRef,
-    orderBy('timestamp', 'desc'),
-    limit(messageLimit)
+    firestoreOrderBy('timestamp', 'desc'),
+    firestoreLimit(messageLimit)
   );
   
   const snapshot = await getDocs(queryRef);
@@ -1141,11 +1308,11 @@ export const getMessages = async (chatId: string, messageLimit = 50) => {
 };
 
 export const getUserChats = async (userId: string) => {
-  const chatsRef = collection(db, 'chats');
+  const chatsRef = collection(db, 'chatRooms');
   const queryRef = query(
     chatsRef,
     where('participants', 'array-contains', userId),
-    orderBy('lastMessageTime', 'desc')
+    firestoreOrderBy('lastMessageTime', 'desc')
   );
   
   const snapshot = await getDocs(queryRef);
@@ -1311,11 +1478,12 @@ export const checkFriendship = async (userA: string, userB: string): Promise<boo
  */
 export const getReceivedFriendRequests = async (userAddress: string): Promise<FriendRequest[]> => {
   try {
+    const requestsRef = collection(db, 'friendRequests');
     const requestsQuery = query(
-      collection(db, 'friendRequests'),
+      requestsRef,
       where('to', '==', userAddress),
       where('status', '==', 'pending'),
-      orderBy('timestamp', 'desc')
+      firestoreOrderBy('timestamp', 'desc')
     );
     
     const snapshot = await getDocs(requestsQuery);
@@ -1353,7 +1521,7 @@ export const getSentFriendRequests = async (userAddress: string): Promise<Friend
       collection(db, 'friendRequests'),
       where('from', '==', userAddress),
       where('status', '==', 'pending'),
-      orderBy('timestamp', 'desc')
+      firestoreOrderBy('timestamp', 'desc')
     );
     
     const snapshot = await getDocs(requestsQuery);
@@ -1652,7 +1820,7 @@ export const getPendingQuotes = async (): Promise<AuthorizedQuote[]> => {
     const q = query(
       quotesRef,
       where('status', '==', 'pending'),
-      orderBy('timestamp', 'desc')
+      firestoreOrderBy('timestamp', 'desc')
     );
     
     const snapshot = await getDocs(q);
@@ -1691,7 +1859,7 @@ export const getApprovedQuotes = async (category: string): Promise<AuthorizedQuo
       quotesRef,
       where('status', '==', 'approved'),
       where('category', '==', category),
-      orderBy('timestamp', 'desc')
+      firestoreOrderBy('timestamp', 'desc')
     );
     
     const snapshot = await getDocs(q);
@@ -2082,5 +2250,185 @@ export const getGlobalStats = async () => {
       likesCount: 0,
       commentsCount: 0
     };
+  }
+};
+
+// Interfejsy rozszerzające bazowe typy
+interface ExtendedPost extends Post {
+  pollId?: string;
+  lastEdited?: any;
+}
+
+// Funkcja do usuwania postów wg. filtru
+export const deletePostsByFilter = async (filter: { author?: string }) => {
+  try {
+    const postsCollection = collection(db, 'posts');
+    const queryConstraints = [];
+    
+    if (filter.author) {
+      queryConstraints.push(where('author', '==', filter.author));
+    }
+    
+    // Zastosuj limit bezpieczeństwa
+    queryConstraints.push(firestoreLimit(1000));
+    
+    const q = query(postsCollection, ...queryConstraints);
+    const snapshot = await getDocs(q);
+    
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    return { deleted: snapshot.size };
+  } catch (error) {
+    console.error('Error deleting posts by filter:', error);
+    throw error;
+  }
+};
+
+// Funkcja do pobierania statystyk dla użytkownika
+export const fetchUserStats = async (userId: string) => {
+  try {
+    // Pobierz liczbę postów użytkownika
+    const postsRef = collection(db, 'posts');
+    const postsQuery = query(
+      postsRef, 
+      where('author', '==', userId),
+      firestoreOrderBy('timestamp', 'desc')
+    );
+    const postsSnapshot = await getDocs(postsQuery);
+    const actualPostsCount = postsSnapshot.size;
+    
+    if (postsSnapshot.empty) {
+      return {
+        posts: 0,
+        likes: 0,
+        points: 0,
+        hasRecentActivity: false,
+        hasBaseName: false,
+        baseNameBonus: 0
+      };
+    }
+    
+    let totalLikes = 0;
+    let totalPosts = actualPostsCount;
+    
+    // Calculate total likes from all user's posts
+    postsSnapshot.forEach((doc) => {
+      const postData = doc.data();
+      totalLikes += postData.likes || 0;
+    });
+
+    // Get last 30 days activity
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentPostsQuery = query(
+      postsRef,
+      where('author', '==', userId),
+      where('timestamp', '>=', thirtyDaysAgo)
+    );
+    
+    const recentPostsSnapshot = await getDocs(recentPostsQuery);
+    const recentActivityBonus = recentPostsSnapshot.size > 0 ? 1.25 : 1;
+
+    // Sprawdź czy użytkownik ma BaseName
+    const isBaseNameUser = await hasBaseName(userId);
+    const baseNameBonus = isBaseNameUser ? 1000 : 0;
+
+    // Calculate total points
+    // Base formula: (posts * 5) + (likes * 1) + BaseName bonus
+    const points = ((totalPosts * 5) + totalLikes) * recentActivityBonus + baseNameBonus;
+
+    return {
+      posts: totalPosts,
+      likes: totalLikes,
+      points: Math.round(points),
+      hasRecentActivity: recentActivityBonus > 1,
+      hasBaseName: isBaseNameUser,
+      baseNameBonus: baseNameBonus
+    };
+  } catch (error) {
+    console.error('Error calculating user stats:', error);
+    throw error;
+  }
+};
+
+// Pobieranie użytkowników dla proponowanych użytkowników
+export const fetchRecommendedUsers = async (currentUserId: string) => {
+  try {
+    // Najpierw pobierz obserwowanych użytkowników, aby ich wykluczyć
+    const userFollowingRef = collection(db, `users/${currentUserId}/following`);
+    const followingSnapshot = await getDocs(userFollowingRef);
+    const followingIds = followingSnapshot.docs.map(doc => doc.id);
+    
+    // Dodaj też aktualnego użytkownika do wykluczonych
+    const excludedIds = [...followingIds, currentUserId];
+    
+    // Pobierz wszystkich użytkowników
+    // ... existing code ...
+  } catch (error) {
+    // ... existing code ...
+  }
+};
+
+// Pobieranie opinii o użytkowniku
+export const fetchUserRatings = async (userId: string) => {
+  try {
+    // ... existing code ...
+    
+    // Pobierz opinie o użytkowniku
+    const ratingsRef = collection(db, 'userRatings');
+    const q = query(
+      ratingsRef,
+      where('ratedUserId', '==', userId),
+      firestoreOrderBy('timestamp', 'desc')
+    );
+    const ratingsSnapshot = await getDocs(q);
+    
+    // ... existing code ...
+  } catch (error) {
+    // ... existing code ...
+  }
+};
+
+// Pobranie historii płatności użytkownika
+export const fetchPaymentHistory = async (userId: string) => {
+  try {
+    // ... existing code ...
+    
+    const paymentsRef = collection(db, 'payments');
+    const q = query(
+      paymentsRef,
+      where('userId', '==', userId),
+      firestoreOrderBy('timestamp', 'desc')
+    );
+    const paymentsSnapshot = await getDocs(q);
+    
+    // ... existing code ...
+  } catch (error) {
+    // ... existing code ...
+  }
+};
+
+// Zmieniam nazwę zduplikowanej funkcji
+export const fetchUserProfileSimple = async (userId: string) => {
+  try {
+    // ... existing code ...
+    
+    // Pobierz posty użytkownika
+    const postsRef = collection(db, 'posts');
+    const postsQuery = query(
+      postsRef,
+      where('author', '==', userId),
+      firestoreOrderBy('timestamp', 'desc')
+    );
+    const postsSnapshot = await getDocs(postsQuery);
+    
+    // ... existing code ...
+  } catch (error) {
+    // ... existing code ...
   }
 };
