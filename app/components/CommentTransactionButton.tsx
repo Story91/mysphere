@@ -23,13 +23,15 @@ interface CommentTransactionButtonProps {
   onTransactionSuccess: (txHash: string) => void;
   disabled?: boolean;
   autoPost?: boolean;
+  onCommentAdded?: () => Promise<void>;
 }
 
 export default function CommentTransactionButton({ 
   content, 
   onTransactionSuccess,
   disabled = false,
-  autoPost = true
+  autoPost = true,
+  onCommentAdded
 }: CommentTransactionButtonProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -115,6 +117,11 @@ export default function CommentTransactionButton({
         if (autoPost) {
           toast.success('Automatically saving comment to database...');
           onTransactionSuccess(txHash);
+          if (onCommentAdded) {
+            onCommentAdded().catch(error => {
+              console.error('Error in onCommentAdded callback:', error);
+            });
+          }
         } else {
           toast.success('Comment confirmed! Click to save your comment to the database.');
           onTransactionSuccess(txHash);
@@ -137,7 +144,7 @@ export default function CommentTransactionButton({
     } else if (status.statusName === 'buildingTransaction') {
       console.log('Building comment transaction...');
     }
-  }, [onTransactionSuccess, autoPost]);
+  }, [onTransactionSuccess, autoPost, onCommentAdded]);
 
   // Przygotowanie wywołania kontraktu
   const getCalls = useCallback(() => {

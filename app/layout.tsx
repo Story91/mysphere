@@ -22,7 +22,8 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <head>
-        <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" />
+        {/* Usunięto skrypt reCAPTCHA - obciążał stronę */}
+        {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         
         {/* Frame compatibility tags */}
@@ -82,9 +83,17 @@ export default function RootLayout({
           <ContextProvider>
             <Providers>
               <ClientOnly fallback={
-                <div className="min-h-screen flex flex-col items-center justify-center text-white">
-                  <div className="text-2xl font-bold mb-4">Connecting with Base...</div>
-                  <div className="w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin"></div>
+                <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-black to-[#050B20]">
+                  <div className="relative">
+                    <div className="absolute -inset-6 rounded-full bg-blue-500/20 animate-pulse"></div>
+                    <div className="relative w-32 h-32 animate-spin">
+                      <img 
+                        src="/favicon_io (1)/apple-touch-icon.png" 
+                        alt="Loading" 
+                        className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                      />
+                    </div>
+                  </div>
                 </div>
               }>
                 {!isHomepage && <Navigation />}

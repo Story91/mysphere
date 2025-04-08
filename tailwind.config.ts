@@ -47,6 +47,7 @@ const config: Config = {
         },
         background: "var(--background)",
         foreground: "var(--foreground)",
+        border: "var(--border)",
       },
       backgroundImage: {
         'base-gradient': 'linear-gradient(90deg, #0052FF 0%, #00FF8F 100%)',

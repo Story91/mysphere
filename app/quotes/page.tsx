@@ -94,6 +94,7 @@ const CreateQuote: React.FC<CreateQuoteProps> = ({ theme, address, userBaseName,
   const [approvedQuotes, setApprovedQuotes] = useState<AuthorizedQuote[]>([]);
   const [filteredQuotes, setFilteredQuotes] = useState<AuthorizedQuote[]>([]);
   const [quoteSearchQuery, setQuoteSearchQuery] = useState('');
+  const [isAppleDevice, setIsAppleDevice] = useState(false);
 
   // Pobierz cytaty użytkownika przy montowaniu komponentu
   useEffect(() => {
@@ -282,6 +283,54 @@ const CreateQuote: React.FC<CreateQuoteProps> = ({ theme, address, userBaseName,
     }
   };
 
+  // Wykrywanie urządzeń Apple
+  useEffect(() => {
+    // Wykrywanie urządzeń Apple
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isApple = /iphone|ipad|macintosh|mac os x/.test(userAgent) && !('MSStream' in window);
+    setIsAppleDevice(isApple);
+    
+    // Naprawianie problemu z vh na iOS
+    if (isApple) {
+      const setVh = () => {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+      };
+      
+      setVh();
+      window.addEventListener('resize', setVh);
+      
+      // Dodanie styli CSS dla urządzeń Apple
+      const styleElement = document.createElement('style');
+      styleElement.innerHTML = `
+        .apple-touch-scroll {
+          -webkit-overflow-scrolling: touch;
+        }
+        .apple-performance {
+          will-change: transform;
+          transform: translateZ(0);
+        }
+        .full-height {
+          height: calc(var(--vh, 1vh) * 100);
+        }
+        .reduce-animation {
+          animation-duration: 0.5s !important;
+          transition-duration: 0.3s !important;
+        }
+      `;
+      document.head.appendChild(styleElement);
+      
+      return () => {
+        window.removeEventListener('resize', setVh);
+        if (styleElement && document.head.contains(styleElement)) {
+          document.head.removeChild(styleElement);
+        }
+      };
+    }
+    // Zwracamy pusty cleanup function aby zadowolić TypeScript
+    return () => {};
+  }, []);
+
   return (
     <div className={`col-span-2 rounded-xl p-3 sm:p-4 backdrop-blur-xl border ${
       theme === 'light' 
@@ -467,9 +516,9 @@ const CreateQuote: React.FC<CreateQuoteProps> = ({ theme, address, userBaseName,
                         </label>
                       </div>
                       <div className="rounded-lg bg-black/50 p-3">
-                        <p className="text-sm text-white">
+                        <div className="text-sm text-white">
                           {knownQuote}
-                        </p>
+                        </div>
                         {knownQuoteAuthor && (
                           <p className="text-xs mt-2 italic text-gray-400">
                             — {knownQuoteAuthor}
@@ -486,6 +535,7 @@ const CreateQuote: React.FC<CreateQuoteProps> = ({ theme, address, userBaseName,
         
         <button
           onClick={quoteType === 'own' ? handleSubmitQuote : handleSubmitKnownQuote}
+          onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na iOS
           disabled={isSubmittingQuote || 
             (quoteType === 'own' ? !ownQuote : (!knownQuote || !knownQuoteAuthor)) || 
             !address}
@@ -493,7 +543,7 @@ const CreateQuote: React.FC<CreateQuoteProps> = ({ theme, address, userBaseName,
             (isSubmittingQuote || 
               (quoteType === 'own' ? !ownQuote : (!knownQuote || !knownQuoteAuthor)) || 
               !address) ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          } ${isAppleDevice ? 'apple-performance' : ''}`}
         >
           <div className="relative rounded-[10px] bg-black/90 px-4 py-3 transition-all duration-300">
             <div className="flex items-center justify-center gap-2">
@@ -682,6 +732,7 @@ export default function QuotesPage() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'loading' | 'success' | 'error'>('loading');
   const [isToastVisible, setIsToastVisible] = useState(false);
+  const [isAppleDevice, setIsAppleDevice] = useState(false);
 
   // Pobieranie nextTokenId z kontraktu
   const { data: tokenId, refetch: refetchTokenId } = useContractRead({
@@ -1195,6 +1246,54 @@ export default function QuotesPage() {
     
     checkOwnership();
   }, [address, publicClient]);
+
+  // Wykrywanie urządzeń Apple
+  useEffect(() => {
+    // Wykrywanie urządzeń Apple
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isApple = /iphone|ipad|macintosh|mac os x/.test(userAgent) && !('MSStream' in window);
+    setIsAppleDevice(isApple);
+    
+    // Naprawianie problemu z vh na iOS
+    if (isApple) {
+      const setVh = () => {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+      };
+      
+      setVh();
+      window.addEventListener('resize', setVh);
+      
+      // Dodanie styli CSS dla urządzeń Apple
+      const styleElement = document.createElement('style');
+      styleElement.innerHTML = `
+        .apple-touch-scroll {
+          -webkit-overflow-scrolling: touch;
+        }
+        .apple-performance {
+          will-change: transform;
+          transform: translateZ(0);
+        }
+        .full-height {
+          height: calc(var(--vh, 1vh) * 100);
+        }
+        .reduce-animation {
+          animation-duration: 0.5s !important;
+          transition-duration: 0.3s !important;
+        }
+      `;
+      document.head.appendChild(styleElement);
+      
+      return () => {
+        window.removeEventListener('resize', setVh);
+        if (styleElement && document.head.contains(styleElement)) {
+          document.head.removeChild(styleElement);
+        }
+      };
+    }
+    // Zwracamy pusty cleanup function aby zadowolić TypeScript
+    return () => {};
+  }, []);
 
   return (
     <div className={`min-h-screen w-full ${theme === 'light' ? 'bg-gray-100' : 'bg-[#0F172A]'}`}>

@@ -24,7 +24,6 @@ import {
 import { useAccount } from 'wagmi';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
-import { AppKitButton } from '../AppKitButton';
 
 // Stały adres administratora
 const ADMIN_ADDRESS = "0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd";
@@ -265,7 +264,6 @@ export default function Navigation() {
                 <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000"></div>
               </div>
             </Link>
-            <AppKitButton />
             <Wallet>
               <ConnectWallet className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2">
                 <ConnectWalletText>Log In</ConnectWalletText>

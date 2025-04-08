@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, ReactNode } from 'react';
+import { installMerkleProxy } from '../utils/merkleProxy';
 
 interface ClientOnlyProps {
   children: ReactNode;
@@ -12,6 +13,9 @@ export default function ClientOnly({ children, fallback = null }: ClientOnlyProp
 
   useEffect(() => {
     setIsMounted(true);
+    
+    // Instalujemy proxy dla merkle.io
+    installMerkleProxy();
   }, []);
 
   if (!isMounted) {

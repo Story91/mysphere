@@ -14,6 +14,7 @@ export interface Post {
   visibility?: 'public' | 'followers' | 'private';
   pollId?: string;
   txHash?: string;
+  lastEdited?: any;
 }
 
 export interface Comment {
@@ -32,6 +33,7 @@ export interface Comment {
     amount: number;
     currency: string;
   };
+  replies?: Comment[];
 }
 
 export interface UserProfile {
