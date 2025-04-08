@@ -48,7 +48,7 @@ import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
 import YapsMetrics from '../yapscan/components/YapsMetrics';
 import ProfileSocials from './components/ProfileSocials';
-import PostList from './components/PostList';
+import PostList, { ExtendedPost } from './components/PostList';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -76,10 +76,6 @@ interface LocalUserProfile {
     farcaster?: string;
     discord?: string;
   };
-}
-
-interface ExtendedPost extends Post {
-  pollId?: string;
 }
 
 interface ActiveUser {
@@ -2463,10 +2459,31 @@ export default function BaseChat() {
                         sortOrder={sortOrder}
                         selectedTag={selectedTag}
                         selectedAuthor={selectedAuthor}
-                        onRefreshPosts={async () => {
+                        onRefreshPosts={async (newPosts?: any[]) => {
                           if (address) {
-                            const { posts: updatedPosts } = await fetchPosts({ userId: address });
-                            setPosts(updatedPosts);
+                            if (newPosts && newPosts.length > 0) {
+                              // Jeśli przekazano nowe posty, dodaj je do istniejących
+                              console.log(`Dodawanie ${newPosts.length} nowych postów do listy`);
+                              
+                              // Utwórz mapę istniejących postów wg ID, aby uniknąć duplikatów
+                              const existingPostsMap = new Map(posts.map(post => [post.id, post]));
+                              
+                              // Dodaj nowe posty, które nie istnieją w aktualnej liście
+                              newPosts.forEach(post => {
+                                if (!existingPostsMap.has(post.id)) {
+                                  existingPostsMap.set(post.id, post);
+                                }
+                              });
+                              
+                              // Konwertuj mapę z powrotem na tablicę
+                              const updatedPosts = Array.from(existingPostsMap.values());
+                              setPosts(updatedPosts);
+                            } else {
+                              // Jeśli nie przekazano nowych postów, pobierz wszystkie od nowa
+                              const { posts: updatedPosts } = await fetchPosts({ userId: address });
+                              setPosts(updatedPosts);
+                            }
+                            
                             // Odśwież również inne dane
                             fetchGlobalStats();
                             calculateAndSaveBaseChatPoints();

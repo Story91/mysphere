@@ -11,7 +11,7 @@ import { Avatar as CoinbaseAvatar } from '@coinbase/onchainkit/identity';
 import LinkPreview from './LinkPreview';
 import CommentTransactionButton from '../../components/CommentTransactionButton';
 
-interface ExtendedPost extends Post {
+export interface ExtendedPost extends Post {
   pollId?: string;
 }
 
@@ -21,7 +21,7 @@ interface PostListProps {
   sortOrder?: 'newest' | 'oldest';
   selectedTag?: string;
   selectedAuthor?: string;
-  onRefreshPosts?: () => Promise<void>;
+  onRefreshPosts?: (newPosts?: ExtendedPost[]) => Promise<void>;
   onPostAdded?: () => Promise<void>;
   onCommentAdded?: () => Promise<void>;
   displayUserName: (userAddress: string, elementId: string) => JSX.Element;
@@ -353,16 +353,21 @@ export default function PostList({
         startAfter: lastVisible
       });
       
-      // Zaktualizuj stan rodzica przez callback
-      if (onRefreshPosts && morePosts.length > 0) {
-        // Tu powinien być kod, który połączy nowe posty z istniejącymi
-        // Ponieważ nie możemy bezpośrednio modyfikować postów (są props),
-        // musimy zaimplementować tę funkcjonalność w komponencie rodzica
-        await onRefreshPosts();
+      if (morePosts.length > 0) {
+        // Sprawdź, czy onRefreshPosts jest dostępne
+        if (onRefreshPosts) {
+          // Wywołaj funkcję z nowymi postami
+          // Teraz potrzebujemy zmienić implementację w komponencie nadrzędnym,
+          // aby obsłużyć dodawanie nowych postów do istniejących, zamiast tylko odświeżania
+          await onRefreshPosts(morePosts);
+          console.log(`Załadowano ${morePosts.length} nowych postów`);
+        }
       }
       
       // Zaktualizuj referencję do ostatniego dokumentu
-      setLastVisible(newLastVisible);
+      if (newLastVisible) {
+        setLastVisible(newLastVisible);
+      }
       
       // Sprawdź, czy są jeszcze posty do załadowania
       setHasMorePosts(morePosts.length > 0);

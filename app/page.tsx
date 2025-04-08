@@ -318,7 +318,7 @@ export default function HomePage() {
 
   return (
     <div className={`min-h-screen bg-[#050B20] text-white ${isAppleDevice ? 'full-height' : ''}`}>
-      <div className="absolute top-4 right-4 z-50">
+      <div className="absolute top-6 right-6 z-50">
         <Link href="/basechat">
           <button 
             className="relative overflow-hidden backdrop-blur-md bg-[#0052FF]/20 text-white font-bold py-2 px-8 rounded-full transition-all duration-500 flex items-center justify-center group hover:bg-[#0052FF]/30 hover:shadow-[0_0_15px_rgba(0,82,255,0.8)] group"
@@ -388,14 +388,14 @@ export default function HomePage() {
                   
                   {/* Content */}
                   <div className="relative z-10">
-                    <div className="flex items-center justify-center gap-4 mb-4">
+                    <div className="flex items-center justify-center gap-8 mb-4">
                       <Image
                         src="/elo2.png"
                         alt="SPHERE"
-                        width={80}
-                        height={80}
-                        className="object-contain w-[80px] h-auto transform hover:scale-105 transition-transform duration-300"
-                        style={{ width: 'auto', height: 'auto' }}
+                        width={36}
+                        height={36}
+                        className="object-contain w-[36px] h-auto transform hover:scale-105 transition-transform duration-300"
+                        style={{ width: 'auto', height: 'auto', maxHeight: '36px' }}
                       />
                       <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#0052FF]/10 border border-[#0052FF]/20">
                         <span className="w-2 h-2 rounded-full bg-[#0052FF] animate-pulse mr-2"></span>
@@ -1076,10 +1076,10 @@ export default function HomePage() {
             <Image
               src="/elo2.png"
               alt="SPHERE"
-              width={80}
-              height={24}
-              className="h-6 w-auto opacity-70 hover:opacity-100 transition-opacity"
-              style={{ width: 'auto', height: 'auto' }}
+              width={60}
+              height={20}
+              className="h-5 w-auto opacity-70 hover:opacity-100 transition-opacity"
+              style={{ width: 'auto', height: '20px', maxWidth: '60px' }}
             />
           </div>
 
