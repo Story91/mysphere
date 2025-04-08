@@ -2,17 +2,17 @@
 
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import OnchainkitSvg from './svg/OnchainKit';
-import HomeNeonBackground from './components/Backgrounds/HomeNeonBackground';
+// import HomeNeonBackground from './components/Backgrounds/HomeNeonBackground';
 import { getGlobalStats } from './utils/firebase';
 import { FiUsers, FiFileText, FiMessageCircle, FiHeart } from 'react-icons/fi';
 import { BiGasPump } from 'react-icons/bi';
 import { FaEthereum } from 'react-icons/fa';
 import { MdOutlineStackedLineChart } from 'react-icons/md';
-import { CircularProgress } from '@mui/material';
+// import { CircularProgress } from '@mui/material';
 
 // Ikony dla sekcji community
 import { FaTwitter as Twitter, FaDiscord as Discord, FaBook as Book, FaBlog as Blog } from 'react-icons/fa';
@@ -127,24 +127,8 @@ export default function HomePage() {
     comments: false,
     likes: false
   });
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1
-    }
-  };
+  const [isAppleDevice, setIsAppleDevice] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(0);
 
   // Funkcja do animowania aktualizacji
   const triggerUpdate = (statType: string) => {
@@ -288,11 +272,58 @@ export default function HomePage() {
     };
   }, []);
 
+  // Wykrywanie urządzeń Apple i naprawianie vh
+  useEffect(() => {
+    // Wykrywanie urządzeń Apple
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isApple = /iphone|ipad|macintosh|mac os x/.test(userAgent) && !('MSStream' in window);
+    setIsAppleDevice(isApple);
+    
+    // Naprawianie problemu z vh na iOS
+    const setVh = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      setViewportHeight(window.innerHeight);
+    };
+    
+    setVh();
+    window.addEventListener('resize', setVh);
+    
+    // Dodanie styli CSS dla urządzeń Apple
+    if (isApple) {
+      const styleElement = document.createElement('style');
+      styleElement.innerHTML = `
+        .apple-touch-scroll {
+          -webkit-overflow-scrolling: touch;
+        }
+        .apple-performance {
+          will-change: transform;
+          transform: translateZ(0);
+        }
+        .full-height {
+          height: calc(var(--vh, 1vh) * 100);
+        }
+        .reduce-animation {
+          animation-duration: 0.5s !important;
+          transition-duration: 0.3s !important;
+        }
+      `;
+      document.head.appendChild(styleElement);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', setVh);
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#0F172A] text-white">
+    <div className={`min-h-screen bg-[#050B20] text-white ${isAppleDevice ? 'full-height' : ''}`}>
       <div className="absolute top-4 right-4 z-50">
         <Link href="/basechat">
-          <button className="relative overflow-hidden backdrop-blur-md bg-[#0052FF]/20 text-white font-bold py-2 px-8 rounded-full transition-all duration-500 flex items-center justify-center group hover:bg-[#0052FF]/30 hover:shadow-[0_0_15px_rgba(0,82,255,0.8)] group">
+          <button 
+            className="relative overflow-hidden backdrop-blur-md bg-[#0052FF]/20 text-white font-bold py-2 px-8 rounded-full transition-all duration-500 flex items-center justify-center group hover:bg-[#0052FF]/30 hover:shadow-[0_0_15px_rgba(0,82,255,0.8)] group"
+            onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
+          >
             {/* Animowana ramka */}
             <div className="absolute -inset-[1px] rounded-full bg-gradient-to-r from-[#0052FF] via-[#4C8FFF] to-[#0052FF] opacity-70 group-hover:opacity-100 animate-[spin_4s_linear_infinite] z-0"></div>
             {/* Wewnętrzne tło */}
@@ -307,207 +338,210 @@ export default function HomePage() {
         </Link>
       </div>
       
-      {/* Background elements - neonowe tło z MySphere */}
-      <HomeNeonBackground intensity={2.0} />
+      {/* Dodajemy prosty gradient w tle */}
+      <div className="fixed inset-0 bg-gradient-to-b from-[#050B20] via-[#071030] to-[#050B20] z-0"></div>
 
       {/* Main content */}
-      <div className="relative z-10">
-        {/* Hero section */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-24 relative pt-12"
-        >
+      <div className={`relative z-10 ${isAppleDevice ? 'apple-touch-scroll' : ''}`}>
+        {/* Hero section - usuwamy animacje */}
+        <div className="text-center mb-24 relative pt-12">
           <div className="flex items-center justify-center mt-8 mb-4">
-            <div className="transform hover:scale-105 transition-transform duration-300 px-4 md:px-0">
+            <div className="transform transition-transform duration-300 px-4 md:px-0">
               <Image
                 src="/elo2.png"
                 alt="SPHERE"
                 width={350}
                 height={100}
                 quality={100}
-                priority
+                priority={true}
                 className="object-contain w-[280px] md:w-[350px] h-auto max-w-full"
+                style={{ width: 'auto', height: 'auto' }}
               />
             </div>
           </div>
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-3xl md:text-5xl font-bold text-white mb-4 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
-          >
+          <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]">
             The onchain <span className="text-[#0052FF]">social Dapp</span>
-          </motion.h1>
+          </h1>
           <p className="font-['Coinbase_Display'] text-gray-100 text-base md:text-xl text-center mt-2 mb-4 px-4 filter drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
             Build, grow, and <span className="text-[#0052FF] font-semibold">own</span> your digital sphere
           </p>
           <p className="font-['Share_Tech_Mono'] text-xs md:text-sm text-[#0052FF] text-center mb-4">[BETA 2.9.1]</p>
           <div className="h-0.5 w-32 mx-auto bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mt-6 mb-6"></div>
-        </motion.div>
+        </div>
 
-        {/* Main features */}
+        {/* Main features - usunięto animacje dla lepszej wydajności */}
         <div className="relative px-4 md:px-8 max-w-7xl mx-auto">
-          <AnimatePresence>
-            <motion.div
-              key="features-container"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 auto-rows-fr mb-28 w-full"
-            >
-              {/* BaseChat Card - przeniesiony na początek */}
-              <motion.div key="basechat-card" variants={itemVariants} className="group">
-                <Link href="/basechat" className="block h-full">
-                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
-                    {/* Hover efekt */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-center gap-4 mb-4">
-                        <Image
-                          src="/elo2.png"
-                          alt="SPHERE"
-                          width={80}
-                          height={80}
-                          className="object-contain w-[80px] h-auto transform hover:scale-105 transition-transform duration-300"
-                        />
-                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#0052FF]/10 border border-[#0052FF]/20">
-                          <span className="w-2 h-2 rounded-full bg-[#0052FF] animate-pulse mr-2"></span>
-                          <span className="text-[#0052FF] text-sm font-['Share_Tech_Mono']">LAUNCH APP</span>
-                        </span>
-                      </div>
-                      <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed text-center">
-                        Connect with other .base.eth owners, share updates, create daily posts about base and earn sphere points!
-                      </p>
-                    </div>
+          <div
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 auto-rows-fr mb-28 w-full"
+          >
+            {/* BaseChat Card - przeniesiony na początek */}
+            <div className="group">
+              <Link href="/basechat" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
+                <div 
+                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
+                  onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
+                >
+                  {/* Hover efekt */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                   </div>
-                </Link>
-              </motion.div>
-
-              {/* Identity Card (wcześniej Profile) */}
-              <motion.div key="identity-card" variants={itemVariants} className="group">
-                <Link href="/profile" className="block h-full">
-                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                  
+                  {/* Content */}
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-center gap-4 mb-4">
+                      <Image
+                        src="/elo2.png"
+                        alt="SPHERE"
+                        width={80}
+                        height={80}
+                        className="object-contain w-[80px] h-auto transform hover:scale-105 transition-transform duration-300"
+                        style={{ width: 'auto', height: 'auto' }}
+                      />
+                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#0052FF]/10 border border-[#0052FF]/20">
+                        <span className="w-2 h-2 rounded-full bg-[#0052FF] animate-pulse mr-2"></span>
+                        <span className="text-[#0052FF] text-sm font-['Share_Tech_Mono']">LAUNCH APP</span>
+                      </span>
                     </div>
-                    
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-xl md:text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Identity</h2>
-                      </div>
-                      <p className="text-gray-400 text-sm md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                        View your on-chain identity, statistics, and achievements. Track your progress and ranking in the Base ecosystem.
-                      </p>
-                    </div>
+                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed text-center">
+                      Connect with other .base.eth owners, share updates, create daily posts about base and earn sphere points!
+                    </p>
                   </div>
-                </Link>
-              </motion.div>
+                </div>
+              </Link>
+            </div>
 
-              {/* Buy&Swap Card - Changed to Docs */}
-              <motion.div key="docs-card" variants={itemVariants} className="group">
-                <Link href="/Docs" className="block h-full">
-                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-green-500/10 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Docs</h2>
-                      </div>
-                      <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                        Learn everything about MySphere platform features, how it works, and how to get the most out of your social experience.
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-
-              {/* Bridge Card - Changed to GenesisNFT */}
-              <motion.div key="genesis-nft-card" variants={itemVariants} className="group">
-                <Link href="/nft" className="block h-full">
-                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-yellow-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">
-                          Sphere Genesis
-                        </h2>
-                      </div>
-                      <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                        Get your exclusive Sphere Genesis NFT collection. Early supporters receive special benefits and access to premium features.
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-
-              {/* NFT Card - Changed to $AIS Utilities */}
-              <motion.div key="ais-utilities-card" variants={itemVariants} className="group">
-                <Link href="/ais" className="block h-full">
-                  <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">$AIS Utilities</h2>
-                      </div>
-                      <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                        Explore $AIS token utilities. DAO governance and staking features coming soon to enhance your MySphere experience.
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-
-              {/* Get Started Card - Updated description */}
-              <motion.div key="getstarted-card" variants={itemVariants} className="group">
-                <div className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative">
+            {/* Identity Card (wcześniej Profile) */}
+            <div className="group">
+              <Link href="/profile" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
+                <div 
+                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
+                  onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
+                >
                   {/* Hover overlay */}
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-violet-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                   </div>
                   
                   {/* Content */}
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Get Started</h2>
+                      <h2 className="text-xl md:text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Identity</h2>
                     </div>
-                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed mb-4">
-                      Click 'Launch App' in the top right corner to access the platform and begin your journey on MySphere.
+                    <p className="text-gray-400 text-sm md:text-lg font-['Coinbase_Display'] leading-relaxed">
+                      View your on-chain identity, statistics, and achievements. Track your progress and ranking in the Base ecosystem.
                     </p>
-                    {!address && (
-                      <div className="text-sm rounded-lg p-3 bg-[#0052FF]/10 text-[#0052FF]">
-                        Use the wallet button to connect after launching the app
-                      </div>
-                    )}
                   </div>
                 </div>
-              </motion.div>
-            </motion.div>
-          </AnimatePresence>
+              </Link>
+            </div>
+
+            {/* Buy&Swap Card - Changed to Docs */}
+            <div className="group">
+              <Link href="/Docs" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
+                <div 
+                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
+                  onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
+                >
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-green-500/10 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Docs</h2>
+                    </div>
+                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
+                      Learn everything about MySphere platform features, how it works, and how to get the most out of your social experience.
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
+            {/* Bridge Card - Changed to GenesisNFT */}
+            <div className="group">
+              <Link href="/nft" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
+                <div 
+                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
+                  onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
+                >
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-yellow-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">
+                        Sphere Genesis
+                      </h2>
+                    </div>
+                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
+                      Get your exclusive Sphere Genesis NFT collection. Early supporters receive special benefits and access to premium features.
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
+            {/* NFT Card - Changed to $AIS Utilities */}
+            <div className="group">
+              <Link href="/ais" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
+                <div 
+                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
+                  onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
+                >
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">$AIS Utilities</h2>
+                    </div>
+                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
+                      Explore $AIS token utilities. DAO governance and staking features coming soon to enhance your MySphere experience.
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
+            {/* Get Started Card - Updated description */}
+            <div 
+              className={`h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative ${isAppleDevice ? 'apple-performance' : ''}`}
+              onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
+            >
+              {/* Hover overlay */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-violet-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+              </div>
+              
+              {/* Content */}
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Get Started</h2>
+                </div>
+                <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed mb-4">
+                  Click 'Launch App' in the top right corner to access the platform and begin your journey on MySphere.
+                </p>
+                {!address && (
+                  <div className="text-sm rounded-lg p-3 bg-[#0052FF]/10 text-[#0052FF]">
+                    Use the wallet button to connect after launching the app
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Stats Section - moved below features */}
-        <section className="max-w-6xl mx-auto px-4 mb-28">
+        <section className={`max-w-6xl mx-auto px-4 mb-28 ${isAppleDevice ? 'reduce-animation' : ''}`}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {/* Users - Niebieski */}
             <div className={`bg-gradient-to-br from-black to-blue-950/40 backdrop-blur-md rounded-xl p-6 border ${updateTrigger.users ? 'border-blue-500 shadow-[0_0_20px_rgba(0,82,255,0.8)]' : 'border-blue-900/50'} transition-all duration-500 relative overflow-hidden group hover:border-blue-500 hover:shadow-[0_0_25px_rgba(0,82,255,0.5)]`}>
@@ -745,13 +779,9 @@ export default function HomePage() {
 
         {/* Features Section - The MySphere Stack */}
         <section className="max-w-7xl mx-auto px-4 mb-32">
-          <motion.h2 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-3xl md:text-4xl font-bold text-center mb-12 text-white"
-          >
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-white">
             The <span className="text-[#0052FF]">MySphere</span> Stack
-          </motion.h2>
+          </h2>
           
           <div className="grid md:grid-cols-2 gap-8">
             {/* Feature 1 */}
@@ -1049,6 +1079,7 @@ export default function HomePage() {
               width={80}
               height={24}
               className="h-6 w-auto opacity-70 hover:opacity-100 transition-opacity"
+              style={{ width: 'auto', height: 'auto' }}
             />
           </div>
 

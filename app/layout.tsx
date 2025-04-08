@@ -22,7 +22,8 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <head>
-        <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" />
+        {/* Usunięto skrypt reCAPTCHA - obciążał stronę */}
+        {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         
         {/* Frame compatibility tags */}

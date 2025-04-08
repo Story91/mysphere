@@ -95,16 +95,10 @@ interface ActiveUser {
 const BASESCAN_API_KEY = 'YB9ZQ71MVDJU3CQQXFJ6GQ4Y17MPKEQCBN';
 const REFRESH_INTERVAL = 5000; // 5 seconds
 
-// Add gradient animation styles
+// Usuwamy animację gradientu która obciąża przeglądarkę
 const gradientAnimation = `
-  @keyframes gradient {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-  .animate-gradient {
+  .static-gradient {
     background-size: 200% 200%;
-    animation: gradient 3s ease infinite;
   }
 `;
 
@@ -256,6 +250,14 @@ export default function BaseChat() {
   const [selectedAuthor, setSelectedAuthor] = useState('');
   const [dailyPostCount, setDailyPostCount] = useState(0);
   const [showDailyPostOverlay, setShowDailyPostOverlay] = useState(false);
+  const [isAppleDevice, setIsAppleDevice] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showPostDialog, setShowPostDialog] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showPostImagePreview, setShowPostImagePreview] = useState(false);
   
   // Hook do sprawdzania BaseName
   const { data: baseName, isLoading: isBaseNameLoading } = useName({ 
@@ -1559,7 +1561,7 @@ export default function BaseChat() {
             className="w-8 h-8 rounded-full object-cover"
           />
         ) : (
-          <Avatar address={user.address} className="w-8 h-8 rounded-full" />
+          <Avatar address={toEthereumAddress(user.address)} className="w-8 h-8 rounded-full" />
         )}
       </div>
       <div className="flex-1 min-w-0 px-2">
@@ -1573,15 +1575,19 @@ export default function BaseChat() {
           </span>
         </div>
         <div className="text-[9px] text-gray-500">
-          {user.stats.posts} posts · {user.stats.likes} likes
+          {user.points.toLocaleString()} pts
         </div>
       </div>
-      <div className="text-[11px] font-semibold text-purple-500">
-        {user.points} pts
+      <div 
+        onTouchStart={() => handleViewBuilderProfile(user.address)} 
+        onClick={() => handleViewBuilderProfile(user.address)}
+        className="text-[11px] px-2 py-1 rounded-md bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors cursor-pointer"
+      >
+        View
       </div>
     </div>
-        );
-        
+  );
+
   useEffect(() => {
     const fetchDailyPostCount = async () => {
       if (!isConnected || !address) return;
@@ -1707,27 +1713,78 @@ export default function BaseChat() {
     }
   }, [isMounted]);
 
-  // Dodaję styl dla animacji gradientu
+  // Wykrywanie urządzeń Apple i naprawianie vh
   useEffect(() => {
-    // Dodaj style do głównego dokumentu dla animacji gradientu
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @keyframes gradient-x {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-      .animate-gradient-x {
-        background-size: 200% 200%;
-        animation: gradient-x 3s ease infinite;
-      }
-    `;
-    document.head.appendChild(style);
-
+    // Wykrywanie urządzeń Apple
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isApple = /iphone|ipad|macintosh|mac os x/.test(userAgent) && !('MSStream' in window);
+    setIsAppleDevice(isApple);
+    
+    // Naprawianie problemu z vh na iOS
+    const setVh = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      setViewportHeight(window.innerHeight);
+    };
+    
+    setVh();
+    window.addEventListener('resize', setVh);
+    
+    // Dodanie styli CSS dla urządzeń Apple
+    if (isApple) {
+      const styleElement = document.createElement('style');
+      styleElement.innerHTML = `
+        .modal-open {
+          overflow: hidden;
+          position: fixed;
+          width: 100%;
+          height: 100%;
+        }
+        .apple-touch-scroll {
+          -webkit-overflow-scrolling: touch;
+        }
+        .apple-performance {
+          will-change: transform;
+          transform: translateZ(0);
+        }
+        .full-height {
+          height: calc(var(--vh, 1vh) * 100);
+        }
+        .reduce-animation {
+          animation-duration: 0.5s !important;
+          transition-duration: 0.3s !important;
+        }
+      `;
+      document.head.appendChild(styleElement);
+    }
+    
     return () => {
-      document.head.removeChild(style);
+      window.removeEventListener('resize', setVh);
     };
   }, []);
+
+  // Blokowanie przewijania gdy modal jest otwarty
+  useEffect(() => {
+    if (showShareModal || showPostDialog || showSettingsModal || showProfileModal || showGroupModal || showPostImagePreview) {
+      document.body.classList.add('modal-open');
+      
+      // Dodatkowa obsługa dla iOS aby zapobiec przewijaniu w tle
+      if (isAppleDevice) {
+        const preventScroll = (e: TouchEvent) => {
+          if (e.target && e.target instanceof Element && !e.target.closest('.apple-touch-scroll')) {
+            e.preventDefault();
+          }
+        };
+        document.addEventListener('touchmove', preventScroll, { passive: false });
+        return () => {
+          document.removeEventListener('touchmove', preventScroll);
+          document.body.classList.remove('modal-open');
+        };
+      }
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+  }, [showShareModal, showPostDialog, showSettingsModal, showProfileModal, showGroupModal, showPostImagePreview, isAppleDevice]);
 
   // Jeśli komponent nie jest zamontowany, zwracamy pusty div
   if (!isMounted) {
@@ -1789,23 +1846,14 @@ export default function BaseChat() {
       <BanPage>
         <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
         <div className="min-h-screen relative">
-          {/* Background effects */}
-          <div className="fixed inset-0 z-0">
-            <div className="absolute inset-0 bg-black opacity-90">
-              {/* Usunięto odwołanie do matrix.png */}
-            </div>
-            {/* Glowing Coinbase orb - statyczny, bez animacji */}
-            <div className="absolute inset-0">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-[#0052FF] blur-[150px] opacity-20"></div>
-            </div>
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.1)_0%,transparent_70%)]"></div>
-            <div className="absolute inset-0" style={{
-              backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(0, 82, 255, 0.05) 25%, rgba(0, 82, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 82, 255, 0.05) 75%, rgba(0, 82, 255, 0.05) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(0, 82, 255, 0.05) 25%, rgba(0, 82, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 82, 255, 0.05) 75%, rgba(0, 82, 255, 0.05) 76%, transparent 77%, transparent)',
-              backgroundSize: '50px 50px'
-            }}></div>
+          {/* Prosty gradient w tle zamiast skomplikowanych efektów */}
+          <div className="fixed inset-0 bg-[#050B20] z-0">
+            {/* Usuwamy wszystkie skomplikowane tła i efekty */}
+            <div className="fixed inset-0 bg-gradient-to-b from-[#050B20] via-[#071030] to-[#050B20] z-0"></div>
           </div>
 
-          <div className="relative z-10">
+          {/* Dodajemy klasę reduce-animation do elementów z animacjami dla urządzeń Apple */}
+          <div className={`relative z-10 ${isAppleDevice ? 'reduce-animation' : ''}`}>
             {/* Widgets */}
             <div className="w-full space-y-1">
               <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
@@ -1838,7 +1886,7 @@ export default function BaseChat() {
                       <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
                         {/* Rank section moved and centered */}
                         <div className="text-center mb-4">
-                          <div className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 text-transparent bg-clip-text animate-gradient">
+                          <div className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 text-transparent bg-clip-text static-gradient">
                             {currentRank}
                           </div>
                           <div className="text-sm text-gray-500 mt-1">{RANK_DESCRIPTIONS[currentRank]}</div>
@@ -2397,12 +2445,12 @@ export default function BaseChat() {
 
                             <a href="https://www.base.org/names" target="_blank" rel="noopener noreferrer" 
                               className="inline-flex items-center px-6 py-2.5 bg-gradient-to-r from-[#0052FF] to-[#0040CC] text-white text-sm font-medium rounded-full transition-all duration-200 transform hover:scale-[1.02] shadow-[0_8px_16px_-3px_rgba(0,82,255,0.5)] hover:shadow-[0_12px_20px_-3px_rgba(0,82,255,0.6)] relative overflow-hidden group">
-                              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 group-hover:animate-shine"></div>
+                              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0"></div>
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                               </svg>
                               Claim Basename
-                              <span className="ml-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-xs px-1.5 py-0.5 rounded-full font-bold animate-gradient">NEW</span>
+                              <span className="ml-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-xs px-1.5 py-0.5 rounded-full font-bold">NEW</span>
                             </a>
                           </div>
                     </div>
@@ -2477,7 +2525,7 @@ export default function BaseChat() {
               {/* BaseChat Points */}
               {isConnected && (
                 <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-gradient"></div>
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 static-gradient"></div>
                   
                   <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100 flex items-center">
                     BaseChat Points
