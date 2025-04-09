@@ -22,7 +22,7 @@
     "@coinbase/wallet-sdk": "^4.3.0",
     "@farcaster/frame-wagmi-connector": "^0.0.17",
     "@google-cloud/recaptcha-enterprise": "^5.13.0",
-    "@heroicons/react": "^2.1.1",
+    "@heroicons/react": "^2.2.0",
     "@langchain/core": "^0.3.42",
     "@langchain/openai": "^0.4.4",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",

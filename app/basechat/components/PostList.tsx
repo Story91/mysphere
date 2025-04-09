@@ -161,31 +161,32 @@ export default function PostList({
     
     try {
       // Najpierw lokalnie aktualizujemy UI dla natychmiastowej odpowiedzi
+      // Używamy przekazanej przez Props funkcji onRefreshPosts z parametrem
+      // przekazując zaktualizowane posty jako argument
+      
+      // 1. Tworzymy kopię aktualnych postów z zaktualizowanym stanem polubienia
       const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          const isLiked = post.likedBy?.includes(address);
-          return {
-            ...post,
-            likes: (post.likes || 0) + (isLiked ? -1 : 1),
-            likedBy: isLiked 
-              ? (post.likedBy || []).filter(id => id !== address)
-              : [...(post.likedBy || []), address]
-          };
-        }
-        return post;
+          if (post.id === postId) {
+            const isLiked = post.likedBy?.includes(address);
+            return {
+              ...post,
+              likes: (post.likes || 0) + (isLiked ? -1 : 1),
+              likedBy: isLiked 
+                ? (post.likedBy || []).filter(id => id !== address)
+                : [...(post.likedBy || []), address]
+            };
+          }
+          return post;
       });
       
-      // Odświeżamy lokalnie posty dla natychmiastowej aktualizacji UI
-      // Nie można używać setPosts, bo to jest props, ale możemy przekazać zaktualizowane posty do rodzica
-      // przez onRefreshPosts, jeśli zaimplementujemy tę funkcję
-      
-      // Następnie wysyłamy akcję do Firebase
-      await toggleLike(postId, address);
-      
-      // Na końcu odświeżamy posty z serwera
+      // 2. Lokalna optymistyczna aktualizacja UI - będzie widoczna natychmiast
       if (onRefreshPosts) {
-        await onRefreshPosts();
+        // Zamiast używać null, przekazujemy zaktualizowane posty
+        await onRefreshPosts(updatedPosts);
       }
+      
+      // 3. Następnie wysyłamy akcję do Firebase w tle
+      await toggleLike(postId, address);
     } catch (error) {
       console.error('Error toggling like:', error);
       toast.error('Failed to like post');
@@ -240,25 +241,25 @@ export default function PostList({
         if (post.id === postId) {
           // Znajdź komentarz
           const updatedComments = (post.comments || []).map(comment => {
-            if (comment.id === commentId) {
+              if (comment.id === commentId) {
               const isLiked = comment.likedBy?.includes(address);
-              return {
-                ...comment,
+                return {
+                  ...comment,
                 likes: (comment.likes || 0) + (isLiked ? -1 : 1),
                 likedBy: isLiked 
                   ? (comment.likedBy || []).filter(id => id !== address)
                   : [...(comment.likedBy || []), address]
-              };
-            }
-            return comment;
-          });
-          
-          return {
-            ...post,
-            comments: updatedComments
-          };
-        }
-        return post;
+                };
+              }
+              return comment;
+            });
+            
+            return {
+              ...post,
+              comments: updatedComments
+            };
+          }
+          return post;
       });
       
       // Wykonaj rzeczywiste żądanie do serwera
@@ -410,7 +411,7 @@ export default function PostList({
           });
           
           setLastVisible(newLastVisible);
-        } catch (error) {
+    } catch (error) {
           console.error('Error setting initial lastVisible:', error);
         }
       }
@@ -907,22 +908,22 @@ export default function PostList({
         </div>
       ))}
       
-      <div ref={loadMoreTriggerRef} className="flex justify-center p-4">
-        {isLoadingMore ? (
+        <div ref={loadMoreTriggerRef} className="flex justify-center p-4">
+          {isLoadingMore ? (
           <div className="animate-pulse space-y-4 w-full">
             <div className="bg-gray-200 dark:bg-gray-700 h-10 rounded-lg"></div>
           </div>
         ) : hasMorePosts ? (
-          <button 
-            onClick={loadMorePosts}
-            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          >
-            Load more
-          </button>
+            <button 
+              onClick={loadMorePosts}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Load more
+            </button>
         ) : posts.length > 0 ? (
           <p className="text-gray-500 dark:text-gray-400 text-sm">No more posts to load</p>
         ) : null}
-      </div>
+        </div>
 
       {enlargedImage && (
         <div 
