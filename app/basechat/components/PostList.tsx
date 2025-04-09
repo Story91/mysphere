@@ -125,7 +125,9 @@ export default function PostList({
     if (!address) return;
     
     try {
-      const newComment = {
+      const newComment: Comment = {
+        id: `temp-${Date.now()}`, // Tymczasowe ID
+        postId: postId,
         author: address,
         content: newComments[postId],
         timestamp: Date.now(),
@@ -144,15 +146,28 @@ export default function PostList({
       
       toast.success('Comment added successfully');
       
-      if (onCommentAdded) {
-        await onCommentAdded();
-      } else {
-        await refreshPosts();
+      // Optymistyczna aktualizacja UI - dodajemy komentarz lokalnie
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            comments: [...(post.comments || []), newComment]
+          };
+        }
+        return post;
+      });
+
+      // Aktualizujemy posty lokalnie, zachowując stan scrollowania
+      if (onRefreshPosts) {
+        await onRefreshPosts(updatedPosts);
       }
     } catch (error) {
       console.error('Error adding comment:', error);
       toast.error('Failed to add comment');
-      await refreshPosts();
+      // W przypadku błędu, odświeżamy posty
+      if (onRefreshPosts) {
+        await onRefreshPosts();
+      }
     }
   };
 
