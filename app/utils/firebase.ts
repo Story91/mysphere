@@ -179,43 +179,33 @@ export const toggleLike = async (postId: string, userId: string): Promise<boolea
       }
 
       const postData = postDoc.data();
-      const authorRef = doc(db, 'users', postData.author);
       const likedBy = postData.likedBy || [];
       const isLiked = likedBy.includes(userId);
-
-      if (isLiked) {
-        // Usuń lajka
-        transaction.update(postRef, {
-          likes: increment(-1),
-          likedBy: arrayRemove(userId)
-        });
-        
-        // Zaktualizuj profil autora tylko jeśli autor != lajkujący (optymalizacja)
-        if (postData.author !== userId) {
-          transaction.update(authorRef, {
-            likesReceived: increment(-1),
-            lastActive: serverTimestamp()
-          });
-        }
-        
-        return false;
-      } else {
-        // Dodaj lajka
-        transaction.update(postRef, {
-          likes: increment(1),
-          likedBy: arrayUnion(userId)
-        });
-        
-        // Zaktualizuj profil autora tylko jeśli autor != lajkujący (optymalizacja)
-        if (postData.author !== userId) {
-          transaction.update(authorRef, {
-            likesReceived: increment(1),
-            lastActive: serverTimestamp()
-          });
-        }
-        
-        return true;
+      
+      // Aktualizuj post z inkrementacją/dekrementacją lajków
+      transaction.update(postRef, {
+        likes: increment(isLiked ? -1 : 1),
+        likedBy: isLiked ? arrayRemove(userId) : arrayUnion(userId)
+      });
+      
+      // Zaktualizuj profil autora tylko jeśli autor != lajkujący (optymalizacja)
+      // Zrobimy to w osobnym wywołaniu, asynchronicznie, aby nie blokować transakcji
+      if (postData.author !== userId) {
+        // Zaktualizujemy autora poza transakcją, aby była ona szybsza
+        setTimeout(async () => {
+          try {
+            const authorRef = doc(db, 'users', postData.author);
+            await updateDoc(authorRef, {
+              likesReceived: increment(isLiked ? -1 : 1),
+              lastActive: serverTimestamp()
+            });
+          } catch (error) {
+            console.error('Error updating author stats:', error);
+          }
+        }, 10);
       }
+      
+      return !isLiked; // Zwróć true jeśli dodano lajka, false jeśli usunięto
     });
   } catch (error) {
     console.error('Error toggling like:', error);
@@ -996,75 +986,71 @@ export const deleteComment = async (postId: string, commentId: string) => {
 // Funkcja do przełączania polubienia komentarza
 export const toggleCommentLike = async (postId: string, commentId: string, userId: string) => {
   try {
-    // Pobierz referencję do dokumentu posta
     const postRef = doc(db, 'posts', postId);
     
-    // Pobierz dane posta
-    const postDoc = await getDoc(postRef);
-    
-    if (!postDoc.exists()) {
-      throw new Error('Post not found');
-    }
-    
-    // Pobierz tablicę komentarzy z dokumentu posta
-    const postData = postDoc.data();
-    const comments = postData.comments || [];
-    
-    // Znajdź indeks komentarza w tablicy
-    const commentIndex = comments.findIndex((c: any) => c.id === commentId);
-    
-    if (commentIndex === -1) {
-      throw new Error('Comment not found');
-    }
-    
-    // Pobierz dane komentarza
-    const comment = comments[commentIndex];
-    const likedBy = comment.likedBy || [];
-    const isLiked = likedBy.includes(userId);
-    
-    // Przygotuj zaktualizowaną wersję komentarza
-    const updatedComment = {
-      ...comment,
-      likes: (comment.likes || 0) + (isLiked ? -1 : 1),
-      likedBy: isLiked 
-        ? likedBy.filter((id: string) => id !== userId)
-        : [...likedBy, userId]
-    };
-    
-    // Utwórz nową tablicę komentarzy z zaktualizowanym komentarzem
-    comments[commentIndex] = updatedComment;
-    
-    // Zapisz zaktualizowaną tablicę komentarzy w dokumencie posta
-    await updateDoc(postRef, { 
-      comments: comments,
-      lastUpdated: serverTimestamp()
-    });
-    
-    // Sprawdź, czy komentarz istnieje również w kolekcji comments
-    const commentRef = doc(db, 'comments', commentId);
-    const commentDoc = await getDoc(commentRef);
-    
-    // Jeśli komentarz istnieje w kolekcji comments, zaktualizuj go również tam
-    if (commentDoc.exists()) {
-      const commentData = commentDoc.data();
-      const commentLikedBy = commentData.likedBy || [];
-      const isCommentLiked = commentLikedBy.includes(userId);
+    // Użyj transakcji zamiast wielu operacji odczytu/zapisu
+    return await runTransaction(db, async (transaction) => {
+      const postDoc = await transaction.get(postRef);
+
+      if (!postDoc.exists()) {
+        throw new Error('Post not found');
+      }
       
-      await updateDoc(commentRef, {
-        likes: (commentData.likes || 0) + (isCommentLiked ? -1 : 1),
-        likedBy: isCommentLiked 
-          ? commentLikedBy.filter((id: string) => id !== userId)
-          : [...commentLikedBy, userId],
+      // Pobierz tablicę komentarzy z dokumentu posta
+      const postData = postDoc.data();
+      const comments = postData.comments || [];
+      
+      // Znajdź indeks komentarza w tablicy
+      const commentIndex = comments.findIndex((c: any) => c.id === commentId);
+      
+      if (commentIndex === -1) {
+        throw new Error('Comment not found');
+      }
+      
+      // Pobierz dane komentarza
+      const comment = comments[commentIndex];
+      const likedBy = comment.likedBy || [];
+      const isLiked = likedBy.includes(userId);
+      
+      // Przygotuj zaktualizowaną wersję komentarza
+      const updatedComment = {
+        ...comment,
+        likes: (comment.likes || 0) + (isLiked ? -1 : 1),
+        likedBy: isLiked 
+          ? likedBy.filter((id: string) => id !== userId)
+          : [...likedBy, userId]
+      };
+      
+      // Utwórz nową tablicę komentarzy z zaktualizowanym komentarzem
+      comments[commentIndex] = updatedComment;
+      
+      // Zaktualizuj dokument posta w transakcji
+      transaction.update(postRef, { 
+        comments: comments,
         lastUpdated: serverTimestamp()
       });
-    }
-    
-    // Logowanie dla diagnostyki
-    console.log('Comment like toggled successfully');
-    console.log('New likes count:', updatedComment.likes);
-    console.log('New likedBy array:', updatedComment.likedBy);
-    
-    return true;
+      
+      // Sprawdź, czy komentarz istnieje również w kolekcji comments
+      const commentRef = doc(db, 'comments', commentId);
+      const commentDoc = await transaction.get(commentRef);
+      
+      // Jeśli komentarz istnieje w kolekcji comments, zaktualizuj go również tam
+      if (commentDoc.exists()) {
+        const commentData = commentDoc.data();
+        const commentLikedBy = commentData.likedBy || [];
+        const isCommentLiked = commentLikedBy.includes(userId);
+        
+        transaction.update(commentRef, {
+          likes: (commentData.likes || 0) + (isCommentLiked ? -1 : 1),
+          likedBy: isCommentLiked 
+            ? commentLikedBy.filter((id: string) => id !== userId)
+            : [...commentLikedBy, userId],
+          lastUpdated: serverTimestamp()
+        });
+      }
+      
+      return !isLiked; // Zwróć true jeśli dodano lajka, false jeśli usunięto
+    });
   } catch (error) {
     console.error('Error toggling comment like:', error);
     throw error;

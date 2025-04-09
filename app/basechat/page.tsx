@@ -49,6 +49,7 @@ import { toast } from 'react-hot-toast';
 import YapsMetrics from '../yapscan/components/YapsMetrics';
 import ProfileSocials from './components/ProfileSocials';
 import PostList, { ExtendedPost } from './components/PostList';
+import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -505,6 +506,46 @@ export default function BaseChat() {
     }
   }, [isConnected, address]);
 
+  // Dodaj funkcję do obsługi odświeżania i dodawania nowych postów
+  const onRefreshPosts = async (newPosts?: ExtendedPost[]) => {
+    if (!address) return;
+    
+    try {
+      setIsLoadingPosts(true);
+      
+      if (newPosts && newPosts.length > 0) {
+        // Przypadek 1: Otrzymaliśmy nowe posty z infinite scroll
+        // lub zoptymalizowane posty z funkcji handleToggleLike
+        
+        // Sprawdź, czy posty mają takie same ID jak istniejące (optymistyczny update)
+        // lub są to nowe posty (infinite scroll)
+        const existingIds = new Set(posts.map(p => p.id));
+        const hasExistingIds = newPosts.some(p => existingIds.has(p.id));
+        
+        if (hasExistingIds) {
+          // To jest optymistyczny update - całkowicie zastąp posty
+          setPosts(newPosts);
+        } else {
+          // To są nowe posty z infinite scroll - dodaj je do istniejących
+          setPosts(currentPosts => {
+            // Filtruj tylko nowe posty, których jeszcze nie mamy
+            const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
+            // Zwróć połączone tablice postów
+            return [...currentPosts, ...uniqueNewPosts];
+          });
+        }
+      } else {
+        // Przypadek 2: Standardowe odświeżenie - pobierz wszystkie posty od nowa
+        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
+        setPosts(refreshedPosts);
+      }
+    } catch (error) {
+      console.error('Error refreshing posts:', error);
+    } finally {
+      setIsLoadingPosts(false);
+    }
+  };
+
   // Dodaj stan dla przechowywania hash transakcji i flagi blokującej wielokrotne tworzenie postów
   const [storedTxHash, setStoredTxHash] = useState<string | null>(null);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
@@ -706,13 +747,40 @@ export default function BaseChat() {
     if (!isConnected || !address) return;
     
     try {
-      await toggleLike(postId, address);
-      // Odśwież posty po zmianie polubienia
-      const { posts: updatedPosts } = await fetchPosts({ userId: address });
+      // Optymistyczna aktualizacja UI - natychmiastowa reakcja
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          const isLiked = post.likedBy?.includes(address);
+          return {
+            ...post,
+            likes: (post.likes || 0) + (isLiked ? -1 : 1),
+            likedBy: isLiked 
+              ? (post.likedBy || []).filter(id => id !== address)
+              : [...(post.likedBy || []), address]
+          };
+        }
+        return post;
+      });
+      
+      // Aktualizuj stan natychmiast, aby użytkownik widział efekt od razu
       setPosts(updatedPosts);
+      
+      // Wykonaj rzeczywistą operację w tle
+      await toggleLike(postId, address);
+      
+      // Na końcu odśwież dane z serwera (opcjonalnie, aby upewnić się, że dane są zgodne)
+      const { posts: refreshedPosts } = await fetchPosts({ userId: address });
+      setPosts(refreshedPosts);
       await fetchUserStats(address);
     } catch (error) {
       console.error('Error toggling like:', error);
+      // W przypadku błędu, przywróć dane z serwera
+      try {
+        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
+        setPosts(refreshedPosts);
+      } catch {
+        console.error('Failed to restore posts state after like error');
+      }
     }
   };
 
@@ -2459,36 +2527,7 @@ export default function BaseChat() {
                         sortOrder={sortOrder}
                         selectedTag={selectedTag}
                         selectedAuthor={selectedAuthor}
-                        onRefreshPosts={async (newPosts?: any[]) => {
-                          if (address) {
-                            if (newPosts && newPosts.length > 0) {
-                              // Jeśli przekazano nowe posty, dodaj je do istniejących
-                              console.log(`Dodawanie ${newPosts.length} nowych postów do listy`);
-                              
-                              // Utwórz mapę istniejących postów wg ID, aby uniknąć duplikatów
-                              const existingPostsMap = new Map(posts.map(post => [post.id, post]));
-                              
-                              // Dodaj nowe posty, które nie istnieją w aktualnej liście
-                              newPosts.forEach(post => {
-                                if (!existingPostsMap.has(post.id)) {
-                                  existingPostsMap.set(post.id, post);
-                                }
-                              });
-                              
-                              // Konwertuj mapę z powrotem na tablicę
-                              const updatedPosts = Array.from(existingPostsMap.values());
-                              setPosts(updatedPosts);
-                            } else {
-                              // Jeśli nie przekazano nowych postów, pobierz wszystkie od nowa
-                              const { posts: updatedPosts } = await fetchPosts({ userId: address });
-                              setPosts(updatedPosts);
-                            }
-                            
-                            // Odśwież również inne dane
-                            fetchGlobalStats();
-                            calculateAndSaveBaseChatPoints();
-                          }
-                        }}
+                        onRefreshPosts={onRefreshPosts}
                         displayUserName={displayUserName}
                         userNames={userNames}
                         posts={posts} // Dodajemy przekazywanie postów jako prop
@@ -2824,36 +2863,51 @@ export default function BaseChat() {
         <div className="flex items-center justify-around p-4">
           <button
             onClick={() => setActiveMobilePanel('left')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-colors ${
-              activeMobilePanel === 'left' ? 'text-[#0052FF]' : 'text-gray-400'
+            className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${
+              activeMobilePanel === 'left' 
+                ? 'bg-blue-500/10 text-[#0052FF] font-medium' 
+                : 'text-gray-100 hover:bg-blue-500/5'
             }`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <span className="text-xs mt-1">Profile</span>
+            <div className={`p-1 rounded-full ${activeMobilePanel === 'left' ? 'bg-blue-500/20' : ''}`}>
+              <UserIcon 
+                className="w-6 h-6" 
+                color={activeMobilePanel === 'left' ? '#0052FF' : '#172554'} 
+              />
+            </div>
+            <span className={`text-xs mt-1 font-medium ${activeMobilePanel === 'left' ? 'text-[#0052FF]' : 'text-[#60A5FA]'}`}>Profile</span>
           </button>
           <button
             onClick={() => setActiveMobilePanel('main')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-colors ${
-              activeMobilePanel === 'main' ? 'text-[#0052FF]' : 'text-gray-400'
+            className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${
+              activeMobilePanel === 'main' 
+                ? 'bg-blue-500/10 text-[#0052FF] font-medium' 
+                : 'text-gray-100 hover:bg-blue-500/5'
             }`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            <span className="text-xs mt-1">Feed</span>
+            <div className={`p-1 rounded-full ${activeMobilePanel === 'main' ? 'bg-blue-500/20' : ''}`}>
+              <HomeIcon 
+                className="w-6 h-6" 
+                color={activeMobilePanel === 'main' ? '#0052FF' : '#172554'} 
+              />
+            </div>
+            <span className={`text-xs mt-1 font-medium ${activeMobilePanel === 'main' ? 'text-[#0052FF]' : 'text-[#60A5FA]'}`}>Feed</span>
           </button>
           <button
             onClick={() => setActiveMobilePanel('right')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-colors ${
-              activeMobilePanel === 'right' ? 'text-[#0052FF]' : 'text-gray-400'
+            className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${
+              activeMobilePanel === 'right' 
+                ? 'bg-blue-500/10 text-[#0052FF] font-medium' 
+                : 'text-gray-100 hover:bg-blue-500/5'
             }`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-            <span className="text-xs mt-1">Trends</span>
+            <div className={`p-1 rounded-full ${activeMobilePanel === 'right' ? 'bg-blue-500/20' : ''}`}>
+              <ChartBarIcon 
+                className="w-6 h-6" 
+                color={activeMobilePanel === 'right' ? '#0052FF' : '#172554'} 
+              />
+            </div>
+            <span className={`text-xs mt-1 font-medium ${activeMobilePanel === 'right' ? 'text-[#0052FF]' : 'text-[#60A5FA]'}`}>Trends</span>
           </button>
         </div>
       </div>
