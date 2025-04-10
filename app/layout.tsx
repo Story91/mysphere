@@ -24,53 +24,27 @@ export default function RootLayout({
       <head>
         {/* Usunięto skrypt reCAPTCHA - obciążał stronę */}
         {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}
+        <title>MySphere.fun</title>
+        <meta name="description" content="The onchain social Dapp on Base. Build, grow, and own your digital Sphere." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         
-        {/* Frame compatibility tags */}
-        <meta property="fc:frame" content="vNext" />
-        <meta property="fc:frame:image" content="https://mysphere.fun/images/frame-v2.png" />
-        <meta property="fc:frame:button:1" content="Open MySphere" />
-        <meta property="fc:frame:button:1:action" content="link" />
-        <meta property="fc:frame:button:1:target" content="https://mysphere.fun/basechat" />
-        <meta property="fc:frame:aspect_ratio" content="1.91:1" />
-        
-        {/* Frame v2 tags */}
+        {/* Farcaster Frame - zaktualizowany format z launch_frame */}
         <meta name="fc:frame" content='{
           "version": "next",
-          "imageUrl": "https://mysphere.fun/images/frame-v2.png",
-          "buttons": [
-            {
-              "label": "Open MySphere",
-              "action": "post",
-              "target": "https://mysphere.fun/basechat"
+          "imageUrl": "https://mysphere.fun/frame-v2.png",
+          "aspectRatio": "3:2",
+          "button": {
+            "title": "Launch MySphere",
+            "action": {
+              "type": "launch_frame",
+              "name": "MySphere",
+              "url": "https://mysphere.fun",
+              "splashImageUrl": "https://mysphere.fun/frame-v2.png",
+              "splashBackgroundColor": "#050B20"
             }
-          ],
-          "postUrl": "https://mysphere.fun/api/frame"
+          }
         }' />
-        <meta name="fc:frame:root" content='{
-          "version": "next",
-          "imageUrl": "https://mysphere.fun/images/frame-v2.png",
-          "buttons": [
-            {
-              "label": "Open MySphere",
-              "action": "post",
-              "target": "https://mysphere.fun"
-            }
-          ],
-          "postUrl": "https://mysphere.fun/api/frame"
-        }' />
-        <meta name="fc:frame:www" content='{
-          "version": "next",
-          "imageUrl": "https://mysphere.fun/images/frame-v2.png",
-          "buttons": [
-            {
-              "label": "Open MySphere",
-              "action": "post",
-              "target": "https://www.mysphere.fun"
-            }
-          ],
-          "postUrl": "https://mysphere.fun/api/frame"
-        }' />
+        
         <link rel="icon" type="image/x-icon" href="/favicon_io (1)/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io (1)/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io (1)/favicon-16x16.png" />

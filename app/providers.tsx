@@ -42,15 +42,15 @@ const wagmiConfig = createConfig({
     farcasterFrame(),
     injected(),
     coinbaseWallet({
-      appName: 'BaseBook',
+      appName: 'MySphere',
       appLogoUrl: '/android-chrome-192x192.png',
       darkMode: true
     }),
     walletConnect({ 
       projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '',
       metadata: {
-        name: 'BaseBook',
-        description: 'Social network on Base',
+        name: 'MySphere',
+        description: 'The onchain social Dapp on Base. Build, grow, and own your digital Sphere.',
         url: 'https://mysphere.fun',
         icons: ['https://mysphere.fun/android-chrome-192x192.png']
       }
@@ -72,15 +72,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
               chain={base}
               config={{
                 appearance: {
-                  name: 'BaseBook',
+                  name: 'MySphere',
                   logo: '/android-chrome-192x192.png',
                   mode: 'dark',
                   theme: 'base',
                 },
                 wallet: {
                   display: 'modal',
-                  termsUrl: 'https://basebook.xyz/terms',
-                  privacyUrl: 'https://basebook.xyz/privacy',
+                  termsUrl: 'https://mysphere.fun/docs',
+                  privacyUrl: 'https://basebook.xyz/docs',
                 }
               }}
               projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
