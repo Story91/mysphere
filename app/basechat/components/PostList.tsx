@@ -175,32 +175,36 @@ export default function PostList({
     if (!address) return;
     
     try {
-      // Najpierw lokalnie aktualizujemy UI dla natychmiastowej odpowiedzi
-      // Używamy przekazanej przez Props funkcji onRefreshPosts z parametrem
-      // przekazując zaktualizowane posty jako argument
-      
-      // 1. Tworzymy kopię aktualnych postów z zaktualizowanym stanem polubienia
+      // Lokalna optymistyczna aktualizacja UI bez resetowania całej listy
       const updatedPosts = posts.map(post => {
-          if (post.id === postId) {
-            const isLiked = post.likedBy?.includes(address);
-            return {
-              ...post,
-              likes: (post.likes || 0) + (isLiked ? -1 : 1),
-              likedBy: isLiked 
-                ? (post.likedBy || []).filter(id => id !== address)
-                : [...(post.likedBy || []), address]
-            };
-          }
-          return post;
+        if (post.id === postId) {
+          const isLiked = post.likedBy?.includes(address);
+          return {
+            ...post,
+            likes: (post.likes || 0) + (isLiked ? -1 : 1),
+            likedBy: isLiked 
+              ? (post.likedBy || []).filter(id => id !== address)
+              : [...(post.likedBy || []), address]
+          };
+        }
+        return post;
       });
       
-      // 2. Lokalna optymistyczna aktualizacja UI - będzie widoczna natychmiast
-      if (onRefreshPosts) {
-        // Zamiast używać null, przekazujemy zaktualizowane posty
-        await onRefreshPosts(updatedPosts);
+      // Zachowujemy bieżące sortedPosts i displayLimit
+      // Zamiast pełnego odświeżenia, które resetuje scroll i widok
+      // aktualizujemy tylko konkretny post
+      const postIndex = posts.findIndex(p => p.id === postId);
+      if (postIndex !== -1) {
+        const postsCopy = [...posts];
+        postsCopy[postIndex] = updatedPosts[postIndex];
+        
+        // Aktualizujemy stan bez resetowania widoku
+        if (onRefreshPosts) {
+          onRefreshPosts([...postsCopy]);
+        }
       }
       
-      // 3. Następnie wysyłamy akcję do Firebase w tle
+      // Wysyłamy akcję do Firebase w tle
       await toggleLike(postId, address);
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -251,44 +255,53 @@ export default function PostList({
     if (!address) return;
     
     try {
-      // Optymistyczne UI - aktualizujemy stan lokalnie przed żądaniem do serwera
+      // Optymistyczna aktualizacja UI - lokalna bez resetowania widoku
       const updatedPosts = posts.map(post => {
         if (post.id === postId) {
           // Znajdź komentarz
           const updatedComments = (post.comments || []).map(comment => {
-              if (comment.id === commentId) {
+            if (comment.id === commentId) {
               const isLiked = comment.likedBy?.includes(address);
-                return {
-                  ...comment,
+              return {
+                ...comment,
                 likes: (comment.likes || 0) + (isLiked ? -1 : 1),
                 likedBy: isLiked 
                   ? (comment.likedBy || []).filter(id => id !== address)
                   : [...(comment.likedBy || []), address]
-                };
-              }
-              return comment;
-            });
+              };
+            }
+            return comment;
+          });
             
-            return {
-              ...post,
-              comments: updatedComments
-            };
-          }
-          return post;
+          return {
+            ...post,
+            comments: updatedComments
+          };
+        }
+        return post;
       });
       
-      // Wykonaj rzeczywiste żądanie do serwera
-      await toggleCommentLike(postId, commentId, address);
-      
-      // Odśwież posty aby zsynchronizować stan serwera
-      if (onRefreshPosts) {
-        await onRefreshPosts();
+      // Zachowujemy bieżące sortowanie i limity wyświetlania
+      // Aktualizujemy tylko konkretny post z komentarzem
+      const postIndex = posts.findIndex(p => p.id === postId);
+      if (postIndex !== -1) {
+        const postsCopy = [...posts];
+        postsCopy[postIndex] = updatedPosts[postIndex];
+        
+        // Aktualizujemy stan bez resetowania widoku
+        if (onRefreshPosts) {
+          onRefreshPosts([...postsCopy]);
+        }
       }
+      
+      // Wykonaj rzeczywiste żądanie do serwera w tle
+      await toggleCommentLike(postId, commentId, address);
     } catch (error) {
       console.error('Error toggling comment like:', error);
       toast.error('Failed to like comment');
-      // W przypadku błędu, przywróć poprzedni stan poprzez odświeżenie postów
-      if (onRefreshPosts) {
+      // W przypadku błędu, przywróć poprzedni stan
+      const postIndex = posts.findIndex(p => p.id === postId);
+      if (postIndex !== -1 && onRefreshPosts) {
         await onRefreshPosts();
       }
     }
@@ -298,7 +311,8 @@ export default function PostList({
     if (!address || !replyContent.trim()) return;
     
     try {
-      await addCommentReply(postId, commentId, {
+      // Dodajemy odpowiedź z poprawnie ustawionym polem replyTo
+      const newReply = await addCommentReply(postId, commentId, {
         author: address,
         content: replyContent.trim()
       });
@@ -306,12 +320,44 @@ export default function PostList({
       setReplyingTo(null);
       setReplyContent('');
       
-      await refreshPosts();
+      // Optymistyczna aktualizacja UI - dodajemy odpowiedź lokalnie
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          // Tworzymy nową odpowiedź zgodną z typem Comment
+          const newReplyComment: Comment = {
+            id: newReply.id,
+            postId: postId,
+            author: address,
+            content: replyContent.trim(),
+            timestamp: Date.now(),
+            likes: 0,
+            likedBy: [],
+            mentions: [],
+            replyTo: commentId // Kluczowe pole - oznaczamy, że to odpowiedź do konkretnego komentarza
+          };
+          
+          return {
+            ...post,
+            comments: [
+              ...(post.comments || []),
+              newReplyComment
+            ]
+          };
+        }
+        return post;
+      });
+      
+      // Aktualizujemy stan bez pełnego odświeżenia
+      if (onRefreshPosts) {
+        await onRefreshPosts(updatedPosts);
+      }
       
       toast.success('Reply added successfully');
     } catch (error) {
       console.error('Error adding reply:', error);
       toast.error('Failed to add reply');
+      // W przypadku błędu, pełne odświeżenie
+      await refreshPosts();
     }
   };
 
@@ -370,12 +416,11 @@ export default function PostList({
       });
       
       if (morePosts.length > 0) {
-        // Sprawdź, czy onRefreshPosts jest dostępne
+        // Dodaj nowe posty do istniejących bez resetowania widoku
         if (onRefreshPosts) {
-          // Wywołaj funkcję z nowymi postami
-          // Teraz potrzebujemy zmienić implementację w komponencie nadrzędnym,
-          // aby obsłużyć dodawanie nowych postów do istniejących, zamiast tylko odświeżania
-          await onRefreshPosts(morePosts);
+          // Połącz istniejące posty z nowymi
+          const allPosts = [...posts, ...morePosts];
+          await onRefreshPosts(allPosts);
           console.log(`Załadowano ${morePosts.length} nowych postów`);
         }
       }
@@ -403,7 +448,7 @@ export default function PostList({
       if (entries[0].isIntersecting && hasMorePosts && !isLoadingMore) {
         loadMorePosts();
       }
-    }, { threshold: 0.5 });
+    }, { threshold: 0.1, rootMargin: '100px' }); // Zmniejszamy próg dla wcześniejszego ładowania
 
     if (loadMoreTriggerRef.current) {
       observer.observe(loadMoreTriggerRef.current);
@@ -414,7 +459,7 @@ export default function PostList({
         observer.unobserve(loadMoreTriggerRef.current);
       }
     };
-  }, [hasMorePosts, isLoadingMore, lastVisible]);
+  }, [hasMorePosts, isLoadingMore, lastVisible, loadMorePosts]);
 
   useEffect(() => {
     const setInitialLastVisible = async () => {
@@ -436,6 +481,23 @@ export default function PostList({
   }, [posts, address, lastVisible]);
 
   const renderComments = (post: ExtendedPost) => {
+    // Grupujemy odpowiedzi według ID komentarza, do którego należą
+    const repliesByCommentId: { [key: string]: Comment[] } = {};
+    
+    // Szukamy wszystkich odpowiedzi i grupujemy je
+    (post.comments || []).forEach(comment => {
+      if (comment.replyTo) {
+        // To jest odpowiedź do komentarza
+        if (!repliesByCommentId[comment.replyTo]) {
+          repliesByCommentId[comment.replyTo] = [];
+        }
+        repliesByCommentId[comment.replyTo].push(comment);
+      }
+    });
+    
+    // Filtrujemy tylko główne komentarze (te, które nie są odpowiedziami)
+    const mainComments = (post.comments || []).filter(comment => !comment.replyTo);
+    
     return (
       <div className="mt-4 space-y-4">
         <div className="flex items-start space-x-2">
@@ -473,7 +535,7 @@ export default function PostList({
           </div>
         </div>
 
-        {post.comments && post.comments.map((comment: Comment, index: number) => (
+        {mainComments.map((comment: Comment, index: number) => (
           <div key={comment.id} className={`border-l-2 border-gray-200 dark:border-gray-700 pl-3 pb-3 ${index > 0 ? 'pt-3 border-t border-gray-100 dark:border-gray-800' : ''}`}>
             <div className="flex items-start">
               <div className="flex-shrink-0 mt-1">
@@ -492,7 +554,7 @@ export default function PostList({
                   <div className="flex flex-col">
                     <div className="flex items-center">
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {displayUserName(comment.author, `comment-${comment.id}`).props.children[0].props.children[1]}
+                        {displayUserName(comment.author, `comment-${comment.id}`)}
                       </span>
                       <span className="text-xs text-gray-500 ml-2">
                         {formatTimestamp(comment.timestamp)}
@@ -615,10 +677,11 @@ export default function PostList({
                   </div>
                 )}
 
-                {comment.replies && comment.replies.length > 0 && (
+                {/* Wyświetlamy odpowiedzi do tego komentarza */}
+                {repliesByCommentId[comment.id] && repliesByCommentId[comment.id].length > 0 && (
                   <div className="mt-3 pl-3 border-l-2 border-gray-100 dark:border-gray-800 space-y-2">
-                    {comment.replies.map((reply: Comment, replyIndex: number) => (
-                      <div key={replyIndex} className={`text-xs ${replyIndex > 0 ? 'mt-2 pt-2 border-t border-gray-50 dark:border-gray-900' : ''}`}>
+                    {repliesByCommentId[comment.id].map((reply: Comment, replyIndex: number) => (
+                      <div key={reply.id || replyIndex} className={`text-xs ${replyIndex > 0 ? 'mt-2 pt-2 border-t border-gray-50 dark:border-gray-900' : ''}`}>
                         <div className="flex items-start">
                           <div className="flex-shrink-0 mt-1">
                             {userNames[reply.author]?.avatar ? (
@@ -634,7 +697,7 @@ export default function PostList({
                           <div className="ml-2 flex-1">
                             <div className="flex items-center">
                               <span className="font-medium text-gray-900 dark:text-white text-xs">
-                                {displayUserName(reply.author, `reply-${comment.id}-${replyIndex}`).props.children[0].props.children[1]}
+                                {displayUserName(reply.author, `reply-${comment.id}-${replyIndex}`)}
                               </span>
                               <span className="text-[10px] text-gray-500 ml-1.5">
                                 {formatTimestamp(reply.timestamp)}
@@ -642,6 +705,26 @@ export default function PostList({
                             </div>
                             <div className="text-xs text-gray-800 dark:text-gray-200 mt-0.5 whitespace-pre-wrap">
                               {reply.content}
+                            </div>
+                            {/* Dodajemy przycisk lajkowania odpowiedzi */}
+                            <div className="flex items-center mt-1 text-xs text-gray-500 space-x-2">
+                              <button
+                                onClick={() => handleToggleCommentLike(post.id, reply.id)}
+                                className={`flex items-center ${
+                                  reply.likedBy?.includes(address || '') ? 'text-blue-500' : 'hover:text-blue-500'
+                                }`}
+                              >
+                                {reply.likedBy?.includes(address || '') ? (
+                                  <svg className="w-3 h-3 mr-0.5 transform scale-95" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-3 h-3 mr-0.5 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                  </svg>
+                                )}
+                                <span className="text-[10px]">{reply.likes || 0}</span>
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -700,6 +783,17 @@ export default function PostList({
         <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                {userNames[post.author]?.avatar ? (
+                  <img
+                    src={userNames[post.author].avatar}
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <CoinbaseAvatar address={post.author as `0x${string}`} className="w-10 h-10 rounded-full" />
+                )}
+              </div>
               <div>
                 <div className="font-medium text-gray-900 dark:text-white flex items-center scale-110 transform origin-left">
                   {displayUserName(post.author, `post-${post.id}`)}

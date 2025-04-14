@@ -270,7 +270,7 @@ export default function Navigation() {
                 <Avatar className="h-6 w-6" />
                 <Name className="text-white inline" />
               </ConnectWallet>
-              <WalletDropdown className="!fixed md:!absolute !top-[70px] md:!top-full !right-4 !w-[calc(100%-32px)] md:!w-auto !max-w-[400px] !z-[9999] !bg-white wallet-dropdown">
+              <WalletDropdown className="!absolute !top-[70px] !right-4 !left-4 md:!left-auto md:!top-full !w-auto !max-w-[400px] !z-[60] !bg-white wallet-dropdown">
                   <Identity hasCopyAddressOnClick className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-link">
                     <Avatar />
                     <Name className="!text-gray-900" />
