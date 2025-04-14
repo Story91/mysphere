@@ -523,6 +523,34 @@ h1, h2, h3, h4, h5, h6 {
 .font-anton { font-family: 'Anton', sans-serif; }
 
 /* Style dla ikon w menu rozwijanym */
+.wallet-dropdown {
+  position: absolute !important;
+  top: 70px !important;
+  right: 16px !important;
+  left: 16px !important;
+  width: auto !important;
+  max-width: 400px !important;
+  z-index: 9999 !important;
+  background-color: white !important;
+  transform-origin: top right !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  max-height: calc(100vh - 150px) !important;
+  overflow-y: auto !important;
+  margin-bottom: 80px !important;
+}
+
+@media (min-width: 768px) {
+  .wallet-dropdown {
+    top: 100% !important;
+    left: auto !important;
+    width: auto !important;
+    margin-bottom: 0 !important;
+    max-height: none !important;
+  }
+}
+
 .wallet-dropdown svg {
   color: #111111 !important;
   stroke: #111111 !important;

@@ -987,10 +987,13 @@ export const deleteComment = async (postId: string, commentId: string) => {
 export const toggleCommentLike = async (postId: string, commentId: string, userId: string) => {
   try {
     const postRef = doc(db, 'posts', postId);
+    const commentRef = doc(db, 'comments', commentId);
     
     // Użyj transakcji zamiast wielu operacji odczytu/zapisu
     return await runTransaction(db, async (transaction) => {
+      // Wykonaj WSZYSTKIE odczyty na początku transakcji
       const postDoc = await transaction.get(postRef);
+      const commentDoc = await transaction.get(commentRef);
 
       if (!postDoc.exists()) {
         throw new Error('Post not found');
@@ -1024,15 +1027,13 @@ export const toggleCommentLike = async (postId: string, commentId: string, userI
       // Utwórz nową tablicę komentarzy z zaktualizowanym komentarzem
       comments[commentIndex] = updatedComment;
       
+      // WSZYSTKIE ZAPISY wykonuj PO wszystkich odczytach
+      
       // Zaktualizuj dokument posta w transakcji
       transaction.update(postRef, { 
         comments: comments,
         lastUpdated: serverTimestamp()
       });
-      
-      // Sprawdź, czy komentarz istnieje również w kolekcji comments
-      const commentRef = doc(db, 'comments', commentId);
-      const commentDoc = await transaction.get(commentRef);
       
       // Jeśli komentarz istnieje w kolekcji comments, zaktualizuj go również tam
       if (commentDoc.exists()) {
@@ -1075,14 +1076,16 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
       throw new Error('Parent comment not found');
     }
 
-    // Utwórz nową odpowiedź
+    // Utwórz nową odpowiedź z wszystkimi wymaganymi polami
     const newReply = {
       id: generateId(),
+      postId: postId, // Dodane pole postId
       author: replyData.author,
       content: replyData.content,
       timestamp: Date.now(),
       likes: 0,
       likedBy: [],
+      mentions: [], // Dodane pole mentions
       replyTo: commentId // Dodaj referencję do komentarza nadrzędnego
     };
 
@@ -1091,7 +1094,8 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
 
     // Zaktualizuj dokument
     await updateDoc(postRef, {
-      comments: comments
+      comments: comments,
+      lastUpdated: serverTimestamp() // Aktualizujemy czas ostatniej zmiany
     });
 
     return newReply;

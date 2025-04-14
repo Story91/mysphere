@@ -297,7 +297,7 @@ export default function BaseChat() {
   };
 
   // Funkcja pomocnicza do wyświetlania nazwy użytkownika z tooltipem
-  const displayUserName = (userAddress: string, elementId: string) => {
+  const displayUserName = (userAddress: string, elementId: string, showAvatar: boolean = false) => {
     // Sprawdź, czy mamy już nazwę w cache
     const userName = userNames[userAddress]?.name || userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
     const hasBaseName = isBaseName(userName);
@@ -305,26 +305,25 @@ export default function BaseChat() {
     return (
       <div className="relative inline-block">
         <div className="flex items-center">
-          {userNames[userAddress]?.avatar ? (
-            <img
-              src={userNames[userAddress].avatar}
-              alt="Profile"
-              className="w-10 h-10 rounded-full mr-2"
-            />
-          ) : (
-            <Avatar address={toEthereumAddress(userAddress)} className="w-10 h-10 rounded-full mr-2" />
+          {showAvatar && (
+            userNames[userAddress]?.avatar ? (
+              <img
+                src={userNames[userAddress].avatar}
+                alt="Profile"
+                className="w-10 h-10 rounded-full mr-2"
+              />
+            ) : (
+              <Avatar address={toEthereumAddress(userAddress)} className="w-10 h-10 rounded-full mr-2" />
+            )
           )}
           <div 
             className="cursor-pointer group relative"
             onClick={() => handleViewBuilderProfile(userAddress)}
             onMouseEnter={() => {
               setHoveredElement(elementId);
-              setHoveredUser(userAddress);
-              fetchUserStats(userAddress);
             }}
             onMouseLeave={() => {
               setHoveredElement(null);
-              setHoveredUser(null);
             }}
           >
             <span className={`${hasBaseName ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'} text-base`}>
@@ -343,70 +342,6 @@ export default function BaseChat() {
             </div>
           </div>
         </div>
-        
-        {/* Tooltip */}
-        {hoveredElement === elementId && hoveredUser === userAddress && userStats[userAddress] && (
-          <div className="absolute left-0 mt-2 w-64 px-4 py-3 bg-white dark:bg-gray-800 rounded-xl shadow-lg z-50 border border-gray-200 dark:border-gray-700">
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
-                <div className="text-blue-500 font-bold">{userStats[userAddress].transactions || 0}</div>
-                <div className="text-xs text-gray-500">Transactions</div>
-              </div>
-              <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
-                <div className="text-green-500 font-bold">{userStats[userAddress].tokens || 0}</div>
-                <div className="text-xs text-gray-500">Tokens</div>
-              </div>
-              <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
-                <div className="text-purple-500 font-bold">{userStats[userAddress].nfts || 0}</div>
-                <div className="text-xs text-gray-500">NFTs</div>
-              </div>
-              <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
-                <div className="text-yellow-500 font-bold">{userStats[userAddress].contracts || 0}</div>
-                <div className="text-xs text-gray-500">Contracts</div>
-              </div>
-            </div>
-            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-              <div className="text-center">
-                <div className="text-sm font-medium">Total Points</div>
-                <div className="text-lg font-bold text-indigo-500">{userStats[userAddress].totalPoints}</div>
-              </div>
-              {Boolean(
-                userStats[userAddress] && 
-                'hasBaseName' in userStats[userAddress] && 
-                userStats[userAddress].hasBaseName && 
-                'baseNameBonus' in userStats[userAddress]
-              ) && (
-                <div className="mt-1 text-center">
-                  <div className="text-xs text-green-500 font-medium">
-                    Includes +1000 BaseName Bonus
-                  </div>
-                </div>
-              )}
-              <div className="mt-1 text-center">
-                <div className="text-sm font-medium">Badges Earned</div>
-                <div className="text-lg font-bold text-indigo-500">
-                  {BADGES.filter(badge => badge.condition({
-                    totalPoints: userStats[userAddress].totalPoints,
-                    rank: UserRank.NEWBIE,
-                    percentile: 0,
-                    breakdown: {
-                      transactionPoints: 0,
-                      tokenPoints: 0,
-                      nftPoints: 0,
-                      uniqueContractPoints: 0
-                    },
-                    stats: {
-                      transactions: userStats[userAddress].transactions || 0,
-                      tokens: userStats[userAddress].tokens || 0,
-                      nfts: userStats[userAddress].nfts || 0,
-                      contracts: userStats[userAddress].contracts || 0
-                    }
-                  })).length}/24
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -2859,7 +2794,7 @@ export default function BaseChat() {
           )}
 
       {/* Mobile footer */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-t border-[#0052FF]/20 z-50">
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-t border-[#0052FF]/20 z-40">
         <div className="flex items-center justify-around p-4">
           <button
             onClick={() => setActiveMobilePanel('left')}
