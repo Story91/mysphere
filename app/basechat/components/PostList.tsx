@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { Post, Comment } from '../../types';
 import { doc, updateDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
-import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment } from '../../utils/firebase';
+import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, ADMIN_ADDRESS } from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { Avatar as CoinbaseAvatar } from '@coinbase/onchainkit/identity';
@@ -239,7 +239,7 @@ export default function PostList({
     
     try {
       if (confirm('Are you sure you want to delete this comment?')) {
-        await deleteComment(postId, commentId);
+        await deleteComment(postId, commentId, address);
         
         await refreshPosts();
         
@@ -307,14 +307,15 @@ export default function PostList({
     }
   };
 
-  const handleAddReply = async (postId: string, commentId: string) => {
+  const handleAddReply = async (postId: string, commentId: string, txHash?: string) => {
     if (!address || !replyContent.trim()) return;
     
     try {
       // Dodajemy odpowiedź z poprawnie ustawionym polem replyTo
       const newReply = await addCommentReply(postId, commentId, {
         author: address,
-        content: replyContent.trim()
+        content: replyContent.trim(),
+        txHash // Uproszczona wersja, pozwalamy aby undefined było przekazywane
       });
       
       setReplyingTo(null);
@@ -333,7 +334,8 @@ export default function PostList({
             likes: 0,
             likedBy: [],
             mentions: [],
-            replyTo: commentId // Kluczowe pole - oznaczamy, że to odpowiedź do konkretnego komentarza
+            replyTo: commentId, // Kluczowe pole - oznaczamy, że to odpowiedź do konkretnego komentarza
+            txHash // Uproszczona wersja bez null
           };
           
           return {
@@ -657,22 +659,11 @@ export default function PostList({
                       rows={2}
                     />
                     <div className="flex justify-end mt-1 space-x-2">
-                      <button
-                        onClick={() => handleAddReply(post.id, comment.id)}
-                        disabled={!replyContent.trim()}
-                        className="px-2 py-1 text-xs bg-blue-500 text-white rounded disabled:opacity-50"
-                      >
-                        Reply
-                      </button>
-                      <button
-                        onClick={() => {
-                          setReplyingTo(null);
-                          setReplyContent('');
-                        }}
-                        className="px-2 py-1 text-xs bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-white rounded"
-                      >
-                        Cancel
-                      </button>
+                      <CommentTransactionButton 
+                        content={replyContent} 
+                        disabled={!replyContent.trim()} 
+                        onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
+                      />
                     </div>
                   </div>
                 )}
@@ -706,7 +697,7 @@ export default function PostList({
                             <div className="text-xs text-gray-800 dark:text-gray-200 mt-0.5 whitespace-pre-wrap">
                               {reply.content}
                             </div>
-                            {/* Dodajemy przycisk lajkowania odpowiedzi */}
+                            {/* Dodajemy przycisk lajkowania i usuwania odpowiedzi */}
                             <div className="flex items-center mt-1 text-xs text-gray-500 space-x-2">
                               <button
                                 onClick={() => handleToggleCommentLike(post.id, reply.id)}
@@ -725,6 +716,18 @@ export default function PostList({
                                 )}
                                 <span className="text-[10px]">{reply.likes || 0}</span>
                               </button>
+                              
+                              {/* Przycisk usunięcia odpowiedzi - wyświetlany dla autora odpowiedzi lub admina */}
+                              {(reply.author === address || address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()) && (
+                                <button
+                                  onClick={() => handleDeleteComment(post.id, reply.id)}
+                                  className="flex items-center hover:text-red-500"
+                                >
+                                  <svg className="w-3 h-3 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>

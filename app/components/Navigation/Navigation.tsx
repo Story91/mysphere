@@ -270,29 +270,29 @@ export default function Navigation() {
                 <Avatar className="h-6 w-6" />
                 <Name className="text-white inline" />
               </ConnectWallet>
-              <WalletDropdown className="!absolute !top-[70px] !right-4 !left-4 md:!left-auto md:!top-full !w-auto !max-w-[400px] !z-[60] !bg-white wallet-dropdown">
-                  <Identity hasCopyAddressOnClick className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-link">
+              <WalletDropdown>
+                  <Identity hasCopyAddressOnClick>
                     <Avatar />
-                    <Name className="!text-gray-900" />
-                    <Address className="!text-gray-900" />
-                    <EthBalance className="!text-gray-900" />
+                    <Name />
+                    <Address />
+                    <EthBalance />
                   </Identity>
-                  <WalletDropdownBasename className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-link" />
+                  <WalletDropdownBasename />
                   <Link 
                     href="/profile" 
                     target="_blank"
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 !text-gray-900 wallet-dropdown-link"
+                    className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 15C15.3137 15 18 12.3137 18 9C18 5.68629 15.3137 3 12 3C8.68629 3 6 5.68629 6 9C6 12.3137 8.68629 15 12 15Z" stroke="#111111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M2.90625 20.2491C3.82834 18.6531 5.15423 17.3278 6.75064 16.4064C8.34705 15.485 10.1572 15 12.0002 15C13.8432 15 15.6534 15.4851 17.2498 16.4065C18.8462 17.3279 20.1721 18.6533 21.0942 20.2493" stroke="#111111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M12 15C15.3137 15 18 12.3137 18 9C18 5.68629 15.3137 3 12 3C8.68629 3 6 5.68629 6 9C6 12.3137 8.68629 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M2.90625 20.2491C3.82834 18.6531 5.15423 17.3278 6.75064 16.4064C8.34705 15.485 10.1572 15 12.0002 15C13.8432 15 15.6534 15.4851 17.2498 16.4065C18.8462 17.3279 20.1721 18.6533 21.0942 20.2493" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                     SPHERE Identity
                   </Link>
                   <Link 
                     href="https://keys.coinbase.com"
                     target="_blank"
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 wallet-dropdown-link"
+                    className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2"/>
@@ -303,7 +303,7 @@ export default function Navigation() {
                   <Link 
                     href="https://basescan.org"
                     target="_blank"
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 wallet-dropdown-link"
+                    className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M21 21L15.8033 15.8033M15.8033 15.8033C17.1605 14.4461 18 12.5711 18 10.5C18 6.35786 14.6421 3 10.5 3C6.35786 3 3 6.35786 3 10.5C3 14.6421 6.35786 18 10.5 18C12.5711 18 14.4461 17.1605 15.8033 15.8033Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -313,15 +313,15 @@ export default function Navigation() {
                   <Link 
                     href="https://bridge.base.org"
                     target="_blank"
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 wallet-dropdown-link"
+                    className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M7 10V14M17 10V14M3 12H7M17 12H21M8 17H16C16.5523 17 17 16.5523 17 16V8C17 7.44772 16.5523 7 16 7H8C7.44772 7 7 7.44772 7 8V16C7 16.5523 7.44772 17 8 17Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                     Base Bridge
                   </Link>
-                  <WalletDropdownFundLink className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-fund" />
-                  <WalletDropdownDisconnect className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-disconnect" />
+                  <WalletDropdownFundLink />
+                  <WalletDropdownDisconnect />
               </WalletDropdown>
             </Wallet>
           </div>

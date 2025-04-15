@@ -336,6 +336,11 @@ export default function BaseChat() {
                 userName
               )}
             </span>
+            <img 
+              src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png" 
+              alt="Base Network" 
+              className="inline-block ml-2 w-3.5 h-3.5 align-middle" 
+            />
             {/* Podpowiedź nad nazwą zamiast pod nią */}
             <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 text-[9px] text-blue-400 bg-white/80 dark:bg-gray-800/80 px-2 py-0.5 rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
               Click to view profile
@@ -1239,12 +1244,30 @@ export default function BaseChat() {
 
         // Update user profile in Firebase
         const userRef = doc(db, 'users', address);
-        await updateDoc(userRef, {
-          totalPoints,
-          currentRank: currentRankValue,
-          lastUpdated: serverTimestamp(),
-          stats: rankingStats.stats
-        });
+        
+        // Sprawdź czy dokument istnieje
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          // Aktualizuj istniejący dokument
+          await updateDoc(userRef, {
+            totalPoints,
+            currentRank: currentRankValue,
+            lastUpdated: serverTimestamp(),
+            stats: rankingStats.stats
+          });
+        } else {
+          // Utwórz nowy dokument
+          await setDoc(userRef, {
+            address,
+            name: baseName || `${address.slice(0, 6)}...${address.slice(-4)}`,
+            totalPoints,
+            currentRank: currentRankValue,
+            joinedAt: serverTimestamp(),
+            lastUpdated: serverTimestamp(),
+            stats: rankingStats.stats
+          });
+        }
 
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -1256,7 +1279,7 @@ export default function BaseChat() {
       const interval = setInterval(fetchData, REFRESH_INTERVAL);
       return () => clearInterval(interval);
     }
-  }, [address, isConnected]);
+  }, [address, isConnected, baseName]);
 
   // Funkcja do pobierania nazw użytkowników
   const fetchUserNames = async (posts: Post[]) => {
@@ -1376,11 +1399,11 @@ export default function BaseChat() {
 
   // Funkcja do obsługi usuwania komentarza
   const handleDeleteComment = async (postId: string, commentId: string) => {
-    if (!address) return;
+    if (!isConnected || !address) return;
     
     try {
       if (confirm('Are you sure you want to delete this comment?')) {
-        await deleteComment(postId, commentId);
+        await deleteComment(postId, commentId, address);
         
         // Odśwież posty
         const { posts: updatedPosts } = await fetchPosts({ userId: address });
