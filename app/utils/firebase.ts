@@ -916,10 +916,10 @@ export const editComment = async (postId: string, commentId: string, newContent:
   }
 };
 
-// Funkcja do usuwania komentarza
-export const deleteComment = async (postId: string, commentId: string) => {
+// Funkcja do usuwania komentarza - dodaję sprawdzenie uprawnień
+export const deleteComment = async (postId: string, commentId: string, userId: string) => {
   try {
-    console.log(`[DEBUG] Usuwanie komentarza ${commentId} z posta ${postId}`);
+    console.log(`[DEBUG] Usuwanie komentarza ${commentId} z posta ${postId} przez ${userId}`);
     
     // 1. Przygotuj batch do operacji atomowych
     const batch = writeBatch(db);
@@ -937,6 +937,21 @@ export const deleteComment = async (postId: string, commentId: string) => {
     const comments = postData.comments || [];
     
     console.log(`[DEBUG] Znaleziono ${comments.length} komentarzy w poście ${postId}`);
+    
+    // Znajdź komentarz który ma zostać usunięty
+    const commentToDelete = comments.find((c: any) => c.id === commentId);
+    
+    if (!commentToDelete) {
+      throw new Error('Comment not found');
+    }
+    
+    // Sprawdź uprawnienia - tylko autor komentarza lub admin mogą usuwać
+    const isAdmin = userId.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
+    const isAuthor = commentToDelete.author === userId;
+    
+    if (!isAdmin && !isAuthor) {
+      throw new Error('Unauthorized to delete this comment');
+    }
     
     // 3. Znajdź odpowiedzi do usuwanego komentarza
     const repliesToDelete = comments.filter((c: any) => c.replyTo === commentId);
@@ -1058,7 +1073,11 @@ export const toggleCommentLike = async (postId: string, commentId: string, userI
   }
 };
 
-export const addCommentReply = async (postId: string, commentId: string, replyData: { author: string, content: string }) => {
+export const addCommentReply = async (postId: string, commentId: string, replyData: { 
+  author: string, 
+  content: string,
+  txHash?: string | null 
+}) => {
   try {
     const postRef = doc(db, 'posts', postId);
     const postDoc = await getDoc(postRef);
@@ -1086,7 +1105,9 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
       likes: 0,
       likedBy: [],
       mentions: [], // Dodane pole mentions
-      replyTo: commentId // Dodaj referencję do komentarza nadrzędnego
+      replyTo: commentId, // Dodaj referencję do komentarza nadrzędnego
+      txHash: replyData.txHash || null, // Dodajemy obsługę txHash dla onchain
+      onchain: replyData.txHash ? true : false // Oznaczamy czy jest onchain
     };
 
     // Dodaj odpowiedź do tablicy komentarzy

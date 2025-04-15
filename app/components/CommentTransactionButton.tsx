@@ -193,7 +193,7 @@ export default function CommentTransactionButton({
                       alt="Base Logo" 
                       className="w-4 h-4 mr-1.5"
                     />
-                    <span className="hidden xs:inline">Comment Onchain</span>
+                    <span className="hidden xs:inline">Comment</span>
                     <span className="inline xs:hidden">Comment</span>
                   </>
                 )}
@@ -222,7 +222,7 @@ export default function CommentTransactionButton({
             <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span className="hidden xs:inline">Saved onchain</span>
+            <span className="hidden xs:inline">Saved</span>
             <span className="inline xs:hidden">Saved</span>
           </span>
         </button>
