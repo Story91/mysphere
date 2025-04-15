@@ -522,6 +522,27 @@ h1, h2, h3, h4, h5, h6 {
 .font-oswald { font-family: 'Oswald', sans-serif; }
 .font-anton { font-family: 'Anton', sans-serif; }
 
+/* Style dla ikon w menu rozwijanym */
+.wallet-dropdown svg {
+  color: #111111 !important;
+  stroke: #111111 !important;
+}
+
+.wallet-dropdown-link svg {
+  color: #111111 !important;
+  stroke: #111111 !important;
+}
+
+.wallet-dropdown-fund svg {
+  color: #111111 !important;
+  stroke: #111111 !important;
+}
+
+.wallet-dropdown-disconnect svg {
+  color: #111111 !important;
+  stroke: #111111 !important;
+}
+
 /* Color Picker Styles */
 .react-colorful {
   width: 100% !important;
