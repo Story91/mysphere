@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, PropsWithChildren } from 'react';
-import { useAccount, useSendTransaction } from 'wagmi';
+import { useAccount, useSendTransaction, usePublicClient, useWalletClient } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
 import { ConnectWallet } from '@coinbase/onchainkit/wallet';
@@ -25,7 +25,7 @@ import {
   addCommentReply,
   ADMIN_ADDRESS
 } from '../utils/firebase';
-import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
 import { Post, Comment, UserProfile, Stats } from '../types';
 import { calculateRanking, UserRank, RANK_DESCRIPTIONS, BADGES } from '../utils/ranking';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
@@ -50,6 +50,10 @@ import YapsMetrics from '../yapscan/components/YapsMetrics';
 import ProfileSocials from './components/ProfileSocials';
 import PostList, { ExtendedPost } from './components/PostList';
 import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
+// Import Zora SDK functions
+import { createCoin, getCoinCreateFromLogs } from '@zoralabs/coins-sdk';
+// Import Viem types
+import { Address as ViemAddress, Hex } from 'viem';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -148,6 +152,27 @@ const BaseNameBadge = () => (
   </span>
 );
 
+// Helper function to upload metadata JSON (replace with actual implementation)
+async function uploadMetadataJson(metadata: object): Promise<string> {
+  // Example: Upload to Vercel Blob or IPFS
+  console.log("Uploading metadata:", metadata);
+  // Use fetch to call an API route or directly upload to IPFS/Blob
+  const response = await fetch('/api/upload-metadata', { // Assuming an API route exists
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ metadata }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to upload metadata');
+  }
+  const data = await response.json();
+  if (!data.uri) {
+    throw new Error('Metadata URI not returned from upload');
+  }
+  console.log("Metadata URI:", data.uri);
+  return data.uri; // Should be like "ipfs://<hash>" or "https://<...>/metadata.json"
+}
+
 export default function BaseChat() {
   const [isMounted, setIsMounted] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
@@ -190,15 +215,8 @@ export default function BaseChat() {
   const [newComments, setNewComments] = useState<{[key: string]: string}>({});
   const [userProfile, setUserProfile] = useState<LocalUserProfile>({
     name: '',
-    avatar: undefined,
     postCount: 0,
-    likesReceived: 0,
-    address: '',
-    socialLinks: {
-      twitter: '',
-      farcaster: '',
-      discord: ''
-    }
+    likesReceived: 0
   });
   const [stats, setStats] = useState<Stats>({
     transactions: 0,
@@ -213,6 +231,8 @@ export default function BaseChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const postFileInputRef = useRef<HTMLInputElement>(null);
   const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [postPreviewImage, setPostPreviewImage] = useState<string | null>(null);
   const [postPreviewVideo, setPostPreviewVideo] = useState<string | null>(null);
@@ -498,113 +518,79 @@ export default function BaseChat() {
       return;
     }
     
-    setStoredTxHash(txHash);
-    // Automatycznie wywołaj handleCreatePost po udanej transakcji
-    handleCreatePost(txHash);
+    // Zapisz txHash i wywołaj nową funkcję dla prostych postów onchain
+    // zamiast tworzenia tokena Zora
+    handleOnchainPostSuccess(txHash);
   };
 
-  // Modyfikacja handleCreatePost, aby odświeżał posty po dodaniu nowego posta
-  const handleCreatePost = async (txHash?: string) => {
-    if (!isConnected || !address || !newPost.trim()) return;
-    
-    // Jeśli już trwa tworzenie posta, nie kontynuuj
-    if (isCreatingPost) {
-      console.log('Post creation already in progress, ignoring duplicate request');
+  // Nowa funkcja do obsługi prostych postów onchain (bez tokena Zora)
+  const handleOnchainPostSuccess = async (txHash: string) => {
+    if (!isConnected || !address || !newPost.trim()) {
+      toast.error("Wallet not connected or post content empty");
       return;
     }
-    
-    // Ustaw flagę blokującą wielokrotne tworzenie postów
+
+    if (isCreatingPost) {
+      console.log('Post creation already in progress, ignoring duplicate request');
+      toast("Post creation in progress...", { icon: '⏳' });
+      return;
+    }
+
     setIsCreatingPost(true);
+    const toastId = toast.loading("Creating post...");
 
     try {
       // Sprawdzenie czy użytkownik jest adminem
       const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
-      
+
       // Sprawdzenie limitu postów dziennie (tylko dla zwykłych użytkowników)
       if (!isAdmin && dailyPostCount >= 5) {
-        alert('You have reached the daily limit of 5 posts.');
-        setIsCreatingPost(false); // Resetuj flagę
+        toast.error('You have reached the daily limit of 5 posts.');
+        setIsCreatingPost(false);
+        toast.dismiss(toastId);
         return;
       }
-      setDailyPostCount(prev => prev + 1);
 
-      console.log('🚀 Starting post creation...');
-      
-      // Usunięto weryfikację reCAPTCHA
-      
-      let imageUrl = null;
-      let videoUrl = null;
-      
-      // Handle media upload (image or video)
+      let imageUrl: string | null = null;
+      let videoUrl: string | null = null;
+
+      // 1. Handle media upload (image or video) - jeśli istnieje
       if (postPreviewImage || postPreviewVideo) {
-        try {
-          setUploadProgress(0);
-          const mediaContent = postPreviewImage || postPreviewVideo;
-          if (!mediaContent) throw new Error('No media content');
+        setUploadProgress(0);
+        const mediaContent = postPreviewImage || postPreviewVideo;
+        if (!mediaContent) throw new Error('No media content');
 
-          // Convert base64 to Blob
-          const base64Response = await fetch(mediaContent);
-          const blob = await base64Response.blob();
+        const base64Response = await fetch(mediaContent);
+        const blob = await base64Response.blob();
 
-          // Get file extension and type based on media type
-          const isVideo = postPreviewVideo !== null;
-          const fileExtension = isVideo ? 'mp4' : 'jpg';
-          const fileName = `post-${Date.now()}.${fileExtension}`;
+        const isVideo = postPreviewVideo !== null;
+        const fileExtension = isVideo ? (blob.type.split('/')[1] || 'mp4') : (blob.type.split('/')[1] || 'jpg');
+        const fileName = `post-media-${Date.now()}.${fileExtension}`;
 
-          // Upload to Vercel Blob Storage
-          const formData = new FormData();
-          formData.append('file', blob, fileName);
+        const formData = new FormData();
+        formData.append('file', blob, fileName);
 
-          const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          });
+        const response = await fetch('/api/upload', { method: 'POST', body: formData });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
-          }
-
-          const data = await response.json();
-          if (isVideo) {
-            videoUrl = data.url;
-          } else {
-            imageUrl = data.url;
-          }
-          setUploadProgress(100);
-        } catch (uploadError) {
-          console.error('Error during media upload:', uploadError);
-          throw uploadError;
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
         }
+
+        const data = await response.json();
+        if (isVideo) {
+          videoUrl = data.url;
+        } else {
+          imageUrl = data.url;
+        }
+        setUploadProgress(100);
       }
 
       // Extract hashtags and mentions
-      const hashtagRegex = /#(\w+)/g;
-      const mentionRegex = /@(\w+)/g;
-      const tags = Array.from(new Set((newPost.match(hashtagRegex) || []).map(tag => tag.slice(1))));
-      const mentions = Array.from(new Set((newPost.match(mentionRegex) || []).map(mention => mention.slice(1))));
+      const tags = Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1))));
+      const mentions = Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))));
 
-      // Dodaj tymczasowy post do UI - optymistyczny update (podobny do komentarzy)
-      const tempPost: ExtendedPost = {
-        id: `temp-${Date.now()}`,
-        author: address,
-        content: newPost,
-        timestamp: Date.now(),
-        image: imageUrl,
-        video: videoUrl,
-        tags: tags,
-        mentions: mentions,
-        visibility: 'public',
-        txHash: txHash || storedTxHash || undefined,
-        likes: 0,
-        likedBy: [],
-        comments: []
-      };
-      
-      // Dodaj tymczasowy post do UI przed zapisem w Firebase
-      setPosts(currentPosts => [tempPost, ...currentPosts]);
-
-      // Create post with media and transaction hash
+      // 2. Save to Firebase bez tokena Zora
       await createPost({
         author: address,
         content: newPost,
@@ -614,10 +600,270 @@ export default function BaseChat() {
         tags: tags,
         mentions: mentions,
         visibility: 'public',
-        txHash: txHash || storedTxHash || undefined // Naprawienie błędu typowania
+        txHash: txHash // Zapisz hash transakcji onchain
       });
 
-      // Odświeżenie postów po dodaniu nowego posta, aby pobrać prawdziwe ID z Firebase
+      // 3. Update UI
+      toast.success('Post created successfully!', { id: toastId });
+      setNewPost('');
+      setPostPreviewImage(null);
+      setPostPreviewVideo(null);
+      
+      // 4. Refresh posts
+      await refreshPosts();
+      
+      // 5. Increment daily count
+      setDailyPostCount(prev => prev + 1);
+      await updateDoc(doc(db, 'users', address), {
+        [`dailyPosts.${today}`]: increment(1)
+      });
+      
+      // 6. Update user stats
+      await updateDoc(doc(db, 'users', address), {
+        postCount: increment(1)
+      });
+      
+      // 7. Update global stats
+      try {
+        await setDoc(doc(db, 'stats', 'global'), {
+          posts: increment(1)
+        }, { merge: true }); // Użyj setDoc z merge: true zamiast updateDoc
+      } catch (error) {
+        console.log("Error updating global stats, but post was created:", error);
+        // Nie przerywamy procesu tworzenia posta, tylko logujemy błąd
+      }
+      
+      // 8. Calculate and update BaseChatPoints
+      try {
+        await calculateAndSaveBaseChatPoints();
+      } catch (error) {
+        console.log("Error calculating BaseChatPoints, but post was created:", error);
+      }
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast.error(`Failed to create post: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: toastId });
+    } finally {
+      setIsCreatingPost(false);
+    }
+  };
+
+  // Modyfikacja handleCreatePost, aby odświeżał posty po dodaniu nowego posta
+  const handleCreatePost = async () => { // Function for Zora token creation
+    // Ensure clients are available
+    if (!isConnected || !address || !newPost.trim() || !publicClient || !walletClient) {
+        toast.error("Wallet not connected or client not ready.");
+        return;
+    }
+
+    // Jeśli już trwa tworzenie posta, nie kontynuuj
+    if (isCreatingPost) {
+      console.log('Post creation already in progress, ignoring duplicate request');
+      toast("Post creation in progress...", { icon: '⏳' }); // Use default toast for info/warning
+      return;
+    }
+
+    // Ustaw flagę blokującą wielokrotne tworzenie postów
+    setIsCreatingPost(true);
+    const toastId = toast.loading("Creating post token..."); // Store toast ID
+
+    try {
+      // Sprawdzenie czy użytkownik jest adminem
+      const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
+
+      // Sprawdzenie limitu postów dziennie (tylko dla zwykłych użytkowników)
+      if (!isAdmin && dailyPostCount >= 5) {
+        toast.error('You have reached the daily limit of 5 posts.');
+        setIsCreatingPost(false); // Resetuj flagę
+        toast.dismiss(toastId);
+        return;
+      }
+      // Optimistically update count, handle potential failure later if needed
+      // setDailyPostCount(prev => prev + 1); // Moved after successful creation
+
+      console.log('🚀 Starting Zora coin creation for post...');
+
+      let imageUrl: string | null = null;
+      let videoUrl: string | null = null;
+      let mediaMimeType: string | undefined = undefined;
+
+      // 1. Handle media upload (image or video)
+      if (postPreviewImage || postPreviewVideo) {
+        setUploadProgress(0); // Start progress indication
+        const mediaContent = postPreviewImage || postPreviewVideo;
+        if (!mediaContent) throw new Error('No media content');
+
+        const base64Response = await fetch(mediaContent);
+        const blob = await base64Response.blob();
+        mediaMimeType = blob.type; // Store mime type
+
+        const isVideo = postPreviewVideo !== null;
+        const fileExtension = isVideo ? (blob.type.split('/')[1] || 'mp4') : (blob.type.split('/')[1] || 'jpg');
+        const fileName = `post-media-${Date.now()}.${fileExtension}`;
+
+        const formData = new FormData();
+        formData.append('file', blob, fileName);
+
+        const response = await fetch('/api/upload', { method: 'POST', body: formData });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (isVideo) {
+          videoUrl = data.url;
+        } else {
+          imageUrl = data.url;
+        }
+        setUploadProgress(100); // Finish progress indication
+        console.log("Media uploaded:", isVideo ? videoUrl : imageUrl);
+      }
+
+      // 2. Generate Metadata
+      const postContentExcerpt = newPost.length > 100 ? newPost.substring(0, 97) + "..." : newPost;
+      const metadata = {
+        name: `Post by ${userProfile.name || address.slice(0,6)}: ${postContentExcerpt}`, // Example name
+        description: newPost,
+        image: imageUrl || '', // Use uploaded image URL or empty string
+        ...(videoUrl && { animation_url: videoUrl }), // Add animation_url if video exists
+        ...(videoUrl && mediaMimeType && { // Add Zora 'content' extension if video
+          content: {
+            mime: mediaMimeType,
+            uri: videoUrl
+          }
+        }),
+        properties: {
+          category: "social", // Example property
+          author: address,
+          createdAt: new Date().toISOString(),
+          tags: Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1)))),
+          mentions: Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))))
+        }
+      };
+
+      // 3. Upload Metadata using /api/upload
+      console.log("Uploading metadata JSON via /api/upload...");
+      const metadataJsonString = JSON.stringify(metadata);
+      const metadataBlob = new Blob([metadataJsonString], { type: 'application/json' });
+      const metadataFileName = `metadata-${Date.now()}.json`;
+
+      const metadataFormData = new FormData();
+      metadataFormData.append('file', metadataBlob, metadataFileName);
+
+      const metadataUploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: metadataFormData,
+      });
+
+      if (!metadataUploadResponse.ok) {
+          const errorData = await metadataUploadResponse.json();
+          throw new Error(`Failed to upload metadata: ${errorData.error || metadataUploadResponse.statusText}`);
+      }
+
+      const metadataUploadData = await metadataUploadResponse.json();
+      const metadataUri = metadataUploadData.url; // Get the URL from the response
+      if (!metadataUri) {
+          throw new Error("Metadata URI not returned from upload");
+      }
+      console.log("Metadata URI:", metadataUri);
+
+      // 4. Prepare Coin Parameters for Zora SDK
+      const coinParams = {
+        name: `MySphere Post by ${userProfile.name || address.slice(0,6)}`.substring(0, 32), // Nowa nazwa tokena
+        symbol: newPost.trim().split(/\s+/)[0].substring(0, 10).toUpperCase(), // Użyj pierwszego słowa z posta jako tickera
+        uri: metadataUri, // Use the URL from Vercel Blob
+        payoutRecipient: address as ViemAddress, // Creator receives earnings
+        // owners: [address as ViemAddress], // Optional: defaults to payoutRecipient
+        initialPurchaseWei: 0n, // No initial purchase for now
+        // platformReferrer: undefined, // Optional platform fee recipient
+      };
+      console.log("Zora coin parameters:", coinParams);
+
+
+      // 5. Call createCoin
+      console.log("Calling createCoin via Zora SDK...");
+      // Make sure walletClient is not null/undefined before calling createCoin
+      if (!walletClient) {
+          throw new Error("Wallet client is not available.");
+      }
+      const result = await createCoin(coinParams, walletClient, publicClient);
+
+      console.log("Zora coin creation transaction sent:", result.hash);
+      toast.loading("Waiting for transaction confirmation...", { id: toastId });
+
+      // Wait for the transaction to be confirmed
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: result.hash });
+      console.log("Transaction confirmed:", receipt);
+
+      // 6. Get Coin Address from logs
+      const coinDeployment = getCoinCreateFromLogs(receipt);
+      if (!coinDeployment?.coin) {
+        throw new Error("Could not extract coin address from transaction logs.");
+      }
+      const zoraCoinAddress = coinDeployment.coin;
+      console.log("Successfully created Zora Coin Address:", zoraCoinAddress);
+
+
+      // Extract hashtags and mentions (already done for metadata)
+      const tags = metadata.properties.tags;
+      const mentions = metadata.properties.mentions;
+
+      // 7. Save to Firebase (including the new zoraCoinAddress)
+      console.log("Saving post data to Firebase...");
+      const visibilityValue = 'public'; // Use simple string type
+      const postDataForFirebase = {
+        author: address,
+        content: newPost,
+        timestamp: Date.now(),
+        image: imageUrl,
+        video: videoUrl,
+        tags: tags,
+        mentions: mentions,
+        visibility: visibilityValue, // Use simple string
+        zoraCoinAddress: zoraCoinAddress, // <-- Save the Zora Coin address
+        txHash: result.hash // <-- Save the Zora creation tx hash
+      };
+
+      // Optimistic UI update (Add temporary post)
+      const tempPost: ExtendedPost = {
+        id: `temp-${Date.now()}`,
+        author: address,
+        content: newPost,
+        timestamp: Date.now(),
+        image: imageUrl ?? undefined, // Ensure undefined if null
+        video: videoUrl ?? undefined, // Ensure undefined if null
+        tags: tags,
+        mentions: mentions,
+        visibility: visibilityValue, // Use simple string
+        zoraCoinAddress: zoraCoinAddress,
+        txHash: result.hash,
+        likes: 0,
+        likedBy: [],
+        comments: []
+      };
+      setPosts(currentPosts => [tempPost, ...currentPosts]);
+
+      // Actual Firebase save
+      // Assuming createPost in firebase.ts can handle the new zoraCoinAddress field
+      await createPost({
+          author: address,
+          content: newPost,
+          timestamp: Date.now(),
+          image: imageUrl,
+          video: videoUrl,
+          tags: tags,
+          mentions: mentions,
+          visibility: visibilityValue,
+          zoraCoinAddress: zoraCoinAddress,
+          txHash: result.hash
+      });
+      console.log("Post saved to Firebase.");
+
+      // Successfully created, now increment daily count
+      setDailyPostCount(prev => prev + 1);
+
+      // Refresh posts list from Firebase to get the real ID
       const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
 
@@ -628,19 +874,21 @@ export default function BaseChat() {
       setUploadProgress(0);
 
       // Show success message
-      toast.success('Post created successfully!');
-      
-      // Show daily post overlay with delay (7 seconds instead of immediate)
+      toast.dismiss(toastId);
+      toast.success('Post created successfully as a Zora token!');
+
+      // Show daily post overlay with delay
       setTimeout(() => {
         setShowDailyPostOverlay(true);
         setTimeout(() => setShowDailyPostOverlay(false), 3000);
-      }, 7000);
-      
-      // Reset transaction hash after post is created
-      setStoredTxHash(null);
+      }, 1000); // Shorter delay now
+
     } catch (error: any) {
-      console.error('Error creating post:', error);
-      toast.error(`Error: ${error.message}`);
+      console.error('Error creating Zora coin post:', error);
+      toast.dismiss(toastId); // Ensure loading toast is dismissed on error
+      toast.error(`Error creating post: ${error.message.substring(0, 100)}`); // Limit error message length
+      // Consider reverting optimistic daily count update if needed:
+      // setDailyPostCount(prev => Math.max(0, prev - 1));
     } finally {
       // Zawsze resetuj flagę blokującą, nawet w przypadku błędu
       setIsCreatingPost(false);
@@ -1863,6 +2111,16 @@ export default function BaseChat() {
     setHoveredUser(null);
   };
 
+  // Na początku pliku po inicjalizacji wszystkich stanów, dodajmy funkcję refreshPosts i zmienną today
+  const today = new Date().toISOString().split('T')[0];
+
+  // Funkcja do odświeżania postów
+  const refreshPosts = async () => {
+    if (onRefreshPosts) {
+      await onRefreshPosts();
+    }
+  };
+
   return (
     <FarcasterFrameProvider>
       <BanPage>
@@ -2421,12 +2679,46 @@ export default function BaseChat() {
                               </button>
                             </div>
                             
-                            <TransactionButton 
-                              content={newPost}
-                              onTransactionSuccess={handleTransactionSuccess}
-                              disabled={!newPost.trim()}
-                              autoPost={true}
-                            />
+                            {/* Replace TransactionButton with a standard button */}
+                            <div className="flex space-x-2">
+                              {/* Option 1: Post as Token (Zora) - z logo Zora i fioletowym gradientem */}
+                              <button 
+                                onClick={handleCreatePost}
+                                disabled={!newPost.trim() || isCreatingPost} 
+                                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 ${ 
+                                  (!newPost.trim() || isCreatingPost)
+                                    ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-purple-400 to-purple-500 text-white'
+                                }`}
+                              >
+                                {isCreatingPost ? (
+                                  <>
+                                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>Creating...</span>
+                                  </>                                  
+                                ) : (
+                                  <>
+                                    <img 
+                                      src="/zora.png" 
+                                      alt="Zora Logo" 
+                                      className="w-4 h-4 mr-1.5"
+                                    />
+                                    <span>Zora</span>
+                                  </>
+                                )}
+                              </button>
+                              
+                              {/* Option 2: Post Onchain with TransactionButton */}
+                              <TransactionButton 
+                                content={newPost}
+                                onTransactionSuccess={handleTransactionSuccess}
+                                disabled={!newPost.trim() || isCreatingPost}
+                                autoPost={true}
+                              />
+                            </div>
                           </div>
                           <input
                             id="fileInput"
