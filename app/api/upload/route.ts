@@ -23,10 +23,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check file type
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+    // Check file type - Allow images, videos, and JSON
+    const allowedTypes = ['image/', 'video/', 'application/json'];
+    if (!allowedTypes.some(type => file.type.startsWith(type))) {
       return NextResponse.json(
-        { error: 'Invalid file type. Only images and videos are allowed.' },
+        { error: 'Invalid file type. Only images, videos, and JSON are allowed.' },
         { status: 400 }
       );
     }

@@ -39,6 +39,7 @@
     "@walletconnect/core": "^2.19.0",
     "@walletconnect/ethereum-provider": "^2.19.0",
     "@walletconnect/modal": "^2.7.0",
+    "@zoralabs/coins-sdk": "^0.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.1",
@@ -69,7 +70,7 @@
     "three": "^0.161.0",
     "tsparticles": "^3.8.1",
     "tsparticles-slim": "^2.12.0",
-    "viem": "^2.23.10",
+    "viem": "^2.27.3",
     "wagmi": "^2.14.13"
   },
   "devDependencies": {

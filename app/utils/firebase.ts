@@ -378,54 +378,49 @@ export const createPost = async (post: {
   tags?: string[];
   mentions?: string[];
   visibility?: 'public' | 'followers' | 'private';
-  txHash?: string;
+  txHash?: string; // Keep this as it now represents the Zora creation tx hash
+  zoraCoinAddress?: string; // <-- ADDED
 }): Promise<string> => {
-  const postsRef = collection(db, 'posts');
-  
-  // Najpierw pobierz nazwę użytkownika
-  const userName = await getUserName(post.author);
-  
-  // Wykryj wzmianki w treści
-  const mentionRegex = /@(\w+)/g;
-  const mentionsFromContent = (post.content.match(mentionRegex) || [])
-    .map(m => m.slice(1));
-  const mentions = Array.from(
-    new Set([...(post.mentions || []), ...mentionsFromContent])
-  );
+  try {
+    const userRef = doc(db, 'users', post.author);
+    const postsRef = collection(db, 'posts');
+    
+    // Utwórz nowy dokument posta
+    const docRef = await addDoc(postsRef, {
+      ...post,
+      timestamp: serverTimestamp(), // Użyj serverTimestamp dla Firebase
+      likes: 0,
+      likedBy: [],
+      comments: []
+    });
 
-  // Wykryj hashtagi w treści
-  const hashtagRegex = /#(\w+)/g;
-  const hashtagsFromContent = (post.content.match(hashtagRegex) || [])
-    .map(h => h.slice(1));
-  const hashtags = Array.from(
-    new Set([...(post.tags || []), ...hashtagsFromContent])
-  );
-
-  const docRef = await addDoc(postsRef, {
-    ...post,
-    authorName: userName,
-    timestamp: serverTimestamp(),
-    likes: 0,
-    likedBy: [],
-    comments: [],
-    shares: 0,
-    tags: hashtags,
-    mentions: mentions,
-    visibility: post.visibility || 'public',
-    image: post.image || null,
-    video: post.video || null,
-    txHash: post.txHash || null
-  });
-
-  // Aktualizuj statystyki użytkownika
-  const userRef = doc(db, 'users', post.author);
-  await updateDoc(userRef, {
-    postsCount: increment(1),
-    lastActive: serverTimestamp(),
-    'stats.posts': increment(1)
-  });
-
-  return docRef.id;
+    // Zaktualizuj statystyki użytkownika (liczbę postów)
+    await runTransaction(db, async (transaction) => {
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists()) {
+        // Jeśli użytkownik nie istnieje, utwórz go
+        transaction.set(userRef, { 
+          address: post.author,
+          postsCount: 1, 
+          likesReceived: 0,
+          joinedAt: serverTimestamp(),
+          lastActive: serverTimestamp()
+        });
+      } else {
+        // Jeśli użytkownik istnieje, zaktualizuj liczbę postów
+        transaction.update(userRef, { 
+          postsCount: increment(1),
+          lastActive: serverTimestamp()
+        });
+      }
+    });
+    
+    console.log("Post created with ID: ", docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error creating post: ", error);
+    throw error;
+  }
 };
 
 // Interfejs dla parametrów funkcji fetchPosts
@@ -515,6 +510,7 @@ export const fetchPosts = async ({
           video: postData.video || null,
           txHash: postData.txHash || null,
           lastEdited: postData.lastEdited || null,
+          zoraCoinAddress: postData.zoraCoinAddress || null,
         };
         
         // Dodatkowe filtrowanie po stronie klienta dla wyszukiwania (jeśli potrzebne)

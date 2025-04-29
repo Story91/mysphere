@@ -1,3 +1,5 @@
+export type PostVisibility = 'public' | 'followers' | 'private';
+
 export interface Post {
   id: string;
   author: string;
@@ -5,15 +7,16 @@ export interface Post {
   content: string;
   timestamp: number;
   image?: string | null;
-  video?: string;
+  video?: string | null;
   likes: number;
   likedBy: string[];
   comments: Comment[];
   tags?: string[];
   mentions?: string[];
-  visibility?: 'public' | 'followers' | 'private';
+  visibility?: PostVisibility;
   pollId?: string;
   txHash?: string;
+  zoraCoinAddress?: string;
   lastEdited?: any;
 }
 
@@ -28,7 +31,7 @@ export interface Comment {
   likedBy: string[];
   mentions: string[];
   replyTo?: string;
-  txHash?: string;
+  txHash?: string | null;
   tip?: {
     amount: number;
     currency: string;
