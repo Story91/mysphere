@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { Post, Comment } from '../../types';
 import { doc, updateDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
@@ -12,12 +12,39 @@ import LinkPreview from './LinkPreview';
 import CommentTransactionButton from '../../components/CommentTransactionButton';
 
 // Import Zora SDK functions and types
-import { tradeCoin, getCoin } from '@zoralabs/coins-sdk';
-import { parseEther, parseUnits, formatEther } from 'viem'; // Import viem utils
+import { tradeCoin, getProfileBalances } from '@zoralabs/coins-sdk';
+import { getCachedCoin } from '../../utils/zoraSdk';
+import { parseEther, parseUnits, formatEther, formatUnits } from 'viem'; // Import viem utils
 import { Address as ViemAddress } from 'viem';
 
 // Import icons
-import { Users, Coins, ShoppingCart, Tag, ExternalLink } from 'lucide-react';
+import { Users, Coins, ShoppingCart, Tag, ExternalLink, X, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
+
+// Utility function for formatting large numbers with K, M, B suffixes
+const formatNumberWithSuffix = (value: number | string): string => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  
+  if (isNaN(num)) return 'N/A';
+  
+  if (num >= 1_000_000_000) {
+    return `${(num / 1_000_000_000).toLocaleString(undefined, { maximumFractionDigits: 2 })}B`;
+  } else if (num >= 1_000_000) {
+    return `${(num / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 2 })}M`;
+  } else if (num >= 1_000) {
+    return `${(num / 1_000).toLocaleString(undefined, { maximumFractionDigits: 2 })}K`;
+  } else if (num < 0.01 && num > 0) {
+    // Zamiast notacji naukowej, użyjmy bardziej przyjaznego formatu
+    if (num < 0.000001) {
+      return `${(num * 1_000_000_000).toLocaleString(undefined, { maximumFractionDigits: 2 })}n`;
+    } else if (num < 0.001) {
+      return `${(num * 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 2 })}μ`;
+    } else {
+      return `${(num * 1_000).toLocaleString(undefined, { maximumFractionDigits: 2 })}m`;
+    }
+  }
+  
+  return num.toLocaleString(undefined, { maximumFractionDigits: 6 });
+};
 
 export interface ExtendedPost extends Post {
   pollId?: string;
@@ -28,7 +55,37 @@ interface ZoraCoinData {
   totalSupply?: string;
   uniqueHolders?: number;
   symbol?: string;
-  // Add other relevant fields from getCoin response as needed
+  name?: string;
+  marketCap?: string;
+  volume24h?: string;
+  createdAt?: string;
+  priceUSD?: string;
+  imageUrl?: string;
+  priceChange24h?: number; // Add 24h price change percentage
+  isFetched?: boolean;
+}
+
+// Interface for Zora API response
+interface ZoraApiTokenInfo {
+  id: string;
+  name: string;
+  description?: string;
+  address: string;
+  symbol: string;
+  totalSupply: string;
+  totalVolume?: string;
+  volume24h?: string;
+  createdAt?: string;
+  creatorAddress?: string;
+  marketCap?: string;
+  priceUSD?: string;
+  uniqueHolders?: number;
+  priceChange24h?: number; // Add 24h price change percentage
+  media?: {
+    previewImage?: string;
+    medium?: string;
+    blurhash?: string;
+  };
 }
 
 interface PostListProps {
@@ -45,6 +102,19 @@ interface PostListProps {
   posts: ExtendedPost[];
   isLoading?: boolean;
 }
+
+// Utility function for extracting hashtags from text
+const extractHashtags = (text: string): string[] => {
+  const hashtags: string[] = [];
+  text.split(/\s+/).forEach(word => {
+    if (word.startsWith('#') && word.length > 1) {
+      if (!hashtags.includes(word)) {
+        hashtags.push(word);
+      }
+    }
+  });
+  return hashtags;
+};
 
 export default function PostList({
   showOnlyUserPosts = false,
@@ -77,6 +147,15 @@ export default function PostList({
   const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
   const [postTokenData, setPostTokenData] = useState<{[postId: string]: ZoraCoinData}>({});
   const [isLoadingTokenData, setIsLoadingTokenData] = useState<{[postId: string]: boolean}>({});
+  const [userTokenBalances, setUserTokenBalances] = useState<{[tokenAddress: string]: string}>({});
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
+  
+  // States for transaction modal
+  const [transactionModalOpen, setTransactionModalOpen] = useState(false);
+  const [transactionType, setTransactionType] = useState<'buy' | 'sell'>('buy');
+  const [transactionAmount, setTransactionAmount] = useState('0.01');
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [isTransacting, setIsTransacting] = useState(false);
   
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
   const { address, isConnected } = useAccount();
@@ -195,36 +274,31 @@ export default function PostList({
     if (!address) return;
     
     try {
-      // Lokalna optymistyczna aktualizacja UI bez resetowania całej listy
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          const isLiked = post.likedBy?.includes(address);
-          return {
-            ...post,
-            likes: (post.likes || 0) + (isLiked ? -1 : 1),
-            likedBy: isLiked 
-              ? (post.likedBy || []).filter(id => id !== address)
-              : [...(post.likedBy || []), address]
-          };
-        }
-        return post;
-      });
-      
-      // Zachowujemy bieżące sortedPosts i displayLimit
-      // Zamiast pełnego odświeżenia, które resetuje scroll i widok
-      // aktualizujemy tylko konkretny post
+      // Znajdź post w obecnej liście
       const postIndex = posts.findIndex(p => p.id === postId);
-      if (postIndex !== -1) {
-        const postsCopy = [...posts];
-        postsCopy[postIndex] = updatedPosts[postIndex];
-        
-        // Aktualizujemy stan bez resetowania widoku
-        if (onRefreshPosts) {
-          onRefreshPosts([...postsCopy]);
-        }
+      if (postIndex === -1) return;
+      
+      const post = posts[postIndex];
+      const isLiked = post.likedBy?.includes(address);
+      
+      // Utwórz kopię postów, aby nie modyfikować bezpośrednio stanu
+      const updatedPosts = [...posts];
+      
+      // Zaktualizuj konkretny post
+      updatedPosts[postIndex] = {
+        ...post,
+        likes: (post.likes || 0) + (isLiked ? -1 : 1),
+        likedBy: isLiked 
+          ? (post.likedBy || []).filter(id => id !== address)
+          : [...(post.likedBy || []), address]
+      };
+      
+      // Wywołaj onRefreshPosts z zaktualizowaną listą, ale zachowaj pozycję na liście
+      if (onRefreshPosts) {
+        await onRefreshPosts(updatedPosts);
       }
       
-      // Wysyłamy akcję do Firebase w tle
+      // Wykonaj rzeczywiste żądanie do serwera w tle
       await toggleLike(postId, address);
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -275,43 +349,40 @@ export default function PostList({
     if (!address) return;
     
     try {
-      // Optymistyczna aktualizacja UI - lokalna bez resetowania widoku
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          // Znajdź komentarz
-          const updatedComments = (post.comments || []).map(comment => {
-            if (comment.id === commentId) {
-              const isLiked = comment.likedBy?.includes(address);
-              return {
-                ...comment,
-                likes: (comment.likes || 0) + (isLiked ? -1 : 1),
-                likedBy: isLiked 
-                  ? (comment.likedBy || []).filter(id => id !== address)
-                  : [...(comment.likedBy || []), address]
-              };
-            }
-            return comment;
-          });
-            
-          return {
-            ...post,
-            comments: updatedComments
-          };
-        }
-        return post;
-      });
-      
-      // Zachowujemy bieżące sortowanie i limity wyświetlania
-      // Aktualizujemy tylko konkretny post z komentarzem
+      // Znajdź post i komentarz
       const postIndex = posts.findIndex(p => p.id === postId);
-      if (postIndex !== -1) {
-        const postsCopy = [...posts];
-        postsCopy[postIndex] = updatedPosts[postIndex];
-        
-        // Aktualizujemy stan bez resetowania widoku
-        if (onRefreshPosts) {
-          onRefreshPosts([...postsCopy]);
-        }
+      if (postIndex === -1) return;
+      
+      const post = posts[postIndex];
+      const comments = post.comments || [];
+      const commentIndex = comments.findIndex(c => c.id === commentId);
+      if (commentIndex === -1) return;
+      
+      const comment = comments[commentIndex];
+      const isLiked = comment.likedBy?.includes(address);
+      
+      // Utwórz kopię postów, aby nie modyfikować bezpośrednio stanu
+      const updatedPosts = [...posts];
+      
+      // Zaktualizuj komentarze dla posta
+      const updatedComments = [...comments];
+      updatedComments[commentIndex] = {
+        ...comment,
+        likes: (comment.likes || 0) + (isLiked ? -1 : 1),
+        likedBy: isLiked 
+          ? (comment.likedBy || []).filter(id => id !== address)
+          : [...(comment.likedBy || []), address]
+      };
+      
+      // Zaktualizuj post
+      updatedPosts[postIndex] = {
+        ...post,
+        comments: updatedComments
+      };
+      
+      // Zaktualizuj stan bez pełnego odświeżenia
+      if (onRefreshPosts) {
+        await onRefreshPosts(updatedPosts);
       }
       
       // Wykonaj rzeczywiste żądanie do serwera w tle
@@ -320,8 +391,7 @@ export default function PostList({
       console.error('Error toggling comment like:', error);
       toast.error('Failed to like comment');
       // W przypadku błędu, przywróć poprzedni stan
-      const postIndex = posts.findIndex(p => p.id === postId);
-      if (postIndex !== -1 && onRefreshPosts) {
+      if (onRefreshPosts) {
         await onRefreshPosts();
       }
     }
@@ -434,16 +504,25 @@ export default function PostList({
       // Pobierz następną partię postów
       const { posts: morePosts, lastVisible: newLastVisible } = await fetchPosts({
         userId: address,
-        startAfter: lastVisible
+        startAfter: lastVisible,
+        limit: 20 // Pobieraj stałą liczbę postów za każdym razem
       });
       
       if (morePosts.length > 0) {
-        // Dodaj nowe posty do istniejących bez resetowania widoku
-        if (onRefreshPosts) {
-          // Połącz istniejące posty z nowymi
-          const allPosts = [...posts, ...morePosts];
-          await onRefreshPosts(allPosts);
-          console.log(`Załadowano ${morePosts.length} nowych postów`);
+        // Sprawdź, czy nowe posty nie są duplikatami (porównaj przez ID)
+        const existingPostIds = new Set(posts.map(post => post.id));
+        const uniqueNewPosts = morePosts.filter(post => !existingPostIds.has(post.id));
+        
+        if (uniqueNewPosts.length > 0) {
+          // Dodaj nowe posty do istniejących bez resetowania widoku
+          if (onRefreshPosts) {
+            // Połącz istniejące posty z nowymi
+            const allPosts = [...posts, ...uniqueNewPosts];
+            await onRefreshPosts(allPosts);
+            console.log(`Załadowano ${uniqueNewPosts.length} nowych postów`);
+          }
+        } else {
+          console.log('Brak nowych unikalnych postów do załadowania');
         }
       }
       
@@ -504,39 +583,62 @@ export default function PostList({
 
   useEffect(() => {
     const fetchAllTokenData = async () => {
-      const tokenPosts = posts.filter(post => post.zoraCoinAddress);
-      if (tokenPosts.length === 0) return;
+      // Pobierz tylko posty z adresami zoraCoinAddress, które nie mają jeszcze danych w cache
+      const tokenPostsToFetch = posts.filter(post => 
+        post.zoraCoinAddress && 
+        (!postTokenData[post.id] || !postTokenData[post.id].isFetched)
+      );
 
-      console.log(`Fetching Zora data for ${tokenPosts.length} posts...`);
+      if (tokenPostsToFetch.length === 0) return;
+
+      console.log(`Fetching Zora data for ${tokenPostsToFetch.length} new posts...`);
 
       // Use Promise.allSettled to fetch data for all posts concurrently
       // and handle potential errors for individual posts
       const results = await Promise.allSettled(
-        tokenPosts.map(async (post) => {
+        tokenPostsToFetch.map(async (post) => {
           if (!post.zoraCoinAddress) return { postId: post.id, data: null }; // Should not happen due to filter
 
           // Indicate loading for this specific post
           setIsLoadingTokenData(prev => ({ ...prev, [post.id]: true }));
 
           try {
-            // Access data correctly via response.data.zora20Token
-            const response = await getCoin({ address: post.zoraCoinAddress });
-            const tokenInfo = response?.data?.zora20Token;
+            // Timeout dla zapytania, aby uniknąć zawieszenia
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout fetching token data')), 5000)
+            );
+            
+            // Race między rzeczywistym zapytaniem a timeoutem
+            const response = await Promise.race([
+              getCachedCoin(post.zoraCoinAddress),
+              timeoutPromise
+            ]) as any;
+            
+            const tokenInfo = response?.data?.zora20Token as unknown as ZoraApiTokenInfo;
+            
             if (tokenInfo) {
               // Basic data extraction - simplified due to typing issues
               const data: ZoraCoinData = {
                 totalSupply: tokenInfo.totalSupply || undefined,
                 uniqueHolders: tokenInfo.uniqueHolders || undefined,
-                symbol: tokenInfo.symbol || 'POST'
+                symbol: tokenInfo.symbol || 'POST',
+                name: tokenInfo.name || 'POST',
+                marketCap: tokenInfo.marketCap,
+                volume24h: tokenInfo.volume24h,
+                createdAt: tokenInfo.createdAt,
+                priceUSD: tokenInfo.priceUSD,
+                imageUrl: tokenInfo.media?.previewImage || tokenInfo.media?.medium,
+                priceChange24h: tokenInfo.priceChange24h,
+                isFetched: true // Mark as fetched for caching
               };
               return { postId: post.id, data };
             } else {
               console.warn(`No Zora token data found for address: ${post.zoraCoinAddress}`);
-              return { postId: post.id, data: null };
+              return { postId: post.id, data: { isFetched: true } }; // Mark as fetched even if no data
             }
           } catch (error) {
             console.error(`Error fetching Zora data for post ${post.id} (${post.zoraCoinAddress}):`, error);
-            return { postId: post.id, data: null, error: true }; // Indicate error
+            return { postId: post.id, data: { isFetched: true }, error: true }; // Mark as fetched with error
           } finally {
             // Finish loading for this specific post
             setIsLoadingTokenData(prev => ({ ...prev, [post.id]: false }));
@@ -552,7 +654,9 @@ export default function PostList({
             newData[result.value.postId] = result.value.data;
           } else if (result.status === 'fulfilled' && result.value && result.value.error) {
             // Optionally handle posts where data fetching failed
-            // delete newData[result.value.postId]; // Or mark as errored
+            if (!newData[result.value.postId]) {
+              newData[result.value.postId] = { isFetched: true }; // Mark as attempted
+            }
           } else if (result.status === 'rejected') {
             // Handle unexpected promise rejection
             console.error("Unexpected error fetching Zora data:", result.reason);
@@ -562,90 +666,179 @@ export default function PostList({
       });
     };
 
-    if (posts && posts.length > 0) {
+    if (posts?.length > 0) {
       fetchAllTokenData();
     }
 
-    // We might not want to refetch every time `posts` changes if it changes frequently
-    // Consider adding more specific dependencies if needed, e.g., posts.length
-  }, [posts]); // Dependency on the posts array
+    // Teraz zależymy tylko od długości tablicy postów zamiast całej tablicy
+    // co zapobiega niepotrzebnym re-renderom i wielokrotnym zapytaniom API
+  }, [posts.length, postTokenData]); // Zmienione zależności
+
+  useEffect(() => {
+    // Fetch user token balances
+    const fetchUserBalances = async () => {
+      if (!address) return;
+      
+      try {
+        setIsLoadingBalances(true);
+        
+        // Get all unique token addresses from posts
+        const tokenAddresses = posts
+          .filter(post => post.zoraCoinAddress)
+          .map(post => post.zoraCoinAddress as string);
+        
+        if (tokenAddresses.length === 0) {
+          setIsLoadingBalances(false);
+          return;
+        }
+        
+        // Try to get balances from cache first
+        const cachedBalances: {[tokenAddress: string]: string} = {};
+        let needToFetch = false;
+        
+        tokenAddresses.forEach(tokenAddress => {
+          const cacheKey = `token_balance_${address.toLowerCase()}_${tokenAddress.toLowerCase()}`;
+          const cachedData = localStorage.getItem(cacheKey);
+          
+          if (cachedData) {
+            const { balance, timestamp } = JSON.parse(cachedData);
+            // Use cache if it's less than 5 minutes old
+            if (Date.now() - timestamp < 5 * 60 * 1000) {
+              // Poprawka: balance jest złożonym obiektem, musimy wyciągnąć właściwą wartość
+              if (typeof balance === 'object' && balance !== null && 'balance' in balance) {
+                cachedBalances[tokenAddress.toLowerCase()] = balance.balance;
+              } else {
+                cachedBalances[tokenAddress.toLowerCase()] = balance;
+              }
+            } else {
+              needToFetch = true;
+            }
+          } else {
+            needToFetch = true;
+          }
+        });
+        
+        if (!needToFetch) {
+          setUserTokenBalances(cachedBalances);
+          setIsLoadingBalances(false);
+          return;
+        }
+        
+        // Need to fetch fresh balances
+        const result = await getProfileBalances({
+          identifier: address,
+          count: 100 // Fetch more tokens to ensure we get all needed ones
+        });
+        
+        const freshBalances: {[tokenAddress: string]: string} = {};
+        
+        result.data?.profile?.coinBalances?.edges?.forEach((edge: any) => {
+          if (edge?.node?.coin?.address && edge?.node?.balance) {
+            const tokenAddress = edge.node.coin.address.toLowerCase();
+            const balance = formatUnits(BigInt(edge.node.balance), 18);
+            
+            freshBalances[tokenAddress] = balance;
+            
+            // Save to localStorage - poprawiony format aby był spójny
+            const cacheKey = `token_balance_${address.toLowerCase()}_${tokenAddress}`;
+            localStorage.setItem(cacheKey, JSON.stringify({
+              balance: balance, // Teraz zapisujemy prostą wartość, nie obiekt
+              timestamp: Date.now()
+            }));
+          }
+        });
+        
+        // Combine fresh balances with cached ones for any that weren't found
+        const combinedBalances = { ...freshBalances };
+        
+        tokenAddresses.forEach(tokenAddress => {
+          const lowerAddress = tokenAddress.toLowerCase();
+          if (!combinedBalances[lowerAddress]) {
+            combinedBalances[lowerAddress] = cachedBalances[lowerAddress] || '0';
+          }
+        });
+        
+        setUserTokenBalances(combinedBalances);
+      } catch (error) {
+        console.error('Error fetching user balances:', error);
+      } finally {
+        setIsLoadingBalances(false);
+      }
+    };
+    
+    fetchUserBalances();
+  }, [address, posts]);
 
   const handleBuyCoin = async (postId: string) => {
-      const post = posts.find(p => p.id === postId);
-      if (!post?.zoraCoinAddress || !address || !walletClient || !publicClient) return;
-
-      const amountEth = prompt("Enter amount of ETH to spend:", "0.01");
-      if (!amountEth || isNaN(parseFloat(amountEth)) || parseFloat(amountEth) <= 0) {
-        toast.error("Invalid amount");
-        return;
-      }
-
-      const toastId = toast.loading(`Buying ${postTokenData[postId]?.symbol || 'tokens'}...`);
-
-      try {
-          const buyParams = {
-              direction: "buy" as const,
-              target: post.zoraCoinAddress as ViemAddress,
-              args: {
-                  recipient: address as ViemAddress,
-                  orderSize: parseEther(amountEth),
-                  minAmountOut: 0n, // TODO: Add slippage control
-              }
-          };
-
-          // Remove the 4th argument (value). SDK should handle value for ETH buys.
-          const result = await tradeCoin(buyParams, walletClient, publicClient);
-
-          toast.loading("Waiting for transaction...", { id: toastId });
-          await publicClient.waitForTransactionReceipt({ hash: result.hash });
-          toast.success(`Successfully bought ${postTokenData[postId]?.symbol || 'tokens'}!`, { id: toastId });
-          // TODO: Refresh token data or user balance
-          refreshPosts(); // Refresh posts to potentially update token data
-      } catch (error: any) {
-          console.error("Error buying coin:", error);
-          toast.error(`Buy failed: ${error.message.substring(0, 60)}...`, { id: toastId });
-      }
+    setSelectedPostId(postId);
+    setTransactionType('buy');
+    setTransactionAmount('0.01');
+    setTransactionModalOpen(true);
   };
 
   const handleSellCoin = async (postId: string) => {
-      const post = posts.find(p => p.id === postId);
-      const tokenData = postTokenData[postId];
-      // Need decimals for parseUnits, default to 18 if unavailable for now
-      const decimals = 18; // Defaulting to 18 as tokenInfo.decimals is unavailable
-      if (!post?.zoraCoinAddress || !address || !walletClient || !publicClient) return;
+    setSelectedPostId(postId);
+    setTransactionType('sell');
+    setTransactionAmount('1.0');
+    setTransactionModalOpen(true);
+  };
 
-      const amountTokens = prompt(`Enter amount of ${tokenData?.symbol || 'tokens'} to sell:`);
-      if (!amountTokens || isNaN(parseFloat(amountTokens)) || parseFloat(amountTokens) <= 0) {
-          toast.error("Invalid amount");
-          return;
+  const executeTransaction = async () => {
+    if (!selectedPostId || !address || !walletClient || !publicClient) return;
+    
+    const post = posts.find(p => p.id === selectedPostId);
+    if (!post?.zoraCoinAddress) return;
+    
+    const tokenData = postTokenData[selectedPostId];
+    setIsTransacting(true);
+    
+    try {
+      const toastId = toast.loading(`${transactionType === 'buy' ? 'Buying' : 'Selling'} ${tokenData?.symbol || 'tokens'}...`);
+      
+      if (transactionType === 'buy') {
+        const buyParams = {
+          direction: "buy" as const,
+          target: post.zoraCoinAddress as ViemAddress,
+          args: {
+            recipient: address as ViemAddress,
+            orderSize: parseEther(transactionAmount),
+            minAmountOut: 0n,
+          }
+        };
+        
+        const result = await tradeCoin(buyParams, walletClient, publicClient);
+        
+        toast.loading("Waiting for transaction...", { id: toastId });
+        await publicClient.waitForTransactionReceipt({ hash: result.hash });
+        toast.success(`Successfully bought ${tokenData?.symbol || 'tokens'}!`, { id: toastId });
+      } else {
+        // Sell transaction
+        const decimals = 18;
+        const sellParams = {
+          direction: "sell" as const,
+          target: post.zoraCoinAddress as ViemAddress,
+          args: {
+            recipient: address as ViemAddress,
+            orderSize: parseUnits(transactionAmount, decimals),
+            minAmountOut: 0n,
+          }
+        };
+        
+        const result = await tradeCoin(sellParams, walletClient, publicClient);
+        
+        toast.loading("Waiting for transaction...", { id: toastId });
+        await publicClient.waitForTransactionReceipt({ hash: result.hash });
+        toast.success(`Successfully sold ${tokenData?.symbol || 'tokens'}!`, { id: toastId });
       }
-
-      const toastId = toast.loading(`Selling ${tokenData?.symbol || 'tokens'}...`);
-
-      try {
-          const sellParams = {
-              direction: "sell" as const,
-              target: post.zoraCoinAddress as ViemAddress,
-              args: {
-                  recipient: address as ViemAddress,
-                  orderSize: parseUnits(amountTokens, decimals), // Using default decimals
-                  minAmountOut: 0n, // TODO: Add slippage control
-              }
-          };
-
-          // Note: Selling might require prior approval of the token contract
-          // Zora SDK might handle this, but needs verification.
-          const result = await tradeCoin(sellParams, walletClient, publicClient);
-
-          toast.loading("Waiting for transaction...", { id: toastId });
-          await publicClient.waitForTransactionReceipt({ hash: result.hash });
-          toast.success(`Successfully sold ${tokenData?.symbol || 'tokens'}!`, { id: toastId });
-          // TODO: Refresh token data or user balance
-          refreshPosts(); // Refresh posts to potentially update token data
-      } catch (error: any) {
-          console.error("Error selling coin:", error);
-          toast.error(`Sell failed: ${error.message.substring(0, 60)}...`, { id: toastId });
-      }
+      
+      refreshPosts();
+      setTransactionModalOpen(false);
+    } catch (error: any) {
+      console.error(`Error ${transactionType}ing coin:`, error);
+      toast.error(`${transactionType === 'buy' ? 'Buy' : 'Sell'} failed: ${error.message.substring(0, 60)}...`);
+    } finally {
+      setIsTransacting(false);
+    }
   };
 
   const renderComments = (post: ExtendedPost) => {
@@ -921,7 +1114,7 @@ export default function PostList({
     const isLoadingData = isLoadingTokenData[post.id];
 
     return (
-      <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 border border-gray-100 dark:border-gray-700">
+      <div key={`post-${post.id}`} className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 border border-gray-100 dark:border-gray-700">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
             <div className="flex-shrink-0">
@@ -936,18 +1129,18 @@ export default function PostList({
               )}
             </div>
             <div className="flex items-center">
-              {/* Logo Zora jeśli post jest tokenem Zora */}
-              {post.zoraCoinAddress && (
-                <img 
-                  src="/zora.png"
-                  alt="Zora Token"
-                  className="w-4 h-4 mx-1"
-                  title="This post is a Zora token"
-                />
-              )}
               {displayUserName(post.author, `post-author-${post.id}`, false)}
+              {/* Zora logo and badge */}
               {post.zoraCoinAddress && (
-                <span className="ml-1 text-xs text-purple-500 font-medium">PostCoin on Zora</span>
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
+                  <img 
+                    src="/android-chrome-512x512.png"
+                    alt="Sphere Token"
+                    className="w-5 h-5 drop-shadow-md"
+                    title="This post is a Sphere token"
+                  />
+                  <span className="ml-1 text-sm bg-gradient-to-r from-purple-600 to-blue-500 text-transparent bg-clip-text font-bold drop-shadow-sm">PostCoin</span>
+                </div>
               )}
             </div>
           </div>
@@ -958,19 +1151,56 @@ export default function PostList({
         </div>
 
         <div className="mb-3">
-          <div className={`prose prose-sm max-w-none break-words text-black dark:text-white ${!isTextExpanded && post.content.length > 300 ? 'max-h-24 overflow-hidden relative' : ''}`}>
-            {post.content}
-            {!isTextExpanded && post.content.length > 300 && (
-              <div className="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-t from-white dark:from-gray-800 to-transparent"></div>
+          <div className={`prose prose-sm max-w-none whitespace-pre-wrap break-words text-black dark:text-white ${!isTextExpanded && post.content.length > 500 ? 'max-h-52 overflow-hidden relative' : ''}`}>
+            {post.content.split('\n').map((paragraph, index) => (
+              paragraph.trim() ? (
+                <p key={index} className="mb-2 break-words whitespace-normal overflow-wrap-anywhere">
+                  {paragraph.split(/(\s+)/).map((part, partIndex) => {
+                    if (part.startsWith('#')) {
+                      return (
+                        <span key={partIndex} className="text-blue-500 dark:text-blue-400 font-medium hover:underline">
+                          {part}
+                        </span>
+                      );
+                    }
+                    return part;
+                  })}
+                </p>
+              ) : (
+                <br key={index} />
+              )
+            ))}
+            {!isTextExpanded && post.content.length > 500 && (
+              <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-white dark:from-gray-800 to-transparent"></div>
             )}
           </div>
-          {post.content.length > 300 && (
+          
+          {post.content.length > 500 && (
             <button
               onClick={() => setExpandedTextPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
               className="text-blue-500 text-xs mt-1 hover:underline"
             >
               {isTextExpanded ? 'Show less' : 'Show more'}
             </button>
+          )}
+          
+          {/* Pasek hashtagów - wyświetla wszystkie hashtagi, nawet te niewidoczne */}
+          {extractHashtags(post.content).length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
+              {extractHashtags(post.content).map((tag, i) => (
+                <a 
+                  key={i}
+                  href="#" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Można dodać funkcjonalność filtrowania po hashtagach
+                  }}
+                  className="inline-block px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400 text-xs font-medium rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/30 transition-colors"
+                >
+                  {tag}
+                </a>
+              ))}
+            </div>
           )}
         </div>
 
@@ -997,91 +1227,206 @@ export default function PostList({
           </div>
         )}
 
+        {/* --- NEW ZORA TOKEN INFO & ACTIONS SECTION --- */}
         {post.zoraCoinAddress && (
-          <div className="mt-3 mb-3 text-xs">
-            <a 
-              href={`https://zora.co/collections/base/${post.zoraCoinAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center text-blue-500 hover:text-blue-600 hover:underline"
-            >
-              <img 
-                src="/zora.png" 
-                alt="Zora Logo" 
-                className="w-3.5 h-3.5 mr-1.5"
-              />
-              <span>View token on Zora: {post.zoraCoinAddress.substring(0,6)}...{post.zoraCoinAddress.substring(38)}</span>
-              <ExternalLink className="w-3 h-3 ml-1" />
-            </a>
-          </div>
-        )}
-
-        {/* --- ZORA TOKEN INFO & ACTIONS --- */}
-        {post.zoraCoinAddress && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 rounded-b-lg -mx-4 -mb-4 px-4 pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-gray-600 dark:text-gray-300 mb-3">
-              {isLoadingData && (
-                <span className="flex items-center text-gray-500">
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Loading token data...
-                </span>
-              )}
-              {zoraData && (
+          <div className="mt-4 mb-2 overflow-hidden">
+            {/* Modern Zora Token Card */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl border border-purple-100 dark:border-purple-800/30 p-4">
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center">
+                  {zoraData?.imageUrl ? (
+                    <img 
+                      src={zoraData.imageUrl} 
+                      alt={zoraData?.name || 'Token'} 
+                      className="w-5 h-5 mr-2 rounded-full"
+                    />
+                  ) : (
+                    <img 
+                      src="/android-chrome-512x512.png" 
+                      alt="Sphere Logo" 
+                      className="w-5 h-5 mr-2"
+                    />
+                  )}
+                  <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                    {zoraData?.symbol || 'POSTCOIN'}
+                  </h3>
+                  {zoraData?.name && zoraData.name !== zoraData?.symbol && (
+                    <span className="ml-1.5 text-xs text-gray-700 dark:text-gray-300 whitespace-normal">
+                      {zoraData.name}
+                    </span>
+                  )}
+                </div>
+                <a 
+                  href={`https://zora.co/coin/base:${post.zoraCoinAddress}?referrer=0xf1fa20027b6202bc18e4454149c85cb01dc91dfd`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition-colors"
+                >
+                  View on Zora
+                  <ArrowUpRight className="w-3 h-3 ml-1" />
+                </a>
+              </div>
+              
+              {isLoadingData ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
+                </div>
+              ) : (
                 <>
-                  <span className="flex items-center" title="Token Symbol">
-                    <Tag className="w-3.5 h-3.5 mr-1.5 text-blue-500" />
-                    Symbol: <span className="font-medium text-gray-800 dark:text-gray-100 ml-1">{zoraData.symbol || 'N/A'}</span>
-                  </span>
-                  {zoraData.uniqueHolders !== undefined && (
-                    <span className="flex items-center" title="Number of Holders">
-                      <Users className="w-3.5 h-3.5 mr-1.5 text-purple-500" />
-                      Holders: <span className="font-medium text-gray-800 dark:text-gray-100 ml-1">{zoraData.uniqueHolders}</span>
-                    </span>
-                  )}
-                  {zoraData.totalSupply && (
-                    <span className="flex items-center" title="Total Supply">
-                      <Coins className="w-3.5 h-3.5 mr-1.5 text-green-500" />
-                      Supply: <span className="font-medium text-gray-800 dark:text-gray-100 ml-1">{formatEther(BigInt(zoraData.totalSupply || '0'))}</span>
-                    </span>
-                  )}
-                  <a
-                    href={`https://basescan.org/token/${post.zoraCoinAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center text-blue-500 hover:text-blue-600 hover:underline"
-                    title="View on Basescan"
-                  >
-                    View on Basescan
-                    <ExternalLink className="w-3 h-3 ml-1" />
-                  </a>
+                  {/* First row of kafelki */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Symbol</div>
+                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{zoraData?.symbol || 'N/A'}</div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Holders</div>
+                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{zoraData?.uniqueHolders || '0'}</div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Supply</div>
+                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                        {zoraData?.totalSupply 
+                        ? zoraData.totalSupply
+                        : '0.00'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Second row of kafelki with balance */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {/* Balance kafelek */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Your Balance</div>
+                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                        {isLoadingBalances 
+                          ? '...' 
+                          : (function() {
+                              // Bezpieczne parsowanie balansu
+                              if (!post.zoraCoinAddress) return '0.000000';
+                              
+                              const balanceStr = userTokenBalances[post.zoraCoinAddress.toLowerCase()];
+                              if (!balanceStr) return '0.000000';
+                              
+                              try {
+                                const balanceNum = parseFloat(balanceStr);
+                                return isNaN(balanceNum) ? '0.000000' : balanceNum.toFixed(6);
+                              } catch (e) {
+                                console.error('Error formatting balance:', e);
+                                return '0.000000';
+                              }
+                            })()
+                        }
+                      </div>
+                    </div>
+                    
+                    {zoraData?.marketCap && (
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Market Cap</div>
+                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                          ${formatNumberWithSuffix(zoraData.marketCap)}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {zoraData?.volume24h && (
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">24h Volume</div>
+                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                          ${formatNumberWithSuffix(zoraData.volume24h)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Third row of kafelki */}
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    {zoraData?.priceUSD && (
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Price</div>
+                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100 flex items-center justify-center">
+                          <span>${formatNumberWithSuffix(zoraData.priceUSD)}</span>
+                          {zoraData.priceChange24h !== undefined && (
+                            <span 
+                              className={`ml-1.5 text-xs ${
+                                zoraData.priceChange24h > 0 
+                                  ? 'text-green-500' 
+                                  : zoraData.priceChange24h < 0 
+                                    ? 'text-red-500' 
+                                    : 'text-gray-500'
+                              }`}
+                            >
+                              {zoraData.priceChange24h > 0 ? '↑' : zoraData.priceChange24h < 0 ? '↓' : ''}
+                              {Math.abs(zoraData.priceChange24h).toFixed(2)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Usuwamy kafelek Created */}
+                  </div>
+                  
+                  <div className="flex space-x-2 mb-4">
+                    <button
+                      onClick={() => handleBuyCoin(post.id)}
+                      className="flex-1 flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all duration-200 transform hover:scale-[1.02]"
+                    >
+                      <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
+                      Buy Token
+                    </button>
+                    <button
+                      onClick={() => handleSellCoin(post.id)}
+                      className="flex-1 flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-gradient-to-r from-green-500 to-teal-500 rounded-lg hover:from-green-600 hover:to-teal-600 transition-all duration-200 transform hover:scale-[1.02]"
+                    >
+                      <TrendingDown className="w-3.5 h-3.5 mr-1.5" />
+                      Sell Token
+                    </button>
+                  </div>
+                  
+                  {/* Linki do zewnętrznych serwisów */}
+                  <div className="border-t border-purple-100 dark:border-purple-800/30 pt-4">
+                    <div className="flex justify-center space-x-4">
+                      {post.zoraCoinAddress && userTokenBalances[post.zoraCoinAddress.toLowerCase()] && 
+                       parseFloat(userTokenBalances[post.zoraCoinAddress.toLowerCase()]) > 0 && (
+                        <a 
+                          href={`https://zora.co/profile/${address}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-500 hover:text-purple-700 flex items-center"
+                        >
+                          View your tokens
+                          <ExternalLink className="w-3 h-3 ml-1" />
+                        </a>
+                      )}
+                      
+                      <a 
+                        href={`https://basescan.org/token/${post.zoraCoinAddress}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 flex items-center"
+                      >
+                        View on Basescan
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                      
+                      <a 
+                        href={`https://dexscreener.com/base/${post.zoraCoinAddress}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-green-500 hover:text-green-700 flex items-center"
+                      >
+                        View on Dexscreener
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                    </div>
+                  </div>
                 </>
               )}
             </div>
-            {/* Buy/Sell Buttons */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => handleBuyCoin(post.id)}
-                className="flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-md hover:from-green-600 hover:to-emerald-700 transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 shadow-sm hover:shadow-md"
-                disabled={!address || !walletClient}
-              >
-                <ShoppingCart className="w-3.5 h-3.5 mr-1.5" />
-                Buy
-              </button>
-              <button
-                onClick={() => handleSellCoin(post.id)}
-                className="flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-gradient-to-r from-red-500 to-rose-600 rounded-md hover:from-red-600 hover:to-rose-700 transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 shadow-sm hover:shadow-md"
-                disabled={!address || !walletClient}
-              >
-                <Tag className="w-3.5 h-3.5 mr-1.5 transform rotate-180" />
-                Sell
-              </button>
-            </div>
           </div>
         )}
-        {/* --- END ZORA TOKEN INFO & ACTIONS --- */}
+        {/* --- END NEW ZORA TOKEN INFO & ACTIONS --- */}
 
         <div className="flex items-center space-x-4 text-gray-900 dark:text-gray-200 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
           <button
@@ -1219,7 +1564,11 @@ export default function PostList({
 
   return (
     <div className="space-y-6">
-      {displayedPosts.map(renderPost)}
+      {displayedPosts.map(post => (
+        <React.Fragment key={`post-fragment-${post.id}`}>
+          {renderPost(post)}
+        </React.Fragment>
+      ))}
       
       <div ref={loadMoreTriggerRef} className="flex justify-center p-4">
         {isLoadingMore ? (
@@ -1258,6 +1607,140 @@ export default function PostList({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Transaction Modal */}
+      {transactionModalOpen && selectedPostId && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-4 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity backdrop-blur-sm" aria-hidden="true" onClick={() => !isTransacting && setTransactionModalOpen(false)}></div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div className="inline-block align-middle bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-lg sm:w-full mx-auto my-4 border border-gray-100 dark:border-gray-700">
+              <div className="px-6 pt-6 pb-4 sm:p-8 sm:pb-6">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-14 w-14 rounded-full bg-purple-100 dark:bg-purple-900 sm:mx-0 sm:h-12 sm:w-12">
+                    <img 
+                      src="/android-chrome-512x512.png" 
+                      alt="Sphere Logo" 
+                      className="h-8 w-8"
+                    />
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-6 sm:text-left w-full">
+                    <h3 className="text-xl leading-6 font-semibold text-gray-900 dark:text-white" id="modal-title">
+                      {transactionType === 'buy' ? 'Buy' : 'Sell'} {postTokenData[selectedPostId]?.symbol || 'Token'}
+                    </h3>
+                    
+                    {/* Display Current Balance */}
+                    <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">
+                      {transactionType === 'buy' ? (
+                        <div>Your ETH balance will be shown here</div>
+                      ) : (
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Your Balance: <span className="text-purple-600 dark:text-purple-400">{
+                            (() => {
+                              const post = posts.find(p => p.id === selectedPostId);
+                              if (!post?.zoraCoinAddress || !address) return '0.00';
+                              
+                              const balanceStr = userTokenBalances[post.zoraCoinAddress.toLowerCase()];
+                              if (!balanceStr) return '0.00';
+                              
+                              try {
+                                const balanceNum = parseFloat(balanceStr);
+                                return isNaN(balanceNum) ? '0.00' : balanceNum.toFixed(6);
+                              } catch (e) {
+                                return '0.00';
+                              }
+                            })()
+                          } {postTokenData[selectedPostId]?.symbol || 'Tokens'}</span></span>
+                          <button
+                            onClick={() => {
+                              const post = posts.find(p => p.id === selectedPostId);
+                              if (!post?.zoraCoinAddress || !address) return;
+                              
+                              const balanceStr = userTokenBalances[post.zoraCoinAddress.toLowerCase()];
+                              if (!balanceStr) return;
+                              
+                              try {
+                                const balanceNum = parseFloat(balanceStr);
+                                if (!isNaN(balanceNum) && balanceNum > 0) {
+                                  setTransactionAmount(balanceNum.toString());
+                                }
+                              } catch (e) {
+                                console.error('Error setting max balance:', e);
+                              }
+                            }}
+                            className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                            type="button"
+                          >
+                            Use Max
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="mt-5">
+                      <label htmlFor="amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {transactionType === 'buy' ? 'Amount in ETH' : `Amount of ${postTokenData[selectedPostId]?.symbol || 'Tokens'}`}
+                      </label>
+                      <div className="relative rounded-xl shadow-sm">
+                        <input
+                          type="text"
+                          name="amount"
+                          id="amount"
+                          className="focus:ring-purple-500 focus:border-purple-500 block w-full p-3 sm:text-base border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white font-medium rounded-xl"
+                          placeholder={transactionType === 'buy' ? "0.01" : "1.0"}
+                          value={transactionAmount}
+                          onChange={(e) => setTransactionAmount(e.target.value)}
+                          disabled={isTransacting}
+                        />
+                        <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                          <span className="text-gray-500 dark:text-gray-400 sm:text-base font-medium">
+                            {transactionType === 'buy' ? 'ETH' : postTokenData[selectedPostId]?.symbol || 'Tokens'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-4 sm:p-6 flex flex-col space-y-3 sm:flex-row-reverse sm:space-y-0 sm:space-x-3 sm:space-x-reverse">
+                <button
+                  type="button"
+                  onClick={executeTransaction}
+                  disabled={isTransacting || !transactionAmount || isNaN(parseFloat(transactionAmount)) || parseFloat(transactionAmount) <= 0}
+                  className={`w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-5 py-3 text-base font-medium text-white sm:w-auto
+                    ${transactionType === 'buy' 
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 focus:ring-purple-500' 
+                      : 'bg-gradient-to-r from-red-700 to-red-600 hover:from-red-800 hover:to-red-700 focus:ring-red-500'}
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200 transform hover:scale-[1.02]`}
+                >
+                  {isTransacting ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : (
+                    `${transactionType === 'buy' ? 'Buy' : 'Sell'} Now`
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-xl border border-gray-300 dark:border-gray-600 shadow-sm px-5 py-3 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:w-auto disabled:opacity-50 transition-all duration-200"
+                  onClick={() => !isTransacting && setTransactionModalOpen(false)}
+                  disabled={isTransacting}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

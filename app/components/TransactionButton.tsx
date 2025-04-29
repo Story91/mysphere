@@ -209,7 +209,7 @@ export default function TransactionButtonWrapper({
                 )}
               </span>
             }
-            className="px-3 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-[#0052FF] to-[#2D74FF] text-white rounded-lg hover:from-[#0047E1] hover:to-[#2D6AE6] disabled:opacity-50 disabled:cursor-not-allowed border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3),0_0_20px_rgba(0,82,255,0.2),0_0_30px_rgba(0,82,255,0.1)] transition-all duration-300 font-medium relative overflow-hidden text-sm"
+            className="px-3 py-1.5 sm:px-5 sm:py-2 h-[32px] bg-gradient-to-r from-[#0052FF] to-[#2D74FF] text-white rounded-lg hover:from-[#0047E1] hover:to-[#2D6AE6] disabled:opacity-50 disabled:cursor-not-allowed border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3),0_0_20px_rgba(0,82,255,0.2),0_0_30px_rgba(0,82,255,0.1)] transition-all duration-300 font-medium relative overflow-hidden text-sm"
             disabled={disabled || !content.trim() || isTransacting || !!networkError}
           />
           <TransactionSponsor />
@@ -253,7 +253,8 @@ export default function TransactionButtonWrapper({
         Request denied.
       </div>
       
-      <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-transparent opacity-50 animate-pulse pointer-events-none"></div>
+      {/* Zakomentowana pulsująca animacja tła */}
+      {/* <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-transparent opacity-50 animate-pulse pointer-events-none"></div> */}
     </div>
   );
 } 
