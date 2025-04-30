@@ -1152,38 +1152,68 @@ export default function BaseChat() {
     }
   }, [canManuallyRefresh, getActiveUsers]);
 
-  // Zmodyfikowane useEffect-y
+  // Automatyczne odświeżanie przy pierwszym załadowaniu strony
   useEffect(() => {
-    // Najpierw załaduj dane z localStorage
-    loadInitialData();
-    
-    // Po 15 sekundach pobierz aktualne dane z Firebase
-    const initialRefreshTimeout = setTimeout(() => {
-      getActiveUsers();
-    }, 15 * 1000);
-    
-    // Po pierwszym odświeżeniu, ustaw interwał co 2 minuty
-    const intervalTimeout = setTimeout(() => {
+    if (isMounted && !initialRefreshDone) {
+      // Najpierw załaduj dane z localStorage
+      loadInitialData();
+      
+      // Następnie pobierz aktualne dane z Firebase
+      const initialRefreshTimeout = setTimeout(() => {
+        getActiveUsers();
+      }, 1000); // Odśwież po 1 sekundzie od załadowania strony
+      
+      return () => {
+        clearTimeout(initialRefreshTimeout);
+      };
+    }
+  }, [isMounted, initialRefreshDone, loadInitialData, getActiveUsers]);
+
+  // Usuwam zmieniony useEffect dla odświeżania po zalogowaniu
+  useEffect(() => {
+    if (isConnected && address && !isLoadingUsers) {
+      // Zamiast bezpośredniego wywołania getActiveUsers,
+      // symulujemy kliknięcie przycisku Refresh, jeśli można odświeżyć
+      if (canManuallyRefresh) {
+        handleManualRefresh();
+      } else {
+        // Jeśli nie można teraz odświeżyć, ustawiamy timeout na próbę za 2 sekundy
+        const refreshTimeout = setTimeout(() => {
+          if (canManuallyRefresh) {
+            handleManualRefresh();
+          }
+        }, 2000);
+        
+        return () => clearTimeout(refreshTimeout);
+      }
+    }
+  }, [isConnected, address, canManuallyRefresh, handleManualRefresh]);
+  
+  // Regularne odświeżanie co 2 minuty
+  useEffect(() => {
+    if (isMounted) {
       const refreshInterval = setInterval(getActiveUsers, 2 * 60 * 1000); // Co 2 minuty
       
       // Cleanup dla interwału
       return () => {
         clearInterval(refreshInterval);
       };
-    }, 20 * 1000); // 20 sekund (15 na pierwsze odświeżenie + 5 sekund zapasu)
-    
-    // Cleanup dla timeoutów
-    return () => {
-      clearTimeout(initialRefreshTimeout);
-      clearTimeout(intervalTimeout);
-    };
-  }, [loadInitialData, getActiveUsers]);
+    }
+  }, [isMounted, getActiveUsers]);
 
   // Dodaj useEffect do aktualizacji trendujących tagów
   useEffect(() => {
     const trending = getTrendingTags(posts);
     setTrendingTags(trending);
   }, [posts]);
+
+  // useEffect do ustawienia isMounted
+  useEffect(() => {
+    setIsMounted(true);
+    return () => {
+      setIsMounted(false);
+    };
+  }, []);
 
   // Dodaj funkcję do tworzenia grupy
   const handleCreateGroup = async () => {
@@ -2015,11 +2045,6 @@ export default function BaseChat() {
       setIsGeneratingAI(false);
     }
   };
-
-  // Dodajemy useEffect do obsługi montowania komponentu
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // Efekt uruchamiany przy montowaniu komponentu
   useEffect(() => {
