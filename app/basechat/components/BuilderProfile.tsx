@@ -62,6 +62,9 @@ export default function BuilderProfile({
   // Używaj dostarczonych opisów rang lub importowanych
   const rankDescriptions = externalRankDescriptions || RANK_DESCRIPTIONS;
   
+  // Sprawdź czy to profil Vitalika
+  const isVitalik = profile.name === 'vitalik.eth';
+  
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [newBio, setNewBio] = useState(profile.bio || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -180,18 +183,40 @@ export default function BuilderProfile({
           <div className="flex-1">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
               <div className="flex flex-col">
-                <div className="text-2xl font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text">
-                  {profile.name.endsWith('.eth') ? (
-                    profile.name
-                  ) : profile.name.endsWith('.base.eth') ? (
+                <div className={`text-2xl font-semibold ${
+                  isVitalik 
+                    ? "bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-transparent bg-clip-text"
+                    : "bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text"
+                }`}>
+                  {profile.name.endsWith('.base.eth') ? (
                     <>
                       <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text">{profile.name}</span>
                       <span className="ml-1.5 text-sm bg-blue-100 dark:bg-blue-900 text-blue-500 px-1.5 py-0.5 rounded-md">BaseName</span>
                     </>
                   ) : (
-                    profile.name
+                    <>
+                      {profile.name}
+                      {isVitalik && (
+                        <span className="inline-flex items-center ml-2">
+                          <img 
+                            src="/ethlogo.png" 
+                            alt="ETH" 
+                            className="w-5 h-5 object-contain"
+                          />
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
+                
+                {/* Badge dla Vitalika */}
+                {isVitalik && (
+                  <div className="mt-1">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-yellow-500 text-white text-xs font-medium">
+                      Ethereum Founder
+                    </span>
+                  </div>
+                )}
                 <button
                   onClick={copyAddressToClipboard}
                   className="flex items-center text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md mt-1 w-fit"
@@ -271,6 +296,30 @@ export default function BuilderProfile({
             )}
           </div>
         </div>
+        
+        {/* Vitalik Buterin Info - Tylko dla profilu Vitalika */}
+        {isVitalik && (
+          <div className="mb-6 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-2xl shadow-sm p-6 border border-yellow-200 relative overflow-hidden">
+            {/* Efekt świecenia */}
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-yellow-200 rounded-full filter blur-3xl opacity-30"></div>
+            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-yellow-400 rounded-full filter blur-3xl opacity-20"></div>
+            
+            <div className="text-black relative z-10">
+              <h3 className="font-medium text-xl mb-3">About Vitalik Buterin</h3>
+              <div className="space-y-2 text-sm">
+                <p className="leading-relaxed">
+                  Vitalik Buterin is the co-founder of Ethereum, a decentralized, open-source blockchain platform that enables smart contracts and decentralized applications (dApps). He proposed Ethereum in a white paper in late 2013 when he was just 19 years old.
+                </p>
+                <p className="leading-relaxed">
+                  Ethereum launched in 2015 and quickly became the second-largest blockchain platform after Bitcoin. It introduced programmability through smart contracts, revolutionizing blockchain technology by enabling DeFi, NFTs, and DAOs.
+                </p>
+                <p className="leading-relaxed">
+                  Vitalik is known for his vision of a decentralized future and continues to lead Ethereum's development, including its major upgrade to Ethereum 2.0, which transitioned the network from Proof-of-Work (PoW) to Proof-of-Stake (PoS) for improved scalability and energy efficiency.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4 mb-6">

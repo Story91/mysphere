@@ -1097,8 +1097,31 @@ export default function BaseChat() {
         };
       }));
 
+      // Special case for vitalik.eth - Add bonus points if found
+      const updatedUsers = users.map(user => {
+        // Check if this user has the name vitalik.eth
+        if (userNames[user.address]?.name === 'vitalik.eth') {
+          // Znaleziono użytkownika vitalik.eth - aktualizuj dane w Firebase
+          try {
+            const userRef = doc(db, 'users', user.address);
+            updateDoc(userRef, {
+              'baseChatPoints.totalPoints': 5000,
+              lastUpdated: serverTimestamp()
+            }).catch(error => console.error('Error updating Vitalik points in Firebase:', error));
+          } catch (err) {
+            console.error('Error updating Vitalik stats in Firebase:', err);
+          }
+
+          return {
+            ...user,
+            points: 5000, // Set fixed high score for Vitalik
+          };
+        }
+        return user;
+      });
+
       // Sortuj użytkowników po punktach
-      const sortedUsers = users.sort((a, b) => b.points - a.points);
+      const sortedUsers = updatedUsers.sort((a, b) => b.points - a.points);
 
       // Zapisz do localStorage
       localStorage.setItem('activeUsers', JSON.stringify(sortedUsers));
@@ -1811,9 +1834,17 @@ export default function BaseChat() {
   };
         
   // Funkcja renderująca pojedynczy element listy użytkowników
-  const renderUserItem = (user: any, index: number) => (
+  const renderUserItem = (user: any, index: number) => {
+    // Special case for vitalik.eth
+    const isVitalik = userNames[user.address]?.name === 'vitalik.eth';
+    // Add 5000 points for display if it's vitalik.eth
+    const displayPoints = isVitalik ? 5000 : user.points;
+    // Sprawdź, czy numer pozycji ma dwie lub więcej cyfr
+    const hasLargeRankNumber = (index + 1) >= 10;
+    
+    return (
     <div key={user.address} className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
-      <div className="w-6 flex-shrink-0">
+      <div className={`${hasLargeRankNumber ? 'w-8' : 'w-6'} flex-shrink-0`}>
         <span className={`text-[11px] font-bold ${
           index === 0 ? 'text-yellow-500' :
           index === 1 ? 'text-gray-400' :
@@ -1837,15 +1868,29 @@ export default function BaseChat() {
       <div className="flex-1 min-w-0 px-2">
         <div className="flex items-center">
           <span className={`text-[11px] font-medium truncate ${
-            userNames[user.address]?.name?.includes('.base.eth') 
-              ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text' 
-              : 'text-gray-900 dark:text-white'
+            isVitalik
+              ? 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-transparent bg-clip-text font-bold'
+              : userNames[user.address]?.name?.includes('.base.eth') 
+                ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text' 
+                : 'text-gray-900 dark:text-white'
           }`}>
             {userNames[user.address]?.name || user.address.slice(0, 6) + '...' + user.address.slice(-4)}
           </span>
+          
+          {/* Display Ethereum Founder badge for vitalik.eth */}
+          {isVitalik && (
+            <span className="inline-flex items-center px-2 py-0.5 ml-2 text-[9px] font-medium rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-white">
+              <img 
+                src="/ethlogo.png" 
+                alt="ETH" 
+                className="w-3 h-3 mr-1"
+              />
+              ETH Founder
+            </span>
+          )}
         </div>
         <div className="text-[9px] text-gray-500">
-          {user.points.toLocaleString()} pts
+          {displayPoints.toLocaleString()} pts
         </div>
       </div>
       <div 
@@ -1856,7 +1901,7 @@ export default function BaseChat() {
         View
       </div>
     </div>
-  );
+  )};
 
   useEffect(() => {
     const fetchDailyPostCount = async () => {
