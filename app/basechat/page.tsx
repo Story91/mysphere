@@ -1155,39 +1155,23 @@ export default function BaseChat() {
   // Automatyczne odświeżanie przy pierwszym załadowaniu strony
   useEffect(() => {
     if (isMounted && !initialRefreshDone) {
-      // Najpierw załaduj dane z localStorage
-      loadInitialData();
-      
-      // Następnie pobierz aktualne dane z Firebase
-      const initialRefreshTimeout = setTimeout(() => {
-        getActiveUsers();
-      }, 1000); // Odśwież po 1 sekundzie od załadowania strony
-      
-      return () => {
-        clearTimeout(initialRefreshTimeout);
-      };
+      // Pobierz aktualne dane z Firebase
+      getActiveUsers();
+      setInitialRefreshDone(true);
     }
-  }, [isMounted, initialRefreshDone, loadInitialData, getActiveUsers]);
-
-  // Usuwam zmieniony useEffect dla odświeżania po zalogowaniu
+  }, [isMounted, initialRefreshDone, getActiveUsers]);
+  
+  // Automatyczne odświeżanie po zalogowaniu - symuluje kliknięcie przycisku Refresh
   useEffect(() => {
-    if (isConnected && address && !isLoadingUsers) {
-      // Zamiast bezpośredniego wywołania getActiveUsers,
-      // symulujemy kliknięcie przycisku Refresh, jeśli można odświeżyć
-      if (canManuallyRefresh) {
-        handleManualRefresh();
-      } else {
-        // Jeśli nie można teraz odświeżyć, ustawiamy timeout na próbę za 2 sekundy
-        const refreshTimeout = setTimeout(() => {
-          if (canManuallyRefresh) {
-            handleManualRefresh();
-          }
-        }, 2000);
-        
-        return () => clearTimeout(refreshTimeout);
-      }
+    if (isConnected && address) {
+      // Odśwież po 1 sekundzie od zalogowania
+      const timer = setTimeout(() => {
+        getActiveUsers();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
     }
-  }, [isConnected, address, canManuallyRefresh, handleManualRefresh]);
+  }, [isConnected, address, getActiveUsers]);
   
   // Regularne odświeżanie co 2 minuty
   useEffect(() => {
