@@ -1052,8 +1052,10 @@ export default function BaseChat() {
       const usersRef = collection(db, 'users');
       const usersSnap = await getDocs(usersRef);
 
-      const users = await Promise.all(usersSnap.docs.map(async doc => {
-        const data = doc.data();
+      let vitalikAddress = '';
+      
+      const users = await Promise.all(usersSnap.docs.map(async docSnapshot => {
+        const data = docSnapshot.data();
 
         // Zmieniona obsługa lastActive
         const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
@@ -1076,18 +1078,33 @@ export default function BaseChat() {
         }
 
         // Aktualizuj nazwy użytkowników
-        const userName = data.name || (data.baseName ? `${data.baseName}.base.eth` : doc.id.slice(0, 6) + '...' + doc.id.slice(-4));
+        const userName = data.name || (data.baseName ? `${data.baseName}.base.eth` : docSnapshot.id.slice(0, 6) + '...' + docSnapshot.id.slice(-4));
         setUserNames(prev => ({
           ...prev,
-          [doc.id]: {
+          [docSnapshot.id]: {
             name: userName,
             avatar: data.avatar
           }
         }));
+        
+        // Sprawdź czy to Vitalik i zapisz jego adres
+        if (userName === 'vitalik.eth') {
+          vitalikAddress = docSnapshot.id;
+          // Natychmiast aktualizuj dane Vitalika w Firebase
+          try {
+            const userRef = doc(db, 'users', docSnapshot.id);
+            updateDoc(userRef, {
+              'baseChatPoints.totalPoints': 5000,
+              lastUpdated: serverTimestamp()
+            }).catch(error => console.error('Error updating Vitalik points in Firebase:', error));
+          } catch (err) {
+            console.error('Error updating Vitalik stats in Firebase:', err);
+          }
+        }
 
         return {
-          address: doc.id,
-          points: totalPoints,
+          address: docSnapshot.id,
+          points: userName === 'vitalik.eth' ? 5000 : totalPoints,
           stats: {
             posts: data.postsCount || 0,
             likes: data.likesReceived || 0
@@ -1097,31 +1114,15 @@ export default function BaseChat() {
         };
       }));
 
-      // Special case for vitalik.eth - Add bonus points if found
-      const updatedUsers = users.map(user => {
-        // Check if this user has the name vitalik.eth
-        if (userNames[user.address]?.name === 'vitalik.eth') {
-          // Znaleziono użytkownika vitalik.eth - aktualizuj dane w Firebase
-          try {
-            const userRef = doc(db, 'users', user.address);
-            updateDoc(userRef, {
-              'baseChatPoints.totalPoints': 5000,
-              lastUpdated: serverTimestamp()
-            }).catch(error => console.error('Error updating Vitalik points in Firebase:', error));
-          } catch (err) {
-            console.error('Error updating Vitalik stats in Firebase:', err);
-          }
-
-          return {
-            ...user,
-            points: 5000, // Set fixed high score for Vitalik
-          };
-        }
-        return user;
+      // Sortuj użytkowników po punktach, stawiając Vitalika zawsze na pierwszym miejscu
+      const sortedUsers = users.sort((a, b) => {
+        // Jeśli a to Vitalik, powinien być na pierwszym miejscu
+        if (a.address === vitalikAddress) return -1;
+        // Jeśli b to Vitalik, powinien być na pierwszym miejscu
+        if (b.address === vitalikAddress) return 1;
+        // W przeciwnym razie normalne sortowanie po punktach
+        return b.points - a.points;
       });
-
-      // Sortuj użytkowników po punktach
-      const sortedUsers = updatedUsers.sort((a, b) => b.points - a.points);
 
       // Zapisz do localStorage
       localStorage.setItem('activeUsers', JSON.stringify(sortedUsers));
@@ -2141,6 +2142,22 @@ export default function BaseChat() {
         
         // Przełącz panel
         setActiveMainPanel('builders');
+        
+        // Na telefonach, ustaw główny widok na środkowy panel i przełącz z Trends na główny panel
+        if (window.innerWidth < 1024) {
+          // Przełącz na główny panel
+          setActiveMobilePanel('main');
+          
+          // Automatyczne przewijanie do widoku builder profile
+          setTimeout(() => {
+            const builderSection = document.querySelector('.builder-profile-container');
+            if (builderSection) {
+              builderSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }, 100);
+        }
       }
     } catch (error) {
       console.error('Error loading builder profile:', error);
