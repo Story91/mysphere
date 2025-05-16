@@ -2856,15 +2856,67 @@ export default function BaseChat() {
                       />
                                 </>
                               ) : (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm text-center">
-                      <div className="text-4xl mb-4">👋</div>
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Connect your wallet</h3>
-                      <p className="text-gray-500 dark:text-gray-400 mb-4">
-                        Connect your wallet to start posting and interacting with the community.
-                      </p>
-                      <ConnectWallet />
-                            </div>
-                          )}
+                    <div className="relative rounded-xl overflow-hidden shadow-xl">
+                      {/* Animated gradient border */}
+                      <div className="absolute -z-10 inset-0 bg-gradient-to-r from-blue-500 via-indigo-600 to-blue-400 animate-gradient-x"></div>
+                      
+                      {/* Inner content with background */}
+                      <div className="m-[2px] bg-gradient-to-br from-black via-gray-900 to-blue-900 rounded-xl p-2 pt-1 shadow-inner">
+                        {/* Logo with custom styling to avoid background issues */}
+                        <div className="flex justify-center mt-2 mb-3 overflow-hidden">
+                          <div className="relative w-[300px] h-[120px] overflow-hidden">
+                            <img 
+                              src="/frame-v2.png" 
+                              alt="Logo" 
+                              className="w-full h-full object-contain"
+                              style={{
+                                filter: 'brightness(1.1) contrast(1.1)',
+                                mixBlendMode: 'lighten'
+                              }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="text-gray-200 mb-3 max-w-md mx-auto">
+                          <p className="mb-3 text-center">
+                            Welcome to our decentralized social platform! Connect your wallet to unlock all features:
+                          </p>
+                          <ul className="text-left space-y-2 mb-3">
+                            <li className="flex items-start">
+                              <svg className="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span>Create and share posts with the Base community</span>
+                            </li>
+                            <li className="flex items-start">
+                              <svg className="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span>Engage with other users through likes and comments</span>
+                            </li>
+                            <li className="flex items-start">
+                              <svg className="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span>Build your profile and track your on-chain activity</span>
+                            </li>
+                            <li className="flex items-start">
+                              <svg className="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span>Earn points and climb the community leaderboard</span>
+                            </li>
+                          </ul>
+                        </div>
+                        
+                        <div className="flex justify-center mb-2">
+                          <div className="transform hover:scale-105 transition-transform duration-300">
+                            <ConnectWallet />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
