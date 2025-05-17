@@ -135,17 +135,27 @@ async function getBaseContractTransactions() {
       const blockData = await blockResponse.json();
       const latestBlock = parseInt(blockData.result, 16);
       
-      // Rzeczywiste liczby transakcji na podstawie BaseScan
+      // Pobierz rzeczywistą liczbę transakcji z BaseScan API
+      const txCountResponse = await fetch(
+        `https://api.basescan.org/api?module=account&action=txlist&address=${contractAddress}&startblock=0&endblock=99999999&sort=asc&apikey=${process.env.NEXT_PUBLIC_BASESCAN_API_KEY || 'YB9ZQ71MVDJU3CQQXFJ6GQ4Y17MPKEQCBN'}`
+      );
+      
       let totalTransactions = 0;
-      if (contractAddress === "0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7") {
-        // Pierwszy kontrakt ma 1,365 transakcji według BaseScan
-        totalTransactions = 1365;
-      } else if (contractAddress === "0x9c44802843a670732383f62b2f3304f92ec1702b") {
-        // Drugi kontrakt ma 59 transakcji według BaseScan
-        totalTransactions = 59;
+      const txData = await txCountResponse.json();
+      
+      if (txData.status === '1' && Array.isArray(txData.result)) {
+        totalTransactions = txData.result.length;
+      } else {
+        // Fallback do wcześniej znanych wartości w przypadku błędu API
+        if (contractAddress === "0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7") {
+          totalTransactions = 1365;
+        } else if (contractAddress === "0x9c44802843a670732383f62b2f3304f92ec1702b") {
+          totalTransactions = 59;
+        }
+        console.log(`Użyto fallbackowej liczby transakcji dla ${contractAddress}: ${totalTransactions}`);
       }
       
-      // Sprawdź czy to kontrakt (to nadal warto sprawdzić)
+      // Sprawdź czy to kontrakt
       const codeResponse = await fetch('https://mainnet.base.org', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,9 +181,23 @@ async function getBaseContractTransactions() {
         latestBlock: latestBlock
       };
     } catch (error: unknown) {
+      // W przypadku błędu, używamy fallbackowych wartości
+      let fallbackTx = 0;
+      if (contractAddress === "0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7") {
+        fallbackTx = 1365;
+      } else if (contractAddress === "0x9c44802843a670732383f62b2f3304f92ec1702b") {
+        fallbackTx = 59;
+      }
+      
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`Błąd pobierania danych dla ${contractAddress}:`, error);
-      return { address: contractAddress, transactions: 0, error: errorMessage };
+      console.log(`Użyto fallbackowej liczby transakcji: ${fallbackTx}`);
+      
+      return { 
+        address: contractAddress, 
+        transactions: fallbackTx, 
+        error: errorMessage 
+      };
     }
   }
   
