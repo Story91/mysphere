@@ -273,11 +273,11 @@ export default function IdentityComponent() {
           <div className="flex items-center justify-between gap-2 mb-4 relative z-10">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0052FF] to-[#00A3FF] flex items-center justify-center shadow-lg shadow-[#0052FF]/20">
-                <img 
-                  src="/favicon_io (1)/apple-touch-icon.png" 
-                  alt="Sphere Logo" 
-                  className="w-6 h-6"
-                />
+              <img 
+                src="/favicon_io (1)/apple-touch-icon.png" 
+                alt="Sphere Logo" 
+                className="w-6 h-6"
+              />
               </div>
               <h2 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Sphere Identity</h2>
             </div>
@@ -369,7 +369,7 @@ export default function IdentityComponent() {
                         <h3 className="text-lg font-medium text-blue-400">{stats.totalPoints.toLocaleString()}</h3>
                       </div>
                     </div>
-                    
+
                     <div className="mt-2 w-full h-2 bg-gray-800 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
@@ -385,326 +385,329 @@ export default function IdentityComponent() {
                 
                 {/* Treść zmieniająca się w zależności od zakładki */}
                 <div className="w-full">
-                  {/* Przegląd */}
-                  {activeTab === 'overview' && (
-                    <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all h-full shadow-lg">
-                      <h3 className="text-lg font-medium text-white mb-4">Your Progress</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">Transactions</span>
-                            <span className="text-white">{stats.stats.transactions}</span>
+                  {/* Kontener z ustaloną minimalną wysokością */}
+                  <div className="relative min-h-[450px]">
+                    {/* Przegląd */}
+                    <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ${activeTab === 'overview' ? 'opacity-100 z-10' : 'opacity-0 -z-10'}`}>
+                      <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all h-full shadow-lg">
+                        <h3 className="text-lg font-medium text-white mb-4">Your Progress</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Transactions</span>
+                              <span className="text-white">{stats.stats.transactions}</span>
+                            </div>
+                            <div className="mt-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" style={{ 
+                                width: `${Math.min(100, stats.stats.transactions / 50 * 100)}%` 
+                              }}></div>
+                            </div>
                           </div>
-                          <div className="mt-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" style={{ 
-                              width: `${Math.min(100, stats.stats.transactions / 50 * 100)}%` 
-                            }}></div>
+                          <div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Tokens</span>
+                              <span className="text-white">{stats.stats.tokens}</span>
+                            </div>
+                            <div className="mt-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-green-500 to-teal-500 rounded-full" style={{ width: `${Math.min(100, stats.stats.tokens / 10 * 100)}%` }}></div>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">NFTs</span>
+                              <span className="text-white">{stats.stats.nfts}</span>
+                            </div>
+                            <div className="mt-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-pink-500 to-red-500 rounded-full" style={{ width: `${Math.min(100, stats.stats.nfts / 5 * 100)}%` }}></div>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Contracts</span>
+                              <span className="text-white">{stats.stats.contracts}</span>
+                            </div>
+                            <div className="mt-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style={{ width: `${Math.min(100, stats.stats.contracts / 10 * 100)}%` }}></div>
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">Tokens</span>
-                            <span className="text-white">{stats.stats.tokens}</span>
-                          </div>
-                          <div className="mt-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-green-500 to-teal-500 rounded-full" style={{ width: `${Math.min(100, stats.stats.tokens / 10 * 100)}%` }}></div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">NFTs</span>
-                            <span className="text-white">{stats.stats.nfts}</span>
-                          </div>
-                          <div className="mt-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-pink-500 to-red-500 rounded-full" style={{ width: `${Math.min(100, stats.stats.nfts / 5 * 100)}%` }}></div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">Contracts</span>
-                            <span className="text-white">{stats.stats.contracts}</span>
-                          </div>
-                          <div className="mt-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style={{ width: `${Math.min(100, stats.stats.contracts / 10 * 100)}%` }}></div>
+                        
+                        <div className="mt-4">
+                          <h4 className="text-gray-300 text-sm font-medium mb-2">Recent Badges</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {earnedBadges.slice(0, 3).map((badge, index) => (
+                              <div 
+                                key={index}
+                                className="bg-gradient-to-r from-gray-800 to-gray-900 p-2 rounded-lg border border-gray-700 flex items-center gap-2 group hover:border-blue-500/50 transition-all"
+                              >
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-r ${
+                                  badge.glowIntensity >= 5 ? 'from-blue-500 to-purple-500' :
+                                  badge.glowIntensity >= 3 ? 'from-cyan-500 to-blue-500' :
+                                  'from-teal-500 to-cyan-500'
+                                }`}>
+                                  <span className="text-white text-xs">{badge.glowIntensity}</span>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-white font-medium">{badge.name.toString()}</p>
+                                  <p className="text-xs text-gray-400">{badge.title}</p>
+                                </div>
+                              </div>
+                            ))}
+                            {earnedBadges.length > 3 && (
+                              <button 
+                                onClick={() => setActiveTab('badges')}
+                                className="px-3 py-2 rounded-lg text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-all"
+                              >
+                                +{earnedBadges.length - 3} more
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
-                      
-                      <div className="mt-4">
-                        <h4 className="text-gray-300 text-sm font-medium mb-2">Recent Badges</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {earnedBadges.slice(0, 3).map((badge, index) => (
-                            <div 
-                              key={index}
-                              className="bg-gradient-to-r from-gray-800 to-gray-900 p-2 rounded-lg border border-gray-700 flex items-center gap-2 group hover:border-blue-500/50 transition-all"
-                            >
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-r ${
-                                badge.glowIntensity >= 5 ? 'from-blue-500 to-purple-500' :
-                                badge.glowIntensity >= 3 ? 'from-cyan-500 to-blue-500' :
-                                'from-teal-500 to-cyan-500'
-                              }`}>
-                                <span className="text-white text-xs">{badge.glowIntensity}</span>
-                              </div>
-                              <div>
-                                <p className="text-xs text-white font-medium">{badge.name.toString()}</p>
-                                <p className="text-xs text-gray-400">{badge.title}</p>
+                    </div>
+                    
+                    {/* Odznaki */}
+                    <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ${activeTab === 'badges' ? 'opacity-100 z-10' : 'opacity-0 -z-10'}`}>
+                      <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all h-full shadow-lg overflow-y-auto">
+                        <h3 className="text-lg font-medium text-white mb-4">Your Badges</h3>
+                        <div className="space-y-6">
+                          {Object.entries(groupedBadges).map(([category, badges]) => (
+                            <div key={category} className="space-y-2">
+                              <h4 className="text-gray-300 text-sm font-medium capitalize">
+                                {category === 'transactions' ? 'Transactions' : 
+                                category === 'tokens' ? 'Tokens' : 
+                                category === 'nfts' ? 'NFTs' : 'Contracts'}
+                              </h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                {badges.map((badge, index) => {
+                                  const earned = badge.condition(stats);
+                                  return (
+                                    <div 
+                                      key={index}
+                                      className={`p-3 rounded-lg border ${
+                                        earned 
+                                          ? 'bg-gradient-to-br from-gray-800/80 to-gray-900/80 border-blue-500/30' 
+                                          : 'bg-gray-900/30 border-gray-800/30 opacity-50'
+                                      } flex items-center gap-3 group transition-all`}
+                                    >
+                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                        earned ? `bg-gradient-to-r ${
+                                          badge.glowIntensity >= 5 ? 'from-blue-500 to-purple-500' :
+                                          badge.glowIntensity >= 3 ? 'from-cyan-500 to-blue-500' :
+                                          'from-teal-500 to-cyan-500'
+                                        }` : 'bg-gray-800'
+                                      }`}>
+                                        <span className="text-white text-sm font-bold">{badge.glowIntensity}</span>
+                                      </div>
+                                      <div>
+                                        <p className={`text-sm ${earned ? 'text-white' : 'text-gray-500'} font-medium`}>{badge.title}</p>
+                                        <p className="text-xs text-gray-400">{badge.description}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           ))}
-                          {earnedBadges.length > 3 && (
-                            <button 
-                              onClick={() => setActiveTab('badges')}
-                              className="px-3 py-2 rounded-lg text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-all"
-                            >
-                              +{earnedBadges.length - 3} more
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>
-                  )}
-                  
-                  {/* Odznaki */}
-                  {activeTab === 'badges' && (
-                    <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all shadow-lg">
-                      <h3 className="text-lg font-medium text-white mb-4">Your Badges</h3>
-                      <div className="space-y-6">
-                        {Object.entries(groupedBadges).map(([category, badges]) => (
-                          <div key={category} className="space-y-2">
-                            <h4 className="text-gray-300 text-sm font-medium capitalize">
-                              {category === 'transactions' ? 'Transactions' : 
-                               category === 'tokens' ? 'Tokens' : 
-                               category === 'nfts' ? 'NFTs' : 'Contracts'}
-                            </h4>
-                            <div className="grid grid-cols-2 gap-2">
-                              {badges.map((badge, index) => {
-                                const earned = badge.condition(stats);
-                                return (
-                                  <div 
-                                    key={index}
-                                    className={`p-3 rounded-lg border ${
-                                      earned 
-                                        ? 'bg-gradient-to-br from-gray-800/80 to-gray-900/80 border-blue-500/30' 
-                                        : 'bg-gray-900/30 border-gray-800/30 opacity-50'
-                                    } flex items-center gap-3 group transition-all`}
-                                  >
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                      earned ? `bg-gradient-to-r ${
-                                        badge.glowIntensity >= 5 ? 'from-blue-500 to-purple-500' :
-                                        badge.glowIntensity >= 3 ? 'from-cyan-500 to-blue-500' :
-                                        'from-teal-500 to-cyan-500'
-                                      }` : 'bg-gray-800'
-                                    }`}>
-                                      <span className="text-white text-sm font-bold">{badge.glowIntensity}</span>
-                                    </div>
-                                    <div>
-                                      <p className={`text-sm ${earned ? 'text-white' : 'text-gray-500'} font-medium`}>{badge.title}</p>
-                                      <p className="text-xs text-gray-400">{badge.description}</p>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                    
+                    {/* Statystyki */}
+                    <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ${activeTab === 'stats' ? 'opacity-100 z-10' : 'opacity-0 -z-10'}`}>
+                      <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all h-full shadow-lg overflow-y-auto">
+                        <h3 className="text-lg font-medium text-white mb-4">Detailed Statistics</h3>
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
+                              <p className="text-gray-400 text-xs">Transactions</p>
+                              <p className="text-xl font-bold text-white">{stats.stats.transactions}</p>
+                              <p className="text-xs text-blue-400">{stats.breakdown.transactionPoints.toLocaleString()} points</p>
+                            </div>
+                            <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
+                              <p className="text-gray-400 text-xs">Unique Tokens</p>
+                              <p className="text-xl font-bold text-white">{stats.stats.tokens}</p>
+                              <p className="text-xs text-blue-400">{stats.breakdown.tokenPoints.toLocaleString()} points</p>
+                            </div>
+                            <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
+                              <p className="text-gray-400 text-xs">NFT Collection</p>
+                              <p className="text-xl font-bold text-white">{stats.stats.nfts}</p>
+                              <p className="text-xs text-blue-400">{stats.breakdown.nftPoints.toLocaleString()} points</p>
+                            </div>
+                            <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
+                              <p className="text-gray-400 text-xs">Unique Contracts</p>
+                              <p className="text-xl font-bold text-white">{stats.stats.contracts}</p>
+                              <p className="text-xs text-blue-400">{stats.breakdown.uniqueContractPoints.toLocaleString()} points</p>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Statystyki */}
-                  {activeTab === 'stats' && (
-                    <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all shadow-lg">
-                      <h3 className="text-lg font-medium text-white mb-4">Detailed Statistics</h3>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
-                            <p className="text-gray-400 text-xs">Transactions</p>
-                            <p className="text-xl font-bold text-white">{stats.stats.transactions}</p>
-                            <p className="text-xs text-blue-400">{stats.breakdown.transactionPoints.toLocaleString()} points</p>
-                          </div>
-                          <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
-                            <p className="text-gray-400 text-xs">Unique Tokens</p>
-                            <p className="text-xl font-bold text-white">{stats.stats.tokens}</p>
-                            <p className="text-xs text-blue-400">{stats.breakdown.tokenPoints.toLocaleString()} points</p>
-                          </div>
-                          <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
-                            <p className="text-gray-400 text-xs">NFT Collection</p>
-                            <p className="text-xl font-bold text-white">{stats.stats.nfts}</p>
-                            <p className="text-xs text-blue-400">{stats.breakdown.nftPoints.toLocaleString()} points</p>
-                          </div>
-                          <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
-                            <p className="text-gray-400 text-xs">Unique Contracts</p>
-                            <p className="text-xl font-bold text-white">{stats.stats.contracts}</p>
-                            <p className="text-xs text-blue-400">{stats.breakdown.uniqueContractPoints.toLocaleString()} points</p>
+                          
+                          <div className="p-4 bg-gradient-to-br from-blue-900/20 to-blue-900/10 rounded-lg border border-blue-900/20">
+                            <div className="flex justify-between">
+                              <p className="text-gray-300">Total points:</p>
+                              <p className="text-xl font-bold text-white">{stats.totalPoints.toLocaleString()}</p>
+                            </div>
                           </div>
                         </div>
+                      </div>
+                    </div>
+                    
+                    {/* Ranks */}
+                    <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ${activeTab === 'ranks' ? 'opacity-100 z-10' : 'opacity-0 -z-10'}`}>
+                      <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all h-full shadow-lg overflow-y-auto">
+                        <h3 className="text-lg font-medium text-white mb-4">Rank System</h3>
                         
-                        <div className="p-4 bg-gradient-to-br from-blue-900/20 to-blue-900/10 rounded-lg border border-blue-900/20">
-                          <div className="flex justify-between">
-                            <p className="text-gray-300">Total points:</p>
-                            <p className="text-xl font-bold text-white">{stats.totalPoints.toLocaleString()}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Ranks */}
-                  {activeTab === 'ranks' && (
-                    <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all shadow-lg">
-                      <h3 className="text-lg font-medium text-white mb-4">Rank System</h3>
-                      
-                      <div className="space-y-3">
-                        {RANK_INFO.map((rankInfo, index) => (
-                          <div 
-                            key={rankInfo.rank}
-                            className={`p-3 rounded-lg border transition-all ${
-                              stats.rank === rankInfo.rank 
-                                ? 'bg-gradient-to-br from-blue-900/30 to-purple-900/20 border-blue-500/30 shadow-lg' 
-                                : 'bg-gray-900/30 border-gray-800/30'
-                            }`}
-                          >
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                  rankInfo.rank === UserRank.NEWBIE ? 'bg-gray-600' :
-                                  rankInfo.rank === UserRank.EXPLORER ? 'bg-orange-600' :
-                                  rankInfo.rank === UserRank.TRADER ? 'bg-yellow-600' :
-                                  rankInfo.rank === UserRank.INVESTOR ? 'bg-green-600' :
-                                  rankInfo.rank === UserRank.WHALE ? 'bg-blue-600' :
-                                  'bg-purple-600'
-                                }`}>
-                                  <span className="text-white text-sm font-bold">{index + 1}</span>
+                        <div className="space-y-3">
+                          {RANK_INFO.map((rankInfo, index) => (
+                            <div 
+                              key={rankInfo.rank}
+                              className={`p-3 rounded-lg border transition-all ${
+                                stats.rank === rankInfo.rank 
+                                  ? 'bg-gradient-to-br from-blue-900/30 to-purple-900/20 border-blue-500/30 shadow-lg' 
+                                  : 'bg-gray-900/30 border-gray-800/30'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                    rankInfo.rank === UserRank.NEWBIE ? 'bg-gray-600' :
+                                    rankInfo.rank === UserRank.EXPLORER ? 'bg-orange-600' :
+                                    rankInfo.rank === UserRank.TRADER ? 'bg-yellow-600' :
+                                    rankInfo.rank === UserRank.INVESTOR ? 'bg-green-600' :
+                                    rankInfo.rank === UserRank.WHALE ? 'bg-blue-600' :
+                                    'bg-purple-600'
+                                  }`}>
+                                    <span className="text-white text-sm font-bold">{index + 1}</span>
+                                  </div>
+                                  <div>
+                                    <h4 className={`text-lg font-bold ${rankInfo.color}`}>{rankInfo.rank}</h4>
+                                    <p className="text-gray-400 text-sm">{rankInfo.description}</p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <h4 className={`text-lg font-bold ${rankInfo.color}`}>{rankInfo.rank}</h4>
-                                  <p className="text-gray-400 text-sm">{rankInfo.description}</p>
+                                <div className="text-right">
+                                  <p className="text-gray-300 text-sm">Required points</p>
+                                  <p className="text-white font-bold">{rankInfo.threshold.toLocaleString()}</p>
                                 </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-gray-300 text-sm">Required points</p>
-                                <p className="text-white font-bold">{rankInfo.threshold.toLocaleString()}</p>
-                              </div>
-                              {stats.rank === rankInfo.rank && (
-                                <div className="absolute top-2 right-2">
-                                  <div className="bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full">Current</div>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {index < RANK_INFO.length - 1 && (
-                              <div className="mt-3 pt-2 border-t border-gray-800">
-                                <div className="flex justify-between text-xs text-gray-500">
-                                  <span>Your progress</span>
-                                  <span>
-                                    {stats.rank === rankInfo.rank ? (
-                                      <span className="text-blue-400">
-                                        {stats.totalPoints.toLocaleString()} / {RANK_INFO[index + 1].threshold.toLocaleString()}
-                                      </span>
-                                    ) : isRankLowerThanCurrent(rankInfo.rank, stats.rank) ? (
-                                      <span className="text-green-400">Completed</span>
-                                    ) : (
-                                      <span>Not reached yet</span>
-                                    )}
-                                  </span>
-                                </div>
-                                
                                 {stats.rank === rankInfo.rank && (
-                                  <div className="mt-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full rounded-full ${
-                                        rankInfo.rank === UserRank.NEWBIE ? 'bg-gradient-to-r from-gray-500 to-gray-600' :
-                                        rankInfo.rank === UserRank.EXPLORER ? 'bg-gradient-to-r from-orange-500 to-orange-600' :
-                                        rankInfo.rank === UserRank.TRADER ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
-                                        rankInfo.rank === UserRank.INVESTOR ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                                        rankInfo.rank === UserRank.WHALE ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
-                                        'bg-gradient-to-r from-purple-500 to-purple-600'
-                                      }`}
-                                      style={{ 
-                                        width: `${calculateProgressBetweenRanks(stats.totalPoints, rankInfo.threshold, RANK_INFO[index + 1].threshold)}%` 
-                                      }}
-                                    ></div>
+                                  <div className="absolute top-2 right-2">
+                                    <div className="bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full">Current</div>
                                   </div>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      
-                      <div className="mt-6 p-4 bg-gradient-to-br from-blue-900/20 to-purple-900/10 rounded-lg border border-blue-900/20">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-500/20 rounded-full">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h4 className="text-white font-medium">How ranks work</h4>
-                            <p className="text-gray-400 text-sm mt-1">
-                              Your rank is determined by the total points you've earned through transactions, tokens, NFTs, and contract interactions. 
-                              Higher ranks require more points and unlock exclusive features and recognition within the Sphere ecosystem.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Szczegóły */}
-                  {activeTab === 'details' && (
-                    <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all shadow-lg">
-                      <h3 className="text-lg font-medium text-white mb-4">Point System</h3>
-                      
-                      <div className="space-y-4">
-                        <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
-                          <h4 className="text-blue-400 font-medium">Transactions</h4>
-                          <p className="text-gray-300 text-sm mt-1">{POINT_SYSTEM.transactions.description}</p>
-                          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                            <div className="p-2 bg-black/20 rounded-lg">
-                              <p className="text-gray-400">Basic</p>
-                              <p className="text-white font-medium">{POINT_SYSTEM.transactions.base} points</p>
+                              
+                              {index < RANK_INFO.length - 1 && (
+                                <div className="mt-3 pt-2 border-t border-gray-800">
+                                  <div className="flex justify-between text-xs text-gray-500">
+                                    <span>Your progress</span>
+                                    <span>
+                                      {stats.rank === rankInfo.rank ? (
+                                        <span className="text-blue-400">
+                                          {stats.totalPoints.toLocaleString()} / {RANK_INFO[index + 1].threshold.toLocaleString()}
+                                        </span>
+                                      ) : isRankLowerThanCurrent(rankInfo.rank, stats.rank) ? (
+                                        <span className="text-green-400">Completed</span>
+                                      ) : (
+                                        <span>Not reached yet</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                  
+                                  {stats.rank === rankInfo.rank && (
+                                    <div className="mt-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                      <div 
+                                        className={`h-full rounded-full ${
+                                          rankInfo.rank === UserRank.NEWBIE ? 'bg-gradient-to-r from-gray-500 to-gray-600' :
+                                          rankInfo.rank === UserRank.EXPLORER ? 'bg-gradient-to-r from-orange-500 to-orange-600' :
+                                          rankInfo.rank === UserRank.TRADER ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+                                          rankInfo.rank === UserRank.INVESTOR ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                                          rankInfo.rank === UserRank.WHALE ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
+                                          'bg-gradient-to-r from-purple-500 to-purple-600'
+                                        }`}
+                                        style={{ 
+                                          width: `${calculateProgressBetweenRanks(stats.totalPoints, rankInfo.threshold, RANK_INFO[index + 1].threshold)}%` 
+                                        }}
+                                      ></div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div className="p-2 bg-black/20 rounded-lg">
-                              <p className="text-gray-400">Successful</p>
-                              <p className="text-white font-medium">{POINT_SYSTEM.transactions.successful} points</p>
-                            </div>
-                            <div className="p-2 bg-black/20 rounded-lg">
-                              <p className="text-gray-400">High Value</p>
-                              <p className="text-white font-medium">{POINT_SYSTEM.transactions.highValue} points</p>
-                            </div>
-                          </div>
+                          ))}
                         </div>
                         
-                        <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
-                          <h4 className="text-green-400 font-medium">Tokens</h4>
-                          <p className="text-gray-300 text-sm mt-1">{POINT_SYSTEM.tokens.description}</p>
-                          <div className="mt-2 text-xs p-2 bg-black/20 rounded-lg inline-block">
-                            <p className="text-gray-400">Per token</p>
-                            <p className="text-white font-medium">{POINT_SYSTEM.tokens.points} points</p>
-                          </div>
-                        </div>
-                        
-                        <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
-                          <h4 className="text-pink-400 font-medium">NFTs</h4>
-                          <p className="text-gray-300 text-sm mt-1">{POINT_SYSTEM.nfts.description}</p>
-                          <div className="mt-2 text-xs p-2 bg-black/20 rounded-lg inline-block">
-                            <p className="text-gray-400">Per NFT</p>
-                            <p className="text-white font-medium">{POINT_SYSTEM.nfts.points} points</p>
-                          </div>
-                        </div>
-                        
-                        <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
-                          <h4 className="text-amber-400 font-medium">Contracts</h4>
-                          <p className="text-gray-300 text-sm mt-1">{POINT_SYSTEM.contracts.description}</p>
-                          <div className="mt-2 text-xs p-2 bg-black/20 rounded-lg inline-block">
-                            <p className="text-gray-400">Per contract</p>
-                            <p className="text-white font-medium">{POINT_SYSTEM.contracts.points} points</p>
+                        <div className="mt-6 p-4 bg-gradient-to-br from-blue-900/20 to-purple-900/10 rounded-lg border border-blue-900/20">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-500/20 rounded-full">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h4 className="text-white font-medium">How ranks work</h4>
+                              <p className="text-gray-400 text-sm mt-1">
+                                Your rank is determined by the total points you've earned through transactions, tokens, NFTs, and contract interactions. 
+                                Higher ranks require more points and unlock exclusive features and recognition within the Sphere ecosystem.
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  )}
+                    
+                    {/* Details */}
+                    <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ${activeTab === 'details' ? 'opacity-100 z-10' : 'opacity-0 -z-10'}`}>
+                      <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 border border-gray-700/50 hover:border-blue-500/50 transition-all h-full shadow-lg overflow-y-auto">
+                        <h3 className="text-lg font-medium text-white mb-4">Point System</h3>
+                        
+                        <div className="space-y-4">
+                          <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
+                            <h4 className="text-blue-400 font-medium">Transactions</h4>
+                            <p className="text-gray-300 text-sm mt-1">{POINT_SYSTEM.transactions.description}</p>
+                            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                              <div className="p-2 bg-black/20 rounded-lg">
+                                <p className="text-gray-400">Basic</p>
+                                <p className="text-white font-medium">{POINT_SYSTEM.transactions.base} points</p>
+                              </div>
+                              <div className="p-2 bg-black/20 rounded-lg">
+                                <p className="text-gray-400">Successful</p>
+                                <p className="text-white font-medium">{POINT_SYSTEM.transactions.successful} points</p>
+                              </div>
+                              <div className="p-2 bg-black/20 rounded-lg">
+                                <p className="text-gray-400">High Value</p>
+                                <p className="text-white font-medium">{POINT_SYSTEM.transactions.highValue} points</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
+                            <h4 className="text-green-400 font-medium">Tokens</h4>
+                            <p className="text-gray-300 text-sm mt-1">{POINT_SYSTEM.tokens.description}</p>
+                            <div className="mt-2 text-xs p-2 bg-black/20 rounded-lg inline-block">
+                              <p className="text-gray-400">Per token</p>
+                              <p className="text-white font-medium">{POINT_SYSTEM.tokens.points} points</p>
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
+                            <h4 className="text-pink-400 font-medium">NFTs</h4>
+                            <p className="text-gray-300 text-sm mt-1">{POINT_SYSTEM.nfts.description}</p>
+                            <div className="mt-2 text-xs p-2 bg-black/20 rounded-lg inline-block">
+                              <p className="text-gray-400">Per NFT</p>
+                              <p className="text-white font-medium">{POINT_SYSTEM.nfts.points} points</p>
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 bg-gradient-to-br from-gray-800/50 to-gray-900/80 rounded-lg border border-gray-700/50">
+                            <h4 className="text-amber-400 font-medium">Contracts</h4>
+                            <p className="text-gray-300 text-sm mt-1">{POINT_SYSTEM.contracts.description}</p>
+                            <div className="mt-2 text-xs p-2 bg-black/20 rounded-lg inline-block">
+                              <p className="text-gray-400">Per contract</p>
+                              <p className="text-white font-medium">{POINT_SYSTEM.contracts.points} points</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
