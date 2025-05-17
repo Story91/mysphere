@@ -35,9 +35,13 @@ type NavLink = {
   label: string;
   isHighlighted?: boolean;
   icon?: ReactNode;
+  isExternal?: boolean;
   dropdownItems?: Array<{
     href: string;
     label: string;
+    isHighlighted?: boolean;
+    isFlashBlock?: boolean;
+    isExternal?: boolean;
   }>;
 };
 
@@ -47,6 +51,9 @@ type NavLinkWithDropdown = {
   dropdownItems: Array<{
     href: string;
     label: string;
+    isHighlighted?: boolean;
+    isFlashBlock?: boolean;
+    isExternal?: boolean;
   }>;
   isHighlighted?: boolean;
   icon?: ReactNode;
@@ -87,7 +94,7 @@ export default function Navigation() {
       ]
     },
     {
-      label: 'Tools',
+      label: 'MiniApps',
       dropdownItems: [
         { 
           href: '/flashblock', 
@@ -96,8 +103,14 @@ export default function Navigation() {
           isFlashBlock: true
         },
         {
-          href: '/yapscan',
-          label: 'YapScan'
+          href: 'https://mini-tv.app',
+          label: 'MiniTV',
+          isExternal: true
+        },
+        {
+          href: 'https://justcoinit.vercel.app',
+          label: 'JustCoinIT',
+          isExternal: true
         }
       ]
     },
@@ -158,6 +171,8 @@ export default function Navigation() {
                             href={item.href}
                             onClick={() => setActiveDropdown(null)}
                             className="flex items-center gap-2 px-4 py-2.5 text-gray-900 hover:bg-[#0052FF]/5 transition-colors duration-200 whitespace-nowrap"
+                            target={item.isExternal ? "_blank" : undefined}
+                            rel={item.isExternal ? "noopener noreferrer" : undefined}
                           >
                             {item.label === 'Buy&Swap' ? (
                               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -169,6 +184,11 @@ export default function Navigation() {
                               </svg>
                             )}
                             <span className="font-['Coinbase_Display']">{item.label}</span>
+                            {item.isExternal && (
+                              <svg className="w-3 h-3 ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14M14 4H20M20 4V10M20 4L10 14" stroke="#0052FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
                           </Link>
                         ))}
                       </div>
