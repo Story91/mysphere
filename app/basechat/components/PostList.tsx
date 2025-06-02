@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
+import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { Post, Comment } from '../../types';
 import { doc, updateDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
 import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, ADMIN_ADDRESS } from '../../utils/firebase';
@@ -10,6 +10,8 @@ import { toast } from 'react-hot-toast';
 import { Avatar as CoinbaseAvatar } from '@coinbase/onchainkit/identity';
 import LinkPreview from './LinkPreview';
 import CommentTransactionButton from '../../components/CommentTransactionButton';
+import CommentTransactionButtonBaseCamp from './BaseCampPosts/CommentTransactionButtonBaseCamp';
+import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
 
 // Import Zora SDK functions and types
 import { tradeCoin, getProfileBalances } from '@zoralabs/coins-sdk';
@@ -48,6 +50,7 @@ const formatNumberWithSuffix = (value: number | string): string => {
 
 export interface ExtendedPost extends Post {
   pollId?: string;
+  network?: 'base' | 'basecamp';
 }
 
 // Placeholder type for Zora Coin data
@@ -161,6 +164,7 @@ export default function PostList({
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const networkChainId = useChainId();
 
   const formatTimestamp = (timestamp: number) => {
     try {
@@ -842,57 +846,53 @@ export default function PostList({
   };
 
   const renderComments = (post: ExtendedPost) => {
-    // Grupujemy odpowiedzi według ID komentarza, do którego należą
-    const repliesByCommentId: { [key: string]: Comment[] } = {};
+    // Check if post is from BaseCamp network
+    const isBaseCampPost = post.network === 'basecamp';
     
-    // Szukamy wszystkich odpowiedzi i grupujemy je
-    (post.comments || []).forEach(comment => {
-      if (comment.replyTo) {
-        // To jest odpowiedź do komentarza
-        if (!repliesByCommentId[comment.replyTo]) {
-          repliesByCommentId[comment.replyTo] = [];
+    // Split comments into main comments and replies
+    const comments = post.comments || [];
+    
+    // Group by main comments and replies
+    const mainComments = comments.filter((c: Comment) => !c.replyTo);
+    const repliesByCommentId: {[key: string]: Comment[]} = {};
+    
+    comments.filter((c: Comment) => c.replyTo).forEach((c: Comment) => {
+      if (c.replyTo) {
+        if (!repliesByCommentId[c.replyTo]) {
+          repliesByCommentId[c.replyTo] = [];
         }
-        repliesByCommentId[comment.replyTo].push(comment);
+        repliesByCommentId[c.replyTo].push(c);
       }
     });
     
-    // Filtrujemy tylko główne komentarze (te, które nie są odpowiedziami)
-    const mainComments = (post.comments || []).filter(comment => !comment.replyTo);
-    
     return (
-      <div className="mt-4 space-y-4">
-        <div className="flex items-start space-x-2">
-          <div className="flex-shrink-0">
-            {userNames[address || '']?.avatar ? (
-              <img
-                src={userNames[address || ''].avatar}
-                alt="Profile"
-                className="w-8 h-8 rounded-full object-cover"
-              />
-            ) : (
-              <CoinbaseAvatar address={address as `0x${string}`} className="w-8 h-8 rounded-full" />
-            )}
-          </div>
-          <div className="flex-1">
+      <div className="space-y-6">
+        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <textarea
               value={newComments[post.id] || ''}
-              onChange={(e) => setNewComments(prev => ({
-                ...prev,
-                [post.id]: e.target.value
-              }))}
+            onChange={(e) => setNewComments(prev => ({...prev, [post.id]: e.target.value}))}
               placeholder="Write a comment..."
-              className="w-full p-2 text-sm border rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="w-full p-3 text-sm border rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white"
               rows={2}
             />
+          
             <div className="flex justify-end mt-2">
+            {/* Show comment button based on user's connected network chainId instead of post network */}
+            {networkChainId === BASECAMP_CHAIN_ID ? (
+              <CommentTransactionButtonBaseCamp
+                content={newComments[post.id] || ''}
+                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
+                disabled={!newComments[post.id]?.trim()}
+                onCommentAdded={onCommentAdded}
+              />
+            ) : (
               <CommentTransactionButton
                 content={newComments[post.id] || ''}
                 onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
                 disabled={!newComments[post.id]?.trim()}
-                autoPost={true}
                 onCommentAdded={onCommentAdded}
               />
-            </div>
+            )}
           </div>
         </div>
 
@@ -1018,11 +1018,19 @@ export default function PostList({
                       rows={2}
                     />
                     <div className="flex justify-end mt-1 space-x-2">
+                      {networkChainId === BASECAMP_CHAIN_ID ? (
+                        <CommentTransactionButtonBaseCamp 
+                          content={replyContent} 
+                          disabled={!replyContent.trim()} 
+                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
+                        />
+                      ) : (
                       <CommentTransactionButton 
                         content={replyContent} 
                         disabled={!replyContent.trim()} 
                         onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
                       />
+                      )}
                     </div>
                   </div>
                 )}
@@ -1112,6 +1120,7 @@ export default function PostList({
     const isTextExpanded = expandedTextPosts[post.id] || false;
     const zoraData = postTokenData[post.id];
     const isLoadingData = isLoadingTokenData[post.id];
+    const isBaseCampPost = post.network === 'basecamp';
 
     return (
       <div key={`post-${post.id}`} className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 border border-gray-100 dark:border-gray-700">
@@ -1130,6 +1139,36 @@ export default function PostList({
             </div>
             <div className="flex items-center">
               {displayUserName(post.author, `post-author-${post.id}`, false)}
+              
+              {/* BaseCamp badge */}
+              {isBaseCampPost && (
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-orange-50/30 dark:bg-orange-900/20 shadow-sm">
+                  <svg 
+                    className="w-4 h-4 drop-shadow-md"
+                    viewBox="0 0 600 600"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
+                    <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
+                    <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
+                    <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
+                  </svg>
+                  <span className="ml-1 text-xs bg-gradient-to-r from-orange-600 to-yellow-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Camp Network</span>
+                </div>
+              )}
+              
+              {/* Base network badge */}
+              {post.network === 'base' && (
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
+                  <img 
+                    src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png"
+                    alt="Base"
+                    className="w-4 h-4 drop-shadow-md"
+                  />
+                  <span className="ml-1 text-xs bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Base</span>
+                </div>
+              )}
+              
               {/* Zora logo and badge */}
               {post.zoraCoinAddress && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
@@ -1401,12 +1440,14 @@ export default function PostList({
                       )}
                       
                       <a 
-                        href={`https://basescan.org/token/${post.zoraCoinAddress}`}
+                        href={`${post.network === 'basecamp' 
+                          ? 'https://basecamp.cloud.blockscout.com/token/' 
+                          : 'https://basescan.org/token/'}${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 flex items-center"
                       >
-                        View on Basescan
+                        View on {post.network === 'basecamp' ? 'Camp Network Explorer' : 'Basescan'}
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
                       
@@ -1452,7 +1493,9 @@ export default function PostList({
 
           {post.txHash && (
             <a
-              href={`https://basescan.org/tx/${post.txHash}`}
+              href={`${post.network === 'basecamp' 
+                ? 'https://basecamp.cloud.blockscout.com/tx/' 
+                : 'https://basescan.org/tx/'}${post.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center space-x-1 text-gray-900 dark:text-gray-200 hover:text-blue-500"
