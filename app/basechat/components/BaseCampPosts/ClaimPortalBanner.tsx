@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import { baseCampChain } from '../../../contracts/BaseCampPostContract';
 import { AnimatePresence, motion } from 'framer-motion';
 
-const PORTAL_NFT_ADDRESS = "0x856D34f4dA04226d65ad8Eb9B2cea3a271915A19";
+const PORTAL_NFT_ADDRESS = "0x1eD74B27f846C699A90926daD057A7f6FD22C126";
 const PORTAL_NFT_ABI = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"uint256","name":"balance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"},{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"ERC1155InsufficientBalance","type":"error"},{"inputs":[{"internalType":"address","name":"approver","type":"address"}],"name":"ERC1155InvalidApprover","type":"error"},{"inputs":[{"internalType":"uint256","name":"idsLength","type":"uint256"},{"internalType":"uint256","name":"valuesLength","type":"uint256"}],"name":"ERC1155InvalidArrayLength","type":"error"},{"inputs":[{"internalType":"address","name":"operator","type":"address"}],"name":"ERC1155InvalidOperator","type":"error"},{"inputs":[{"internalType":"address","name":"receiver","type":"address"}],"name":"ERC1155InvalidReceiver","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"}],"name":"ERC1155InvalidSender","type":"error"},{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"address","name":"owner","type":"address"}],"name":"ERC1155MissingApprovalForAll","type":"error"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":false,"internalType":"bool","name":"approved","type":"bool"}],"name":"ApprovalForAll","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256[]","name":"ids","type":"uint256[]"},{"indexed":false,"internalType":"uint256[]","name":"values","type":"uint256[]"}],"name":"TransferBatch","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"TransferSingle","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"value","type":"string"},{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"}],"name":"URI","type":"event"},{"inputs":[],"name":"TOKEN_ID","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"uint256","name":"id","type":"uint256"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint256[]","name":"ids","type":"uint256[]"}],"name":"balanceOfBatch","outputs":[{"internalType":"uint256[]","name":"","type":"uint256[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"claim","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"address","name":"operator","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256[]","name":"ids","type":"uint256[]"},{"internalType":"uint256[]","name":"values","type":"uint256[]"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"safeBatchTransferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"id","type":"uint256"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"safeTransferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"newuri","type":"string"}],"name":"setURI","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalClaimed","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"uri","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"}];
 
 // Interface for NFT metadata
@@ -38,7 +38,7 @@ const ClaimPortalBanner = () => {
   const publicClient = usePublicClient();
   const { switchChain } = useSwitchChain();
   const [totalClaimed, setTotalClaimed] = useState(0);
-  const [maxSupply, setMaxSupply] = useState(2500);
+  const [maxSupply, setMaxSupply] = useState(999999);
   const [claimed, setClaimed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
@@ -64,14 +64,6 @@ const ClaimPortalBanner = () => {
     chainId: baseCampChain.id,
   });
 
-  // Get max supply
-  const { data: maxSupplyData } = useContractRead({
-    address: PORTAL_NFT_ADDRESS,
-    abi: PORTAL_NFT_ABI,
-    functionName: 'maxSupply',
-    chainId: baseCampChain.id,
-  });
-
   // Update states when data is loaded
   useEffect(() => {
     if (hasClaimedData !== undefined) {
@@ -82,10 +74,11 @@ const ClaimPortalBanner = () => {
       setTotalClaimed(Number(totalClaimedData));
     }
 
-    if (maxSupplyData) {
-      setMaxSupply(Number(maxSupplyData));
-    }
-  }, [hasClaimedData, totalClaimedData, maxSupplyData]);
+    // maxSupply is unlimited in new contract, so we don't update it from contract
+    // if (maxSupplyData) {
+    //   setMaxSupply(Number(maxSupplyData));
+    // }
+  }, [hasClaimedData, totalClaimedData]);
 
   // Show NFT preview - simplified to prevent re-renders
   const handleShowPreview = useCallback(() => {
@@ -247,12 +240,12 @@ const ClaimPortalBanner = () => {
             <div className="w-full mt-2">
               <div className="flex justify-between text-xs text-white mb-1">
                 <span>Progress</span>
-                <span>{totalClaimed} / {maxSupply} claimed</span>
+                <span>{totalClaimed} / ∞ claimed</span>
               </div>
               <div className="w-full bg-gray-800 rounded-full h-2">
                 <div 
                   className="bg-orange-400 h-2 rounded-full" 
-                  style={{ width: `${(totalClaimed / maxSupply) * 100}%` }}
+                  style={{ width: `${Math.min((totalClaimed / 100) * 100, 100)}%` }}
                 ></div>
               </div>
             </div>
@@ -265,7 +258,7 @@ const ClaimPortalBanner = () => {
               <div className="px-4 py-2 bg-green-500 text-white rounded text-sm font-medium">
                 Already Claimed ✓
               </div>
-            ) : totalClaimed >= maxSupply ? (
+            ) : totalClaimed >= 999999 ? (
               <div className="px-4 py-2 bg-gray-500 text-white rounded text-sm font-medium">
                 All NFTs Claimed
               </div>

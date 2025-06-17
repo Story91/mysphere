@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import BanRestriction from '../../../admin/components/BanRestriction';
 import TransactionButtonBaseCamp from './TransactionButtonBaseCamp';
@@ -11,9 +11,12 @@ import { Avatar } from '@coinbase/onchainkit/identity';
 
 interface CreatePostBaseCampProps {
   onPostCreated?: () => Promise<void>;
+  setShowAIModal?: (show: boolean) => void;
+  aiGeneratedContent?: string;
+  onAiContentUsed?: () => void;
 }
 
-export default function CreatePostBaseCamp({ onPostCreated }: CreatePostBaseCampProps) {
+export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGeneratedContent, onAiContentUsed }: CreatePostBaseCampProps) {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [postPreviewImage, setPostPreviewImage] = useState<string | null>(null);
@@ -21,6 +24,17 @@ export default function CreatePostBaseCamp({ onPostCreated }: CreatePostBaseCamp
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { address } = useAccount();
+
+  // Update content when AI generates new content
+  useEffect(() => {
+    if (aiGeneratedContent) {
+      setContent(aiGeneratedContent);
+      // Call callback to clear the AI content after using it
+      if (onAiContentUsed) {
+        onAiContentUsed();
+      }
+    }
+  }, [aiGeneratedContent, onAiContentUsed]);
 
   // Handle file selection for media upload
   const handlePostFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,15 +120,10 @@ export default function CreatePostBaseCamp({ onPostCreated }: CreatePostBaseCamp
   };
 
   const handleShowAIModal = () => {
-    // Trigger the global AI modal from parent component
-    const event = new CustomEvent('showAIModal', {
-      detail: {
-        callback: (aiGeneratedContent: string) => {
-          setContent(aiGeneratedContent);
-        }
-      }
-    });
-    window.dispatchEvent(event);
+    // Use direct function call instead of CustomEvent
+    if (setShowAIModal) {
+      setShowAIModal(true);
+    }
   };
 
   if (!address) {
