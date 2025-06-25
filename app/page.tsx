@@ -372,6 +372,7 @@ export default function HomePage() {
   const [postsCount, setPostsCount] = useState(0);
   const [transactionsCount, setTransactionsCount] = useState(1340);
   const [campTransactionsCount, setCampTransactionsCount] = useState(73); // 45 + 28
+  const [campNetworkData, setCampNetworkData] = useState<any>(null);
   const [likesCount, setLikesCount] = useState(0);
   const [commentsCount, setCommentsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -574,6 +575,7 @@ export default function HomePage() {
             const cachedData = JSON.parse(cached);
             // Użyj danych z cache do pierwszego wyświetlenia
             setCampTransactionsCount(cachedData.totalTransactions);
+            setCampNetworkData(cachedData);
             console.log('Użyto danych Camp Network z cache:', cachedData);
           }
         } catch (e) {
@@ -589,6 +591,7 @@ export default function HomePage() {
         
         // Aktualizuj stan komponentu
         setCampTransactionsCount(campData.totalTransactions);
+        setCampNetworkData(campData);
       } catch (error) {
         console.error('Błąd pobierania danych Camp Network:', error);
         // W przypadku błędu użyj fallbackowej wartości
@@ -1271,7 +1274,11 @@ export default function HomePage() {
                       <FaCheckCircle className="w-4 h-4" />
                     </div>
                     <h3 className="text-sm font-medium text-orange-400">Camp Network Post</h3>
-                    <span className="ml-2 text-xs text-gray-500">(45 txs)</span>
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({campNetworkData?.contracts?.find((c: any) => 
+                          c.address === "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E"
+                        )?.transactions || 45} txs)
+                    </span>
                   </div>
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x177Af844a3c7A1749dE97656a5d84b6373Fc350E</p>
                 </div>
@@ -1290,7 +1297,11 @@ export default function HomePage() {
                       <FaCheckCircle className="w-4 h-4" />
                     </div>
                     <h3 className="text-sm font-medium text-blue-400">PORTAL MSxCAMP</h3>
-                    <span className="ml-2 text-xs text-gray-500">(28 txs)</span>
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({campNetworkData?.contracts?.find((c: any) => 
+                          c.address === "0x1eD74B27f846C699A90926daD057A7f6FD22C126"
+                        )?.transactions || 28} txs)
+                    </span>
                   </div>
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x1eD74B27f846C699A90926daD057A7f6FD22C126</p>
                 </div>
@@ -1453,6 +1464,58 @@ export default function HomePage() {
                   }}
                 />
               ))}
+            </div>
+
+            {/* Coming Soon Networks */}
+            {/* Ethereum - Coming Soon */}
+            <div className="absolute top-8 left-8 md:top-12 md:left-12">
+              <div className="relative w-16 h-16 md:w-20 md:h-20">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-gray-500/20 to-gray-400/20 blur-sm animate-pulse"></div>
+                <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-full p-3 border border-gray-600/30 transition-all duration-300 hover:scale-105">
+                  <div className="w-10 h-10 md:w-14 md:h-14 bg-gray-500/50 rounded-full flex items-center justify-center blur-[1px]">
+                    <span className="text-gray-300 text-sm md:text-lg font-mono font-bold">ETH</span>
+                  </div>
+                </div>
+                <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
+                  <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-900/80 px-3 py-1 rounded-full border border-gray-600/30">
+                    Coming Soon
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Optimism - Coming Soon */}
+            <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12">
+              <div className="relative w-16 h-16 md:w-20 md:h-20">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/20 to-red-400/20 blur-sm animate-pulse"></div>
+                <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-full p-3 border border-red-600/30 transition-all duration-300 hover:scale-105">
+                  <div className="w-10 h-10 md:w-14 md:h-14 bg-red-500/50 rounded-full flex items-center justify-center blur-[1px]">
+                    <span className="text-red-300 text-sm md:text-lg font-mono font-bold">OP</span>
+                  </div>
+                </div>
+                <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
+                  <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-900/80 px-3 py-1 rounded-full border border-red-600/30">
+                    Coming Soon
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Arbitrum - Coming Soon */}
+            <div className="absolute top-8 right-8 md:top-12 md:right-12">
+              <div className="relative w-16 h-16 md:w-20 md:h-20">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400/20 to-blue-300/20 blur-sm animate-pulse"></div>
+                <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-full p-3 border border-blue-600/30 transition-all duration-300 hover:scale-105">
+                  <div className="w-10 h-10 md:w-14 md:h-14 bg-blue-500/50 rounded-full flex items-center justify-center blur-[1px]">
+                    <span className="text-blue-300 text-sm md:text-lg font-mono font-bold">ARB</span>
+                  </div>
+                </div>
+                <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
+                  <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-900/80 px-3 py-1 rounded-full border border-blue-600/30">
+                    Coming Soon
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Floating Background Particles */}
