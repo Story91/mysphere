@@ -2490,10 +2490,11 @@ export const saveMySphereUserConnections = async (
       const connectionHistory = [...(existingData.connectionHistory || [])];
       
       // Dodaj nowe połączenia do historii
+      const currentTime = new Date();
       newPlatforms.forEach(platform => {
         connectionHistory.push({
           platform,
-          connectedAt: now
+          connectedAt: currentTime
         });
       });
       
@@ -2503,7 +2504,7 @@ export const saveMySphereUserConnections = async (
           .filter(h => h.platform === platform && !h.disconnectedAt)
           .pop();
         if (lastConnection) {
-          lastConnection.disconnectedAt = now;
+          lastConnection.disconnectedAt = currentTime;
         }
       });
       
@@ -2515,9 +2516,10 @@ export const saveMySphereUserConnections = async (
       });
     } else {
       // Utwórz nowy dokument
+      const currentTime = new Date();
       const connectionHistory = connectedPlatforms.map(platform => ({
         platform,
-        connectedAt: now
+        connectedAt: currentTime
       }));
       
       await setDoc(userSocialRef, {
@@ -2624,21 +2626,53 @@ export const getMySphereGlobalStats = async () => {
       { connections: '5', users: connectionDistribution[5], percentage: totalUsers > 0 ? ((connectionDistribution[5] / totalUsers) * 100).toFixed(1) : '0' }
     ];
     
-    // Wygeneruj dane trendu wzrostu (ostatnie 7 dni)
+    // Wygeneruj rzeczywiste dane trendu wzrostu (ostatnie 7 dni) na podstawie historii połączeń
     const growthTrendData = [];
     const now = new Date();
+    
     for (let i = 6; i >= 0; i--) {
       const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const baseUsers = Math.max(1, totalUsers - Math.floor(Math.random() * 3));
-      growthTrendData.push({
-        date: date.toISOString().split('T')[0],
-        users: baseUsers,
-        twitter: Math.floor(socialMediaConnections.twitter * (baseUsers / Math.max(totalUsers, 1))),
-        discord: Math.floor(socialMediaConnections.discord * (baseUsers / Math.max(totalUsers, 1))),
-        spotify: Math.floor(socialMediaConnections.spotify * (baseUsers / Math.max(totalUsers, 1))),
-        tiktok: Math.floor(socialMediaConnections.tiktok * (baseUsers / Math.max(totalUsers, 1))),
-        telegram: Math.floor(socialMediaConnections.telegram * (baseUsers / Math.max(totalUsers, 1)))
+      const dateString = date.toISOString().split('T')[0];
+      
+      // Zlicz rzeczywiste połączenia dla każdego dnia
+      let dailyStats = {
+        date: dateString,
+        users: 0,
+        twitter: 0,
+        discord: 0,
+        spotify: 0,
+        tiktok: 0,
+        telegram: 0
+      };
+      
+      userSocialsSnapshot.forEach(doc => {
+        const userData = doc.data() as MySphereUserSocialConnections;
+        const userFirstConnected = userData.firstConnected?.toDate?.() || new Date(userData.firstConnected);
+        
+        // Sprawdź czy użytkownik był aktywny w tym dniu
+        if (userFirstConnected <= date) {
+          dailyStats.users++;
+          
+          // Sprawdź każdą platformę w historii połączeń
+          userData.connectionHistory?.forEach(connection => {
+            const connectionDate = connection.connectedAt?.toDate?.() || new Date(connection.connectedAt);
+            const disconnectionDate = connection.disconnectedAt?.toDate?.() || null;
+            
+            // Sprawdź czy połączenie było aktywne w tym dniu
+            if (connectionDate <= date && (!disconnectionDate || disconnectionDate > date)) {
+              switch (connection.platform) {
+                case 'twitter': dailyStats.twitter++; break;
+                case 'discord': dailyStats.discord++; break;
+                case 'spotify': dailyStats.spotify++; break;
+                case 'tiktok': dailyStats.tiktok++; break;
+                case 'telegram': dailyStats.telegram++; break;
+              }
+            }
+          });
+        }
       });
+      
+      growthTrendData.push(dailyStats);
     }
     
     return {

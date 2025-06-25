@@ -260,6 +260,8 @@ export default function MyCampPage() {
     }
   };
 
+
+
   useEffect(() => {
     if (authenticated && address) {
       testApiConnection();
@@ -1276,6 +1278,10 @@ export default function MyCampPage() {
                                   <span className="text-gray-300">
                                     {globalStats.totalUsers > 0 ? ((platform.value / globalStats.totalUsers) * 100).toFixed(1) : '0'}%
                                   </span>
+                                  {/* Debug info - usuń po naprawie */}
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    ({platform.value}/{globalStats.totalUsers})
+                                  </div>
                                 </td>
                                 <td className="text-center py-3 px-4">
                                   <span className="text-green-400 text-xs bg-green-400/20 px-2 py-1 rounded-full">
@@ -1737,6 +1743,8 @@ export default function MyCampPage() {
             )}
           </motion.div>
         )}
+
+
 
 
 

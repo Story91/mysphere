@@ -3,7 +3,7 @@ import { TwitterAPI } from '@campnetwork/sdk';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(request.nextUrl);
     const address = searchParams.get('address');
 
     if (!address) {
