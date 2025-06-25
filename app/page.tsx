@@ -100,10 +100,26 @@ const tailwindConfig = {
         glow: {
           '0%, 100%': { opacity: '0.3' },
           '50%': { opacity: '0.8' }
+        },
+        orbit: {
+          '0%': { transform: 'rotate(0deg) translateX(50px) rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg) translateX(50px) rotate(-360deg)' }
+        },
+        flow: {
+          '0%': { left: '0%', opacity: '0' },
+          '50%': { opacity: '1' },
+          '100%': { left: '100%', opacity: '0' }
+        },
+        twinkle: {
+          '0%, 100%': { opacity: '0.3', transform: 'scale(1)' },
+          '50%': { opacity: '1', transform: 'scale(1.2)' }
         }
       },
       animation: {
-        glow: 'glow 2s ease-in-out infinite'
+        glow: 'glow 2s ease-in-out infinite',
+        orbit: 'orbit 4s linear infinite',
+        flow: 'flow 2s ease-in-out infinite',
+        twinkle: 'twinkle 3s ease-in-out infinite'
       }
     }
   }
@@ -579,7 +595,82 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className={`min-h-screen bg-[#050B20] text-white ${isAppleDevice ? 'full-height' : ''}`}>
+    <>
+      <style jsx global>{`
+        @keyframes orbit {
+          0% { transform: rotate(0deg) translateX(50px) rotate(0deg); }
+          100% { transform: rotate(360deg) translateX(50px) rotate(-360deg); }
+        }
+        @keyframes orbit-large {
+          0% { transform: rotate(0deg) translateX(75px) rotate(0deg); }
+          100% { transform: rotate(360deg) translateX(75px) rotate(-360deg); }
+        }
+        @keyframes orbit-small {
+          0% { transform: rotate(0deg) translateX(50px) rotate(0deg); }
+          100% { transform: rotate(360deg) translateX(50px) rotate(-360deg); }
+        }
+        @keyframes progress-fill {
+          0% { width: 0%; }
+          100% { width: var(--target-width); }
+        }
+        @keyframes progress-blue {
+          0% { width: 0%; }
+          100% { width: var(--target-width); }
+        }
+        @keyframes progress-orange {
+          0% { width: 0%; min-width: 0px; }
+          100% { width: var(--target-width); min-width: var(--min-width); }
+        }
+        @keyframes flow {
+          0% { left: 0%; opacity: 0; }
+          50% { opacity: 1; }
+          100% { left: 100%; opacity: 0; }
+        }
+        @keyframes flow-right {
+          0% { left: 0%; opacity: 0; transform: scale(0.5); }
+          50% { opacity: 1; transform: scale(1); }
+          100% { left: 100%; opacity: 0; transform: scale(0.5); }
+        }
+        @keyframes flow-left {
+          0% { left: 100%; opacity: 0; transform: scale(0.5); }
+          50% { opacity: 1; transform: scale(1); }
+          100% { left: 0%; opacity: 0; transform: scale(0.5); }
+        }
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.2); }
+        }
+        @keyframes grid-move {
+          0% { transform: translateX(0) translateY(0); }
+          100% { transform: translateX(50px) translateY(50px); }
+        }
+        @keyframes beam-flow-left {
+          0% { left: 0%; opacity: 0; transform: scale(0.5); }
+          50% { opacity: 1; transform: scale(1); }
+          100% { left: 100%; opacity: 0; transform: scale(0.5); }
+        }
+        @keyframes beam-flow-right {
+          0% { left: 0%; opacity: 0; transform: scale(0.5); }
+          50% { opacity: 1; transform: scale(1); }
+          100% { left: 100%; opacity: 0; transform: scale(0.5); }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.4; }
+          50% { transform: translateY(-20px) rotate(180deg); opacity: 0.8; }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.6); }
+          50% { box-shadow: 0 0 25px rgba(59, 130, 246, 1); }
+        }
+        @keyframes spin-slow {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+          animation: spin-slow 8s linear infinite;
+        }
+      `}</style>
+      <div className={`min-h-screen bg-[#050B20] text-white ${isAppleDevice ? 'full-height' : ''}`}>
       <div className="absolute top-6 right-6 z-50">
         <Link href="/basechat">
           <button 
@@ -1154,6 +1245,252 @@ export default function HomePage() {
           </div>
         </section>
 
+                {/* Interactive Network Map - Modern Version */}
+        <section className="max-w-7xl mx-auto px-4 mb-32">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
+              Network <span className="bg-gradient-to-r from-[#0052FF] to-orange-500 bg-clip-text text-transparent">Activity</span> Map
+            </h2>
+            <p className="text-gray-300 text-lg max-w-2xl mx-auto">
+              Real-time visualization of blockchain activity across Base and Camp Network ecosystems
+            </p>
+          </div>
+          
+          <div className="relative h-[500px] bg-gradient-to-br from-black/40 via-gray-900/20 to-black/60 backdrop-blur-xl rounded-3xl border border-gray-700/50 overflow-hidden shadow-2xl">
+            {/* Animated Background Grid */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="h-full w-full" style={{
+                backgroundImage: `
+                  linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px)
+                `,
+                backgroundSize: '50px 50px',
+                animation: 'grid-move 20s linear infinite'
+              }}></div>
+            </div>
+
+            {/* Base Network Node */}
+            <div className="absolute left-[20%] top-1/2 transform -translate-x-1/2 -translate-y-1/2 group">
+              <div className="relative">
+                {/* Outer Glow Ring */}
+                <div className="absolute -inset-8 rounded-full bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 blur-xl animate-pulse"></div>
+                
+                {/* Main Node */}
+                <div className="relative w-30 h-30 bg-gradient-to-br from-[#0052FF] via-[#1E4DD8] to-[#4C8FFF] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(0,82,255,0.8)] transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_60px_rgba(0,82,255,1)] border-2 border-white/20">
+                  <Image
+                    src="/brand-kit/base/logo/in-product/Base_Network_Logo.png"
+                    alt="Base Network"
+                    width={48}
+                    height={48}
+                    className="object-contain w-12 h-12 filter drop-shadow-[0_0_10px_rgba(255,255,255,0.9)]"
+                  />
+                </div>
+
+                {/* Network Stats Card */}
+                <div className="absolute -bottom-20 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-gradient-to-r from-blue-500/30 to-blue-600/30 backdrop-blur-lg rounded-xl px-4 py-3 border border-blue-400/40 shadow-lg min-w-[140px]">
+                    <p className="text-blue-200 text-xs font-bold uppercase tracking-wider mb-1">Base Network</p>
+                    <p className="text-white text-xl font-black">{transactionsCount.toLocaleString()}</p>
+                    <p className="text-blue-300 text-xs">Transactions</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* MySphere Central Hub */}
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 group">
+              <div className="relative">
+                {/* Animated Ring */}
+                <div className="absolute -inset-6 rounded-full border-2 border-gradient-to-r from-purple-500/50 to-indigo-500/50 animate-spin-slow"></div>
+                <div className="absolute -inset-4 rounded-full border border-purple-400/30 animate-ping"></div>
+                
+                {/* Central Node */}
+                <div className="relative w-20 h-20 bg-gradient-to-br from-purple-500/40 via-indigo-500/40 to-purple-600/40 backdrop-blur-lg rounded-full flex items-center justify-center border border-purple-400/50 shadow-[0_0_30px_rgba(139,69,233,0.6)] transition-all duration-500 group-hover:scale-110">
+                  <Image
+                    src="/elo2.png"
+                    alt="MySphere"
+                    width={36}
+                    height={36}
+                    className="object-contain w-9 h-9 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Camp Network Node */}
+            <div className="absolute right-[20%] top-1/2 transform translate-x-1/2 -translate-y-1/2 group">
+              <div className="relative">
+                {/* Outer Glow Ring */}
+                <div className="absolute -inset-8 rounded-full bg-gradient-to-r from-orange-500/20 to-orange-600/20 blur-xl animate-pulse"></div>
+                
+                {/* Main Node */}
+                <div className="relative w-30 h-30 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.8)] transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_60px_rgba(249,115,22,1)] border-2 border-white/20">
+                  <Image
+                    src="/Camp.png"
+                    alt="Camp Network"
+                    width={48}
+                    height={48}
+                    className="object-contain w-12 h-12 filter drop-shadow-[0_0_10px_rgba(255,255,255,0.9)]"
+                  />
+                </div>
+
+                {/* Network Stats Card */}
+                <div className="absolute -bottom-20 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-gradient-to-r from-orange-500/30 to-orange-600/30 backdrop-blur-lg rounded-xl px-4 py-3 border border-orange-400/40 shadow-lg min-w-[140px]">
+                    <p className="text-orange-200 text-xs font-bold uppercase tracking-wider mb-1">Camp Network</p>
+                    <p className="text-white text-xl font-black">{campTransactionsCount.toLocaleString()}</p>
+                    <p className="text-orange-300 text-xs">Transactions</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Connection Lines and Data Flow */}
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+              {/* Left line: Base to MySphere */}
+              <div className="absolute w-48 h-0.5 bg-gradient-to-r from-[#0052FF]/60 to-purple-500/40 rounded-full transform -translate-x-full -translate-y-1/2">
+                {/* Blue particles flowing from Base to MySphere */}
+                {[...Array(2)].map((_, i) => (
+                  <div
+                    key={`blue-to-sphere-${i}`}
+                    className="absolute w-3 h-3 bg-blue-400 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.9)]"
+                    style={{
+                      top: '-6px',
+                      animation: `flow-right 3s ease-in-out infinite`,
+                      animationDelay: `${i * 1.5}s`
+                    }}
+                  />
+                ))}
+              </div>
+              
+              {/* Right line: Camp to MySphere */}
+              <div className="absolute w-48 h-0.5 bg-gradient-to-r from-orange-500/60 to-purple-500/40 rounded-full transform translate-y-1/2">
+                {/* Orange particles flowing from Camp to MySphere */}
+                {[...Array(2)].map((_, i) => (
+                  <div
+                    key={`orange-to-sphere-${i}`}
+                    className="absolute w-3 h-3 bg-orange-400 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.9)]"
+                    style={{
+                      top: '-6px',
+                      animation: `flow-left 3s ease-in-out infinite`,
+                      animationDelay: `${i * 1.5}s`
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* MySphere Data Processing Animation */}
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+              {/* Processing particles around MySphere */}
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={`sphere-particle-${i}`}
+                  className="absolute w-2 h-2 rounded-full"
+                  style={{
+                    background: i % 2 === 0 ? '#3B82F6' : '#F97316',
+                    boxShadow: i % 2 === 0 ? '0 0 8px rgba(59,130,246,0.8)' : '0 0 8px rgba(249,115,22,0.8)',
+                    animation: `orbit-small 4s linear infinite`,
+                    animationDelay: `${i * 0.7}s`,
+                    transformOrigin: '50px 50px'
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Floating Background Particles */}
+            {[...Array(20)].map((_, i) => (
+              <div
+                key={`floating-${i}`}
+                className="absolute w-2 h-2 bg-gradient-to-r from-white/40 to-blue-200/40 rounded-full"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animation: `float ${3 + Math.random() * 4}s ease-in-out infinite`,
+                  animationDelay: `${Math.random() * 5}s`
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Transaction Comparison Visualization */}
+          <div className="mt-16 mb-12">
+            <h3 className="text-2xl font-bold text-center text-white mb-8">
+              Network Transaction <span className="text-purple-400">Comparison</span>
+            </h3>
+            
+            <div className="max-w-4xl mx-auto bg-gradient-to-br from-black/40 via-gray-900/20 to-black/60 backdrop-blur-xl rounded-2xl border border-gray-700/50 p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* Base Network Bar */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-300 font-semibold">Base Network</span>
+                    <span className="text-white font-bold">{transactionsCount.toLocaleString()}</span>
+                  </div>
+                  <div className="relative h-6 bg-gray-800/50 rounded-full overflow-hidden">
+                    <div 
+                      className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.6)] animate-[progress-blue_2s_ease-out_forwards]"
+                      style={{ 
+                        '--target-width': `${Math.min((transactionsCount / (transactionsCount + campTransactionsCount)) * 100, 100)}%`
+                      } as React.CSSProperties}
+                    ></div>
+                  </div>
+                  <div className="text-blue-200 text-sm">
+                    {((transactionsCount / (transactionsCount + campTransactionsCount)) * 100).toFixed(1)}% of total activity
+                  </div>
+                </div>
+
+                {/* Camp Network Bar */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-orange-300 font-semibold">Camp Network</span>
+                    <span className="text-white font-bold">{campTransactionsCount.toLocaleString()}</span>
+                  </div>
+                  <div className="relative h-6 bg-gray-800/50 rounded-full overflow-hidden">
+                    <div 
+                      className="absolute left-0 top-0 h-full bg-gradient-to-r from-orange-500 to-orange-600 rounded-full shadow-[0_0_15px_rgba(249,115,22,0.6)] animate-[progress-orange_2s_ease-out_0.5s_forwards]"
+                      style={{ 
+                        '--target-width': `${Math.max((campTransactionsCount / (transactionsCount + campTransactionsCount)) * 100, 5)}%`,
+                        '--min-width': '20px'
+                      } as React.CSSProperties}
+                    ></div>
+                  </div>
+                  <div className="text-orange-200 text-sm">
+                    {((campTransactionsCount / (transactionsCount + campTransactionsCount)) * 100).toFixed(1)}% of total activity
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Total Summary */}
+              <div className="mt-8 pt-6 border-t border-gray-700/50 text-center">
+                <div className="inline-flex items-center space-x-4 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 backdrop-blur-md rounded-xl px-6 py-3 border border-purple-400/30">
+                  <span className="text-purple-300 font-semibold">Total Cross-Chain Activity:</span>
+                  <span className="text-white text-xl font-bold">{(transactionsCount + campTransactionsCount).toLocaleString()}</span>
+                  <span className="text-purple-200 text-sm">transactions</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Enhanced Legend */}
+          <div className="flex flex-wrap justify-center gap-8 mt-12">
+            <div className="flex items-center space-x-3 bg-gradient-to-r from-blue-500/10 to-blue-600/10 backdrop-blur-md rounded-xl px-4 py-3 border border-blue-400/20">
+              <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.6)] animate-pulse"></div>
+              <span className="text-blue-300 font-medium">Base Network Activity</span>
+            </div>
+            <div className="flex items-center space-x-3 bg-gradient-to-r from-orange-500/10 to-orange-600/10 backdrop-blur-md rounded-xl px-4 py-3 border border-orange-400/20">
+              <div className="w-6 h-6 bg-gradient-to-r from-orange-400 to-orange-600 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse"></div>
+              <span className="text-orange-300 font-medium">Camp Network Activity</span>
+            </div>
+            <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 backdrop-blur-md rounded-xl px-4 py-3 border border-purple-400/20">
+              <div className="w-6 h-6 bg-gradient-to-r from-purple-400 to-indigo-500 rounded-full shadow-[0_0_10px_rgba(139,69,233,0.6)] animate-pulse"></div>
+              <span className="text-purple-300 font-medium">MySphere Integration</span>
+            </div>
+          </div>
+        </section>
+
         {/* Features Section - The MySphere Stack */}
         <section className="max-w-7xl mx-auto px-4 mb-32">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-white">
@@ -1483,5 +1820,6 @@ export default function HomePage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
