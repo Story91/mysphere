@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
 import { defineChain } from 'viem';
 import { baseCampChain } from './contracts/BaseCampPostContract';
+import { CampProvider } from '@campnetwork/sdk/react';
 
 type ThemeMode = 'auto' | 'light' | 'dark';
 type ThemeStyle = 'default' | 'base' | 'cyberpunk' | 'hacker';
@@ -80,29 +81,34 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeContext.Provider value={{ mode, setMode, style, setStyle }}>
       <QueryClientProvider client={queryClient}>
         <WagmiConfig config={wagmiConfig}>
-          <FarcasterFrameProvider>
-            <OnchainKitProvider
-              apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-              // We're using base as default, but the WagmiConfig above already supports BaseCamp
-              chain={base}
-              config={{
-                appearance: {
-                  name: 'MySphere',
-                  logo: '/android-chrome-192x192.png',
-                  mode: 'dark',
-                  theme: 'base',
-                },
-                wallet: {
-                  display: 'modal',
-                  termsUrl: 'https://mysphere.fun/docs',
-                  privacyUrl: 'https://basebook.xyz/docs',
-                }
-              }}
-              projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
-            >
-              {children}
-            </OnchainKitProvider>
-          </FarcasterFrameProvider>
+          <CampProvider 
+            clientId={process.env.NEXT_PUBLIC_CAMP_CLIENT_ID!}
+            redirectUri={typeof window !== 'undefined' ? `${window.location.origin}/mycamp` : ''}
+          >
+            <FarcasterFrameProvider>
+              <OnchainKitProvider
+                apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+                // We're using base as default, but the WagmiConfig above already supports BaseCamp
+                chain={base}
+                config={{
+                  appearance: {
+                    name: 'MySphere',
+                    logo: '/android-chrome-192x192.png',
+                    mode: 'dark',
+                    theme: 'base',
+                  },
+                  wallet: {
+                    display: 'modal',
+                    termsUrl: 'https://mysphere.fun/docs',
+                    privacyUrl: 'https://basebook.xyz/docs',
+                  }
+                }}
+                projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
+              >
+                {children}
+              </OnchainKitProvider>
+            </FarcasterFrameProvider>
+          </CampProvider>
         </WagmiConfig>
       </QueryClientProvider>
     </ThemeContext.Provider>

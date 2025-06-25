@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write access to all documents for now (for development)
+    // In production, add proper authentication
+    match /{document=**} {
+      allow read, write: if true;
+    }
+    
+    // Specific rules for MySphere social media data
+    match /mySphereUserSocials/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+} 
