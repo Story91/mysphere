@@ -1328,7 +1328,7 @@ export default function HomePage() {
             </p>
           </div>
           
-          <div className="relative h-[500px] bg-gradient-to-br from-black/40 via-gray-900/20 to-black/60 backdrop-blur-xl rounded-3xl border border-gray-700/50 overflow-hidden shadow-2xl">
+          <div className="relative h-[350px] md:h-[500px] bg-gradient-to-br from-black/40 via-gray-900/20 to-black/60 backdrop-blur-xl rounded-3xl border border-gray-700/50 overflow-hidden shadow-2xl">
             {/* Animated Background Grid */}
             <div className="absolute inset-0 opacity-10">
               <div className="h-full w-full" style={{
@@ -1348,21 +1348,21 @@ export default function HomePage() {
                 <div className="absolute -inset-8 rounded-full bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 blur-xl animate-pulse"></div>
                 
                 {/* Main Node */}
-                <div className="relative w-30 h-30 bg-gradient-to-br from-[#0052FF] via-[#1E4DD8] to-[#4C8FFF] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(0,82,255,0.8)] transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_60px_rgba(0,82,255,1)] border-2 border-white/20">
+                <div className="relative w-20 h-20 md:w-30 md:h-30 bg-gradient-to-br from-[#0052FF] via-[#1E4DD8] to-[#4C8FFF] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(0,82,255,0.8)] transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_60px_rgba(0,82,255,1)] border-2 border-white/20">
                   <Image
                     src="/brand-kit/base/logo/in-product/Base_Network_Logo.png"
                     alt="Base Network"
                     width={48}
                     height={48}
-                    className="object-contain w-12 h-12 filter drop-shadow-[0_0_10px_rgba(255,255,255,0.9)]"
+                    className="object-contain w-8 h-8 md:w-12 md:h-12 filter drop-shadow-[0_0_10px_rgba(255,255,255,0.9)]"
                   />
                 </div>
 
                 {/* Network Stats Card */}
-                <div className="absolute -bottom-20 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-gradient-to-r from-blue-500/30 to-blue-600/30 backdrop-blur-lg rounded-xl px-4 py-3 border border-blue-400/40 shadow-lg min-w-[140px]">
+                <div className="absolute -bottom-16 md:-bottom-20 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-gradient-to-r from-blue-500/30 to-blue-600/30 backdrop-blur-lg rounded-xl px-2 py-2 md:px-4 md:py-3 border border-blue-400/40 shadow-lg min-w-[100px] md:min-w-[140px]">
                     <p className="text-blue-200 text-xs font-bold uppercase tracking-wider mb-1">Base Network</p>
-                    <p className="text-white text-xl font-black">{transactionsCount.toLocaleString()}</p>
+                    <p className="text-white text-lg md:text-xl font-black">{transactionsCount.toLocaleString()}</p>
                     <p className="text-blue-300 text-xs">Transactions</p>
                   </div>
                 </div>
@@ -1377,13 +1377,13 @@ export default function HomePage() {
                 <div className="absolute -inset-4 rounded-full border border-purple-400/30 animate-ping"></div>
                 
                 {/* Central Node */}
-                <div className="relative w-20 h-20 bg-gradient-to-br from-purple-500/40 via-indigo-500/40 to-purple-600/40 backdrop-blur-lg rounded-full flex items-center justify-center border border-purple-400/50 shadow-[0_0_30px_rgba(139,69,233,0.6)] transition-all duration-500 group-hover:scale-110">
+                <div className="relative w-14 h-14 md:w-20 md:h-20 bg-gradient-to-br from-purple-500/40 via-indigo-500/40 to-purple-600/40 backdrop-blur-lg rounded-full flex items-center justify-center border border-purple-400/50 shadow-[0_0_30px_rgba(139,69,233,0.6)] transition-all duration-500 group-hover:scale-110">
                   <Image
                     src="/elo2.png"
                     alt="MySphere"
                     width={36}
                     height={36}
-                    className="object-contain w-9 h-9 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                    className="object-contain w-6 h-6 md:w-9 md:h-9 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
                   />
                 </div>
               </div>
@@ -1396,21 +1396,21 @@ export default function HomePage() {
                 <div className="absolute -inset-8 rounded-full bg-gradient-to-r from-orange-500/20 to-orange-600/20 blur-xl animate-pulse"></div>
                 
                 {/* Main Node */}
-                <div className="relative w-30 h-30 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.8)] transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_60px_rgba(249,115,22,1)] border-2 border-white/20">
+                <div className="relative w-20 h-20 md:w-30 md:h-30 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.8)] transition-all duration-500 group-hover:scale-110 group-hover:shadow-[0_0_60px_rgba(249,115,22,1)] border-2 border-white/20">
                   <Image
                     src="/Camp.png"
                     alt="Camp Network"
                     width={48}
                     height={48}
-                    className="object-contain w-12 h-12 filter drop-shadow-[0_0_10px_rgba(255,255,255,0.9)]"
+                    className="object-contain w-8 h-8 md:w-12 md:h-12 filter drop-shadow-[0_0_10px_rgba(255,255,255,0.9)]"
                   />
                 </div>
 
                 {/* Network Stats Card */}
-                <div className="absolute -bottom-20 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-gradient-to-r from-orange-500/30 to-orange-600/30 backdrop-blur-lg rounded-xl px-4 py-3 border border-orange-400/40 shadow-lg min-w-[140px]">
+                <div className="absolute -bottom-16 md:-bottom-20 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-gradient-to-r from-orange-500/30 to-orange-600/30 backdrop-blur-lg rounded-xl px-2 py-2 md:px-4 md:py-3 border border-orange-400/40 shadow-lg min-w-[100px] md:min-w-[140px]">
                     <p className="text-orange-200 text-xs font-bold uppercase tracking-wider mb-1">Camp Network</p>
-                    <p className="text-white text-xl font-black">{campTransactionsCount.toLocaleString()}</p>
+                    <p className="text-white text-lg md:text-xl font-black">{campTransactionsCount.toLocaleString()}</p>
                     <p className="text-orange-300 text-xs">Transactions</p>
                   </div>
                 </div>
@@ -1420,14 +1420,14 @@ export default function HomePage() {
             {/* Connection Lines and Data Flow */}
             <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
               {/* Left line: Base to MySphere */}
-              <div className="absolute w-48 h-0.5 bg-gradient-to-r from-[#0052FF]/60 to-purple-500/40 rounded-full transform -translate-x-full -translate-y-1/2">
+              <div className="absolute w-32 md:w-48 h-0.5 bg-gradient-to-r from-[#0052FF]/60 to-purple-500/40 rounded-full transform -translate-x-full -translate-y-1/2">
                 {/* Blue particles flowing from Base to MySphere */}
                 {[...Array(2)].map((_, i) => (
                   <div
                     key={`blue-to-sphere-${i}`}
-                    className="absolute w-3 h-3 bg-blue-400 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.9)]"
+                    className="absolute w-2 h-2 md:w-3 md:h-3 bg-blue-400 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.9)]"
                     style={{
-                      top: '-6px',
+                      top: '-4px',
                       animation: `flow-right 3s ease-in-out infinite`,
                       animationDelay: `${i * 1.5}s`
                     }}
@@ -1436,14 +1436,14 @@ export default function HomePage() {
               </div>
               
               {/* Right line: Camp to MySphere */}
-              <div className="absolute w-48 h-0.5 bg-gradient-to-r from-orange-500/60 to-purple-500/40 rounded-full transform translate-y-1/2">
+              <div className="absolute w-32 md:w-48 h-0.5 bg-gradient-to-r from-orange-500/60 to-purple-500/40 rounded-full transform translate-y-1/2">
                 {/* Orange particles flowing from Camp to MySphere */}
                 {[...Array(2)].map((_, i) => (
                   <div
                     key={`orange-to-sphere-${i}`}
-                    className="absolute w-3 h-3 bg-orange-400 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.9)]"
+                    className="absolute w-2 h-2 md:w-3 md:h-3 bg-orange-400 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.9)]"
                     style={{
-                      top: '-6px',
+                      top: '-4px',
                       animation: `flow-left 3s ease-in-out infinite`,
                       animationDelay: `${i * 1.5}s`
                     }}
@@ -1472,16 +1472,16 @@ export default function HomePage() {
 
             {/* Coming Soon Networks */}
             {/* Ethereum - Coming Soon */}
-            <div className="absolute top-8 left-8 md:top-12 md:left-12">
-              <div className="relative w-16 h-16 md:w-20 md:h-20">
+            <div className="absolute top-4 left-4 md:top-12 md:left-12">
+              <div className="relative w-12 h-12 md:w-20 md:h-20">
                 <div className="absolute inset-0 rounded-full bg-gradient-to-r from-gray-500/20 to-gray-400/20 blur-sm animate-pulse"></div>
-                <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-full p-3 border border-gray-600/30 transition-all duration-300 hover:scale-105">
-                  <div className="w-10 h-10 md:w-14 md:h-14 bg-gray-500/50 rounded-full flex items-center justify-center blur-[1px]">
-                    <span className="text-gray-300 text-sm md:text-lg font-mono font-bold">ETH</span>
+                <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-full p-2 md:p-3 border border-gray-600/30 transition-all duration-300 hover:scale-105">
+                  <div className="w-8 h-8 md:w-14 md:h-14 bg-gray-500/50 rounded-full flex items-center justify-center blur-[1px]">
+                    <span className="text-gray-300 text-xs md:text-lg font-mono font-bold">ETH</span>
                   </div>
                 </div>
-                <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
-                  <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-900/80 px-3 py-1 rounded-full border border-gray-600/30">
+                <div className="absolute -bottom-6 md:-bottom-8 left-1/2 transform -translate-x-1/2">
+                  <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-900/80 px-2 py-1 md:px-3 md:py-1 rounded-full border border-gray-600/30">
                     Coming Soon
                   </span>
                 </div>
@@ -1489,16 +1489,16 @@ export default function HomePage() {
             </div>
 
             {/* Optimism - Coming Soon */}
-            <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12">
-              <div className="relative w-16 h-16 md:w-20 md:h-20">
+            <div className="absolute bottom-4 right-4 md:bottom-12 md:right-12">
+              <div className="relative w-12 h-12 md:w-20 md:h-20">
                 <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/20 to-red-400/20 blur-sm animate-pulse"></div>
-                <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-full p-3 border border-red-600/30 transition-all duration-300 hover:scale-105">
-                  <div className="w-10 h-10 md:w-14 md:h-14 bg-red-500/50 rounded-full flex items-center justify-center blur-[1px]">
-                    <span className="text-red-300 text-sm md:text-lg font-mono font-bold">OP</span>
+                <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-full p-2 md:p-3 border border-red-600/30 transition-all duration-300 hover:scale-105">
+                  <div className="w-8 h-8 md:w-14 md:h-14 bg-red-500/50 rounded-full flex items-center justify-center blur-[1px]">
+                    <span className="text-red-300 text-xs md:text-lg font-mono font-bold">OP</span>
                   </div>
                 </div>
-                <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
-                  <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-900/80 px-3 py-1 rounded-full border border-red-600/30">
+                <div className="absolute -bottom-6 md:-bottom-8 left-1/2 transform -translate-x-1/2">
+                  <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-900/80 px-2 py-1 md:px-3 md:py-1 rounded-full border border-red-600/30">
                     Coming Soon
                   </span>
                 </div>
@@ -1506,16 +1506,16 @@ export default function HomePage() {
             </div>
 
             {/* Arbitrum - Coming Soon */}
-            <div className="absolute top-8 right-8 md:top-12 md:right-12">
-              <div className="relative w-16 h-16 md:w-20 md:h-20">
+            <div className="absolute top-4 right-4 md:top-12 md:right-12">
+              <div className="relative w-12 h-12 md:w-20 md:h-20">
                 <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400/20 to-blue-300/20 blur-sm animate-pulse"></div>
-                <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-full p-3 border border-blue-600/30 transition-all duration-300 hover:scale-105">
-                  <div className="w-10 h-10 md:w-14 md:h-14 bg-blue-500/50 rounded-full flex items-center justify-center blur-[1px]">
-                    <span className="text-blue-300 text-sm md:text-lg font-mono font-bold">ARB</span>
+                <div className="relative bg-gray-900/60 backdrop-blur-sm rounded-full p-2 md:p-3 border border-blue-600/30 transition-all duration-300 hover:scale-105">
+                  <div className="w-8 h-8 md:w-14 md:h-14 bg-blue-500/50 rounded-full flex items-center justify-center blur-[1px]">
+                    <span className="text-blue-300 text-xs md:text-lg font-mono font-bold">ARB</span>
                   </div>
                 </div>
-                <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
-                  <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-900/80 px-3 py-1 rounded-full border border-blue-600/30">
+                <div className="absolute -bottom-6 md:-bottom-8 left-1/2 transform -translate-x-1/2">
+                  <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-900/80 px-2 py-1 md:px-3 md:py-1 rounded-full border border-blue-600/30">
                     Coming Soon
                   </span>
                 </div>
