@@ -302,11 +302,11 @@ export default function MyCampPage() {
   // Update dropdown position when button ref changes
   useEffect(() => {
     const updatePosition = () => {
-      if (buttonRef && socialDropdownOpen) {
+      if (buttonRef && socialDropdownOpen && !isMobile) {
         const rect = buttonRef.getBoundingClientRect();
         const scrollY = window.scrollY;
         setDropdownPosition({
-          top: rect.bottom + scrollY - 1,
+          top: rect.bottom + scrollY + 4,
           left: rect.left,
           width: rect.width
         });
@@ -315,7 +315,7 @@ export default function MyCampPage() {
 
     updatePosition();
 
-    if (socialDropdownOpen) {
+    if (socialDropdownOpen && !isMobile) {
       window.addEventListener('scroll', updatePosition);
       window.addEventListener('resize', updatePosition);
       
@@ -324,7 +324,7 @@ export default function MyCampPage() {
         window.removeEventListener('resize', updatePosition);
       };
     }
-  }, [buttonRef, socialDropdownOpen]);
+  }, [buttonRef, socialDropdownOpen, isMobile]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -685,7 +685,42 @@ export default function MyCampPage() {
 
               </motion.button>
 
-
+              {/* Mobile Social Dropdown - positioned right below button */}
+              {isMobile && socialDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scaleY: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                  exit={{ opacity: 0, y: -10, scaleY: 0.8 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="absolute top-full left-0 right-0 mt-2 bg-black/90 backdrop-blur-sm border border-green-500/30 rounded-xl overflow-hidden shadow-2xl shadow-green-500/20 z-50"
+                >
+                  {[
+                    { key: 'twitter', name: 'Twitter', gradient: 'from-sky-500 to-blue-500' },
+                    { key: 'discord', name: 'Discord', gradient: 'from-indigo-500 to-purple-500' },
+                    { key: 'spotify', name: 'Spotify', gradient: 'from-green-500 to-emerald-500' },
+                    { key: 'tiktok', name: 'TikTok', gradient: 'from-pink-500 to-rose-500' },
+                    { key: 'telegram', name: 'Telegram', gradient: 'from-cyan-500 to-blue-500' }
+                  ].map((social, index) => (
+                    <motion.button
+                      key={social.key}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      disabled={true}
+                      className="w-full px-3 sm:px-4 py-3 text-left transition-all duration-200 text-orange-200/50 cursor-not-allowed backdrop-blur-[1px] relative overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium blur-[0.5px] text-sm sm:text-base">{social.name}</span>
+                        <span className="text-xs text-orange-300/70 font-medium">
+                          Soon
+                        </span>
+                      </div>
+                      {/* Subtle overlay */}
+                      <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
             </motion.div>
           </div>
         </motion.div>
@@ -1172,8 +1207,8 @@ export default function MyCampPage() {
                               <Pie
                                 data={globalStats.platformChartData}
                                 cx="50%"
-                                cy="50%"
-                                outerRadius={isMobile ? 50 : 80}
+                                cy={isMobile ? "45%" : "50%"}
+                                outerRadius={isMobile ? 40 : 80}
                                 fill="#8884d8"
                                 dataKey="value"
                                 label={isMobile ? false : ({ name, value, percent }: any) => `${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`}
@@ -1183,6 +1218,23 @@ export default function MyCampPage() {
                                   <Cell key={`cell-${index}`} fill={entry.color} />
                                 ))}
                               </Pie>
+                              {isMobile && (
+                                <Legend
+                                  verticalAlign="bottom"
+                                  height={36}
+                                  fontSize={10}
+                                  iconType="circle"
+                                  wrapperStyle={{
+                                    fontSize: '10px',
+                                    color: '#E5E7EB'
+                                  }}
+                                  formatter={(value: string, entry: any) => (
+                                    <span style={{ color: entry.color, fontSize: '10px' }}>
+                                      {value}
+                                    </span>
+                                  )}
+                                />
+                              )}
                               <Tooltip 
                                 contentStyle={{
                                   backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -1498,13 +1550,13 @@ export default function MyCampPage() {
                     </div>
                   </div>
 
-                  {/* Preview Contracts */}
+                  {/* Preview Unique Contracts */}
                   <div className="bg-gradient-to-br from-orange-600/20 via-orange-500/10 to-orange-800/20 backdrop-blur-sm border border-orange-500/30 rounded-xl p-6 grayscale">
                     <div className="flex items-center justify-between mb-4">
                       <div className="text-4xl opacity-50">📋</div>
                       <div className="text-right">
                         <div className="text-3xl font-bold text-orange-300/50">***</div>
-                        <div className="text-sm text-orange-200/50">Contracts</div>
+                        <div className="text-sm text-orange-200/50">Unique Contracts</div>
                       </div>
                     </div>
                     <div className="text-center pt-2 border-t border-orange-500/20">
@@ -1631,25 +1683,25 @@ export default function MyCampPage() {
                   )}
                 </motion.div>
 
-                {/* Contracts */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5, delay: 0.4 }}
-                  className="bg-gradient-to-br from-orange-600/20 via-orange-500/10 to-orange-800/20 backdrop-blur-sm border border-orange-500/30 rounded-xl p-6 hover:border-orange-500/50 transition-all duration-300"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="text-4xl">📋</div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold text-orange-300">{walletStats.contracts.toLocaleString()}</div>
-                      <div className="text-sm text-orange-200/70">Contracts</div>
+                                  {/* Unique Contracts */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
+                    className="bg-gradient-to-br from-orange-600/20 via-orange-500/10 to-orange-800/20 backdrop-blur-sm border border-orange-500/30 rounded-xl p-6 hover:border-orange-500/50 transition-all duration-300"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-4xl">📋</div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-orange-300">{walletStats.contracts.toLocaleString()}</div>
+                        <div className="text-sm text-orange-200/70">Unique Contracts</div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-center pt-2 border-t border-orange-500/20">
-                    <div className="text-sm text-orange-200/70">Points Earned</div>
-                    <div className="text-xl font-bold text-orange-200">{walletStats.contractsPoints.toLocaleString()}</div>
-                  </div>
-                </motion.div>
+                    <div className="text-center pt-2 border-t border-orange-500/20">
+                      <div className="text-sm text-orange-200/70">Points Earned</div>
+                      <div className="text-xl font-bold text-orange-200">{walletStats.contractsPoints.toLocaleString()}</div>
+                    </div>
+                  </motion.div>
               </div>
             ) : (
               <div className="text-center py-12">
@@ -1797,14 +1849,14 @@ export default function MyCampPage() {
         <CampModal injectButton={false} />
       </div>
 
-      {/* Portal Dropdown - Renders at document.body level */}
-      {typeof window !== 'undefined' && socialDropdownOpen && createPortal(
+      {/* Portal Dropdown - Renders at document.body level (Desktop only) */}
+      {typeof window !== 'undefined' && socialDropdownOpen && !isMobile && createPortal(
         <motion.div
           initial={{ 
             opacity: 0, 
-            y: isMobile ? 20 : -5, 
+            y: -5, 
             scaleY: 0.8, 
-            transformOrigin: isMobile ? 'bottom' : 'top' 
+            transformOrigin: 'top' 
           }}
           animate={{ 
             opacity: 1, 
@@ -1813,19 +1865,12 @@ export default function MyCampPage() {
           }}
           exit={{ 
             opacity: 0, 
-            y: isMobile ? 20 : -5, 
+            y: -5, 
             scaleY: 0.8 
           }}
           transition={{ duration: 0.15, ease: "easeOut" }}
           className="fixed bg-black/90 backdrop-blur-sm border border-green-500/30 rounded-xl overflow-hidden shadow-2xl shadow-green-500/20"
-          style={isMobile ? {
-            bottom: 80,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 'calc(100vw - 32px)',
-            maxWidth: '400px',
-            zIndex: 10000
-          } : {
+          style={{
             top: dropdownPosition.top,
             left: dropdownPosition.left,
             width: dropdownPosition.width,

@@ -31,7 +31,7 @@ const POINT_MULTIPLIERS = {
 
 async function fetchWalletData(address: string): Promise<WalletStats> {
   try {
-    // Fetch transactions count
+    // Fetch total transactions count with pagination info
     const transactionsResponse = await fetch(
       `${BASECAMP_API_URL}/addresses/${address}/transactions?filter=to%20%7C%20from`,
       {
@@ -61,7 +61,17 @@ async function fetchWalletData(address: string): Promise<WalletStats> {
       }
     );
     
-    // For contracts, we'll check if the address is a contract
+    // Fetch Internal Transactions (contracts calls)
+    const internalTxnsResponse = await fetch(
+      `${BASECAMP_API_URL}/addresses/${address}/internal-transactions`,
+      {
+        headers: {
+          'Accept': 'application/json',
+        },
+      }
+    );
+
+    // Get address details to check for created contracts count
     const addressResponse = await fetch(
       `${BASECAMP_API_URL}/addresses/${address}`,
       {
@@ -78,19 +88,26 @@ async function fetchWalletData(address: string): Promise<WalletStats> {
     let hasCampNFT = false;
     let campNFTDetails = undefined;
 
-    // Parse transactions
-    if (transactionsResponse.ok) {
+    // Parse address details first to get transaction count
+    let addressData = null;
+    if (addressResponse.ok) {
+      addressData = await addressResponse.json();
+      // Get exact transaction count from address summary
+      transactions = addressData.transactions_count || 0;
+      console.log('Address data:', {
+        address,
+        transactions_count: addressData.transactions_count,
+        fetchedTransactions: transactions
+      });
+    } else {
+      console.error('Address API failed:', addressResponse.status, addressResponse.statusText);
+    }
+    
+    // Fallback: if address response fails, try to get from transactions endpoint
+    if (transactions === 0 && transactionsResponse.ok) {
       const transactionsData = await transactionsResponse.json();
-      // Count total transactions (sent + received)
       if (transactionsData.items) {
         transactions = transactionsData.items.length;
-        
-        // If there are next_page_params, we need to estimate total count
-        // For now, we'll use the current page count as a base
-        if (transactionsData.next_page_params) {
-          // Estimate based on pagination - this is a rough estimate
-          transactions = Math.min(transactions * 20, 10000); // Cap at reasonable number
-        }
       }
     }
 
@@ -125,11 +142,19 @@ async function fetchWalletData(address: string): Promise<WalletStats> {
       }
     }
 
-    // Parse contracts (if address has created contracts)
-    if (addressResponse.ok) {
-      const addressData = await addressResponse.json();
-      // This is simplified - in reality we'd need to check created contracts
-      contracts = addressData.is_contract ? 1 : 0;
+    // Parse internal transactions (contract calls)
+    if (internalTxnsResponse.ok) {
+      const internalTxnsData = await internalTxnsResponse.json();
+      if (internalTxnsData.items) {
+        contracts = internalTxnsData.items.length;
+        console.log('Internal transactions data:', {
+          address,
+          internalTxnsCount: contracts,
+          totalItems: internalTxnsData.items.length
+        });
+      }
+    } else {
+              console.error('Unique Contracts API failed:', internalTxnsResponse.status, internalTxnsResponse.statusText);
     }
 
     // Calculate points
@@ -138,7 +163,7 @@ async function fetchWalletData(address: string): Promise<WalletStats> {
     const nftsPoints = nfts * POINT_MULTIPLIERS.nfts;
     const contractsPoints = contracts * POINT_MULTIPLIERS.contracts;
 
-    return {
+    const result = {
       transactions,
       tokens,
       nfts,
@@ -151,8 +176,24 @@ async function fetchWalletData(address: string): Promise<WalletStats> {
       campNFTDetails,
     };
 
+    console.log('Final wallet stats:', {
+      address,
+      result,
+      timestamp: new Date().toISOString()
+    });
+
+    return result;
+
   } catch (error) {
     console.error('Error fetching wallet data:', error);
+    
+    // Log more details for debugging
+    console.error('Error details:', {
+      address,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+    
     // Return default values on error
     return {
       transactions: 0,
