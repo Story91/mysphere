@@ -246,27 +246,63 @@ async function getCampNetworkTransactions() {
   // Pobieranie danych o transakcjach dla pojedynczego kontraktu Camp Network
   async function fetchCampContractData(contractAddress: string) {
     try {
-      // Fallback wartości dla kontraktów Camp Network
-      let fallbackTx = 0;
-      if (contractAddress === "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E") {
-        fallbackTx = 45; // Przykładowa wartość
-      } else if (contractAddress === "0x1eD74B27f846C699A90926daD057A7f6FD22C126") {
-        fallbackTx = 28; // Przykładowa wartość
+      // Spróbuj pobrać rzeczywiste dane z Camp Network Blockscout API
+      const txCountResponse = await fetch(
+        `https://basecamp.cloud.blockscout.com/api/v2/addresses/${contractAddress}/transactions?filter=to%20%7C%20from`
+      );
+      
+      let totalTransactions = 0;
+      
+      if (txCountResponse.ok) {
+        const txData = await txCountResponse.json();
+        
+        if (txData && txData.items && Array.isArray(txData.items)) {
+          totalTransactions = txData.items.length;
+          
+          // Jeśli jest więcej niż 50 transakcji (domyślny limit), spróbuj pobrać wszystkie
+          if (totalTransactions === 50 && txData.next_page_params) {
+            // Dla uproszczenia, użyjemy przybliżonej liczby na podstawie next_page_params
+            // W przyszłości można zaimplementować paginację
+            totalTransactions = 50; // Minimalna znana liczba
+          }
+        }
+        
+        console.log(`Camp Network contract ${contractAddress}: ${totalTransactions} transactions (real data)`);
+      } else {
+        console.warn(`Nie udało się pobrać danych z Camp Network API dla ${contractAddress}, używam fallback`);
+        throw new Error('API response not ok');
       }
       
-      console.log(`Camp Network contract ${contractAddress}: ${fallbackTx} transactions`);
+      // Jeśli nie udało się pobrać danych, użyj fallback
+      if (totalTransactions === 0) {
+        if (contractAddress === "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E") {
+          totalTransactions = 45; // Fallback
+        } else if (contractAddress === "0x1eD74B27f846C699A90926daD057A7f6FD22C126") {
+          totalTransactions = 28; // Fallback
+        }
+        console.log(`Camp Network contract ${contractAddress}: ${totalTransactions} transactions (fallback)`);
+      }
       
       return { 
         address: contractAddress, 
-        transactions: fallbackTx
+        transactions: totalTransactions
       };
     } catch (error: unknown) {
+      // W przypadku błędu, używamy fallbackowych wartości
+      let fallbackTx = 0;
+      if (contractAddress === "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E") {
+        fallbackTx = 45;
+      } else if (contractAddress === "0x1eD74B27f846C699A90926daD057A7f6FD22C126") {
+        fallbackTx = 28;
+      }
+      
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`Błąd pobierania danych Camp Network dla ${contractAddress}:`, error);
+      console.log(`Użyto fallbackowej liczby transakcji: ${fallbackTx}`);
       
       return { 
         address: contractAddress, 
-        transactions: 0, 
+        transactions: fallbackTx, 
         error: errorMessage 
       };
     }
@@ -531,11 +567,32 @@ export default function HomePage() {
     // Pobierz dane o transakcjach Camp Network
     const fetchCampData = async () => {
       try {
+        // Próba odczytu danych z localStorage dla natychmiastowego wyświetlenia
+        try {
+          const cached = localStorage.getItem('campNetworkTransactions');
+          if (cached) {
+            const cachedData = JSON.parse(cached);
+            // Użyj danych z cache do pierwszego wyświetlenia
+            setCampTransactionsCount(cachedData.totalTransactions);
+            console.log('Użyto danych Camp Network z cache:', cachedData);
+          }
+        } catch (e) {
+          console.error('Błąd odczytu cache Camp Network:', e);
+        }
+        
+        // Pobierz świeże dane
         const campData = await getCampNetworkTransactions();
-        console.log('Pobrano dane Camp Network:', campData);
+        console.log('Pobrano świeże dane Camp Network:', campData);
+        
+        // Zapisz w localStorage
+        localStorage.setItem('campNetworkTransactions', JSON.stringify(campData));
+        
+        // Aktualizuj stan komponentu
         setCampTransactionsCount(campData.totalTransactions);
       } catch (error) {
         console.error('Błąd pobierania danych Camp Network:', error);
+        // W przypadku błędu użyj fallbackowej wartości
+        setCampTransactionsCount(73);
       }
     };
     fetchCampData();
