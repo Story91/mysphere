@@ -823,6 +823,43 @@ export default function HomePage() {
               </Link>
             </div>
 
+            {/* Camp Network Integration Card - FEATURED */}
+            <div className="group">
+              <Link href="/mycamp" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
+                <div 
+                  className="h-full bg-gradient-to-br from-orange-400/30 via-orange-500/25 to-orange-600/30 backdrop-blur-xl rounded-xl overflow-hidden border-2 border-orange-400/60 hover:border-orange-300/80 transition-all duration-500 group-hover:scale-[1.05] group-hover:shadow-2xl shadow-[0_0_25px_rgba(249,115,22,0.4)] p-6 relative"
+                  onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
+                >
+                  {/* Animated border glow */}
+                  <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 opacity-60 group-hover:opacity-100 animate-[spin_3s_linear_infinite] transition-opacity duration-500"></div>
+                  <div className="absolute inset-[2px] rounded-xl bg-gradient-to-br from-orange-400/30 via-orange-500/25 to-orange-600/30 backdrop-blur-xl"></div>
+                  
+                  {/* Enhanced hover overlay */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    <div className="absolute inset-0 bg-gradient-to-r from-orange-400/40 to-orange-600/40 rounded-xl blur-xl transition-all duration-500"></div>
+                  </div>
+                  
+                  {/* Enhanced NEW badge */}
+                  <div className="absolute top-3 right-3">
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-orange-500/30 border-2 border-orange-400/50 shadow-[0_0_15px_rgba(249,115,22,0.6)]">
+                      <span className="w-3 h-3 rounded-full bg-orange-400 animate-pulse mr-2 shadow-[0_0_8px_rgba(249,115,22,0.8)]"></span>
+                      <span className="text-orange-100 text-sm font-bold">HOT</span>
+                    </span>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-orange-200 text-orange-100 filter drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]">Camp Network</h2>
+                    </div>
+                    <p className="text-orange-50/90 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed filter drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+                      Explore the new Camp Network integration! Connect your social accounts, manage your onchain identity, and access exclusive features.
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
             {/* Identity Card (wcześniej Profile) */}
             <div className="group">
               <Link href="/profile" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
@@ -894,39 +931,6 @@ export default function HomePage() {
                     </div>
                     <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
                       Get your exclusive Sphere Genesis NFT collection. Early supporters receive special benefits and access to premium features.
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            </div>
-
-            {/* Camp Network Integration Card */}
-            <div className="group">
-              <Link href="/mycamp" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
-                <div 
-                  className="h-full bg-gradient-to-br from-orange-500/20 via-blue-500/20 to-orange-600/20 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-orange-500/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
-                  onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
-                >
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/30 to-blue-500/30 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                  </div>
-                  
-                  {/* New Network Badge */}
-                  <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-orange-500/20 border border-orange-400/30">
-                      <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse mr-1"></span>
-                      <span className="text-orange-300 text-xs font-bold">NEW</span>
-                    </span>
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-orange-400 text-orange-200">Camp Network</h2>
-                    </div>
-                    <p className="text-gray-300 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                      Explore the new Camp Network integration! Connect your social accounts, manage your onchain identity, and access exclusive features.
                     </p>
                   </div>
                 </div>
