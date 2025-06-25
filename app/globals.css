@@ -129,6 +129,53 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile responsiveness fixes */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Prevent horizontal scrolling on mobile */
+* {
+  box-sizing: border-box;
+}
+
+/* Specific mobile fixes */
+@media (max-width: 768px) {
+  /* Prevent text overflow */
+  h1, h2, h3, h4, h5, h6 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Ensure no element exceeds viewport width */
+  .container, .max-w-6xl {
+    max-width: 100vw !important;
+    overflow-x: hidden;
+  }
+  
+  /* Mobile modal positioning */
+  .mobile-modal {
+    position: fixed !important;
+    bottom: 80px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - 32px) !important;
+    max-width: 400px !important;
+    z-index: 10000 !important;
+  }
+  
+  /* Mobile success message */
+  .mobile-success {
+    position: fixed !important;
+    bottom: 16px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    max-width: calc(100vw - 32px) !important;
+    z-index: 10000 !important;
+  }
+}
+
 /* Podstawowe style responsywne */
 html {
   font-size: 14.4px;

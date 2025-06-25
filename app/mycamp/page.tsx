@@ -52,6 +52,7 @@ export default function MyCampPage() {
   const [connectedSocialsCount, setConnectedSocialsCount] = useState(0);
   const [globalStats, setGlobalStats] = useState<any>(null);
   const [globalStatsLoading, setGlobalStatsLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   
   // Camp SDK hooks
   const auth = useAuth();
@@ -114,6 +115,19 @@ export default function MyCampPage() {
         EXPLORER_URL
       }
     });
+  }, []);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkIsMobile = () => {
+      const isMobileDevice = window.innerWidth <= 768;
+      setIsMobile(isMobileDevice);
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    
+    return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
 
   // Note: API data fetching moved to backend routes
@@ -327,26 +341,30 @@ export default function MyCampPage() {
   }, [socialDropdownOpen, buttonRef]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-orange-800 to-orange-600">
+    <div className="min-h-screen bg-gradient-to-br from-black via-orange-800 to-orange-600 overflow-x-hidden">
       {/* Background Effects */}
       <div className="fixed inset-0 bg-[linear-gradient(90deg,transparent_24%,rgba(249,115,22,0.08)_25%,rgba(249,115,22,0.08)_26%,transparent_27%,transparent_74%,rgba(249,115,22,0.08)_75%,rgba(249,115,22,0.08)_76%,transparent_77%,transparent),linear-gradient(0deg,transparent_24%,rgba(249,115,22,0.08)_25%,rgba(249,115,22,0.08)_26%,transparent_27%,transparent_74%,rgba(249,115,22,0.08)_75%,rgba(249,115,22,0.08)_76%,transparent_77%,transparent)] bg-[length:30px_30px] opacity-60"></div>
       
       {/* Success Message */}
       {showSuccessMessage && (
         <motion.div
-          initial={{ opacity: 0, y: -50, scale: 0.9 }}
+          initial={{ opacity: 0, y: isMobile ? 50 : -50, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -50, scale: 0.9 }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500/90 backdrop-blur-sm text-white px-6 py-3 rounded-xl shadow-2xl border border-green-400/50"
+          exit={{ opacity: 0, y: isMobile ? 50 : -50, scale: 0.9 }}
+          className={`fixed z-50 bg-green-500/90 backdrop-blur-sm text-white px-4 sm:px-6 py-3 rounded-xl shadow-2xl border border-green-400/50 max-w-[90vw] ${
+            isMobile 
+              ? 'bottom-4 left-1/2 -translate-x-1/2' 
+              : 'top-4 left-1/2 -translate-x-1/2'
+          }`}
         >
           <div className="flex items-center gap-2">
             <div className="text-xl">🎉</div>
-            <span className="font-medium">Social account connected successfully!</span>
+            <span className="font-medium text-sm sm:text-base">Social account connected successfully!</span>
           </div>
         </motion.div>
       )}
       
-      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8">
+      <div className="relative z-10 max-w-6xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
         {/* Enhanced Beautiful Header */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -375,7 +393,7 @@ export default function MyCampPage() {
             initial={{ opacity: 0, scale: 0.3, rotateX: -15 }}
             animate={{ opacity: 1, scale: 1, rotateX: 0 }}
             transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
-            className="text-8xl md:text-9xl font-black relative tracking-wider"
+            className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black relative tracking-wider"
             style={{ fontFamily: 'Impact, "Arial Black", sans-serif' }}
           >
             {/* Multi-layer Text with Enhanced Gradient */}
@@ -466,11 +484,11 @@ export default function MyCampPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.8 }}
-          className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-8 mb-8"
+          className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 md:p-8 mb-8"
         >
 
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {/* Home Button */}
             <motion.button
               initial={{ opacity: 0, y: 20 }}
@@ -483,7 +501,7 @@ export default function MyCampPage() {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setActiveTab('home')}
-              className={`group relative overflow-hidden rounded-2xl p-6 transition-all duration-500 ${
+              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
                 activeTab === 'home'
                   ? 'bg-gradient-to-br from-orange-500/80 to-red-500/80 text-white shadow-2xl shadow-orange-500/25 border border-orange-400/50'
                   : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-orange-400/40'
@@ -501,7 +519,7 @@ export default function MyCampPage() {
                   whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="text-3xl mb-3 font-black tracking-wider">HOME</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">HOME</div>
                   <div className="text-xs opacity-80 uppercase tracking-widest">Dashboard</div>
                 </motion.div>
               </div>
@@ -526,7 +544,7 @@ export default function MyCampPage() {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setActiveTab('stats')}
-              className={`group relative overflow-hidden rounded-2xl p-6 transition-all duration-500 ${
+              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
                 activeTab === 'stats'
                   ? 'bg-gradient-to-br from-blue-500/80 to-cyan-500/80 text-white shadow-2xl shadow-blue-500/25 border border-blue-400/50'
                   : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-blue-400/40'
@@ -544,7 +562,7 @@ export default function MyCampPage() {
                   whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="text-3xl mb-3 font-black tracking-wider">STATS</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">STATS</div>
                   <div className="text-xs opacity-80 uppercase tracking-widest">Analytics</div>
                 </motion.div>
               </div>
@@ -569,7 +587,7 @@ export default function MyCampPage() {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setActiveTab('nfts')}
-              className={`group relative overflow-hidden rounded-2xl p-6 transition-all duration-500 ${
+              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
                 activeTab === 'nfts'
                   ? 'bg-gradient-to-br from-purple-500/80 to-pink-500/80 text-white shadow-2xl shadow-purple-500/25 border border-purple-400/50'
                   : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-purple-400/40'
@@ -587,7 +605,7 @@ export default function MyCampPage() {
                   whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="text-3xl mb-3 font-black tracking-wider">NFTs</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">NFTs</div>
                   <div className="text-xs opacity-80 uppercase tracking-widest">Collection</div>
                 </motion.div>
               </div>
@@ -614,7 +632,7 @@ export default function MyCampPage() {
                   y: -2
                 }}
                 onClick={() => setSocialDropdownOpen(!socialDropdownOpen)}
-                className="group relative overflow-hidden rounded-2xl p-6 w-full transition-all duration-500 bg-black/40 text-orange-200/70 border border-orange-500/20 cursor-pointer"
+                className="group relative overflow-hidden rounded-2xl p-4 sm:p-6 w-full transition-all duration-500 bg-black/40 text-orange-200/70 border border-orange-500/20 cursor-pointer"
               >
                 {/* Disabled overlay */}
                 <div className="absolute inset-0 bg-black/30 backdrop-blur-[0.5px]"></div>
@@ -624,13 +642,13 @@ export default function MyCampPage() {
                     className="text-center"
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="text-3xl mb-3 font-black tracking-wider blur-[0.5px] flex items-center justify-center gap-3">
+                    <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider blur-[0.5px] flex items-center justify-center gap-2 sm:gap-3">
                       SOCIAL
                       {authenticated && (
                         <motion.div
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
-                          className="bg-orange-500/80 text-white text-sm px-2 py-1 rounded-full font-bold min-w-[24px] text-center"
+                          className="bg-orange-500/80 text-white text-xs sm:text-sm px-2 py-1 rounded-full font-bold min-w-[24px] text-center"
                         >
                           {connectedSocialsCount}/5
                         </motion.div>
@@ -664,10 +682,10 @@ export default function MyCampPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-6 mb-8"
+          className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8"
         >
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-2xl font-bold text-orange-200 flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
+            <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-200 flex items-center gap-2">
               🔗 Social Media Management
             </h3>
             <div className="flex items-center gap-3">
@@ -710,7 +728,7 @@ export default function MyCampPage() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
               {/* Twitter - Compact Glass Card */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -941,9 +959,9 @@ export default function MyCampPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.8 }}
-              className="text-center mb-8"
+              className="text-center mb-6 sm:mb-8 px-2"
             >
-              <p className="text-orange-200/80 text-sm max-w-2xl mx-auto leading-relaxed">
+              <p className="text-orange-200/80 text-xs sm:text-sm max-w-2xl mx-auto leading-relaxed">
                 💡 <strong className="text-orange-300">Tip:</strong> Connecting your social accounts allows Camp Network to verify your 
                 social presence and enables advanced features like social-based reputation scoring.
               </p>
@@ -954,11 +972,11 @@ export default function MyCampPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.9 }}
-              className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 rounded-xl p-6 mb-8"
+              className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 rounded-xl p-4 sm:p-6 mb-8"
             >
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
                 <div>
-                  <h4 className="text-xl font-bold text-blue-200 flex items-center gap-2">
+                  <h4 className="text-lg sm:text-xl font-bold text-blue-200 flex items-center gap-2">
                     🌍 MySphere User Statistics
                   </h4>
                   {globalStats && (
@@ -988,7 +1006,7 @@ export default function MyCampPage() {
                 </div>
               ) : globalStats ? (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
                     {/* Total Users */}
                     <div className="text-center bg-blue-500/20 rounded-lg p-4">
                       <div className="text-2xl font-bold text-blue-300">{globalStats.totalUsers.toLocaleString()}</div>
@@ -1011,7 +1029,7 @@ export default function MyCampPage() {
                   {/* Social Media Breakdown */}
                   <div className="mb-6">
                     <h5 className="text-lg font-bold text-blue-200 mb-4 text-center">Social Media Connections</h5>
-                    <div className="grid grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                       {[
                         { key: 'twitter', name: 'Twitter', icon: '🐦', color: 'text-blue-400' },
                         { key: 'discord', name: 'Discord', icon: '🎮', color: 'text-purple-400' },
@@ -1312,12 +1330,12 @@ export default function MyCampPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.9 }}
-              className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-6 mb-8"
+              className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8"
             >
-              <h3 className="text-2xl font-bold text-orange-200 mb-6 flex items-center gap-2">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-200 mb-4 sm:mb-6 flex items-center gap-2">
                 🛠️ Network Tools
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <Link
                   href={FAUCET_URL}
                   target="_blank"
@@ -1371,10 +1389,10 @@ export default function MyCampPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-6 mb-8"
+            className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8"
           >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-orange-200 flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-200 flex items-center gap-2">
                 📊 Wallet Statistics
                 <Image 
                   src="/Camp.png" 
@@ -1400,7 +1418,7 @@ export default function MyCampPage() {
             {!isConnected ? (
               <>
                 {/* Preview Cards - Blurred */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 relative">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8 relative">
                   {/* Blur Overlay */}
                   <div className="absolute inset-0 bg-black/50 backdrop-blur-sm rounded-xl z-10 flex items-center justify-center">
                     <div className="text-center">
@@ -1504,7 +1522,7 @@ export default function MyCampPage() {
                 </motion.button>
               </div>
             ) : walletStats ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 {/* Transactions */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -1662,9 +1680,9 @@ export default function MyCampPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-6 mb-8"
+            className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8"
           >
-            <h3 className="text-2xl font-bold text-orange-200 mb-6 flex items-center gap-2">
+            <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-200 mb-4 sm:mb-6 flex items-center gap-2">
               🖼️ Camp Network NFTs
               <Image 
                 src="/Camp.png" 
@@ -1757,16 +1775,32 @@ export default function MyCampPage() {
       {/* Portal Dropdown - Renders at document.body level */}
       {typeof window !== 'undefined' && socialDropdownOpen && createPortal(
         <motion.div
-          initial={{ opacity: 0, y: -5, scaleY: 0.8, transformOrigin: 'top' }}
+          initial={{ 
+            opacity: 0, 
+            y: isMobile ? 20 : -5, 
+            scaleY: 0.8, 
+            transformOrigin: isMobile ? 'bottom' : 'top' 
+          }}
           animate={{ 
             opacity: 1, 
             y: 0,
             scaleY: 1
           }}
-          exit={{ opacity: 0, y: -5, scaleY: 0.8 }}
+          exit={{ 
+            opacity: 0, 
+            y: isMobile ? 20 : -5, 
+            scaleY: 0.8 
+          }}
           transition={{ duration: 0.15, ease: "easeOut" }}
           className="fixed bg-black/90 backdrop-blur-sm border border-green-500/30 rounded-xl overflow-hidden shadow-2xl shadow-green-500/20"
-          style={{
+          style={isMobile ? {
+            bottom: 80,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'calc(100vw - 32px)',
+            maxWidth: '400px',
+            zIndex: 10000
+          } : {
             top: dropdownPosition.top,
             left: dropdownPosition.left,
             width: dropdownPosition.width,
@@ -1786,10 +1820,10 @@ export default function MyCampPage() {
                animate={{ opacity: 1, x: 0 }}
                transition={{ delay: index * 0.05 }}
                disabled={true}
-               className="w-full px-4 py-3 text-left transition-all duration-200 text-orange-200/50 cursor-not-allowed backdrop-blur-[1px] relative overflow-hidden"
+               className="w-full px-3 sm:px-4 py-3 text-left transition-all duration-200 text-orange-200/50 cursor-not-allowed backdrop-blur-[1px] relative overflow-hidden"
              >
                <div className="flex items-center justify-between">
-                 <span className="font-medium blur-[0.5px]">{social.name}</span>
+                 <span className="font-medium blur-[0.5px] text-sm sm:text-base">{social.name}</span>
                  <span className="text-xs text-orange-300/70 font-medium">
                    Soon
                  </span>

@@ -26,7 +26,7 @@ export default function RootLayout({
         {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}
         <title>MySphere.fun</title>
         <meta name="description" content="The onchain social Dapp on Base. Build, grow, and own your digital Sphere." />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         
         {/* Farcaster Frame - zaktualizowany format z launch_frame */}
         <meta name="fc:frame" content='{
