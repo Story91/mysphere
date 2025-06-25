@@ -176,12 +176,17 @@ export default function TransactionButtonWrapper({
     }
   };
 
+  // Get contract calls before rendering
+  const contractCalls = getCalls();
+  const hasValidCalls = contractCalls !== undefined && Array.isArray(contractCalls) && contractCalls.length > 0;
+
   return (
     <div className="relative">
       {!transactionSuccess ? (
+        hasValidCalls ? (
         <Transaction
           chainId={chainId}
-          calls={getCalls()}
+            calls={contractCalls}
           onStatus={handleTransactionStatus}
         >
           <OnchainKitTransactionButton 
@@ -223,6 +228,16 @@ export default function TransactionButtonWrapper({
             <TransactionToastAction />
           </TransactionToast>
         </Transaction>
+        ) : (
+          <button
+            className="px-3 py-1.5 sm:px-5 sm:py-2 h-[32px] bg-gray-500 text-white rounded-lg border border-gray-400 opacity-70 cursor-not-allowed text-sm"
+            disabled={true}
+          >
+            <span className="flex items-center justify-center">
+              <span>Network not supported</span>
+            </span>
+          </button>
+        )
       ) : (
         <div className="flex flex-col">
           <button
@@ -240,14 +255,6 @@ export default function TransactionButtonWrapper({
         </div>
       )}
       
-      {networkError && (
-        <div className="mt-2 p-2 bg-red-100 text-red-700 rounded-lg text-xs">
-          <p className="font-medium">Network Error</p>
-          <p>{networkError}</p>
-          <p className="mt-1">Please switch to Base Mainnet or Base Sepolia in your wallet.</p>
-        </div>
-      )}
-      
       {/* Komunikat o odrzuceniu żądania */}
       <div className={`absolute top-full left-0 right-0 mt-2 p-2 bg-red-100 text-red-700 rounded-lg text-xs text-center transition-opacity duration-300 ${requestDenied ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         Request denied.
@@ -255,6 +262,13 @@ export default function TransactionButtonWrapper({
       
       {/* Zakomentowana pulsująca animacja tła */}
       {/* <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-transparent opacity-50 animate-pulse pointer-events-none"></div> */}
+
+      {/* Network error message as a single line */}
+      {networkError && (
+        <div className="mt-2 text-center text-red-500 text-xs whitespace-nowrap overflow-hidden text-ellipsis w-full">
+          Network Error: Please switch to Base Mainnet
+        </div>
+      )}
     </div>
   );
 } 

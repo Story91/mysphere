@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, PropsWithChildren } from 'react';
-import { useAccount, useSendTransaction, usePublicClient, useWalletClient } from 'wagmi';
-import { base } from 'wagmi/chains';
+import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
+import { base, baseSepolia } from 'wagmi/chains';
 import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
 import { ConnectWallet } from '@coinbase/onchainkit/wallet';
 import { parseEther } from 'viem';
@@ -54,6 +54,8 @@ import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { createCoin, getCoinCreateFromLogs } from '@zoralabs/coins-sdk';
 // Import Viem types
 import { Address as ViemAddress, Hex } from 'viem';
+import CreatePostBaseCamp from './components/BaseCampPosts/CreatePostBaseCamp';
+import ClaimPortalBanner from './components/BaseCampPosts/ClaimPortalBanner';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -200,10 +202,14 @@ export default function BaseChat() {
     currentRank?: UserRank;
   } | null>(null);
   
+  // Network filter state - renamed to activePostingNetwork to reflect its new purpose
+  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp'>('base');
+  
   // Stany dla generowania AI
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiGeneratedContentForCamp, setAiGeneratedContentForCamp] = useState<string>('');
   
   // Globalne deklaracje stanów modalu przeniesione na początek funkcji
   const [modalMessage, setModalMessage] = useState('');
@@ -293,6 +299,8 @@ export default function BaseChat() {
   const [userStats, setUserStats] = useState<{[key: string]: Stats & { totalPoints: number }}>({});
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
 
+  const chainId = useChainId();
+
   // Funkcja do pobierania statystyk użytkownika
   const fetchUserStats = async (userAddress: string) => {
     if (!userStats[userAddress]) {
@@ -356,11 +364,7 @@ export default function BaseChat() {
                 userName
               )}
             </span>
-            <img 
-              src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png" 
-              alt="Base Network" 
-              className="inline-block ml-2 w-3.5 h-3.5 align-middle" 
-            />
+            {/* Base logo removed as requested */}
             {/* Podpowiedź nad nazwą zamiast pod nią */}
             <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 text-[9px] text-blue-400 bg-white/80 dark:bg-gray-800/80 px-2 py-0.5 rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
               Click to view profile
@@ -454,7 +458,10 @@ export default function BaseChat() {
       const loadPosts = async () => {
         try {
           setIsLoadingPosts(true); // Ustaw ładowanie na true przed rozpoczęciem pobierania
-          const { posts: fetchedPosts } = await fetchPosts({ userId: address });
+          const { posts: fetchedPosts } = await fetchPosts({ 
+            userId: address
+            // Remove networkFilter parameter to always fetch all posts
+          });
           setPosts(fetchedPosts);
         } catch (error) {
           console.error('Error fetching posts:', error);
@@ -464,9 +471,9 @@ export default function BaseChat() {
       };
       loadPosts();
     }
-  }, [isConnected, address]);
+  }, [isConnected, address]); // Remove networkFilter from dependencies
 
-  // Dodaj funkcję do obsługi odświeżania i dodawania nowych postów
+  // Update onRefreshPosts to not use network filtering
   const onRefreshPosts = async (newPosts?: ExtendedPost[]) => {
     if (!address) return;
     
@@ -496,7 +503,10 @@ export default function BaseChat() {
         }
       } else {
         // Przypadek 2: Standardowe odświeżenie - pobierz wszystkie posty od nowa
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
+        const { posts: refreshedPosts } = await fetchPosts({ 
+          userId: address
+          // Remove networkFilter parameter to always fetch all posts
+        });
         setPosts(refreshedPosts);
       }
     } catch (error) {
@@ -600,7 +610,8 @@ export default function BaseChat() {
         tags: tags,
         mentions: mentions,
         visibility: 'public',
-        txHash: txHash // Zapisz hash transakcji onchain
+        txHash: txHash, // Zapisz hash transakcji onchain
+        network: 'base' // Identify as a Base network post
       });
 
       // 3. Update UI
@@ -776,7 +787,7 @@ export default function BaseChat() {
         payoutRecipient: address as ViemAddress, // Creator receives earnings
         // owners: [address as ViemAddress], // Optional: defaults to payoutRecipient
         initialPurchaseWei: 0n, // No initial purchase for now
-        // platformReferrer: undefined, // Optional platform fee recipient
+        platformReferrer: "0x9fb014812e5c22643640a5885866f499b1bbb5e0" as ViemAddress, // Referral fees recipient
       };
       console.log("Zora coin parameters:", coinParams);
 
@@ -1976,7 +1987,9 @@ export default function BaseChat() {
             messages: [
               {
                 role: "system",
-                content: "You are an assistant who generates engaging social media posts related to the Base blockchain ecosystem. Your posts should be informative, but also friendly and encouraging interaction."
+                content: activePostingNetwork === 'basecamp' 
+                  ? "You are an assistant who generates engaging social media posts related to the Camp Network ecosystem. Your posts should be informative, but also friendly and encouraging interaction. Focus on community building, innovation, and the unique features of Camp Network."
+                  : "You are an assistant who generates engaging social media posts related to the Base blockchain ecosystem. Your posts should be informative, but also friendly and encouraging interaction."
               },
               {
                 role: "user",
@@ -2010,7 +2023,13 @@ export default function BaseChat() {
         const generatedPost = data.choices[0].message.content;
         console.log('Post generated:', generatedPost);
 
-        setNewPost(generatedPost);
+        // Check which network is active and set appropriate content
+        if (activePostingNetwork === 'basecamp') {
+          setAiGeneratedContentForCamp(generatedPost);
+        } else {
+          setNewPost(generatedPost);
+        }
+        
         setShowAIModal(false);
         setAiPrompt('');
         
@@ -2629,6 +2648,37 @@ export default function BaseChat() {
                 </div>
               </div>
 
+              {/* Network Filter tabs */}
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  onClick={() => setActivePostingNetwork('base')}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'base' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
+                >
+                  <img 
+                    src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png"
+                    alt="Base"
+                    className="w-4 h-4 mr-1.5 bg-white rounded-full p-0.5"
+                  />
+                  Base Post
+                </button>
+                <button
+                  onClick={() => setActivePostingNetwork('basecamp')}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'basecamp' ? 'bg-orange-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
+                >
+                  <svg 
+                    className="w-4 h-4 mr-1.5"
+                    viewBox="0 0 600 600"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
+                    <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
+                    <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
+                    <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
+                  </svg>
+                  Camp Network Post
+                </button>
+              </div>
+
               {/* Dodaj warunek wyświetlania panelu Builders lub feed */}
               {activeMainPanel === 'builders' ? (
                 <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden border border-blue-100 dark:border-blue-900">
@@ -2664,6 +2714,9 @@ export default function BaseChat() {
                     <>
                       {canCreatePosts ? (
                         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow mb-6">
+                          {/* Show Base post form conditionally */}
+                          {activePostingNetwork === 'base' && (
+                            <>
                           <div className="flex items-center space-x-3 mb-4">
                             {userProfile.avatar ? (
                               <img
@@ -2750,14 +2803,12 @@ export default function BaseChat() {
                               </button>
                             </div>
                             
-                            {/* Replace TransactionButton with a standard button */}
                             <div className="flex space-x-2">
-                              {/* Option 1: Post as Token (Zora) - z logo Zora i fioletowym gradientem */}
                             <button 
                               onClick={handleCreatePost}
-                              disabled={!newPost.trim() || isCreatingPost} 
+                                    disabled={!newPost.trim() || isCreatingPost || (chainId !== base.id && chainId !== baseSepolia.id)} 
                               className={`px-3 py-0.5 text-sm font-medium rounded-lg transition-colors duration-200 flex items-center justify-center h-[32px] ${ 
-                                (!newPost.trim() || isCreatingPost)
+                                      (!newPost.trim() || isCreatingPost || (chainId !== base.id && chainId !== baseSepolia.id))
                                   ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                                     : 'bg-white text-[#0052FF] border border-[#0052FF]'
                               }`}
@@ -2782,7 +2833,6 @@ export default function BaseChat() {
                               )}
                             </button>
                               
-                              {/* Option 2: Post Onchain with TransactionButton */}
                               <TransactionButton 
                                 content={newPost}
                                 onTransactionSuccess={handleTransactionSuccess}
@@ -2798,6 +2848,21 @@ export default function BaseChat() {
                             onChange={handlePostFileSelect}
                             className="hidden"
                           />
+                            </>
+                          )}
+
+                          {/* Add BaseCamp post form conditionally */}
+                          {activePostingNetwork === 'basecamp' && (
+                            <div>
+                              <CreatePostBaseCamp 
+                                onPostCreated={refreshPosts} 
+                                setShowAIModal={setShowAIModal}
+                                aiGeneratedContent={aiGeneratedContentForCamp}
+                                onAiContentUsed={() => setAiGeneratedContentForCamp('')}
+                              />
+                              <ClaimPortalBanner />
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="bg-white rounded-xl p-6 text-center shadow-lg mb-6 border border-[#0052FF]/20 relative overflow-hidden">
@@ -3302,18 +3367,33 @@ export default function BaseChat() {
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.5, opacity: 0 }}
-              className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl rounded-2xl p-6 max-w-md w-full mx-4 border border-white/10 shadow-[0_0_30px_rgba(59,130,246,0.2)]"
+              className={`${
+                activePostingNetwork === 'basecamp' 
+                  ? 'bg-gradient-to-br from-black/90 to-orange-900/90 border-orange-500/30 shadow-[0_0_30px_rgba(249,115,22,0.3)]'
+                  : 'bg-gradient-to-br from-gray-900/90 to-gray-800/90 border-white/10 shadow-[0_0_30px_rgba(59,130,246,0.2)]'
+              } backdrop-blur-xl rounded-2xl p-6 max-w-md w-full mx-4 border`}
               onClick={e => e.stopPropagation()}
             >
               <div className="flex flex-col items-center mb-6 relative">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent"></div>
+                <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 ${
+                  activePostingNetwork === 'basecamp'
+                    ? 'bg-gradient-to-r from-transparent via-orange-500 to-transparent'
+                    : 'bg-gradient-to-r from-transparent via-blue-500 to-transparent'
+                }`}></div>
                 
-                <h3 className="text-xl font-medium text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 mt-4">
-                  AI Post Generator
+                <h3 className={`text-xl font-medium text-transparent bg-clip-text ${
+                  activePostingNetwork === 'basecamp'
+                    ? 'bg-gradient-to-r from-orange-400 to-yellow-400'
+                    : 'bg-gradient-to-r from-blue-400 to-purple-400'
+                } mt-4`}>
+                  {activePostingNetwork === 'basecamp' ? 'Camp AI Generator' : 'AI Post Generator'}
                 </h3>
                 
                 <div className="text-sm text-gray-400 mt-2 text-center">
-                  Let AI help you create engaging content
+                  {activePostingNetwork === 'basecamp' 
+                    ? 'Let AI help you create engaging Camp Network content'
+                    : 'Let AI help you create engaging content'
+                  }
                 </div>
 
                 <button
@@ -3330,8 +3410,16 @@ export default function BaseChat() {
                 <textarea
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="I'm your personal Base network agent. How can I assist you with creating engaging content today?"
-                  className="w-full px-4 py-3 bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-md border border-white/10 rounded-xl text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                  placeholder={
+                    activePostingNetwork === 'basecamp'
+                      ? "I'm your personal Camp Network agent. How can I assist you with creating engaging content for the Camp community today?"
+                      : "I'm your personal Base network agent. How can I assist you with creating engaging content today?"
+                  }
+                  className={`w-full px-4 py-3 ${
+                    activePostingNetwork === 'basecamp'
+                      ? 'bg-gradient-to-r from-black/50 to-orange-900/50 border-orange-500/20 focus:ring-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.1)]'
+                      : 'bg-gradient-to-r from-gray-800/50 to-gray-900/50 border-white/10 focus:ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+                  } backdrop-blur-md border rounded-xl text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 resize-none`}
                   rows={4}
                   maxLength={500}
                 />
@@ -3350,7 +3438,11 @@ export default function BaseChat() {
                 <button
                   onClick={handleGenerateAIPost}
                   disabled={isGeneratingAI || !aiPrompt.trim()}
-                  className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-500/30 to-purple-500/30 backdrop-blur-md rounded-xl text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed border border-white/20"
+                  className={`flex items-center gap-2 px-6 py-2 ${
+                    activePostingNetwork === 'basecamp'
+                      ? 'bg-gradient-to-r from-orange-500/30 to-yellow-500/30 hover:shadow-[0_0_20px_rgba(249,115,22,0.5)] border-orange-500/20'
+                      : 'bg-gradient-to-r from-blue-500/30 to-purple-500/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] border-white/20'
+                  } backdrop-blur-md rounded-xl text-white font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed border`}
                 >
                   {isGeneratingAI ? (
                     <>
@@ -3368,11 +3460,19 @@ export default function BaseChat() {
                 </button>
               </div>
               {isGeneratingAI && (
-                <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-blue-500/10 to-purple-500/10 backdrop-blur-md border border-white/10 shadow-lg">
+                <div className={`mt-4 p-4 rounded-xl ${
+                  activePostingNetwork === 'basecamp'
+                    ? 'bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border-orange-500/20'
+                    : 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-white/10'
+                } backdrop-blur-md border shadow-lg`}>
                   <p className="text-sm text-white/80 text-center">
                     Due to high demand, generation may take about a minute.
                     <br />
-                    <span className="text-blue-400 font-medium">We're creating the perfect post for you! ✨</span>
+                    <span className={`${
+                      activePostingNetwork === 'basecamp' ? 'text-orange-400' : 'text-blue-400'
+                    } font-medium`}>
+                      We're creating the perfect {activePostingNetwork === 'basecamp' ? 'Camp Network' : ''} post for you! ✨
+                    </span>
                   </p>
                 </div>
               )}

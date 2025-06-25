@@ -18,6 +18,7 @@ export interface Post {
   txHash?: string;
   zoraCoinAddress?: string;
   lastEdited?: any;
+  network?: 'base' | 'basecamp';
 }
 
 export interface Comment {

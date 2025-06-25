@@ -77,15 +77,20 @@ export default function Navigation() {
 
   const navLinks: (NavLink | NavLinkWithDropdown)[] = [
     { href: '/basechat', label: 'MySphere' },
-    { href: '/profile', label: 'Identity' },
-    {
-      label: 'Finance',
-      dropdownItems: [
-        { href: '/bridge', label: 'Bridge' },
-        { href: '/earn', label: 'Earn' },
-        { href: '/ais', label: 'Buy $AIS' }
-      ]
+    { 
+      href: '/mycamp', 
+      label: '🏕️ MyCamp', 
+      isHighlighted: true 
     },
+    { href: '/profile', label: 'Identity' },
+    // {
+    //   label: 'Finance',
+    //   dropdownItems: [
+    //     { href: '/bridge', label: 'Bridge' },
+    //     { href: '/earn', label: 'Earn' },
+    //     { href: '/ais', label: 'Buy $AIS' }
+    //   ]
+    // },
     {
       label: 'NFT',
       dropdownItems: [
@@ -204,7 +209,7 @@ export default function Navigation() {
                         : link.isFlashBlock 
                           ? 'text-white bg-blue-700 shadow-lg shadow-blue-700/30' 
                           : link.isHighlighted 
-                            ? 'text-white bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg shadow-purple-600/20' 
+                            ? 'text-white bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20' 
                             : 'text-gray-100 hover:text-[#0052FF]'
                     }`}
                   >
@@ -220,7 +225,7 @@ export default function Navigation() {
                     {!link.isFlashBlock && (
                       <div className={`absolute inset-0 rounded-xl ${
                         link.isHighlighted 
-                          ? 'bg-gradient-to-r from-purple-600/80 to-pink-600/80 group-hover:from-purple-500 group-hover:to-pink-500' 
+                          ? 'bg-gradient-to-r from-orange-500/80 to-orange-600/80 group-hover:from-orange-400 group-hover:to-orange-500' 
                           : 'bg-[#0052FF]/0 group-hover:bg-[#0052FF]/5'
                         } transition-all duration-300`}></div>
                     )}
@@ -228,7 +233,7 @@ export default function Navigation() {
                       <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4C8FFF] opacity-20 animate-pulse"></div>
                     )}
                     {link.isHighlighted && !link.isFlashBlock && (
-                      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 opacity-80 animate-pulse"></div>
+                      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 opacity-80 animate-pulse"></div>
                     )}
                   </Link>
                 )
@@ -391,7 +396,7 @@ export default function Navigation() {
                       : link.isFlashBlock 
                         ? 'text-white bg-blue-700 relative shadow-lg shadow-blue-700/30' 
                         : link.isHighlighted 
-                          ? 'text-white bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg shadow-purple-600/20' 
+                          ? 'text-white bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20' 
                           : 'text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5'
                   }`}
                 >

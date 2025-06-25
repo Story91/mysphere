@@ -380,6 +380,7 @@ export const createPost = async (post: {
   visibility?: 'public' | 'followers' | 'private';
   txHash?: string; // Keep this as it now represents the Zora creation tx hash
   zoraCoinAddress?: string; // <-- ADDED
+  network?: 'base' | 'basecamp'; // Add network parameter to identify the source network
 }): Promise<string> => {
   try {
     const userRef = doc(db, 'users', post.author);
@@ -432,6 +433,7 @@ interface FetchPostsParams {
   authorFilter?: string | null;
   tagFilter?: string | null;
   searchTerm?: string | null;
+  networkFilter?: 'base' | 'basecamp' | null; // Add network filter parameter
 }
 
 // Interfejs zwracany przez funkcję fetchPosts
@@ -448,7 +450,8 @@ export const fetchPosts = async ({
   orderBy = 'newest',
   authorFilter = null,
   tagFilter = null,
-  searchTerm = null
+  searchTerm = null,
+  networkFilter = null // Default to null (no filtering)
 }: FetchPostsParams = {}): Promise<FetchPostsResult> => {
   try {
     const postsCollection = collection(db, 'posts');
@@ -468,6 +471,12 @@ export const fetchPosts = async ({
     
     if (tagFilter) {
       queryConstraints.push(where('tags', 'array-contains', tagFilter));
+    }
+    
+    // Add network filter - only if specifically requested for filtered views
+    // For normal feed, we want to show all posts regardless of network
+    if (networkFilter) {
+      queryConstraints.push(where('network', '==', networkFilter));
     }
     
     // Ograniczenie liczby postów
@@ -511,6 +520,7 @@ export const fetchPosts = async ({
           txHash: postData.txHash || null,
           lastEdited: postData.lastEdited || null,
           zoraCoinAddress: postData.zoraCoinAddress || null,
+          network: postData.network || 'base', // Include network property and default to 'base' for backward compatibility
         };
         
         // Dodatkowe filtrowanie po stronie klienta dla wyszukiwania (jeśli potrzebne)
@@ -518,6 +528,9 @@ export const fetchPosts = async ({
             !post.content.toLowerCase().includes(searchTerm.toLowerCase())) {
           continue; // Pomiń post, jeśli nie zawiera szukanej frazy
         }
+        
+        // Remove this debugging log to reduce console output
+        // console.log(`Post ${post.id} network: ${post.network}, content: ${post.content.substring(0, 20)}...`);
         
         posts.push(post);
       }
@@ -2439,3 +2452,264 @@ export const fetchUserProfileSimple = async (userId: string) => {
     // ... existing code ...
   }
 };
+
+// --- MySphere Social Media Tracking Functions ---
+
+interface MySphereUserSocialConnections {
+  address: string;
+  connectedPlatforms: string[];
+  lastUpdated: any;
+  firstConnected: any;
+  connectionHistory: {
+    platform: string;
+    connectedAt: any;
+    disconnectedAt?: any;
+  }[];
+}
+
+// Zapisz połączenia social media użytkownika w Firebase
+export const saveMySphereUserConnections = async (
+  address: string, 
+  connectedPlatforms: string[]
+): Promise<void> => {
+  try {
+    const userSocialRef = doc(db, 'mySphereUserSocials', address);
+    const userSocialDoc = await getDoc(userSocialRef);
+    
+    const now = serverTimestamp();
+    
+    if (userSocialDoc.exists()) {
+      const existingData = userSocialDoc.data() as MySphereUserSocialConnections;
+      const previousPlatforms = existingData.connectedPlatforms || [];
+      
+      // Sprawdź które platformy zostały dodane lub usunięte
+      const newPlatforms = connectedPlatforms.filter(p => !previousPlatforms.includes(p));
+      const removedPlatforms = previousPlatforms.filter(p => !connectedPlatforms.includes(p));
+      
+      // Utwórz historię zmian
+      const connectionHistory = [...(existingData.connectionHistory || [])];
+      
+      // Dodaj nowe połączenia do historii
+      newPlatforms.forEach(platform => {
+        connectionHistory.push({
+          platform,
+          connectedAt: now
+        });
+      });
+      
+      // Dodaj rozłączenia do historii
+      removedPlatforms.forEach(platform => {
+        const lastConnection = connectionHistory
+          .filter(h => h.platform === platform && !h.disconnectedAt)
+          .pop();
+        if (lastConnection) {
+          lastConnection.disconnectedAt = now;
+        }
+      });
+      
+      // Zaktualizuj dokument
+      await updateDoc(userSocialRef, {
+        connectedPlatforms,
+        lastUpdated: now,
+        connectionHistory
+      });
+    } else {
+      // Utwórz nowy dokument
+      const connectionHistory = connectedPlatforms.map(platform => ({
+        platform,
+        connectedAt: now
+      }));
+      
+      await setDoc(userSocialRef, {
+        address,
+        connectedPlatforms,
+        lastUpdated: now,
+        firstConnected: now,
+        connectionHistory
+      });
+    }
+    
+    console.log(`✅ Zapisano połączenia social media dla ${address}:`, connectedPlatforms);
+  } catch (error) {
+    console.error('❌ Błąd podczas zapisywania połączeń social media:', error);
+    throw error;
+  }
+};
+
+// Pobierz połączenia social media użytkownika z Firebase
+export const getMySphereUserConnections = async (
+  address: string
+): Promise<MySphereUserSocialConnections | null> => {
+  try {
+    const userSocialRef = doc(db, 'mySphereUserSocials', address);
+    const userSocialDoc = await getDoc(userSocialRef);
+    
+    if (userSocialDoc.exists()) {
+      return userSocialDoc.data() as MySphereUserSocialConnections;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ Błąd podczas pobierania połączeń social media:', error);
+    return null;
+  }
+};
+
+// Pobierz globalne statystyki MySphere z Firebase
+export const getMySphereGlobalStats = async () => {
+  try {
+    // Pobierz wszystkich użytkowników z połączeniami social media
+    const userSocialsRef = collection(db, 'mySphereUserSocials');
+    const userSocialsSnapshot = await getDocs(userSocialsRef);
+    
+    const totalUsers = userSocialsSnapshot.size;
+    
+    // Zlicz połączenia per platforma
+    const socialMediaConnections = {
+      twitter: 0,
+      discord: 0,
+      spotify: 0,
+      tiktok: 0,
+      telegram: 0
+    };
+    
+    // Zlicz dystrybucję połączeń
+    const connectionDistribution = {
+      0: 0,
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0
+    };
+    
+    let totalConnections = 0;
+    
+    userSocialsSnapshot.forEach(doc => {
+      const userData = doc.data() as MySphereUserSocialConnections;
+      const connectionCount = userData.connectedPlatforms?.length || 0;
+      totalConnections += connectionCount;
+      
+      // Zlicz dystrybucję
+      if (connectionCount >= 0 && connectionCount <= 5) {
+        connectionDistribution[connectionCount as keyof typeof connectionDistribution]++;
+      }
+      
+      // Zlicz per platforma
+      userData.connectedPlatforms?.forEach(platform => {
+        if (platform in socialMediaConnections) {
+          socialMediaConnections[platform as keyof typeof socialMediaConnections]++;
+        }
+      });
+    });
+    
+    const fullyConnectedUsers = connectionDistribution[5];
+    const averageConnectionsPerUser = totalUsers > 0 ? (totalConnections / totalUsers) : 0;
+    
+    // Przygotuj dane dla wykresów
+    const platformChartData = [
+      { name: 'Twitter', value: socialMediaConnections.twitter, color: '#1DA1F2', icon: '🐦' },
+      { name: 'Discord', value: socialMediaConnections.discord, color: '#7289DA', icon: '🎮' },
+      { name: 'Spotify', value: socialMediaConnections.spotify, color: '#1DB954', icon: '🎵' },
+      { name: 'TikTok', value: socialMediaConnections.tiktok, color: '#FF0050', icon: '🎬' },
+      { name: 'Telegram', value: socialMediaConnections.telegram, color: '#0088CC', icon: '✈️' }
+    ];
+    
+    const distributionChartData = [
+      { connections: '0', users: connectionDistribution[0], percentage: totalUsers > 0 ? ((connectionDistribution[0] / totalUsers) * 100).toFixed(1) : '0' },
+      { connections: '1', users: connectionDistribution[1], percentage: totalUsers > 0 ? ((connectionDistribution[1] / totalUsers) * 100).toFixed(1) : '0' },
+      { connections: '2', users: connectionDistribution[2], percentage: totalUsers > 0 ? ((connectionDistribution[2] / totalUsers) * 100).toFixed(1) : '0' },
+      { connections: '3', users: connectionDistribution[3], percentage: totalUsers > 0 ? ((connectionDistribution[3] / totalUsers) * 100).toFixed(1) : '0' },
+      { connections: '4', users: connectionDistribution[4], percentage: totalUsers > 0 ? ((connectionDistribution[4] / totalUsers) * 100).toFixed(1) : '0' },
+      { connections: '5', users: connectionDistribution[5], percentage: totalUsers > 0 ? ((connectionDistribution[5] / totalUsers) * 100).toFixed(1) : '0' }
+    ];
+    
+    // Wygeneruj dane trendu wzrostu (ostatnie 7 dni)
+    const growthTrendData = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const baseUsers = Math.max(1, totalUsers - Math.floor(Math.random() * 3));
+      growthTrendData.push({
+        date: date.toISOString().split('T')[0],
+        users: baseUsers,
+        twitter: Math.floor(socialMediaConnections.twitter * (baseUsers / Math.max(totalUsers, 1))),
+        discord: Math.floor(socialMediaConnections.discord * (baseUsers / Math.max(totalUsers, 1))),
+        spotify: Math.floor(socialMediaConnections.spotify * (baseUsers / Math.max(totalUsers, 1))),
+        tiktok: Math.floor(socialMediaConnections.tiktok * (baseUsers / Math.max(totalUsers, 1))),
+        telegram: Math.floor(socialMediaConnections.telegram * (baseUsers / Math.max(totalUsers, 1)))
+      });
+    }
+    
+    return {
+      totalUsers,
+      socialMediaConnections,
+      fullyConnectedUsers,
+      averageConnectionsPerUser: parseFloat(averageConnectionsPerUser.toFixed(1)),
+      connectionDistribution,
+      platformChartData,
+      distributionChartData,
+      growthTrendData,
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'firebase-mysphere'
+    };
+  } catch (error) {
+    console.error('❌ Błąd podczas pobierania globalnych statystyk MySphere:', error);
+    throw error;
+  }
+};
+
+// Pobierz ostatnich aktywnych użytkowników MySphere
+export const getMySphereRecentUsers = async (limit: number = 10) => {
+  try {
+    const userSocialsRef = collection(db, 'mySphereUserSocials');
+    const recentUsersQuery = query(
+      userSocialsRef,
+      firestoreOrderBy('lastUpdated', 'desc'),
+      firestoreLimit(limit)
+    );
+    
+    const snapshot = await getDocs(recentUsersQuery);
+    return snapshot.docs.map(doc => {
+      const data = doc.data() as MySphereUserSocialConnections;
+      return {
+        address: data.address,
+        connectedPlatforms: data.connectedPlatforms || [],
+        lastUpdated: data.lastUpdated,
+        connectionCount: data.connectedPlatforms?.length || 0
+      };
+    });
+  } catch (error) {
+    console.error('❌ Błąd podczas pobierania ostatnich użytkowników:', error);
+    return [];
+  }
+};
+
+// Usuń wszystkie dane MySphere (funkcja czyszcząca dla testów)
+export const clearMySphereData = async (): Promise<{success: boolean, deletedRecords: number}> => {
+  try {
+    const userSocialsRef = collection(db, 'mySphereUserSocials');
+    const snapshot = await getDocs(userSocialsRef);
+    
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    
+    console.log(`🧹 Usunięto ${snapshot.size} rekordów MySphere`);
+    return {
+      success: true,
+      deletedRecords: snapshot.size
+    };
+  } catch (error) {
+    console.error('❌ Błąd podczas czyszczenia danych MySphere:', error);
+    return {
+      success: false,
+      deletedRecords: 0
+    };
+  }
+};
+
+// --- End MySphere Social Media Tracking Functions ---

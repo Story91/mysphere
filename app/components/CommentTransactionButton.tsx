@@ -1,22 +1,10 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useAccount, useChainId } from 'wagmi';
-import { 
-  Transaction,
-  TransactionButton as OnchainKitTransactionButton,
-  TransactionSponsor,
-  TransactionStatus,
-  TransactionStatusAction,
-  TransactionStatusLabel,
-  TransactionToast,
-  TransactionToastIcon,
-  TransactionToastLabel,
-  TransactionToastAction
-} from '@coinbase/onchainkit/transaction';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useAccount, useChainId, useSwitchChain, useWalletClient, usePublicClient } from 'wagmi';
+import { base, baseSepolia } from 'wagmi/chains';
 import { toast } from 'react-hot-toast';
 import { getContractAddress2, prepareCreatePostCall2 } from '../contracts/PostContract2';
-import { base, baseSepolia } from 'wagmi/chains';
 
 interface CommentTransactionButtonProps {
   content: string;
@@ -35,6 +23,9 @@ export default function CommentTransactionButton({
 }: CommentTransactionButtonProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+  const { switchChain } = useSwitchChain();
   const [isTransacting, setIsTransacting] = useState(false);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [transactionSuccess, setTransactionSuccess] = useState(false);
@@ -43,10 +34,10 @@ export default function CommentTransactionButton({
   const requestDeniedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const successTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Pobierz adres kontraktu w zależności od sieci
+  // Get contract address based on current chain
   const contractAddress = getContractAddress2(chainId);
 
-  // Sprawdź, czy jesteśmy na odpowiedniej sieci
+  // Check if we're on the right network
   useEffect(() => {
     if (isConnected) {
       if (chainId !== base.id && chainId !== baseSepolia.id) {
@@ -57,7 +48,7 @@ export default function CommentTransactionButton({
     }
   }, [chainId, isConnected]);
 
-  // Efekt dla automatycznego ukrywania komunikatu "Request denied"
+  // Auto-hide "Request denied" message after 5 seconds
   useEffect(() => {
     if (requestDenied) {
       if (requestDeniedTimerRef.current) {
@@ -76,7 +67,7 @@ export default function CommentTransactionButton({
     };
   }, [requestDenied]);
 
-  // Efekt dla automatycznego ukrywania komunikatu o sukcesie
+  // Auto-hide success message after 6 seconds
   useEffect(() => {
     if (transactionSuccess) {
       if (successTimerRef.current) {
@@ -96,67 +87,111 @@ export default function CommentTransactionButton({
     };
   }, [transactionSuccess]);
 
-  // Obsługa statusu transakcji
-  const handleTransactionStatus = useCallback((status: any) => {
-    // Loguj tylko istotne statusy (nie loguj 'init')
-    if (status.statusName !== 'init') {
-      console.log('Comment transaction status:', status);
+  // Function to handle sending transaction via wagmi
+  const handleSendTransaction = useCallback(async () => {
+    if (!isConnected || !address || !content.trim() || disabled || isTransacting) {
+      return;
     }
-    
-    if (status.statusName === 'success') {
-      const txHash = status.statusData?.transactionReceipts?.[0]?.transactionHash;
+
+    if (!walletClient || !publicClient) {
+      toast.error('Wallet not connected properly');
+      return;
+    }
+
+    try {
+      setIsTransacting(true);
+      toast.loading('Preparing comment transaction...');
+
+      // If on wrong network, try to switch
+      if (chainId !== base.id && chainId !== baseSepolia.id) {
+        try {
+          await switchChain({ chainId: base.id });
+          toast.success('Switched to Base network');
+        } catch (switchError) {
+          console.error('Failed to switch network:', switchError);
+          toast.error('Please switch to Base network manually');
+          setIsTransacting(false);
+          setRequestDenied(true);
+          return;
+        }
+      }
+
+      // Check if contract address is available
+      if (!contractAddress) {
+        throw new Error('Contract address is undefined');
+      }
+
+      // Ensure the contract address has the correct format
+      const formattedAddress = contractAddress.startsWith('0x') 
+        ? contractAddress as `0x${string}` 
+        : `0x${contractAddress}` as `0x${string}`;
+
+      // Prepare a basic contract write for PostContract2
+      const { request } = await publicClient.simulateContract({
+        address: formattedAddress,
+        // PostContract2 ABI simplified for the createPost function
+        abi: [{ 
+          name: 'createPost',
+          type: 'function',
+          stateMutability: 'nonpayable',
+          inputs: [{ name: 'content', type: 'string' }],
+          outputs: []
+        }],
+        functionName: 'createPost',
+        args: [`comment:${content}`],
+        account: address,
+      });
+
+      // Send transaction using wallet client
+      const hash = await walletClient.writeContract(request);
       
-      if (txHash) {
-        toast.success('Comment confirmed on blockchain!');
-        console.log('✅ Comment transaction confirmed:', status.statusData);
-        console.log('✅ Comment transaction hash:', txHash);
+      toast.success('Comment transaction sent!');
+      console.log('Comment transaction hash:', hash);
         
-        setTransactionHash(txHash);
+      // Set transaction hash and call success handler
+      setTransactionHash(hash);
         setTransactionSuccess(true);
         
         if (autoPost) {
           toast.success('Automatically saving comment to database...');
-          onTransactionSuccess(txHash);
+        onTransactionSuccess(hash);
           if (onCommentAdded) {
-            onCommentAdded().catch(error => {
-              console.error('Error in onCommentAdded callback:', error);
-            });
+          await onCommentAdded();
           }
         } else {
-          toast.success('Comment confirmed! Click to save your comment to the database.');
-          onTransactionSuccess(txHash);
+        toast.success('Comment transaction confirmed! Click to save your comment.');
+        onTransactionSuccess(hash);
         }
-      }
       
-      setIsTransacting(false);
-    } else if (status.statusName === 'error') {
-      const errorMessage = status.statusData?.message || 'Unknown error';
+    } catch (error) {
+      console.error('Comment transaction error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
       if (errorMessage.includes('rejected') || errorMessage.includes('denied') || errorMessage.includes('cancelled')) {
         setRequestDenied(true);
       }
       
-      toast.error(`Comment transaction error: ${errorMessage}`);
-      console.error('Comment transaction error:', status.statusData);
+      toast.error(`Comment transaction failed: ${errorMessage}`);
+    } finally {
       setIsTransacting(false);
-    } else if (status.statusName === 'transactionPending') {
-      toast.loading('Comment transaction pending...');
-      setIsTransacting(true);
-    } else if (status.statusName === 'buildingTransaction') {
-      console.log('Building comment transaction...');
     }
-  }, [onTransactionSuccess, autoPost, onCommentAdded]);
+  }, [
+    isConnected, 
+    address, 
+    content, 
+    disabled, 
+    isTransacting, 
+    chainId,
+    switchChain,
+    contractAddress,
+    walletClient,
+    publicClient,
+    onTransactionSuccess,
+    onCommentAdded,
+    autoPost
+  ]);
 
-  // Przygotowanie wywołania kontraktu
-  const getCalls = useCallback(() => {
-    if (!contractAddress) {
-      return undefined;
-    }
-    
-    // Używamy tej samej funkcji co dla postów, ale z prefiksem "comment:" dla rozróżnienia
-    return prepareCreatePostCall2(contractAddress, `comment:${content}`);
-  }, [contractAddress, content]);
-
-  // Funkcja do otwierania transakcji w eksploratorze bloków
+  // Function to open transaction in explorer
   const openTransactionInExplorer = () => {
     if (transactionHash) {
       const baseUrl = chainId === base.id 
@@ -169,13 +204,11 @@ export default function CommentTransactionButton({
   return (
     <div className="relative">
       {!transactionSuccess ? (
-        <Transaction
-          chainId={chainId}
-          calls={getCalls()}
-          onStatus={handleTransactionStatus}
+        <button
+          onClick={handleSendTransaction}
+          disabled={disabled || !content.trim() || isTransacting || !!networkError}
+          className="px-3 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-[#0052FF] to-[#2D74FF] text-white rounded-lg hover:from-[#0047E1] hover:to-[#2D6AE6] disabled:opacity-50 disabled:cursor-not-allowed border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3)] transition-all duration-300 font-medium relative overflow-hidden text-xs sm:text-sm"
         >
-          <OnchainKitTransactionButton 
-            text={
               <span className="flex items-center justify-center">
                 {isTransacting ? (
                   <>
@@ -198,21 +231,7 @@ export default function CommentTransactionButton({
                   </>
                 )}
               </span>
-            }
-            className="px-3 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-[#0052FF] to-[#2D74FF] text-white rounded-lg hover:from-[#0047E1] hover:to-[#2D6AE6] disabled:opacity-50 disabled:cursor-not-allowed border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3)] transition-all duration-300 font-medium relative overflow-hidden text-xs sm:text-sm"
-            disabled={disabled || !content.trim() || isTransacting || !!networkError}
-          />
-          <TransactionSponsor />
-          <TransactionStatus>
-            <TransactionStatusLabel />
-            <TransactionStatusAction />
-          </TransactionStatus>
-          <TransactionToast>
-            <TransactionToastIcon />
-            <TransactionToastLabel />
-            <TransactionToastAction />
-          </TransactionToast>
-        </Transaction>
+        </button>
       ) : (
         <button
           onClick={openTransactionInExplorer}
@@ -228,17 +247,16 @@ export default function CommentTransactionButton({
         </button>
       )}
       
-      {networkError && (
-        <div className="mt-2 p-2 bg-red-100 text-red-700 rounded-lg text-xs">
-          <p className="font-medium">Network Error</p>
-          <p>{networkError}</p>
-          <p className="mt-1">Please switch to Base Mainnet or Base Sepolia in your wallet.</p>
-        </div>
-      )}
-      
       <div className={`absolute top-full left-0 right-0 mt-2 p-2 bg-red-100 text-red-700 rounded-lg text-xs text-center transition-opacity duration-300 ${requestDenied ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         Request denied.
       </div>
+
+      {/* Network error message as a single line */}
+      {networkError && (
+        <div className="mt-2 text-center text-red-500 text-xs whitespace-nowrap overflow-hidden text-ellipsis w-full">
+          Network Error: Please switch to Base Mainnet
+        </div>
+      )}
     </div>
   );
 } 
