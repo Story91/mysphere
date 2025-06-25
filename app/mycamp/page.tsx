@@ -370,7 +370,7 @@ export default function MyCampPage() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease: "easeOut" }}
-          className="text-center mb-16 relative"
+          className={`text-center ${isMobile ? 'mb-8' : 'mb-16'} relative`}
         >
           {/* Multi-layer Glow Effect Background */}
           <div className="absolute inset-0 -z-10">
@@ -378,13 +378,17 @@ export default function MyCampPage() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 1.5, ease: "easeOut" }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-40 bg-gradient-to-r from-orange-500/30 via-yellow-500/40 to-red-500/30 blur-3xl rounded-full"
+              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${
+                isMobile ? 'w-[300px] h-24' : 'w-[500px] h-40'
+              } bg-gradient-to-r from-orange-500/30 via-yellow-500/40 to-red-500/30 blur-3xl rounded-full`}
             />
             <motion.div
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 2, ease: "easeOut", delay: 0.3 }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-32 bg-gradient-to-r from-pink-500/20 via-orange-500/30 to-yellow-500/20 blur-2xl rounded-full"
+              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${
+                isMobile ? 'w-48 h-20' : 'w-96 h-32'
+              } bg-gradient-to-r from-pink-500/20 via-orange-500/30 to-yellow-500/20 blur-2xl rounded-full`}
             />
           </div>
           
@@ -417,7 +421,11 @@ export default function MyCampPage() {
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: "100%", opacity: 1 }}
               transition={{ duration: 2, delay: 1.2, ease: "easeOut" }}
-              className="absolute -bottom-6 left-1/2 -translate-x-1/2 h-2 bg-gradient-to-r from-transparent via-orange-400 via-yellow-400 via-orange-400 to-transparent rounded-full shadow-[0_0_20px_rgba(249,115,22,0.8)]"
+              className={`absolute ${
+                isMobile ? '-bottom-3' : '-bottom-6'
+              } left-1/2 -translate-x-1/2 ${
+                isMobile ? 'h-1' : 'h-2'
+              } bg-gradient-to-r from-transparent via-orange-400 via-yellow-400 via-orange-400 to-transparent rounded-full shadow-[0_0_20px_rgba(249,115,22,0.8)]`}
             />
             
             {/* Secondary Underline */}
@@ -425,7 +433,11 @@ export default function MyCampPage() {
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: "80%", opacity: 0.6 }}
               transition={{ duration: 1.5, delay: 1.8, ease: "easeOut" }}
-              className="absolute -bottom-3 left-1/2 -translate-x-1/2 h-1 bg-gradient-to-r from-transparent via-yellow-300 to-transparent rounded-full"
+              className={`absolute ${
+                isMobile ? '-bottom-2' : '-bottom-3'
+              } left-1/2 -translate-x-1/2 ${
+                isMobile ? 'h-0.5' : 'h-1'
+              } bg-gradient-to-r from-transparent via-yellow-300 to-transparent rounded-full`}
             />
           </motion.h1>
 
@@ -434,11 +446,11 @@ export default function MyCampPage() {
             initial={{ opacity: 0, y: 30, scale: 0.5 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 1.2, delay: 0.8, ease: "easeOut" }}
-            className="mt-12 inline-block"
+            className={`${isMobile ? 'mt-8' : 'mt-12'} inline-block`}
           >
             <motion.div
               animate={{ 
-                y: [0, -15, 0],
+                y: [0, isMobile ? -8 : -15, 0],
                 rotate: [0, 8, -8, 0],
                 scale: [1, 1.1, 1]
               }}
@@ -447,7 +459,9 @@ export default function MyCampPage() {
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
-              className="text-7xl filter drop-shadow-[0_0_30px_rgba(249,115,22,0.9)] hover:drop-shadow-[0_0_40px_rgba(249,115,22,1)] transition-all duration-300"
+              className={`${
+                isMobile ? 'text-4xl' : 'text-7xl'
+              } filter drop-shadow-[0_0_30px_rgba(249,115,22,0.9)] hover:drop-shadow-[0_0_40px_rgba(249,115,22,1)] transition-all duration-300`}
             >
               🏕️
             </motion.div>
@@ -455,15 +469,15 @@ export default function MyCampPage() {
 
           {/* Enhanced Particles Effect */}
           <div className="absolute inset-0 -z-20">
-            {[...Array(8)].map((_, i) => (
+            {[...Array(isMobile ? 4 : 8)].map((_, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, scale: 0 }}
                 animate={{ 
                   opacity: [0, 1, 0.5, 0],
                   scale: [0, 1.5, 1, 0],
-                  x: [0, Math.random() * 600 - 300],
-                  y: [0, Math.random() * 300 - 150],
+                  x: [0, Math.random() * (isMobile ? 300 : 600) - (isMobile ? 150 : 300)],
+                  y: [0, Math.random() * (isMobile ? 150 : 300) - (isMobile ? 75 : 150)],
                   rotate: [0, Math.random() * 360]
                 }}
                 transition={{
@@ -472,7 +486,9 @@ export default function MyCampPage() {
                   delay: i * 0.6,
                   ease: "easeOut"
                 }}
-                className="absolute top-1/2 left-1/2 w-3 h-3 bg-gradient-to-r from-orange-400 to-yellow-400 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.8)]"
+                className={`absolute top-1/2 left-1/2 ${
+                  isMobile ? 'w-2 h-2' : 'w-3 h-3'
+                } bg-gradient-to-r from-orange-400 to-yellow-400 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.8)]`}
               />
             ))}
           </div>
@@ -1144,23 +1160,24 @@ export default function MyCampPage() {
                     </div>
                     
                     {/* Platform Distribution Charts */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                       {/* Pie Chart */}
-                      <div className="bg-gradient-to-br from-purple-600/10 via-pink-600/10 to-red-600/10 backdrop-blur-sm border border-purple-500/20 rounded-xl p-6">
-                        <h6 className="text-lg font-bold text-purple-200 mb-4 flex items-center gap-2">
+                      <div className="bg-gradient-to-br from-purple-600/10 via-pink-600/10 to-red-600/10 backdrop-blur-sm border border-purple-500/20 rounded-xl p-4 sm:p-6">
+                        <h6 className="text-base sm:text-lg font-bold text-purple-200 mb-3 sm:mb-4 flex items-center gap-2">
                           🥧 Platform Distribution
                         </h6>
-                        <div className="h-64">
+                        <div className="h-48 sm:h-64">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
                                 data={globalStats.platformChartData}
                                 cx="50%"
                                 cy="50%"
-                                outerRadius={80}
+                                outerRadius={isMobile ? 50 : 80}
                                 fill="#8884d8"
                                 dataKey="value"
-                                label={({ name, value, percent }: any) => `${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`}
+                                label={isMobile ? false : ({ name, value, percent }: any) => `${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`}
+                                labelLine={false}
                               >
                                 {globalStats.platformChartData.map((entry: any, index: number) => (
                                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1171,8 +1188,10 @@ export default function MyCampPage() {
                                   backgroundColor: 'rgba(0, 0, 0, 0.8)',
                                   border: '1px solid rgba(147, 51, 234, 0.3)',
                                   borderRadius: '8px',
-                                  color: '#E5E7EB'
+                                  color: '#E5E7EB',
+                                  fontSize: isMobile ? '12px' : '14px'
                                 }}
+                                formatter={(value, name) => [`${value} users`, name]}
                               />
                             </PieChart>
                           </ResponsiveContainer>
@@ -1180,27 +1199,33 @@ export default function MyCampPage() {
                       </div>
                       
                       {/* Bar Chart */}
-                      <div className="bg-gradient-to-br from-green-600/10 via-emerald-600/10 to-teal-600/10 backdrop-blur-sm border border-green-500/20 rounded-xl p-6">
-                        <h6 className="text-lg font-bold text-green-200 mb-4 flex items-center gap-2">
+                      <div className="bg-gradient-to-br from-green-600/10 via-emerald-600/10 to-teal-600/10 backdrop-blur-sm border border-green-500/20 rounded-xl p-4 sm:p-6">
+                        <h6 className="text-base sm:text-lg font-bold text-green-200 mb-3 sm:mb-4 flex items-center gap-2">
                           📊 Platform Comparison
                         </h6>
-                        <div className="h-64">
+                        <div className="h-48 sm:h-64">
                           <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={globalStats.platformChartData}>
+                            <BarChart data={globalStats.platformChartData} margin={{ bottom: isMobile ? 20 : 5 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                               <XAxis 
                                 dataKey="name" 
                                 stroke="#9CA3AF"
-                                fontSize={12}
+                                fontSize={isMobile ? 8 : 12}
+                                angle={isMobile ? -45 : 0}
+                                textAnchor={isMobile ? 'end' : 'middle'}
+                                height={isMobile ? 40 : 30}
+                                interval={0}
                               />
-                              <YAxis stroke="#9CA3AF" fontSize={12} />
+                              <YAxis stroke="#9CA3AF" fontSize={isMobile ? 8 : 12} />
                               <Tooltip 
                                 contentStyle={{
                                   backgroundColor: 'rgba(0, 0, 0, 0.8)',
                                   border: '1px solid rgba(34, 197, 94, 0.3)',
                                   borderRadius: '8px',
-                                  color: '#E5E7EB'
+                                  color: '#E5E7EB',
+                                  fontSize: isMobile ? '12px' : '14px'
                                 }}
+                                formatter={(value, name) => [`${value} users`, 'Connected Users']}
                               />
                               <Bar 
                                 dataKey="value" 
