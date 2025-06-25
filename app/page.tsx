@@ -600,8 +600,8 @@ export default function HomePage() {
         </Link>
       </div>
       
-      {/* Dodajemy prosty gradient w tle */}
-      <div className="fixed inset-0 bg-gradient-to-b from-[#050B20] via-[#071030] to-[#050B20] z-0"></div>
+      {/* Pomarańczowo-czarno-niebieski gradient w tle */}
+      <div className="fixed inset-0 bg-gradient-to-br from-orange-500/40 via-gray-900 to-blue-800/50 z-0"></div>
 
       {/* Main content */}
       <div className={`relative z-10 ${isAppleDevice ? 'apple-touch-scroll' : ''}`}>
@@ -1054,31 +1054,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* MySphere Treasury - Cyjan/Turkusowy (zablokowany z kłódką) */}
-            <div className="bg-gradient-to-br from-black to-cyan-950/40 backdrop-blur-md rounded-xl p-6 border border-cyan-900/30 relative overflow-hidden group">
-              {/* Efekt poświaty w tle */}
-              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-cyan-500/20 rounded-full blur-3xl opacity-50"></div>
-              
-              {/* Ikona kłódki */}
-              <div className="absolute top-3 right-3 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              
-              {/* Przezroczystość dla zablokowania */}
-              <div className="absolute inset-0 bg-black/40"></div>
-              
-              <div className="relative z-10">
-                <h3 className="text-cyan-300/80 text-sm font-semibold mb-2 relative">MySphere Treasury</h3>
-                <div className="mt-2 flex items-center justify-between">
-                  <p className="text-3xl md:text-4xl font-bold text-white/60">
-                    --
-                  </p>
-                  <span className="bg-cyan-900/20 text-cyan-400/80 text-xs px-2 py-1 rounded">Coming Soon</span>
-                </div>
-              </div>
-            </div>
+
           </div>
         </section>
 
@@ -1138,7 +1114,7 @@ export default function HomePage() {
             </span>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <a href={`https://camp-network-4lyart.blockscout.com/address/0x177Af844a3c7A1749dE97656a5d84b6373Fc350E`} target="_blank" rel="noopener noreferrer" 
+            <a href="https://basecamp.cloud.blockscout.com/address/0x177Af844a3c7A1749dE97656a5d84b6373Fc350E" target="_blank" rel="noopener noreferrer" 
                className="bg-gradient-to-br from-orange-500/10 via-blue-500/10 to-orange-600/10 backdrop-blur-md rounded-xl p-4 border border-orange-800/50 hover:border-orange-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(249,115,22,0.3)] group">
               <div className="flex items-center">
                 <div className="flex-1">
@@ -1146,7 +1122,7 @@ export default function HomePage() {
                     <div className="text-orange-400 mr-2">
                       <FaCheckCircle className="w-4 h-4" />
                     </div>
-                    <h3 className="text-sm font-medium text-orange-400">MySphere Social</h3>
+                    <h3 className="text-sm font-medium text-orange-400">Camp Network Post</h3>
                     <span className="ml-2 text-xs text-gray-500">(45 txs)</span>
                   </div>
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x177Af844a3c7A1749dE97656a5d84b6373Fc350E</p>
@@ -1157,7 +1133,7 @@ export default function HomePage() {
               </div>
             </a>
             
-            <a href={`https://camp-network-4lyart.blockscout.com/address/0x1eD74B27f846C699A90926daD057A7f6FD22C126`} target="_blank" rel="noopener noreferrer"
+            <a href="https://basecamp.cloud.blockscout.com/token/0x1eD74B27f846C699A90926daD057A7f6FD22C126" target="_blank" rel="noopener noreferrer"
                className="bg-gradient-to-br from-orange-500/10 via-blue-500/10 to-orange-600/10 backdrop-blur-md rounded-xl p-4 border border-orange-800/50 hover:border-blue-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] group">
               <div className="flex items-center">
                 <div className="flex-1">
@@ -1165,7 +1141,7 @@ export default function HomePage() {
                     <div className="text-blue-400 mr-2">
                       <FaCheckCircle className="w-4 h-4" />
                     </div>
-                    <h3 className="text-sm font-medium text-blue-400">Camp Network NFT</h3>
+                    <h3 className="text-sm font-medium text-blue-400">PORTAL MSxCAMP</h3>
                     <span className="ml-2 text-xs text-gray-500">(28 txs)</span>
                   </div>
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x1eD74B27f846C699A90926daD057A7f6FD22C126</p>
