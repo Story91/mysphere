@@ -31,15 +31,61 @@ const POINT_MULTIPLIERS = {
 
 async function fetchWalletData(address: string): Promise<WalletStats> {
   try {
-    // Fetch total transactions count with pagination info
-    const transactionsResponse = await fetch(
-      `${BASECAMP_API_URL}/addresses/${address}/transactions?filter=to%20%7C%20from`,
-      {
+    // Fetch ALL transactions with pagination
+    let allTransactions = [];
+    let nextPageParams = null;
+    let pageCount = 0;
+    const maxPages = 10; // Zwiększam limit stron dla portfeli
+    
+    console.log(`🔍 Pobieranie wszystkich transakcji dla portfela: ${address}`);
+    
+    do {
+      // Buduj URL z parametrami paginacji
+      let apiUrl = `${BASECAMP_API_URL}/addresses/${address}/transactions?filter=to%20%7C%20from`;
+      
+      if (nextPageParams) {
+        // Dodaj parametry następnej strony
+        const params = new URLSearchParams(nextPageParams);
+        apiUrl += `&${params.toString()}`;
+      }
+      
+      console.log(`📡 Pobieranie strony ${pageCount + 1} dla portfela: ${apiUrl}`);
+      
+      const transactionsResponse = await fetch(apiUrl, {
         headers: {
           'Accept': 'application/json',
         },
+      });
+      
+      if (!transactionsResponse.ok) {
+        console.warn(`❌ Błąd API dla strony ${pageCount + 1}: ${transactionsResponse.status}`);
+        break;
       }
-    );
+      
+      const txData = await transactionsResponse.json();
+      
+      if (txData && txData.items && Array.isArray(txData.items)) {
+        allTransactions.push(...txData.items);
+        nextPageParams = txData.next_page_params;
+        pageCount++;
+        
+        console.log(`📄 Strona ${pageCount}: ${txData.items.length} transakcji, razem: ${allTransactions.length}`);
+        
+        // Sprawdź czy są następne strony
+        if (!nextPageParams || pageCount >= maxPages) {
+          break;
+        }
+      } else {
+        console.warn(`⚠️ Nieprawidłowa struktura danych na stronie ${pageCount + 1}`);
+        break;
+      }
+      
+    } while (nextPageParams && pageCount < maxPages);
+    
+    console.log(`✅ Portfel ${address}: ${allTransactions.length} transakcji (${pageCount} stron)`);
+    
+    // Teraz pobierz pozostałe dane (bez zmian)
+    const transactionsResponse = null; // Nie potrzebujemy już tego
     
     // Fetch tokens
     const tokensResponse = await fetch(

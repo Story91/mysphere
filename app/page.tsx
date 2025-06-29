@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -243,55 +244,72 @@ async function getCampNetworkTransactions() {
     "0x1eD74B27f846C699A90926daD057A7f6FD22C126"
   ];
   
-  // Pobieranie danych o transakcjach dla pojedynczego kontraktu Camp Network
+  // Pobieranie danych o transakcjach dla pojedynczego kontraktu Camp Network z paginacją
   async function fetchCampContractData(contractAddress: string) {
     try {
-      // Spróbuj pobrać rzeczywiste dane z Camp Network Blockscout API
-      const txCountResponse = await fetch(
-        `https://basecamp.cloud.blockscout.com/api/v2/addresses/${contractAddress}/transactions?filter=to%20%7C%20from`
-      );
+      let allTransactions = [];
+      let nextPageParams = null;
+      let pageCount = 0;
+      const maxPages = 5; // Zabezpieczenie przed nieskończoną pętlą
       
-      let totalTransactions = 0;
+      console.log(`🔍 Pobieranie wszystkich transakcji dla kontraktu: ${contractAddress}`);
       
-      if (txCountResponse.ok) {
+      do {
+        // Buduj URL z parametrami paginacji
+        let apiUrl = `https://basecamp.cloud.blockscout.com/api/v2/addresses/${contractAddress}/transactions?filter=to%20%7C%20from`;
+        
+        if (nextPageParams) {
+          // Dodaj parametry następnej strony
+          const params = new URLSearchParams(nextPageParams);
+          apiUrl += `&${params.toString()}`;
+        }
+        
+        console.log(`📡 Pobieranie strony ${pageCount + 1}: ${apiUrl}`);
+        
+        const txCountResponse = await fetch(apiUrl);
+        
+        if (!txCountResponse.ok) {
+          console.warn(`❌ Błąd API dla strony ${pageCount + 1}: ${txCountResponse.status}`);
+          break;
+        }
+        
         const txData = await txCountResponse.json();
         
         if (txData && txData.items && Array.isArray(txData.items)) {
-          totalTransactions = txData.items.length;
+          allTransactions.push(...txData.items);
+          nextPageParams = txData.next_page_params;
+          pageCount++;
           
-          // Jeśli jest więcej niż 50 transakcji (domyślny limit), spróbuj pobrać wszystkie
-          if (totalTransactions === 50 && txData.next_page_params) {
-            // Dla uproszczenia, użyjemy przybliżonej liczby na podstawie next_page_params
-            // W przyszłości można zaimplementować paginację
-            totalTransactions = 50; // Minimalna znana liczba
+          console.log(`📄 Strona ${pageCount}: ${txData.items.length} transakcji, razem: ${allTransactions.length}`);
+          
+          // Sprawdź czy są następne strony
+          if (!nextPageParams || pageCount >= maxPages) {
+            break;
           }
+        } else {
+          console.warn(`⚠️ Nieprawidłowa struktura danych na stronie ${pageCount + 1}`);
+          break;
         }
         
-        console.log(`Camp Network contract ${contractAddress}: ${totalTransactions} transactions (real data)`);
-      } else {
-        console.warn(`Nie udało się pobrać danych z Camp Network API dla ${contractAddress}, używam fallback`);
-        throw new Error('API response not ok');
-      }
+      } while (nextPageParams && pageCount < maxPages);
       
-      // Jeśli nie udało się pobrać danych, użyj fallback
+      const totalTransactions = allTransactions.length;
+      console.log(`✅ Camp Network contract ${contractAddress}: ${totalTransactions} transactions (${pageCount} stron)`);
+      
       if (totalTransactions === 0) {
-        if (contractAddress === "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E") {
-          totalTransactions = 45; // Fallback
-        } else if (contractAddress === "0x1eD74B27f846C699A90926daD057A7f6FD22C126") {
-          totalTransactions = 28; // Fallback
-        }
-        console.log(`Camp Network contract ${contractAddress}: ${totalTransactions} transactions (fallback)`);
+        throw new Error('No transactions found');
       }
       
       return { 
         address: contractAddress, 
         transactions: totalTransactions
       };
+      
     } catch (error: unknown) {
       // W przypadku błędu, używamy fallbackowych wartości
       let fallbackTx = 0;
       if (contractAddress === "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E") {
-        fallbackTx = 45;
+        fallbackTx = 77; // Aktualizowane na podstawie rzeczywistych danych
       } else if (contractAddress === "0x1eD74B27f846C699A90926daD057A7f6FD22C126") {
         fallbackTx = 28;
       }
