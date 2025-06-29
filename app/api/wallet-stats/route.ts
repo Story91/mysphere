@@ -85,8 +85,6 @@ async function fetchWalletData(address: string): Promise<WalletStats> {
     console.log(`✅ Portfel ${address}: ${allTransactions.length} transakcji (${pageCount} stron)`);
     
     // Teraz pobierz pozostałe dane (bez zmian)
-    const transactionsResponse = null; // Nie potrzebujemy już tego
-    
     // Fetch tokens
     const tokensResponse = await fetch(
       `${BASECAMP_API_URL}/addresses/${address}/tokens`,
@@ -127,34 +125,25 @@ async function fetchWalletData(address: string): Promise<WalletStats> {
       }
     );
 
-    let transactions = 0;
+    let transactions = allTransactions.length; // Użyj rzeczywistej liczby z paginacji
     let tokens = 0;
     let nfts = 0;
     let contracts = 0;
     let hasCampNFT = false;
     let campNFTDetails = undefined;
 
-    // Parse address details first to get transaction count
+    // Parse address details for additional info (ale transakcje już mamy z paginacji)
     let addressData = null;
     if (addressResponse.ok) {
       addressData = await addressResponse.json();
-      // Get exact transaction count from address summary
-      transactions = addressData.transactions_count || 0;
       console.log('Address data:', {
         address,
-        transactions_count: addressData.transactions_count,
-        fetchedTransactions: transactions
+        api_transactions_count: addressData.transactions_count,
+        paginated_transactions: transactions,
+        timestamp: new Date().toISOString()
       });
     } else {
       console.error('Address API failed:', addressResponse.status, addressResponse.statusText);
-    }
-    
-    // Fallback: if address response fails, try to get from transactions endpoint
-    if (transactions === 0 && transactionsResponse.ok) {
-      const transactionsData = await transactionsResponse.json();
-      if (transactionsData.items) {
-        transactions = transactionsData.items.length;
-      }
     }
 
     // Parse tokens
