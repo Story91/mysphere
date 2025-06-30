@@ -773,82 +773,7 @@ export default function PostList({
     fetchUserBalances();
   }, [address, posts]);
 
-  const handleBuyCoin = async (postId: string) => {
-    setSelectedPostId(postId);
-    setTransactionType('buy');
-    setTransactionAmount('0.01');
-    setTransactionModalOpen(true);
-  };
-
-  const handleSellCoin = async (postId: string) => {
-    setSelectedPostId(postId);
-    setTransactionType('sell');
-    setTransactionAmount('1.0');
-    setTransactionModalOpen(true);
-  };
-
-  const executeTransaction = async () => {
-    if (!selectedPostId || !address || !walletClient || !publicClient) return;
-    
-    const post = posts.find(p => p.id === selectedPostId);
-    if (!post?.zoraCoinAddress) return;
-    
-    const tokenData = postTokenData[selectedPostId];
-    setIsTransacting(true);
-    
-    try {
-      const toastId = toast.loading(`${transactionType === 'buy' ? 'Buying' : 'Selling'} ${tokenData?.symbol || 'tokens'}...`);
-      
-      // Trading functionality is temporarily disabled due to SDK issues
-      throw new Error("Trading functionality is temporarily disabled. Please use Zora.co directly to trade tokens.");
-      
-      /*
-      if (transactionType === 'buy') {
-        const buyParams = {
-          direction: "buy" as const,
-          target: post.zoraCoinAddress as ViemAddress,
-          args: {
-            recipient: address as ViemAddress,
-            orderSize: parseEther(transactionAmount),
-            minAmountOut: 0n,
-          }
-        };
-        
-        const result = await tradeCoin(buyParams, walletClient, publicClient);
-        
-        toast.loading("Waiting for transaction...", { id: toastId });
-        await publicClient.waitForTransactionReceipt({ hash: result.hash });
-        toast.success(`Successfully bought ${tokenData?.symbol || 'tokens'}!`, { id: toastId });
-      } else {
-        // Sell transaction
-        const decimals = 18;
-        const sellParams = {
-          direction: "sell" as const,
-          target: post.zoraCoinAddress as ViemAddress,
-          args: {
-            recipient: address as ViemAddress,
-            orderSize: parseUnits(transactionAmount, decimals),
-            minAmountOut: 0n,
-          }
-        };
-        
-        const result = await tradeCoin(sellParams, walletClient, publicClient);
-        
-        toast.loading("Waiting for transaction...", { id: toastId });
-        await publicClient.waitForTransactionReceipt({ hash: result.hash });
-        toast.success(`Successfully sold ${tokenData?.symbol || 'tokens'}!`, { id: toastId });
-      }
-      
-      refreshPosts();
-      setTransactionModalOpen(false);
-      */
-    } catch (error: any) {
-      console.error(`Error ${transactionType}ing coin:`, error);
-      toast.error(`${transactionType === 'buy' ? 'Buy' : 'Sell'} failed: ${error.message.substring(0, 60)}...`);
-    } finally {
-      setIsTransacting(false);
-    }
-  };
+  // Trading functions removed - now handled by direct links to Zora.co in the UI
 
   const renderComments = (post: ExtendedPost) => {
     // Check if post is from BaseCamp network
@@ -1413,18 +1338,24 @@ export default function PostList({
                   
                   <div className="flex space-x-2 mb-4">
                     <button
-                      onClick={() => handleBuyCoin(post.id)}
+                      onClick={() => {
+                        toast.success(`Opening ${zoraData?.symbol || 'token'} trading on Zora.co`);
+                        window.open(`https://zora.co/coin/base:${post.zoraCoinAddress}`, '_blank');
+                      }}
                       className="flex-1 flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all duration-200 transform hover:scale-[1.02]"
                     >
                       <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
-                      Buy Token
+                      Buy on Zora
                     </button>
                     <button
-                      onClick={() => handleSellCoin(post.id)}
+                      onClick={() => {
+                        toast.success(`Opening ${zoraData?.symbol || 'token'} trading on Zora.co`);
+                        window.open(`https://zora.co/coin/base:${post.zoraCoinAddress}`, '_blank');
+                      }}
                       className="flex-1 flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-gradient-to-r from-green-500 to-teal-500 rounded-lg hover:from-green-600 hover:to-teal-600 transition-all duration-200 transform hover:scale-[1.02]"
                     >
                       <TrendingDown className="w-3.5 h-3.5 mr-1.5" />
-                      Sell Token
+                      Sell on Zora
                     </button>
                   </div>
                   
@@ -1659,139 +1590,7 @@ export default function PostList({
         </div>
       )}
 
-      {/* Add Transaction Modal */}
-      {transactionModalOpen && selectedPostId && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-4 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity backdrop-blur-sm" aria-hidden="true" onClick={() => !isTransacting && setTransactionModalOpen(false)}></div>
-
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-            <div className="inline-block align-middle bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-lg sm:w-full mx-auto my-4 border border-gray-100 dark:border-gray-700">
-              <div className="px-6 pt-6 pb-4 sm:p-8 sm:pb-6">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-14 w-14 rounded-full bg-purple-100 dark:bg-purple-900 sm:mx-0 sm:h-12 sm:w-12">
-                    <img 
-                      src="/android-chrome-512x512.png" 
-                      alt="Sphere Logo" 
-                      className="h-8 w-8"
-                    />
-                  </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-6 sm:text-left w-full">
-                    <h3 className="text-xl leading-6 font-semibold text-gray-900 dark:text-white" id="modal-title">
-                      {transactionType === 'buy' ? 'Buy' : 'Sell'} {postTokenData[selectedPostId]?.symbol || 'Token'}
-                    </h3>
-                    
-                    {/* Display Current Balance */}
-                    <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">
-                      {transactionType === 'buy' ? (
-                        <div>Your ETH balance will be shown here</div>
-                      ) : (
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">Your Balance: <span className="text-purple-600 dark:text-purple-400">{
-                            (() => {
-                              const post = posts.find(p => p.id === selectedPostId);
-                              if (!post?.zoraCoinAddress || !address) return '0.00';
-                              
-                              const balanceStr = userTokenBalances[post.zoraCoinAddress.toLowerCase()];
-                              if (!balanceStr) return '0.00';
-                              
-                              try {
-                                const balanceNum = parseFloat(balanceStr);
-                                return isNaN(balanceNum) ? '0.00' : balanceNum.toFixed(6);
-                              } catch (e) {
-                                return '0.00';
-                              }
-                            })()
-                          } {postTokenData[selectedPostId]?.symbol || 'Tokens'}</span></span>
-                          <button
-                            onClick={() => {
-                              const post = posts.find(p => p.id === selectedPostId);
-                              if (!post?.zoraCoinAddress || !address) return;
-                              
-                              const balanceStr = userTokenBalances[post.zoraCoinAddress.toLowerCase()];
-                              if (!balanceStr) return;
-                              
-                              try {
-                                const balanceNum = parseFloat(balanceStr);
-                                if (!isNaN(balanceNum) && balanceNum > 0) {
-                                  setTransactionAmount(balanceNum.toString());
-                                }
-                              } catch (e) {
-                                console.error('Error setting max balance:', e);
-                              }
-                            }}
-                            className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                            type="button"
-                          >
-                            Use Max
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="mt-5">
-                      <label htmlFor="amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {transactionType === 'buy' ? 'Amount in ETH' : `Amount of ${postTokenData[selectedPostId]?.symbol || 'Tokens'}`}
-                      </label>
-                      <div className="relative rounded-xl shadow-sm">
-                        <input
-                          type="text"
-                          name="amount"
-                          id="amount"
-                          className="focus:ring-purple-500 focus:border-purple-500 block w-full p-3 sm:text-base border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white font-medium rounded-xl"
-                          placeholder={transactionType === 'buy' ? "0.01" : "1.0"}
-                          value={transactionAmount}
-                          onChange={(e) => setTransactionAmount(e.target.value)}
-                          disabled={isTransacting}
-                        />
-                        <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                          <span className="text-gray-500 dark:text-gray-400 sm:text-base font-medium">
-                            {transactionType === 'buy' ? 'ETH' : postTokenData[selectedPostId]?.symbol || 'Tokens'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-4 sm:p-6 flex flex-col space-y-3 sm:flex-row-reverse sm:space-y-0 sm:space-x-3 sm:space-x-reverse">
-                <button
-                  type="button"
-                  onClick={executeTransaction}
-                  disabled={isTransacting || !transactionAmount || isNaN(parseFloat(transactionAmount)) || parseFloat(transactionAmount) <= 0}
-                  className={`w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-5 py-3 text-base font-medium text-white sm:w-auto
-                    ${transactionType === 'buy' 
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 focus:ring-purple-500' 
-                      : 'bg-gradient-to-r from-red-700 to-red-600 hover:from-red-800 hover:to-red-700 focus:ring-red-500'}
-                    focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200 transform hover:scale-[1.02]`}
-                >
-                  {isTransacting ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Processing...
-                    </span>
-                  ) : (
-                    `${transactionType === 'buy' ? 'Buy' : 'Sell'} Now`
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className="w-full inline-flex justify-center rounded-xl border border-gray-300 dark:border-gray-600 shadow-sm px-5 py-3 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:w-auto disabled:opacity-50 transition-all duration-200"
-                  onClick={() => !isTransacting && setTransactionModalOpen(false)}
-                  disabled={isTransacting}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Transaction modal removed - trading now handled via direct Zora.co links */}
     </div>
   );
 } 
