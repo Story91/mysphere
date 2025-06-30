@@ -6,6 +6,20 @@ import { toast } from 'react-hot-toast';
 import { UserRank, RANK_DESCRIPTIONS } from '../../utils/ranking';
 import { Avatar } from '@coinbase/onchainkit/identity';
 
+// Talent Protocol API types
+interface TalentScore {
+  score: number;
+  percentile: number;
+  human_checkmark: boolean;
+}
+
+interface TalentProfile {
+  display_name: string;
+  bio: string;
+  human_checkmark: boolean;
+  tags: string[];
+}
+
 // Funkcja pomocnicza do konwersji adresu do formatu Ethereum
 const toEthereumAddress = (address: string): `0x${string}` => {
   // Upewnij się, że adres ma prefiks 0x
@@ -13,6 +27,160 @@ const toEthereumAddress = (address: string): `0x${string}` => {
     return address as `0x${string}`;
   }
   return `0x${address}` as `0x${string}`;
+};
+
+// Talent Protocol API functions
+const fetchTalentScore = async (walletAddress: string): Promise<TalentScore | null> => {
+  try {
+    // Try different parameter combinations based on the API documentation
+    const apiConfigs = [
+      // Basic wallet address
+      { id: walletAddress, account_source: 'wallet' },
+      // Try without account_source
+      { id: walletAddress },
+      // Try with explicit builder score scorer
+      { id: walletAddress, account_source: 'wallet', scorer_slug: 'builder_score' },
+      // Try with just scorer_slug
+      { id: walletAddress, scorer_slug: 'builder_score' }
+    ];
+    
+    for (const config of apiConfigs) {
+      try {
+        // Build query string
+        const params = new URLSearchParams();
+        Object.entries(config).forEach(([key, value]) => {
+          if (value) params.append(key, value);
+        });
+        
+        const endpoint = `https://api.talentprotocol.com/score?${params.toString()}`;
+        console.log(`Trying Talent Protocol endpoint: ${endpoint}`);
+        
+        const response = await fetch(endpoint, {
+          headers: {
+            'Accept': 'application/json',
+            'X-API-KEY': process.env.NEXT_PUBLIC_TALENT_PROTOCOL_API_KEY || ''
+          }
+        });
+        
+        console.log(`Response status for ${endpoint}:`, response.status);
+        
+        if (!response.ok) {
+          console.warn(`Endpoint returned ${response.status} for config:`, config);
+          continue;
+        }
+        
+        const data = await response.json();
+        console.log(`✅ SUCCESS - Response from ${endpoint}:`, data);
+        console.log('🔍 Detailed score object:', JSON.stringify(data.score, null, 2));
+        
+        // Handle different possible response structures based on API docs
+        if (data.score) {
+          console.log('📊 Score object type:', typeof data.score);
+          console.log('📊 Score object keys:', Object.keys(data.score || {}));
+          
+          // If data.score is an object with score/percentile properties
+          if (typeof data.score === 'object' && data.score !== null) {
+            // Check if score object has score property
+            if (data.score.score !== undefined) {
+              console.log('✅ Found score.score:', data.score.score);
+              return {
+                score: data.score.score,
+                percentile: data.score.percentile,
+                human_checkmark: data.score.human_checkmark
+              };
+            }
+            // Check if score object has value property  
+            else if (data.score.value !== undefined) {
+              console.log('✅ Found score.value:', data.score.value);
+              return {
+                score: data.score.value,
+                percentile: data.score.percentile,
+                human_checkmark: data.score.human_checkmark
+              };
+            }
+            // Check if score object has builder_score property
+            else if (data.score.builder_score !== undefined) {
+              console.log('✅ Found score.builder_score:', data.score.builder_score);
+              return {
+                score: data.score.builder_score,
+                percentile: data.score.percentile,
+                human_checkmark: data.score.human_checkmark
+              };
+            }
+                         // If score object has any numeric properties, try to use them
+             else {
+               const numericValues = Object.entries(data.score).filter(([key, value]) => typeof value === 'number');
+               if (numericValues.length > 0) {
+                 console.log('✅ Found numeric values in score object:', numericValues);
+                 const scoreValue = numericValues[0][1] as number;
+                 return {
+                   score: scoreValue,
+                   percentile: data.score.percentile,
+                   human_checkmark: data.score.human_checkmark
+                 };
+               }
+             }
+          }
+          // If data.score is just a number
+          else if (typeof data.score === 'number') {
+            console.log('✅ Found direct numeric score:', data.score);
+            return {
+              score: data.score,
+              percentile: data.percentile,
+              human_checkmark: data.human_checkmark
+            };
+          }
+        }
+        
+        // Try other possible structures
+        if (data.builder_score) {
+          console.log('✅ Found builder_score:', data.builder_score);
+          return data.builder_score;
+        }
+        
+        if (data.scores && Array.isArray(data.scores) && data.scores.length > 0) {
+          console.log('✅ Found scores array:', data.scores[0]);
+          return data.scores[0];
+        }
+        
+        console.log('⚠️ Score data structure not recognized for config:', config);
+        console.log('⚠️ Available data keys:', Object.keys(data));
+      } catch (endpointError) {
+        console.warn(`Error with config ${JSON.stringify(config)}:`, endpointError);
+        continue;
+      }
+    }
+    
+    console.warn('❌ No score data found from any endpoint configuration');
+    return null;
+  } catch (error) {
+    console.error('Error fetching Talent Protocol score:', error);
+    return null;
+  }
+};
+
+const fetchTalentProfile = async (walletAddress: string): Promise<TalentProfile | null> => {
+  try {
+    const response = await fetch(`https://api.talentprotocol.com/profile?id=${walletAddress}`, {
+      headers: {
+        'Accept': 'application/json',
+        'X-API-KEY': process.env.NEXT_PUBLIC_TALENT_PROTOCOL_API_KEY || ''
+      }
+    });
+    
+    if (!response.ok) {
+      console.warn(`Talent Protocol Profile API returned ${response.status} for ${walletAddress}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('Talent Protocol Profile Response:', data); // Debug log
+    
+    return data.profile || null;
+  } catch (error) {
+    console.error('Error fetching Talent Protocol profile:', error);
+    return null;
+  }
 };
 
 // Interfejs definiujący props komponentu
@@ -69,11 +237,40 @@ export default function BuilderProfile({
   const [newBio, setNewBio] = useState(profile.bio || '');
   const [isSaving, setIsSaving] = useState(false);
   
+  // Talent Protocol state
+  const [talentScore, setTalentScore] = useState<TalentScore | null>(null);
+  const [talentProfile, setTalentProfile] = useState<TalentProfile | null>(null);
+  const [loadingTalentData, setLoadingTalentData] = useState(false);
+  
   // Zresetuj stan edycji bio kiedy zmienia się profil
   useEffect(() => {
     setNewBio(profile.bio || '');
     setIsEditingBio(false);
   }, [profile]);
+
+  // Fetch Talent Protocol data
+  useEffect(() => {
+    const fetchTalentData = async () => {
+      if (!userAddress || !process.env.NEXT_PUBLIC_TALENT_PROTOCOL_API_KEY) return;
+      
+      setLoadingTalentData(true);
+      try {
+        const [scoreData, profileData] = await Promise.all([
+          fetchTalentScore(userAddress),
+          fetchTalentProfile(userAddress)
+        ]);
+        
+        setTalentScore(scoreData);
+        setTalentProfile(profileData);
+      } catch (error) {
+        console.error('Error fetching Talent Protocol data:', error);
+      } finally {
+        setLoadingTalentData(false);
+      }
+    };
+
+    fetchTalentData();
+  }, [userAddress]);
 
   // Funkcja do zapisywania nowego bio
   const handleSaveBio = async () => {
@@ -148,7 +345,16 @@ export default function BuilderProfile({
       
       {/* User Info Section */}
       <div className="p-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-6 p-6 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-sm border border-blue-50 dark:border-blue-900/30">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-6 p-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl">
+          {/* Niebieska poświata */}
+          <div className="absolute -top-6 -right-6 w-32 h-32 bg-blue-300/20 rounded-full filter blur-2xl"></div>
+          <div className="absolute -bottom-6 -left-6 w-24 h-24 bg-blue-400/15 rounded-full filter blur-xl"></div>
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent"></div>
+          
+          {/* Efekt szkła */}
+          <div className="absolute inset-0 bg-white/30 backdrop-blur-sm"></div>
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-6 w-full">
           <div className="flex flex-col items-center">
             <div className="w-24 h-24 rounded-full overflow-hidden mr-0 md:mr-4 flex-shrink-0 ring-4 ring-white dark:ring-gray-800 shadow-lg relative">
               {profile.avatar ? (
@@ -228,72 +434,173 @@ export default function BuilderProfile({
                 </button>
               </div>
             </div>
+                    </div>
           </div>
         </div>
-        
-        {/* Bio Section */}
-        <div className="mb-6 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-sm p-6 border border-blue-50 dark:border-blue-900/30">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-light text-xl text-gray-900 dark:text-white">About</h3>
-            {currentUserAddress === userAddress && !isEditingBio && (
-              <button
-                onClick={() => setIsEditingBio(true)}
-                className="text-xs text-blue-500 hover:text-blue-600 flex items-center bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full transition-all duration-300 hover:scale-105"
-              >
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                <span>Edit</span>
-              </button>
-            )}
-          </div>
-          <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl p-5 border border-blue-100/20 dark:border-blue-900/20">
-            {isEditingBio ? (
-              <div>
-                <textarea
-                  value={newBio}
-                  onChange={(e) => setNewBio(e.target.value)}
-                  maxLength={90}
-                  placeholder="Write something about yourself..."
-                  className="w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-3 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  rows={3}
-                />
-                <div className="flex justify-between items-center mt-2">
-                  <div className="text-xs text-gray-500">
-                    {newBio.length}/90 characters
+          
+        {/* Talent Protocol Builder Score */}
+        {(talentScore || talentProfile || loadingTalentData) && (
+          <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 via-black to-gray-800 border border-gray-700/50 backdrop-blur-xl shadow-2xl">
+            {/* Neonowa poświata */}
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-green-400/30 rounded-full filter blur-2xl animate-pulse"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-emerald-400/20 rounded-full filter blur-xl"></div>
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-green-400/50 to-transparent"></div>
+            
+            {/* Efekt szkła */}
+            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
+            
+            <div className="relative z-10 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-green-400/20 to-emerald-500/20 backdrop-blur-sm border border-green-400/30 mr-4 shadow-lg">
+                    <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                   </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => {
-                        setIsEditingBio(false);
-                        setNewBio(profile.bio || '');
-                      }}
-                      className="px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg text-xs hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                      disabled={isSaving}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveBio}
-                      disabled={isSaving}
-                      className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isSaving ? 'Saving...' : 'Save'}
-                    </button>
+                  <div>
+                    <h3 className="font-light text-xl text-white">Talent Protocol</h3>
+                    <p className="text-sm text-green-400/80">Builder Reputation</p>
                   </div>
                 </div>
+                
+                {talentProfile?.human_checkmark && (
+                  <div className="flex items-center bg-green-400/10 backdrop-blur-sm border border-green-400/30 px-3 py-1.5 rounded-full">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-xs text-green-400 font-medium">Human Verified</span>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-gray-700 dark:text-gray-300 leading-relaxed font-light">
-                {profile.bio || 
-                  <span className="text-gray-400 italic">
-                    {currentUserAddress === userAddress ? 
-                      "Click Edit to add your bio" : 
-                      "This builder hasn't added a bio yet"}
-                  </span>
-                }
+              
+              {loadingTalentData ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-green-400/30 border-t-green-400"></div>
+                  <span className="ml-4 text-green-400/80">Loading Builder Score...</span>
+                </div>
+              ) : (talentScore && (talentScore.score !== undefined || talentScore.percentile !== undefined)) ? (
+                <div className="text-center">
+                  {/* Builder Score z neonową poświatą */}
+                  <div className="relative inline-block mb-2">
+                    <div className="text-6xl font-light text-green-400 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)] relative z-10">
+                      {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
+                    </div>
+                    {/* Dodatkowa neonowa poświata */}
+                    <div className="absolute inset-0 text-6xl font-light text-green-400 blur-md opacity-40">
+                      {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
+                    </div>
+                  </div>
+                  
+                  <div className="text-lg text-gray-300 font-light mb-4">Builder Score</div>
+                  
+                  {/* Percentile - jeśli dostępny */}
+                  {(talentScore.percentile !== undefined && talentScore.percentile !== null) && (
+                    <div className="flex items-center justify-center">
+                      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2">
+                        <span className="text-green-400 text-sm font-medium">
+                          Top {100 - talentScore.percentile}% Builder
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : talentProfile ? (
+                <div className="text-center py-6">
+                  <div className="text-gray-400 text-sm">
+                    Profile found but Builder Score not available
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <div className="text-gray-400 text-sm">
+                    No Talent Protocol data available
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Bio Section */}
+        <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl">
+          {/* Niebieska poświata */}
+          <div className="absolute -top-6 -right-6 w-24 h-24 bg-blue-300/20 rounded-full filter blur-2xl"></div>
+          <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-blue-400/15 rounded-full filter blur-xl"></div>
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent"></div>
+          
+          {/* Efekt szkła */}
+          <div className="absolute inset-0 bg-white/30 backdrop-blur-sm"></div>
+          
+          <div className="relative z-10 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-500/20 backdrop-blur-sm border border-blue-400/30 mr-3 shadow-lg">
+                  <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <h3 className="font-light text-xl text-blue-900">About</h3>
               </div>
-            )}
+              {currentUserAddress === userAddress && !isEditingBio && (
+                <button
+                  onClick={() => setIsEditingBio(true)}
+                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center bg-blue-100/50 backdrop-blur-sm border border-blue-300/30 px-3 py-1.5 rounded-full transition-all duration-300 hover:scale-105"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>Edit</span>
+                </button>
+              )}
+            </div>
+            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-5 border border-blue-200/30">
+              {isEditingBio ? (
+                <div>
+                  <textarea
+                    value={newBio}
+                    onChange={(e) => setNewBio(e.target.value)}
+                    maxLength={90}
+                    placeholder="Write something about yourself..."
+                    className="w-full bg-white border border-blue-200 rounded-lg p-3 text-blue-900 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+                    rows={3}
+                  />
+                  <div className="flex justify-between items-center mt-2">
+                    <div className="text-xs text-blue-600">
+                      {newBio.length}/90 characters
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => {
+                          setIsEditingBio(false);
+                          setNewBio(profile.bio || '');
+                        }}
+                        className="px-3 py-1.5 bg-white/80 text-blue-700 border border-blue-200 rounded-lg text-xs hover:bg-blue-50 transition-colors"
+                        disabled={isSaving}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveBio}
+                        disabled={isSaving}
+                        className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSaving ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-blue-800 leading-relaxed font-light">
+                  {profile.bio || 
+                    <span className="text-blue-400 italic">
+                      {currentUserAddress === userAddress ? 
+                        "Click Edit to add your bio" : 
+                        "This builder hasn't added a bio yet"}
+                    </span>
+                  }
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
@@ -323,23 +630,31 @@ export default function BuilderProfile({
         
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-6 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 mb-3">
-              <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl p-6 text-center transition-transform duration-300 hover:scale-[1.02]">
+            <div className="absolute -top-4 -right-4 w-16 h-16 bg-blue-300/20 rounded-full filter blur-xl"></div>
+            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm"></div>
+            <div className="relative z-10">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-500/20 backdrop-blur-sm border border-blue-400/30 mb-3 shadow-lg">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <div className="text-blue-600 text-3xl font-light drop-shadow-sm">{profile.postCount || 0}</div>
+              <div className="text-sm text-blue-500 font-light mt-1">Posts</div>
             </div>
-            <div className="text-blue-500 text-3xl font-light">{profile.postCount || 0}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 font-light mt-1">Posts</div>
           </div>
-          <div className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl p-6 shadow-sm text-center border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.02]">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-pink-100 dark:bg-pink-900/30 mb-3">
-              <svg className="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl p-6 text-center transition-transform duration-300 hover:scale-[1.02]">
+            <div className="absolute -top-4 -right-4 w-16 h-16 bg-blue-300/20 rounded-full filter blur-xl"></div>
+            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm"></div>
+            <div className="relative z-10">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-pink-400/20 to-pink-500/20 backdrop-blur-sm border border-pink-400/30 mb-3 shadow-lg">
+                <svg className="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </div>
+              <div className="text-pink-600 text-3xl font-light drop-shadow-sm">{profile.likesReceived || 0}</div>
+              <div className="text-sm text-pink-500 font-light mt-1">Likes Received</div>
             </div>
-            <div className="text-pink-500 text-3xl font-light">{profile.likesReceived || 0}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 font-light mt-1">Likes Received</div>
           </div>
         </div>
         
