@@ -676,6 +676,11 @@ export default function BaseChat() {
     // Ustaw flagę blokującą wielokrotne tworzenie postów
     setIsCreatingPost(true);
     const toastId = toast.loading("Creating post token..."); // Store toast ID
+    
+    // Declare variables outside try block so they're accessible in catch
+    let imageUrl: string | null = null;
+    let videoUrl: string | null = null;
+    let mediaMimeType: string | undefined = undefined;
 
     try {
       // Sprawdzenie czy użytkownik jest adminem
@@ -693,6 +698,7 @@ export default function BaseChat() {
 
       console.log('🚀 Starting Zora coin creation for post...');
 
+      // Declare variables for media URLs
       let imageUrl: string | null = null;
       let videoUrl: string | null = null;
       let mediaMimeType: string | undefined = undefined;
@@ -779,20 +785,35 @@ export default function BaseChat() {
       }
       console.log("Metadata URI:", metadataUri);
 
-      // 4. Prepare Coin Parameters for Zora SDK
-      const coinParams = {
-        name: `MySphere Post by ${userProfile.name || address.slice(0,6)}`.substring(0, 32), // Nowa nazwa tokena
-        symbol: newPost.trim().split(/\s+/)[0].substring(0, 10).toUpperCase(), // Użyj pierwszego słowa z posta jako tickera
-        uri: metadataUri, // Use the URL from Vercel Blob
-        payoutRecipient: address as ViemAddress, // Creator receives earnings
-        // owners: [address as ViemAddress], // Optional: defaults to payoutRecipient
-        initialPurchaseWei: 0n, // No initial purchase for now
-        platformReferrer: "0x9fb014812e5c22643640a5885866f499b1bbb5e0" as ViemAddress, // Referral fees recipient
-      };
-      console.log("Zora coin parameters:", coinParams);
-
-
-      // 5. Call createCoin
+              // 4. Prepare Coin Parameters for Zora SDK
+        // Clean and validate parameters according to Zora SDK documentation
+        const cleanName = `MySphere Post by ${userProfile.name || address.slice(0,6)}`.substring(0, 32).trim();
+        const firstWord = newPost.trim().split(/\s+/)[0];
+        const cleanSymbol = firstWord.replace(/[^A-Z0-9]/gi, '').substring(0, 10).toUpperCase() || 'POST';
+        
+        const coinParams = {
+          name: cleanName,
+          symbol: cleanSymbol,
+          uri: metadataUri, // Use the URL from Vercel Blob
+          payoutRecipient: address as ViemAddress, // Creator receives earnings
+          owners: [address as ViemAddress], // Required: specify owners array
+          platformReferrer: "0x9fb014812e5c22643640a5885866f499b1bbb5e0" as ViemAddress, // Referral fees recipient
+          // Remove problematic parameters that cause poolConfig issues
+        };
+              console.log("Zora coin parameters:", coinParams);
+        
+        // Validate parameters before calling createCoin  
+        if (!coinParams.name || coinParams.name.length === 0) {
+          throw new Error("Token name cannot be empty");
+        }
+        if (!coinParams.symbol || coinParams.symbol.length === 0) {
+          throw new Error("Token symbol cannot be empty"); 
+        }
+        if (!coinParams.uri || !coinParams.uri.startsWith('http')) {
+          throw new Error("Invalid metadata URI - must be a valid HTTP/HTTPS URL");
+        }
+        
+        // 5. Call createCoin
       console.log("Calling createCoin via Zora SDK...");
       // Make sure walletClient is not null/undefined before calling createCoin
       if (!walletClient) {
@@ -897,9 +918,81 @@ export default function BaseChat() {
     } catch (error: any) {
       console.error('Error creating Zora coin post:', error);
       toast.dismiss(toastId); // Ensure loading toast is dismissed on error
-      toast.error(`Error creating post: ${error.message.substring(0, 100)}`); // Limit error message length
-      // Consider reverting optimistic daily count update if needed:
-      // setDailyPostCount(prev => Math.max(0, prev - 1));
+      
+      // Determine the specific error type and show appropriate message
+      let errorMessage = 'Unknown error occurred while creating post';
+      let shouldFallback = false;
+      
+      if (error.message.includes('execution reverted') || error.message.includes('ContractFunctionExecutionError')) {
+        errorMessage = 'Token creation failed due to contract error. Creating as regular post instead.';
+        shouldFallback = true;
+      } else if (error.message.includes('Missing or invalid parameters')) {
+        errorMessage = 'Invalid token parameters. Creating as regular post instead.';
+        shouldFallback = true;
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds to create the token. Please ensure you have enough ETH for gas fees.';
+      } else if (error.message.includes('user rejected')) {
+        errorMessage = 'Transaction was rejected by user.';
+      } else if (error.message.includes('Failed to upload')) {
+        errorMessage = 'Failed to upload media or metadata. Please try again.';
+      } else if (error.message.includes('Token name cannot be empty') || 
+                 error.message.includes('Token symbol cannot be empty') ||
+                 error.message.includes('Invalid metadata URI')) {
+        errorMessage = error.message;
+      } else if (error.message) {
+        errorMessage = error.message.substring(0, 100);
+      }
+      
+      // Try fallback to regular post if token creation failed
+      if (shouldFallback) {
+        try {
+          console.log('Attempting fallback to regular post...');
+          toast.loading('Creating as regular post...', { id: toastId });
+          
+          // Extract hashtags and mentions  
+          const tags = Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1))));
+          const mentions = Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))));
+          
+          // Create regular post without token
+          await createPost({
+            author: address,
+            content: newPost,
+            timestamp: Date.now(),
+            image: imageUrl ?? undefined,
+            video: videoUrl ?? undefined,
+            tags: tags,
+            mentions: mentions,
+            visibility: 'public',
+            network: 'base' // Identify as a Base network post without token
+          });
+          
+          // Update UI
+          toast.success('Post created successfully!', { id: toastId });
+          setNewPost('');
+          setPostPreviewImage(null);
+          setPostPreviewVideo(null);
+          
+          // Refresh posts
+          await refreshPosts();
+          
+          // Increment daily count
+          setDailyPostCount(prev => prev + 1);
+          
+        } catch (fallbackError) {
+          console.error('Fallback post creation also failed:', fallbackError);
+          toast.error('Failed to create post. Please try again.', { id: toastId });
+        }
+      } else {
+        toast.error(`Error creating post: ${errorMessage}`);
+      }
+      
+      // Log detailed error for debugging
+      console.error('Detailed error:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        cause: error.cause
+      });
     } finally {
       // Zawsze resetuj flagę blokującą, nawet w przypadku błędu
       setIsCreatingPost(false);

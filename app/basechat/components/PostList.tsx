@@ -14,7 +14,7 @@ import CommentTransactionButtonBaseCamp from './BaseCampPosts/CommentTransaction
 import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
 
 // Import Zora SDK functions and types
-import { tradeCoin, getProfileBalances } from '@zoralabs/coins-sdk';
+import { getProfileBalances } from '@zoralabs/coins-sdk';
 import { getCachedCoin } from '../../utils/zoraSdk';
 import { parseEther, parseUnits, formatEther, formatUnits } from 'viem'; // Import viem utils
 import { Address as ViemAddress } from 'viem';
@@ -799,6 +799,10 @@ export default function PostList({
     try {
       const toastId = toast.loading(`${transactionType === 'buy' ? 'Buying' : 'Selling'} ${tokenData?.symbol || 'tokens'}...`);
       
+      // Trading functionality is temporarily disabled due to SDK issues
+      throw new Error("Trading functionality is temporarily disabled. Please use Zora.co directly to trade tokens.");
+      
+      /*
       if (transactionType === 'buy') {
         const buyParams = {
           direction: "buy" as const,
@@ -837,6 +841,7 @@ export default function PostList({
       
       refreshPosts();
       setTransactionModalOpen(false);
+      */
     } catch (error: any) {
       console.error(`Error ${transactionType}ing coin:`, error);
       toast.error(`${transactionType === 'buy' ? 'Buy' : 'Sell'} failed: ${error.message.substring(0, 60)}...`);

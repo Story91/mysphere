@@ -40,7 +40,7 @@
     "@walletconnect/core": "^2.19.0",
     "@walletconnect/ethereum-provider": "^2.19.0",
     "@walletconnect/modal": "^2.7.0",
-    "@zoralabs/coins-sdk": "^0.1.0",
+    "@zoralabs/coins-sdk": "^0.2.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.1",
