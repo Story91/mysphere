@@ -73,14 +73,40 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
     const toastId = toast.loading("Saving your Camp Network post...");
     
     try {
-      // Skip Vercel Blob storage due to missing token
-      // Instead of:
-      // let uploadUrl = null;
-      // if (content.trim()) {
-      //   const blob = new Blob([content], { type: 'text/plain' });
-      //   const result = await put(`basecamp-post-${Date.now()}.txt`, blob, { access: 'public' });
-      //   uploadUrl = result.url;
-      // }
+      let imageUrl: string | null = null;
+      let videoUrl: string | null = null;
+
+      // Handle media upload (image or video) - same as Base network
+      if (postPreviewImage || postPreviewVideo) {
+        setUploadProgress(0);
+        const mediaContent = postPreviewImage || postPreviewVideo;
+        if (!mediaContent) throw new Error('No media content');
+
+        const base64Response = await fetch(mediaContent);
+        const blob = await base64Response.blob();
+
+        const isVideo = postPreviewVideo !== null;
+        const fileExtension = isVideo ? (blob.type.split('/')[1] || 'mp4') : (blob.type.split('/')[1] || 'jpg');
+        const fileName = `basecamp-post-media-${Date.now()}.${fileExtension}`;
+
+        const formData = new FormData();
+        formData.append('file', blob, fileName);
+
+        const response = await fetch('/api/upload', { method: 'POST', body: formData });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (isVideo) {
+          videoUrl = data.url;
+        } else {
+          imageUrl = data.url;
+        }
+        setUploadProgress(100);
+      }
       
       // Extract hashtags and mentions
       const tags = Array.from(new Set((content.match(/#(\w+)/g) || []).map(tag => tag.slice(1))));
@@ -89,15 +115,15 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
       // Save post to Firebase with network:basecamp
       await createPost({
         author: address,
-        content: content, // Use the content directly instead of blob URL
+        content: content,
         timestamp: Date.now(),
         tags: tags,
         mentions: mentions,
         visibility: 'public',
         txHash: txHash,
         network: 'basecamp', // Mark as a BaseCamp network post
-        image: postPreviewImage || null,
-        video: postPreviewVideo || null
+        image: imageUrl, // Use uploaded URL instead of base64
+        video: videoUrl  // Use uploaded URL instead of base64
       });
       
       // Reset UI
