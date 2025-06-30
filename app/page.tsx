@@ -250,7 +250,7 @@ async function getCampNetworkTransactions() {
       let allTransactions = [];
       let nextPageParams = null;
       let pageCount = 0;
-      const maxPages = 5; // Zabezpieczenie przed nieskończoną pętlą
+      const maxPages = 50; // Zabezpieczenie przed nieskończoną pętlą
       
       console.log(`🔍 Pobieranie wszystkich transakcji dla kontraktu: ${contractAddress}`);
       
