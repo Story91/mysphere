@@ -128,6 +128,8 @@ const tailwindConfig = {
 
 // Funkcja do pobierania danych o transakcjach dla określonych kontraktów na sieci Base
 async function getBaseContractTransactions() {
+  console.log(`🚀 getBaseContractTransactions() wywołana o ${new Date().toLocaleTimeString()}`);
+  
   // Adresy kontraktów do monitorowania
   const contractAddresses = [
     "0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7", 
@@ -160,8 +162,17 @@ async function getBaseContractTransactions() {
       let totalTransactions = 0;
       const txData = await txCountResponse.json();
       
+      // Debug: loguj odpowiedź API
+      console.log(`🔍 BaseScan API response for ${contractAddress}:`, {
+        status: txData.status,
+        message: txData.message,
+        resultLength: Array.isArray(txData.result) ? txData.result.length : 'not array',
+        result: Array.isArray(txData.result) ? 'array' : txData.result
+      });
+      
       if (txData.status === '1' && Array.isArray(txData.result)) {
         totalTransactions = txData.result.length;
+        console.log(`✅ Pobrano ${totalTransactions} transakcji dla ${contractAddress}`);
       } else {
         // Fallback do wcześniej znanych wartości w przypadku błędu API
         if (contractAddress === "0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7") {
@@ -169,7 +180,8 @@ async function getBaseContractTransactions() {
         } else if (contractAddress === "0x9c44802843a670732383f62b2f3304f92ec1702b") {
           totalTransactions = 59;
         }
-        console.log(`Użyto fallbackowej liczby transakcji dla ${contractAddress}: ${totalTransactions}`);
+        console.log(`❌ Błąd API BaseScan, użyto fallback dla ${contractAddress}: ${totalTransactions}`);
+        console.log(`Błąd API: ${txData.message || 'Unknown error'}`);
       }
       
       // Sprawdź czy to kontrakt
@@ -218,10 +230,22 @@ async function getBaseContractTransactions() {
     }
   }
   
-  // Pobierz dane dla wszystkich kontraktów równolegle
-  const contractsData = await Promise.all(
-    contractAddresses.map(address => fetchContractData(address))
-  );
+  // Pobierz dane dla kontraktów z delay (BaseScan ma limit 2/sec)
+  const contractsData = [];
+  for (let i = 0; i < contractAddresses.length; i++) {
+    console.log(`🔄 Zapytanie ${i + 1}/${contractAddresses.length} do BaseScan: ${contractAddresses[i]}`);
+    
+    if (i > 0) {
+      console.log(`⏳ Czekam 1000ms przed następnym zapytaniem...`);
+      // Czekaj 1000ms między zapytaniami (bezpieczniej dla rate limit)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    const data = await fetchContractData(contractAddresses[i]);
+    contractsData.push(data);
+    
+    console.log(`✅ Zapytanie ${i + 1} zakończone, transactions: ${data.transactions}`);
+  }
   
   // Oblicz łączną liczbę transakcji
   const totalTransactions = contractsData.reduce(
