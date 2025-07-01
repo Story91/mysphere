@@ -399,7 +399,17 @@ export default function BuilderProfile({
                       <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text">{profile.name}</span>
                       <span className="ml-1.5 text-sm bg-blue-100 dark:bg-blue-900 text-blue-500 px-1.5 py-0.5 rounded-md">BaseName</span>
                     </>
-                  ) : (
+                  ) : profile.name.endsWith('.sphere') ? (
+                    <>
+                      <span className="text-gray-900 dark:text-white">{profile.name.replace('.sphere', '')}</span>
+                      <span className="text-blue-500">.sphere</span>
+                    </>
+                                     ) : profile.name.endsWith('.camper') ? (
+                     <>
+                       <span className="text-gray-900 dark:text-white">{profile.name.replace('.camper', '')}</span>
+                       <span className="text-orange-500">.camper🏕️</span>
+                     </>
+                   ) : (
                     <>
                       {profile.name}
                       {isVitalik && (

@@ -206,7 +206,19 @@ export default function UserManagement() {
                   <div className="flex items-center">
                     <div className="ml-4">
                       <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {user.name || user.id?.slice(0, 6) + '...' + user.id?.slice(-4)}
+                        {user.name?.endsWith('.sphere') ? (
+                          <>
+                            <span>{user.name.replace('.sphere', '')}</span>
+                            <span className="text-blue-500">.sphere</span>
+                          </>
+                                                 ) : user.name?.endsWith('.camper') ? (
+                           <>
+                             <span>{user.name.replace('.camper', '')}</span>
+                             <span className="text-orange-500">.camper🏕️</span>
+                           </>
+                         ) : (
+                          user.name || user.id?.slice(0, 6) + '...' + user.id?.slice(-4)
+                        )}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         {user.id}
@@ -253,7 +265,19 @@ export default function UserManagement() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
             <h3 className="text-lg font-medium mb-4">
-              Banowanie użytkownika: {selectedUser.name || selectedUser.id}
+              Banowanie użytkownika: {selectedUser.name?.endsWith('.sphere') ? (
+                <>
+                  <span>{selectedUser.name.replace('.sphere', '')}</span>
+                  <span className="text-blue-500">.sphere</span>
+                </>
+                             ) : selectedUser.name?.endsWith('.camper') ? (
+                 <>
+                   <span>{selectedUser.name.replace('.camper', '')}</span>
+                   <span className="text-orange-500">.camper🏕️</span>
+                 </>
+               ) : (
+                selectedUser.name || selectedUser.id
+              )}
             </h3>
             <textarea
               className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"

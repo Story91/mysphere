@@ -122,6 +122,65 @@ const addBaseNameBonusToUser = async (userAddress: string): Promise<void> => {
   }
 };
 
+// Funkcja dodająca bonus 500 punktów za .camper
+const addCamperBonusToUser = async (userAddress: string): Promise<void> => {
+  try {
+    console.log(`🏕️ [addCamperBonusToUser] Rozpoczynam dodawanie bonusu dla ${userAddress}`);
+    const userRef = doc(db, 'users', userAddress);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      
+      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
+      let baseChatPoints: any = userData.baseChatPoints;
+      
+      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
+      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
+        baseChatPoints = {
+          activityBonus: 0,
+          likePoints: 0,
+          postPoints: 0,
+          totalPoints: 0
+        };
+      }
+      
+      // Upewnij się, że wszystkie pola są liczbami
+      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
+      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
+      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
+      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
+      
+      // Sprawdź czy użytkownik już ma camperBonus - jeśli tak, nie dodawaj ponownie
+      if (baseChatPoints.camperBonus) {
+        console.log(`Użytkownik ${userAddress} już ma camperBonus, pomijam dodawanie`);
+        return;
+      }
+      
+      // Dodaj camperBonus jako liczbę
+      baseChatPoints.camperBonus = 500;
+      
+      // Przelicz totalPoints jako sumę wszystkich składników
+      baseChatPoints.totalPoints = 
+        baseChatPoints.activityBonus + 
+        baseChatPoints.likePoints + 
+        baseChatPoints.postPoints + 
+        baseChatPoints.baseNameBonus + 
+        baseChatPoints.camperBonus;
+      
+      // Zaktualizuj dokument użytkownika
+      await updateDoc(userRef, {
+        baseChatPoints: baseChatPoints,
+        lastUpdated: serverTimestamp()
+      });
+      
+      console.log(`🏕️ Dodano camperBonus (500 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
+    }
+  } catch (error) {
+    console.error('Error adding Camper bonus:', error);
+  }
+};
+
 // Funkcja dodająca bonus BaseName dla wszystkich użytkowników z BaseName
 export const addBaseNameBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
   try {
@@ -766,10 +825,11 @@ export const updateUserName = async (walletAddress: string, newName: string): Pr
 };
 
 // Prosta funkcja do zapisywania nazwy profilowej
-export const saveProfileName = async (address: string, name: string) => {
+export const saveProfileName = async (address: string, name: string, suffix?: 'sphere' | 'camper') => {
   try {
     const userRef = doc(db, 'usernames', address);
     const isBaseName = name.endsWith('.base.eth');
+    const isCamper = name.endsWith('.camper');
     
     // Sprawdź czy użytkownik już ma zapisaną nazwę
     const userDoc = await getDoc(userRef);
@@ -785,7 +845,8 @@ export const saveProfileName = async (address: string, name: string) => {
       address,
       name,
       updatedAt: serverTimestamp(),
-      isBaseName
+      isBaseName,
+      isCamper
     });
     
     // Zaktualizuj też profil użytkownika
@@ -798,6 +859,12 @@ export const saveProfileName = async (address: string, name: string) => {
     // Jeśli to BaseName, dodaj bonus 1000 punktów
     if (isBaseName) {
       await addBaseNameBonusToUser(address);
+    }
+    
+    // Jeśli to .camper, dodaj bonus 500 punktów
+    if (isCamper || suffix === 'camper') {
+      console.log(`🏕️ Próba dodania camperBonus dla ${address}, isCamper: ${isCamper}, suffix: ${suffix}`);
+      await addCamperBonusToUser(address);
     }
     
     return true;

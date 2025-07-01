@@ -254,6 +254,7 @@ export default function BaseChat() {
   const [isUploading, setIsUploading] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [customName, setCustomName] = useState('');
+  const [selectedSuffix, setSelectedSuffix] = useState<'sphere' | 'camper'>('sphere');
   const [userNames, setUserNames] = useState<{[key: string]: {name: string, avatar?: string}}>({});
   const [expandedPosts, setExpandedPosts] = useState<{[key: string]: boolean}>({});
   const [editingPost, setEditingPost] = useState<string | null>(null);
@@ -360,6 +361,11 @@ export default function BaseChat() {
                   <span className="text-gray-900 dark:text-white">{userName.replace('.sphere', '')}</span>
                   <span className="text-blue-500">.sphere</span>
                 </>
+              ) : userName.endsWith('.camper') ? (
+                <>
+                  <span className="text-gray-900 dark:text-white">{userName.replace('.camper', '')}</span>
+                  <span className="text-orange-500">.camper🏕️</span>
+                </>
               ) : (
                 userName
               )}
@@ -380,9 +386,9 @@ export default function BaseChat() {
     if (!address || !customName.trim()) return;
     
     try {
-      // Dodaj końcówkę .sphere do nazwy
-      const newName = customName.trim() + '.sphere';
-      const success = await saveProfileName(address, newName);
+      // Dodaj wybraną końcówkę do nazwy
+      const newName = customName.trim() + '.' + selectedSuffix;
+      const success = await saveProfileName(address, newName, selectedSuffix);
       
       if (success) {
         // Aktualizuj lokalny stan
@@ -407,10 +413,16 @@ export default function BaseChat() {
         // Wyczyść formularz
         setIsEditingName(false);
         setCustomName('');
+        setSelectedSuffix('sphere');
         
         // Odśwież nazwy użytkowników
         if (posts.length > 0) {
           fetchUserNames(posts);
+        }
+        
+        // Pokaż komunikat o bonusie punktów za .camper
+        if (selectedSuffix === 'camper') {
+          alert('🎉 Congratulations! You earned 500 bonus points for choosing .camper!');
         }
       } else {
         alert('Wystąpił błąd podczas zapisywania nazwy. Spróbuj ponownie.');
@@ -1993,7 +2005,21 @@ export default function BaseChat() {
                 ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text' 
                 : 'text-gray-900 dark:text-white'
           }`}>
-            {userNames[user.address]?.name || user.address.slice(0, 6) + '...' + user.address.slice(-4)}
+            <span>
+          {userNames[user.address]?.name?.endsWith('.sphere') ? (
+            <>
+              <span>{userNames[user.address].name.replace('.sphere', '')}</span>
+              <span className="text-blue-500">.sphere</span>
+            </>
+                     ) : userNames[user.address]?.name?.endsWith('.camper') ? (
+             <>
+               <span>{userNames[user.address].name.replace('.camper', '')}</span>
+               <span className="text-orange-500">.camper🏕️</span>
+             </>
+           ) : (
+            userNames[user.address]?.name || user.address.slice(0, 6) + '...' + user.address.slice(-4)
+          )}
+        </span>
           </span>
           
           {/* Display Ethereum Founder badge for vitalik.eth */}
@@ -2433,31 +2459,67 @@ export default function BaseChat() {
 
                           <div className="text-center">
                             {isEditingName ? (
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="text"
-                                  value={customName}
-                                  onChange={(e) => setCustomName(e.target.value)}
-                                  placeholder="Enter username"
-                                  className="px-2 py-1 border rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600"
-                                />
-                    <button
-                                  onClick={handleSaveCustomName}
-                                  className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
-                      >
-                                  Save
-                    </button>
-                    <button
-                                  onClick={() => setIsEditingName(false)}
-                                  className="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600"
-                    >
-                                  Cancel
-                                </button>
+                              <div className="space-y-3">
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="text"
+                                    value={customName}
+                                    onChange={(e) => setCustomName(e.target.value)}
+                                    placeholder="Enter username"
+                                    className="px-2 py-1 border rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 flex-1"
+                                  />
+                                  <span className="text-sm text-gray-500">.</span>
+                                  <select
+                                    value={selectedSuffix}
+                                    onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper')}
+                                    className="px-2 py-1 border rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+                                  >
+                                    <option value="sphere">sphere</option>
+                                    <option value="camper">camper (+500 pts!)</option>
+                                  </select>
+                                </div>
+                                <div className="text-xs text-center text-gray-500">
+                                  Preview: {customName || 'username'}.
+                                  <span className={selectedSuffix === 'sphere' ? 'text-blue-500' : 'text-orange-500'}>
+                                    {selectedSuffix}
+                                  </span>
+                                  {selectedSuffix === 'camper' && <span className="text-orange-600 ml-1">🏕️ +500 Base Points!</span>}
+                                </div>
+                                <div className="flex justify-center space-x-2">
+                        <button
+                                    onClick={handleSaveCustomName}
+                                    className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
+                        >
+                                    Save
+                        </button>
+                        <button
+                                    onClick={() => {
+                                      setIsEditingName(false);
+                                      setCustomName('');
+                                      setSelectedSuffix('sphere');
+                                    }}
+                                    className="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600"
+                        >
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               <div className="flex items-center justify-center space-x-2">
                                 <span className={`${isBaseName(userProfile.name) ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold animate-pulse' : 'text-gray-900 dark:text-white'}`}>
-                                  {userProfile.name}
+                                  {userProfile.name.endsWith('.sphere') ? (
+                                    <>
+                                      <span className="text-gray-900 dark:text-white">{userProfile.name.replace('.sphere', '')}</span>
+                                      <span className="text-blue-500">.sphere</span>
+                                    </>
+                                                     ) : userProfile.name.endsWith('.camper') ? (
+                     <>
+                       <span className="text-gray-900 dark:text-white">{userProfile.name.replace('.camper', '')}</span>
+                       <span className="text-orange-500">.camper🏕️</span>
+                     </>
+                   ) : (
+                                    userProfile.name
+                                  )}
                                 </span>
                                 {!baseName && (
                                   <button
