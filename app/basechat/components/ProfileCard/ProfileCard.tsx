@@ -57,15 +57,6 @@ export interface ProfileCardProps {
   onContactClick?: () => void;
 }
 
-// Dynamic font size calculation based on name length
-const getDynamicFontSize = (name: string) => {
-  const nameLength = name.length;
-  if (nameLength <= 10) return 'pc-name-short';
-  if (nameLength <= 15) return 'pc-name-medium';
-  if (nameLength <= 20) return 'pc-name-long';
-  return 'pc-name-extra-long';
-};
-
 const ProfileCardComponent: React.FC<ProfileCardProps> = ({
   avatarUrl = "/favicon_io (1)/android-chrome-192x1921.png",
   iconUrl,
@@ -86,6 +77,7 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
   socialLinks,
   onContactClick,
 }) => {
+  const nameRef = useRef<HTMLHeadingElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLElement>(null);
   const [showCopied, setShowCopied] = useState(false);
@@ -291,6 +283,30 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
     }
   }, [fullAddress]);
 
+  // Dynamic font size based on name length
+  useEffect(() => {
+    if (nameRef.current && name) {
+      const nameLength = name.length;
+      const nameElement = nameRef.current;
+      
+      // Remove existing data attributes
+      nameElement.removeAttribute('data-long');
+      nameElement.removeAttribute('data-very-long');
+      
+      // Add appropriate data attribute based on length
+      // Special handling for .base.eth addresses which are typically longer
+      if (name.includes('.base.eth') && nameLength > 16) {
+        nameElement.setAttribute('data-very-long', 'true');
+      } else if (name.includes('.base.eth') && nameLength > 10) {
+        nameElement.setAttribute('data-long', 'true');
+      } else if (nameLength > 18) {
+        nameElement.setAttribute('data-very-long', 'true');
+      } else if (nameLength > 12) {
+        nameElement.setAttribute('data-long', 'true');
+      }
+    }
+  }, [name]);
+
   return (
     <div
       ref={wrapRef}
@@ -444,7 +460,7 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
           </div>
           <div className="pc-content">
             <div className="pc-details">
-              <h3 className={getDynamicFontSize(name)}>{name}</h3>
+              <h3 ref={nameRef}>{name}</h3>
               {title && <p>{title}</p>}
             </div>
           </div>
