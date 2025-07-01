@@ -1,19 +1,20 @@
 'use client';
 
-import { useLinkSocials, useSocials, useAuthState, useModal } from '@campnetwork/sdk/react';
+import { useLinkSocials, useSocials, useAuthState, useModal } from '@campnetwork/origin/react';
 import { motion } from 'framer-motion';
 
 interface SocialPlatform {
-  id: 'twitter' | 'discord' | 'spotify';
+  id: 'twitter' | 'spotify' | 'tiktok';
   name: string;
   icon: string;
   color: string;
+  available: boolean;
 }
 
 const socialPlatforms: SocialPlatform[] = [
-  { id: 'twitter', name: 'Twitter', icon: '🐦', color: 'blue' },
-  { id: 'discord', name: 'Discord', icon: '💬', color: 'purple' },
-  { id: 'spotify', name: 'Spotify', icon: '🎵', color: 'green' }
+  { id: 'twitter', name: 'Twitter', icon: '🐦', color: 'blue', available: true },
+  { id: 'spotify', name: 'Spotify', icon: '🎵', color: 'green', available: true },
+  { id: 'tiktok', name: 'TikTok', icon: '🎬', color: 'pink', available: true }
 ];
 
 export default function SocialLinksManager() {
@@ -22,11 +23,11 @@ export default function SocialLinksManager() {
   const modal = useModal();
   const {
     linkTwitter,
-    linkDiscord,
     linkSpotify,
+    linkTiktok,
     unlinkTwitter,
-    unlinkDiscord,
-    unlinkSpotify
+    unlinkSpotify,
+    unlinkTiktok
   } = useLinkSocials();
 
   // Debug logging
@@ -39,11 +40,11 @@ export default function SocialLinksManager() {
     socialsDataKeys: socialsData ? Object.keys(socialsData) : [],
     linkFunctions: {
       linkTwitter: typeof linkTwitter,
-      linkDiscord: typeof linkDiscord,
       linkSpotify: typeof linkSpotify,
+      linkTiktok: typeof linkTiktok,
       unlinkTwitter: typeof unlinkTwitter,
-      unlinkDiscord: typeof unlinkDiscord,
-      unlinkSpotify: typeof unlinkSpotify
+      unlinkSpotify: typeof unlinkSpotify,
+      unlinkTiktok: typeof unlinkTiktok
     }
   });
 
@@ -90,13 +91,13 @@ export default function SocialLinksManager() {
               await linkTwitter();
             }
             break;
-          case 'discord':
+          case 'tiktok':
             if (isConnected) {
-              console.log('💬 Unlinking Discord...');
-              await unlinkDiscord();
+              console.log('🎬 Unlinking TikTok...');
+              await unlinkTiktok();
             } else {
-              console.log('💬 Linking Discord...');
-              await linkDiscord();
+              console.log('🎬 Linking TikTok...');
+              await linkTiktok();
             }
             break;
           case 'spotify':

@@ -14,7 +14,7 @@ import {
   useSocials,
   useLinkSocials,
   useModal
-} from '@campnetwork/sdk/react';
+} from '@campnetwork/origin/react';
 import {
   LineChart,
   Line,
@@ -61,11 +61,11 @@ export default function MyCampPage() {
   const modal = useModal();
   const {
     linkTwitter,
-    linkDiscord,
     linkSpotify,
+    linkTiktok,
     unlinkTwitter,
-    unlinkDiscord,
-    unlinkSpotify
+    unlinkSpotify,
+    unlinkTiktok
   } = useLinkSocials();
 
   // Environment variables
@@ -136,7 +136,7 @@ export default function MyCampPage() {
   // Count connected social media platforms and update stats
   useEffect(() => {
     if (socialsData && address) {
-      const platforms = ['twitter', 'discord', 'spotify', 'tiktok', 'telegram'];
+      const platforms = ['twitter', 'spotify', 'tiktok'];
       const connectedPlatforms = platforms.filter(platform => 
         (socialsData as any)?.[platform]
       );
@@ -211,7 +211,7 @@ export default function MyCampPage() {
       socialsLoading,
       hasTwitter: (socialsData as any)?.twitter,
       hasSpotify: (socialsData as any)?.spotify,
-      hasDiscord: (socialsData as any)?.discord,
+      hasTiktok: (socialsData as any)?.tiktok,
       connectedSocialsCount
     });
   }, [authenticated, loading, address, socialsData, socialsError, socialsLoading, CLIENT_ID, API_KEY, connectedSocialsCount]);
@@ -666,12 +666,12 @@ export default function MyCampPage() {
                           animate={{ scale: 1 }}
                           className="bg-orange-500/80 text-white text-xs sm:text-sm px-2 py-1 rounded-full font-bold min-w-[24px] text-center"
                         >
-                          {connectedSocialsCount}/5
+                          {connectedSocialsCount}/3
                         </motion.div>
                       )}
                     </div>
                     <div className="text-xs opacity-60 uppercase tracking-widest flex items-center justify-center gap-1">
-                      {authenticated ? `${connectedSocialsCount} Connected` : 'Coming Soon'}
+                      {authenticated ? `${connectedSocialsCount} Connected` : 'Disabled'}
                       <motion.span
                         animate={{ rotate: socialDropdownOpen ? 180 : 0 }}
                         transition={{ duration: 0.2 }}
@@ -695,28 +695,34 @@ export default function MyCampPage() {
                   className="absolute top-full left-0 right-0 mt-2 bg-black/90 backdrop-blur-sm border border-green-500/30 rounded-xl overflow-hidden shadow-2xl shadow-green-500/20 z-50"
                 >
                   {[
-                    { key: 'twitter', name: 'Twitter', gradient: 'from-sky-500 to-blue-500' },
-                    { key: 'discord', name: 'Discord', gradient: 'from-indigo-500 to-purple-500' },
-                    { key: 'spotify', name: 'Spotify', gradient: 'from-green-500 to-emerald-500' },
-                    { key: 'tiktok', name: 'TikTok', gradient: 'from-pink-500 to-rose-500' },
-                    { key: 'telegram', name: 'Telegram', gradient: 'from-cyan-500 to-blue-500' }
+                    { key: 'twitter', name: 'Twitter', gradient: 'from-sky-500 to-blue-500', available: true },
+                    { key: 'spotify', name: 'Spotify', gradient: 'from-green-500 to-emerald-500', available: true },
+                    { key: 'tiktok', name: 'TikTok', gradient: 'from-pink-500 to-rose-500', available: true },
+                    { key: 'discord', name: 'Discord', gradient: 'from-indigo-500 to-purple-500', available: false },
+                    { key: 'telegram', name: 'Telegram', gradient: 'from-cyan-500 to-blue-500', available: false }
                   ].map((social, index) => (
                     <motion.button
                       key={social.key}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      disabled={true}
-                      className="w-full px-3 sm:px-4 py-3 text-left transition-all duration-200 text-orange-200/50 cursor-not-allowed backdrop-blur-[1px] relative overflow-hidden"
+                      disabled={!social.available}
+                      className={`w-full px-3 sm:px-4 py-3 text-left transition-all duration-200 relative overflow-hidden ${
+                        social.available 
+                          ? 'text-orange-200 hover:bg-white/10 cursor-pointer' 
+                          : 'text-orange-200/50 cursor-not-allowed backdrop-blur-[1px]'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium blur-[0.5px] text-sm sm:text-base">{social.name}</span>
+                        <span className={`font-medium text-sm sm:text-base ${social.available ? '' : 'blur-[0.5px]'}`}>
+                          {social.name}
+                        </span>
                         <span className="text-xs text-orange-300/70 font-medium">
-                          Soon
+                          {social.available ? 'Available' : 'Soon'}
                         </span>
                       </div>
-                      {/* Subtle overlay */}
-                      <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>
+                      {/* Subtle overlay for disabled items */}
+                      {!social.available && <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>}
                     </motion.button>
                   ))}
                 </motion.div>
@@ -826,46 +832,39 @@ export default function MyCampPage() {
                 </div>
               </motion.div>
 
-              {/* Discord - Compact Glass Card */}
+              {/* Discord - Compact Glass Card (Disabled) */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
                 className="group relative"
               >
-                <div className="relative bg-gradient-to-br from-white/20 via-white/10 to-white/5 backdrop-blur-2xl rounded-2xl border border-white/30 p-4 hover:border-white/50 transition-all duration-500 overflow-hidden shadow-xl hover:shadow-purple-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-purple-500/10 to-indigo-800/20 rounded-2xl"></div>
+                <div className="relative bg-gradient-to-br from-white/10 via-white/5 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-4 transition-all duration-500 overflow-hidden shadow-xl opacity-50">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/10 via-purple-500/5 to-indigo-800/10 rounded-2xl"></div>
                   
-                  <div className="relative z-10 mb-3">
-                    <div className="w-full h-24 bg-gradient-to-br from-indigo-500/30 to-purple-600/30 rounded-xl flex items-center justify-center border border-white/20 backdrop-blur-sm">
-                      <svg className="w-8 h-8 text-white/80" fill="currentColor" viewBox="0 0 24 24">
+                  {/* Blur overlay */}
+                  <div className="absolute inset-0 backdrop-blur-[2px] bg-black/20 rounded-2xl z-10"></div>
+                  
+                  {/* Disabled Badge */}
+                  <div className="absolute top-2 right-2 z-20 bg-red-500/80 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    Disabled
+                  </div>
+                  
+                  <div className="relative z-5 mb-3 blur-[1px]">
+                    <div className="w-full h-24 bg-gradient-to-br from-indigo-500/20 to-purple-600/20 rounded-xl flex items-center justify-center border border-white/10 backdrop-blur-sm">
+                      <svg className="w-8 h-8 text-white/50" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
                       </svg>
                     </div>
                   </div>
                   
-                  <div className="absolute top-3 right-3">
-                    <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.discord) ? 'bg-green-400' : 'bg-red-400'} relative shadow-lg`}>
-                      <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.discord) ? 'bg-green-400' : 'bg-red-400'} absolute animate-ping`}></div>
-                    </div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <h3 className="text-lg font-bold text-white mb-1">Discord</h3>
-                    <p className="text-white/70 text-xs mb-3">Join Discord community</p>
+                  <div className="relative z-5 blur-[1px]">
+                    <h3 className="text-lg font-bold text-white/70 mb-1">Discord</h3>
+                    <p className="text-white/50 text-xs mb-3">Disabled</p>
                     
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => modal.openModal()}
-                      className={`w-full py-2 px-3 rounded-lg font-bold text-xs transition-all duration-300 ${
-                        ((socialsData as any)?.discord)
-                          ? 'bg-red-500/80 hover:bg-red-500/90 text-white backdrop-blur-sm'
-                          : 'bg-indigo-500/80 hover:bg-indigo-500/90 text-white backdrop-blur-sm'
-                      }`}
-                    >
-                      {((socialsData as any)?.discord) ? '🔗 Unlink Account' : '🔗 Connect Discord'}
-                    </motion.button>
+                    <div className="w-full py-2 px-3 rounded-lg font-bold text-xs bg-gray-500/50 text-white/50 cursor-not-allowed">
+                      🔒 Disabled
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -958,46 +957,39 @@ export default function MyCampPage() {
                 </div>
               </motion.div>
 
-              {/* Telegram - Compact Glass Card */}
+              {/* Telegram - Compact Glass Card (Disabled) */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.5, ease: "easeOut" }}
                 className="group relative"
               >
-                <div className="relative bg-gradient-to-br from-white/20 via-white/10 to-white/5 backdrop-blur-2xl rounded-2xl border border-white/30 p-4 hover:border-white/50 transition-all duration-500 overflow-hidden shadow-xl hover:shadow-blue-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-sky-500/10 to-blue-800/20 rounded-2xl"></div>
+                <div className="relative bg-gradient-to-br from-white/10 via-white/5 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20 p-4 transition-all duration-500 overflow-hidden shadow-xl opacity-50">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-sky-500/5 to-blue-800/10 rounded-2xl"></div>
                   
-                  <div className="relative z-10 mb-3">
-                    <div className="w-full h-24 bg-gradient-to-br from-blue-500/30 to-sky-600/30 rounded-xl flex items-center justify-center border border-white/20 backdrop-blur-sm">
-                      <svg className="w-8 h-8 text-white/80" fill="currentColor" viewBox="0 0 24 24">
+                  {/* Blur overlay */}
+                  <div className="absolute inset-0 backdrop-blur-[2px] bg-black/20 rounded-2xl z-10"></div>
+                  
+                  {/* Disabled Badge */}
+                  <div className="absolute top-2 right-2 z-20 bg-red-500/80 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    Disabled
+                  </div>
+                  
+                  <div className="relative z-5 mb-3 blur-[1px]">
+                    <div className="w-full h-24 bg-gradient-to-br from-blue-500/20 to-sky-600/20 rounded-xl flex items-center justify-center border border-white/10 backdrop-blur-sm">
+                      <svg className="w-8 h-8 text-white/50" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
                       </svg>
                     </div>
                   </div>
                   
-                  <div className="absolute top-3 right-3">
-                    <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.telegram) ? 'bg-green-400' : 'bg-red-400'} relative shadow-lg`}>
-                      <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.telegram) ? 'bg-green-400' : 'bg-red-400'} absolute animate-ping`}></div>
-                    </div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <h3 className="text-lg font-bold text-white mb-1">Telegram</h3>
-                    <p className="text-white/70 text-xs mb-3">Join Telegram channel</p>
+                  <div className="relative z-5 blur-[1px]">
+                    <h3 className="text-lg font-bold text-white/70 mb-1">Telegram</h3>
+                    <p className="text-white/50 text-xs mb-3">Disabled</p>
                     
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => modal.openModal()}
-                      className={`w-full py-2 px-3 rounded-lg font-bold text-xs transition-all duration-300 ${
-                        ((socialsData as any)?.telegram)
-                          ? 'bg-red-500/80 hover:bg-red-500/90 text-white backdrop-blur-sm'
-                          : 'bg-blue-500/80 hover:bg-blue-500/90 text-white backdrop-blur-sm'
-                      }`}
-                    >
-                      {((socialsData as any)?.telegram) ? '🔗 Unlink Account' : '🔗 Connect Telegram'}
-                    </motion.button>
+                    <div className="w-full py-2 px-3 rounded-lg font-bold text-xs bg-gray-500/50 text-white/50 cursor-not-allowed">
+                      🔒 Disabled
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -1080,13 +1072,11 @@ export default function MyCampPage() {
                   {/* Social Media Breakdown */}
                   <div className="mb-6">
                     <h5 className="text-lg font-bold text-blue-200 mb-4 text-center">Social Media Connections</h5>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4">
                       {[
                         { key: 'twitter', name: 'Twitter', icon: '🐦', color: 'text-blue-400' },
-                        { key: 'discord', name: 'Discord', icon: '🎮', color: 'text-purple-400' },
                         { key: 'spotify', name: 'Spotify', icon: '🎵', color: 'text-green-400' },
-                        { key: 'tiktok', name: 'TikTok', icon: '🎬', color: 'text-pink-400' },
-                        { key: 'telegram', name: 'Telegram', icon: '✈️', color: 'text-cyan-400' }
+                        { key: 'tiktok', name: 'TikTok', icon: '🎬', color: 'text-pink-400' }
                       ].map((platform) => (
                         <div key={platform.key} className="text-center bg-black/30 rounded-lg p-3">
                           <div className={`text-2xl mb-2 ${platform.color}`}>
@@ -1108,9 +1098,9 @@ export default function MyCampPage() {
                     <div className="bg-orange-500/20 rounded-lg p-4 text-center">
                       <div className="text-sm text-orange-200/70 mb-1">Your Status</div>
                       <div className="text-lg font-bold text-orange-200">
-                        {connectedSocialsCount}/5 platforms connected
+                        {connectedSocialsCount}/3 platforms connected
                       </div>
-                      {connectedSocialsCount === 5 && (
+                      {connectedSocialsCount === 3 && (
                         <div className="text-sm text-green-400 mt-1">
                           🎉 You're among the {globalStats.fullyConnectedUsers} MySphere users with all platforms connected!
                         </div>
@@ -1159,14 +1149,6 @@ export default function MyCampPage() {
                             />
                             <Line 
                               type="monotone" 
-                              dataKey="discord" 
-                              stroke="#7289DA" 
-                              strokeWidth={3}
-                              dot={{ fill: '#7289DA', strokeWidth: 2, r: 4 }}
-                              name="Discord"
-                            />
-                            <Line 
-                              type="monotone" 
                               dataKey="spotify" 
                               stroke="#1DB954" 
                               strokeWidth={3}
@@ -1180,14 +1162,6 @@ export default function MyCampPage() {
                               strokeWidth={3}
                               dot={{ fill: '#FF0050', strokeWidth: 2, r: 4 }}
                               name="TikTok"
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="telegram" 
-                              stroke="#0088CC" 
-                              strokeWidth={3}
-                              dot={{ fill: '#0088CC', strokeWidth: 2, r: 4 }}
-                              name="Telegram"
                             />
                           </LineChart>
                         </ResponsiveContainer>
@@ -1878,28 +1852,32 @@ export default function MyCampPage() {
           }}
         >
           {[
-            { key: 'twitter', name: 'Twitter', gradient: 'from-sky-500 to-blue-500' },
-            { key: 'discord', name: 'Discord', gradient: 'from-indigo-500 to-purple-500' },
-            { key: 'spotify', name: 'Spotify', gradient: 'from-green-500 to-emerald-500' },
-            { key: 'tiktok', name: 'TikTok', gradient: 'from-pink-500 to-rose-500' },
-            { key: 'telegram', name: 'Telegram', gradient: 'from-cyan-500 to-blue-500' }
+            { key: 'twitter', name: 'Twitter', gradient: 'from-sky-500 to-blue-500', available: true },
+            { key: 'spotify', name: 'Spotify', gradient: 'from-green-500 to-emerald-500', available: true },
+            { key: 'tiktok', name: 'TikTok', gradient: 'from-pink-500 to-rose-500', available: true }
                      ].map((social, index) => (
              <motion.button
                key={social.key}
                initial={{ opacity: 0, x: -20 }}
                animate={{ opacity: 1, x: 0 }}
                transition={{ delay: index * 0.05 }}
-               disabled={true}
-               className="w-full px-3 sm:px-4 py-3 text-left transition-all duration-200 text-orange-200/50 cursor-not-allowed backdrop-blur-[1px] relative overflow-hidden"
+               disabled={!social.available}
+               className={`w-full px-3 sm:px-4 py-3 text-left transition-all duration-200 relative overflow-hidden ${
+                 social.available 
+                   ? 'text-orange-200 hover:bg-white/10 cursor-pointer' 
+                   : 'text-orange-200/50 cursor-not-allowed backdrop-blur-[1px]'
+               }`}
              >
                <div className="flex items-center justify-between">
-                 <span className="font-medium blur-[0.5px] text-sm sm:text-base">{social.name}</span>
+                 <span className={`font-medium text-sm sm:text-base ${social.available ? '' : 'blur-[0.5px]'}`}>
+                   {social.name}
+                 </span>
                  <span className="text-xs text-orange-300/70 font-medium">
-                   Soon
+                   {social.available ? 'Available' : 'Disabled'}
                  </span>
                </div>
-               {/* Subtle overlay */}
-               <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>
+               {/* Subtle overlay for disabled items */}
+               {!social.available && <div className="absolute inset-0 bg-black/20 pointer-events-none"></div>}
              </motion.button>
            ))}
         </motion.div>,

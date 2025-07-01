@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useAuthState, useSocials } from '@campnetwork/sdk/react';
+import { useAuthState, useSocials } from '@campnetwork/origin/react';
 
 export default function SpotifyCallbackPage() {
   const router = useRouter();

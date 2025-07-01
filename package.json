@@ -17,7 +17,7 @@
     "contracts:test": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat test"
   },
   "dependencies": {
-    "@campnetwork/sdk": "^1.4.5",
+    "@campnetwork/origin": "^0.0.9",
     "@chainlink/contracts": "0.8.0",
     "@coinbase/onchainkit": "^0.37.8",
     "@coinbase/wallet-sdk": "^4.3.0",

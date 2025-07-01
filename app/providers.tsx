@@ -11,7 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
 import { defineChain } from 'viem';
 import { baseCampChain } from './contracts/BaseCampPostContract';
-import { CampProvider } from '@campnetwork/sdk/react';
+import { CampProvider } from '@campnetwork/origin/react';
 
 type ThemeMode = 'auto' | 'light' | 'dark';
 type ThemeStyle = 'default' | 'base' | 'cyberpunk' | 'hacker';

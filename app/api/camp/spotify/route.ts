@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SpotifyAPI } from '@campnetwork/sdk';
+import { SpotifyAPI } from '@campnetwork/origin';
 
 export async function GET(request: NextRequest) {
   try {

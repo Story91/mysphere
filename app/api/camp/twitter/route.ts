@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TwitterAPI } from '@campnetwork/sdk';
+import { TwitterAPI } from '@campnetwork/origin';
 
 export async function GET(request: NextRequest) {
   try {
