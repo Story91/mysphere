@@ -274,7 +274,7 @@ async function getCampNetworkTransactions() {
       let allTransactions = [];
       let nextPageParams = null;
       let pageCount = 0;
-      const maxPages = 50; // Zabezpieczenie przed nieskończoną pętlą
+      const maxPages = 500; // Zwiększone zabezpieczenie - pozwala na ~50,000 transakcji (100 tx/strona)
       
       console.log(`🔍 Pobieranie wszystkich transakcji dla kontraktu: ${contractAddress}`);
       
@@ -319,6 +319,7 @@ async function getCampNetworkTransactions() {
       
       const totalTransactions = allTransactions.length;
       console.log(`✅ Camp Network contract ${contractAddress}: ${totalTransactions} transactions (${pageCount} stron)`);
+      console.log(`📊 Zakończono pobieranie po ${pageCount} stronach${pageCount >= maxPages ? ' (osiągnięto limit stron)' : ' (wszystkie strony pobrane)'}`);
       
       if (totalTransactions === 0) {
         throw new Error('No transactions found');
