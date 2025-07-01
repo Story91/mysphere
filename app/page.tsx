@@ -274,7 +274,7 @@ async function getCampNetworkTransactions() {
       let allTransactions = [];
       let nextPageParams = null;
       let pageCount = 0;
-      const maxPages = 500; // Zwiększone zabezpieczenie - pozwala na ~50,000 transakcji (100 tx/strona)
+      const maxPages = 1000; // Zwiększone zabezpieczenie - pozwala na ~100,000 transakcji (100 tx/strona)
       
       console.log(`🔍 Pobieranie wszystkich transakcji dla kontraktu: ${contractAddress}`);
       
@@ -293,17 +293,11 @@ async function getCampNetworkTransactions() {
         const txCountResponse = await fetch(apiUrl);
         
         if (!txCountResponse.ok) {
-          console.warn(`❌ Błąd API dla strony ${pageCount + 1}: ${txCountResponse.status} - ${txCountResponse.statusText}`);
+          console.warn(`❌ Błąd API dla strony ${pageCount + 1}: ${txCountResponse.status}`);
           break;
         }
         
         const txData = await txCountResponse.json();
-        console.log(`🔍 Odpowiedź API strona ${pageCount + 1}:`, { 
-          hasItems: !!txData.items, 
-          itemsLength: txData.items?.length, 
-          hasNextPage: !!txData.next_page_params,
-          nextPageParams: txData.next_page_params ? 'exists' : 'null'
-        });
         
         if (txData && txData.items && Array.isArray(txData.items)) {
           allTransactions.push(...txData.items);
@@ -313,17 +307,11 @@ async function getCampNetworkTransactions() {
           console.log(`📄 Strona ${pageCount}: ${txData.items.length} transakcji, razem: ${allTransactions.length}`);
           
           // Sprawdź czy są następne strony
-          if (!nextPageParams) {
-            console.log(`🏁 Brak kolejnych stron - zakończono pobieranie po ${pageCount} stronach`);
-            break;
-          }
-          
-          if (pageCount >= maxPages) {
-            console.log(`⚠️ Osiągnięto maksymalny limit stron (${maxPages}) - przerywanie`);
+          if (!nextPageParams || pageCount >= maxPages) {
             break;
           }
         } else {
-          console.warn(`⚠️ Nieprawidłowa struktura danych na stronie ${pageCount + 1}:`, txData);
+          console.warn(`⚠️ Nieprawidłowa struktura danych na stronie ${pageCount + 1}`);
           break;
         }
         
@@ -343,17 +331,17 @@ async function getCampNetworkTransactions() {
       };
       
     } catch (error: unknown) {
-      // W przypadku błędu, używamy fallbackowych wartości - ZWIĘKSZONE na podstawie najnowszych danych
+      // W przypadku błędu, używamy fallbackowych wartości
       let fallbackTx = 0;
       if (contractAddress === "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E") {
-        fallbackTx = 2000; // Zwiększone z 77 - powinno być przynajmniej 2000+ transakcji
+        fallbackTx = 77; // Aktualizowane na podstawie rzeczywistych danych
       } else if (contractAddress === "0x1eD74B27f846C699A90926daD057A7f6FD22C126") {
-        fallbackTx = 500; // Zwiększone z 28 - powinno być przynajmniej 500+ transakcji
+        fallbackTx = 28;
       }
       
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`❌ Błąd pobierania danych Camp Network dla ${contractAddress}:`, error);
-      console.log(`🔄 Użyto fallbackowej liczby transakcji: ${fallbackTx} (zwiększone na podstawie najnowszych szacunków)`);
+      console.error(`Błąd pobierania danych Camp Network dla ${contractAddress}:`, error);
+      console.log(`Użyto fallbackowej liczby transakcji: ${fallbackTx}`);
       
       return { 
         address: contractAddress, 
@@ -364,7 +352,6 @@ async function getCampNetworkTransactions() {
   }
   
   // Pobierz dane dla wszystkich kontraktów Camp Network równolegle
-  console.log(`🔄 Rozpoczynam pobieranie danych dla ${campContractAddresses.length} kontraktów Camp Network...`);
   const campContractsData = await Promise.all(
     campContractAddresses.map(address => fetchCampContractData(address))
   );
@@ -374,15 +361,6 @@ async function getCampNetworkTransactions() {
     (sum, contract) => sum + (contract.transactions || 0), 
     0
   );
-  
-  console.log(`📊 Podsumowanie Camp Network:`, {
-    kontrakty: campContractsData.map(c => ({ 
-      address: c.address.slice(0, 10) + '...', 
-      transactions: c.transactions,
-      error: c.error ? 'TAK' : 'NIE' 
-    })),
-    totalTransactions: totalCampTransactions
-  });
   
   return {
     contracts: campContractsData,
@@ -438,6 +416,8 @@ export default function HomePage() {
   const [transactionsCount, setTransactionsCount] = useState(1340);
   const [campTransactionsCount, setCampTransactionsCount] = useState(73); // 45 + 28
   const [campNetworkData, setCampNetworkData] = useState<any>(null);
+  const [isCampDataRefreshing, setIsCampDataRefreshing] = useState(false);
+  const [campDataLastUpdated, setCampDataLastUpdated] = useState<string | null>(null);
   const [likesCount, setLikesCount] = useState(0);
   const [commentsCount, setCommentsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -458,6 +438,8 @@ export default function HomePage() {
       setUpdateTrigger(prev => ({...prev, [statType]: false}));
     }, 1000);
   };
+
+
 
   useEffect(() => {
     const fetchGlobalStats = async () => {
@@ -630,65 +612,83 @@ export default function HomePage() {
     // Pobierz dane o transakcjach tylko raz przy uruchomieniu strony
     fetchAndStoreContractData(setTransactionsCount);
     
+    // Funkcja do sprawdzania czy dane z cache są świeże (młodsze niż 1 godzina)
+    const isCacheDataFresh = (timestamp: string): boolean => {
+      const cacheTime = new Date(timestamp).getTime();
+      const currentTime = new Date().getTime();
+      const oneHour = 60 * 60 * 1000; // 1 godzina w milisekundach
+      return (currentTime - cacheTime) < oneHour;
+    };
+
     // Pobierz dane o transakcjach Camp Network
-    const fetchCampData = async () => {
+    const fetchCampData = async (forceRefresh: boolean = false) => {
       try {
-        // Próba odczytu danych z localStorage dla natychmiastowego wyświetlenia
-        try {
-          const cached = localStorage.getItem('campNetworkTransactions');
-          if (cached) {
-            const cachedData = JSON.parse(cached);
-            // Użyj danych z cache do pierwszego wyświetlenia
+        // Sprawdź cache
+        const cached = localStorage.getItem('campNetworkTransactions');
+        if (cached && !forceRefresh) {
+          const cachedData = JSON.parse(cached);
+          
+          // Sprawdź czy dane są świeże (młodsze niż 1 godzina)
+          if (cachedData.timestamp && isCacheDataFresh(cachedData.timestamp)) {
             setCampTransactionsCount(cachedData.totalTransactions);
             setCampNetworkData(cachedData);
-            
-            const lastUpdated = cachedData.lastUpdated ? new Date(cachedData.lastUpdated).toLocaleString() : 'nieznany';
-            const isFullScan = cachedData.fullScanCompleted ? '(pełny skan)' : '(częściowy)';
-            console.log(`🔄 Użyto danych Camp Network z cache: ${cachedData.totalTransactions} transakcji ${isFullScan}, ostatnia aktualizacja: ${lastUpdated}`);
+            setCampDataLastUpdated(cachedData.timestamp);
+            console.log('✅ Użyto świeżych danych Camp Network z cache (', new Date(cachedData.timestamp).toLocaleString(), ')');
+            console.log('📊 Liczba transakcji z cache:', cachedData.totalTransactions);
+            return; // WAŻNE: Zakończ tutaj, nie pobieraj nowych danych
+          } else {
+            // Dane są stare, ale użyj ich tymczasowo
+            setCampTransactionsCount(cachedData.totalTransactions);
+            setCampNetworkData(cachedData);
+            setCampDataLastUpdated(cachedData.timestamp);
+            console.log('📦 Cache wygasł, używam starych danych tymczasowo i pobieram nowe...');
           }
-        } catch (e) {
-          console.error('Błąd odczytu cache Camp Network:', e);
+        } else {
+          console.log('🔍 Brak cache lub wymuszono refresh, pobieranie danych...');
         }
         
-        // Pobierz świeże dane ze wszystkich stron
-        console.log('🚀 Rozpoczynam pobieranie świeżych danych Camp Network...');
+        // Pobierz świeże dane tylko jeśli:
+        // 1. Brak cache ALBO
+        // 2. Cache wygasł ALBO  
+        // 3. Wymuszono refresh
+        console.log('🔄 Pobieranie świeżych danych Camp Network (może to potrwać...)');
+        setIsCampDataRefreshing(true);
+        
         const campData = await getCampNetworkTransactions();
-        console.log('✅ Pobrano wszystkie dane Camp Network:', campData.totalTransactions, 'transakcji');
+        console.log('✅ Pobrano świeże dane Camp Network:', campData.totalTransactions, 'transakcji');
         
-        // Zapisz kompletne dane w localStorage z timestamp
-        const dataToSave = {
+        // Zapisz w localStorage z timestampem
+        const dataWithTimestamp = {
           ...campData,
-          lastUpdated: new Date().toISOString(),
-          fullScanCompleted: true
+          timestamp: new Date().toISOString()
         };
-        localStorage.setItem('campNetworkTransactions', JSON.stringify(dataToSave));
-        console.log('💾 Zapisano kompletne dane Camp Network w localStorage:', campData.totalTransactions, 'transakcji');
-        
-        // Sprawdzenie co faktycznie zostało zapisane
-        const verification = localStorage.getItem('campNetworkTransactions');
-        if (verification) {
-          const parsed = JSON.parse(verification);
-          console.log('✅ Weryfikacja localStorage - zapisano:', parsed.totalTransactions, 'transakcji');
-        }
+        localStorage.setItem('campNetworkTransactions', JSON.stringify(dataWithTimestamp));
         
         // Aktualizuj stan komponentu
         setCampTransactionsCount(campData.totalTransactions);
-        setCampNetworkData(dataToSave);
+        setCampNetworkData(dataWithTimestamp);
+        setCampDataLastUpdated(dataWithTimestamp.timestamp);
+        setIsCampDataRefreshing(false);
+        
       } catch (error) {
         console.error('❌ Błąd pobierania danych Camp Network:', error);
-        // W przypadku błędu użyj fallbackowej wartości ale nie nadpisuj localStorage
-        if (campTransactionsCount === 73) { // Tylko jeśli nie mamy lepszych danych
+        setIsCampDataRefreshing(false);
+        // W przypadku błędu użyj fallbackowej wartości tylko jeśli nie ma cache
+        const cached = localStorage.getItem('campNetworkTransactions');
+        if (!cached) {
+          console.log('🔧 Używam fallbackowej wartości (73 transakcji)');
           setCampTransactionsCount(73);
         }
       }
     };
-    fetchCampData();
+    
+    fetchCampData(); // Pierwszo wywołanie bez wymuszenia
     
     // Pobierz stan ETH
     fetchTotalEthBalance();
     
     const interval = setInterval(fetchData, 60000);
-    
+
     return () => {
       clearInterval(interval);
     };
@@ -1271,11 +1271,11 @@ export default function HomePage() {
               {/* Background glow effect */}
               <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-orange-500/30 rounded-full blur-3xl opacity-70 group-hover:opacity-90 transition-opacity"></div>
               
-              {/* NEW indicator badge */}
+              {/* Simple live indicator */}
               <div className="absolute top-3 right-3 flex items-center">
                 <span className="inline-flex items-center px-2 py-1 rounded-full bg-orange-500/20 border border-orange-400/30">
                   <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse mr-1"></span>
-                  <span className="text-orange-300 text-xs font-bold">NEW</span>
+                  <span className="text-orange-300 text-xs font-bold">LIVE</span>
                 </span>
               </div>
               
