@@ -2814,3 +2814,233 @@ export const clearMySphereData = async (): Promise<{success: boolean, deletedRec
 };
 
 // --- End MySphere Social Media Tracking Functions ---
+
+/*
+🔥 FIREBASE INDEXES REQUIRED 🔥
+
+Aby nowe funkcje optymalizacji działały poprawnie, musisz dodać te indeksy w Firebase Console:
+
+1. Collection: users
+   - Field: baseChatPoints.totalPoints (Descending)
+   - Field: __name__ (Ascending)
+
+2. Collection: users  
+   - Field: postsCount (Descending)
+   - Field: __name__ (Ascending)
+
+Instrukcje:
+1. Idź do Firebase Console > Firestore Database > Indexes
+2. Kliknij "Create Index"
+3. Dodaj powyższe indeksy
+
+Alternatywnie uruchom aplikację - Firebase automatycznie zasugeruje indeksy w konsoli.
+
+📊 OPTIMIZED FOR 1000 TOP USERS (vs previous 12k all users):
+- 92% reduction in Firebase reads (1000 vs 12k)
+- 5-minute cache TTL for fast repeat loads
+- Smart localStorage cache with timestamp validation
+- Admin can force refresh all 12k users via batch processing
+*/
+
+// Optymalizowana funkcja do pobierania tylko top użytkowników
+export const getTopActiveUsers = async (limit: number = 1000) => {
+  try {
+    console.log(`📊 Fetching top ${limit} active users...`);
+    
+    // Query użytkowników posortowanych po baseChatPoints.totalPoints
+    const usersRef = collection(db, 'users');
+    const topUsersQuery = query(
+      usersRef,
+      where('baseChatPoints.totalPoints', '>', 0),
+      firestoreOrderBy('baseChatPoints.totalPoints', 'desc'),
+      firestoreLimit(limit)
+    );
+    
+    const topUsersSnap = await getDocs(topUsersQuery);
+    
+    // Jeśli nie ma wystarczająco użytkowników z baseChatPoints, pobierz resztę
+    if (topUsersSnap.size < limit) {
+      const remainingLimit = limit - topUsersSnap.size;
+      const fallbackQuery = query(
+        usersRef,
+        where('postsCount', '>', 0),
+        firestoreOrderBy('postsCount', 'desc'),
+        firestoreLimit(remainingLimit)
+      );
+      
+      const fallbackSnap = await getDocs(fallbackQuery);
+      
+      // Połącz wyniki
+      const allUsers = [...topUsersSnap.docs, ...fallbackSnap.docs];
+      return allUsers;
+    }
+    
+    return topUsersSnap.docs;
+  } catch (error) {
+    console.error('Error fetching top active users:', error);
+    // Fallback - pobierz pierwszych {limit} użytkowników
+    const usersRef = collection(db, 'users');
+    const fallbackQuery = query(usersRef, firestoreLimit(limit));
+    const fallbackSnap = await getDocs(fallbackQuery);
+    return fallbackSnap.docs;
+  }
+};
+
+// Funkcja dla admina do force refresh rankingu wszystkich użytkowników
+export const refreshUserRankings = async (): Promise<{
+  success: boolean;
+  processedUsers: number;
+  updatedUsers: number;
+  error?: string;
+}> => {
+  try {
+    console.log('🔄 Starting full user rankings refresh...');
+    
+    const usersRef = collection(db, 'users');
+    const usersSnap = await getDocs(usersRef);
+    
+    let processedUsers = 0;
+    let updatedUsers = 0;
+    
+    // Przetwarzaj użytkowników w batches po 10
+    const batchSize = 10;
+    const userDocs = usersSnap.docs;
+    
+    for (let i = 0; i < userDocs.length; i += batchSize) {
+      const batch = userDocs.slice(i, i + batchSize);
+      
+      // Przetwórz batch równolegle
+      await Promise.all(batch.map(async (docSnapshot) => {
+        try {
+          const data = docSnapshot.data();
+          processedUsers++;
+          
+          // Oblicz punkty
+          const stats = {
+            posts: data.postsCount || 0,
+            likes: data.likesReceived || 0
+          };
+          const postPoints = stats.posts * 5;
+          const likePoints = stats.likes;
+          const basePoints = postPoints + likePoints;
+          const activityBonus = Math.round(basePoints * 0.25);
+          const totalPoints = basePoints + activityBonus;
+          
+          // Aktualizuj tylko jeśli punkty się zmieniły
+          const currentPoints = data.baseChatPoints?.totalPoints || 0;
+          if (Math.abs(currentPoints - totalPoints) > 1) {
+            const userRef = doc(db, 'users', docSnapshot.id);
+            await updateDoc(userRef, {
+              'baseChatPoints.postPoints': postPoints,
+              'baseChatPoints.likePoints': likePoints,
+              'baseChatPoints.activityBonus': activityBonus,
+              'baseChatPoints.totalPoints': totalPoints,
+              'baseChatPoints.lastUpdated': serverTimestamp()
+            });
+            updatedUsers++;
+          }
+        } catch (error) {
+          console.error(`Error processing user ${docSnapshot.id}:`, error);
+        }
+      }));
+      
+      // Krótka pauza między batch'ami
+      if (i + batchSize < userDocs.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Log progress co 100 użytkowników
+      if (processedUsers % 100 === 0) {
+        console.log(`📊 Processed ${processedUsers}/${userDocs.length} users...`);
+      }
+    }
+    
+    console.log(`✅ Rankings refresh completed: ${processedUsers} processed, ${updatedUsers} updated`);
+    
+    return {
+      success: true,
+      processedUsers,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('❌ Error refreshing user rankings:', error);
+    return {
+      success: false,
+      processedUsers: 0,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
+// Cache dla aktywnych użytkowników z TTL
+let cachedActiveUsers: any[] = [];
+let cacheTimestamp = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minut
+
+export const getCachedActiveUsers = async (limit: number = 1000, forceRefresh: boolean = false) => {
+  const now = Date.now();
+  
+  // Użyj cache jeśli jest świeży i nie force refresh
+  if (!forceRefresh && cachedActiveUsers.length > 0 && (now - cacheTimestamp) < CACHE_TTL) {
+    console.log('📋 Using cached active users (up to 1000)');
+    return cachedActiveUsers.slice(0, limit);
+  }
+  
+  console.log('🔄 Refreshing active users cache...');
+  
+  try {
+    const userDocs = await getTopActiveUsers(Math.min(limit * 1.2, 1200)); // Pobierz 20% więcej dla lepszego cache'u, max 1200
+    
+    const users = userDocs.map(docSnapshot => {
+      const data = docSnapshot.data();
+      const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
+      
+      let totalPoints = 0;
+      if (data.baseChatPoints && typeof data.baseChatPoints === 'object') {
+        totalPoints = data.baseChatPoints.totalPoints || 0;
+      } else {
+        const stats = {
+          posts: data.postsCount || 0,
+          likes: data.likesReceived || 0
+        };
+        const postPoints = stats.posts * 5;
+        const likePoints = stats.likes;
+        const basePoints = postPoints + likePoints;
+        const activityBonus = Math.round(basePoints * 0.25);
+        totalPoints = basePoints + activityBonus;
+      }
+      
+      const userName = data.name || (data.baseName ? `${data.baseName}.base.eth` : docSnapshot.id.slice(0, 6) + '...' + docSnapshot.id.slice(-4));
+      
+      return {
+        address: docSnapshot.id,
+        points: userName === 'vitalik.eth' ? 5000 : totalPoints,
+        stats: {
+          posts: data.postsCount || 0,
+          likes: data.likesReceived || 0
+        },
+        lastActive: lastActive,
+        name: userName,
+        avatar: data.avatar
+      };
+    });
+    
+    // Sortuj po punktach
+    const sortedUsers = users.sort((a, b) => {
+      if (a.name === 'vitalik.eth') return -1;
+      if (b.name === 'vitalik.eth') return 1;
+      return b.points - a.points;
+    });
+    
+    // Aktualizuj cache
+    cachedActiveUsers = sortedUsers;
+    cacheTimestamp = now;
+    
+    console.log(`✅ Active users cache updated: ${sortedUsers.length}/1000 users`);
+    return sortedUsers.slice(0, limit);
+  } catch (error) {
+    console.error('❌ Error updating active users cache:', error);
+    return cachedActiveUsers.slice(0, limit); // Zwróć stary cache w przypadku błędu
+  }
+};

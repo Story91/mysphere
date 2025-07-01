@@ -23,7 +23,8 @@ import {
   editComment,
   deleteComment,
   addCommentReply,
-  ADMIN_ADDRESS
+  ADMIN_ADDRESS,
+  getCachedActiveUsers
 } from '../utils/firebase';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
 import { Post, Comment, UserProfile, Stats } from '../types';
@@ -1138,15 +1139,23 @@ export default function BaseChat() {
   // Dodaj stan do śledzenia, czy można odświeżyć dane ręcznie
   const [canManuallyRefresh, setCanManuallyRefresh] = useState(true);
 
-  // Funkcja do szybkiego ładowania podstawowych danych
+  // Funkcja do szybkiego ładowania podstawowych danych z localStorage
   const loadInitialData = useCallback(() => {
     try {
       const cachedData = localStorage.getItem('activeUsers');
       const cachedNames = localStorage.getItem('userNames');
       
       if (cachedData) {
-        setActiveUsers(JSON.parse(cachedData));
-        setIsLoadingUsers(false);
+        const parsedUsers = JSON.parse(cachedData);
+        // Sprawdź czy cache nie jest za stary (max 10 minut)
+        const cacheTime = localStorage.getItem('usersCacheTime');
+        const isStale = !cacheTime || (Date.now() - parseInt(cacheTime)) > 10 * 60 * 1000;
+        
+        if (!isStale) {
+          setActiveUsers(parsedUsers);
+          setIsLoadingUsers(false);
+          console.log('📋 Loaded cached users data');
+        }
       }
         
       if (cachedNames) {
@@ -1157,103 +1166,48 @@ export default function BaseChat() {
     }
   }, []);
 
-  // Zmodyfikowana funkcja getActiveUsers
-  const getActiveUsers = useCallback(async () => {
+  // Zmodyfikowana funkcja getActiveUsers - teraz używa cache'u
+  const getActiveUsers = useCallback(async (forceRefresh: boolean = false) => {
     if (!db) return;
 
     try {
       setIsLoadingUsers(true);
-      setCanManuallyRefresh(false); // Zablokuj możliwość ręcznego odświeżania podczas pobierania danych
+      setCanManuallyRefresh(false);
       
-      const usersRef = collection(db, 'users');
-      const usersSnap = await getDocs(usersRef);
-
-      let vitalikAddress = '';
+      console.log(`🔄 Loading active users (force: ${forceRefresh})...`);
       
-      const users = await Promise.all(usersSnap.docs.map(async docSnapshot => {
-        const data = docSnapshot.data();
-
-        // Zmieniona obsługa lastActive
-        const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
-        
-        // Pobierz punkty bezpośrednio z struktury baseChatPoints
-        let totalPoints = 0;
-        if (data.baseChatPoints && typeof data.baseChatPoints === 'object') {
-          totalPoints = data.baseChatPoints.totalPoints || 0;
-        } else {
-          // Oblicz punkty jeśli struktura baseChatPoints nie istnieje
-          const stats = {
-            posts: data.postsCount || 0,
-            likes: data.likesReceived || 0
-          };
-          const postPoints = stats.posts * 5;
-          const likePoints = stats.likes;
-          const basePoints = postPoints + likePoints;
-          const activityBonus = Math.round(basePoints * 0.25);
-          totalPoints = basePoints + activityBonus;
-        }
-
-        // Aktualizuj nazwy użytkowników
-        const userName = data.name || (data.baseName ? `${data.baseName}.base.eth` : docSnapshot.id.slice(0, 6) + '...' + docSnapshot.id.slice(-4));
-        setUserNames(prev => ({
-          ...prev,
-          [docSnapshot.id]: {
-            name: userName,
-            avatar: data.avatar
-          }
-        }));
-        
-        // Sprawdź czy to Vitalik i zapisz jego adres
-        if (userName === 'vitalik.eth') {
-          vitalikAddress = docSnapshot.id;
-          // Natychmiast aktualizuj dane Vitalika w Firebase
-          try {
-            const userRef = doc(db, 'users', docSnapshot.id);
-            updateDoc(userRef, {
-              'baseChatPoints.totalPoints': 5000,
-              lastUpdated: serverTimestamp()
-            }).catch(error => console.error('Error updating Vitalik points in Firebase:', error));
-          } catch (err) {
-            console.error('Error updating Vitalik stats in Firebase:', err);
-          }
-        }
-
-        return {
-          address: docSnapshot.id,
-          points: userName === 'vitalik.eth' ? 5000 : totalPoints,
-          stats: {
-            posts: data.postsCount || 0,
-            likes: data.likesReceived || 0
-          },
-          lastActive: lastActive,
-          name: userName
+             // Użyj nowej funkcji z cache'em
+       const users = await getCachedActiveUsers(1000, forceRefresh);
+      
+      // Aktualizuj userNames
+      const userNamesUpdate: {[key: string]: {name: string, avatar?: string}} = {};
+      users.forEach(user => {
+        userNamesUpdate[user.address] = {
+          name: user.name,
+          avatar: user.avatar
         };
-      }));
-
-      // Sortuj użytkowników po punktach, stawiając Vitalika zawsze na pierwszym miejscu
-      const sortedUsers = users.sort((a, b) => {
-        // Jeśli a to Vitalik, powinien być na pierwszym miejscu
-        if (a.address === vitalikAddress) return -1;
-        // Jeśli b to Vitalik, powinien być na pierwszym miejscu
-        if (b.address === vitalikAddress) return 1;
-        // W przeciwnym razie normalne sortowanie po punktach
-        return b.points - a.points;
       });
+      
+      setUserNames(prev => ({
+        ...prev,
+        ...userNamesUpdate
+      }));
+      
+             // Zapisz do localStorage z timestampem
+       localStorage.setItem('activeUsers', JSON.stringify(users));
+       localStorage.setItem('userNames', JSON.stringify(userNamesUpdate));
+       localStorage.setItem('usersCacheTime', Date.now().toString());
 
-      // Zapisz do localStorage
-      localStorage.setItem('activeUsers', JSON.stringify(sortedUsers));
-      localStorage.setItem('userNames', JSON.stringify(userNames));
-
-      setActiveUsers(sortedUsers);
+      setActiveUsers(users);
       setIsLoadingUsers(false);
       setInitialRefreshDone(true);
       
-      // Pozwól na ręczne odświeżenie po 10 sekundach
+      // Pozwól na ręczne odświeżenie po 5 sekundach (skrócono z 10)
       setTimeout(() => {
         setCanManuallyRefresh(true);
-      }, 10000);
+      }, 5000);
       
-      console.log('Zaktualizowano listę aktywnych użytkowników:', sortedUsers.length);
+             console.log(`✅ Loaded ${users.length}/1000 active users from cache`);
     } catch (error) {
       console.error('Error fetching active users:', error);
       setIsLoadingUsers(false);
@@ -1261,18 +1215,18 @@ export default function BaseChat() {
     }
   }, [db]);
 
-  // Funkcja do ręcznego odświeżania danych
+  // Funkcja do ręcznego odświeżania danych z force refresh
   const handleManualRefresh = useCallback(() => {
     if (canManuallyRefresh) {
-      getActiveUsers();
+      getActiveUsers(true); // Force refresh when manually triggered
     }
   }, [canManuallyRefresh, getActiveUsers]);
 
   // Automatyczne odświeżanie przy pierwszym załadowaniu strony
   useEffect(() => {
     if (isMounted && !initialRefreshDone) {
-      // Pobierz aktualne dane z Firebase
-      getActiveUsers();
+      // Pobierz aktualne dane z Firebase (bez force refresh - użyj cache'u jeśli dostępny)
+      getActiveUsers(false);
       setInitialRefreshDone(true);
     }
   }, [isMounted, initialRefreshDone, getActiveUsers]);
@@ -1280,19 +1234,19 @@ export default function BaseChat() {
   // Automatyczne odświeżanie po zalogowaniu - symuluje kliknięcie przycisku Refresh
   useEffect(() => {
     if (isConnected && address) {
-      // Odśwież po 1 sekundzie od zalogowania
+      // Odśwież po 1 sekundzie od zalogowania (force refresh)
       const timer = setTimeout(() => {
-        getActiveUsers();
+        getActiveUsers(true);
       }, 1000);
       
       return () => clearTimeout(timer);
     }
   }, [isConnected, address, getActiveUsers]);
   
-  // Regularne odświeżanie co 2 minuty
+  // Regularne odświeżanie co 10 minut (zwiększono z 2 minut)
   useEffect(() => {
     if (isMounted) {
-      const refreshInterval = setInterval(getActiveUsers, 2 * 60 * 1000); // Co 2 minuty
+      const refreshInterval = setInterval(() => getActiveUsers(false), 10 * 60 * 1000); // Co 10 minut, używa cache'u
       
       // Cleanup dla interwału
       return () => {
@@ -1307,13 +1261,14 @@ export default function BaseChat() {
     setTrendingTags(trending);
   }, [posts]);
 
-  // useEffect do ustawienia isMounted
+  // useEffect do ustawienia isMounted i wczytania cache'u
   useEffect(() => {
     setIsMounted(true);
+    loadInitialData(); // Załaduj cache od razu
     return () => {
       setIsMounted(false);
     };
-  }, []);
+  }, [loadInitialData]);
 
   // Dodaj funkcję do tworzenia grupy
   const handleCreateGroup = async () => {

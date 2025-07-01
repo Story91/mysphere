@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { collection, query, getDocs, where, orderBy, limit, Timestamp, getDoc, doc } from 'firebase/firestore';
-import { db, updateAllUserJoinDates, addBaseNameBonusToAllUsers, fixBaseChatPointsRadical, refreshAllPosts, saveProfileName } from '../../utils/firebase';
+import { db, updateAllUserJoinDates, addBaseNameBonusToAllUsers, fixBaseChatPointsRadical, refreshAllPosts, saveProfileName, refreshUserRankings } from '../../utils/firebase';
 import { useName } from '@coinbase/onchainkit/identity';
 import { base } from 'wagmi/chains';
 
@@ -60,6 +60,8 @@ export default function Statistics() {
   const [isRefreshingBaseNames, setIsRefreshingBaseNames] = useState(false);
   const [refreshBaseNamesResult, setRefreshBaseNamesResult] = useState<{success: boolean, processedUsers: number, updatedUsers: number, error?: string} | null>(null);
   const [currentUserAddress, setCurrentUserAddress] = useState<string | null>(null);
+  const [isRefreshingUserRankings, setIsRefreshingUserRankings] = useState(false);
+  const [refreshUserRankingsResult, setRefreshUserRankingsResult] = useState<{success: boolean, processedUsers: number, updatedUsers: number, error?: string} | null>(null);
 
   useEffect(() => {
     fetchStats();
@@ -330,6 +332,26 @@ export default function Statistics() {
     }
   };
 
+  const handleRefreshUserRankings = async () => {
+    try {
+      setIsRefreshingUserRankings(true);
+      setRefreshUserRankingsResult(null);
+      
+      const result = await refreshUserRankings();
+      setRefreshUserRankingsResult(result);
+    } catch (error) {
+      console.error('Error refreshing user rankings:', error);
+      setRefreshUserRankingsResult({
+        success: false,
+        processedUsers: 0,
+        updatedUsers: 0,
+        error: error instanceof Error ? error.message : 'Nieznany błąd podczas odświeżania rankingu użytkowników'
+      });
+    } finally {
+      setIsRefreshingUserRankings(false);
+    }
+  };
+
   // Komponent do pobierania BaseName dla pojedynczego adresu
   function BaseNameFetcher() {
     const fallbackAddress = '0x0000000000000000000000000000000000000000';
@@ -515,6 +537,24 @@ export default function Statistics() {
             {isRefreshingBaseNames && currentUserAddress && (
               <div className="mt-2 p-2 bg-blue-100 text-blue-800 rounded">
                 Przetwarzanie: {currentUserAddress.slice(0, 8)}...{currentUserAddress.slice(-6)}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <button
+              onClick={handleRefreshUserRankings}
+              disabled={isRefreshingUserRankings}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+                             {isRefreshingUserRankings ? 'Odświeżanie rankingu...' : 'Odśwież ranking wszystkich użytkowników (12k+)'}
+            </button>
+            
+            {refreshUserRankingsResult && (
+              <div className={`mt-2 p-2 rounded ${refreshUserRankingsResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {refreshUserRankingsResult.success 
+                  ? `Sukces! Zaktualizowano ${refreshUserRankingsResult.updatedUsers} użytkowników.` 
+                  : `Błąd: ${refreshUserRankingsResult.error}`}
               </div>
             )}
           </div>
