@@ -57,6 +57,15 @@ export interface ProfileCardProps {
   onContactClick?: () => void;
 }
 
+// Dynamic font size calculation based on name length
+const getDynamicFontSize = (name: string) => {
+  const nameLength = name.length;
+  if (nameLength <= 10) return 'pc-name-short';
+  if (nameLength <= 15) return 'pc-name-medium';
+  if (nameLength <= 20) return 'pc-name-long';
+  return 'pc-name-extra-long';
+};
+
 const ProfileCardComponent: React.FC<ProfileCardProps> = ({
   avatarUrl = "/favicon_io (1)/android-chrome-192x1921.png",
   iconUrl,
@@ -435,7 +444,7 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
           </div>
           <div className="pc-content">
             <div className="pc-details">
-              <h3>{name}</h3>
+              <h3 className={getDynamicFontSize(name)}>{name}</h3>
               {title && <p>{title}</p>}
             </div>
           </div>

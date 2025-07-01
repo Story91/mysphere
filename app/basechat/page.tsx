@@ -2581,23 +2581,25 @@ export default function BaseChat() {
                                     <span>Username</span>
                                   </label>
                                   <div className="space-y-3">
-                                    <div className="flex items-center space-x-2">
+                                    <div className="space-y-2">
                                       <input
                                         type="text"
                                         value={customName}
                                         onChange={(e) => setCustomName(e.target.value)}
                                         placeholder="Enter username"
-                                        className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                       />
-                                      <span className="text-gray-500 text-sm">.</span>
-                                      <select
-                                        value={selectedSuffix}
-                                        onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper')}
-                                        className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      >
-                                        <option value="sphere">sphere</option>
-                                        <option value="camper">camper (+500 pts!)</option>
-                                      </select>
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-gray-500 text-sm">Choose domain:</span>
+                                        <select
+                                          value={selectedSuffix}
+                                          onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper')}
+                                          className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        >
+                                          <option value="sphere">.sphere</option>
+                                          <option value="camper">.camper (+500 pts!)</option>
+                                        </select>
+                                      </div>
                                     </div>
                                     <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-2 border border-blue-200/30 dark:border-purple-700/30">
                                       <div className="text-center text-xs text-gray-600 dark:text-gray-400">

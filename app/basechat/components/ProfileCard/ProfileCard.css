@@ -633,7 +633,7 @@
 .pc-details h3 {
   font-weight: 700;
   margin: 0;
-  font-size: min(3.5svh, 2.2em);
+  font-size: min(2.8svh, 1.4em);
   margin: 0;
   background-image: linear-gradient(to bottom, #ffffff, rgba(76, 143, 255, 0.9));
   background-size: 1em 1.5em;
@@ -642,6 +642,32 @@
   -webkit-background-clip: text;
   font-family: 'Coinbase Display', -apple-system, BlinkMacSystemFont, sans-serif;
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  max-width: 100%;
+  text-align: center;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Dynamic font sizing based on name length */
+.pc-name-short {
+  font-size: min(2.8svh, 1.4em) !important;
+}
+
+.pc-name-medium {
+  font-size: min(2.4svh, 1.2em) !important;
+}
+
+.pc-name-long {
+  font-size: min(2.0svh, 1.0em) !important;
+}
+
+.pc-name-extra-long {
+  font-size: min(1.6svh, 0.9em) !important;
 }
 
 .pc-details p {
@@ -787,11 +813,44 @@
   }
 }
 
-/* Responsive Design */
+/* Mobile Performance Optimizations */
 @media (max-width: 768px) {
   .pc-card {
     height: 70svh;
     max-height: 450px;
+    /* Disable heavy 3D effects on mobile */
+    transform: none !important;
+  }
+  
+  .pc-card:hover {
+    transform: none !important;
+  }
+  
+  .pc-shine,
+  .pc-shine::before,
+  .pc-shine::after {
+    display: none !important;
+  }
+  
+  .pc-glare {
+    display: none !important;
+  }
+  
+  .pc-card * {
+    will-change: auto !important;
+  }
+  
+  .pc-avatar-content::after {
+    display: none !important;
+  }
+  
+  .pc-avatar-content .avatar {
+    animation: none !important;
+  }
+  
+  .pc-card:hover .pc-avatar-content .avatar {
+    animation: none !important;
+    transform: none !important;
   }
 
   .pc-details {
@@ -800,7 +859,33 @@
   }
 
   .pc-details h3 {
-    font-size: min(4svh, 2.5em);
+    font-size: min(3.2svh, 1.8em);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    text-align: center;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* Dynamic font sizing for mobile */
+  .pc-name-short {
+    font-size: min(3.2svh, 1.8em) !important;
+  }
+
+  .pc-name-medium {
+    font-size: min(2.8svh, 1.5em) !important;
+  }
+
+  .pc-name-long {
+    font-size: min(2.4svh, 1.2em) !important;
+  }
+
+  .pc-name-extra-long {
+    font-size: min(2.0svh, 1.0em) !important;
   }
 
   .pc-details p {
@@ -918,7 +1003,33 @@
   }
   
   .pc-details h3 {
-    font-size: min(3.5vh, 2em);
+    font-size: min(2.8vh, 1.5em);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    text-align: center;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* Dynamic font sizing for desktop */
+  .pc-name-short {
+    font-size: min(2.8vh, 1.5em) !important;
+  }
+
+  .pc-name-medium {
+    font-size: min(2.4vh, 1.3em) !important;
+  }
+
+  .pc-name-long {
+    font-size: min(2.0vh, 1.1em) !important;
+  }
+
+  .pc-name-extra-long {
+    font-size: min(1.6vh, 0.9em) !important;
   }
   
   .pc-contact-btn {
@@ -964,6 +1075,24 @@
   .pc-card {
     height: 60svh;
     max-height: 380px;
+    /* Disable all animations for better performance */
+    transform: none !important;
+  }
+  
+  .pc-card:hover {
+    transform: none !important;
+  }
+  
+  .pc-shine,
+  .pc-shine::before,
+  .pc-shine::after,
+  .pc-glare {
+    display: none !important;
+  }
+  
+  .pc-card * {
+    will-change: auto !important;
+    animation: none !important;
   }
 
   .pc-details {
@@ -972,7 +1101,33 @@
   }
 
   .pc-details h3 {
-    font-size: min(3.5svh, 2em);
+    font-size: min(2.5svh, 1.3em);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    text-align: center;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* Dynamic font sizing for small screens */
+  .pc-name-short {
+    font-size: min(2.5svh, 1.3em) !important;
+  }
+
+  .pc-name-medium {
+    font-size: min(2.1svh, 1.1em) !important;
+  }
+
+  .pc-name-long {
+    font-size: min(1.8svh, 0.95em) !important;
+  }
+
+  .pc-name-extra-long {
+    font-size: min(1.5svh, 0.8em) !important;
   }
 
   .pc-details p {
@@ -1070,10 +1225,53 @@
   .pc-card {
     height: 55svh;
     max-height: 320px;
+    /* Maximum performance mode for very small screens */
+    transform: none !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  .pc-card:hover {
+    transform: none !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  .pc-card *,
+  .pc-card *::before,
+  .pc-card *::after {
+    animation: none !important;
+    transition: none !important;
+    will-change: auto !important;
+    transform: none !important;
   }
 
   .pc-details h3 {
-    font-size: min(3svh, 1.5em);
+    font-size: min(2.2svh, 1.1em);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    text-align: center;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* Dynamic font sizing for very small screens */
+  .pc-name-short {
+    font-size: min(2.2svh, 1.1em) !important;
+  }
+
+  .pc-name-medium {
+    font-size: min(1.9svh, 0.95em) !important;
+  }
+
+  .pc-name-long {
+    font-size: min(1.6svh, 0.8em) !important;
+  }
+
+  .pc-name-extra-long {
+    font-size: min(1.3svh, 0.7em) !important;
   }
 
   .pc-details p {
