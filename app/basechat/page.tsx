@@ -49,8 +49,9 @@ import TransactionButton from '../components/TransactionButton';
 import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
 import YapsMetrics from '../yapscan/components/YapsMetrics';
-import ProfileSocials from './components/ProfileSocials';
+
 import PostList, { ExtendedPost } from './components/PostList';
+import ProfileCard from './components/ProfileCard';
 import { HomeIcon, UserIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
 // Import Zora SDK functions
 import { createCoin, getCoinCreateFromLogs } from '@zoralabs/coins-sdk';
@@ -254,7 +255,7 @@ export default function BaseChat() {
   const [expandedUsersList, setExpandedUsersList] = useState(false);
   const [expandedTagsList, setExpandedTagsList] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(false);
+
   const [customName, setCustomName] = useState('');
   const [selectedSuffix, setSelectedSuffix] = useState<'sphere' | 'camper'>('sphere');
   const [userNames, setUserNames] = useState<{[key: string]: {name: string, avatar?: string}}>({});
@@ -284,6 +285,7 @@ export default function BaseChat() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showPostImagePreview, setShowPostImagePreview] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   
   // Hook do sprawdzania BaseName
   const { data: baseName, isLoading: isBaseNameLoading } = useName({ 
@@ -413,7 +415,6 @@ export default function BaseChat() {
         });
         
         // Wyczyść formularz
-        setIsEditingName(false);
         setCustomName('');
         setSelectedSuffix('sphere');
         
@@ -2392,185 +2393,359 @@ export default function BaseChat() {
                 <div className="mb-8">
                   {isConnected ? (
                     <div className="space-y-4">
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                        {/* Rank section moved and centered */}
-                        <div className="text-center mb-4">
-                          <div className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 text-transparent bg-clip-text static-gradient">
-                            {currentRank}
-                          </div>
-                          <div className="text-sm text-gray-500 mt-1">{RANK_DESCRIPTIONS[currentRank]}</div>
-              </div>
+                      {/* ProfileCard at the top */}
+                      {address && (
+                        <div className="mb-4">
+                          <ProfileCard
+                            name={userProfile.name || 'MySphere User'}
+                            handle={userProfile.name?.replace('.sphere', '').replace('.camper', '') || address.slice(0, 6) + '...' + address.slice(-4)}
+                            status={address.slice(0, 6) + '...' + address.slice(-4)}
+                            fullAddress={address}
+                            contactText="Edit"
+                            avatarUrl={userProfile.avatar || `/favicon_io (1)/android-chrome-192x1921.png`}
+                            miniAvatarUrl={userProfile.avatar}
+                            socialLinks={userProfile.socialLinks}
+                            showUserInfo={true}
+                            enableTilt={true}
+                            onContactClick={() => {
+                              setIsEditingProfile(!isEditingProfile);
+                            }}
+                            className="w-full max-w-sm mx-auto"
+                          />
+                        </div>
+                      )}
 
-                        {isConnected && userProfile && (
-                          <div className="mb-6">
-                            <div className="relative group">
-                              <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={async (e) => {
-                                  if (!e.target.files || !e.target.files[0] || !address) return;
-                                  
-                                  const file = e.target.files[0];
-                                  
-                                  // Sprawdź rozmiar pliku (max 1MB)
-                                  if (file.size > 1024 * 1024) {
-                                    setModalMessage('Maximum file size is 1MB');
-                                    setModalType('error');
-                                    setShowModal(true);
-                                    return;
-      }
-
-                                  // Sprawdź czy można zmienić zdjęcie
-                                  const userRef = doc(db, 'users', address);
-                                  const userDoc = await getDoc(userRef);
-                                  const userData = userDoc.data();
-
-                                  if (userData?.lastImageUpdate) {
-                                    const lastUpdate = userData.lastImageUpdate.toDate();
-                                    const oneMonthAgo = new Date();
-                                    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                                    
-                                    if (lastUpdate > oneMonthAgo) {
-                                      const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
-                                      const now = new Date();
-                                      const diff = timeToWait.getTime() - now.getTime();
-                                      
-                                      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                                      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                      
-                                      setModalMessage(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
-                                      setModalType('warning');
-                                      setShowModal(true);
-                                      return;
-                                    }
-                                  }
-
-                                  setSelectedFile(file);
-                                  setModalMessage('Are you sure you want to change your profile picture?\nNext change will be possible in one month.\nMaximum file size: 1MB');
-                                  setModalType('confirm');
-                                  setShowModal(true);
-                    }}
-                                accept="image/*"
-                                className="hidden"
-                              />
-                              <div 
-                                className="relative w-32 h-32 mx-auto mb-4 cursor-pointer group"
-                                onClick={() => fileInputRef.current?.click()}
-                  >
-                                {previewImage || userProfile.avatar ? (
-                                  <img
-                                    src={previewImage || userProfile.avatar}
-                                    alt="Profile"
-                                    className="w-32 h-32 rounded-full object-cover border-4 border-blue-500 group-hover:opacity-80 transition-opacity"
-                                  />
-                                ) : (
-                                  <Avatar address={address} className="w-32 h-32 rounded-full border-4 border-blue-500 group-hover:opacity-80 transition-opacity" />
-                                )}
-                                <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <span className="text-white text-sm">
-                                    {isUploading ? 'Uploading...' : 'Change Picture'}
-                            </span>
-                  </div>
-                  </div>
-                </div>
-                            {/* Reszta profilu */}
-              </div>
-              )}
-
-                          <div className="text-center">
-                            {isEditingName ? (
-                              <div className="space-y-3">
-                                <div className="flex items-center space-x-2">
-                                  <input
-                                    type="text"
-                                    value={customName}
-                                    onChange={(e) => setCustomName(e.target.value)}
-                                    placeholder="Enter username"
-                                    className="px-2 py-1 border rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 flex-1"
-                                  />
-                                  <span className="text-sm text-gray-500">.</span>
-                                  <select
-                                    value={selectedSuffix}
-                                    onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper')}
-                                    className="px-2 py-1 border rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600"
-                                  >
-                                    <option value="sphere">sphere</option>
-                                    <option value="camper">camper (+500 pts!)</option>
-                                  </select>
+                      {/* Modern Edit Profile Panel */}
+                      {isEditingProfile && address && (
+                        <div className="mb-3 relative">
+                          <div className="bg-gradient-to-br from-blue-50/80 via-white/50 to-purple-50/80 dark:from-blue-900/20 dark:via-gray-800/40 dark:to-purple-900/20 backdrop-blur-xl rounded-xl border border-blue-200/50 dark:border-blue-700/30 p-4 shadow-xl">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
                                 </div>
-                                <div className="text-xs text-center text-gray-500">
-                                  Preview: {customName || 'username'}.
-                                  <span className={selectedSuffix === 'sphere' ? 'text-blue-500' : 'text-orange-500'}>
-                                    {selectedSuffix}
-                                  </span>
-                                  {selectedSuffix === 'camper' && <span className="text-orange-600 ml-1">🏕️ +500 Base Points!</span>}
+                                <div>
+                                  <h3 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                    Edit Profile
+                                  </h3>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Customize your MySphere identity</p>
                                 </div>
-                                <div className="flex justify-center space-x-2">
-                        <button
-                                    onClick={handleSaveCustomName}
-                                    className="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
-                        >
-                                    Save
-                        </button>
-                        <button
-                                    onClick={() => {
-                                      setIsEditingName(false);
-                                      setCustomName('');
-                                      setSelectedSuffix('sphere');
+                              </div>
+                              <button
+                                onClick={() => setIsEditingProfile(false)}
+                                className="w-6 h-6 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
+                              >
+                                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+
+                            {/* Profile Picture Section */}
+                            {/* Profile Section - Grid Layout */}
+                            <div className="mb-4 grid grid-cols-2 gap-3">
+                              {/* Profile Picture */}
+                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                                  <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  <span>Profile Picture</span>
+                                </label>
+                                <div className="flex flex-col items-center space-y-2">
+                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-blue-200 dark:border-blue-700">
+                                    {userProfile.avatar ? (
+                                      <img
+                                        src={userProfile.avatar}
+                                        alt="Current profile"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 to-purple-900 flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-center">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={async (e) => {
+                                        if (!e.target.files || !e.target.files[0] || !address) return;
+                                        
+                                        const file = e.target.files[0];
+                                        
+                                        if (file.size > 1024 * 1024) {
+                                          alert('Maximum file size is 1MB');
+                                          return;
+                                        }
+
+                                        const userRef = doc(db, 'users', address);
+                                        const userDoc = await getDoc(userRef);
+                                        const userData = userDoc.data();
+
+                                        if (userData?.lastImageUpdate) {
+                                          const lastUpdate = userData.lastImageUpdate.toDate();
+                                          const oneMonthAgo = new Date();
+                                          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                                          
+                                          if (lastUpdate > oneMonthAgo) {
+                                            const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
+                                            const now = new Date();
+                                            const diff = timeToWait.getTime() - now.getTime();
+                                            
+                                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                            
+                                            alert(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
+                                            return;
+                                          }
+                                        }
+
+                                        setSelectedFile(file);
+                                        setModalMessage('Are you sure you want to change your profile picture?\nNext change will be possible in one month.\nMaximum file size: 1MB');
+                                        setModalType('confirm');
+                                        setShowModal(true);
+                                      }}
+                                      className="hidden"
+                                      id="profile-picture-input"
+                                    />
+                                    <label
+                                      htmlFor="profile-picture-input"
+                                      className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all cursor-pointer text-xs font-medium shadow-md"
+                                    >
+                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                      </svg>
+                                      Upload
+                                    </label>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      Max 1MB
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Upgrade Your Card */}
+                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                                  <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                  </svg>
+                                  <span>Card Upgrade</span>
+                                </label>
+                                <div className="flex flex-col items-center space-y-2">
+                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-orange-200 dark:border-orange-700 bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-900 dark:to-yellow-900 flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                    </svg>
+                                  </div>
+                                  <div className="flex flex-col items-center">
+                                    <div className="relative group">
+                                      <button
+                                        className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-lg hover:from-orange-600 hover:to-yellow-600 transition-all cursor-pointer text-xs font-medium shadow-md opacity-75 cursor-not-allowed"
+                                        disabled
+                                      >
+                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                        </svg>
+                                        Upgrade Your Card
+                                      </button>
+                                      {/* Tooltip */}
+                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                        soon
+                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">
+                                      Premium features
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Username Section - only if no baseName */}
+                            {!baseName && (
+                              <div className="mb-4">
+                                <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
+                                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                                    <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span>Username</span>
+                                  </label>
+                                  <div className="space-y-3">
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="text"
+                                        value={customName}
+                                        onChange={(e) => setCustomName(e.target.value)}
+                                        placeholder="Enter username"
+                                        className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      />
+                                      <span className="text-gray-500 text-sm">.</span>
+                                      <select
+                                        value={selectedSuffix}
+                                        onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper')}
+                                        className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      >
+                                        <option value="sphere">sphere</option>
+                                        <option value="camper">camper (+500 pts!)</option>
+                                      </select>
+                                    </div>
+                                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-2 border border-blue-200/30 dark:border-purple-700/30">
+                                      <div className="text-center text-xs text-gray-600 dark:text-gray-400">
+                                        Preview: <span className="font-medium text-gray-900 dark:text-white">{customName || 'username'}</span>.
+                                        <span className={selectedSuffix === 'sphere' ? 'text-blue-500 font-medium' : 'text-orange-500 font-medium'}>
+                                          {selectedSuffix}
+                                        </span>
+                                        {selectedSuffix === 'camper' && <span className="text-orange-600 ml-1">🏕️ +500 pts!</span>}
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={handleSaveCustomName}
+                                      className="w-full px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs"
+                                    >
+                                      Save Username
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Social Links Section */}
+                            <div className="mb-4">
+                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                                  <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  </svg>
+                                  <span>Social Links</span>
+                                </label>
+                                <div className="space-y-2">
+                                  {/* Twitter */}
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                      <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">X (Twitter)</label>
+                                      <input
+                                        type="text"
+                                        value={userProfile.socialLinks?.twitter || ''}
+                                        onChange={(e) => setUserProfile(prev => ({
+                                          ...prev,
+                                          socialLinks: {
+                                            ...prev.socialLinks,
+                                            twitter: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="username"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Farcaster */}
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                      <img src="/icon.png" alt="Farcaster" className="w-4 h-4" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Farcaster/Warpcast</label>
+                                      <input
+                                        type="text"
+                                        value={userProfile.socialLinks?.farcaster || ''}
+                                        onChange={(e) => setUserProfile(prev => ({
+                                          ...prev,
+                                          socialLinks: {
+                                            ...prev.socialLinks,
+                                            farcaster: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="username"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Discord */}
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-lg flex items-center justify-center">
+                                      <svg className="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/>
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Discord</label>
+                                      <input
+                                        type="text"
+                                        value={userProfile.socialLinks?.discord || ''}
+                                        onChange={(e) => setUserProfile(prev => ({
+                                          ...prev,
+                                          socialLinks: {
+                                            ...prev.socialLinks,
+                                            discord: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="username"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    onClick={async () => {
+                                      if (!address) return;
+                                      
+                                      try {
+                                        const userRef = doc(db, 'users', address);
+                                        await updateDoc(userRef, {
+                                          socialLinks: userProfile.socialLinks || {},
+                                          lastUpdated: serverTimestamp()
+                                        });
+                                        
+                                        alert('Social links saved successfully!');
+                                      } catch (error) {
+                                        console.error('Error saving social links:', error);
+                                        alert('Error saving social links. Please try again.');
+                                      }
                                     }}
-                                    className="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600"
-                        >
-                                    Cancel
+                                    className="w-full px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all font-medium text-xs"
+                                  >
+                                    Save Social Links
                                   </button>
                                 </div>
                               </div>
-                            ) : (
-                              <div className="flex items-center justify-center space-x-2">
-                                <span className={`${isBaseName(userProfile.name) ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold animate-pulse' : 'text-gray-900 dark:text-white'}`}>
-                                  {userProfile.name.endsWith('.sphere') ? (
-                                    <>
-                                      <span className="text-gray-900 dark:text-white">{userProfile.name.replace('.sphere', '')}</span>
-                                      <span className="text-blue-500">.sphere</span>
-                                    </>
-                                                     ) : userProfile.name.endsWith('.camper') ? (
-                     <>
-                       <span className="text-gray-900 dark:text-white">{userProfile.name.replace('.camper', '')}</span>
-                       <span className="text-orange-500">.camper🏕️</span>
-                     </>
-                   ) : (
-                                    userProfile.name
-                                  )}
-                                </span>
-                                {!baseName && (
-                                  <button
-                                    onClick={() => setIsEditingName(true)}
-                                    className="text-sm text-blue-500 hover:text-blue-600"
-                                  >
-                                    ✏️
-                        </button>
-                      )}
-                    </div>
-                            )}
-                            <div className="text-sm text-gray-500 break-all mt-2">
-                              <Address address={address} />
-                              {address && (
-                                <ProfileSocials 
-                                  address={address}
-                                  initialLinks={userProfile.socialLinks}
-                                  lazyLoad={false} // User's own profile, load immediately
-                                  isOwner={true}
-                                  onSave={(newLinks) => {
-                                    console.log("Updating userProfile with new social links:", newLinks);
-                                    setUserProfile(prev => ({
-                                      ...prev,
-                                      socialLinks: newLinks
-                                    }));
-                                  }}
-                                />
-                              )}
                             </div>
-              </div>
-            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => setIsEditingProfile(false)}
+                                className="flex-1 px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs flex items-center justify-center space-x-1"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span>Done</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+
+
+
 
                       {/* YapYap Integration - moved outside About Me */}
                       {address && (
