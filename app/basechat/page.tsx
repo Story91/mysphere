@@ -24,7 +24,8 @@ import {
   deleteComment,
   addCommentReply,
   ADMIN_ADDRESS,
-  getCachedActiveUsers
+  getCachedActiveUsers,
+  searchUsers
 } from '../utils/firebase';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
 import { Post, Comment, UserProfile, Stats } from '../types';
@@ -50,7 +51,7 @@ import { toast } from 'react-hot-toast';
 import YapsMetrics from '../yapscan/components/YapsMetrics';
 import ProfileSocials from './components/ProfileSocials';
 import PostList, { ExtendedPost } from './components/PostList';
-import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
+import { HomeIcon, UserIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
 // Import Zora SDK functions
 import { createCoin, getCoinCreateFromLogs } from '@zoralabs/coins-sdk';
 // Import Viem types
@@ -1267,6 +1268,10 @@ export default function BaseChat() {
     loadInitialData(); // Załaduj cache od razu
     return () => {
       setIsMounted(false);
+      // Cleanup search timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
     };
   }, [loadInitialData]);
 
@@ -1871,6 +1876,66 @@ export default function BaseChat() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showAllUsers, setShowAllUsers] = useState(false);
   const usersPerPage = 10;
+
+  // Stany dla wyszukiwarki użytkowników
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isBaseChatPointsExpanded, setIsBaseChatPointsExpanded] = useState(true);
+  const [isSearchingAll, setIsSearchingAll] = useState(false);
+
+  // Ref dla debounce timer
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Funkcja do wyszukiwania użytkowników z debounce
+  const handleUserSearch = useCallback(async (query: string, forceSearchAll: boolean = false) => {
+    setUserSearchQuery(query);
+    
+    if (!query.trim()) {
+      setSearchResults([]);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      return;
+    }
+    
+    if (query.length < 2) {
+      setSearchResults([]);
+      return; // Wyszukuj dopiero od 2 znaków
+    }
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Decide whether to search all users
+    const searchAll = forceSearchAll || isSearchingAll;
+    
+    // Set new timeout for debounce (300ms for quick search, 500ms for full search)
+    const debounceTime = searchAll ? 500 : 300;
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        setIsSearching(true);
+        const results = await searchUsers(query, 5, searchAll);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Error searching users:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, debounceTime);
+  }, [isSearchingAll]);
+
+  // Funkcja do przełączania trybu wyszukiwania
+  const toggleSearchMode = useCallback(() => {
+    setIsSearchingAll(!isSearchingAll);
+    // Jeśli jest aktywne wyszukiwanie, wyszukaj ponownie w nowym trybie
+    if (userSearchQuery.trim() && userSearchQuery.length >= 2) {
+      handleUserSearch(userSearchQuery, !isSearchingAll);
+    }
+  }, [isSearchingAll, userSearchQuery, handleUserSearch]);
 
   // Funkcja renderująca pusty element listy
   const renderEmptyItem = (index: number) => (
@@ -3126,97 +3191,260 @@ export default function BaseChat() {
                 </div>
               </div>
 
-              {/* BaseChat Points */}
+              {/* BaseChat Points - Collapsible */}
               {isConnected && (
                 <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 static-gradient"></div>
                   
-                  <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100 flex items-center">
-                    BaseChat Points
-                    <div className="ml-2 text-3xl animate-bounce">⚡</div>
-                  </h2>
+                  <button
+                    onClick={() => setIsBaseChatPointsExpanded(!isBaseChatPointsExpanded)}
+                    className="w-full flex items-center justify-between text-left hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg transition-all duration-300"
+                  >
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+                      BaseChat Points
+                      <div className="ml-2 text-3xl animate-bounce">⚡</div>
+                    </h2>
+                    {isBaseChatPointsExpanded ? (
+                      <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                    ) : (
+                      <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                    )}
+                  </button>
 
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg">
-                      <span className="text-gray-500 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Posts
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-gray-400">{userProfile.postCount} × 5</span>
-                        <span className="text-blue-500 font-semibold">{userProfile.postCount * 5}</span>
+                  {isBaseChatPointsExpanded && (
+                    <div className="mt-3 space-y-3">
+                      <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg">
+                        <span className="text-gray-500 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Posts
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-400">{userProfile.postCount} × 5</span>
+                          <span className="text-blue-500 font-semibold">{userProfile.postCount * 5}</span>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg">
-                      <span className="text-gray-500 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                        Likes Received
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-gray-400">{userProfile.likesReceived} × 1</span>
-                        <span className="text-pink-500 font-semibold">{userProfile.likesReceived}</span>
+                      <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg">
+                        <span className="text-gray-500 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                          Likes Received
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-400">{userProfile.likesReceived} × 1</span>
+                          <span className="text-pink-500 font-semibold">{userProfile.likesReceived}</span>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg">
-                      <span className="text-gray-500 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        Activity Bonus
-                                  </span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-gray-400">+25%</span>
-                        <span className="text-purple-500 font-semibold">
-                          {Math.round((userProfile.postCount * 5 + userProfile.likesReceived) * 0.25)}
-                                  </span>
-                                </div>
-                    </div>
+                      <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg">
+                        <span className="text-gray-500 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          Activity Bonus
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-400">+25%</span>
+                          <span className="text-purple-500 font-semibold">
+                            {Math.round((userProfile.postCount * 5 + userProfile.likesReceived) * 0.25)}
+                          </span>
+                        </div>
+                      </div>
 
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-10 rounded-lg"></div>
-                      <div className="flex items-center justify-between p-3 relative">
-                        <span className="text-gray-700 dark:text-gray-300 font-bold">Total Score</span>
-                        <div className="flex items-center">
-                          <div className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text animate-pulse">
-                            {Math.round((userProfile.postCount * 5 + userProfile.likesReceived) * 1.25)}
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-10 rounded-lg"></div>
+                        <div className="flex items-center justify-between p-3 relative">
+                          <span className="text-gray-700 dark:text-gray-300 font-bold">Total Score</span>
+                          <div className="flex items-center">
+                            <div className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text animate-pulse">
+                              {Math.round((userProfile.postCount * 5 + userProfile.likesReceived) * 1.25)}
+                            </div>
+                            <div className="ml-2 text-lg">✨</div>
                           </div>
-                          <div className="ml-2 text-lg">✨</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 text-sm text-gray-400">
+                        <div className="p-3 bg-gray-100 dark:bg-gray-600 rounded-lg">
+                          <div className="font-medium text-gray-700 dark:text-gray-200 mb-2 flex items-center">
+                            BaseBook Tips
+                            <span className="ml-2">💡</span>
+                          </div>
+                          <ul className="space-y-2">
+                            <li className="flex items-center text-xs">
+                              <span className="mr-2">🎯</span>
+                              Share your Base journey and experiences
+                            </li>
+                            <li className="flex items-center text-xs">
+                              <span className="mr-2">🤝</span>
+                              Engage with other Base enthusiasts
+                            </li>
+                            <li className="flex items-center text-xs">
+                              <span className="mr-2">🌟</span>
+                              Stay active to unlock special features
+                            </li>
+                          </ul>
+                          <div className="mt-2 text-xs italic text-gray-500">Building the Base community together!</div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+                </div>
+              )}
 
-                  <div className="mt-4 text-sm text-gray-400">
-                    <div className="p-3 bg-gray-100 dark:bg-gray-600 rounded-lg">
-                      <div className="font-medium text-gray-700 dark:text-gray-200 mb-2 flex items-center">
-                        BaseBook Tips
-                        <span className="ml-2">💡</span>
-                      </div>
-                      <ul className="space-y-2">
-                        <li className="flex items-center text-xs">
-                          <span className="mr-2">🎯</span>
-                          Share your Base journey and experiences
-                        </li>
-                        <li className="flex items-center text-xs">
-                          <span className="mr-2">🤝</span>
-                          Engage with other Base enthusiasts
-                        </li>
-                        <li className="flex items-center text-xs">
-                          <span className="mr-2">🌟</span>
-                          Stay active to unlock special features
-                        </li>
-                      </ul>
-                      <div className="mt-2 text-xs italic text-gray-500">Building the Base community together!</div>
-                              </div>
-                          </div>
-                      </div>
-                    )}
+              {/* User Search */}
+              <div className="mb-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-transparent bg-clip-text flex items-center">
+                    Search Users
+                    <div className="ml-2 text-2xl">🔍</div>
+                  </h2>
+                  
+                  <button
+                    onClick={toggleSearchMode}
+                    className={`px-3 py-1 text-xs rounded-full transition-all duration-300 ${
+                      isSearchingAll
+                        ? 'bg-orange-500 text-white hover:bg-orange-600'
+                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                    }`}
+                  >
+                    {isSearchingAll ? '🌐 All Users' : '⚡ Quick Search'}
+                  </button>
+                </div>
+                
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={userSearchQuery}
+                    onChange={(e) => handleUserSearch(e.target.value)}
+                    placeholder={isSearchingAll 
+                      ? "Searching all 12k+ users..." 
+                      : "Search by address, .eth, .sphere, .camper..."
+                    }
+                    className={`w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent text-gray-900 dark:text-gray-100 placeholder-gray-500 ${
+                      isSearchingAll 
+                        ? 'focus:ring-orange-500 border-orange-200 dark:border-orange-600' 
+                        : 'focus:ring-purple-500'
+                    }`}
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <RefreshCw className={`w-4 h-4 animate-spin ${isSearchingAll ? 'text-orange-500' : 'text-purple-500'}`} />
+                    </div>
+                  )}
+                </div>
+                
+                {/* Search Mode Info */}
+                <div className="mt-2 text-xs text-gray-500 flex items-center">
+                  {isSearchingAll ? (
+                    <>
+                      <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
+                      Searching all Firebase users (may take longer)
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
+                      Quick search in top 1000 active users
+                    </>
+                  )}
+                </div>
+
+                                 {/* Search Results */}
+                 {userSearchQuery && (
+                   <div className="mt-4 space-y-2">
+                     {searchResults.length > 0 ? (
+                       <>
+                         {/* Results Header */}
+                         <div className="flex items-center justify-between px-2 py-1">
+                           <div className="text-xs text-gray-500">
+                             Found {searchResults.length} user{searchResults.length !== 1 ? 's' : ''}
+                           </div>
+                           <div className="text-xs text-gray-400">
+                             {isSearchingAll ? '🌐 All users' : '⚡ Top 1k'}
+                           </div>
+                         </div>
+                         
+                         {/* Results List */}
+                         {searchResults.map((user, index) => (
+                           <button
+                             key={user.address}
+                             onClick={() => handleViewBuilderProfile(user.address)}
+                             className={`w-full flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-300 group border-l-4 ${
+                               isSearchingAll 
+                                 ? 'border-orange-300 hover:border-orange-500' 
+                                 : 'border-purple-300 hover:border-purple-500'
+                             }`}
+                           >
+                             <div className="w-10 h-10 flex-shrink-0">
+                               {user.avatar ? (
+                                 <img
+                                   src={user.avatar}
+                                   alt="Profile"
+                                   className="w-10 h-10 rounded-full object-cover"
+                                 />
+                               ) : (
+                                 <Avatar address={toEthereumAddress(user.address)} className="w-10 h-10 rounded-full" />
+                               )}
+                             </div>
+                             <div className="ml-3 flex-1 text-left">
+                               <div className={`font-medium text-gray-900 dark:text-gray-100 transition-colors ${
+                                 isSearchingAll 
+                                   ? 'group-hover:text-orange-500' 
+                                   : 'group-hover:text-purple-500'
+                               }`}>
+                                 {user.name}
+                               </div>
+                               <div className="text-xs text-gray-500 flex items-center mt-1">
+                                 <span>{user.totalPoints || 0} pts</span>
+                                 <span className="mx-2">•</span>
+                                 <span>{user.postsCount || 0} posts</span>
+                               </div>
+                             </div>
+                             <div className={`text-gray-400 transition-colors ${
+                               isSearchingAll 
+                                 ? 'group-hover:text-orange-500' 
+                                 : 'group-hover:text-purple-500'
+                             }`}>
+                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                               </svg>
+                             </div>
+                           </button>
+                         ))}
+                       </>
+                     ) : userSearchQuery.length >= 2 && !isSearching ? (
+                       <div className="text-center py-4 text-gray-500">
+                         <div className="mb-2">No users found matching "{userSearchQuery}"</div>
+                         {!isSearchingAll && (
+                           <button
+                             onClick={() => handleUserSearch(userSearchQuery, true)}
+                             className="text-xs text-orange-500 hover:text-orange-600 underline"
+                           >
+                             Try searching all 12k+ users instead?
+                           </button>
+                         )}
+                       </div>
+                     ) : userSearchQuery.length >= 2 && isSearching ? (
+                       <div className="text-center py-4 text-gray-500">
+                         <div className="flex items-center justify-center space-x-2">
+                           <RefreshCw className={`w-4 h-4 animate-spin ${isSearchingAll ? 'text-orange-500' : 'text-purple-500'}`} />
+                           <span>
+                             {isSearchingAll ? 'Searching all users...' : 'Searching top users...'}
+                           </span>
+                         </div>
+                       </div>
+                     ) : userSearchQuery.length > 0 && userSearchQuery.length < 2 ? (
+                       <div className="text-center py-4 text-gray-500 text-sm">
+                         Type at least 2 characters to search
+                       </div>
+                     ) : null}
+                   </div>
+                 )}
+              </div>
 
               {/* Most Active Users */}
               <div className="mb-4 relative z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">

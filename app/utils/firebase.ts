@@ -1290,47 +1290,402 @@ export const saveUserAvatar = async (address: string, avatarUrl: string) => {
   });
 };
 
-// Funkcje do obsługi wiadomości bezpośrednich
-export const searchUsers = async (searchQuery?: string) => {
-  const usersRef = collection(db, 'users');
-  let usersQuery;
+// Cache dla wyszukiwania użytkowników (TTL 10 minut)
+let userSearchCache: { [key: string]: { results: any[], timestamp: number } } = {};
+const USER_SEARCH_CACHE_TTL = 10 * 60 * 1000; // 10 minut
+
+// Funkcje do obsługi wiadomości bezpośrednich - hybrydowa wyszukiwarka
+export const searchUsers = async (
+  searchQuery: string, 
+  limit: number = 5, 
+  searchAll: boolean = false
+): Promise<{
+  address: string;
+  name?: string;
+  avatar?: string;
+  totalPoints?: number;
+  postsCount?: number;
+  likesReceived?: number;
+}[]> => {
+  if (!searchQuery.trim()) return [];
   
-  if (searchQuery && searchQuery.trim() !== '') {
-    // Wyszukiwanie użytkowników po nazwie
-    usersQuery = query(
-      usersRef,
-      where('name', '>=', searchQuery),
-      where('name', '<=', searchQuery + '\uf8ff'),
-      firestoreLimit(10)
-    );
-  } else {
-    // Pobierz wszystkich użytkowników z BaseName i wybierz losowych 10
-    usersQuery = query(
-      usersRef,
-      where('isBaseName', '==', true),
-      firestoreLimit(50) // Pobieramy więcej, żeby potem wylosować z nich 10
-    );
+  const searchTerm = searchQuery.toLowerCase().trim();
+  const cacheKey = `${searchTerm}_${limit}_${searchAll}`;
+  
+  // Sprawdź cache
+  if (userSearchCache[cacheKey] && Date.now() - userSearchCache[cacheKey].timestamp < USER_SEARCH_CACHE_TTL) {
+    console.log(`📋 Using cached search results for: "${searchTerm}" (searchAll: ${searchAll})`);
+    return userSearchCache[cacheKey].results;
   }
   
-  const snapshot = await getDocs(usersQuery);
-  let users = snapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      name: data.name,
-      address: data.address,
-      isBaseName: true
+  try {
+    console.log(`🔍 Searching users for: "${searchQuery}" -> normalized: "${searchTerm}" (searchAll: ${searchAll})`);
+    
+    const usersRef = collection(db, 'users');
+    let matchedUsers: any[] = [];
+    
+    if (searchAll) {
+      // PEŁNE WYSZUKIWANIE - przeszukaj całą bazę Firebase (12k+ użytkowników)
+      console.log('🌐 Performing full Firebase search...');
+      
+      try {
+        // Strategia 1: Jeśli wygląda jak adres, spróbuj bezpośredniego dostępu do dokumentu
+        if (searchTerm.startsWith('0x') && searchTerm.length >= 6) {
+          console.log(`🎯 Direct address search for: ${searchTerm}`);
+          
+          // Spróbuj różne case variations dla exact match
+          const addressVariations = [
+            searchQuery.trim(), // Oryginalna wersja
+            searchQuery.trim().toLowerCase(), // lowercase
+            searchQuery.trim().toUpperCase(), // uppercase
+          ];
+          
+          // Jeśli to pełny adres (42 znaki), spróbuj dokładnego dopasowania
+          if (searchQuery.trim().length === 42) {
+            for (const addressVariation of addressVariations) {
+              try {
+                const userDocRef = doc(db, 'users', addressVariation);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                  const userData = userDoc.data();
+                  matchedUsers.push({
+                    address: userDoc.id,
+                    name: userData.name || userData.displayName || `${userDoc.id.slice(0, 6)}...${userDoc.id.slice(-4)}`,
+                    avatar: userData.avatar,
+                    totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
+                    postsCount: userData.postsCount || 0,
+                    likesReceived: userData.likesReceived || 0
+                  });
+                  console.log(`✅ Found exact document match: ${userDoc.id}`);
+                  break; // Znaleziony, przerwij pętlę
+                }
+              } catch (error) {
+                console.log(`Direct doc access failed for ${addressVariation}:`, error);
+              }
+            }
+          }
+          
+          // Jeśli nie znaleziono exact match, spróbuj range queries
+          if (matchedUsers.length === 0) {
+            // Spróbuj range query z różnymi case variations
+            for (const addressVariation of addressVariations) {
+              try {
+                const rangeQuery = query(
+                  usersRef,
+                  where('__name__', '>=', addressVariation),
+                  where('__name__', '<=', addressVariation + '\uf8ff'),
+                  firestoreLimit(limit * 2)
+                );
+                
+                const rangeSnapshot = await getDocs(rangeQuery);
+                rangeSnapshot.docs.forEach(doc => {
+                  const userData = doc.data();
+                  if (!matchedUsers.find(u => u.address === doc.id)) {
+                    matchedUsers.push({
+                      address: doc.id,
+                      name: userData.name || userData.displayName || `${doc.id.slice(0, 6)}...${doc.id.slice(-4)}`,
+                      avatar: userData.avatar,
+                      totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
+                      postsCount: userData.postsCount || 0,
+                      likesReceived: userData.likesReceived || 0
+                    });
+                  }
+                });
+                
+                if (rangeSnapshot.docs.length > 0) {
+                  console.log(`✅ Range query found: ${rangeSnapshot.docs.length} users with ${addressVariation}`);
+                  break; // Znaleziono wyniki, przerwij pętlę
+                }
+              } catch (error) {
+                console.log(`Range query failed for ${addressVariation}:`, error);
+              }
+            }
+          }
+        }
+        
+        // Strategia 2: Jeśli nie znaleźliśmy wystarczająco przez adres, wyszukaj po nazwie
+        if (matchedUsers.length < limit) {
+          // Wyszukaj po name field
+          const nameQuery = query(
+            usersRef,
+            where('name', '>=', searchTerm),
+            where('name', '<=', searchTerm + '\uf8ff'),
+            firestoreLimit(limit * 3)
+          );
+          
+          try {
+            const nameSnapshot = await getDocs(nameQuery);
+            nameSnapshot.docs.forEach(doc => {
+              const userData = doc.data();
+              const address = doc.id;
+              
+              // Sprawdź czy już nie mamy tego użytkownika
+              if (!matchedUsers.find(u => u.address === address)) {
+                matchedUsers.push({
+                  address: address,
+                  name: userData.name || userData.displayName || `${address.slice(0, 6)}...${address.slice(-4)}`,
+                  avatar: userData.avatar,
+                  totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
+                  postsCount: userData.postsCount || 0,
+                  likesReceived: userData.likesReceived || 0
+                });
+              }
+            });
+          } catch (nameError) {
+            console.log('Name query failed, trying batch search...');
+          }
+        }
+        
+        // Strategia 3: Jeśli wciąż za mało wyników, przeszukaj batch'ami
+        if (matchedUsers.length < limit) {
+          console.log('🔄 Not enough results, performing batch search...');
+          
+          let batchCount = 0;
+          const maxBatches = 5; // Maksymalnie 5 batch'y aby nie przeciążyć
+          
+          while (matchedUsers.length < limit && batchCount < maxBatches) {
+            const batchQuery = query(
+              usersRef,
+              firestoreLimit(1000)
+            );
+            
+            const batchSnapshot = await getDocs(batchQuery);
+            
+            batchSnapshot.docs.forEach(doc => {
+              const userData = doc.data();
+              const userAddress = doc.id.toLowerCase();
+              const originalAddress = doc.id; // Zachowaj oryginalny case
+              const address = doc.id;
+              
+              // Sprawdź czy już nie mamy tego użytkownika
+              if (matchedUsers.find(u => u.address === address)) {
+                return;
+              }
+              
+              // Pobierz nazwy użytkowników
+              const userName = (userData.name || '').toLowerCase();
+              const displayName = (userData.displayName || '').toLowerCase();
+              
+              // Sprawdź różne kryteria wyszukiwania (case insensitive)
+              const matchesCriteria = 
+                // Dopasowanie nazw
+                userName.includes(searchTerm) ||
+                displayName.includes(searchTerm) ||
+                userName.includes(searchTerm.replace(/\.(eth|sphere|camper)$/, '')) ||
+                displayName.includes(searchTerm.replace(/\.(eth|sphere|camper)$/, '')) ||
+                (searchTerm.match(/\.(eth|sphere|camper)$/) && (
+                  userName === searchTerm ||
+                  displayName === searchTerm
+                )) ||
+                // Lepsze dopasowanie adresów - case insensitive
+                (searchTerm.startsWith('0x') && (
+                  userAddress === searchTerm ||
+                  userAddress.startsWith(searchTerm) ||
+                  originalAddress.toLowerCase() === searchTerm ||
+                  originalAddress.toLowerCase().startsWith(searchTerm)
+                )) ||
+                // Jeśli search term nie ma 0x prefix, sprawdź czy może to być część adresu (case insensitive)
+                (!searchTerm.startsWith('0x') && (
+                  userAddress.includes(searchTerm) ||
+                  originalAddress.toLowerCase().includes(searchTerm)
+                )) ||
+                // Dodatkowe dopasowanie dla części adresu
+                (searchTerm.startsWith('0x') && userAddress.includes(searchTerm));
+              
+              if (matchesCriteria) {
+                matchedUsers.push({
+                  address: address,
+                  name: userData.name || userData.displayName || `${address.slice(0, 6)}...${address.slice(-4)}`,
+                  avatar: userData.avatar,
+                  totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
+                  postsCount: userData.postsCount || 0,
+                  likesReceived: userData.likesReceived || 0
+                });
+              }
+            });
+            
+            batchCount++;
+          }
+        }
+        
+      } catch (error) {
+        console.error('Full search failed:', error);
+      }
+      
+    } else {
+      // SZYBKIE WYSZUKIWANIE - używaj cache'owanych danych (1000 użytkowników)
+      console.log('⚡ Quick Search - checking cache and direct Firebase access...');
+      
+      // Jeśli to wygląda jak pełny adres Ethereum, spróbuj bezpośredniego dostępu
+      if (searchTerm.startsWith('0x') && searchQuery.trim().length === 42) {
+        console.log(`🎯 Quick Search - trying direct Firebase access for: ${searchQuery.trim()}`);
+        
+        const addressVariations = [
+          searchQuery.trim(), // Oryginalna wersja
+          searchQuery.trim().toLowerCase(), // lowercase
+          searchQuery.trim().toUpperCase(), // uppercase
+        ];
+        
+        for (const addressVariation of addressVariations) {
+          try {
+            const userDocRef = doc(db, 'users', addressVariation);
+            const userDoc = await getDoc(userDocRef);
+            
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              matchedUsers.push({
+                address: userDoc.id,
+                name: userData.name || userData.displayName || `${userDoc.id.slice(0, 6)}...${userDoc.id.slice(-4)}`,
+                avatar: userData.avatar,
+                totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
+                postsCount: userData.postsCount || 0,
+                likesReceived: userData.likesReceived || 0
+              });
+              console.log(`✅ Quick Search - found direct Firebase match: ${userDoc.id}`);
+              
+              // Jeśli znaleziono exact match, zwróć od razu
+              const result = [{
+                address: userDoc.id,
+                name: userData.name || userData.displayName || `${userDoc.id.slice(0, 6)}...${userDoc.id.slice(-4)}`,
+                avatar: userData.avatar,
+                totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
+                postsCount: userData.postsCount || 0,
+                likesReceived: userData.likesReceived || 0
+              }];
+              
+              // Cache wynik
+              userSearchCache[cacheKey] = {
+                results: result,
+                timestamp: Date.now()
+              };
+              
+              return result;
+            }
+          } catch (error) {
+            console.log(`Quick Search - direct Firebase access failed for ${addressVariation}:`, error);
+          }
+        }
+      }
+      
+      let usersToSearch: any[] = [];
+      
+      // Spróbuj pobrać z localStorage active users cache
+      if (typeof localStorage !== 'undefined') {
+        const cachedActiveUsers = localStorage.getItem('activeUsers');
+        if (cachedActiveUsers) {
+          try {
+            const parsed = JSON.parse(cachedActiveUsers);
+            usersToSearch = parsed.map((user: any) => ({
+              id: user.address,
+              userData: {
+                name: user.name || '',
+                displayName: user.displayName || '',
+                avatar: user.avatar,
+                baseChatPoints: { totalPoints: user.points || 0 },
+                totalPoints: user.points || 0,
+                postsCount: user.stats?.posts || 0,
+                likesReceived: user.stats?.likes || 0
+              }
+            }));
+          } catch (error) {
+            console.log('Failed to parse cached active users, falling back to Firebase query');
+          }
+        }
+      }
+      
+      // Jeśli nie ma cache'u, pobierz próbkę użytkowników z Firebase
+      if (usersToSearch.length === 0) {
+        try {
+          const sampleQuery = query(
+            usersRef,
+            firestoreOrderBy('baseChatPoints.totalPoints', 'desc'),
+            firestoreLimit(1000)
+          );
+          
+          const sampleSnapshot = await getDocs(sampleQuery);
+          usersToSearch = sampleSnapshot.docs.map(doc => ({
+            id: doc.id,
+            userData: doc.data()
+          }));
+        } catch (error) {
+          console.log('Failed to query with ordering, trying without order');
+          const fallbackQuery = query(usersRef, firestoreLimit(1000));
+          const fallbackSnapshot = await getDocs(fallbackQuery);
+          usersToSearch = fallbackSnapshot.docs.map(doc => ({
+            id: doc.id,
+            userData: doc.data()
+          }));
+        }
+      }
+      
+      // Przeszukaj cache'owanych użytkowników
+      usersToSearch.forEach(user => {
+        const userData = user.userData;
+        const userAddress = user.id.toLowerCase();
+        const originalUserAddress = user.id; // Zachowaj oryginalny case
+        
+        // Pobierz nazwy użytkowników
+        const userName = (userData.name || '').toLowerCase();
+        const displayName = (userData.displayName || '').toLowerCase();
+        
+        // Sprawdź różne kryteria wyszukiwania (Quick Search)
+        const matchesCriteria = 
+          // Dopasowanie nazw
+          userName.includes(searchTerm) ||
+          displayName.includes(searchTerm) ||
+          userName.includes(searchTerm.replace(/\.(eth|sphere|camper)$/, '')) ||
+          displayName.includes(searchTerm.replace(/\.(eth|sphere|camper)$/, '')) ||
+          (searchTerm.match(/\.(eth|sphere|camper)$/) && (
+            userName === searchTerm ||
+            displayName === searchTerm
+          )) ||
+          // Lepsze dopasowanie adresów - case insensitive
+          (searchTerm.startsWith('0x') && (
+            userAddress === searchTerm ||
+            userAddress.startsWith(searchTerm) ||
+            originalUserAddress.toLowerCase() === searchTerm ||
+            originalUserAddress.toLowerCase().startsWith(searchTerm)
+          )) ||
+          // Jeśli search term nie ma 0x prefix, sprawdź czy może to być część adresu (case insensitive)
+          (!searchTerm.startsWith('0x') && (
+            userAddress.includes(searchTerm) ||
+            originalUserAddress.toLowerCase().includes(searchTerm)
+          )) ||
+          // Dodatkowe dopasowanie dla części adresu bez 0x
+          (searchTerm.startsWith('0x') && userAddress.includes(searchTerm));
+        
+        if (matchesCriteria) {
+          matchedUsers.push({
+            address: user.id,
+            name: userData.name || userData.displayName || `${user.id.slice(0, 6)}...${user.id.slice(-4)}`,
+            avatar: userData.avatar,
+            totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
+            postsCount: userData.postsCount || 0,
+            likesReceived: userData.likesReceived || 0
+          });
+        }
+      });
+    }
+    
+    // Sortuj po totalPoints (malejąco) i ogranicz wyniki
+    const sortedUsers = matchedUsers
+      .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0))
+      .slice(0, limit);
+    
+    // Cache wyniki
+    userSearchCache[cacheKey] = {
+      results: sortedUsers,
+      timestamp: Date.now()
     };
-  });
-
-  // Jeśli nie ma wyszukiwania, wybierz losowych 10 użytkowników
-  if (!searchQuery || searchQuery.length < 3) {
-    users = users
-      .sort(() => Math.random() - 0.5) // Losowe sortowanie
-      .slice(0, 10); // Wybierz pierwszych 10
+    
+    console.log(`✅ Found ${sortedUsers.length} matching users (searchAll: ${searchAll})`);
+    return sortedUsers;
+    
+  } catch (error) {
+    console.error('Error searching users:', error);
+    return [];
   }
-
-  return users;
 };
 
 export const createChat = async (user1: string, user2: string) => {
