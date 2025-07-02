@@ -1,10 +1,9 @@
-
 'use client';
 
 import Link from 'next/link';
-import { useAccount } from 'wagmi';
+import { useAccount, useContractRead, useContractReads } from 'wagmi';
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import OnchainkitSvg from './svg/OnchainKit';
 // import HomeNeonBackground from './components/Backgrounds/HomeNeonBackground';
@@ -20,6 +19,9 @@ import { FaTwitter as Twitter, FaDiscord as Discord, FaBook as Book, FaBlog as B
 
 // Dodaj import dla ikon
 import { FaCheckCircle, FaExternalLinkAlt } from 'react-icons/fa';
+
+// Import Camp Network config
+import { baseCampChain, BASECAMP_POST_CONTRACT_ABI } from './contracts/BaseCampPostContract';
 
 const themes = [
   { id: 'base', name: 'Base', gradient: 'from-[#0052FF] via-[#1E4DD8] to-[#4C8FFF]' },
@@ -125,6 +127,50 @@ const tailwindConfig = {
     }
   }
 }
+
+// Camp Network contracts addresses
+const CAMP_POST_CONTRACT = "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E" as `0x${string}`;
+const PORTAL_NFT_CONTRACT = "0x1eD74B27f846C699A90926daD057A7f6FD22C126" as `0x${string}`;
+
+// PORTAL NFT ABI (simplified - only for reading totalClaimed)
+const PORTAL_NFT_ABI = [
+  {
+    "inputs": [],
+    "name": "totalClaimed",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
+
+// Base Network contracts addresses
+const BASE_POST_CONTRACT = "0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7" as `0x${string}`;
+const BASE_QUOTES_CONTRACT = "0x9c44802843a670732383f62b2f3304f92ec1702b" as `0x${string}`;
+
+// Base contracts ABI (simplified - for reading post/quote counts)
+const BASE_CONTRACT_ABI = [
+  {
+    "inputs": [],
+    "name": "postCount",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalPosts",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "quoteCount",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
 
 // Funkcja do pobierania danych o transakcjach dla określonych kontraktów na sieci Base
 async function getBaseContractTransactions() {
@@ -260,147 +306,7 @@ async function getBaseContractTransactions() {
   };
 }
 
-// Funkcja do pobierania danych o transakcjach z sieci Camp Network
-async function getCampNetworkTransactions() {
-  // Adresy kontraktów Camp Network do monitorowania  
-  const campContractAddresses = [
-    "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E",
-    "0x1eD74B27f846C699A90926daD057A7f6FD22C126"
-  ];
-  
-  // Pobieranie danych o transakcjach dla pojedynczego kontraktu Camp Network z paginacją
-  async function fetchCampContractData(contractAddress: string) {
-    try {
-      let allTransactions = [];
-      let nextPageParams = null;
-      let pageCount = 0;
-      const maxPages = 1000; // Zwiększone zabezpieczenie - pozwala na ~100,000 transakcji (100 tx/strona)
-      
-      console.log(`🔍 Pobieranie wszystkich transakcji dla kontraktu: ${contractAddress}`);
-      
-      do {
-        // Buduj URL z parametrami paginacji
-        let apiUrl = `https://basecamp.cloud.blockscout.com/api/v2/addresses/${contractAddress}/transactions?filter=to%20%7C%20from`;
-        
-        if (nextPageParams) {
-          // Dodaj parametry następnej strony
-          const params = new URLSearchParams(nextPageParams);
-          apiUrl += `&${params.toString()}`;
-        }
-        
-        console.log(`📡 Pobieranie strony ${pageCount + 1}: ${apiUrl}`);
-        
-        const txCountResponse = await fetch(apiUrl);
-        
-        if (!txCountResponse.ok) {
-          console.warn(`❌ Błąd API dla strony ${pageCount + 1}: ${txCountResponse.status}`);
-          break;
-        }
-        
-        const txData = await txCountResponse.json();
-        
-        if (txData && txData.items && Array.isArray(txData.items)) {
-          allTransactions.push(...txData.items);
-          nextPageParams = txData.next_page_params;
-          pageCount++;
-          
-          console.log(`📄 Strona ${pageCount}: ${txData.items.length} transakcji, razem: ${allTransactions.length}`);
-          
-          // Sprawdź czy są następne strony
-          if (!nextPageParams || pageCount >= maxPages) {
-            break;
-          }
-        } else {
-          console.warn(`⚠️ Nieprawidłowa struktura danych na stronie ${pageCount + 1}`);
-          break;
-        }
-        
-      } while (nextPageParams && pageCount < maxPages);
-      
-      const totalTransactions = allTransactions.length;
-      console.log(`✅ Camp Network contract ${contractAddress}: ${totalTransactions} transactions (${pageCount} stron)`);
-      console.log(`📊 Zakończono pobieranie po ${pageCount} stronach${pageCount >= maxPages ? ' (osiągnięto limit stron)' : ' (wszystkie strony pobrane)'}`);
-      
-      if (totalTransactions === 0) {
-        throw new Error('No transactions found');
-      }
-      
-      return { 
-        address: contractAddress, 
-        transactions: totalTransactions
-      };
-      
-    } catch (error: unknown) {
-      // W przypadku błędu, używamy fallbackowych wartości
-      let fallbackTx = 0;
-      if (contractAddress === "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E") {
-        fallbackTx = 77; // Aktualizowane na podstawie rzeczywistych danych
-      } else if (contractAddress === "0x1eD74B27f846C699A90926daD057A7f6FD22C126") {
-        fallbackTx = 28;
-      }
-      
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`Błąd pobierania danych Camp Network dla ${contractAddress}:`, error);
-      console.log(`Użyto fallbackowej liczby transakcji: ${fallbackTx}`);
-      
-      return { 
-        address: contractAddress, 
-        transactions: fallbackTx, 
-        error: errorMessage 
-      };
-    }
-  }
-  
-  // Pobierz dane dla wszystkich kontraktów Camp Network równolegle
-  const campContractsData = await Promise.all(
-    campContractAddresses.map(address => fetchCampContractData(address))
-  );
-  
-  // Oblicz łączną liczbę transakcji
-  const totalCampTransactions = campContractsData.reduce(
-    (sum, contract) => sum + (contract.transactions || 0), 
-    0
-  );
-  
-  return {
-    contracts: campContractsData,
-    totalTransactions: totalCampTransactions,
-    timestamp: new Date().toISOString()
-  };
-}
 
-// Funkcja do jednorazowego pobrania i zapisania danych
-async function fetchAndStoreContractData(setTransactionsCount: React.Dispatch<React.SetStateAction<number>>) {
-  try {
-    // Próba odczytu danych z localStorage dla natychmiastowego wyświetlenia
-    try {
-      const cached = localStorage.getItem('baseContractTransactions');
-      if (cached) {
-        const cachedData = JSON.parse(cached);
-        // Użyj danych z cache do pierwszego wyświetlenia
-        setTransactionsCount(cachedData.totalTransactions);
-        console.log('Użyto danych z cache:', cachedData);
-      }
-    } catch (e) {
-      console.error('Błąd odczytu cache:', e);
-    }
-    
-    // Pobierz świeże dane
-    const freshData = await getBaseContractTransactions();
-    console.log('Pobrano dane o transakcjach:', freshData);
-    
-    // Zapisz w localStorage
-    localStorage.setItem('baseContractTransactions', JSON.stringify(freshData));
-    
-    // Aktualizuj stan komponentu
-    setTransactionsCount(freshData.totalTransactions);
-    
-    return freshData;
-  } catch (error: unknown) {
-    console.error('Błąd pobierania danych o transakcjach:', error);
-    return null;
-  }
-}
 
 export default function HomePage() {
   const { address } = useAccount();
@@ -413,11 +319,8 @@ export default function HomePage() {
   const [blockTime, setBlockTime] = useState(0);
   const [userCount, setUserCount] = useState(0);
   const [postsCount, setPostsCount] = useState(0);
-  const [transactionsCount, setTransactionsCount] = useState(1340);
-  const [campTransactionsCount, setCampTransactionsCount] = useState(73); // 45 + 28
-  const [campNetworkData, setCampNetworkData] = useState<any>(null);
-  const [isCampDataRefreshing, setIsCampDataRefreshing] = useState(false);
-  const [campDataLastUpdated, setCampDataLastUpdated] = useState<string | null>(null);
+  const [transactionsCount] = useState(1340); // Fallback tylko
+
   const [likesCount, setLikesCount] = useState(0);
   const [commentsCount, setCommentsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -439,7 +342,49 @@ export default function HomePage() {
     }, 1000);
   };
 
+  // LIVE DATA z Camp Network blockchain
+  const { data: campPostsData } = useContractRead({
+    address: CAMP_POST_CONTRACT,
+    abi: BASECAMP_POST_CONTRACT_ABI,
+    functionName: 'totalPosts',
+    chainId: baseCampChain.id,
+  });
 
+  const { data: portalClaimedData } = useContractRead({
+    address: PORTAL_NFT_CONTRACT,
+    abi: PORTAL_NFT_ABI,
+    functionName: 'totalClaimed',
+    chainId: baseCampChain.id,
+  });
+
+  // LIVE DATA z Base Network blockchain
+  const { data: basePostsData } = useContractRead({
+    address: BASE_POST_CONTRACT,
+    abi: BASE_CONTRACT_ABI,
+    functionName: 'totalPosts',
+    chainId: 8453, // Base mainnet
+  });
+
+  const { data: baseQuotesData } = useContractRead({
+    address: BASE_QUOTES_CONTRACT,
+    abi: BASE_CONTRACT_ABI,
+    functionName: 'quoteCount',
+    chainId: 8453, // Base mainnet
+  });
+
+  // Oblicz łączną liczbę transakcji Camp Network na żywo
+  const campTransactionsCount = useMemo(() => {
+    const postTransactions = campPostsData ? Number(campPostsData) : 0;
+    const nftTransactions = portalClaimedData ? Number(portalClaimedData) : 0;
+    return postTransactions + nftTransactions;
+  }, [campPostsData, portalClaimedData]);
+
+  // Oblicz łączną liczbę transakcji Base Network na żywo
+  const baseTransactionsCount = useMemo(() => {
+    const posts = basePostsData ? Number(basePostsData) : 0;
+    const quotes = baseQuotesData ? Number(baseQuotesData) : 0;
+    return posts + quotes;
+  }, [basePostsData, baseQuotesData]);
 
   useEffect(() => {
     const fetchGlobalStats = async () => {
@@ -461,6 +406,25 @@ export default function HomePage() {
       } catch (error) {
         console.error('Error fetching global stats:', error);
         setIsLoading(false);
+      }
+    };
+
+    // Funkcja do jednorazowego pobrania i zapisania danych Base
+    const fetchAndStoreContractData = async () => {
+      try {
+        // Cache już nie jest używany - dane pochodzą z wagmi hooks
+        
+        // Pobierz świeże dane (już nie używane - dane z wagmi hooks)
+        const freshData = await getBaseContractTransactions();
+        console.log('Pobrano dane o transakcjach:', freshData);
+        
+        // Zapisz w localStorage (pozostawione dla celów cache'owania)
+        localStorage.setItem('baseContractTransactions', JSON.stringify(freshData));
+        
+        return freshData;
+      } catch (error: unknown) {
+        console.error('Błąd pobierania danych o transakcjach:', error);
+        return null;
       }
     };
 
@@ -606,84 +570,12 @@ export default function HomePage() {
       }
     };
     
-    fetchGlobalStats(); // Pobierz dane z Firebase
+        fetchGlobalStats(); // Pobierz dane z Firebase
     fetchData(); // Pobierz pozostałe dane
     
     // Pobierz dane o transakcjach tylko raz przy uruchomieniu strony
-    fetchAndStoreContractData(setTransactionsCount);
-    
-    // Funkcja do sprawdzania czy dane z cache są świeże (młodsze niż 1 godzina)
-    const isCacheDataFresh = (timestamp: string): boolean => {
-      const cacheTime = new Date(timestamp).getTime();
-      const currentTime = new Date().getTime();
-      const oneHour = 60 * 60 * 1000; // 1 godzina w milisekundach
-      return (currentTime - cacheTime) < oneHour;
-    };
-
-    // Pobierz dane o transakcjach Camp Network
-    const fetchCampData = async (forceRefresh: boolean = false) => {
-      try {
-        // Sprawdź cache
-        const cached = localStorage.getItem('campNetworkTransactions');
-        if (cached && !forceRefresh) {
-          const cachedData = JSON.parse(cached);
-          
-          // Sprawdź czy dane są świeże (młodsze niż 1 godzina)
-          if (cachedData.timestamp && isCacheDataFresh(cachedData.timestamp)) {
-            setCampTransactionsCount(cachedData.totalTransactions);
-            setCampNetworkData(cachedData);
-            setCampDataLastUpdated(cachedData.timestamp);
-            console.log('✅ Użyto świeżych danych Camp Network z cache (', new Date(cachedData.timestamp).toLocaleString(), ')');
-            console.log('📊 Liczba transakcji z cache:', cachedData.totalTransactions);
-            return; // WAŻNE: Zakończ tutaj, nie pobieraj nowych danych
-          } else {
-            // Dane są stare, ale użyj ich tymczasowo
-            setCampTransactionsCount(cachedData.totalTransactions);
-            setCampNetworkData(cachedData);
-            setCampDataLastUpdated(cachedData.timestamp);
-            console.log('📦 Cache wygasł, używam starych danych tymczasowo i pobieram nowe...');
-          }
-        } else {
-          console.log('🔍 Brak cache lub wymuszono refresh, pobieranie danych...');
-        }
-        
-        // Pobierz świeże dane tylko jeśli:
-        // 1. Brak cache ALBO
-        // 2. Cache wygasł ALBO  
-        // 3. Wymuszono refresh
-        console.log('🔄 Pobieranie świeżych danych Camp Network (może to potrwać...)');
-        setIsCampDataRefreshing(true);
-        
-        const campData = await getCampNetworkTransactions();
-        console.log('✅ Pobrano świeże dane Camp Network:', campData.totalTransactions, 'transakcji');
-        
-        // Zapisz w localStorage z timestampem
-        const dataWithTimestamp = {
-          ...campData,
-          timestamp: new Date().toISOString()
-        };
-        localStorage.setItem('campNetworkTransactions', JSON.stringify(dataWithTimestamp));
-        
-        // Aktualizuj stan komponentu
-        setCampTransactionsCount(campData.totalTransactions);
-        setCampNetworkData(dataWithTimestamp);
-        setCampDataLastUpdated(dataWithTimestamp.timestamp);
-        setIsCampDataRefreshing(false);
-        
-      } catch (error) {
-        console.error('❌ Błąd pobierania danych Camp Network:', error);
-        setIsCampDataRefreshing(false);
-        // W przypadku błędu użyj fallbackowej wartości tylko jeśli nie ma cache
-        const cached = localStorage.getItem('campNetworkTransactions');
-        if (!cached) {
-          console.log('🔧 Używam fallbackowej wartości (73 transakcji)');
-          setCampTransactionsCount(73);
-        }
-      }
-    };
-    
-    fetchCampData(); // Pierwszo wywołanie bez wymuszenia
-    
+    fetchAndStoreContractData();
+     
     // Pobierz stan ETH
     fetchTotalEthBalance();
     
@@ -1202,7 +1094,7 @@ export default function HomePage() {
               ) : (
                 <div className="relative">
                   <p className="text-3xl md:text-4xl font-bold text-white transition-colors duration-500 filter drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]">
-                    {transactionsCount.toLocaleString()}
+                    {baseTransactionsCount > 0 ? baseTransactionsCount.toLocaleString() : transactionsCount.toLocaleString()}
                   </p>
                   <p className="text-xs text-orange-300/70 mt-2">
                     Transactions on MySphere contracts
@@ -1258,7 +1150,7 @@ export default function HomePage() {
               <h3 className="text-indigo-300 text-sm font-semibold mb-2 relative filter drop-shadow-[0_0_3px_rgba(99,102,241,0.5)]">Smart Contracts</h3>
               <div className="relative">
                 <p className="text-3xl md:text-4xl font-bold text-white transition-colors duration-500 filter drop-shadow-[0_0_8px_rgba(99,102,241,0.5)]">
-                  2
+                  4
                 </p>
                 <p className="text-xs text-indigo-300/70 mt-2">
                   Verified MySphere contracts
@@ -1312,7 +1204,7 @@ export default function HomePage() {
                       <FaCheckCircle className="w-4 h-4" />
                     </div>
                     <h3 className="text-sm font-medium text-orange-400">OnchainPost</h3>
-                    <span className="ml-2 text-xs text-gray-500">({transactionsCount > 0 ? "1,365 txs" : "Loading..."})</span>
+                    <span className="ml-2 text-xs text-gray-500">({basePostsData ? Number(basePostsData) : 0} posts)</span>
                   </div>
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7</p>
                 </div>
@@ -1331,7 +1223,7 @@ export default function HomePage() {
                       <FaCheckCircle className="w-4 h-4" />
                     </div>
                     <h3 className="text-sm font-medium text-indigo-400">QuotesOnBase</h3>
-                    <span className="ml-2 text-xs text-gray-500">(59 txs)</span>
+                    <span className="ml-2 text-xs text-gray-500">({baseQuotesData ? Number(baseQuotesData) : 0} quotes)</span>
                   </div>
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x9c44802843a670732383f62b2f3304f92ec1702b</p>
                 </div>
@@ -1363,9 +1255,7 @@ export default function HomePage() {
                     </div>
                     <h3 className="text-sm font-medium text-orange-400">Camp Network Post</h3>
                     <span className="ml-2 text-xs text-gray-500">
-                      ({campNetworkData?.contracts?.find((c: any) => 
-                          c.address === "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E"
-                        )?.transactions || 45} txs)
+                      ({campPostsData ? Number(campPostsData) : 0} posts)
                     </span>
                   </div>
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x177Af844a3c7A1749dE97656a5d84b6373Fc350E</p>
@@ -1386,9 +1276,7 @@ export default function HomePage() {
                     </div>
                     <h3 className="text-sm font-medium text-blue-400">PORTAL MSxCAMP</h3>
                     <span className="ml-2 text-xs text-gray-500">
-                      ({campNetworkData?.contracts?.find((c: any) => 
-                          c.address === "0x1eD74B27f846C699A90926daD057A7f6FD22C126"
-                        )?.transactions || 28} txs)
+                      ({portalClaimedData ? Number(portalClaimedData) : 0} claimed)
                     </span>
                   </div>
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x1eD74B27f846C699A90926daD057A7f6FD22C126</p>
