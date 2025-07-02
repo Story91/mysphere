@@ -38,11 +38,17 @@
     touch-action: pan-y;
     /* Reduce touch interference with parent scroll */
     pointer-events: auto;
+    /* Ensure no positioning conflicts */
+    display: block;
+    text-align: center;
   }
   
   /* Position card higher on mobile with small margin */
   .pc-card {
-    margin-top: 4px;
+    margin-top: 2px;
+    margin-left: auto;
+    margin-right: auto;
+    display: inline-block;
   }
 }
 
@@ -1413,16 +1419,19 @@
     /* Reduce potential for touch conflicts */
     position: relative;
     z-index: 5;
-    /* Constrain width to allow scroll zones */
-    max-width: calc(100% - 32px);
+    /* Perfect centering in panel */
+    width: 100%;
+    max-width: 320px;
     margin: 0 auto;
+    left: 0;
+    right: 0;
   }
   
   /* Create tap-friendly scroll zones around the card */
   .pc-card {
-    /* Small margin to create scroll zones */
-    margin-left: 16px;
-    margin-right: 16px;
+    /* Perfect centering without side margins */
+    margin-left: auto;
+    margin-right: auto;
     /* Prevent card from intercepting scroll gestures on edges */
     position: relative;
   }
@@ -1452,14 +1461,15 @@
 /* Additional mobile optimizations */
 @media (max-width: 480px) {
   .pc-card {
-    /* Even smaller margins on very small screens */
-    margin-left: 12px;
-    margin-right: 12px;
+    /* Perfect centering on small screens */
+    margin-left: auto;
+    margin-right: auto;
     /* Move card closer to top */
-    margin-top: 2px;
+    margin-top: 0px;
   }
   
   .pc-card-wrapper {
-    max-width: calc(100% - 24px);
+    max-width: 300px;
+    width: 100%;
   }
 }

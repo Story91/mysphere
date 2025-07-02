@@ -2407,25 +2407,25 @@ export default function BaseChat() {
                     <div className="space-y-4">
                       {/* ProfileCard at the top */}
                       {address && (
-                        <div className="mb-4 lg:mb-4 -mt-4 lg:mt-0">
-                          <div className="relative z-10">
-                            <ProfileCard
-                              name={userProfile.name || 'MySphere User'}
-                              handle={userProfile.name?.replace('.sphere', '').replace('.camper', '') || address.slice(0, 6) + '...' + address.slice(-4)}
-                              status={address.slice(0, 6) + '...' + address.slice(-4)}
-                              fullAddress={address}
-                              contactText="Edit"
-                              avatarUrl={userProfile.avatar || `/favicon_io (1)/android-chrome-192x1921.png`}
-                              miniAvatarUrl={userProfile.avatar}
-                              socialLinks={userProfile.socialLinks}
-                              showUserInfo={true}
-                              enableTilt={true}
-                              onContactClick={() => {
-                                setIsEditingProfile(!isEditingProfile);
-                              }}
-                              className="w-full max-w-sm mx-auto"
-                            />
-                          </div>
+                        <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
+                                                      <div className="relative z-10 flex justify-center items-start w-full">
+                              <ProfileCard
+                                name={userProfile.name || 'MySphere User'}
+                                handle={userProfile.name?.replace('.sphere', '').replace('.camper', '') || address.slice(0, 6) + '...' + address.slice(-4)}
+                                status={address.slice(0, 6) + '...' + address.slice(-4)}
+                                fullAddress={address}
+                                contactText="Edit"
+                                avatarUrl={userProfile.avatar || `/favicon_io (1)/android-chrome-192x1921.png`}
+                                miniAvatarUrl={userProfile.avatar}
+                                socialLinks={userProfile.socialLinks}
+                                showUserInfo={true}
+                                enableTilt={true}
+                                onContactClick={() => {
+                                  setIsEditingProfile(!isEditingProfile);
+                                }}
+                                className="w-full max-w-sm"
+                              />
+                            </div>
                         </div>
                       )}
 
