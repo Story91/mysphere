@@ -81,6 +81,26 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
   const wrapRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLElement>(null);
   const [showCopied, setShowCopied] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  // Detect mobile devices and reduced motion preference
+  useEffect(() => {
+    const detectMobile = () => {
+      const isMobile = window.innerWidth <= 768 || 
+                      /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                      ('ontouchstart' in window) ||
+                      (navigator.maxTouchPoints > 0);
+      
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      
+      setIsMobileDevice(isMobile || prefersReducedMotion);
+    };
+
+    detectMobile();
+    window.addEventListener('resize', detectMobile);
+    
+    return () => window.removeEventListener('resize', detectMobile);
+  }, []);
 
   const animationHandlers = useMemo(() => {
     if (!enableTilt) return null;
@@ -210,7 +230,7 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
   );
 
   useEffect(() => {
-    if (!enableTilt || !animationHandlers) return;
+    if (!enableTilt || !animationHandlers || isMobileDevice) return;
 
     const card = cardRef.current;
     const wrap = wrapRef.current;
@@ -249,7 +269,36 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
     handlePointerMove,
     handlePointerEnter,
     handlePointerLeave,
+    isMobileDevice,
   ]);
+
+  // Set static styles for mobile devices
+  useEffect(() => {
+    if (isMobileDevice) {
+      const card = cardRef.current;
+      const wrap = wrapRef.current;
+
+      if (!card || !wrap) return;
+
+      // Set static position for mobile
+      const centerX = wrap.clientWidth / 2;
+      const centerY = wrap.clientHeight / 2;
+
+      card.style.setProperty('--pointer-x', '50%');
+      card.style.setProperty('--pointer-y', '50%');
+      card.style.setProperty('--pointer-from-center', '0');
+      card.style.setProperty('--pointer-from-top', '0.5');
+      card.style.setProperty('--pointer-from-left', '0.5');
+      card.style.setProperty('--rotate-x', '0deg');
+      card.style.setProperty('--rotate-y', '0deg');
+      card.style.setProperty('--background-x', '50%');
+      card.style.setProperty('--background-y', '50%');
+
+      // Add mobile class for CSS targeting
+      wrap.classList.add('mobile-device');
+      card.classList.add('mobile-device');
+    }
+  }, [isMobileDevice]);
 
   const cardStyle = useMemo(
     () =>

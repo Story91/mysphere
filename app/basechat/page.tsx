@@ -2389,29 +2389,43 @@ export default function BaseChat() {
               {/* Left panel (Profile & Stats) */}
               <div className={`${
                 activeMobilePanel === 'left' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
-              } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4`}>
+              } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4 mobile-scroll-container`}
+                                 style={{
+                   WebkitOverflowScrolling: 'touch',
+                   overscrollBehavior: 'contain'
+                 }}
+               >
+                 {/* Invisible scroll trigger areas for mobile */}
+                 <div className="lg:hidden pointer-events-none absolute inset-0 z-0">
+                   <div className="absolute left-0 top-0 w-8 h-full pointer-events-auto" 
+                        style={{ touchAction: 'pan-y' }}></div>
+                   <div className="absolute right-0 top-0 w-8 h-full pointer-events-auto"
+                        style={{ touchAction: 'pan-y' }}></div>
+                 </div>
                 <div className="mb-8">
                   {isConnected ? (
                     <div className="space-y-4">
                       {/* ProfileCard at the top */}
                       {address && (
-                        <div className="mb-4">
-                          <ProfileCard
-                            name={userProfile.name || 'MySphere User'}
-                            handle={userProfile.name?.replace('.sphere', '').replace('.camper', '') || address.slice(0, 6) + '...' + address.slice(-4)}
-                            status={address.slice(0, 6) + '...' + address.slice(-4)}
-                            fullAddress={address}
-                            contactText="Edit"
-                            avatarUrl={userProfile.avatar || `/favicon_io (1)/android-chrome-192x1921.png`}
-                            miniAvatarUrl={userProfile.avatar}
-                            socialLinks={userProfile.socialLinks}
-                            showUserInfo={true}
-                            enableTilt={true}
-                            onContactClick={() => {
-                              setIsEditingProfile(!isEditingProfile);
-                            }}
-                            className="w-full max-w-sm mx-auto"
-                          />
+                        <div className="mb-4 lg:mb-4 -mt-4 lg:mt-0">
+                          <div className="relative z-10">
+                            <ProfileCard
+                              name={userProfile.name || 'MySphere User'}
+                              handle={userProfile.name?.replace('.sphere', '').replace('.camper', '') || address.slice(0, 6) + '...' + address.slice(-4)}
+                              status={address.slice(0, 6) + '...' + address.slice(-4)}
+                              fullAddress={address}
+                              contactText="Edit"
+                              avatarUrl={userProfile.avatar || `/favicon_io (1)/android-chrome-192x1921.png`}
+                              miniAvatarUrl={userProfile.avatar}
+                              socialLinks={userProfile.socialLinks}
+                              showUserInfo={true}
+                              enableTilt={true}
+                              onContactClick={() => {
+                                setIsEditingProfile(!isEditingProfile);
+                              }}
+                              className="w-full max-w-sm mx-auto"
+                            />
+                          </div>
                         </div>
                       )}
 
