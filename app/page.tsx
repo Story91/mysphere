@@ -1431,7 +1431,7 @@ export default function HomePage() {
                 <div className="absolute -bottom-16 md:-bottom-20 left-1/2 transform -translate-x-1/2">
                   <div className="bg-gradient-to-r from-blue-500/30 to-blue-600/30 backdrop-blur-lg rounded-xl px-2 py-2 md:px-4 md:py-3 border border-blue-400/40 shadow-lg min-w-[100px] md:min-w-[140px]">
                     <p className="text-blue-200 text-xs font-bold uppercase tracking-wider mb-1">Base Network</p>
-                    <p className="text-white text-lg md:text-xl font-black">{transactionsCount.toLocaleString()}</p>
+                    <p className="text-white text-lg md:text-xl font-black">{baseTransactionsCount > 0 ? baseTransactionsCount.toLocaleString() : transactionsCount.toLocaleString()}</p>
                     <p className="text-blue-300 text-xs">Transactions</p>
                   </div>
                 </div>
@@ -1619,18 +1619,18 @@ export default function HomePage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-blue-300 font-semibold">Base Network</span>
-                    <span className="text-white font-bold">{transactionsCount.toLocaleString()}</span>
+                    <span className="text-white font-bold">{(baseTransactionsCount > 0 ? baseTransactionsCount : transactionsCount).toLocaleString()}</span>
                   </div>
                   <div className="relative h-6 bg-gray-800/50 rounded-full overflow-hidden">
                     <div 
                       className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.6)] animate-[progress-blue_2s_ease-out_forwards]"
                       style={{ 
-                        '--target-width': `${Math.min((transactionsCount / (transactionsCount + campTransactionsCount)) * 100, 100)}%`
+                        '--target-width': `${Math.min(((baseTransactionsCount > 0 ? baseTransactionsCount : transactionsCount) / ((baseTransactionsCount > 0 ? baseTransactionsCount : transactionsCount) + campTransactionsCount)) * 100, 100)}%`
                       } as React.CSSProperties}
                     ></div>
                   </div>
                   <div className="text-blue-200 text-sm">
-                    {((transactionsCount / (transactionsCount + campTransactionsCount)) * 100).toFixed(1)}% of total activity
+                    {(((baseTransactionsCount > 0 ? baseTransactionsCount : transactionsCount) / ((baseTransactionsCount > 0 ? baseTransactionsCount : transactionsCount) + campTransactionsCount)) * 100).toFixed(1)}% of total activity
                   </div>
                 </div>
 
@@ -1644,13 +1644,13 @@ export default function HomePage() {
                     <div 
                       className="absolute left-0 top-0 h-full bg-gradient-to-r from-orange-500 to-orange-600 rounded-full shadow-[0_0_15px_rgba(249,115,22,0.6)] animate-[progress-orange_2s_ease-out_0.5s_forwards]"
                       style={{ 
-                        '--target-width': `${Math.max((campTransactionsCount / (transactionsCount + campTransactionsCount)) * 100, 5)}%`,
+                        '--target-width': `${Math.max((campTransactionsCount / ((baseTransactionsCount > 0 ? baseTransactionsCount : transactionsCount) + campTransactionsCount)) * 100, 5)}%`,
                         '--min-width': '20px'
                       } as React.CSSProperties}
                     ></div>
                   </div>
                   <div className="text-orange-200 text-sm">
-                    {((campTransactionsCount / (transactionsCount + campTransactionsCount)) * 100).toFixed(1)}% of total activity
+                    {((campTransactionsCount / ((baseTransactionsCount > 0 ? baseTransactionsCount : transactionsCount) + campTransactionsCount)) * 100).toFixed(1)}% of total activity
                   </div>
                 </div>
 
@@ -1660,7 +1660,7 @@ export default function HomePage() {
               <div className="mt-8 pt-6 border-t border-gray-700/50 text-center">
                 <div className="inline-flex items-center space-x-4 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 backdrop-blur-md rounded-xl px-6 py-3 border border-purple-400/30">
                   <span className="text-purple-300 font-semibold">Total Cross-Chain Activity:</span>
-                  <span className="text-white text-xl font-bold">{(transactionsCount + campTransactionsCount).toLocaleString()}</span>
+                  <span className="text-white text-xl font-bold">{((baseTransactionsCount > 0 ? baseTransactionsCount : transactionsCount) + campTransactionsCount).toLocaleString()}</span>
                   <span className="text-purple-200 text-sm">transactions</span>
                 </div>
               </div>
