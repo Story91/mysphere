@@ -1667,21 +1667,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Enhanced Legend */}
-          <div className="flex flex-wrap justify-center gap-8 mt-12">
-            <div className="flex items-center space-x-3 bg-gradient-to-r from-blue-500/10 to-blue-600/10 backdrop-blur-md rounded-xl px-4 py-3 border border-blue-400/20">
-              <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.6)] animate-pulse"></div>
-              <span className="text-blue-300 font-medium">Base Network Activity</span>
-            </div>
-            <div className="flex items-center space-x-3 bg-gradient-to-r from-orange-500/10 to-orange-600/10 backdrop-blur-md rounded-xl px-4 py-3 border border-orange-400/20">
-              <div className="w-6 h-6 bg-gradient-to-r from-orange-400 to-orange-600 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse"></div>
-              <span className="text-orange-300 font-medium">Camp Network Activity</span>
-            </div>
-            <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 backdrop-blur-md rounded-xl px-4 py-3 border border-purple-400/20">
-              <div className="w-6 h-6 bg-gradient-to-r from-purple-400 to-indigo-500 rounded-full shadow-[0_0_10px_rgba(139,69,233,0.6)] animate-pulse"></div>
-              <span className="text-purple-300 font-medium">MySphere Integration</span>
-            </div>
-          </div>
+
         </section>
 
         {/* Features Section - The MySphere Stack */}
