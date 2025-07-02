@@ -43,9 +43,9 @@
     text-align: center;
   }
   
-  /* Position card higher on mobile with small margin */
+  /* Position card higher on mobile with small margin from top */
   .pc-card {
-    margin-top: 2px;
+    margin-top: 8px;
     margin-left: auto;
     margin-right: auto;
     display: inline-block;
@@ -1464,8 +1464,8 @@
     /* Perfect centering on small screens */
     margin-left: auto;
     margin-right: auto;
-    /* Move card closer to top */
-    margin-top: 0px;
+    /* Small margin from top ceiling */
+    margin-top: 6px;
   }
   
   .pc-card-wrapper {
