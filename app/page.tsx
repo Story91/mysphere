@@ -147,6 +147,11 @@ const PORTAL_NFT_ABI = [
 const BASE_POST_CONTRACT = "0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7" as `0x${string}`;
 const BASE_QUOTES_CONTRACT = "0x9c44802843a670732383f62b2f3304f92ec1702b" as `0x${string}`;
 
+// Base Network NFT contracts addresses
+const BASE_NFT_PIONEER = "0x8edb8B2383f41e14b49414dd32c4A786Ed2e277d" as `0x${string}`;
+const BASE_NFT_GUARDIAN = "0x4087EFD20F2A91ADeAa2b7259F61d04d1e5B233E" as `0x${string}`;
+const BASE_NFT_MASTER = "0x6d55153A6B1d1157f19D403DEd541fbe6De48C5A" as `0x${string}`;
+
 // Base contracts ABI (simplified - for reading post/quote counts)
 const BASE_CONTRACT_ABI = [
   {
@@ -166,6 +171,13 @@ const BASE_CONTRACT_ABI = [
   {
     "inputs": [],
     "name": "quoteCount",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalSupply",
     "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
     "stateMutability": "view",
     "type": "function"
@@ -368,7 +380,29 @@ export default function HomePage() {
   const { data: baseQuotesData } = useContractRead({
     address: BASE_QUOTES_CONTRACT,
     abi: BASE_CONTRACT_ABI,
-    functionName: 'quoteCount',
+    functionName: 'totalSupply',
+    chainId: 8453, // Base mainnet
+  });
+
+  // LIVE DATA z Base Network NFT blockchain
+  const { data: basePioneerData } = useContractRead({
+    address: BASE_NFT_PIONEER,
+    abi: BASE_CONTRACT_ABI,
+    functionName: 'totalSupply',
+    chainId: 8453, // Base mainnet
+  });
+
+  const { data: baseGuardianData } = useContractRead({
+    address: BASE_NFT_GUARDIAN,
+    abi: BASE_CONTRACT_ABI,
+    functionName: 'totalSupply',
+    chainId: 8453, // Base mainnet
+  });
+
+  const { data: baseMasterData } = useContractRead({
+    address: BASE_NFT_MASTER,
+    abi: BASE_CONTRACT_ABI,
+    functionName: 'totalSupply',
     chainId: 8453, // Base mainnet
   });
 
@@ -383,8 +417,11 @@ export default function HomePage() {
   const baseTransactionsCount = useMemo(() => {
     const posts = basePostsData ? Number(basePostsData) : 0;
     const quotes = baseQuotesData ? Number(baseQuotesData) : 0;
-    return posts + quotes;
-  }, [basePostsData, baseQuotesData]);
+    const pioneer = basePioneerData ? Number(basePioneerData) : 0;
+    const guardian = baseGuardianData ? Number(baseGuardianData) : 0;
+    const master = baseMasterData ? Number(baseMasterData) : 0;
+    return posts + quotes + pioneer + guardian + master;
+  }, [basePostsData, baseQuotesData, basePioneerData, baseGuardianData, baseMasterData]);
 
   useEffect(() => {
     const fetchGlobalStats = async () => {
@@ -1150,7 +1187,7 @@ export default function HomePage() {
               <h3 className="text-indigo-300 text-sm font-semibold mb-2 relative filter drop-shadow-[0_0_3px_rgba(99,102,241,0.5)]">Smart Contracts</h3>
               <div className="relative">
                 <p className="text-3xl md:text-4xl font-bold text-white transition-colors duration-500 filter drop-shadow-[0_0_8px_rgba(99,102,241,0.5)]">
-                  4
+                  7
                 </p>
                 <p className="text-xs text-indigo-300/70 mt-2">
                   Verified MySphere contracts
@@ -1194,7 +1231,7 @@ export default function HomePage() {
           <h3 className="text-lg font-semibold text-gray-300 mb-4 text-center">
             <span className="text-[#0052FF]">Verified</span> Smart Contracts
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <a href="https://basescan.org/address/0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7" target="_blank" rel="noopener noreferrer" 
                className="bg-black/30 backdrop-blur-md rounded-xl p-4 border border-gray-800 hover:border-orange-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(249,115,22,0.3)] group">
               <div className="flex items-center">
@@ -1228,6 +1265,66 @@ export default function HomePage() {
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x9c44802843a670732383f62b2f3304f92ec1702b</p>
                 </div>
                 <div className="text-gray-500 group-hover:text-indigo-400 transition-colors">
+                  <FaExternalLinkAlt className="w-3 h-3" />
+                </div>
+              </div>
+            </a>
+
+            {/* SPHERE Pioneer NFT */}
+            <a href="https://basescan.org/address/0x8edb8B2383f41e14b49414dd32c4A786Ed2e277d" target="_blank" rel="noopener noreferrer"
+               className="bg-black/30 backdrop-blur-md rounded-xl p-4 border border-gray-800 hover:border-purple-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(147,51,234,0.3)] group">
+              <div className="flex items-center">
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <div className="text-purple-400 mr-2">
+                      <FaCheckCircle className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-sm font-medium text-purple-400">SPHERE Pioneer</h3>
+                    <span className="ml-2 text-xs text-gray-500">({basePioneerData ? Number(basePioneerData) : 0} minted)</span>
+                  </div>
+                  <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x8edb8B2383f41e14b49414dd32c4A786Ed2e277d</p>
+                </div>
+                <div className="text-gray-500 group-hover:text-purple-400 transition-colors">
+                  <FaExternalLinkAlt className="w-3 h-3" />
+                </div>
+              </div>
+            </a>
+
+            {/* SPHERE Guardian NFT */}
+            <a href="https://basescan.org/address/0x4087EFD20F2A91ADeAa2b7259F61d04d1e5B233E" target="_blank" rel="noopener noreferrer"
+               className="bg-black/30 backdrop-blur-md rounded-xl p-4 border border-gray-800 hover:border-cyan-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] group">
+              <div className="flex items-center">
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <div className="text-cyan-400 mr-2">
+                      <FaCheckCircle className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-sm font-medium text-cyan-400">SPHERE Guardian</h3>
+                    <span className="ml-2 text-xs text-gray-500">({baseGuardianData ? Number(baseGuardianData) : 0} minted)</span>
+                  </div>
+                  <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x4087EFD20F2A91ADeAa2b7259F61d04d1e5B233E</p>
+                </div>
+                <div className="text-gray-500 group-hover:text-cyan-400 transition-colors">
+                  <FaExternalLinkAlt className="w-3 h-3" />
+                </div>
+              </div>
+            </a>
+
+            {/* SPHERE Master NFT */}
+            <a href="https://basescan.org/address/0x6d55153A6B1d1157f19D403DEd541fbe6De48C5A" target="_blank" rel="noopener noreferrer"
+               className="bg-black/30 backdrop-blur-md rounded-xl p-4 border border-gray-800 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(234,179,8,0.3)] group">
+              <div className="flex items-center">
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <div className="text-yellow-400 mr-2">
+                      <FaCheckCircle className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-sm font-medium text-yellow-400">SPHERE Master</h3>
+                    <span className="ml-2 text-xs text-gray-500">({baseMasterData ? Number(baseMasterData) : 0} minted)</span>
+                  </div>
+                  <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x6d55153A6B1d1157f19D403DEd541fbe6De48C5A</p>
+                </div>
+                <div className="text-gray-500 group-hover:text-yellow-400 transition-colors">
                   <FaExternalLinkAlt className="w-3 h-3" />
                 </div>
               </div>
