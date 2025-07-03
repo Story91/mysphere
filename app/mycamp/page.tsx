@@ -181,20 +181,109 @@ export default function MyCampPage() {
     }
   };
 
-  // Fetch REAL MySphere user statistics from Firebase - ONLY ON USER REQUEST
-  const fetchGlobalStats = async () => {
+  // Cache key for global statistics
+  const CACHE_KEY = 'mysphere_global_stats';
+  const REFRESH_TRACKING_KEY = 'mysphere_last_refresh';
+  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+  // Check if cached data is still valid
+  const isCacheValid = (timestamp: number) => {
+    return Date.now() - timestamp < CACHE_DURATION;
+  };
+
+  // Check if user can refresh today (only once per day)
+  const canRefreshToday = () => {
+    if (typeof window !== 'undefined') {
+      const lastRefresh = localStorage.getItem(REFRESH_TRACKING_KEY);
+      if (lastRefresh) {
+        const lastRefreshDate = new Date(parseInt(lastRefresh));
+        const today = new Date();
+        // Check if last refresh was today
+        return lastRefreshDate.toDateString() !== today.toDateString();
+      }
+    }
+    return true; // Can refresh if no record exists
+  };
+
+  // Record that user refreshed today
+  const recordRefreshToday = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(REFRESH_TRACKING_KEY, Date.now().toString());
+    }
+  };
+
+  // Load stats from cache if valid, otherwise fetch from API
+  const fetchGlobalStats = async (userRequested = false) => {
     setGlobalStatsLoading(true);
     setShowStats(true); // Show stats section when user requests
+    
     try {
+      // Check cache first
+      if (typeof window !== 'undefined') {
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        if (cachedData) {
+          const parsed = JSON.parse(cachedData);
+          if (parsed.timestamp && isCacheValid(parsed.timestamp)) {
+            setGlobalStats(parsed.data);
+            console.log('📊 MySphere stats loaded from cache:', parsed.data);
+            console.log('🗂️ Cache expires:', new Date(parsed.timestamp + CACHE_DURATION).toLocaleString());
+            setGlobalStatsLoading(false);
+            return;
+          } else if (userRequested) {
+            // User manually requested, but check if they can refresh today
+            if (!canRefreshToday()) {
+              console.log('⚠️ User already refreshed today, using cache');
+              setGlobalStats(parsed.data);
+              setGlobalStatsLoading(false);
+              return;
+            }
+            console.log('🗂️ Cache expired, user can refresh today');
+          } else {
+            console.log('🗂️ Cache expired, auto-fetching fresh data...');
+          }
+        }
+      }
+
+      // Fetch from API (only if cache is invalid or user can refresh)
+      console.log('🌐 Fetching fresh MySphere stats from API...');
       const response = await fetch('/api/camp-stats');
       const data = await response.json();
       
       if (data.success) {
         setGlobalStats(data.data);
-        console.log('📊 REAL MySphere stats loaded from Firebase on user request:', data.data);
+        
+        // Save to cache
+        if (typeof window !== 'undefined') {
+          const cacheData = {
+            data: data.data,
+            timestamp: Date.now()
+          };
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+          console.log('💾 MySphere stats saved to cache');
+          
+          // Record refresh if user requested it
+          if (userRequested) {
+            recordRefreshToday();
+            console.log('✅ Daily refresh recorded');
+          }
+        }
+        
+        console.log('📊 Fresh MySphere stats loaded from API:', data.data);
       }
     } catch (error) {
-      console.error('❌ Failed to fetch MySphere stats from Firebase:', error);
+      console.error('❌ Failed to fetch MySphere stats:', error);
+      
+      // Try to use expired cache as fallback
+      if (typeof window !== 'undefined') {
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        if (cachedData) {
+          const parsed = JSON.parse(cachedData);
+          if (parsed.data) {
+            setGlobalStats(parsed.data);
+            console.log('⚠️ Using expired cache as fallback');
+          }
+        }
+      }
     } finally {
       setGlobalStatsLoading(false);
     }
@@ -204,7 +293,75 @@ export default function MyCampPage() {
   const hideGlobalStats = () => {
     setShowStats(false);
     setGlobalStats(null);
-    console.log('📊 MySphere stats hidden for Firebase cost optimization');
+    console.log('📊 MySphere stats hidden');
+  };
+
+  // Single function to handle stats loading with daily limit
+  const handleLoadStats = () => {
+    const cacheInfo = getCacheInfo();
+    
+    if (cacheInfo.exists && cacheInfo.isValid) {
+      // Valid cache exists, load from cache
+      fetchGlobalStats(false);
+    } else if (cacheInfo.exists && !canRefreshToday()) {
+      // Cache expired but user already refreshed today
+      fetchGlobalStats(false); // Will use expired cache
+    } else {
+      // Can refresh (either no cache or user hasn't refreshed today)
+      fetchGlobalStats(true);
+    }
+  };
+
+  // Get cache info
+  const getCacheInfo = () => {
+    if (typeof window !== 'undefined') {
+      const cachedData = localStorage.getItem(CACHE_KEY);
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData);
+        return {
+          exists: true,
+          timestamp: parsed.timestamp,
+          isValid: isCacheValid(parsed.timestamp),
+          expiresAt: new Date(parsed.timestamp + CACHE_DURATION),
+          age: Math.round((Date.now() - parsed.timestamp) / (1000 * 60 * 60)) // hours
+        };
+      }
+    }
+    return { exists: false };
+  };
+
+  // Get refresh status for UI
+  const getRefreshStatus = () => {
+    const canRefresh = canRefreshToday();
+    const cacheInfo = getCacheInfo();
+    
+    if (cacheInfo.exists && cacheInfo.isValid) {
+      return {
+        canLoad: true,
+        buttonText: 'Load Statistics',
+        buttonIcon: '📊',
+        message: 'Fresh data available from cache'
+      };
+    } else if (cacheInfo.exists && !canRefresh) {
+      const lastRefresh = localStorage.getItem(REFRESH_TRACKING_KEY);
+      const nextRefreshTime = lastRefresh ? 
+        new Date(parseInt(lastRefresh) + 24 * 60 * 60 * 1000) : 
+        new Date();
+      
+      return {
+        canLoad: true,
+        buttonText: 'Load Statistics',
+        buttonIcon: '⏰',
+        message: `Using cached data (next refresh: ${nextRefreshTime.toLocaleTimeString()})`
+      };
+    } else {
+      return {
+        canLoad: true,
+        buttonText: canRefresh ? 'Load Statistics' : 'Load Statistics',
+        buttonIcon: canRefresh ? '🔄' : '📊',
+        message: canRefresh ? 'Will refresh from server' : 'Loading from cache'
+      };
+    }
   };
 
   // Debug social data
@@ -225,10 +382,14 @@ export default function MyCampPage() {
     });
   }, [authenticated, loading, address, socialsData, socialsError, socialsLoading, CLIENT_ID, API_KEY, connectedSocialsCount]);
 
-  // ⚠️ REMOVED: Auto-load global stats for Firebase cost optimization
-  // useEffect(() => {
-  //   fetchGlobalStats();
-  // }, []);
+  // Auto-load stats from cache on component mount (only if valid)
+  useEffect(() => {
+    const cacheInfo = getCacheInfo();
+    if (cacheInfo.exists && cacheInfo.isValid) {
+      console.log('🗂️ Auto-loading fresh stats from cache');
+      fetchGlobalStats(false); // This will use cache instantly
+    }
+  }, []);
 
 
 
@@ -291,7 +452,7 @@ export default function MyCampPage() {
     }
   }, [authenticated, address]);
 
-  // ⚠️ REMOVED: Auto-load global stats for Firebase cost optimization
+  // Stats are loaded only on user request to improve performance
   // useEffect(() => {
   //   fetchGlobalStats();
   // }, []);
@@ -302,7 +463,7 @@ export default function MyCampPage() {
       fetchWalletStats();
     }
     
-    // ⚠️ REMOVED: Auto-fetch global stats for Firebase cost optimization
+    // Stats are loaded only on user request to improve performance
     // if (activeTab === 'home' && !globalStats && !globalStatsLoading) {
     //   fetchGlobalStats();
     // }
@@ -1024,7 +1185,7 @@ export default function MyCampPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.9 }}
-              className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 rounded-xl p-4 sm:p-6 mb-8"
+              className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 rounded-xl p-4 sm:p-6 mb-8 min-h-[400px]"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
                 <div>
@@ -1039,12 +1200,44 @@ export default function MyCampPage() {
                   {globalStats && showStats && (
                     <div className="text-xs text-blue-200/60 mt-1">
                       Last updated: {new Date(globalStats.lastUpdated).toLocaleTimeString()} • 
-                      Source: Firebase Database (Real Data)
+                      Source: Real-time Database
+                      {(() => {
+                        const cacheInfo = getCacheInfo();
+                        const canRefresh = canRefreshToday();
+                        
+                        if (cacheInfo.exists) {
+                          return (
+                            <span className="ml-2">
+                              • Cache: {cacheInfo.age}h old {cacheInfo.isValid ? '✅' : '⏰'}
+                              {!canRefresh && ' • Daily limit used'}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   )}
                   {!showStats && (
                     <div className="text-xs text-blue-200/60 mt-1">
-                      💡 Click "Enable Statistics" to load data from Firebase
+                      💡 Click "Load Statistics" to view data
+                      {(() => {
+                        const cacheInfo = getCacheInfo();
+                        const canRefresh = canRefreshToday();
+                        
+                        if (cacheInfo.exists) {
+                          return (
+                            <span className="ml-2">
+                              • Cache available ({cacheInfo.age}h old)
+                              {!canRefresh && ' • Daily refresh used'}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="ml-2">
+                            • Server refresh: {canRefresh ? 'Available' : 'Used today'}
+                          </span>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1053,25 +1246,17 @@ export default function MyCampPage() {
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={fetchGlobalStats}
+                      onClick={handleLoadStats}
                       disabled={globalStatsLoading}
                       className="bg-green-500/80 hover:bg-green-500/90 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
                     >
-                      <span className={globalStatsLoading ? 'animate-spin' : ''}>📊</span>
-                      {globalStatsLoading ? 'Loading...' : 'Enable Statistics'}
+                      <span className={globalStatsLoading ? 'animate-spin' : ''}>
+                        {getRefreshStatus().buttonIcon}
+                      </span>
+                      {globalStatsLoading ? 'Loading...' : getRefreshStatus().buttonText}
                     </motion.button>
                   ) : (
                     <>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={fetchGlobalStats}
-                        disabled={globalStatsLoading}
-                        className="bg-blue-500/80 hover:bg-blue-500/90 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
-                      >
-                        <span className={globalStatsLoading ? 'animate-spin' : ''}>🔄</span>
-                        {globalStatsLoading ? 'Loading...' : 'Refresh'}
-                      </motion.button>
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -1090,18 +1275,59 @@ export default function MyCampPage() {
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">💤</div>
                   <p className="text-blue-200 text-lg">Statistics Disabled</p>
-                  <p className="text-blue-200/70 text-sm mt-2">Click "Enable Statistics" to load data from Firebase</p>
+                  <p className="text-blue-200/70 text-sm mt-2">Click "Load Statistics" to view MySphere data</p>
+                  <p className="text-blue-200/60 text-xs mt-1">⚡ Smart caching: Fresh data loads instantly, server refresh limited to once daily</p>
                   <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
                     <p className="text-green-300 text-xs">
-                      ✅ Firebase Cost Savings: Statistics loaded only on demand
+                      ✅ Smart Performance: Statistics cached locally, server refresh once daily
                     </p>
+                    {(() => {
+                      const cacheInfo = getCacheInfo();
+                      const canRefresh = canRefreshToday();
+                      
+                      if (cacheInfo.exists && cacheInfo.isValid) {
+                        return (
+                          <div className="mt-2 pt-2 border-t border-green-500/20">
+                            <p className="text-green-300/80 text-xs">
+                              🗂️ Fresh data cached ({cacheInfo.age}h old) - instant loading
+                            </p>
+                          </div>
+                        );
+                      } else if (cacheInfo.exists && !canRefresh) {
+                        return (
+                          <div className="mt-2 pt-2 border-t border-green-500/20">
+                            <p className="text-yellow-300/80 text-xs">
+                              ⏰ Data expired but daily limit reached - using cached version
+                            </p>
+                            <p className="text-yellow-300/60 text-xs mt-1">
+                              Next refresh available tomorrow
+                            </p>
+                          </div>
+                        );
+                      } else if (cacheInfo.exists && canRefresh) {
+                        return (
+                          <div className="mt-2 pt-2 border-t border-green-500/20">
+                            <p className="text-blue-300/80 text-xs">
+                              🔄 Data expired - will refresh from server (1x daily limit)
+                            </p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="mt-2 pt-2 border-t border-green-500/20">
+                          <p className="text-blue-300/80 text-xs">
+                            🆕 First time loading - fetching fresh data
+                          </p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ) : globalStatsLoading ? (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4 animate-spin">⏳</div>
                   <p className="text-blue-200 text-lg">Loading MySphere statistics...</p>
-                  <p className="text-blue-200/70 text-sm mt-2">Fetching real user data from Firebase</p>
+                  <p className="text-blue-200/70 text-sm mt-2">Fetching real-time user data</p>
                 </div>
               ) : globalStats ? (
                 <>
