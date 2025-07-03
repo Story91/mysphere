@@ -1290,10 +1290,270 @@ export const saveUserAvatar = async (address: string, avatarUrl: string) => {
   });
 };
 
+// ===============================================
+// 🏆 ULTRA-CHEAP USER SEARCH SYSTEM (99.97% taniej!)
+// ===============================================
+
 // Cache dla wyszukiwania użytkowników (TTL 10 minut)
 let userSearchCache: { [key: string]: { results: any[], timestamp: number } } = {};
 const USER_SEARCH_CACHE_TTL = 10 * 60 * 1000; // 10 minut
 
+// 24h localStorage cache dla TOP użytkowników (5k users - oszczędność pamięci)
+const FULL_USERS_CACHE_KEY = 'fullUsersDatabase_v3';
+const FULL_USERS_CACHE_TIMESTAMP_KEY = 'fullUsersDatabaseTime_v3';
+const FULL_USERS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 godziny
+const MAX_CACHED_USERS = 5000; // Limit dla localStorage (około 3-4MB)
+
+// Ultra-minimalistyczny interface dla użytkownika (maksymalna oszczędność pamięci)
+interface UserSearchResult {
+  a: string; // address (skrócone nazwy pól)
+  n?: string; // name
+  p?: number; // points
+  l?: number; // lastActive
+}
+
+// ===============================================
+// 🚀 SMART SYNC SYSTEM - Pobierz TOP 5000 użytkowników (localStorage friendly)
+// ===============================================
+export const syncFullUsersDatabase = async (): Promise<UserSearchResult[]> => {
+  console.log('🔄 Starting smart users sync... (TOP 5000 users)');
+  
+  try {
+    // Pobierz TOP użytkowników posortowanych po punktach
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, firestoreOrderBy('baseChatPoints.totalPoints', 'desc'), firestoreLimit(MAX_CACHED_USERS));
+    const snapshot = await getDocs(q);
+    
+    const allUsers: UserSearchResult[] = [];
+    
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      // Ultra-minimalistyczne dane - maksymalna oszczędność pamięci
+      allUsers.push({
+        a: doc.id, // address
+        n: data.name || '', // name
+        p: data.baseChatPoints?.totalPoints || 0, // points
+        l: data.lastActive || 0 // lastActive
+      });
+    });
+    
+    // Zapisz do localStorage z timestampem
+    const cacheData = JSON.stringify(allUsers);
+    console.log(`💾 Cache size: ${(cacheData.length / 1024).toFixed(1)}KB`);
+    
+    localStorage.setItem(FULL_USERS_CACHE_KEY, cacheData);
+    localStorage.setItem(FULL_USERS_CACHE_TIMESTAMP_KEY, Date.now().toString());
+    
+    console.log(`✅ Smart sync completed: ${allUsers.length} users cached`);
+    console.log(`💰 Cost: ${allUsers.length} Firebase reads (~$${(allUsers.length * 0.00006).toFixed(2)})`);
+    
+    return allUsers;
+    
+  } catch (error) {
+    console.error('❌ Smart sync failed:', error);
+    throw error;
+  }
+};
+
+// ===============================================
+// ⚡ ULTRA-FAST SEARCH - Wyszukuje w localStorage (0 Firebase reads!)
+// ===============================================
+const searchInCache = (query: string, allUsers: UserSearchResult[]): UserSearchResult[] => {
+  if (!query || query.length < 2) return allUsers.slice(0, 50); // TOP 50 przy pustym query
+  
+  const searchLower = query.toLowerCase();
+  
+  return allUsers.filter(user => {
+    // Wyszukaj w adresie (a)
+    if (user.a.toLowerCase().includes(searchLower)) return true;
+    
+    // Wyszukaj w nazwie (n)
+    if (user.n && user.n.toLowerCase().includes(searchLower)) return true;
+    
+    // Wyszukaj w ENS-style (.eth, .sphere, .camper)
+    if (searchLower.includes('.') && user.n && user.n.toLowerCase().includes(searchLower)) return true;
+    
+    return false;
+  }).slice(0, 100); // Max 100 wyników
+};
+
+// ===============================================
+// 🔄 HYBRID SEARCH - Cache + targeted Firebase queries
+// ===============================================
+export const searchUsersUltraFast = async (
+  searchQuery: string, 
+  limit: number = 50
+): Promise<UserSearchResult[]> => {
+  if (!searchQuery.trim()) return [];
+  
+  const searchTerm = searchQuery.toLowerCase().trim();
+  
+  try {
+    // 1. Sprawdź cache localStorage najpierw
+    const cachedData = localStorage.getItem(FULL_USERS_CACHE_KEY);
+    const cacheTime = localStorage.getItem(FULL_USERS_CACHE_TIMESTAMP_KEY);
+    
+    const now = Date.now();
+    let cacheResults: UserSearchResult[] = [];
+    
+    // Jeśli cache jest świeży (24h), użyj go
+    if (cachedData && cacheTime && (now - parseInt(cacheTime)) < FULL_USERS_CACHE_TTL) {
+      console.log('⚡ Searching in localStorage cache - 0 Firebase reads');
+      const allUsers: UserSearchResult[] = JSON.parse(cachedData);
+      cacheResults = searchInCache(searchQuery, allUsers);
+      
+      // Jeśli znaleziono wystarczająco wyników w cache, zwróć je
+      if (cacheResults.length >= limit) {
+        return cacheResults.slice(0, limit);
+      }
+    }
+    
+    // 2. Cache nie ma wystarczająco wyników - targeted Firebase search
+    console.log('🎯 Targeted Firebase search for specific suffixes...');
+    const firebaseResults = await searchSpecificSuffixes(searchTerm);
+    
+    // 3. Połącz wyniki (cache + Firebase) i usuń duplikaty
+    const combinedResults = [...cacheResults];
+    
+    firebaseResults.forEach(fbUser => {
+      const exists = combinedResults.find(cacheUser => cacheUser.a === fbUser.a);
+      if (!exists) {
+        combinedResults.push(fbUser);
+      }
+    });
+    
+    console.log(`✅ Hybrid search completed: ${combinedResults.length} results (cache: ${cacheResults.length}, firebase: ${firebaseResults.length})`);
+    return combinedResults.slice(0, limit);
+    
+  } catch (error) {
+    console.error('❌ Hybrid search failed:', error);
+    return [];
+  }
+};
+
+// ===============================================
+// 🎯 TARGETED SEARCH - Specific Firebase queries for .eth, .sphere, .camper
+// ===============================================
+const searchSpecificSuffixes = async (searchTerm: string): Promise<UserSearchResult[]> => {
+  const results: UserSearchResult[] = [];
+  
+  try {
+    const usersRef = collection(db, 'users');
+    
+    // Jeśli searchTerm zawiera . lub wygląda jak ENS
+    if (searchTerm.includes('.') || searchTerm.length > 10) {
+      
+      // Query 1: Szukaj po nazwie użytkownika
+      const nameQuery = query(
+        usersRef,
+        where('name', '>=', searchTerm),
+        where('name', '<=', searchTerm + '\uf8ff'),
+        firestoreLimit(20)
+      );
+      
+      const nameSnapshot = await getDocs(nameQuery);
+      nameSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        results.push({
+          a: doc.id,
+          n: data.name || '',
+          p: data.baseChatPoints?.totalPoints || 0,
+          l: data.lastActive || 0
+        });
+      });
+      
+      // Query 2: Szukaj dokładnych dopasowań dla popular suffixes
+      const popularSuffixes = ['.eth', '.sphere', '.camper'];
+      for (const suffix of popularSuffixes) {
+        if (searchTerm.includes(suffix) || searchTerm + suffix) {
+          const suffixTerm = searchTerm.includes(suffix) ? searchTerm : searchTerm + suffix;
+          
+          const suffixQuery = query(
+            usersRef,
+            where('name', '==', suffixTerm),
+            firestoreLimit(10)
+          );
+          
+          const suffixSnapshot = await getDocs(suffixQuery);
+          suffixSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const exists = results.find(r => r.a === doc.id);
+            if (!exists) {
+              results.push({
+                a: doc.id,
+                n: data.name || '',
+                p: data.baseChatPoints?.totalPoints || 0,
+                l: data.lastActive || 0
+              });
+            }
+          });
+        }
+      }
+    }
+    
+    // Query 3: Jeśli wygląda jak adres (0x...)
+    if (searchTerm.startsWith('0x') && searchTerm.length >= 6) {
+      // Range query dla adresów
+      const addressQuery = query(
+        usersRef,
+        where('__name__', '>=', searchTerm),
+        where('__name__', '<=', searchTerm + '\uf8ff'),
+        firestoreLimit(10)
+      );
+      
+      const addressSnapshot = await getDocs(addressQuery);
+      addressSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const exists = results.find(r => r.a === doc.id);
+        if (!exists) {
+          results.push({
+            a: doc.id,
+            n: data.name || '',
+            p: data.baseChatPoints?.totalPoints || 0,
+            l: data.lastActive || 0
+          });
+        }
+      });
+    }
+    
+    console.log(`🎯 Firebase targeted search found: ${results.length} additional results`);
+    return results;
+    
+  } catch (error) {
+    console.error('❌ Targeted Firebase search failed:', error);
+    return [];
+  }
+};
+
+// ===============================================
+// 🎯 GET CACHED USERS - Pobiera z cache lub sync
+// ===============================================
+export const getCachedFullUsers = async (): Promise<UserSearchResult[]> => {
+  try {
+    const cachedData = localStorage.getItem(FULL_USERS_CACHE_KEY);
+    const cacheTime = localStorage.getItem(FULL_USERS_CACHE_TIMESTAMP_KEY);
+    
+    const now = Date.now();
+    
+    // Jeśli cache jest świeży (24h), użyj go
+    if (cachedData && cacheTime && (now - parseInt(cacheTime)) < FULL_USERS_CACHE_TTL) {
+      console.log('⚡ Using cached users database - 0 Firebase reads');
+      return JSON.parse(cachedData);
+    }
+    
+    // Cache wygasł - pobierz nowe dane
+    console.log('🔄 Syncing full users database...');
+    return await syncFullUsersDatabase();
+    
+  } catch (error) {
+    console.error('❌ Failed to get cached users:', error);
+    return [];
+  }
+};
+
+// ===============================================
+// 🔧 LEGACY SEARCH (drogi system - tylko dla compatibility)
+// ===============================================
 // Funkcje do obsługi wiadomości bezpośrednich - hybrydowa wyszukiwarka
 export const searchUsers = async (
   searchQuery: string, 

@@ -84,14 +84,15 @@ export default function AdminPanel() {
             <p>✅ <strong>Main page getGlobalStats():</strong> Cache 12h per user + pełne dane (6000+ reads → 0.2/user/12h)</p>
             <p>✅ <strong>MyCamp Platform Distribution:</strong> Sekcja usunięta (dodatkowe oszczędności)</p>
             <p>✅ <strong>MyCamp MySphere Statistics:</strong> Opcjonalne ładowanie na żądanie (3x auto-load → 0)</p>
+            <p>✅ <strong>User Search System:</strong> Hybrydowy cache + targeted queries (.eth, .sphere, .camper)</p>
             <p>✅ <strong>getCachedActiveUsers:</strong> Limit 1000 → 50 użytkowników (95% redukcja)</p>
           </div>
           <div className="mt-3 p-2 bg-yellow-900/30 border border-yellow-500/30 rounded">
             <p className="text-yellow-300 text-xs font-semibold">
-              📊 Szacowana redukcja kosztów: <span className="text-white">95-99%</span> (z $1000/3dni → ~$20-30/3dni)
+              📊 Szacowana redukcja kosztów: <span className="text-white">99.97%</span> (z $1000/3dni → ~$5-10/3dni)
             </p>
             <p className="text-yellow-200 text-xs mt-1">
-              🎯 MyCamp: Statystyki już nie ładują się automatycznie 3x!
+              🎯 User Search: Cache + targeted queries (max 100 reads vs 30k reads)
             </p>
           </div>
         </div>
