@@ -26,7 +26,8 @@ import {
   ADMIN_ADDRESS,
   getCachedActiveUsers,
   searchUsers,
-  getGlobalStats
+  getGlobalStats,
+  refreshTop50UsersOnly
 } from '../utils/firebase';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
 import { Post, Comment, UserProfile, Stats } from '../types';
@@ -1329,6 +1330,7 @@ export default function BaseChat() {
       // Store user address for cache system
       localStorage.setItem('userAddress', address);
       fetchGlobalStats(); // Only fetch if user is connected
+
     }
     // No auto-refresh - cache lasts 12h per user
   }, [address]);
@@ -1841,11 +1843,13 @@ export default function BaseChat() {
         }
       });
 
-      // ⚠️ EMERGENCY: Ranking update DISABLED - was fetching ALL users for points calculation
-      // const usersSnap = await getDocs(collection(db, 'users'));
-      // This was generating 3000+ reads every time user points were calculated!
-      
-      console.log('⚠️ Active users ranking update disabled for Firebase cost reduction');
+      // ⚠️ OPTIMIZED: Use refreshTop50UsersOnly instead of ALL users (95% cost reduction)
+      try {
+        await refreshTop50UsersOnly();
+        console.log('✅ TOP 50 users ranking updated with cost optimization');
+      } catch (error) {
+        console.error('Error updating TOP 50 users ranking:', error);
+      }
     } catch (error) {
       console.error('Error saving BaseChat points:', error);
     }
@@ -1867,11 +1871,13 @@ export default function BaseChat() {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [isBaseChatPointsExpanded, setIsBaseChatPointsExpanded] = useState(true);
+  const [isBaseChatPointsExpanded, setIsBaseChatPointsExpanded] = useState(false); // ⚠️ COLLAPSED by default - expand on user request
   const [isSearchingAll, setIsSearchingAll] = useState(false);
 
   // Ref dla debounce timer
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+
 
   // Funkcja do wyszukiwania użytkowników z debounce
   const handleUserSearch = useCallback(async (query: string, forceSearchAll: boolean = false) => {
