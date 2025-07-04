@@ -2881,103 +2881,38 @@ export default function BaseChat() {
                         </div>
                       </div>
 
-                      {/* Stats Grid - Network Activity */}
-                      <div className="grid grid-cols-2 gap-4 mt-4">
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                          <div className="text-blue-500 text-2xl font-bold">{stats.transactions}</div>
-                          <div className="text-sm text-gray-500">Transactions</div>
-                          <div className="text-xs text-gray-400">{stats.transactionPoints} points</div>
-                        </div>
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                          <div className="text-green-500 text-2xl font-bold">{stats.tokens}</div>
-                          <div className="text-sm text-gray-500">Tokens</div>
-                          <div className="text-xs text-gray-400">{stats.tokenPoints} points</div>
-                        </div>
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                          <div className="text-purple-500 text-2xl font-bold">{stats.nfts}</div>
-                          <div className="text-sm text-gray-500">NFTs</div>
-                          <div className="text-xs text-gray-400">{stats.nftPoints} points</div>
-                        </div>
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                          <div className="text-yellow-500 text-2xl font-bold">{stats.contracts}</div>
-                          <div className="text-sm text-gray-500">Contracts</div>
-                          <div className="text-xs text-gray-400">{stats.contractPoints} points</div>
-                        </div>
+                      {/* Base Tracking Identity Link */}
+                      <div className="mt-4">
+                        <a
+                          href="/profile"
+                          className="block w-full p-6 bg-gradient-to-r from-gray-900 via-blue-900 to-black rounded-xl text-center hover:from-black hover:via-blue-800 hover:to-gray-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                        >
+                          <div className="flex items-center justify-center mb-3">
+                            <svg className="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                            </svg>
+                            <div className="flex items-center">
+                              <span className="text-white text-xl font-bold mr-2">Sphere Identity</span>
+                              <div className="flex items-center gap-1 px-2 py-1 bg-white/10 rounded-full">
+                                <svg className="w-4 h-4" viewBox="0 0 146 146" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="73" cy="73" r="73" fill="#0052FF"/>
+                                  <path d="M73.323 123.729C101.617 123.729 124.553 100.832 124.553 72.5875C124.553 44.343 101.617 21.4463 73.323 21.4463C46.4795 21.4463 24.4581 42.0558 22.271 68.2887H89.9859V76.8864H22.271C24.4581 103.119 46.4795 123.729 73.323 123.729Z" fill="white"/>
+                                </svg>
+                                <span className="text-white text-xs font-medium">Base</span>
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-blue-200 text-sm mb-2">
+                            View your complete on-chain identity & activity
+                          </p>
+                          <div className="flex items-center justify-center text-blue-300 text-xs">
+                            <span>Transactions • Tokens • NFTs • Contracts</span>
+                            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </div>
+                        </a>
                       </div>
-
-                      {/* Stats Grid - Posts and Likes */}
-                      <div className="grid grid-cols-2 gap-4 mt-4">
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                          <div className="text-blue-500 text-2xl font-bold">{userProfile.postCount}</div>
-                          <div className="text-sm text-gray-500">Posts</div>
-                        </div>
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                          <div className="text-pink-500 text-2xl font-bold">{userProfile.likesReceived}</div>
-                          <div className="text-sm text-gray-500">Likes Received</div>
-                        </div>
-                      </div>
-
-                      {/* Total Points Section */}
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
-                        <div className="flex justify-between items-center mb-4">
-                          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                            Total Points
-                          </div>
-                          <div className="text-2xl font-bold text-indigo-500">
-                            {stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 mb-4">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">Current Rank:</span>
-                            <span className="text-green-500 font-semibold">{currentRank}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">Next Rank:</span>
-                            <span className="text-blue-500 font-semibold">{nextRank}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">Progress:</span>
-                            <span className="text-purple-500 font-semibold">{Math.round(progress)}%</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">Badges Earned:</span>
-                            <span className="text-orange-500 font-semibold">
-                              {BADGES.filter(badge => badge.condition({
-                                totalPoints: stats.transactionPoints + stats.tokenPoints + stats.nftPoints + stats.contractPoints,
-                                rank: currentRank,
-                                percentile: 0,
-                                breakdown: {
-                                  transactionPoints: stats.transactionPoints,
-                                  tokenPoints: stats.tokenPoints,
-                                  nftPoints: stats.nftPoints,
-                                  uniqueContractPoints: stats.contractPoints
-                                },
-                                stats: {
-                                  transactions: stats.transactions,
-                                  tokens: stats.tokens,
-                                  nfts: stats.nfts,
-                                  contracts: stats.contracts
-                                }
-                              })).length}/24
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="relative pt-1">
-                          <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-gray-200 dark:bg-gray-600">
-        <div 
-                              style={{ width: `${progress}%` }}
-                              className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300"
-                            ></div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 text-xs text-gray-500 text-center">
-                          {RANK_DESCRIPTIONS[currentRank]}
-                      </div>
-                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-4 text-gray-500">
