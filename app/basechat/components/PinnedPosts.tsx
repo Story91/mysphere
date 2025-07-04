@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { useAccount } from 'wagmi';
 import PostList, { ExtendedPost } from './PostList';
-import { fetchPosts } from '../../utils/firebase';
+import { fetchPinnedPosts } from '../../utils/firebase';
 
 interface PinnedPostsProps {
   displayUserName: (userAddress: string, elementId: string, showAvatar?: boolean) => JSX.Element;
@@ -20,24 +20,15 @@ function PinnedPosts({
 
   const loadPinnedPosts = useCallback(async () => {
     try {
+      console.log('🔄 PinnedPosts: Rozpoczynam ładowanie przypiętych postów...');
       setIsLoading(true);
-      const { posts: allPosts } = await fetchPosts({ 
-        limit: 100 // Pobierz więcej postów żeby znaleźć przypięte
-      });
+      // Bezpośrednio pobierz tylko przypięte posty
+      const pinnedPosts = await fetchPinnedPosts();
       
-      // Filtruj tylko przypięte posty
-      const pinned = allPosts.filter(post => post.isPinned);
-      
-      // Sortuj przypięte posty według czasu przypięcia (najnowsze pierwsze)
-      pinned.sort((a, b) => {
-        const aPinnedAt = a.pinnedAt || 0;
-        const bPinnedAt = b.pinnedAt || 0;
-        return bPinnedAt - aPinnedAt;
-      });
-      
-      setPinnedPosts(pinned);
+      console.log(`📌 PinnedPosts: Otrzymano ${pinnedPosts.length} przypiętych postów:`, pinnedPosts);
+      setPinnedPosts(pinnedPosts);
     } catch (error) {
-      console.error('Error loading pinned posts:', error);
+      console.error('❌ PinnedPosts: Błąd podczas ładowania przypiętych postów:', error);
     } finally {
       setIsLoading(false);
     }
@@ -47,13 +38,35 @@ function PinnedPosts({
     loadPinnedPosts();
   }, [address, loadPinnedPosts]);
 
-  const handleRefreshPinnedPosts = useCallback(async () => {
-    await loadPinnedPosts();
+  const handleRefreshPinnedPosts = useCallback(async (newPosts?: ExtendedPost[]) => {
+    if (newPosts) {
+      // Optymistyczna aktualizacja - używamy przekazanych postów
+      const pinned = newPosts.filter((post: ExtendedPost) => post.isPinned);
+      
+      // Sortuj przypięte posty według czasu przypięcia (najnowsze pierwsze)
+      pinned.sort((a: ExtendedPost, b: ExtendedPost) => {
+        const aPinnedAt = a.pinnedAt || 0;
+        const bPinnedAt = b.pinnedAt || 0;
+        return bPinnedAt - aPinnedAt;
+      });
+      
+      setPinnedPosts(pinned);
+    } else {
+      // Tylko gdy nie mamy nowych postów, odświeżamy z Firebase
+      await loadPinnedPosts();
+    }
   }, [loadPinnedPosts]);
 
+  const handleRefreshClick = useCallback(() => {
+    handleRefreshPinnedPosts(); // Bez parametrów - odświeżenie z Firebase
+  }, [handleRefreshPinnedPosts]);
+
   if (pinnedPosts.length === 0 && !isLoading) {
+    console.log('🚫 PinnedPosts: Nie wyświetlam sekcji - brak przypiętych postów i nie ładuję');
     return null; // Nie pokazuj sekcji jeśli nie ma przypiętych postów
   }
+
+  console.log(`🎯 PinnedPosts: Wyświetlam sekcję z ${pinnedPosts.length} postami, isLoading: ${isLoading}`);
 
   return (
     <div className="mb-6">
@@ -78,7 +91,7 @@ function PinnedPosts({
         </div>
         
         <button
-          onClick={handleRefreshPinnedPosts}
+          onClick={handleRefreshClick}
           className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center space-x-1"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

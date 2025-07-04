@@ -3786,3 +3786,67 @@ export const unpinPost = async (postId: string, adminAddress: string): Promise<b
 export const isUserAdmin = (userAddress: string): boolean => {
   return userAddress.toLowerCase() === ADMIN_ADDRESS;
 };
+
+// Funkcja do pobierania TYLKO przypiętych postów
+export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
+  try {
+    console.log('🔍 fetchPinnedPosts: Rozpoczynam pobieranie przypiętych postów...');
+    const postsCollection = collection(db, 'posts');
+    
+    // Zapytanie tylko o przypięte posty (bez sortowania na razie)
+    const pinnedQuery = query(
+      postsCollection,
+      where('isPinned', '==', true)
+    );
+    
+    const pinnedSnapshot = await getDocs(pinnedQuery);
+    console.log(`🔍 fetchPinnedPosts: Znaleziono ${pinnedSnapshot.docs.length} przypiętych postów`);
+    
+    const pinnedPosts: ExtendedPost[] = [];
+    
+    for (const postDoc of pinnedSnapshot.docs) {
+      const postData = postDoc.data();
+      console.log(`🔍 fetchPinnedPosts: Przetwarzam post ${postDoc.id}, isPinned: ${postData.isPinned}`);
+      
+      const post: ExtendedPost = {
+        id: postDoc.id,
+        author: postData.author,
+        content: postData.content,
+        timestamp: postData.timestamp instanceof Timestamp 
+          ? postData.timestamp.toMillis() 
+          : (postData.timestamp || Date.now()),
+        likes: postData.likes || 0,
+        likedBy: postData.likedBy || [],
+        comments: postData.comments || [],
+        tags: postData.tags || [],
+        mentions: postData.mentions || [],
+        image: postData.image || null,
+        video: postData.video || null,
+        txHash: postData.txHash || null,
+        lastEdited: postData.lastEdited || null,
+        zoraCoinAddress: postData.zoraCoinAddress || null,
+        network: postData.network || 'base',
+        isPinned: true, // Zawsze true bo zapytanie tylko o przypięte
+        pinnedAt: postData.pinnedAt instanceof Timestamp 
+          ? postData.pinnedAt.toMillis() 
+          : (postData.pinnedAt || Date.now()),
+        pinnedBy: postData.pinnedBy || undefined,
+      };
+      
+      pinnedPosts.push(post);
+    }
+    
+    // Sortuj po czasie przypięcia po stronie klienta
+    pinnedPosts.sort((a, b) => {
+      const aPinnedAt = a.pinnedAt || 0;
+      const bPinnedAt = b.pinnedAt || 0;
+      return bPinnedAt - aPinnedAt;
+    });
+    
+    console.log(`✅ fetchPinnedPosts: Zwracam ${pinnedPosts.length} przypiętych postów`);
+    return pinnedPosts;
+  } catch (error) {
+    console.error('❌ fetchPinnedPosts: Błąd podczas pobierania przypiętych postów:', error);
+    return [];
+  }
+};
