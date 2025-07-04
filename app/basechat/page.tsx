@@ -296,7 +296,7 @@ export default function BaseChat() {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showPostImagePreview, setShowPostImagePreview] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [showNetworkDropdown, setShowNetworkDropdown] = useState(false);
+
   
   // Hook do sprawdzania BaseName
   const { data: baseName, isLoading: isBaseNameLoading } = useName({ 
