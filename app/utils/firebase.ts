@@ -98,6 +98,12 @@ const addBaseNameBonusToUser = async (userAddress: string): Promise<void> => {
       baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
       baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
       baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
+      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
+      
+      // Sprawdź czy użytkownik już ma baseNameBonus - jeśli tak, nie dodawaj ponownie
+      if (baseChatPoints.baseNameBonus) {
+        return; // Użytkownik już ma bonus, nie rób nic
+      }
       
       // Dodaj baseNameBonus jako liczbę
       baseChatPoints.baseNameBonus = 1000;
@@ -115,7 +121,7 @@ const addBaseNameBonusToUser = async (userAddress: string): Promise<void> => {
         lastUpdated: serverTimestamp()
       });
       
-      console.log(`Dodano baseNameBonus dla użytkownika ${userAddress}`);
+      console.log(`✅ Dodano baseNameBonus (1000 pts) dla nowego użytkownika ${userAddress}`);
     }
   } catch (error) {
     console.error('Error adding BaseName bonus:', error);
