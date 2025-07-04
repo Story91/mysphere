@@ -5,6 +5,7 @@ import ProfileSocials from './ProfileSocials';
 import { toast } from 'react-hot-toast';
 import { UserRank, RANK_DESCRIPTIONS } from '../../utils/ranking';
 import { Avatar } from '@coinbase/onchainkit/identity';
+import TipButton from './TipButton';
 
 // Talent Protocol API types
 interface TalentScore {
@@ -433,15 +434,28 @@ export default function BuilderProfile({
                     </span>
                   </div>
                 )}
-                <button
-                  onClick={copyAddressToClipboard}
-                  className="flex items-center text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md mt-1 w-fit"
-                >
-                  <span className="mr-1.5 font-mono">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </button>
+                <div className="flex items-center space-x-2 mt-1">
+                  <button
+                    onClick={copyAddressToClipboard}
+                    className="flex items-center text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md w-fit"
+                  >
+                    <span className="mr-1.5 font-mono">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                  
+                  {/* Tip Button - Don't show for own profile */}
+                  {currentUserAddress !== userAddress && (
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-md">
+                      <TipButton
+                        recipientAddress={userAddress}
+                        postId={`profile-${userAddress}`}
+                        className="text-gray-500 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-400 p-1"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
                     </div>
