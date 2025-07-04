@@ -12,6 +12,7 @@ import {
 import { parseEther, parseUnits, formatEther, formatUnits, encodeFunctionData } from 'viem';
 import { toast } from 'react-hot-toast';
 import { base } from 'wagmi/chains';
+import { saveTip } from '../../utils/firebase';
 
 // USDC contract address on Base
 const USDC_ADDRESS = '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA';
@@ -63,9 +64,47 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   // Check if on correct network
   const isCorrectNetwork = chainId === base.id;
 
-  const handleTransactionStatus = useCallback((status: any) => {
+  const handleTransactionStatus = useCallback(async (status: any) => {
     if (status.statusName === 'success') {
-      toast.success(`Tip sent successfully! 🎉`);
+      try {
+        // Save tip to Firebase
+        const txHash = status.statusData?.transactionHash || '';
+        await saveTip({
+          senderAddress: address!,
+          recipientAddress,
+          amount: tipAmount,
+          token: selectedToken,
+          postId,
+          txHash,
+          network: 'base'
+        });
+        
+        toast.success(`Tip sent successfully! 🎉 Transaction: ${txHash.slice(0, 10)}...`);
+        
+        // Show transaction link
+        if (txHash) {
+          setTimeout(() => {
+            toast.success(
+              <div className="flex flex-col gap-1">
+                <span>View transaction:</span>
+                <a 
+                  href={`https://basescan.org/tx/${txHash}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-700 underline text-xs"
+                >
+                  {txHash.slice(0, 20)}...
+                </a>
+              </div>,
+              { duration: 10000 }
+            );
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('Error saving tip:', error);
+        toast.error('Tip sent but failed to save to database');
+      }
+      
       setIsTransacting(false);
       setIsOpen(false);
       setTipAmount('0.001');
@@ -77,7 +116,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
       toast.loading('Sending tip...');
       setIsTransacting(true);
     }
-  }, []);
+  }, [address, recipientAddress, tipAmount, selectedToken, postId]);
 
   const getCalls = useCallback(() => {
     if (!isConnected || !address || !recipientAddress || !tipAmount) {

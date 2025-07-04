@@ -6,6 +6,8 @@ import { toast } from 'react-hot-toast';
 import { UserRank, RANK_DESCRIPTIONS } from '../../utils/ranking';
 import { Avatar } from '@coinbase/onchainkit/identity';
 import TipButton from './TipButton';
+import TipStats from './TipStats';
+import RecentTips from './RecentTips';
 
 // Talent Protocol API types
 interface TalentScore {
@@ -455,6 +457,12 @@ export default function BuilderProfile({
                       />
                     </div>
                   )}
+                  
+                  {/* Tip Stats - Show received tips for this user */}
+                  <TipStats
+                    userAddress={userAddress}
+                    className="ml-2"
+                  />
                 </div>
               </div>
             </div>
@@ -777,6 +785,15 @@ export default function BuilderProfile({
             </div>
           </div>
         )}
+        
+        {/* Recent Tips */}
+        <div className="mt-6">
+          <RecentTips 
+            userAddress={userAddress}
+            limit={10}
+            className="w-full"
+          />
+        </div>
       </div>
     </div>
   );

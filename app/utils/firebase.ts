@@ -3848,3 +3848,181 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
     return [];
   }
 };
+
+// ===== TIP TRACKING SYSTEM =====
+
+export interface Tip {
+  id?: string;
+  senderAddress: string;
+  recipientAddress: string;
+  amount: string;
+  token: 'ETH' | 'USDC';
+  postId?: string; // Optional - for tips on specific posts
+  txHash: string;
+  timestamp: number;
+  network: 'base' | 'basecamp';
+}
+
+export interface TipStats {
+  totalReceived: number;
+  totalSent: number;
+  tipCount: number;
+  ethReceived: number;
+  usdcReceived: number;
+  ethSent: number;
+  usdcSent: number;
+}
+
+export interface PostTipStats {
+  totalTips: number;
+  ethTips: number;
+  usdcTips: number;
+  tipCount: number;
+  uniqueTippers: number;
+}
+
+// Zapisuje tip do Firebase po udanej transakcji
+export const saveTip = async (tip: Omit<Tip, 'id' | 'timestamp'>): Promise<string> => {
+  try {
+    const tipData = {
+      ...tip,
+      timestamp: Date.now(),
+    };
+    
+    const docRef = await addDoc(collection(db, 'tips'), tipData);
+    console.log('✅ Tip zapisany:', tipData);
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Błąd zapisywania tipu:', error);
+    throw error;
+  }
+};
+
+// Pobiera statystyki tipów dla użytkownika
+export const getUserTipStats = async (userAddress: string): Promise<TipStats> => {
+  try {
+    const tipsRef = collection(db, 'tips');
+    const receivedQuery = query(tipsRef, where('recipientAddress', '==', userAddress));
+    const sentQuery = query(tipsRef, where('senderAddress', '==', userAddress));
+    
+    const [receivedSnapshot, sentSnapshot] = await Promise.all([
+      getDocs(receivedQuery),
+      getDocs(sentQuery)
+    ]);
+    
+    const stats: TipStats = {
+      totalReceived: 0,
+      totalSent: 0,
+      tipCount: 0,
+      ethReceived: 0,
+      usdcReceived: 0,
+      ethSent: 0,
+      usdcSent: 0
+    };
+    
+    // Policz otrzymane tipy
+    receivedSnapshot.docs.forEach(doc => {
+      const tip = doc.data() as Tip;
+      const amount = parseFloat(tip.amount);
+      stats.tipCount++;
+      stats.totalReceived += amount;
+      
+      if (tip.token === 'ETH') {
+        stats.ethReceived += amount;
+      } else {
+        stats.usdcReceived += amount;
+      }
+    });
+    
+    // Policz wysłane tipy
+    sentSnapshot.docs.forEach(doc => {
+      const tip = doc.data() as Tip;
+      const amount = parseFloat(tip.amount);
+      stats.totalSent += amount;
+      
+      if (tip.token === 'ETH') {
+        stats.ethSent += amount;
+      } else {
+        stats.usdcSent += amount;
+      }
+    });
+    
+    return stats;
+  } catch (error) {
+    console.error('❌ Błąd pobierania statystyk tipów:', error);
+    return {
+      totalReceived: 0,
+      totalSent: 0,
+      tipCount: 0,
+      ethReceived: 0,
+      usdcReceived: 0,
+      ethSent: 0,
+      usdcSent: 0
+    };
+  }
+};
+
+// Pobiera statystyki tipów dla konkretnego posta
+export const getPostTipStats = async (postId: string): Promise<PostTipStats> => {
+  try {
+    const tipsRef = collection(db, 'tips');
+    const postTipsQuery = query(tipsRef, where('postId', '==', postId));
+    const snapshot = await getDocs(postTipsQuery);
+    
+    const stats: PostTipStats = {
+      totalTips: 0,
+      ethTips: 0,
+      usdcTips: 0,
+      tipCount: 0,
+      uniqueTippers: 0
+    };
+    
+    const uniqueTippers = new Set<string>();
+    
+    snapshot.docs.forEach(doc => {
+      const tip = doc.data() as Tip;
+      const amount = parseFloat(tip.amount);
+      
+      stats.tipCount++;
+      stats.totalTips += amount;
+      uniqueTippers.add(tip.senderAddress);
+      
+      if (tip.token === 'ETH') {
+        stats.ethTips += amount;
+      } else {
+        stats.usdcTips += amount;
+      }
+    });
+    
+    stats.uniqueTippers = uniqueTippers.size;
+    return stats;
+  } catch (error) {
+    console.error('❌ Błąd pobierania statystyk tipów posta:', error);
+    return {
+      totalTips: 0,
+      ethTips: 0,
+      usdcTips: 0,
+      tipCount: 0,
+      uniqueTippers: 0
+    };
+  }
+};
+
+// Pobiera ostatnie tipy użytkownika (otrzymane)
+export const getRecentTips = async (userAddress: string, limit: number = 10): Promise<Tip[]> => {
+  try {
+    const tipsRef = collection(db, 'tips');
+    const recentTipsQuery = query(
+      tipsRef, 
+      where('recipientAddress', '==', userAddress),
+      firestoreOrderBy('timestamp', 'desc'),
+      firestoreLimit(limit)
+    );
+    
+    const snapshot = await getDocs(recentTipsQuery);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tip));
+  } catch (error) {
+    console.error('❌ Błąd pobierania ostatnich tipów:', error);
+    return [];
+  }
+};

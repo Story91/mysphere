@@ -13,6 +13,7 @@ import CommentTransactionButton from '../../components/CommentTransactionButton'
 import CommentTransactionButtonBaseCamp from './BaseCampPosts/CommentTransactionButtonBaseCamp';
 import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
 import TipButton from './TipButton';
+import TipStats from './TipStats';
 
 // Import Zora SDK functions and types
 import { getProfileBalances } from '@zoralabs/coins-sdk';
@@ -1500,6 +1501,12 @@ export default function PostList({
           {/* Tip Button - Show for all posts */}
           <TipButton
             recipientAddress={post.author}
+            postId={post.id}
+            className="text-gray-900 dark:text-gray-200"
+          />
+
+          {/* Tip Stats - Show received tips for posts */}
+          <TipStats
             postId={post.id}
             className="text-gray-900 dark:text-gray-200"
           />
