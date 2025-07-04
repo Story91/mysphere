@@ -478,353 +478,162 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* Static Data Management Section */}
+      {/* Global Statistics */}
       {activeTab === 'globalstats' && (
         <div>
-          <h2 className="text-2xl font-bold text-white mb-4">📊 ULTRA-CHEAP Static Data Management</h2>
-          <p className="text-green-200 mb-6">
-            ✅ Cost reduced from $63,000/day to $0/day! Manage static data for Home page and MyCAMP.
-          </p>
-
-          {/* Static Data Optimization Notice */}
-          <div className="mb-6 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
-            <h3 className="text-lg font-semibold text-green-400 mb-2">🎉 Firebase Cost Optimization Complete!</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div className="space-y-1">
-                <p className="text-green-300">✅ <strong>Home Page:</strong> Static data (was $48,000/day)</p>
-                <p className="text-green-300">✅ <strong>MyCAMP Stats:</strong> Static data (was $15,000/day)</p>
-                <p className="text-green-300">✅ <strong>Total Saved:</strong> $63,000+ per day</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-green-300">✅ <strong>Firebase Reads:</strong> 800M+ → 0 per day</p>
-                <p className="text-green-300">✅ <strong>Users:</strong> See realistic, fast-loading stats</p>
-                <p className="text-green-300">✅ <strong>Admin:</strong> Can fetch real data on-demand</p>
-              </div>
+          <h2 className="text-2xl font-bold text-white mb-6">📊 Global Statistics</h2>
+          
+          <div className="bg-white/10 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-white">Current Stats</h3>
+              {lastGlobalStatsUpdate && (
+                <div className="text-sm text-blue-300">
+                  Last updated: {lastGlobalStatsUpdate}
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* Real Data Fetching (Admin Only) */}
-          <div className="bg-red-500/10 rounded-lg p-6 mb-6 border border-red-500/30">
-            <h3 className="text-lg font-semibold text-red-300 mb-4">🔐 Admin Only: Real Firebase Data</h3>
-            <p className="text-red-200 text-sm mb-4">
-              Warning: This fetches real data from Firebase and costs ~$1.50 per request!
-            </p>
-
-            <div className="flex gap-4 mb-4">
+            <div className="flex gap-4 mb-6 flex-wrap">
               <button
-                onClick={fetchRealStats}
-                disabled={realStatsLoading}
+                onClick={handleFetchGlobalStats}
+                disabled={loadingGlobalStats}
                 className={`px-6 py-3 rounded-lg font-medium transition-all ${
-                  realStatsLoading
+                  loadingGlobalStats
+                    ? 'bg-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } text-white`}
+              >
+                {loadingGlobalStats ? (
+                  <span className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Loading...
+                  </span>
+                ) : (
+                  '📋 Fetch Cached Stats (FREE)'
+                )}
+              </button>
+
+              <button
+                onClick={handleFetchRealTimeStats}
+                disabled={loadingGlobalStats}
+                className={`px-6 py-3 rounded-lg font-medium transition-all ${
+                  loadingGlobalStats
                     ? 'bg-gray-500 cursor-not-allowed'
                     : 'bg-red-600 hover:bg-red-700'
                 } text-white`}
               >
-                {realStatsLoading ? (
+                {loadingGlobalStats ? (
                   <span className="flex items-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Fetching... ($1.50)
+                    Loading...
                   </span>
                 ) : (
-                  '💰 Fetch Real Stats ($1.50)'
+                  '🔐 Fetch REAL Firebase Data ($1.50)'
                 )}
               </button>
 
-              {realStatsData && (
+              {globalStats && (
                 <button
-                  onClick={exportStaticData}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all"
+                  onClick={handleExportStats}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
                 >
-                  💾 Export Static Template
+                  💾 Export JSON
                 </button>
               )}
             </div>
 
-            {/* Display Real Stats */}
-            {realStatsData && (
-              <div className="mt-4 p-4 bg-black/30 rounded-lg">
-                <p className="text-green-400 font-medium mb-2">✅ Real Firebase Data Loaded:</p>
-                
-                {/* Main Global Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-sm mb-4">
-                  <div>
-                    <p className="text-gray-400">Global Users:</p>
-                    <p className="text-white font-bold">{realStatsData.global?.userCount?.toLocaleString()}</p>
+            {/* Data Source Indicator */}
+            {globalStats && (
+              <div className={`mb-6 p-3 rounded-lg text-sm ${
+                globalStats.dataSource === 'firebase-realtime' 
+                  ? 'bg-red-500/20 border border-red-500/50 text-red-200'
+                  : 'bg-blue-500/20 border border-blue-500/50 text-blue-200'
+              }`}>
+                {globalStats.dataSource === 'firebase-realtime' ? (
+                  <div className="flex items-center">
+                    <span className="text-red-400 mr-2">🔐</span>
+                    <span className="font-medium">REAL-TIME Firebase data</span>
+                    <span className="ml-2 text-red-300">
+                      (Cost: ~${((globalStats.userCount + globalStats.postsCount) * 0.00006).toFixed(2)})
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-gray-400">Global Posts:</p>
-                    <p className="text-white font-bold">{realStatsData.global?.postsCount?.toLocaleString()}</p>
+                ) : (
+                  <div className="flex items-center">
+                    <span className="text-blue-400 mr-2">📋</span>
+                    <span className="font-medium">Cached data (12h cache)</span>
+                    <span className="ml-2 text-blue-300">(Cost: $0)</span>
                   </div>
-                  <div>
-                    <p className="text-gray-400">Total Likes:</p>
-                    <p className="text-white font-bold">{realStatsData.global?.likesCount?.toLocaleString()}</p>
+                )}
+              </div>
+            )}
+
+            {/* Stats Display - Only 5 stats */}
+            {globalStats && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className={`relative bg-purple-500/20 rounded-lg p-6 text-center border border-purple-500/30 transition-all duration-300 ${
+                  updateTrigger.users ? 'scale-105 shadow-lg shadow-purple-500/20' : ''
+                }`}>
+                  <div className={`text-4xl font-bold text-purple-300 transition-all duration-500 ${
+                    updateTrigger.users ? 'text-purple-100 scale-110' : ''
+                  }`}>
+                    {(animatedStats.users || globalStats.userCount || 0).toLocaleString()}
                   </div>
-                  <div>
-                    <p className="text-gray-400">Total Comments:</p>
-                    <p className="text-white font-bold">{realStatsData.global?.commentsCount?.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Transactions:</p>
-                    <p className="text-white font-bold">{realStatsData.global?.transactionsCount?.toLocaleString()}</p>
-                  </div>
+                  <div className="text-sm text-purple-200 mt-2">Global Users</div>
+                  {updateTrigger.users && (
+                    <div className="absolute inset-0 bg-purple-500/10 rounded-lg animate-pulse"></div>
+                  )}
                 </div>
-                
-                {/* Additional Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4 pt-4 border-t border-gray-500/30">
-                  <div>
-                    <p className="text-gray-400">MySphere Users:</p>
-                    <p className="text-white font-bold">{realStatsData.mySphere?.totalUsers?.toLocaleString()}</p>
+
+                <div className={`relative bg-blue-500/20 rounded-lg p-6 text-center border border-blue-500/30 transition-all duration-300 ${
+                  updateTrigger.posts ? 'scale-105 shadow-lg shadow-blue-500/20' : ''
+                }`}>
+                  <div className={`text-4xl font-bold text-blue-300 transition-all duration-500 ${
+                    updateTrigger.posts ? 'text-blue-100 scale-110' : ''
+                  }`}>
+                    {(animatedStats.posts || globalStats.postsCount || 0).toLocaleString()}
                   </div>
-                  <div>
-                    <p className="text-gray-400">Cost per request:</p>
-                    <p className="text-red-300 font-bold">{realStatsData.adminInfo?.cost}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Data source:</p>
-                    <p className="text-blue-300 font-bold">{realStatsData.adminInfo?.dataSource}</p>
-                  </div>
+                  <div className="text-sm text-blue-200 mt-2">Global Posts</div>
+                  {updateTrigger.posts && (
+                    <div className="absolute inset-0 bg-blue-500/10 rounded-lg animate-pulse"></div>
+                  )}
                 </div>
-                
-                {/* Export Real Data Button */}
-                <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h5 className="text-green-400 font-medium mb-1">💾 Export Real Firebase Data</h5>
-                      <p className="text-green-300 text-xs">
-                        Download current Firebase statistics as JSON file
-                      </p>
-                    </div>
-                    <button
-                      onClick={exportStaticData}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-all"
-                    >
-                      📄 Export JSON
-                    </button>
+
+                <div className={`relative bg-green-500/20 rounded-lg p-6 text-center border border-green-500/30 transition-all duration-300 ${
+                  updateTrigger.likes ? 'scale-105 shadow-lg shadow-green-500/20' : ''
+                }`}>
+                  <div className={`text-4xl font-bold text-green-300 transition-all duration-500 ${
+                    updateTrigger.likes ? 'text-green-100 scale-110' : ''
+                  }`}>
+                    {(animatedStats.likes || globalStats.likesCount || 0).toLocaleString()}
                   </div>
+                  <div className="text-sm text-green-200 mt-2">Total Likes</div>
+                  {updateTrigger.likes && (
+                    <div className="absolute inset-0 bg-green-500/10 rounded-lg animate-pulse"></div>
+                  )}
+                </div>
+
+                <div className={`relative bg-yellow-500/20 rounded-lg p-6 text-center border border-yellow-500/30 transition-all duration-300 ${
+                  updateTrigger.comments ? 'scale-105 shadow-lg shadow-yellow-500/20' : ''
+                }`}>
+                  <div className={`text-4xl font-bold text-yellow-300 transition-all duration-500 ${
+                    updateTrigger.comments ? 'text-yellow-100 scale-110' : ''
+                  }`}>
+                    {(animatedStats.comments || globalStats.commentsCount || 0).toLocaleString()}
+                  </div>
+                  <div className="text-sm text-yellow-200 mt-2">Total Comments</div>
+                  {updateTrigger.comments && (
+                    <div className="absolute inset-0 bg-yellow-500/10 rounded-lg animate-pulse"></div>
+                  )}
+                </div>
+
+                <div className={`relative bg-cyan-500/20 rounded-lg p-6 text-center border border-cyan-500/30 transition-all duration-300`}>
+                  <div className="text-4xl font-bold text-cyan-300 transition-all duration-500">
+                    {realStatsData?.mySphere?.totalUsers?.toLocaleString() || 'N/A'}
+                  </div>
+                  <div className="text-sm text-cyan-200 mt-2">MySphere Users</div>
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Legacy Global Stats Section (keep for compatibility) */}
-          <div className="bg-gray-500/10 rounded-lg p-6 mb-6 border border-gray-500/30">
-            <h3 className="text-lg font-semibold text-gray-300 mb-4">📊 Legacy: Old Global Statistics</h3>
-            <p className="text-gray-400 text-sm mb-4">
-              Note: This is the old system - now replaced with static data for cost optimization.
-            </p>
-
-            {/* Fetch Global Stats Section */}
-            <div className="bg-white/10 rounded-lg p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">📊 Fetch Current Stats</h3>
-                {lastGlobalStatsUpdate && (
-                  <div className="text-sm text-blue-300">
-                    Last updated: {lastGlobalStatsUpdate}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-4 mb-6 flex-wrap">
-                <button
-                  onClick={handleFetchGlobalStats}
-                  disabled={loadingGlobalStats}
-                  className={`px-6 py-3 rounded-lg font-medium transition-all ${
-                    loadingGlobalStats
-                      ? 'bg-gray-500 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  } text-white`}
-                >
-                  {loadingGlobalStats ? (
-                    <span className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Fetching...
-                    </span>
-                  ) : (
-                    '📋 Fetch Cached Stats'
-                  )}
-                </button>
-
-                <button
-                  onClick={handleFetchRealTimeStats}
-                  disabled={loadingGlobalStats}
-                  className={`px-6 py-3 rounded-lg font-medium transition-all ${
-                    loadingGlobalStats
-                      ? 'bg-gray-500 cursor-not-allowed'
-                      : 'bg-red-600 hover:bg-red-700'
-                  } text-white`}
-                >
-                  {loadingGlobalStats ? (
-                    <span className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Loading...
-                    </span>
-                  ) : (
-                    '🔐 Fetch REAL Firebase Data'
-                  )}
-                </button>
-
-                {globalStats && (
-                  <button
-                    onClick={handleExportStats}
-                    className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
-                  >
-                    💾 Export to JSON
-                  </button>
-                )}
-              </div>
-
-              {/* Data Source Indicator */}
-              {globalStats && (
-                <div className={`mb-4 p-3 rounded-lg text-sm ${
-                  globalStats.dataSource === 'firebase-realtime' 
-                    ? 'bg-red-500/20 border border-red-500/50 text-red-200'
-                    : 'bg-blue-500/20 border border-blue-500/50 text-blue-200'
-                }`}>
-                  {globalStats.dataSource === 'firebase-realtime' ? (
-                    <div className="flex items-center">
-                      <span className="text-red-400 mr-2">🔐</span>
-                      <span className="font-medium">REAL-TIME Firebase data</span>
-                      <span className="ml-2 text-red-300">
-                        (Cost: ~${((globalStats.userCount + globalStats.postsCount) * 0.00006).toFixed(2)})
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center">
-                      <span className="text-blue-400 mr-2">📋</span>
-                      <span className="font-medium">Cached data (12h cache)</span>
-                      <span className="ml-2 text-blue-300">(Cost: $0)</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Display Stats - Animated counters like home page */}
-              {globalStats && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                  <div className={`relative bg-purple-500/20 rounded-lg p-4 text-center border border-purple-500/30 transition-all duration-300 ${
-                    updateTrigger.users ? 'scale-105 shadow-lg shadow-purple-500/20' : ''
-                  }`}>
-                    <div className={`text-3xl font-bold text-purple-300 transition-all duration-500 ${
-                      updateTrigger.users ? 'text-purple-100 scale-110' : ''
-                    }`}>
-                      {(animatedStats.users || globalStats.userCount || 0).toLocaleString()}
-                    </div>
-                    <div className="text-sm text-purple-200">Total Users</div>
-                    {updateTrigger.users && (
-                      <div className="absolute inset-0 bg-purple-500/10 rounded-lg animate-pulse"></div>
-                    )}
-                  </div>
-
-                  <div className={`relative bg-blue-500/20 rounded-lg p-4 text-center border border-blue-500/30 transition-all duration-300 ${
-                    updateTrigger.posts ? 'scale-105 shadow-lg shadow-blue-500/20' : ''
-                  }`}>
-                    <div className={`text-3xl font-bold text-blue-300 transition-all duration-500 ${
-                      updateTrigger.posts ? 'text-blue-100 scale-110' : ''
-                    }`}>
-                      {(animatedStats.posts || globalStats.postsCount || 0).toLocaleString()}
-                    </div>
-                    <div className="text-sm text-blue-200">Total Posts</div>
-                    {updateTrigger.posts && (
-                      <div className="absolute inset-0 bg-blue-500/10 rounded-lg animate-pulse"></div>
-                    )}
-                  </div>
-
-                  <div className={`relative bg-green-500/20 rounded-lg p-4 text-center border border-green-500/30 transition-all duration-300 ${
-                    updateTrigger.likes ? 'scale-105 shadow-lg shadow-green-500/20' : ''
-                  }`}>
-                    <div className={`text-3xl font-bold text-green-300 transition-all duration-500 ${
-                      updateTrigger.likes ? 'text-green-100 scale-110' : ''
-                    }`}>
-                      {(animatedStats.likes || globalStats.likesCount || 0).toLocaleString()}
-                    </div>
-                    <div className="text-sm text-green-200">Total Likes</div>
-                    {updateTrigger.likes && (
-                      <div className="absolute inset-0 bg-green-500/10 rounded-lg animate-pulse"></div>
-                    )}
-                  </div>
-
-                  <div className={`relative bg-yellow-500/20 rounded-lg p-4 text-center border border-yellow-500/30 transition-all duration-300 ${
-                    updateTrigger.comments ? 'scale-105 shadow-lg shadow-yellow-500/20' : ''
-                  }`}>
-                    <div className={`text-3xl font-bold text-yellow-300 transition-all duration-500 ${
-                      updateTrigger.comments ? 'text-yellow-100 scale-110' : ''
-                    }`}>
-                      {(animatedStats.comments || globalStats.commentsCount || 0).toLocaleString()}
-                    </div>
-                    <div className="text-sm text-yellow-200">Total Comments</div>
-                    {updateTrigger.comments && (
-                      <div className="absolute inset-0 bg-yellow-500/10 rounded-lg animate-pulse"></div>
-                    )}
-                  </div>
-
-                  <div className={`relative bg-pink-500/20 rounded-lg p-4 text-center border border-pink-500/30 transition-all duration-300 ${
-                    updateTrigger.transactions ? 'scale-105 shadow-lg shadow-pink-500/20' : ''
-                  }`}>
-                    <div className={`text-3xl font-bold text-pink-300 transition-all duration-500 ${
-                      updateTrigger.transactions ? 'text-pink-100 scale-110' : ''
-                    }`}>
-                      {(animatedStats.transactions || globalStats.transactionsCount || 0).toLocaleString()}
-                    </div>
-                    <div className="text-sm text-pink-200">Transactions</div>
-                    {updateTrigger.transactions && (
-                      <div className="absolute inset-0 bg-pink-500/10 rounded-lg animate-pulse"></div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Cache Management Section */}
-              <div className="mt-6 p-4 bg-blue-500/20 rounded-lg border border-blue-500/50">
-                <h4 className="text-blue-300 font-medium mb-3">🚀 Ultra-Cheap Cache System</h4>
-                <p className="text-blue-200 text-sm mb-4">
-                  New optimized user names system reduces Firebase costs by 95%! Monitor cache performance here.
-                </p>
-                
-                <div className="flex gap-4 mb-4">
-                  <button
-                    onClick={() => {
-                      const stats = getUserNamesCacheStats();
-                      alert(`Cache Stats:\n- Total entries: ${stats.total}\n- Fresh entries: ${stats.fresh}\n- Stale entries: ${stats.stale}\n- Hit rate: ${stats.hitRate}`);
-                    }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-all"
-                  >
-                    📊 Check Cache Stats
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      if (confirm('Clear user names cache? This will force fresh Firebase fetches.')) {
-                        clearUserNamesCache();
-                        alert('✅ Cache cleared successfully!');
-                      }
-                    }}
-                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm transition-all"
-                  >
-                    🧹 Clear Cache
-                  </button>
-                </div>
-                
-                <div className="text-xs text-blue-300">
-                  💰 Expected savings: ~$40,000/month vs old system
-                </div>
-              </div>
-
-              {/* Instructions */}
-              <div className="mt-6 p-4 bg-yellow-500/20 rounded-lg border border-yellow-500/50">
-                <h4 className="text-yellow-300 font-medium mb-2">💡 Usage Instructions:</h4>
-                <ul className="text-yellow-200 text-sm space-y-1">
-                  <li>1. 📋 "Fetch Cached Stats" - FREE, shows data from 12h cache</li>
-                  <li>2. 🔐 "Fetch REAL Firebase Data" - EXPENSIVE (~$1-2), shows current live data</li>
-                  <li>3. Export the REAL data to JSON file for analysis</li>
-                  <li>4. Use REAL data only when you need accurate current numbers</li>
-                  <li>5. ⚠️ Each REAL fetch costs ~20k Firebase reads - use sparingly!</li>
-                </ul>
-                <div className="mt-3 p-2 bg-red-500/20 rounded text-xs text-red-200">
-                  ⚠️ Warning: Only use "Fetch REAL Firebase Data" when you need exact current numbers. 
-                  Cached data is sufficient for most admin tasks and costs $0.
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       )}
