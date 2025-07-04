@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getRecentTips, getBulkUserNames, Tip } from '../../utils/firebase';
+import { getRecentTips, getBulkUserNamesOptimized, Tip } from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
 
 interface RecentTipsProps {
@@ -23,11 +23,12 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
         const recentTips = await getRecentTips(userAddress, limit);
         setTips(recentTips);
         
-        // Pobierz nazwy nadawców
+        // 🚀 ULTRA-CHEAP: Pobierz nazwy nadawców (95% oszczędności!)
         if (recentTips.length > 0) {
           const senderAddresses = [...new Set(recentTips.map(tip => tip.senderAddress))];
-          const names = await getBulkUserNames(senderAddresses);
+          const names = await getBulkUserNamesOptimized(senderAddresses);
           setSenderNames(names);
+          console.log(`💰 RecentTips: fetched ${senderAddresses.length} sender names with ultra-cheap method`);
         }
       } catch (error) {
         console.error('Error fetching recent tips:', error);

@@ -164,7 +164,7 @@ export default function PostList({
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [isTransacting, setIsTransacting] = useState(false);
   
-  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
+  // ❌ Usunięto loadMoreTriggerRef - nie potrzebny bez infinite scroll
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
@@ -527,23 +527,7 @@ export default function PostList({
   const [displayLimit, setDisplayLimit] = useState(100);
   const displayedPosts = sortedPosts.slice(0, displayLimit);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && sortedPosts.length > displayLimit) {
-        setDisplayLimit(prev => prev + 50);
-      }
-    }, { threshold: 0.5 });
-
-    if (loadMoreTriggerRef.current) {
-      observer.observe(loadMoreTriggerRef.current);
-    }
-    
-    return () => {
-      if (loadMoreTriggerRef.current) {
-        observer.unobserve(loadMoreTriggerRef.current);
-      }
-    };
-  }, [displayLimit, sortedPosts]);
+  // ❌ USUNIĘTO DRUGI INFINITE SCROLL obserwator - oszczędność Firebase reads/writes
 
   const loadMorePosts = async () => {
     if (!hasMorePosts || isLoadingMore || !address) return;
@@ -592,27 +576,8 @@ export default function PostList({
     }
   };
 
-  useEffect(() => {
-    // Ustawienie obserwatora dla infinite scroll - tylko gdy nie jest wyłączony
-    if (disableInfiniteScroll) return;
-    
-    const observer = new IntersectionObserver((entries) => {
-      // Gdy element obserwowany jest widoczny i mamy więcej postów
-      if (entries[0].isIntersecting && hasMorePosts && !isLoadingMore) {
-        loadMorePosts();
-      }
-    }, { threshold: 0.1, rootMargin: '100px' }); // Zmniejszamy próg dla wcześniejszego ładowania
-
-    if (loadMoreTriggerRef.current) {
-      observer.observe(loadMoreTriggerRef.current);
-    }
-    
-    return () => {
-      if (loadMoreTriggerRef.current) {
-        observer.unobserve(loadMoreTriggerRef.current);
-      }
-    };
-  }, [hasMorePosts, isLoadingMore, lastVisible, loadMorePosts, disableInfiniteScroll]);
+  // ❌ USUNIĘTO INFINITE SCROLL - oszczędność Firebase reads/writes
+  // Teraz tylko przycisk "Load More" będzie kontrolować ładowanie kolejnych postów
 
   useEffect(() => {
     const setInitialLastVisible = async () => {
@@ -1646,24 +1611,26 @@ export default function PostList({
         </React.Fragment>
       ))}
       
-      {!disableInfiniteScroll && (
-        <div ref={loadMoreTriggerRef} className="flex justify-center p-4">
-          {isLoadingMore ? (
-            <div className="animate-pulse space-y-4 w-full">
-              <div className="bg-gray-200 dark:bg-gray-700 h-10 rounded-lg"></div>
-            </div>
-          ) : hasMorePosts ? (
-            <button 
-              onClick={loadMorePosts}
-              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            >
-              Load more
-            </button>
-          ) : posts.length > 0 ? (
-            <p className="text-gray-500 dark:text-gray-400 text-sm">No more posts to load</p>
-          ) : null}
-        </div>
-      )}
+      {/* ✅ ZAWSZE PRZYCISK LOAD MORE - oszczędność Firebase costs */}
+      <div className="flex justify-center p-4">
+        {isLoadingMore ? (
+          <div className="animate-pulse space-y-4 w-full">
+            <div className="bg-gray-200 dark:bg-gray-700 h-10 rounded-lg"></div>
+          </div>
+        ) : hasMorePosts ? (
+          <button 
+            onClick={loadMorePosts}
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg"
+          >
+            📚 Load More Posts
+          </button>
+        ) : posts.length > 0 ? (
+          <div className="text-center p-4">
+            <div className="text-gray-500 dark:text-gray-400 text-sm mb-2">🎉 You've reached the end!</div>
+            <div className="text-gray-400 dark:text-gray-500 text-xs">All posts have been loaded</div>
+          </div>
+        ) : null}
+      </div>
 
       {enlargedImage && (
         <div 
