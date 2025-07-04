@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, PropsWithChildren } from 'react';
+import { useState, useRef, useEffect, useCallback, PropsWithChildren, useMemo } from 'react';
 import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
 import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
@@ -29,7 +29,10 @@ import {
   getGlobalStats,
   refreshTop50UsersOnly,
   searchUsersUltraFast,
-  getCachedFullUsers
+  getCachedFullUsers,
+  pinPost,
+  unpinPost,
+  isUserAdmin
 } from '../utils/firebase';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
 import { Post, Comment, UserProfile, Stats } from '../types';
@@ -56,6 +59,7 @@ import YapsMetrics from '../yapscan/components/YapsMetrics';
 
 import PostList, { ExtendedPost } from './components/PostList';
 import ProfileCard from './components/ProfileCard';
+import PinnedPosts from './components/PinnedPosts';
 import { HomeIcon, UserIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
 // Import Zora SDK functions
 import { createCoin, getCoinCreateFromLogs } from '@zoralabs/coins-sdk';
@@ -334,7 +338,7 @@ export default function BaseChat() {
   };
 
   // Funkcja pomocnicza do wyświetlania nazwy użytkownika z tooltipem
-  const displayUserName = (userAddress: string, elementId: string, showAvatar: boolean = false) => {
+  const displayUserName = useCallback((userAddress: string, elementId: string, showAvatar: boolean = false) => {
     // Sprawdź, czy mamy już nazwę w cache
     const userName = userNames[userAddress]?.name || userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
     const hasBaseName = isBaseName(userName);
@@ -387,7 +391,7 @@ export default function BaseChat() {
         </div>
       </div>
     );
-  };
+  }, [userNames]); // Usunięto handleViewBuilderProfile z zależności bo jest zdefiniowana później
 
   // Funkcja do zapisywania własnej nazwy
   const handleSaveCustomName = async () => {
@@ -493,7 +497,7 @@ export default function BaseChat() {
   }, [isConnected, address]); // Remove networkFilter from dependencies
 
   // Update onRefreshPosts to not use network filtering
-  const onRefreshPosts = async (newPosts?: ExtendedPost[]) => {
+  const onRefreshPosts = useCallback(async (newPosts?: ExtendedPost[]) => {
     if (!address) return;
     
     try {
@@ -503,23 +507,21 @@ export default function BaseChat() {
         // Przypadek 1: Otrzymaliśmy nowe posty z infinite scroll
         // lub zoptymalizowane posty z funkcji handleToggleLike
         
-        // Sprawdź, czy posty mają takie same ID jak istniejące (optymistyczny update)
-        // lub są to nowe posty (infinite scroll)
-        const existingIds = new Set(posts.map(p => p.id));
-        const hasExistingIds = newPosts.some(p => existingIds.has(p.id));
-        
-        if (hasExistingIds) {
-          // To jest optymistyczny update - całkowicie zastąp posty
-          setPosts(newPosts);
-        } else {
-          // To są nowe posty z infinite scroll - dodaj je do istniejących
-          setPosts(currentPosts => {
-            // Filtruj tylko nowe posty, których jeszcze nie mamy
+        setPosts(currentPosts => {
+          // Sprawdź, czy posty mają takie same ID jak istniejące (optymistyczny update)
+          // lub są to nowe posty (infinite scroll)
+          const existingIds = new Set(currentPosts.map(p => p.id));
+          const hasExistingIds = newPosts.some(p => existingIds.has(p.id));
+          
+          if (hasExistingIds) {
+            // To jest optymistyczny update - całkowicie zastąp posty
+            return newPosts;
+          } else {
+            // To są nowe posty z infinite scroll - dodaj je do istniejących
             const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
-            // Zwróć połączone tablice postów
             return [...currentPosts, ...uniqueNewPosts];
-          });
-        }
+          }
+        });
       } else {
         // Przypadek 2: Standardowe odświeżenie - pobierz wszystkie posty od nowa
         const { posts: refreshedPosts } = await fetchPosts({ 
@@ -533,7 +535,7 @@ export default function BaseChat() {
     } finally {
       setIsLoadingPosts(false);
     }
-  };
+  }, [address]); // Usunięto 'posts' z zależności żeby uniknąć nieskończonej pętli
 
   // Dodaj stan dla przechowywania hash transakcji i flagi blokującej wielokrotne tworzenie postów
   const [storedTxHash, setStoredTxHash] = useState<string | null>(null);
@@ -1705,7 +1707,11 @@ export default function BaseChat() {
     return matchesSearch;
   });
 
-  const sortedPosts = [...searchFilteredPosts].sort((a, b) => {
+  // Filtruj posty przypięte z głównego feeda (są już w sekcji PinnedPosts)
+  const nonPinnedPosts = searchFilteredPosts.filter(post => !post.isPinned);
+  
+  const sortedPosts = [...nonPinnedPosts].sort((a, b) => {
+    // Sortuj normalnie według timestamp (bez logiki dla postów przypiętych)
     if (sortOrder === 'newest') {
       return b.timestamp - a.timestamp;
     } else {
@@ -3282,6 +3288,12 @@ export default function BaseChat() {
                           </div>
                     </div>
                   )}
+
+                      {/* Pinned Posts Section */}
+                      <PinnedPosts
+                        displayUserName={displayUserName}
+                        userNames={userNames}
+                      />
 
                       {/* Tutaj zastępuję kod wyświetlający posty komponentem PostList */}
                       <PostList 

@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { Post, Comment } from '../../types';
 import { doc, updateDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
-import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, ADMIN_ADDRESS } from '../../utils/firebase';
+import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, ADMIN_ADDRESS, pinPost, unpinPost, isUserAdmin } from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { Avatar as CoinbaseAvatar } from '@coinbase/onchainkit/identity';
@@ -104,6 +104,7 @@ interface PostListProps {
   userNames: {[key: string]: {name: string, avatar?: string}};
   posts: ExtendedPost[];
   isLoading?: boolean;
+  disableInfiniteScroll?: boolean; // Nowy prop do wyłączenia infinite scroll
 }
 
 // Utility function for extracting hashtags from text
@@ -131,7 +132,8 @@ export default function PostList({
   displayUserName,
   userNames,
   posts,
-  isLoading = false
+  isLoading = false,
+  disableInfiniteScroll = false
 }: PostListProps) {
   const [newComments, setNewComments] = useState<{[key: string]: string}>({});
   const [expandedPosts, setExpandedPosts] = useState<{[key: string]: boolean}>({});
@@ -200,6 +202,48 @@ export default function PostList({
       console.error('Error deleting post:', error);
       toast.error('Failed to delete post');
       await refreshPosts();
+    }
+  };
+
+  const handlePinPost = async (postId: string) => {
+    if (!address || !isUserAdmin(address)) {
+      toast.error('Only admins can pin posts');
+      return;
+    }
+    
+    try {
+      const success = await pinPost(postId, address);
+      
+      if (success) {
+        toast.success('Post pinned successfully');
+        await refreshPosts();
+      } else {
+        toast.error('Failed to pin post');
+      }
+    } catch (error) {
+      console.error('Error pinning post:', error);
+      toast.error('Failed to pin post');
+    }
+  };
+
+  const handleUnpinPost = async (postId: string) => {
+    if (!address || !isUserAdmin(address)) {
+      toast.error('Only admins can unpin posts');
+      return;
+    }
+    
+    try {
+      const success = await unpinPost(postId, address);
+      
+      if (success) {
+        toast.success('Post unpinned successfully');
+        await refreshPosts();
+      } else {
+        toast.error('Failed to unpin post');
+      }
+    } catch (error) {
+      console.error('Error unpinning post:', error);
+      toast.error('Failed to unpin post');
     }
   };
 
@@ -547,7 +591,9 @@ export default function PostList({
   };
 
   useEffect(() => {
-    // Ustawienie obserwatora dla infinite scroll
+    // Ustawienie obserwatora dla infinite scroll - tylko gdy nie jest wyłączony
+    if (disableInfiniteScroll) return;
+    
     const observer = new IntersectionObserver((entries) => {
       // Gdy element obserwowany jest widoczny i mamy więcej postów
       if (entries[0].isIntersecting && hasMorePosts && !isLoadingMore) {
@@ -564,7 +610,7 @@ export default function PostList({
         observer.unobserve(loadMoreTriggerRef.current);
       }
     };
-  }, [hasMorePosts, isLoadingMore, lastVisible, loadMorePosts]);
+  }, [hasMorePosts, isLoadingMore, lastVisible, loadMorePosts, disableInfiniteScroll]);
 
   useEffect(() => {
     const setInitialLastVisible = async () => {
@@ -1045,15 +1091,24 @@ export default function PostList({
     const isAuthor = post.author === address;
     const commentCount = post.comments?.length || 0;
     const postDate = formatTimestamp(post.timestamp);
-    const canEdit = isAuthor || address === ADMIN_ADDRESS;
-    const canDelete = isAuthor || address === ADMIN_ADDRESS;
+    const canEdit = isAuthor || address?.toLowerCase() === ADMIN_ADDRESS;
+    const canDelete = isAuthor || address?.toLowerCase() === ADMIN_ADDRESS;
     const isTextExpanded = expandedTextPosts[post.id] || false;
     const zoraData = postTokenData[post.id];
     const isLoadingData = isLoadingTokenData[post.id];
     const isBaseCampPost = post.network === 'basecamp';
 
     return (
-      <div key={`post-${post.id}`} className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 border border-gray-100 dark:border-gray-700">
+      <div key={`post-${post.id}`} className={`bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 border relative ${
+        post.isPinned 
+          ? 'border-yellow-300 dark:border-yellow-600 shadow-yellow-100 dark:shadow-yellow-900/20 shadow-lg' 
+          : 'border-gray-100 dark:border-gray-700'
+      }`}>
+        {/* Gradient overlay dla przypięć */}
+        {post.isPinned && (
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-50/30 via-transparent to-yellow-50/30 dark:from-yellow-900/10 dark:via-transparent dark:to-yellow-900/10 rounded-xl pointer-events-none" />
+        )}
+        <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
             <div className="flex-shrink-0">
@@ -1069,6 +1124,20 @@ export default function PostList({
             </div>
             <div className="flex items-center">
               {displayUserName(post.author, `post-author-${post.id}`, false)}
+              
+              {/* Przypięcie - żółta gwiazdka */}
+              {post.isPinned && (
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-yellow-50/50 dark:bg-yellow-900/20 shadow-sm">
+                  <svg 
+                    className="w-4 h-4 text-yellow-500 drop-shadow-md"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                  <span className="ml-1 text-xs bg-gradient-to-r from-yellow-600 to-orange-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Pinned</span>
+                </div>
+              )}
               
               {/* BaseCamp badge */}
               {isBaseCampPost && (
@@ -1448,13 +1517,25 @@ export default function PostList({
               <button className="hover:text-gray-700 dark:hover:text-gray-300">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
               </button>
-              <div className="absolute right-0 bottom-full mb-1 w-28 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 border border-gray-100 dark:border-gray-600">
+              <div className="absolute right-0 bottom-full mb-1 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 border border-gray-100 dark:border-gray-600">
                 {canEdit && (
                   <button
                     onClick={() => { setEditingPost(post.id); setEditedContent(post.content); }}
                     className="block w-full text-left px-4 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
                   >
                     Edit
+                  </button>
+                )}
+                {address && isUserAdmin(address) && (
+                  <button
+                    onClick={() => post.isPinned ? handleUnpinPost(post.id) : handlePinPost(post.id)}
+                    className={`block w-full text-left px-4 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-600 ${
+                      post.isPinned 
+                        ? 'text-yellow-600 dark:text-yellow-400' 
+                        : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {post.isPinned ? '📌 Unpin' : '📌 Pin'}
                   </button>
                 )}
                 {canDelete && (
@@ -1500,6 +1581,7 @@ export default function PostList({
             {renderComments(post)}
           </div>
         )}
+        </div>
       </div>
     );
   };
@@ -1549,22 +1631,24 @@ export default function PostList({
         </React.Fragment>
       ))}
       
-      <div ref={loadMoreTriggerRef} className="flex justify-center p-4">
-        {isLoadingMore ? (
-        <div className="animate-pulse space-y-4 w-full">
-          <div className="bg-gray-200 dark:bg-gray-700 h-10 rounded-lg"></div>
+      {!disableInfiniteScroll && (
+        <div ref={loadMoreTriggerRef} className="flex justify-center p-4">
+          {isLoadingMore ? (
+            <div className="animate-pulse space-y-4 w-full">
+              <div className="bg-gray-200 dark:bg-gray-700 h-10 rounded-lg"></div>
+            </div>
+          ) : hasMorePosts ? (
+            <button 
+              onClick={loadMorePosts}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Load more
+            </button>
+          ) : posts.length > 0 ? (
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No more posts to load</p>
+          ) : null}
         </div>
-      ) : hasMorePosts ? (
-          <button 
-            onClick={loadMorePosts}
-            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          >
-            Load more
-          </button>
-      ) : posts.length > 0 ? (
-        <p className="text-gray-500 dark:text-gray-400 text-sm">No more posts to load</p>
-      ) : null}
-      </div>
+      )}
 
       {enlargedImage && (
         <div 

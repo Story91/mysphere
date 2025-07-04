@@ -580,6 +580,11 @@ export const fetchPosts = async ({
           lastEdited: postData.lastEdited || null,
           zoraCoinAddress: postData.zoraCoinAddress || null,
           network: postData.network || 'base', // Include network property and default to 'base' for backward compatibility
+          isPinned: postData.isPinned || false,
+          pinnedAt: postData.pinnedAt instanceof Timestamp 
+            ? postData.pinnedAt.toMillis() 
+            : (postData.pinnedAt || undefined),
+          pinnedBy: postData.pinnedBy || undefined,
         };
         
         // Dodatkowe filtrowanie po stronie klienta dla wyszukiwania (jeśli potrzebne)
@@ -594,6 +599,23 @@ export const fetchPosts = async ({
         posts.push(post);
       }
     }
+    
+    // Sortuj posty: przypięte na górze, potem reszta według kolejności
+    posts.sort((a, b) => {
+      // Jeśli jeden post jest przypięty, a drugi nie
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      
+      // Jeśli oba posty są przypięte, sortuj po czasie przypięcia (najnowsze przypięcie pierwsze)
+      if (a.isPinned && b.isPinned) {
+        const aPinnedAt = a.pinnedAt || 0;
+        const bPinnedAt = b.pinnedAt || 0;
+        return bPinnedAt - aPinnedAt;
+      }
+      
+      // Jeśli żaden post nie jest przypięty, zachowaj oryginalną kolejność (już posortowaną przez Firebase)
+      return 0;
+    });
     
     // Zwróć posty wraz z informacją o ostatnim widocznym dokumencie do paginacji
     return { 
@@ -3716,4 +3738,51 @@ export const getCachedActiveUsers = async (limit: number = 50, forceRefresh: boo
     console.error('❌ Error updating active users cache:', error);
     return cachedActiveUsers.slice(0, limit); // Zwróć stary cache w przypadku błędu
   }
+};
+
+// Funkcje do przypinania postów przez adminów
+export const pinPost = async (postId: string, adminAddress: string): Promise<boolean> => {
+  try {
+    // Sprawdź czy użytkownik jest adminem
+    if (adminAddress.toLowerCase() !== ADMIN_ADDRESS) {
+      throw new Error('Only admins can pin posts');
+    }
+
+    const postRef = doc(db, 'posts', postId);
+    await updateDoc(postRef, {
+      isPinned: true,
+      pinnedAt: serverTimestamp(),
+      pinnedBy: adminAddress
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error pinning post:', error);
+    return false;
+  }
+};
+
+export const unpinPost = async (postId: string, adminAddress: string): Promise<boolean> => {
+  try {
+    // Sprawdź czy użytkownik jest adminem
+    if (adminAddress.toLowerCase() !== ADMIN_ADDRESS) {
+      throw new Error('Only admins can unpin posts');
+    }
+
+    const postRef = doc(db, 'posts', postId);
+    await updateDoc(postRef, {
+      isPinned: false,
+      pinnedAt: deleteField(),
+      pinnedBy: deleteField()
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error unpinning post:', error);
+    return false;
+  }
+};
+
+export const isUserAdmin = (userAddress: string): boolean => {
+  return userAddress.toLowerCase() === ADMIN_ADDRESS;
 };

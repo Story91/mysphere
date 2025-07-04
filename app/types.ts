@@ -19,6 +19,9 @@ export interface Post {
   zoraCoinAddress?: string;
   lastEdited?: any;
   network?: 'base' | 'basecamp';
+  isPinned?: boolean;
+  pinnedAt?: number;
+  pinnedBy?: string;
 }
 
 export interface Comment {
