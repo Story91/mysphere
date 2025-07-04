@@ -79,7 +79,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
           network: 'base'
         });
         
-        toast.success(`Tip sent successfully! 🎉 Transaction: ${txHash.slice(0, 10)}...`);
+        toast.success(`Tip sent successfully! 🎉 Transaction: ${txHash.slice(0, 10)}...`, { duration: 3000 });
         
         // Show transaction link
         if (txHash) {
