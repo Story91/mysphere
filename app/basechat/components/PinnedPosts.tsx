@@ -20,19 +20,15 @@ function PinnedPosts({
 
   const loadPinnedPosts = useCallback(async () => {
     try {
-      console.log('🔄 PinnedPosts: Rozpoczynam ładowanie przypiętych postów...');
       setIsLoading(true);
-      // Bezpośrednio pobierz tylko przypięte posty
       const pinnedPosts = await fetchPinnedPosts();
-      
-      console.log(`📌 PinnedPosts: Otrzymano ${pinnedPosts.length} przypiętych postów:`, pinnedPosts);
       setPinnedPosts(pinnedPosts);
     } catch (error) {
       console.error('❌ PinnedPosts: Błąd podczas ładowania przypiętych postów:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);  // Nie ma zależności zewnętrznych
+  }, []);
 
   useEffect(() => {
     loadPinnedPosts();
@@ -62,11 +58,8 @@ function PinnedPosts({
   }, [handleRefreshPinnedPosts]);
 
   if (pinnedPosts.length === 0 && !isLoading) {
-    console.log('🚫 PinnedPosts: Nie wyświetlam sekcji - brak przypiętych postów i nie ładuję');
     return null; // Nie pokazuj sekcji jeśli nie ma przypiętych postów
   }
-
-  console.log(`🎯 PinnedPosts: Wyświetlam sekcję z ${pinnedPosts.length} postami, isLoading: ${isLoading}`);
 
   return (
     <div className="mb-6">

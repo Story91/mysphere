@@ -936,19 +936,22 @@ export const getBulkUserNames = async (addresses: string[]): Promise<{[key: stri
       let avatar = undefined;
       let isBaseName = false;
       
-      // Sprawdź czy użytkownik ma BaseName - ma najwyższy priorytet
-      if (usernameDoc.exists() && usernameDoc.data().isBaseName) {
+      // Sprawdź czy użytkownik ma JAKĄKOLWIEK nazwę w kolekcji usernames (BaseName, .sphere, .camper itp.)
+      if (usernameDoc.exists() && usernameDoc.data().name) {
         name = usernameDoc.data().name;
-        isBaseName = true;
-        // Usuwam log: console.log(`User ${address} has BaseName: ${name}`);
+        // Sprawdź czy to BaseName - ma najwyższy priorytet
+        if (usernameDoc.data().isBaseName) {
+          isBaseName = true;
+        }
+        // Usuwam log: console.log(`User ${address} has username: ${name}, isBaseName: ${isBaseName}`);
       }
       
       // Pobierz dane z profilu użytkownika
       if (userDoc.exists()) {
         const userData = userDoc.data();
         
-        // Użyj nazwy z users tylko jeśli użytkownik NIE ma BaseName
-        if (!isBaseName && userData.name) {
+        // Użyj nazwy z users tylko jeśli użytkownik NIE ma żadnej nazwy w kolekcji usernames
+        if (!name && userData.name) {
           name = userData.name;
           // Usuwam log: console.log(`User ${address} has regular name: ${name}`);
         }
@@ -963,13 +966,6 @@ export const getBulkUserNames = async (addresses: string[]): Promise<{[key: stri
       }
       
       userInfo[address] = { name, avatar };
-      
-      // Dodaj informację o BaseName do konsoli dla debugowania - tylko dla wyjątkowych przypadków
-      /*
-      if (isBaseName) {
-        console.log(`Returning BaseName for ${address}: ${name}`);
-      }
-      */
     }
     
     return userInfo;
@@ -3790,23 +3786,20 @@ export const isUserAdmin = (userAddress: string): boolean => {
 // Funkcja do pobierania TYLKO przypiętych postów
 export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
   try {
-    console.log('🔍 fetchPinnedPosts: Rozpoczynam pobieranie przypiętych postów...');
     const postsCollection = collection(db, 'posts');
     
-    // Zapytanie tylko o przypięte posty (bez sortowania na razie)
+    // Zapytanie tylko o przypięte posty
     const pinnedQuery = query(
       postsCollection,
       where('isPinned', '==', true)
     );
     
     const pinnedSnapshot = await getDocs(pinnedQuery);
-    console.log(`🔍 fetchPinnedPosts: Znaleziono ${pinnedSnapshot.docs.length} przypiętych postów`);
     
     const pinnedPosts: ExtendedPost[] = [];
     
     for (const postDoc of pinnedSnapshot.docs) {
       const postData = postDoc.data();
-      console.log(`🔍 fetchPinnedPosts: Przetwarzam post ${postDoc.id}, isPinned: ${postData.isPinned}`);
       
       const post: ExtendedPost = {
         id: postDoc.id,
@@ -3826,7 +3819,7 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
         lastEdited: postData.lastEdited || null,
         zoraCoinAddress: postData.zoraCoinAddress || null,
         network: postData.network || 'base',
-        isPinned: true, // Zawsze true bo zapytanie tylko o przypięte
+        isPinned: true,
         pinnedAt: postData.pinnedAt instanceof Timestamp 
           ? postData.pinnedAt.toMillis() 
           : (postData.pinnedAt || Date.now()),
@@ -3843,7 +3836,6 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
       return bPinnedAt - aPinnedAt;
     });
     
-    console.log(`✅ fetchPinnedPosts: Zwracam ${pinnedPosts.length} przypiętych postów`);
     return pinnedPosts;
   } catch (error) {
     console.error('❌ fetchPinnedPosts: Błąd podczas pobierania przypiętych postów:', error);
