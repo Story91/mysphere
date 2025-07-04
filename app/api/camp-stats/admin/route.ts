@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { 
   getMySphereGlobalStats,
-  getGlobalStats,
+  getGlobalStatsRealTime,
   ADMIN_ADDRESS 
 } from '../../../utils/firebase';
 
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // Pobierz prawdziwe dane (kosztowne!)
     const [mySphereStats, globalStats] = await Promise.all([
       getMySphereGlobalStats(),
-      getGlobalStats()
+      getGlobalStatsRealTime()
     ]);
     
     const combinedStats = {

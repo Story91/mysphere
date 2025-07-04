@@ -10,7 +10,7 @@ import ContentModeration from './components/ContentModeration';
 import Statistics from './components/Statistics';
 import { refreshTop50UsersOnly } from '../utils/firebase';
 import AdminQuotes from './quotes/page';
-import { getGlobalStats, getUserNamesCacheStats, clearUserNamesCache } from '../utils/firebase';
+import { getGlobalStats, getGlobalStatsRealTime, getUserNamesCacheStats, clearUserNamesCache } from '../utils/firebase';
 
 // Usuwam stałą ADMIN_ADDRESS, bo importujemy ją z firebase.ts
 const ADMIN_BASENAME = "story91.base.eth";
@@ -84,7 +84,7 @@ export default function AdminPanel() {
     setLoadingGlobalStats(true);
     
     try {
-      console.log('🔄 Admin fetching FULL global stats...');
+      console.log('🔄 Admin fetching CACHED global stats...');
       const stats = await getGlobalStats();
       setGlobalStats(stats);
       setLastGlobalStatsUpdate(new Date().toLocaleString());
@@ -98,9 +98,38 @@ export default function AdminPanel() {
         animateStatValue(stats.transactionsCount, 'transactions');
       }
       
-      console.log('✅ Admin global stats loaded:', stats);
+      console.log('✅ Admin cached stats loaded:', stats);
     } catch (error) {
       console.error('❌ Error fetching admin global stats:', error);
+      setGlobalStats(null);
+    } finally {
+      setLoadingGlobalStats(false);
+    }
+  };
+
+  // 🔐 ADMIN: Pobierz prawdziwe dane Firebase (bez cache!)
+  const handleFetchRealTimeStats = async () => {
+    setLoadingGlobalStats(true);
+    
+    try {
+      console.log('🔐 Admin fetching REAL-TIME Firebase stats (no cache)...');
+      const stats = await getGlobalStatsRealTime();
+      setGlobalStats(stats);
+      setLastGlobalStatsUpdate(new Date().toLocaleString());
+      
+      // 🎯 Animate stats counters
+      if (stats) {
+        animateStatValue(stats.userCount, 'users');
+        animateStatValue(stats.postsCount, 'posts');
+        animateStatValue(stats.likesCount, 'likes');
+        animateStatValue(stats.commentsCount, 'comments');
+        animateStatValue(stats.transactionsCount, 'transactions');
+      }
+      
+      console.log(`✅ REAL-TIME Firebase stats loaded:`, stats);
+      console.log(`💰 Cost: ~$${((stats.userCount + stats.postsCount) * 0.00006).toFixed(2)} for this request`);
+    } catch (error) {
+      console.error('❌ Error fetching real-time Firebase stats:', error);
       setGlobalStats(null);
     } finally {
       setLoadingGlobalStats(false);
@@ -595,7 +624,7 @@ export default function AdminPanel() {
                 )}
               </div>
 
-              <div className="flex gap-4 mb-6">
+              <div className="flex gap-4 mb-6 flex-wrap">
                 <button
                   onClick={handleFetchGlobalStats}
                   disabled={loadingGlobalStats}
@@ -611,7 +640,26 @@ export default function AdminPanel() {
                       Fetching...
                     </span>
                   ) : (
-                    '🔄 Fetch Global Stats'
+                    '📋 Fetch Cached Stats'
+                  )}
+                </button>
+
+                <button
+                  onClick={handleFetchRealTimeStats}
+                  disabled={loadingGlobalStats}
+                  className={`px-6 py-3 rounded-lg font-medium transition-all ${
+                    loadingGlobalStats
+                      ? 'bg-gray-500 cursor-not-allowed'
+                      : 'bg-red-600 hover:bg-red-700'
+                  } text-white`}
+                >
+                  {loadingGlobalStats ? (
+                    <span className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Loading...
+                    </span>
+                  ) : (
+                    '🔐 Fetch REAL Firebase Data'
                   )}
                 </button>
 
@@ -624,6 +672,31 @@ export default function AdminPanel() {
                   </button>
                 )}
               </div>
+
+              {/* Data Source Indicator */}
+              {globalStats && (
+                <div className={`mb-4 p-3 rounded-lg text-sm ${
+                  globalStats.dataSource === 'firebase-realtime' 
+                    ? 'bg-red-500/20 border border-red-500/50 text-red-200'
+                    : 'bg-blue-500/20 border border-blue-500/50 text-blue-200'
+                }`}>
+                  {globalStats.dataSource === 'firebase-realtime' ? (
+                    <div className="flex items-center">
+                      <span className="text-red-400 mr-2">🔐</span>
+                      <span className="font-medium">REAL-TIME Firebase data</span>
+                      <span className="ml-2 text-red-300">
+                        (Cost: ~${((globalStats.userCount + globalStats.postsCount) * 0.00006).toFixed(2)})
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <span className="text-blue-400 mr-2">📋</span>
+                      <span className="font-medium">Cached data (12h cache)</span>
+                      <span className="ml-2 text-blue-300">(Cost: $0)</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Display Stats - Animated counters like home page */}
               {globalStats && (
@@ -740,11 +813,16 @@ export default function AdminPanel() {
               <div className="mt-6 p-4 bg-yellow-500/20 rounded-lg border border-yellow-500/50">
                 <h4 className="text-yellow-300 font-medium mb-2">💡 Usage Instructions:</h4>
                 <ul className="text-yellow-200 text-sm space-y-1">
-                  <li>1. Click "Fetch Global Stats" to get current data (costs ~20k Firebase reads)</li>
-                  <li>2. Export the data to JSON file</li>
-                  <li>3. Update your static data in the main app with these values</li>
-                  <li>4. Do this only once per day to minimize costs</li>
+                  <li>1. 📋 "Fetch Cached Stats" - FREE, shows data from 12h cache</li>
+                  <li>2. 🔐 "Fetch REAL Firebase Data" - EXPENSIVE (~$1-2), shows current live data</li>
+                  <li>3. Export the REAL data to JSON file for analysis</li>
+                  <li>4. Use REAL data only when you need accurate current numbers</li>
+                  <li>5. ⚠️ Each REAL fetch costs ~20k Firebase reads - use sparingly!</li>
                 </ul>
+                <div className="mt-3 p-2 bg-red-500/20 rounded text-xs text-red-200">
+                  ⚠️ Warning: Only use "Fetch REAL Firebase Data" when you need exact current numbers. 
+                  Cached data is sufficient for most admin tasks and costs $0.
+                </div>
               </div>
             </div>
           </div>
