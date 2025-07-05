@@ -32,6 +32,7 @@ import {
   refreshTop50UsersOnly,
   searchUsersUltraFast,
   getCachedFullUsers,
+  preloadUserSearchCache,
   pinPost,
   unpinPost,
   isUserAdmin
@@ -1367,13 +1368,13 @@ export default function BaseChat() {
       localStorage.setItem('userAddress', address);
       fetchGlobalStats(); // Only fetch if user is connected
       
-      // 💰 ULTRA-CHEAP: Initialize user search cache (TOP 5000 users)
+      // 💰 ULTRA-CHEAP: Initialize user search cache (TOP 1000 users) - Background preload
       const initUserSearchCache = async () => {
         try {
-          const cachedUsers = await getCachedFullUsers();
-          console.log(`⚡ User search cache initialized: ${cachedUsers.length} users ready for search (localStorage friendly)`);
+          await preloadUserSearchCache();
+          console.log(`⚡ User search cache preloaded in background (localStorage friendly)`);
         } catch (error) {
-          console.error('❌ User search cache initialization failed:', error);
+          console.error('❌ User search cache preload failed:', error);
         }
       };
       

@@ -1268,8 +1268,8 @@ const USER_SEARCH_CACHE_TTL = 10 * 60 * 1000; // 10 minut
 // 24h localStorage cache dla TOP użytkowników (5k users - oszczędność pamięci)
 const FULL_USERS_CACHE_KEY = 'fullUsersDatabase_v3';
 const FULL_USERS_CACHE_TIMESTAMP_KEY = 'fullUsersDatabaseTime_v3';
-const FULL_USERS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 godziny
-const MAX_CACHED_USERS = 5000; // Limit dla localStorage (około 3-4MB)
+const FULL_USERS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // ✅ OPTYMALIZACJA: 7 dni zamiast 24h (86% mniej synców)
+const MAX_CACHED_USERS = 1000; // ✅ OPTYMALIZACJA: 1000 zamiast 5000 (80% mniej reads przy sync)
 
 // Ultra-minimalistyczny interface dla użytkownika (maksymalna oszczędność pamięci)
 interface UserSearchResult {
@@ -1283,7 +1283,7 @@ interface UserSearchResult {
 // 🚀 SMART SYNC SYSTEM - Pobierz TOP 5000 użytkowników (localStorage friendly)
 // ===============================================
 export const syncFullUsersDatabase = async (): Promise<UserSearchResult[]> => {
-  console.log('🔄 Starting smart users sync... (TOP 5000 users)');
+  console.log('🔄 Starting smart users sync... (TOP 1000 users)'); // ✅ ZAKTUALIZOWANO: komunikat
   
   try {
     // Pobierz TOP użytkowników posortowanych po punktach
@@ -1415,7 +1415,7 @@ const searchSpecificSuffixes = async (searchTerm: string): Promise<UserSearchRes
         usersRef,
         where('name', '>=', searchTerm),
         where('name', '<=', searchTerm + '\uf8ff'),
-        firestoreLimit(20)
+        firestoreLimit(10) // ✅ OPTYMALIZACJA: 10 zamiast 20 (50% mniej reads)
       );
       
       const nameSnapshot = await getDocs(nameQuery);
@@ -1438,7 +1438,7 @@ const searchSpecificSuffixes = async (searchTerm: string): Promise<UserSearchRes
           const suffixQuery = query(
             usersRef,
             where('name', '==', suffixTerm),
-            firestoreLimit(10)
+            firestoreLimit(5) // ✅ OPTYMALIZACJA: 5 zamiast 10 (50% mniej reads)
           );
           
           const suffixSnapshot = await getDocs(suffixQuery);
@@ -1465,7 +1465,7 @@ const searchSpecificSuffixes = async (searchTerm: string): Promise<UserSearchRes
         usersRef,
         where('__name__', '>=', searchTerm),
         where('__name__', '<=', searchTerm + '\uf8ff'),
-        firestoreLimit(10)
+        firestoreLimit(5) // ✅ OPTYMALIZACJA: 5 zamiast 10 (50% mniej reads)
       );
       
       const addressSnapshot = await getDocs(addressQuery);
@@ -1502,7 +1502,7 @@ export const getCachedFullUsers = async (): Promise<UserSearchResult[]> => {
     
     const now = Date.now();
     
-    // Jeśli cache jest świeży (24h), użyj go
+    // Jeśli cache jest świeży (7 dni), użyj go ✅ ZAKTUALIZOWANO: komentarz
     if (cachedData && cacheTime && (now - parseInt(cacheTime)) < FULL_USERS_CACHE_TTL) {
       console.log('⚡ Using cached users database - 0 Firebase reads');
       return JSON.parse(cachedData);
@@ -1515,6 +1515,33 @@ export const getCachedFullUsers = async (): Promise<UserSearchResult[]> => {
   } catch (error) {
     console.error('❌ Failed to get cached users:', error);
     return [];
+  }
+};
+
+// ===============================================
+// 🚀 PRELOAD CACHE - Background refresh gdy potrzeba
+// ===============================================
+export const preloadUserSearchCache = async (): Promise<void> => {
+  try {
+    const cachedData = localStorage.getItem(FULL_USERS_CACHE_KEY);
+    const cacheTime = localStorage.getItem(FULL_USERS_CACHE_TIMESTAMP_KEY);
+    
+    const now = Date.now();
+    const cacheAge = cacheTime ? now - parseInt(cacheTime) : Infinity;
+    
+    // Jeśli cache jest starszy niż 5 dni, odśwież w background
+    if (cacheAge > 5 * 24 * 60 * 60 * 1000) {
+      console.log('🔄 Preloading user search cache in background...');
+      
+      // Background refresh z 5 sekund delay
+      setTimeout(() => {
+        syncFullUsersDatabase()
+          .then(() => console.log('✅ Background cache refresh completed'))
+          .catch(error => console.error('❌ Background cache refresh failed:', error));
+      }, 5000);
+    }
+  } catch (error) {
+    console.error('❌ Preload cache check failed:', error);
   }
 };
 
