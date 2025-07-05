@@ -782,26 +782,23 @@ export default function MyCampPage() {
               )}
             </motion.button>
 
-            {/* Daily Quests Button */}
-            <motion.button
+            {/* Daily Quests Button - Disabled */}
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.35, duration: 0.5 }}
-              whileHover={{ 
-                scale: 1.05, 
-                y: -5,
-                boxShadow: "0 20px 40px rgba(34, 197, 94, 0.4)"
-              }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setActiveTab('quests')}
-              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
-                activeTab === 'quests'
-                  ? 'bg-gradient-to-br from-green-500/80 to-emerald-500/80 text-white shadow-2xl shadow-green-500/25 border border-green-400/50'
-                  : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-green-400/40'
-              }`}
+              className="group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 bg-black/40 text-orange-200/50 border border-orange-500/20 cursor-not-allowed opacity-75"
             >
+              {/* Disabled overlay */}
+              <div className="absolute inset-0 bg-black/30 backdrop-blur-[0.5px]"></div>
+              
+              {/* Soon tooltip */}
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-sm border border-orange-500/30 text-orange-300 px-3 py-1 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none whitespace-nowrap z-20">
+                🚀 Soon
+              </div>
+              
               <motion.div
-                className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-emerald-400/20"
+                className="absolute inset-0 bg-gradient-to-br from-gray-400/10 to-gray-600/10"
                 initial={{ opacity: 0 }}
                 whileHover={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
@@ -809,21 +806,18 @@ export default function MyCampPage() {
               <div className="relative z-10">
                 <motion.div 
                   className="text-center"
-                  whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">QUESTS</div>
-                  <div className="text-xs opacity-80 uppercase tracking-widest">Daily Tasks</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider blur-[0.5px]">QUESTS</div>
+                  <div className="text-xs opacity-60 uppercase tracking-widest blur-[0.5px]">Daily Tasks</div>
                 </motion.div>
               </div>
-              {activeTab === 'quests' && (
-                <motion.div
-                  layoutId="activeGlow"
-                  className="absolute inset-0 bg-gradient-to-br from-green-500/30 to-emerald-500/30 rounded-2xl"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-            </motion.button>
+              
+              {/* Disabled badge */}
+              <div className="absolute top-2 right-2 bg-orange-500/80 text-white text-xs font-bold px-2 py-1 rounded-full">
+                Soon
+              </div>
+            </motion.div>
 
             {/* Stats Button */}
             <motion.button
@@ -1567,39 +1561,94 @@ export default function MyCampPage() {
             className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8"
           >
             <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-200 mb-4 sm:mb-6 flex items-center gap-2">
-              🎯 Daily Quests
-              <span className="text-sm bg-green-500/20 text-green-300 px-2 py-1 rounded-full">
-                Coming Soon
+              🎯 Epic Quest System
+              <span className="text-sm bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded-full">
+                3D Experience
               </span>
             </h3>
             
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🚧</div>
-              <p className="text-orange-200 text-lg">Daily Quests Coming Soon!</p>
-              <p className="text-orange-200/70 text-sm mt-2 mb-4">
-                Complete daily tasks to earn rewards and boost your MySphere ranking
+            <div className="text-center py-8">
+              <div className="relative">
+                <motion.div
+                  animate={{ 
+                    rotateY: [0, 360],
+                    scale: [1, 1.1, 1]
+                  }}
+                  transition={{ 
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  className="text-6xl mb-4"
+                  style={{ transformStyle: "preserve-3d" }}
+                >
+                  🚀
+                </motion.div>
+                
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 blur-xl rounded-full" />
+              </div>
+              
+              <h4 className="text-2xl font-bold text-white mb-4 bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-400 bg-clip-text text-transparent">
+                Revolutionary Quest Experience
+              </h4>
+              
+              <p className="text-orange-200/70 text-sm mt-2 mb-6">
+                Embark on an epic 7-day journey through the Camp Network multiverse
               </p>
               
-              <div className="max-w-md mx-auto">
-                <div className="bg-gradient-to-br from-green-600/20 via-green-500/10 to-green-800/20 backdrop-blur-sm border border-green-500/30 rounded-xl p-6">
-                  <h4 className="text-lg font-bold text-green-200 mb-4">🎁 Upcoming Features</h4>
-                  <div className="space-y-3 text-left">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      <span className="text-green-200/80 text-sm">Connect Social Media Accounts</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      <span className="text-green-200/80 text-sm">Complete On-Chain Transactions</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      <span className="text-green-200/80 text-sm">Participate in Community Events</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      <span className="text-green-200/80 text-sm">Earn Special Badges & Rewards</span>
-                    </div>
+              <motion.div
+                whileHover={{ scale: 1.05, y: -5 }}
+                whileTap={{ scale: 0.95 }}
+                className="inline-block"
+              >
+                <Link
+                  href="/mycamp/quest"
+                  className="group relative bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 hover:from-cyan-400 hover:via-blue-500 hover:to-purple-500 shadow-2xl shadow-cyan-500/25"
+                >
+                  <span className="relative z-10 flex items-center gap-3">
+                    <motion.span
+                      animate={{ rotate: [0, 360] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    >
+                      🌀
+                    </motion.span>
+                    Enter Quest Dimension
+                    <motion.span
+                      animate={{ x: [0, 5, 0] }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      →
+                    </motion.span>
+                  </span>
+                  
+                  {/* Button glow effect */}
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    whileHover={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0 bg-gradient-to-r from-white/20 via-white/10 to-white/20 rounded-2xl"
+                  />
+                </Link>
+              </motion.div>
+              
+              <div className="mt-8 max-w-2xl mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-cyan-600/20 via-cyan-500/10 to-cyan-800/20 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-4">
+                    <div className="text-3xl mb-2">🎨</div>
+                    <h5 className="text-cyan-200 font-bold text-sm mb-1">3D Interactive</h5>
+                    <p className="text-cyan-200/70 text-xs">Holographic quest cards with 3D effects</p>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-purple-600/20 via-purple-500/10 to-purple-800/20 backdrop-blur-sm border border-purple-500/30 rounded-xl p-4">
+                    <div className="text-3xl mb-2">💎</div>
+                    <h5 className="text-purple-200 font-bold text-sm mb-1">NFT Rewards</h5>
+                    <p className="text-purple-200/70 text-xs">Mint exclusive animated NFTs</p>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-pink-600/20 via-pink-500/10 to-pink-800/20 backdrop-blur-sm border border-pink-500/30 rounded-xl p-4">
+                    <div className="text-3xl mb-2">🌟</div>
+                    <h5 className="text-pink-200 font-bold text-sm mb-1">Epic Journey</h5>
+                    <p className="text-pink-200/70 text-xs">7-day adventure with legendary rewards</p>
                   </div>
                 </div>
               </div>

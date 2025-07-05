@@ -15,8 +15,9 @@ import { toast } from 'react-hot-toast';
 import { base } from 'wagmi/chains';
 import { saveTip } from '../../utils/firebase';
 
-// USDC contract address on Base
-const USDC_ADDRESS = '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA';
+// USDC contract address on Base Mainnet (official) - Updated Jan 2024
+const USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+console.log('💰 Using USDC address:', USDC_ADDRESS);
 
 // ERC20 Transfer ABI
 const ERC20_TRANSFER_ABI = [
@@ -43,21 +44,68 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   const [tipAmount, setTipAmount] = useState('0.001');
   const [selectedToken, setSelectedToken] = useState<'ETH' | 'USDC'>('ETH');
   const [isTransacting, setIsTransacting] = useState(false);
+  const [transactionSuccess, setTransactionSuccess] = useState(false);
   
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   
+  // Mobile debugging
+  useEffect(() => {
+    console.log('📱 Mobile Debug - Wallet state:', {
+      isConnected,
+      address,
+      chainId,
+      isCorrectNetwork: chainId === base.id
+    });
+  }, [isConnected, address, chainId]);
+  
+  // Prevent body scroll when modal is open (mobile fix)
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, [isOpen]);
+  
   // Get user balances
-  const { data: ethBalance } = useBalance({
+  const { data: ethBalance, error: ethBalanceError, isLoading: ethLoading } = useBalance({
     address: address,
     chainId: base.id
   });
   
-  const { data: usdcBalance } = useBalance({
+  const { data: usdcBalance, error: usdcBalanceError, isLoading: usdcLoading } = useBalance({
     address: address,
     token: USDC_ADDRESS as `0x${string}`,
     chainId: base.id
   });
+  
+  // Mobile debugging for balances
+  useEffect(() => {
+    console.log('📱 Balance Debug - Full state:', {
+      address,
+      chainId,
+      baseId: base.id,
+      usdcAddress: USDC_ADDRESS,
+      ethBalance: ethBalance ? formatEther(ethBalance.value) : 'null',
+      usdcBalance: usdcBalance ? formatUnits(usdcBalance.value, 6) : 'null',
+      ethBalanceError: ethBalanceError?.message || 'none',
+      usdcBalanceError: usdcBalanceError?.message || 'none',
+      ethLoading,
+      usdcLoading,
+      isCorrectNetwork: chainId === base.id
+    });
+  }, [address, chainId, ethBalance, usdcBalance, ethBalanceError, usdcBalanceError, ethLoading, usdcLoading]);
 
   // Check if user is trying to tip themselves
   const isSelfTip = address?.toLowerCase() === recipientAddress.toLowerCase();
@@ -66,8 +114,12 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   const isCorrectNetwork = chainId === base.id;
 
   const handleTransactionStatus = useCallback(async (status: any) => {
+    console.log('🔄 Transaction status:', status); // Debug log
+    
     if (status.statusName === 'success') {
       try {
+        toast.dismiss(); // Clear loading toasts
+        
         // Save tip to Firebase
         const txHash = status.statusData?.transactionHash || '';
         await saveTip({
@@ -106,35 +158,69 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         toast.error('Tip sent but failed to save to database');
       }
       
-      setIsTransacting(false);
-      setIsOpen(false);
-      setTipAmount('0.001');
+      // Show success state
+      setTransactionSuccess(true);
+      
+      // Wait 2 seconds before closing modal and resetting
+      setTimeout(() => {
+        setIsTransacting(false);
+        setTransactionSuccess(false);
+        setIsOpen(false);
+        setTipAmount('0.001');
+      }, 2000);
     } else if (status.statusName === 'error') {
+      toast.dismiss(); // Clear loading toasts
       const errorMessage = status.statusData?.message || 'Transaction failed';
+      console.error('❌ Transaction error:', errorMessage, status); // Debug log
       toast.error(`Tip failed: ${errorMessage}`);
       setIsTransacting(false);
     } else if (status.statusName === 'transactionPending') {
-      toast.loading('Sending tip...');
+      toast.dismiss(); // Clear previous toasts
+      toast.loading('Sending tip...', { duration: 0 }); // Keep loading until success/error
+      setIsTransacting(true);
+    } else if (status.statusName === 'transactionLegacy') {
+      toast.dismiss(); // Clear previous toasts
+      toast.loading('Processing transaction...', { duration: 0 });
       setIsTransacting(true);
     }
+    
+    console.log('🔄 Transaction status complete:', {
+      statusName: status.statusName,
+      isTransacting,
+      transactionSuccess,
+      isOpen
+    });
   }, [address, recipientAddress, tipAmount, selectedToken, postId]);
 
   const getCalls = useCallback(() => {
+    console.log('📱 Mobile Debug - getCalls:', {
+      isConnected,
+      address,
+      recipientAddress,
+      tipAmount,
+      selectedToken,
+      chainId
+    });
+    
     if (!isConnected || !address || !recipientAddress || !tipAmount) {
+      console.log('❌ Mobile Debug - Missing required params for transaction');
       return [];
     }
 
     const amount = parseFloat(tipAmount);
     if (amount <= 0) {
+      console.log('❌ Mobile Debug - Invalid amount:', amount);
       return [];
     }
 
     if (selectedToken === 'ETH') {
       // Simple ETH transfer
-      return [{
+      const call = {
         to: recipientAddress as `0x${string}`,
         value: parseEther(tipAmount)
-      }];
+      };
+      console.log('📱 Mobile Debug - ETH transfer call:', call);
+      return [call];
     } else {
       // USDC transfer (ERC20)
       const usdcAmount = parseUnits(tipAmount, 6); // USDC has 6 decimals
@@ -144,15 +230,18 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         args: [recipientAddress as `0x${string}`, usdcAmount]
       });
       
-      return [{
+      const call = {
         to: USDC_ADDRESS as `0x${string}`,
         data
-      }];
+      };
+      console.log('📱 Mobile Debug - USDC transfer call:', call);
+      return [call];
     }
-  }, [address, recipientAddress, tipAmount, selectedToken, isConnected]);
+  }, [address, recipientAddress, tipAmount, selectedToken, isConnected, chainId]);
 
-  const formatBalance = (balance: any, symbol: string) => {
-    if (!balance) return '0';
+  const formatBalance = (balance: any, symbol: string, isLoading?: boolean) => {
+    if (isLoading) return 'Loading...';
+    if (!balance) return '0.00';
     const decimals = symbol === 'USDC' ? 6 : 18;
     return parseFloat(formatUnits(balance.value, decimals)).toFixed(decimals === 6 ? 2 : 6);
   };
@@ -177,8 +266,12 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   return (
     <>
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center space-x-1 hover:text-green-500 transition-colors ${className}`}
+        onClick={() => {
+          console.log('📱 Mobile Debug - Tip button clicked');
+          setIsOpen(!isOpen);
+          setTransactionSuccess(false); // Reset success state
+        }}
+        className={`flex items-center space-x-1 hover:text-green-500 active:text-green-600 transition-colors touch-manipulation ${className}`}
         disabled={isTransacting}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,15 +281,25 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
       </button>
 
       {isOpen && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overscroll-contain">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-black/40 backdrop-blur-md"
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setIsOpen(false)}
+            onTouchEnd={(e) => {
+              // Only close if the touch ended on the backdrop itself
+              if (e.target === e.currentTarget) {
+                setIsOpen(false);
+              }
+            }}
           ></div>
           
-          {/* Modal positioned in center */}
-          <div className="relative w-80 max-w-[90vw] bg-gradient-to-br from-gray-900 via-black to-blue-900 backdrop-blur-xl rounded-2xl shadow-2xl border border-blue-500/30 p-6 overflow-hidden">
+          {/* Modal positioned in center - Mobile optimized */}
+          <div 
+            className="relative w-full max-w-sm mx-auto bg-gradient-to-br from-gray-900 via-black to-blue-900 backdrop-blur-xl rounded-2xl shadow-2xl border border-blue-500/30 p-6 overflow-hidden max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
             {/* Neonowa poświata */}
             <div className="absolute -top-6 -right-6 w-24 h-24 bg-blue-500/30 rounded-full filter blur-2xl animate-pulse"></div>
             <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-cyan-400/20 rounded-full filter blur-xl"></div>
@@ -212,17 +315,21 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 </h3>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="text-blue-300 hover:text-blue-100 transition-colors bg-white/10 backdrop-blur-sm rounded-full p-1 border border-blue-400/30"
+                  className="text-blue-300 hover:text-blue-100 active:text-blue-200 transition-colors bg-white/10 backdrop-blur-sm rounded-full p-2 border border-blue-400/30 touch-manipulation"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
 
               {!isCorrectNetwork && (
-                <div className="mb-4 p-3 bg-red-500/20 backdrop-blur-sm border border-red-400/50 rounded-xl text-red-300 text-xs">
-                  Please switch to Base Mainnet
+                <div className="mb-4 p-4 bg-red-500/20 backdrop-blur-sm border border-red-400/50 rounded-xl text-red-300 text-sm">
+                  <div className="font-medium mb-1">❌ Wrong Network</div>
+                  <div>Please switch to Base Mainnet</div>
+                  <div className="text-xs mt-1 opacity-80">
+                    Current: {chainId} | Required: {base.id}
+                  </div>
                 </div>
               )}
 
@@ -234,20 +341,20 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 <div className="flex space-x-3">
                   <button
                     onClick={() => setSelectedToken('ETH')}
-                    className={`flex-1 px-4 py-3 text-sm rounded-xl border backdrop-blur-sm transition-all duration-300 ${
+                    className={`flex-1 px-4 py-4 text-base rounded-xl border backdrop-blur-sm transition-all duration-300 touch-manipulation ${
                       selectedToken === 'ETH'
                         ? 'bg-blue-500/30 border-blue-400/60 text-blue-100 shadow-[0_0_20px_rgba(59,130,246,0.4)] transform scale-105'
-                        : 'bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400/40'
+                        : 'bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400/40 active:bg-white/30'
                     }`}
                   >
                     ETH
                   </button>
                   <button
                     onClick={() => setSelectedToken('USDC')}
-                    className={`flex-1 px-4 py-3 text-sm rounded-xl border backdrop-blur-sm transition-all duration-300 ${
+                    className={`flex-1 px-4 py-4 text-base rounded-xl border backdrop-blur-sm transition-all duration-300 touch-manipulation ${
                       selectedToken === 'USDC'
                         ? 'bg-blue-500/30 border-blue-400/60 text-blue-100 shadow-[0_0_20px_rgba(59,130,246,0.4)] transform scale-105'
-                        : 'bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400/40'
+                        : 'bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400/40 active:bg-white/30'
                     }`}
                   >
                     USDC
@@ -266,14 +373,43 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                   onChange={(e) => setTipAmount(e.target.value)}
                   min="0"
                   step={selectedToken === 'ETH' ? '0.001' : '0.01'}
-                  className="w-full px-4 py-3 text-sm border bg-white/10 backdrop-blur-sm border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400/60 placeholder-blue-300/50"
+                  className="w-full px-4 py-4 text-base border bg-white/10 backdrop-blur-sm border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400/60 placeholder-blue-300/50 touch-manipulation"
                   placeholder={selectedToken === 'ETH' ? '0.001' : '1.00'}
+                  inputMode="decimal"
+                  autoComplete="off"
                 />
               </div>
 
-              {/* Balance Display */}
+                            {/* Balance Display */}
               <div className="mb-4 text-sm text-blue-300">
-                Your balance: {formatBalance(selectedToken === 'ETH' ? ethBalance : usdcBalance, selectedToken)} {selectedToken}
+                <div className="flex items-center justify-between">
+                  <span>
+                    Your balance: {formatBalance(
+                      selectedToken === 'ETH' ? ethBalance : usdcBalance, 
+                      selectedToken,
+                      selectedToken === 'ETH' ? ethLoading : usdcLoading
+                    )} {selectedToken}
+                  </span>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center space-x-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Refresh</span>
+                  </button>
+                </div>
+                {(selectedToken === 'ETH' ? ethBalanceError : usdcBalanceError) && (
+                  <div className="text-red-300 text-xs mt-1">
+                    Error: {(selectedToken === 'ETH' ? ethBalanceError : usdcBalanceError)?.message}
+                    {selectedToken === 'USDC' && (
+                      <div className="mt-1 text-xs opacity-80">
+                        Try refreshing or switching networks
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Quick Amount Buttons */}
@@ -283,19 +419,19 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     <>
                       <button
                         onClick={() => setTipAmount('0.001')}
-                        className="flex-1 px-3 py-2 text-sm bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300"
+                        className="flex-1 px-3 py-3 text-base bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] active:bg-blue-500/30 transition-all duration-300 touch-manipulation"
                       >
                         0.001
                       </button>
                       <button
                         onClick={() => setTipAmount('0.01')}
-                        className="flex-1 px-3 py-2 text-sm bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300"
+                        className="flex-1 px-3 py-3 text-base bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] active:bg-blue-500/30 transition-all duration-300 touch-manipulation"
                       >
                         0.01
                       </button>
                       <button
                         onClick={() => setTipAmount('0.1')}
-                        className="flex-1 px-3 py-2 text-sm bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300"
+                        className="flex-1 px-3 py-3 text-base bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] active:bg-blue-500/30 transition-all duration-300 touch-manipulation"
                       >
                         0.1
                       </button>
@@ -304,19 +440,19 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     <>
                       <button
                         onClick={() => setTipAmount('1')}
-                        className="flex-1 px-3 py-2 text-sm bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300"
+                        className="flex-1 px-3 py-3 text-base bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] active:bg-blue-500/30 transition-all duration-300 touch-manipulation"
                       >
                         $1
                       </button>
                       <button
                         onClick={() => setTipAmount('5')}
-                        className="flex-1 px-3 py-2 text-sm bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300"
+                        className="flex-1 px-3 py-3 text-base bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] active:bg-blue-500/30 transition-all duration-300 touch-manipulation"
                       >
                         $5
                       </button>
                       <button
                         onClick={() => setTipAmount('10')}
-                        className="flex-1 px-3 py-2 text-sm bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300"
+                        className="flex-1 px-3 py-3 text-base bg-white/10 backdrop-blur-sm border border-blue-400/30 rounded-xl text-blue-200 hover:bg-blue-500/20 hover:border-blue-400/60 hover:text-blue-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] active:bg-blue-500/30 transition-all duration-300 touch-manipulation"
                       >
                         $10
                       </button>
@@ -326,28 +462,63 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
               </div>
 
               {/* Transaction Button */}
-              <Transaction
-                chainId={base.id}
-                calls={getCalls()}
-                onStatus={handleTransactionStatus}
-              >
-                <TransactionButton
-                  text={
-                    hasInsufficientBalance()
-                      ? `Insufficient ${selectedToken}`
-                      : isTransacting
-                      ? 'Sending...'
-                      : `Tip ${tipAmount} ${selectedToken}`
-                  }
-                  disabled={
-                    !isCorrectNetwork ||
-                    hasInsufficientBalance() ||
-                    parseFloat(tipAmount) <= 0 ||
-                    isTransacting
-                  }
-                  className="w-full"
-                />
-              </Transaction>
+              <div className="mt-6">
+                {isTransacting && !transactionSuccess && (
+                  <div className="mb-4 p-3 bg-yellow-500/20 backdrop-blur-sm border border-yellow-400/50 rounded-xl text-yellow-300 text-sm text-center">
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-300 border-t-transparent"></div>
+                      <div className="text-center">
+                        <div>Processing transaction...</div>
+                        <div className="text-xs opacity-80 mt-1">Modal will stay open until complete</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {transactionSuccess && (
+                  <div className="mb-4 p-3 bg-green-500/20 backdrop-blur-sm border border-green-400/50 rounded-xl text-green-300 text-sm text-center">
+                                         <div className="flex items-center justify-center space-x-2">
+                       <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                       </svg>
+                       <div className="text-center">
+                         <div>Tip sent successfully! 🎉</div>
+                         <div className="text-xs opacity-80 mt-1">Closing in 2 seconds...</div>
+                       </div>
+                     </div>
+                  </div>
+                )}
+                
+                <Transaction
+                  chainId={base.id}
+                  calls={getCalls()}
+                  onStatus={handleTransactionStatus}
+                  onError={(error) => {
+                    console.error('📱 Mobile Debug - Transaction error:', error);
+                    toast.dismiss(); // Clear loading toasts
+                    toast.error(`Transaction failed: ${error.message || 'Unknown error'}`);
+                    setIsTransacting(false);
+                    setTransactionSuccess(false);
+                  }}
+                >
+                  <TransactionButton
+                    text={
+                      hasInsufficientBalance()
+                        ? `Insufficient ${selectedToken}`
+                        : isTransacting
+                        ? 'Processing...'
+                        : `Tip ${tipAmount} ${selectedToken}`
+                    }
+                    disabled={
+                      !isCorrectNetwork ||
+                      hasInsufficientBalance() ||
+                      parseFloat(tipAmount) <= 0 ||
+                      isTransacting
+                    }
+                    className="w-full px-6 py-4 text-base font-medium rounded-xl touch-manipulation"
+                  />
+                </Transaction>
+              </div>
             </div>
           </div>
         </div>,

@@ -1611,26 +1611,28 @@ export default function PostList({
         </React.Fragment>
       ))}
       
-      {/* ✅ ZAWSZE PRZYCISK LOAD MORE - oszczędność Firebase costs */}
-      <div className="flex justify-center p-4">
-        {isLoadingMore ? (
-          <div className="animate-pulse space-y-4 w-full">
-            <div className="bg-gray-200 dark:bg-gray-700 h-10 rounded-lg"></div>
-          </div>
-        ) : hasMorePosts ? (
-          <button 
-            onClick={loadMorePosts}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg"
-          >
-            📚 Load More Posts
-          </button>
-        ) : posts.length > 0 ? (
-          <div className="text-center p-4">
-            <div className="text-gray-500 dark:text-gray-400 text-sm mb-2">🎉 You've reached the end!</div>
-            <div className="text-gray-400 dark:text-gray-500 text-xs">All posts have been loaded</div>
-          </div>
-        ) : null}
-      </div>
+      {/* Load More Button - Hidden for pinned posts */}
+      {!disableInfiniteScroll && (
+        <div className="flex justify-center p-4">
+          {isLoadingMore ? (
+            <div className="animate-pulse space-y-4 w-full">
+              <div className="bg-gray-200 dark:bg-gray-700 h-10 rounded-lg"></div>
+            </div>
+          ) : hasMorePosts ? (
+            <button 
+              onClick={loadMorePosts}
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg"
+            >
+              📚 Load More Posts
+            </button>
+          ) : posts.length > 0 ? (
+            <div className="text-center p-4">
+              <div className="text-gray-500 dark:text-gray-400 text-sm mb-2">🎉 You've reached the end!</div>
+              <div className="text-gray-400 dark:text-gray-500 text-xs">All posts have been loaded</div>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {enlargedImage && (
         <div 
