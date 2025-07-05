@@ -1297,7 +1297,7 @@ export default function MyCampPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
                 <div>
                   <h4 className="text-lg sm:text-xl font-bold text-blue-200 flex items-center gap-2">
-                    🌐 MySphere IP Connect Statistics
+                    ⚡ Camp Network IP Statistics
                   </h4>
                   {showStats && (
                     <div className="text-xs text-blue-200/60 mt-1">
@@ -1322,7 +1322,7 @@ export default function MyCampPage() {
                       className="relative"
                     >
                       <svg 
-                        className="w-4 h-4 text-white group-hover:text-blue-300 transition-colors" 
+                        className="w-4 h-4 text-white group-hover:text-orange-300 transition-colors" 
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -1340,7 +1340,7 @@ export default function MyCampPage() {
                           d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" 
                         />
                       </svg>
-                      <div className="absolute inset-0 bg-blue-400/20 rounded-full blur-md group-hover:bg-blue-400/40 transition-all"></div>
+                      <div className="absolute inset-0 bg-orange-400/20 rounded-full blur-md group-hover:bg-orange-400/40 transition-all"></div>
                     </motion.div>
                     {showStats ? 'Hide Preview' : 'Preview Data'}
                   </motion.button>
@@ -1349,10 +1349,27 @@ export default function MyCampPage() {
               
               {!showStats ? (
                 <div className="text-center py-8">
-                  <div className="text-4xl mb-3">📊</div>
-                  <p className="text-blue-200/80 text-sm">
-                    MySphere network statistics available
+                  <div className="text-5xl mb-4">🔥</div>
+                  <p className="text-blue-200 text-lg font-semibold mb-3">
+                    Camp Network IP Analytics Ready
                   </p>
+                  <div className="max-w-md mx-auto space-y-2">
+                    <div className="bg-gradient-to-r from-orange-500/20 to-yellow-500/20 border border-orange-400/30 rounded-lg p-3">
+                      <p className="text-orange-300 text-sm font-medium">
+                        🏕️ <strong>Live Camp Network</strong> user connections
+                      </p>
+                    </div>
+                    <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-400/30 rounded-lg p-3">
+                      <p className="text-blue-300 text-sm font-medium">
+                        📡 <strong>{STATIC_MYSPHERE_DATA.totalUsers.toLocaleString()}+</strong> IP addresses tracked
+                      </p>
+                    </div>
+                    <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-400/30 rounded-lg p-3">
+                      <p className="text-green-300 text-sm font-medium">
+                        🔗 <strong>Real-time</strong> social media linking
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>
