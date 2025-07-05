@@ -1100,9 +1100,8 @@ export default function BaseChat() {
       // Wykonaj rzeczywistą operację w tle
       await toggleLike(postId, address);
       
-      // Na końcu odśwież dane z serwera (opcjonalnie, aby upewnić się, że dane są zgodne)
-      const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-      setPosts(refreshedPosts);
+      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował UI
+      // Oszczędność: 50 Firebase reads po każdym like
       await fetchUserStats(address);
     } catch (error) {
       console.error('Error toggling like:', error);
