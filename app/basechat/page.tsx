@@ -542,7 +542,8 @@ export default function BaseChat() {
           }
         });
       } else {
-        // Przypadek 2: Standardowe odświeżenie - pobierz wszystkie posty od nowa
+        // ✅ OPTYMALIZACJA: Przypadek 2 - tylko gdy rzeczywiście potrzebujemy odświeżenia
+        // Większość wywołań będzie używać optimistic update (newPosts)
         const { posts: refreshedPosts } = await fetchPosts({ 
           userId: address
           // Remove networkFilter parameter to always fetch all posts
@@ -1829,13 +1830,45 @@ export default function BaseChat() {
     if (!address) return;
     
     try {
+      // ✅ OPTIMISTIC UPDATE: Aktualizuj UI natychmiast
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          const updatedComments = post.comments?.map(comment => {
+            if (comment.id === commentId) {
+              const isLiked = comment.likedBy?.includes(address);
+              return {
+                ...comment,
+                likes: (comment.likes || 0) + (isLiked ? -1 : 1),
+                likedBy: isLiked
+                  ? (comment.likedBy || []).filter(id => id !== address)
+                  : [...(comment.likedBy || []), address]
+              };
+            }
+            return comment;
+          });
+          return { ...post, comments: updatedComments };
+        }
+        return post;
+      });
+      
+      // Zaktualizuj UI natychmiast
+      setPosts(updatedPosts);
+      
+      // Wykonaj rzeczywistą operację w tle
       await toggleCommentLike(postId, commentId, address);
       
-      // Odśwież posty
-      const { posts: updatedPosts } = await fetchPosts({ userId: address });
-      setPosts(updatedPosts);
+      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował UI
+      // Oszczędność: 50 Firebase reads po każdym like komentarza
+      
     } catch (error) {
       console.error('Error toggling comment like:', error);
+      // W przypadku błędu, przywróć dane z serwera
+      try {
+        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
+        setPosts(refreshedPosts);
+      } catch {
+        console.error('Failed to restore posts state after comment like error');
+      }
     }
   };
 
@@ -1844,18 +1877,20 @@ export default function BaseChat() {
     if (!address || !replyContent.trim() || !canCreatePosts) return;
     
     try {
+      // Wyczyść formularz natychmiast
+      setReplyingTo(null);
+      setReplyContent('');
+      
+      // Wykonaj rzeczywistą operację
       await addCommentReply(postId, commentId, {
         author: address,
         content: replyContent.trim()
       });
       
-      // Odśwież posty
-      const { posts: updatedPosts } = await fetchPosts({ userId: address });
-      setPosts(updatedPosts);
+      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - reply pojawi się po odświeżeniu strony
+      // Oszczędność: 50 Firebase reads po każdym reply
+      // (Alternatywnie: użytkownik może odświeżyć stronę aby zobaczyć reply)
       
-      // Wyczyść formularz
-      setReplyingTo(null);
-      setReplyContent('');
     } catch (error) {
       console.error('Error adding reply:', error);
       alert('An error occurred while adding the reply. Please try again.');
