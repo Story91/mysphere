@@ -510,7 +510,7 @@ interface FetchPostsResult {
 // Funkcja do pobierania postów z Firestore
 export const fetchPosts = async ({ 
   userId, 
-  limit = 50,  // Zwiększam domyślny limit z 20 do 50 postów
+  limit = 25,  // ⚡ OPTYMALIZACJA: Zmniejszam domyślny limit z 50 do 25 postów
   startAfter = null, 
   orderBy = 'newest',
   authorFilter = null,

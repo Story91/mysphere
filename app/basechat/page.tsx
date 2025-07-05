@@ -1757,17 +1757,18 @@ export default function BaseChat() {
     }
   });
 
-  // Dodajemy infinite scroll
-  const [displayLimit, setDisplayLimit] = useState(100);
+  // ⚡ OPTYMALIZACJA: Lazy loading - start z 25, maksymalnie 250 postów
+  const [displayLimit, setDisplayLimit] = useState(25);
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
+  const MAX_DISPLAY_LIMIT = 250; // Maksymalnie 250 postów
 
-  const displayedPosts = expandedPosts ? sortedPosts : sortedPosts.slice(0, displayLimit);
+  const displayedPosts = expandedPosts ? sortedPosts : sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT));
 
   useEffect(() => {
     if (expandedPosts) return; // Gdy mamy pełny widok, nie korzystamy z infinite scroll
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && sortedPosts.length > displayLimit) {
-        setDisplayLimit(prev => prev + 50);
+      if (entries[0].isIntersecting && sortedPosts.length > displayLimit && displayLimit < MAX_DISPLAY_LIMIT) {
+        setDisplayLimit(prev => Math.min(prev + 25, MAX_DISPLAY_LIMIT)); // ⚡ OPTYMALIZACJA: Ładuj po 25 postów, max 250
       }
     }, { threshold: 1.0 });
 

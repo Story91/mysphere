@@ -672,8 +672,9 @@ export default function PostList({
     }
   });
 
-  const [displayLimit, setDisplayLimit] = useState(100);
-  const displayedPosts = sortedPosts.slice(0, displayLimit);
+  const [displayLimit, setDisplayLimit] = useState(25); // ⚡ OPTYMALIZACJA: Start z 25 postów
+  const MAX_DISPLAY_LIMIT = 250; // Maksymalnie 250 postów
+  const displayedPosts = sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT));
 
   // ❌ USUNIĘTO DRUGI INFINITE SCROLL obserwator - oszczędność Firebase reads/writes
 
@@ -687,7 +688,7 @@ export default function PostList({
       const { posts: morePosts, lastVisible: newLastVisible } = await fetchPosts({
         userId: address,
         startAfter: lastVisible,
-        limit: 20 // Pobieraj stałą liczbę postów za każdym razem
+        limit: 25 // ⚡ OPTYMALIZACJA: Pobieraj 25 postów za razem
       });
       
       if (morePosts.length > 0) {
@@ -696,6 +697,9 @@ export default function PostList({
         const uniqueNewPosts = morePosts.filter(post => !existingPostIds.has(post.id));
         
         if (uniqueNewPosts.length > 0) {
+          // ⚡ OPTYMALIZACJA: Zwiększ displayLimit żeby pokazać nowe posty
+          setDisplayLimit(prev => Math.min(prev + uniqueNewPosts.length, MAX_DISPLAY_LIMIT));
+          
           // Dodaj nowe posty do istniejących bez resetowania widoku
           if (onRefreshPosts) {
             // Połącz istniejące posty z nowymi
@@ -1780,7 +1784,7 @@ export default function PostList({
       ))}
       
       {/* Load More Button - Hidden for pinned posts */}
-      {!disableInfiniteScroll && (
+      {!disableInfiniteScroll && displayLimit < MAX_DISPLAY_LIMIT && (
         <div className="flex justify-center p-4">
           {isLoadingMore ? (
             <div className="animate-pulse space-y-4 w-full">
@@ -1789,9 +1793,20 @@ export default function PostList({
           ) : hasMorePosts ? (
             <button 
               onClick={loadMorePosts}
-              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg"
+              className="group relative px-8 py-4 bg-gradient-to-r from-gray-900 via-gray-800 to-black text-white rounded-xl font-semibold hover:from-gray-800 hover:via-gray-700 hover:to-gray-900 transition-all duration-300 transform hover:scale-105 shadow-2xl backdrop-blur-sm border border-gray-700/50 hover:border-gray-600/50"
+              style={{
+                background: 'linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(17,17,17,0.9) 50%, rgba(0,0,0,0.8) 100%)',
+                backdropFilter: 'blur(12px)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)'
+              }}
             >
-              📚 Load More Posts
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-white/10 group-hover:ring-white/20 transition-all duration-300"></div>
+              <div className="relative flex items-center space-x-2">
+                <span className="text-lg">📚</span>
+                <span>Load More Posts</span>
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse group-hover:animate-bounce"></div>
+              </div>
             </button>
           ) : posts.length > 0 ? (
             <div className="text-center p-4">
@@ -1799,6 +1814,16 @@ export default function PostList({
               <div className="text-gray-400 dark:text-gray-500 text-xs">All posts have been loaded</div>
             </div>
           ) : null}
+        </div>
+      )}
+
+      {/* Informacja o limicie wyświetlania */}
+      {!disableInfiniteScroll && displayLimit >= MAX_DISPLAY_LIMIT && posts.length > MAX_DISPLAY_LIMIT && (
+        <div className="text-center p-4">
+          <div className="text-yellow-500 dark:text-yellow-400 text-sm mb-2">📊 Display limit reached</div>
+          <div className="text-gray-400 dark:text-gray-500 text-xs">
+            Showing {MAX_DISPLAY_LIMIT} most recent posts for performance
+          </div>
         </div>
       )}
 
