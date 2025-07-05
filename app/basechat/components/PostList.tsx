@@ -157,6 +157,11 @@ export default function PostList({
   const [userTokenBalances, setUserTokenBalances] = useState<{[tokenAddress: string]: string}>({});
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
   
+  // ✅ LAZY LOADING KOMENTARZY: Stan do śledzenia ile komentarzy pokazywać
+  const [visibleComments, setVisibleComments] = useState<{[key: string]: number}>({});
+  const INITIAL_COMMENTS_COUNT = 5;
+  const LOAD_MORE_COMMENTS_COUNT = 3;
+  
   // States for transaction modal
   const [transactionModalOpen, setTransactionModalOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<'buy' | 'sell'>('buy');
@@ -182,6 +187,15 @@ export default function PostList({
     if (onRefreshPosts) {
       await onRefreshPosts();
     }
+  };
+  
+  // ✅ LAZY LOADING KOMENTARZY: Funkcja do ładowania więcej komentarzy
+  const loadMoreComments = (postId: string) => {
+    const currentVisible = visibleComments[postId] || INITIAL_COMMENTS_COUNT;
+    setVisibleComments(prev => ({
+      ...prev,
+      [postId]: currentVisible + LOAD_MORE_COMMENTS_COUNT
+    }));
   };
 
   const fetchAndUpdateSinglePost = async (postId: string) => {
@@ -214,17 +228,45 @@ export default function PostList({
     }
     
     try {
+      // ✅ OPTIMISTIC UPDATE: Zaktualizuj post w UI natychmiast
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            isPinned: true,
+            pinnedAt: Date.now(),
+            pinnedBy: address
+          };
+        }
+        return post;
+      });
+      
+      // Zaktualizuj UI natychmiast z optimistic update
+      if (onRefreshPosts) {
+        await onRefreshPosts(updatedPosts);
+      }
+      
+      // Wykonaj rzeczywistą operację w tle
       const success = await pinPost(postId, address);
       
       if (success) {
         toast.success('Post pinned successfully');
-        await refreshPosts();
+        // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już zaktualizował UI
+        // Oszczędność: 50 Firebase reads po każdym pin
       } else {
         toast.error('Failed to pin post');
+        // W przypadku błędu, przywróć poprzedni stan
+        if (onRefreshPosts) {
+          await onRefreshPosts();
+        }
       }
     } catch (error) {
       console.error('Error pinning post:', error);
       toast.error('Failed to pin post');
+      // W przypadku błędu, przywróć poprzedni stan
+      if (onRefreshPosts) {
+        await onRefreshPosts();
+      }
     }
   };
 
@@ -235,17 +277,45 @@ export default function PostList({
     }
     
     try {
+      // ✅ OPTIMISTIC UPDATE: Zaktualizuj post w UI natychmiast
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            isPinned: false,
+            pinnedAt: undefined,
+            pinnedBy: undefined
+          };
+        }
+        return post;
+      });
+      
+      // Zaktualizuj UI natychmiast z optimistic update
+      if (onRefreshPosts) {
+        await onRefreshPosts(updatedPosts);
+      }
+      
+      // Wykonaj rzeczywistą operację w tle
       const success = await unpinPost(postId, address);
       
       if (success) {
         toast.success('Post unpinned successfully');
-        await refreshPosts();
+        // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już zaktualizował UI
+        // Oszczędność: 50 Firebase reads po każdym unpin
       } else {
         toast.error('Failed to unpin post');
+        // W przypadku błędu, przywróć poprzedni stan
+        if (onRefreshPosts) {
+          await onRefreshPosts();
+        }
       }
     } catch (error) {
       console.error('Error unpinning post:', error);
       toast.error('Failed to unpin post');
+      // W przypadku błędu, przywróć poprzedni stan
+      if (onRefreshPosts) {
+        await onRefreshPosts();
+      }
     }
   };
 
@@ -253,20 +323,46 @@ export default function PostList({
     if (!address) return;
     
     try {
+      // ✅ OPTIMISTIC UPDATE: Zaktualizuj post w UI natychmiast
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            content: newContent,
+            lastEdited: Date.now()
+          };
+        }
+        return post;
+      });
+      
+      // Zaktualizuj UI natychmiast
+      if (onRefreshPosts) {
+        await onRefreshPosts(updatedPosts);
+      }
+      
+      setEditingPost(null);
+      setEditedContent('');
+      
+      // Wykonaj rzeczywistą operację w tle
       const postRef = doc(db, 'posts', postId);
       await updateDoc(postRef, {
         content: newContent,
         lastEdited: serverTimestamp()
       });
       
-      await refreshPosts();
-      setEditingPost(null);
-      setEditedContent('');
-      
       toast.success('Post updated successfully');
+      
+      // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już zaktualizował post
+      // Oszczędność: 50 Firebase reads po każdej edycji posta
+      
     } catch (error) {
       console.error('Error editing post:', error);
       toast.error('Failed to edit post');
+      
+      // W przypadku błędu, przywróć poprzedni stan
+      if (onRefreshPosts) {
+        await onRefreshPosts();
+      }
     }
   };
 
@@ -364,17 +460,48 @@ export default function PostList({
     if (!address) return;
     
     try {
-      await editComment(postId, commentId, newContent);
+      // ✅ OPTIMISTIC UPDATE: Zaktualizuj komentarz w UI natychmiast
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          const updatedComments = post.comments?.map(comment => {
+            if (comment.id === commentId) {
+              return {
+                ...comment,
+                content: newContent,
+                lastEdited: Date.now()
+              };
+            }
+            return comment;
+          });
+          return { ...post, comments: updatedComments };
+        }
+        return post;
+      });
+      
+      // Zaktualizuj UI natychmiast
+      if (onRefreshPosts) {
+        await onRefreshPosts(updatedPosts);
+      }
       
       setEditingComment(null);
       setEditedCommentContent('');
       
-      await refreshPosts();
+      // Wykonaj rzeczywistą operację w tle
+      await editComment(postId, commentId, newContent);
       
       toast.success('Comment updated successfully');
+      
+      // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już zaktualizował komentarz
+      // Oszczędność: 50 Firebase reads po każdej edycji komentarza
+      
     } catch (error) {
       console.error('Error editing comment:', error);
       toast.error('Failed to edit comment');
+      
+      // W przypadku błędu, przywróć poprzedni stan
+      if (onRefreshPosts) {
+        await onRefreshPosts();
+      }
     }
   };
 
@@ -383,15 +510,36 @@ export default function PostList({
     
     try {
       if (confirm('Are you sure you want to delete this comment?')) {
+        // ✅ OPTIMISTIC UPDATE: Usuń komentarz z UI natychmiast
+        const updatedPosts = posts.map(post => {
+          if (post.id === postId) {
+            const updatedComments = post.comments?.filter(comment => comment.id !== commentId);
+            return { ...post, comments: updatedComments };
+          }
+          return post;
+        });
+        
+        // Zaktualizuj UI natychmiast
+        if (onRefreshPosts) {
+          await onRefreshPosts(updatedPosts);
+        }
+        
+        // Wykonaj rzeczywistą operację w tle
         await deleteComment(postId, commentId, address);
         
-        await refreshPosts();
-        
         toast.success('Comment deleted successfully');
+        
+        // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już usunął komentarz
+        // Oszczędność: 50 Firebase reads po każdym usunięciu komentarza
       }
     } catch (error) {
       console.error('Error deleting comment:', error);
       toast.error('Failed to delete comment');
+      
+      // W przypadku błędu, przywróć poprzedni stan
+      if (onRefreshPosts) {
+        await onRefreshPosts();
+      }
     }
   };
 
@@ -808,6 +956,11 @@ export default function PostList({
       }
     });
     
+    // ✅ LAZY LOADING KOMENTARZY: Liczba komentarzy do pokazania
+    const visibleCount = visibleComments[post.id] || INITIAL_COMMENTS_COUNT;
+    const visibleMainComments = mainComments.slice(0, visibleCount);
+    const hasMoreComments = mainComments.length > visibleCount;
+    
     return (
       <div className="space-y-6">
         <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -839,7 +992,7 @@ export default function PostList({
           </div>
         </div>
 
-        {mainComments.map((comment: Comment, index: number) => (
+        {visibleMainComments.map((comment: Comment, index: number) => (
           <div key={comment.id} className={`border-l-2 border-gray-200 dark:border-gray-700 pl-3 pb-3 ${index > 0 ? 'pt-3 border-t border-gray-100 dark:border-gray-800' : ''}`}>
             <div className="flex items-start">
               <div className="flex-shrink-0 mt-1">
@@ -1049,6 +1202,21 @@ export default function PostList({
             </div>
           </div>
         ))}
+        
+        {/* ✅ LAZY LOADING KOMENTARZY: Przycisk "Load more comments" */}
+        {hasMoreComments && (
+          <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+            <button
+              onClick={() => loadMoreComments(post.id)}
+              className="w-full py-2 px-4 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center justify-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              <span>Load {Math.min(LOAD_MORE_COMMENTS_COUNT, mainComments.length - visibleCount)} more comments ({mainComments.length - visibleCount} remaining)</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   };
