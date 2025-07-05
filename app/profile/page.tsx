@@ -1,85 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
-import { base } from 'wagmi/chains';
-import { IdentityCard } from '@coinbase/onchainkit/identity';
-import { calculateRanking } from '../utils/ranking';
 import IdentityComponent from '../components/Identity/Identity';
 
-const BASESCAN_API_KEY = 'YB9ZQ71MVDJU3CQQXFJ6GQ4Y17MPKEQCBN';
-
-interface Stats {
-  transactions: number;
-  tokens: number;
-  nfts: number;
-  contracts: number;
-  transactionPoints: number;
-  tokenPoints: number;
-  nftPoints: number;
-  contractPoints: number;
-}
-
 export default function ProfilePage() {
-  const { address } = useAccount();
-  const [stats, setStats] = useState<Stats>({
-    transactions: 0,
-    tokens: 0,
-    nfts: 0,
-    contracts: 0,
-    transactionPoints: 0,
-    tokenPoints: 0,
-    nftPoints: 0,
-    contractPoints: 0
-  });
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
-  useEffect(() => {
-    async function fetchData() {
-      if (!address) return;
-
-      try {
-        const [txResponse, nftResponse, tokenResponse] = await Promise.all([
-          fetch(`https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${BASESCAN_API_KEY}`),
-          fetch(`https://api.basescan.org/api?module=account&action=tokennfttx&address=${address}&apikey=${BASESCAN_API_KEY}`),
-          fetch(`https://api.basescan.org/api?module=account&action=tokentx&address=${address}&apikey=${BASESCAN_API_KEY}`)
-        ]);
-
-        const [txData, nftData, tokenData] = await Promise.all([
-          txResponse.json(),
-          nftResponse.json(),
-          tokenResponse.json()
-        ]);
-
-        const rankingStats = calculateRanking(
-          txData.status === '1' ? txData.result : [],
-          tokenData.status === '1' ? tokenData.result : [],
-          nftData.status === '1' ? nftData.result : []
-        );
-
-        setStats({
-          transactions: rankingStats.stats.transactions,
-          tokens: rankingStats.stats.tokens,
-          nfts: rankingStats.stats.nfts,
-          contracts: rankingStats.stats.contracts,
-          transactionPoints: rankingStats.breakdown.transactionPoints,
-          tokenPoints: rankingStats.breakdown.tokenPoints,
-          nftPoints: rankingStats.breakdown.nftPoints,
-          contractPoints: rankingStats.breakdown.uniqueContractPoints
-        });
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    }
-
-    if (address && isMounted) {
-      fetchData();
-    }
-  }, [address, isMounted]);
 
   if (!isMounted) {
     return <div></div>;
@@ -87,11 +16,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Matrix background effect */}
-      <div className="fixed inset-0 bg-black opacity-90">
-        {/* Usunięto odwołanie do matrix.png */}
-      </div>
-
       {/* Cyber grid background */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.1)_0%,transparent_70%)]"></div>
       <div className="absolute inset-0" style={{

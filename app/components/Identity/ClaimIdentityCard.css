@@ -1,0 +1,698 @@
+:root {
+  --pointer-x: 50%;
+  --pointer-y: 50%;
+  --pointer-from-center: 0;
+  --pointer-from-top: 0.5;
+  --pointer-from-left: 0.5;
+  --card-opacity: 0;
+  --rotate-x: 0deg;
+  --rotate-y: 0deg;
+  --background-x: 50%;
+  --background-y: 50%;
+  --grain: none;
+  --icon: none;
+  --behind-gradient: none;
+  --inner-gradient: none;
+  --base-blue-1: #0052FF;
+  --base-blue-2: #4C8FFF;
+  --base-blue-3: #1E4DD8;
+  --mysphere-dark: #050B20;
+  --mysphere-bg: #0A1128;
+  --card-radius: 24px;
+}
+
+.claim-identity-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.claim-card-wrapper {
+  perspective: 600px;
+  transform: translate3d(0, 0, 0.1px);
+  position: relative;
+  touch-action: none;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.claim-card-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  background: inherit;
+  background-position: inherit;
+  border-radius: inherit;
+  transition: all 0.5s ease;
+  filter: contrast(2) saturate(2) blur(40px);
+  transform: scale(0.8) translate3d(0, 0, 0.1px);
+  background-size: 100% 100%;
+  background-image: radial-gradient(farthest-side circle at var(--pointer-x) var(--pointer-y), 
+    hsla(218, 100%, 90%, var(--card-opacity)) 4%, 
+    hsla(218, 50%, 80%, calc(var(--card-opacity) * 0.75)) 10%, 
+    hsla(218, 25%, 70%, calc(var(--card-opacity) * 0.5)) 50%, 
+    hsla(218, 0%, 60%, 0) 100%);
+}
+
+.claim-card-wrapper:hover,
+.claim-card-wrapper.active {
+  --card-opacity: 1;
+}
+
+.claim-card-wrapper:hover::before,
+.claim-card-wrapper.active::before {
+  filter: contrast(1) saturate(2) blur(45px) opacity(1);
+  transform: scale(0.9) translate3d(0, 0, 0.1px);
+}
+
+.claim-card {
+  height: auto;
+  max-height: 520px;
+  min-height: 450px;
+  width: 100%;
+  max-width: 380px;
+  aspect-ratio: 0.75;
+  border-radius: var(--card-radius);
+  position: relative;
+  background-blend-mode: color-dodge, normal, normal, normal;
+  animation: claim-glow 12s linear infinite;
+  box-shadow: rgba(0, 0, 0, 0.9) calc((var(--pointer-from-left) * 12px) - 4px) calc((var(--pointer-from-top) * 22px) - 8px) 25px -8px,
+              0 0 40px rgba(0, 82, 255, 0.3);
+  transition: transform 1s ease;
+  transform: translate3d(0, 0, 0.1px) rotateX(0deg) rotateY(0deg);
+  will-change: transform, box-shadow;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background-size: 100% 100%;
+  background-position: 0 0, 0 0, 50% 50%, 0 0;
+  background-image: 
+    radial-gradient(farthest-side circle at var(--pointer-x) var(--pointer-y), 
+      hsla(218, 100%, 90%, var(--card-opacity)) 4%, 
+      hsla(218, 50%, 80%, calc(var(--card-opacity) * 0.75)) 10%, 
+      hsla(218, 25%, 70%, calc(var(--card-opacity) * 0.5)) 50%, 
+      hsla(218, 0%, 60%, 0) 100%), 
+    radial-gradient(35% 52% at 55% 20%, var(--base-blue-1) 0%, transparent 100%), 
+    radial-gradient(100% 100% at 50% 50%, var(--base-blue-1) 1%, transparent 76%), 
+    conic-gradient(from 124deg at 50% 50%, var(--base-blue-1) 0%, var(--base-blue-2) 40%, var(--base-blue-2) 60%, var(--base-blue-1) 100%);
+  overflow: hidden;
+  border: 1px solid rgba(0, 82, 255, 0.2);
+}
+
+.claim-card:hover,
+.claim-card.active {
+  transition: none;
+  transform: translate3d(0, 0, 0.1px) rotateX(var(--rotate-y)) rotateY(var(--rotate-x));
+  box-shadow: rgba(0, 0, 0, 0.9) calc((var(--pointer-from-left) * 12px) - 4px) calc((var(--pointer-from-top) * 22px) - 8px) 25px -8px,
+              0 0 60px rgba(0, 82, 255, 0.6);
+}
+
+.claim-card * {
+  display: grid;
+  grid-area: 1/-1;
+  border-radius: var(--card-radius);
+  transform: translate3d(0, 0, 0.1px);
+  pointer-events: none;
+}
+
+.claim-inside {
+  inset: 1px;
+  position: absolute;
+  background-image: linear-gradient(145deg, var(--mysphere-dark) 0%, rgba(0, 82, 255, 0.3) 100%);
+  background-color: var(--mysphere-bg);
+  transform: translate3d(0, 0, 0.01px);
+  border: 1px solid rgba(0, 82, 255, 0.1);
+}
+
+.claim-shine {
+  --space: 6%;
+  --angle: -45deg;
+  transform: translate3d(0, 0, 1px);
+  overflow: hidden;
+  z-index: 3;
+  background: transparent;
+  background-size: cover;
+  background-position: center;
+  background-image: 
+    repeating-linear-gradient(0deg, 
+      var(--base-blue-1) calc(var(--space) * 1), 
+      var(--base-blue-2) calc(var(--space) * 2), 
+      var(--base-blue-3) calc(var(--space) * 3), 
+      var(--base-blue-2) calc(var(--space) * 4), 
+      var(--base-blue-1) calc(var(--space) * 5), 
+      var(--base-blue-3) calc(var(--space) * 6), 
+      var(--base-blue-1) calc(var(--space) * 7)), 
+    repeating-linear-gradient(var(--angle), 
+      var(--mysphere-dark) 0%, 
+      rgba(76, 143, 255, 0.6) 3.8%, 
+      rgba(76, 143, 255, 0.8) 4.5%, 
+      rgba(76, 143, 255, 0.6) 5.2%, 
+      var(--mysphere-dark) 10%, 
+      var(--mysphere-dark) 12%);
+  background-position: 0 var(--background-y), var(--background-x) var(--background-y);
+  background-blend-mode: color, hard-light;
+  background-size: 500% 500%, 300% 300%;
+  background-repeat: repeat;
+  transition: filter 0.6s ease;
+  filter: brightness(0.7) contrast(1.4) saturate(0.4) opacity(0.6);
+  animation: claim-shine 18s linear infinite;
+  mix-blend-mode: color-dodge;
+}
+
+.claim-card:hover .claim-shine,
+.claim-card.active .claim-shine {
+  filter: brightness(0.9) contrast(1.6) saturate(0.6);
+  animation: none;
+}
+
+.claim-glare {
+  transform: translate3d(0, 0, 1.1px);
+  overflow: hidden;
+  background-image: radial-gradient(farthest-corner circle at var(--pointer-x) var(--pointer-y), 
+    rgba(0, 82, 255, 0.8) 12%, 
+    rgba(0, 82, 255, 0.3) 90%);
+  mix-blend-mode: overlay;
+  filter: brightness(0.9) contrast(1.3);
+  z-index: 4;
+}
+
+.claim-hologram {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background-image: url('/brand-kit/base/logo/symbol/Base_Symbol_Black.svg');
+  background-size: 120px 120px;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.03;
+  mix-blend-mode: color-dodge;
+  transform: translate3d(0, 0, 0.5px);
+  animation: hologram-pulse 4s ease-in-out infinite;
+  filter: brightness(2) contrast(1.5);
+}
+
+.claim-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  height: 100%;
+  padding: 24px;
+  z-index: 5;
+  position: relative;
+  mix-blend-mode: normal;
+  pointer-events: auto;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+.claim-header {
+  margin-bottom: 16px;
+}
+
+.claim-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.claim-logo {
+  color: rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 0 10px rgba(0, 82, 255, 0.5));
+  animation: logo-glow 3s ease-in-out infinite alternate;
+  flex-shrink: 0;
+}
+
+.claim-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  background-image: linear-gradient(to bottom, #ffffff, rgba(76, 143, 255, 0.9));
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  font-family: 'Coinbase Display', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.claim-stats {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.claim-stat-row {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.claim-stat-item {
+  flex: 1;
+  background: rgba(5, 11, 32, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 82, 255, 0.2);
+  border-radius: 10px;
+  padding: 10px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.claim-stat-label {
+  display: block;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 6px;
+  font-family: 'Coinbase Text', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.claim-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: 'Coinbase Display', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.claim-rank-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.claim-rank-text {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Coinbase Display', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.claim-rank-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: rank-pulse 2s ease-in-out infinite;
+}
+
+.claim-badge-count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.claim-badge-icon {
+  color: rgba(255, 193, 7, 0.9);
+  filter: drop-shadow(0 0 5px rgba(255, 193, 7, 0.5));
+}
+
+.claim-badge-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: rgba(255, 193, 7, 0.9);
+  font-family: 'Coinbase Display', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.claim-stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.claim-grid-item {
+  background: rgba(5, 11, 32, 0.6);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(0, 82, 255, 0.15);
+  border-radius: 6px;
+  padding: 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: calc(50% - 4px);
+}
+
+.claim-grid-label {
+  display: block;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 4px;
+  font-family: 'Coinbase Text', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.claim-grid-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'Coinbase Display', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.claim-user-name {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Coinbase Display', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: linear-gradient(135deg, rgba(5, 11, 32, 0.8) 0%, rgba(0, 82, 255, 0.2) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 82, 255, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  width: 100%;
+  box-sizing: border-box;
+  background-image: linear-gradient(135deg, #ffffff 0%, rgba(76, 143, 255, 0.9) 100%);
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  animation: user-name-glow 3s ease-in-out infinite alternate;
+}
+
+.claim-user-name::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: user-name-shine 2s ease-in-out infinite;
+  z-index: -1;
+}
+
+@keyframes user-name-glow {
+  0% { 
+    border-color: rgba(0, 82, 255, 0.3);
+    box-shadow: 0 0 20px rgba(0, 82, 255, 0.2);
+  }
+  100% { 
+    border-color: rgba(0, 82, 255, 0.6);
+    box-shadow: 0 0 30px rgba(0, 82, 255, 0.4);
+  }
+}
+
+@keyframes user-name-shine {
+  0% { left: -100%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
+}
+
+.claim-button {
+  width: 100%;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, var(--base-blue-1) 0%, var(--base-blue-2) 100%);
+  border: none;
+  border-radius: 16px;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Coinbase Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 32px rgba(0, 82, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.claim-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--base-blue-3) 0%, var(--base-blue-1) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 82, 255, 0.4);
+}
+
+.claim-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.claim-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes claim-glow {
+  0% { --bgrotate: 0deg; }
+  100% { --bgrotate: 360deg; }
+}
+
+@keyframes claim-shine {
+  0% { background-position: 0 var(--background-y), 0 0; }
+  100% { background-position: 0 var(--background-y), 90% 90%; }
+}
+
+@keyframes hologram-pulse {
+  0%, 100% { opacity: 0.03; }
+  50% { opacity: 0.08; }
+}
+
+@keyframes logo-glow {
+  0% { filter: drop-shadow(0 0 10px rgba(0, 82, 255, 0.5)); }
+  100% { filter: drop-shadow(0 0 20px rgba(0, 82, 255, 0.8)); }
+}
+
+@keyframes rank-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .claim-card {
+    height: auto;
+    max-height: none;
+    min-height: auto;
+    aspect-ratio: 0.8;
+    max-width: 90vw;
+    width: 100%;
+  }
+
+  .claim-content {
+    padding: 16px;
+    gap: 10px;
+  }
+
+  .claim-header-row {
+    gap: 10px;
+  }
+
+  .claim-title {
+    font-size: 18px;
+  }
+
+  .claim-stats {
+    gap: 12px;
+  }
+
+  .claim-stat-row {
+    gap: 12px;
+  }
+
+  .claim-stat-item {
+    padding: 10px;
+  }
+
+  .claim-stat-value {
+    font-size: 18px;
+  }
+
+  .claim-rank-text {
+    font-size: 16px;
+  }
+
+  .claim-badge-number {
+    font-size: 18px;
+  }
+
+  .claim-stats-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .claim-grid-item {
+    padding: 8px;
+    flex: 1;
+    min-width: calc(50% - 5px);
+  }
+
+  .claim-grid-label {
+    font-size: 10px;
+  }
+
+  .claim-grid-value {
+    font-size: 14px;
+  }
+
+  .claim-user-name {
+    font-size: 13px;
+    padding: 10px 14px;
+    margin-top: 10px;
+    border-radius: 10px;
+  }
+
+  .claim-button {
+    padding: 14px 20px;
+    font-size: 14px;
+  }
+}
+
+/* Mobile device class - disable animations */
+.mobile-device .claim-card {
+  animation: none !important;
+  transform: translate3d(0, 0, 0.1px) !important;
+  transition: none !important;
+  height: auto !important;
+  min-height: 400px !important;
+  max-height: none !important;
+}
+
+.mobile-device .claim-content {
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Extra small screens */
+@media (max-width: 360px) {
+  .claim-card {
+    max-width: 98vw;
+    aspect-ratio: 0.9;
+    min-height: 300px;
+  }
+  
+  .claim-content {
+    padding: 10px;
+    gap: 6px;
+  }
+  
+  .claim-user-name {
+    font-size: 11px;
+    padding: 6px 10px;
+    margin-top: 6px;
+  }
+}
+
+.mobile-device .claim-shine {
+  animation: none !important;
+  filter: brightness(0.9) contrast(1.1) saturate(0.7) opacity(0.6) !important;
+}
+
+.mobile-device .claim-card:hover,
+.mobile-device .claim-card.active {
+  transform: translate3d(0, 0, 0.1px) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 82, 255, 0.3) !important;
+}
+
+.mobile-device .claim-card-wrapper::before {
+  display: none !important;
+}
+
+@media (max-width: 480px) {
+  .claim-card {
+    height: auto;
+    max-height: none;
+    min-height: auto;
+    aspect-ratio: 0.85;
+    max-width: 95vw;
+    width: 100%;
+  }
+
+  .claim-content {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .claim-header-row {
+    gap: 8px;
+  }
+
+  .claim-title {
+    font-size: 16px;
+  }
+
+  .claim-stats {
+    gap: 10px;
+  }
+
+  .claim-stat-row {
+    gap: 10px;
+  }
+
+  .claim-stat-item {
+    padding: 8px;
+  }
+
+  .claim-stat-value {
+    font-size: 16px;
+  }
+
+  .claim-rank-text {
+    font-size: 14px;
+  }
+
+  .claim-badge-number {
+    font-size: 16px;
+  }
+
+  .claim-stats-grid {
+    gap: 8px;
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .claim-grid-item {
+    padding: 6px;
+    flex: 1;
+    min-width: calc(50% - 4px);
+  }
+
+  .claim-grid-label {
+    font-size: 9px;
+  }
+
+  .claim-grid-value {
+    font-size: 12px;
+  }
+
+  .claim-user-name {
+    font-size: 12px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    border-radius: 8px;
+  }
+
+  .claim-button {
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+} 

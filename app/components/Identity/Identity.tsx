@@ -3,13 +3,18 @@
 import { IdentityCard } from '@coinbase/onchainkit/identity';
 import { useAccount } from 'wagmi';
 import { base } from 'wagmi/chains';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { calculateRanking, UserRank, RANK_DESCRIPTIONS, BADGES, Badge, BadgeInfo } from '../../utils/ranking';
 import { InitialAnimation } from '../Animation/InitialAnimation';
+import ClaimIdentityCard from './ClaimIdentityCard';
 
 const COINBASE_VERIFIED_ACCOUNT_SCHEMA_ID = '0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9';
 const BASESCAN_API_KEY = 'YB9ZQ71MVDJU3CQQXFJ6GQ4Y17MPKEQCBN';
 const REFRESH_INTERVAL = 30000; // 30 sekund
+
+// Cache configuration - separate cache for each data type
+const CACHE_KEY_PREFIX = 'sphereIdentity_';
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache
 
 // Point system explanation
 const POINT_SYSTEM = {
@@ -158,6 +163,76 @@ export default function IdentityComponent() {
   const [animationData, setAnimationData] = useState<RankingStats | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isFetchingManually, setIsFetchingManually] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  // Progressive loading states with live counts
+  const [loadingProgress, setLoadingProgress] = useState({
+    transactions: false,
+    tokens: false,
+    nfts: false,
+    contracts: false
+  });
+
+  const [liveDataCounts, setLiveDataCounts] = useState({
+    transactions: 0,
+    tokens: 0,
+    nfts: 0,
+    contracts: 0
+  });
+
+  const [dataStatus, setDataStatus] = useState({
+    transactions: { loaded: false, error: null as string | null, timestamp: null as number | null },
+    tokens: { loaded: false, error: null as string | null, timestamp: null as number | null },
+    nfts: { loaded: false, error: null as string | null, timestamp: null as number | null },
+    contracts: { loaded: false, error: null as string | null, timestamp: null as number | null }
+  });
+
+  // Track active timeouts to prevent background fetching
+  const activeTimeouts = useRef<Set<NodeJS.Timeout>>(new Set());
+  const isComponentMounted = useRef(true);
+  const globalStopFlag = useRef(false);
+  const hasInitialized = useRef(false);
+
+  // Clear all active timeouts when component unmounts or data is complete
+  useEffect(() => {
+    isComponentMounted.current = true;
+    globalStopFlag.current = false;
+    
+    return () => {
+      console.log('🔄 COMPONENT UNMOUNTING - STOPPING ALL OPERATIONS');
+      isComponentMounted.current = false;
+      globalStopFlag.current = true;
+      activeTimeouts.current.forEach(timeout => clearTimeout(timeout));
+      activeTimeouts.current.clear();
+    };
+  }, []);
+
+  // Clear timeouts when all data is loaded
+  useEffect(() => {
+    const allLoaded = Object.values(dataStatus).every(status => status.loaded);
+    if (allLoaded && isComponentMounted.current) {
+      console.log('🛑 ALL DATA LOADED - CLEARING ALL ACTIVE TIMEOUTS');
+      console.log('📊 Final data status:', dataStatus);
+      console.log('⏰ Active timeouts count:', activeTimeouts.current.size);
+      globalStopFlag.current = true; // Stop all operations
+      activeTimeouts.current.forEach(timeout => clearTimeout(timeout));
+      activeTimeouts.current.clear();
+    }
+  }, [dataStatus]);
+
+  // Debug log when dataStatus changes
+  useEffect(() => {
+    console.log('📊 Data Status Changed:', {
+      transactions: dataStatus.transactions?.loaded ? '✅' : '❌',
+      tokens: dataStatus.tokens?.loaded ? '✅' : '❌', 
+      nfts: dataStatus.nfts?.loaded ? '✅' : '❌',
+      contracts: dataStatus.contracts?.loaded ? '✅' : '❌',
+      allLoaded: Object.values(dataStatus).every(status => status.loaded)
+    });
+  }, [dataStatus]);
 
   // Grupowanie odznak według kategorii
   const groupedBadges = {
@@ -172,47 +247,656 @@ export default function IdentityComponent() {
     setIsMounted(true);
   }, []);
 
-  useEffect(() => {
-    async function fetchData() {
-      if (!address) return;
-      setIsLoading(true);
+  // Cache functions for individual data types
+  const getCacheKey = (address: string, dataType: string) => `${CACHE_KEY_PREFIX}${address}_${dataType}`;
 
-      try {
-        // Fetch data from BaseScan
-        const [txResponse, nftResponse, tokenResponse] = await Promise.all([
-          fetch(`https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${BASESCAN_API_KEY}`),
-          fetch(`https://api.basescan.org/api?module=account&action=tokennfttx&address=${address}&apikey=${BASESCAN_API_KEY}`),
-          fetch(`https://api.basescan.org/api?module=account&action=tokentx&address=${address}&apikey=${BASESCAN_API_KEY}`)
-        ]);
-
-        const [txData, nftData, tokenData] = await Promise.all([
-          txResponse.json(),
-          nftResponse.json(),
-          tokenResponse.json()
-        ]);
-
-        // Calculate ranking
+  const loadFromCache = (address: string): RankingStats | null => {
+    try {
+      console.log('🔄 Checking cache for instant data loading...');
+      setIsFetchingManually(true); // Show loading state immediately
+      
+      const now = Date.now();
+      const cachedResults: {
+        transactions: any[] | null,
+        tokens: any[] | null,
+        nfts: any[] | null,
+        contracts: any[] | null
+      } = {
+        transactions: null,
+        tokens: null,
+        nfts: null,
+        contracts: null
+      };
+      
+      let hasAnyData = false;
+      let latestTimestamp = 0;
+      
+      // Load each data type separately, but preserve already loaded status
+      ['transactions', 'tokens', 'nfts', 'contracts'].forEach(dataType => {
+        // Show loading indicator for cache check
+        setLoadingProgress(prev => ({ ...prev, [dataType]: true }));
+        
+        // If already loaded, don't check cache - use existing data
+        if (dataStatus[dataType as keyof typeof dataStatus]?.loaded) {
+          console.log(`📋 ${dataType} already loaded, skipping cache check`);
+          const cached = localStorage.getItem(getCacheKey(address, dataType));
+          if (cached) {
+            try {
+              const { data } = JSON.parse(cached);
+              cachedResults[dataType as keyof typeof cachedResults] = data;
+              hasAnyData = true;
+            } catch (e) {
+              console.warn(`Failed to parse cached ${dataType}`);
+            }
+          }
+          setLoadingProgress(prev => ({ ...prev, [dataType]: false }));
+          return;
+        }
+        
+        const cached = localStorage.getItem(getCacheKey(address, dataType));
+        if (cached) {
+          try {
+            const { data, timestamp } = JSON.parse(cached);
+            if (now - timestamp < CACHE_TTL) {
+              cachedResults[dataType as keyof typeof cachedResults] = data;
+              hasAnyData = true;
+              latestTimestamp = Math.max(latestTimestamp, timestamp);
+              
+              // Update data status immediately with visual feedback
+              setDataStatus(prev => ({
+                ...prev,
+                [dataType]: { loaded: true, error: null, timestamp }
+              }));
+              
+              console.log(`📋 Loaded ${dataType} from cache: ${data?.length || 0} items`);
+            } else {
+              console.log(`🕰️ Cache expired for ${dataType}, will need to refresh`);
+              // Only set as not loaded if it wasn't already loaded
+              if (!dataStatus[dataType as keyof typeof dataStatus]?.loaded) {
+                setDataStatus(prev => ({
+                  ...prev,
+                  [dataType]: { loaded: false, error: null, timestamp: null }
+                }));
+              }
+            }
+          } catch (e) {
+            console.warn(`Failed to parse cache for ${dataType}`);
+            // Only set error if it wasn't already loaded
+            if (!dataStatus[dataType as keyof typeof dataStatus]?.loaded) {
+              setDataStatus(prev => ({
+                ...prev,
+                [dataType]: { loaded: false, error: 'Cache parse error', timestamp: null }
+              }));
+            }
+          }
+        } else {
+          console.log(`📋 No cache found for ${dataType}`);
+          // Only set as not loaded if it wasn't already loaded
+          if (!dataStatus[dataType as keyof typeof dataStatus]?.loaded) {
+            setDataStatus(prev => ({
+              ...prev,
+              [dataType]: { loaded: false, error: null, timestamp: null }
+            }));
+          }
+        }
+        
+        // Clear loading indicator after cache check
+        setTimeout(() => {
+          setLoadingProgress(prev => ({ ...prev, [dataType]: false }));
+        }, 200); // Short delay to show the loading state
+      });
+      
+      // Clear main loading state
+      setTimeout(() => {
+        setIsFetchingManually(false);
+      }, 500);
+      
+      if (hasAnyData) {
+        setLastFetchTime(latestTimestamp);
+        
+        // Reconstruct stats from cached data
+        const stats = {
+          stats: {
+            transactions: cachedResults.transactions?.length || 0,
+            tokens: cachedResults.tokens?.length || 0,
+            nfts: cachedResults.nfts?.length || 0,
+            contracts: cachedResults.contracts ? new Set(cachedResults.contracts.map((tx: any) => tx.to)).size : 0
+          },
+          totalPoints: 0,
+          rank: 'NEWBIE' as any,
+          percentile: 0,
+          breakdown: {
+            transactionPoints: 0,
+            tokenPoints: 0,
+            nftPoints: 0,
+            uniqueContractPoints: 0
+          }
+        };
+        
+        // Recalculate points
         const rankingStats = calculateRanking(
-          txData.status === '1' ? txData.result : [],
-          tokenData.status === '1' ? tokenData.result : [],
-          nftData.status === '1' ? nftData.result : []
+          cachedResults.transactions || [],
+          cachedResults.tokens || [],
+          cachedResults.nfts || []
         );
+        
+        console.log(`✅ Successfully loaded cached data - ${Object.values(cachedResults).filter(d => d !== null).length}/4 categories`);
+        return rankingStats;
+      }
+      
+      console.log('📋 No valid cached data found');
+      return null;
+    } catch (error) {
+      console.error('❌ Error loading from cache:', error);
+      setIsFetchingManually(false);
+      return null;
+    }
+  };
 
-        setStats(rankingStats);
+  const saveToCache = (address: string, dataType: string, data: any) => {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now()
+      };
+      
+      // Check if we have space - if not, clear old cache first
+      const testKey = `test_${Date.now()}`;
+      try {
+        localStorage.setItem(testKey, JSON.stringify(cacheData));
+        localStorage.removeItem(testKey);
+      } catch (quotaError) {
+        console.warn(`💾 Cache quota exceeded, clearing old cache for ${dataType}`);
+        // Clear old cache entries for this address
+        ['transactions', 'tokens', 'nfts', 'contracts'].forEach(type => {
+          try {
+            localStorage.removeItem(getCacheKey(address, type));
+          } catch (e) {
+            // Ignore errors
+          }
+        });
+      }
+      
+      localStorage.setItem(getCacheKey(address, dataType), JSON.stringify(cacheData));
+      
+      // Update data status
+      setDataStatus(prev => ({
+        ...prev,
+        [dataType]: { loaded: true, error: null, timestamp: cacheData.timestamp }
+      }));
+      
+    } catch (error) {
+      console.warn(`Failed to save ${dataType} to cache:`, error);
+      // Don't fail the whole process if cache fails
+    }
+  };
+
+  // Advanced parallel fetch with automatic retry logic
+  const fetchDataWithRetry = async (dataType: string, maxRetries = 3): Promise<any[] | null> => {
+    if (!address || globalStopFlag.current || !isComponentMounted.current) {
+      console.log(`🛑 ${dataType}: Stopped before starting`);
+      return null;
+    }
+    
+    let retryCount = 0;
+    let url = '';
+    let label = '';
+    
+    switch (dataType) {
+      case 'transactions':
+        url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${BASESCAN_API_KEY}`;
+        label = '📡 Transactions';
+        break;
+      case 'tokens':
+        url = `https://api.basescan.org/api?module=account&action=tokentx&address=${address}&apikey=${BASESCAN_API_KEY}`;
+        label = '🪙 Tokens';
+        break;
+      case 'nfts':
+        url = `https://api.basescan.org/api?module=account&action=tokennfttx&address=${address}&apikey=${BASESCAN_API_KEY}`;
+        label = '🎨 NFTs';
+        break;
+      default:
+        return null;
+    }
+
+    while (retryCount <= maxRetries) {
+      // Check if stopped before each attempt
+      if (globalStopFlag.current || !isComponentMounted.current) {
+        console.log(`🛑 ${label}: Stopped during retry ${retryCount}`);
+        return null;
+      }
+      
+      try {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 8000); // Exponential backoff: 1s, 2s, 4s, 8s max
+        
+        if (retryCount > 0) {
+          console.log(`🔄 ${label}: Retry ${retryCount}/${maxRetries} after ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          // Check if stopped during delay
+          if (globalStopFlag.current || !isComponentMounted.current) {
+            console.log(`🛑 ${label}: Stopped during retry delay`);
+            return null;
+          }
+        } else {
+          console.log(`🚀 ${label}: Starting fetch`);
+        }
+
+        setLoadingProgress(prev => ({ ...prev, [dataType]: true }));
+        
+        const response = await fetch(url, { 
+          signal: AbortSignal.timeout(25000) // 25 second timeout
+        });
+        
+        // Check if stopped after request
+        if (globalStopFlag.current || !isComponentMounted.current) {
+          console.log(`🛑 ${label}: Stopped after request`);
+          setLoadingProgress(prev => ({ ...prev, [dataType]: false }));
+          return null;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.status === '1' && data.result) {
+          // Update live count immediately
+          setLiveDataCounts(prev => ({ 
+            ...prev, 
+            [dataType]: data.result.length 
+          }));
+          
+          saveToCache(address, dataType, data.result);
+          setDataStatus(prev => ({
+            ...prev,
+            [dataType]: { loaded: true, error: null, timestamp: Date.now() }
+          }));
+          console.log(`✅ ${label}: ${data.result.length} items loaded`);
+          return data.result;
+        } else if (data.message === 'No transactions found' || data.message === 'No token transfers found' || data.message === 'No NFT transfers found') {
+          // Empty result is valid
+          setLiveDataCounts(prev => ({ 
+            ...prev, 
+            [dataType]: 0 
+          }));
+          
+          saveToCache(address, dataType, []);
+          setDataStatus(prev => ({
+            ...prev,
+            [dataType]: { loaded: true, error: null, timestamp: Date.now() }
+          }));
+          console.log(`✅ ${label}: No items found (valid)`);
+          return [];
+        } else {
+          throw new Error(data.message || 'API returned error');
+        }
+        
       } catch (error) {
-        console.error('Error fetching data:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`❌ ${label}: Attempt ${retryCount + 1} failed:`, errorMessage);
+        
+        // Check if stopped during error handling
+        if (globalStopFlag.current || !isComponentMounted.current) {
+          console.log(`🛑 ${label}: Stopped during error handling`);
+          setLoadingProgress(prev => ({ ...prev, [dataType]: false }));
+          return null;
+        }
+        
+        // Set error status immediately for UI feedback
+        setDataStatus(prev => ({
+          ...prev,
+          [dataType]: { 
+            loaded: false, 
+            error: `Attempt ${retryCount + 1}/${maxRetries + 1}: ${errorMessage}`, 
+            timestamp: null 
+          }
+        }));
+        
+        retryCount++;
+        
+        if (retryCount > maxRetries) {
+          setDataStatus(prev => ({
+            ...prev,
+            [dataType]: { 
+              loaded: false, 
+              error: `Failed after ${maxRetries + 1} attempts: ${errorMessage}`, 
+              timestamp: null 
+            }
+          }));
+          return null;
+        }
       } finally {
-        setIsLoading(false);
+        setLoadingProgress(prev => ({ ...prev, [dataType]: false }));
       }
     }
+    
+    return null;
+  };
 
-    if (address && isMounted) {
-      fetchData();
-      // Odświeżaj co 5 sekund zamiast 5 minut
-      const interval = setInterval(fetchData, REFRESH_INTERVAL);
-      return () => clearInterval(interval);
+  // Smart parallel fetch with automatic retry
+  const fetchDataProgressively = async (retryTypes: string[] = ['transactions', 'tokens', 'nfts', 'contracts']) => {
+    if (!address || isFetchingManually || !isComponentMounted.current || globalStopFlag.current) {
+      console.log('⏸️ Skipping fetch - no address, already fetching, unmounted, or stopped');
+      return;
     }
-  }, [address, isMounted]);
+    
+    // CRITICAL: Double-check if all data is actually loaded
+    const currentStatus = {
+      transactions: dataStatus.transactions?.loaded || false,
+      tokens: dataStatus.tokens?.loaded || false,
+      nfts: dataStatus.nfts?.loaded || false,
+      contracts: dataStatus.contracts?.loaded || false
+    };
+    
+    const allLoaded = Object.values(currentStatus).every(loaded => loaded);
+    if (allLoaded) {
+      console.log('✅ ALL DATA ALREADY LOADED - STOPPING ALL FETCH ATTEMPTS');
+      console.log('📊 Current status:', currentStatus);
+      globalStopFlag.current = true;
+      return;
+    }
+    
+    // Check if stopped during execution
+    if (globalStopFlag.current || !isComponentMounted.current) {
+      console.log('🛑 Operation stopped during execution');
+      return;
+    }
+    
+    // Check if all requested types are already loaded
+    const alreadyLoaded = retryTypes.filter(type => currentStatus[type as keyof typeof currentStatus]);
+    const needsRefresh = retryTypes.filter(type => !currentStatus[type as keyof typeof currentStatus]);
+    
+    if (needsRefresh.length === 0) {
+      console.log('✅ All requested data types already loaded, skipping fetch');
+      console.log('📊 Requested:', retryTypes, 'Already loaded:', alreadyLoaded);
+      return;
+    }
+    
+    console.log('🔄 FETCH DECISION:');
+    console.log('  - Requested types:', retryTypes);
+    console.log('  - Already loaded:', alreadyLoaded);
+    console.log('  - Needs refresh:', needsRefresh);
+    console.log('  - Current status:', currentStatus);
+    
+    setIsFetchingManually(true);
+    setFetchError(null);
+    
+    console.log(`🔄 Starting smart parallel data fetch for: (${needsRefresh.length}) [${needsRefresh.join(', ')}]`);
+    if (alreadyLoaded.length > 0) {
+      console.log(`📋 Already loaded: [${alreadyLoaded.join(', ')}]`);
+    }
+    
+    const results: {
+      transactions: any[] | null,
+      tokens: any[] | null,
+      nfts: any[] | null,
+      contracts: any[] | null
+    } = {
+      transactions: null,
+      tokens: null,
+      nfts: null,
+      contracts: null
+    };
+    
+    // Load existing cache data first for all types
+    ['transactions', 'tokens', 'nfts', 'contracts'].forEach(dataType => {
+      if (dataStatus[dataType as keyof typeof dataStatus]?.loaded) {
+        const cached = localStorage.getItem(getCacheKey(address, dataType));
+        if (cached) {
+          try {
+            const { data } = JSON.parse(cached);
+            results[dataType as keyof typeof results] = data;
+            console.log(`📋 Using cached ${dataType}: ${data?.length || 0} items`);
+          } catch (e) {
+            console.warn(`Failed to load cached ${dataType}`);
+          }
+        }
+      }
+    });
+
+    // Check if stopped before API calls
+    if (globalStopFlag.current || !isComponentMounted.current) {
+      console.log('🛑 Operation stopped before API calls');
+      setIsFetchingManually(false);
+      return;
+    }
+
+    // Filter API types only (not contracts) that actually need fetching
+    const apiTypes = needsRefresh.filter(type => type !== 'contracts');
+    
+    if (apiTypes.length === 0 && needsRefresh.includes('contracts')) {
+      // Only contracts needs refresh, but it depends on transactions
+      if (results.transactions) {
+        const uniqueContracts = new Set(results.transactions.map((tx: any) => tx.to)).size;
+        results.contracts = results.transactions;
+        saveToCache(address, 'contracts', results.transactions);
+        console.log(`✅ 🏗️ Contracts: ${uniqueContracts} unique contracts derived from cached transactions`);
+      }
+    } else if (apiTypes.length > 0) {
+      // Start parallel API calls with staggered timing to avoid rate limits
+      const promises = apiTypes.map(async (dataType, index) => {
+        // Check if stopped before each API call
+        if (globalStopFlag.current || !isComponentMounted.current) {
+          console.log(`🛑 Stopping ${dataType} fetch - component stopped`);
+          return { dataType, result: null };
+        }
+        
+        // Stagger start times by 500ms to avoid overwhelming the API
+        if (index > 0) {
+          await new Promise(resolve => setTimeout(resolve, index * 500));
+        }
+        
+        // Check again after delay
+        if (globalStopFlag.current || !isComponentMounted.current) {
+          console.log(`🛑 Stopping ${dataType} fetch after delay - component stopped`);
+          return { dataType, result: null };
+        }
+        
+        return { dataType, result: await fetchDataWithRetry(dataType) };
+      });
+
+      // Wait for all API calls to complete (or fail)
+      const apiResults = await Promise.allSettled(promises);
+      
+      // Check if stopped after API calls
+      if (globalStopFlag.current || !isComponentMounted.current) {
+        console.log('🛑 Operation stopped after API calls');
+        setIsFetchingManually(false);
+        return;
+      }
+      
+      // Process API results
+      apiResults.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          const { dataType, result: data } = result.value;
+          results[dataType as keyof typeof results] = data;
+        }
+      });
+
+      // Handle contracts (derived from transactions)
+      if (needsRefresh.includes('contracts')) {
+        if (results.transactions) {
+          const uniqueContracts = new Set(results.transactions.map((tx: any) => tx.to)).size;
+          results.contracts = results.transactions;
+          saveToCache(address, 'contracts', results.transactions);
+          console.log(`✅ 🏗️ Contracts: ${uniqueContracts} unique contracts derived`);
+        } else {
+          console.warn(`⚠️ Cannot derive contracts without transaction data`);
+        }
+      }
+    }
+    
+    // Final check before completing
+    if (globalStopFlag.current || !isComponentMounted.current) {
+      console.log('🛑 Operation stopped before completion');
+      setIsFetchingManually(false);
+      return;
+    }
+    
+    // Calculate final ranking with all available data
+    try {
+      const rankingStats = calculateRanking(
+        results.transactions || [],
+        results.tokens || [],
+        results.nfts || []
+      );
+
+      setStats(rankingStats);
+      setLastFetchTime(Date.now());
+      
+      const successCount = Object.values(results).filter(data => data !== null).length;
+      console.log(`✅ Smart fetch completed: ${successCount}/4 categories loaded`);
+      
+      // IMPORTANT: Stop all auto-retry if we have all data
+      const finalStatus = {
+        transactions: dataStatus.transactions?.loaded || results.transactions !== null,
+        tokens: dataStatus.tokens?.loaded || results.tokens !== null,
+        nfts: dataStatus.nfts?.loaded || results.nfts !== null,
+        contracts: dataStatus.contracts?.loaded || results.contracts !== null
+      };
+      
+      const finalAllLoaded = Object.values(finalStatus).every(loaded => loaded);
+      if (finalAllLoaded) {
+        console.log('🎉 ALL DATA NOW LOADED - NO MORE AUTO-RETRY');
+        globalStopFlag.current = true;
+        setIsFetchingManually(false);
+        return;
+      }
+      
+      // Check if there are still missing types, but DON'T auto-retry if we just fetched them
+      const stillMissing = getMissingDataTypes();
+      if (stillMissing.length > 0 && stillMissing.length < 4 && !globalStopFlag.current && isComponentMounted.current) {
+        // Only auto-retry if the missing types are different from what we just tried
+        const newMissingTypes = stillMissing.filter(type => !needsRefresh.includes(type));
+        if (newMissingTypes.length > 0) {
+          console.log(`🔄 Auto-retrying newly failed types in 5 seconds:`, newMissingTypes);
+          
+          const timeoutId = setTimeout(() => {
+            // Remove this timeout from active set
+            activeTimeouts.current.delete(timeoutId);
+            
+            // Triple check before retrying
+            if (globalStopFlag.current || !isComponentMounted.current) {
+              console.log('🛑 CANCELLING AUTO-RETRY - Component stopped or unmounted');
+              return;
+            }
+            
+            const recheckStatus = {
+              transactions: dataStatus.transactions?.loaded || false,
+              tokens: dataStatus.tokens?.loaded || false,
+              nfts: dataStatus.nfts?.loaded || false,
+              contracts: dataStatus.contracts?.loaded || false
+            };
+            const recheckAllLoaded = Object.values(recheckStatus).every(loaded => loaded);
+            
+            if (recheckAllLoaded) {
+              console.log('🛑 CANCELLING AUTO-RETRY - All data is now loaded');
+              globalStopFlag.current = true;
+              return;
+            }
+            
+            if (!isFetchingManually) { // Don't retry if user manually triggered another fetch
+              fetchDataProgressively(newMissingTypes);
+            }
+          }, 5000);
+          
+          // Track this timeout
+          activeTimeouts.current.add(timeoutId);
+        } else {
+          console.log(`⏸️ Not auto-retrying - just attempted these types:`, needsRefresh);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error calculating ranking:', error);
+      setFetchError('Failed to calculate ranking from fetched data');
+    } finally {
+      setIsFetchingManually(false);
+    }
+  };
+
+  // Get missing data types
+  const getMissingDataTypes = () => {
+    return Object.entries(dataStatus)
+      .filter(([_, status]) => !status.loaded)
+      .map(([dataType, _]) => dataType);
+  };
+
+  // Manual fetch function - now calls progressive fetch
+  const fetchDataManually = async (showLoading = true) => {
+    // Clear any pending timeouts first
+    activeTimeouts.current.forEach(timeout => clearTimeout(timeout));
+    activeTimeouts.current.clear();
+    
+    // Reset global stop flag for manual refresh
+    globalStopFlag.current = false;
+    
+    const missingTypes = getMissingDataTypes();
+    if (missingTypes.length === 0) {
+      console.log('🔄 Manual refresh requested - refreshing all data');
+      
+      // ONLY reset status if user explicitly wants to refresh all data
+      const userConfirmed = window.confirm('All data is already loaded. Do you want to force refresh all data?');
+      if (!userConfirmed) {
+        console.log('❌ User cancelled manual refresh');
+        return;
+      }
+      
+      // Clear current status to force refresh
+      setDataStatus({
+        transactions: { loaded: false, error: null, timestamp: null },
+        tokens: { loaded: false, error: null, timestamp: null },
+        nfts: { loaded: false, error: null, timestamp: null },
+        contracts: { loaded: false, error: null, timestamp: null }
+      });
+      
+      // Wait a bit for state to update
+      const timeoutId = setTimeout(() => {
+        activeTimeouts.current.delete(timeoutId);
+        if (!globalStopFlag.current && isComponentMounted.current) {
+          fetchDataProgressively(['transactions', 'tokens', 'nfts', 'contracts']);
+        }
+      }, 100);
+      activeTimeouts.current.add(timeoutId);
+    } else {
+      console.log('🔄 Manual refresh requested - fetching missing types:', missingTypes);
+      // Only fetch missing data
+      await fetchDataProgressively(missingTypes);
+    }
+  };
+
+  useEffect(() => {
+    async function initializeData() {
+      if (!address || !isMounted || hasInitialized.current) {
+        console.log('⏸️ Skipping initialization - no address, not mounted, or already initialized');
+        return;
+      }
+      
+      hasInitialized.current = true;
+      console.log('🚀 Initializing Sphere Identity data...');
+      
+      // Try to load from cache first
+      const cachedData = loadFromCache(address);
+      if (cachedData) {
+        console.log('📋 Loaded Sphere Identity from cache');
+        setStats(cachedData);
+        return;
+      }
+      
+      // No cache - show manual refresh button
+      console.log('💡 No cached data - ready for manual refresh');
+    }
+
+    initializeData();
+  }, [address, isMounted]); // Remove dataStatus from dependencies to prevent loops
+
+  // Reset initialization flag when address changes
+  useEffect(() => {
+    hasInitialized.current = false;
+    globalStopFlag.current = false;
+  }, [address]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -243,6 +927,30 @@ export default function IdentityComponent() {
 
   // Calculate earned badges
   const earnedBadges = BADGES.filter(badge => badge.condition(stats));
+
+  // Handle NFT claiming
+  const handleClaim = async () => {
+    if (!address || isClaiming) return;
+    
+    setIsClaiming(true);
+    try {
+      // TODO: Implement NFT claiming logic based on BaseFulLM docs
+      console.log('Claiming Sphere Identity NFT for:', address);
+      
+      // Simulate claiming process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Here you would integrate with your NFT contract
+      // Example: await claimSphereIdentityNFT(address, stats);
+      
+      alert('Sphere Identity NFT claimed successfully!');
+    } catch (error) {
+      console.error('Error claiming NFT:', error);
+      alert('Failed to claim NFT. Please try again.');
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
   // Jeśli komponent nie jest zamontowany, zwracamy pusty div
   if (!isMounted) {
@@ -346,6 +1054,264 @@ export default function IdentityComponent() {
                 >
                   Details
                 </button>
+                <button 
+                  onClick={() => setActiveTab('claim')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all relative ${
+                    activeTab === 'claim' 
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25' 
+                      : 'text-gray-300 hover:bg-purple-700/30 bg-gradient-to-r from-purple-900/20 to-pink-900/20 border border-purple-500/20'
+                  }`}
+                >
+                  <span className="relative z-10">Claim Identity</span>
+                  {activeTab !== 'claim' && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-pink-600/10 rounded-lg animate-pulse"></div>
+                  )}
+                </button>
+              </div>
+
+              {/* Manual Refresh Section */}
+              <div className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-md rounded-xl p-4 border border-gray-700/50 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-white font-medium mb-1">Blockchain Data Status</h3>
+                    <div className="flex items-center gap-4 text-sm">
+                      {lastFetchTime ? (
+                        <span className="text-green-400">
+                          ✅ Last updated: {new Date(lastFetchTime).toLocaleTimeString()}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">
+                          📋 No data cached - click Refresh to load
+                        </span>
+                      )}
+                      <span className="text-blue-400">
+                        💾 Smart parallel fetch with auto-retry
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => fetchDataManually()}
+                      disabled={isFetchingManually}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                        isFetchingManually
+                          ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                          : 'bg-blue-600 hover:bg-blue-700 hover:scale-105 shadow-lg hover:shadow-blue-500/25'
+                      } text-white flex items-center gap-2`}
+                    >
+                      {isFetchingManually ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Loading...</span>
+                        </>
+                      ) : (
+                        <>
+                          🔄 <span>Refresh Stats</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    {/* Retry Missing Data Button */}
+                    {(() => {
+                      const missingTypes = getMissingDataTypes();
+                      return missingTypes.length > 0 && missingTypes.length < 4 ? (
+                        <button
+                          onClick={() => fetchDataProgressively(missingTypes)}
+                          disabled={isFetchingManually}
+                          className={`px-3 py-2 rounded-lg font-medium transition-all ${
+                            isFetchingManually
+                              ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                              : 'bg-orange-600 hover:bg-orange-700 hover:scale-105'
+                          } text-white text-sm`}
+                        >
+                          ⚡ Retry Missing ({missingTypes.length})
+                        </button>
+                      ) : null;
+                    })()}
+                  </div>
+                </div>
+
+                {/* Enhanced Data Status Indicators with Progress */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  {Object.entries(dataStatus).map(([dataType, status]) => {
+                    // Real-time status calculation
+                    const isCurrentlyLoading = loadingProgress[dataType as keyof typeof loadingProgress];
+                    const hasData = status.loaded;
+                    const hasError = status.error && !hasData;
+                    const isPending = !hasData && !hasError && !isCurrentlyLoading;
+                    
+                    // Calculate data count for display
+                    let dataCount = 0;
+                    if (hasData && dataType === 'transactions') dataCount = stats.stats.transactions;
+                    if (hasData && dataType === 'tokens') dataCount = stats.stats.tokens;
+                    if (hasData && dataType === 'nfts') dataCount = stats.stats.nfts;
+                    if (hasData && dataType === 'contracts') dataCount = stats.stats.contracts;
+                    
+                    return (
+                      <div 
+                        key={dataType}
+                        className={`p-3 rounded-lg border transition-all duration-300 ${
+                          isCurrentlyLoading
+                            ? 'bg-blue-500/20 border-blue-500/50 shadow-lg shadow-blue-500/20 scale-[1.02]'
+                            : hasData 
+                              ? 'bg-green-500/20 border-green-500/50 shadow-lg shadow-green-500/10'
+                              : hasError
+                                ? 'bg-red-500/20 border-red-500/50 shadow-lg shadow-red-500/10'
+                                : 'bg-gray-500/20 border-gray-500/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            {isCurrentlyLoading ? (
+                              <div className="relative">
+                                <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-400 border-t-transparent"></div>
+                                <div className="absolute inset-0 rounded-full bg-blue-400/20 animate-pulse"></div>
+                              </div>
+                            ) : hasData ? (
+                              <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center animate-pulse">
+                                <span className="text-white text-xs font-bold">✓</span>
+                              </div>
+                            ) : hasError ? (
+                              <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center animate-pulse">
+                                <span className="text-white text-xs font-bold">✗</span>
+                              </div>
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-gray-500 flex items-center justify-center">
+                                <span className="text-white text-xs">⏳</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-medium capitalize text-sm ${
+                                  isCurrentlyLoading
+                                    ? 'text-blue-300'
+                                    : hasData 
+                                      ? 'text-green-300'
+                                      : hasError
+                                        ? 'text-red-300'
+                                        : 'text-gray-300'
+                                }`}>
+                                  {dataType}
+                                </span>
+                                {isCurrentlyLoading && (
+                                  <div className="px-2 py-1 rounded-full bg-blue-500/30 text-blue-200 text-xs font-medium animate-pulse">
+                                    Loading...
+                                  </div>
+                                )}
+                                {hasData && (
+                                  <div className="px-2 py-1 rounded-full bg-green-500/30 text-green-200 text-xs font-medium">
+                                    {dataCount.toLocaleString()} items
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {hasError && (
+                              <p className="text-red-400 text-xs mt-1 truncate" title={status.error || undefined}>
+                                {status.error}
+                              </p>
+                            )}
+                            
+                            {hasData && status.timestamp && (
+                              <p className="text-gray-400 text-xs mt-1">
+                                ✅ Loaded at {new Date(status.timestamp).toLocaleTimeString()}
+                              </p>
+                            )}
+                            
+                            {isCurrentlyLoading && (
+                              <p className="text-blue-400 text-xs mt-1 animate-pulse">
+                                🔄 Fetching from API...
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Enhanced progress bar for loading states */}
+                        {isCurrentlyLoading && (
+                          <div className="mt-3 w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500 rounded-full animate-pulse"></div>
+                          </div>
+                        )}
+                        
+                        {/* Success indicator */}
+                        {hasData && (
+                          <div className="mt-2 w-full h-1 bg-green-500/30 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full"></div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Enhanced Overall Status Summary */}
+                <div className="mt-4 p-4 bg-black/30 rounded-lg border border-gray-700/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full transition-all duration-300 ${
+                        isFetchingManually ? 'bg-blue-500 animate-pulse scale-110' :
+                        Object.values(dataStatus).every(s => s.loaded) ? 'bg-green-500 animate-pulse' :
+                        Object.values(dataStatus).some(s => s.error) ? 'bg-red-500 animate-pulse' :
+                        'bg-gray-500'
+                      }`}></div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-200">
+                          {isFetchingManually ? '🔄 Fetching blockchain data...' :
+                           Object.values(dataStatus).every(s => s.loaded) ? '✅ All data successfully loaded' :
+                           Object.values(dataStatus).some(s => s.error) ? '⚠️ Some data failed to load' :
+                           '⏸️ Ready to fetch data'}
+                        </span>
+                        {isFetchingManually && (
+                          <span className="text-xs text-blue-400 animate-pulse">
+                            Smart parallel fetch with auto-retry active
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <div className="text-sm font-medium text-gray-300">
+                        {Object.values(dataStatus).filter(s => s.loaded).length}/4 complete
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {((Object.values(dataStatus).filter(s => s.loaded).length / 4) * 100).toFixed(0)}% done
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Overall progress bar */}
+                  <div className="mt-3 w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        Object.values(dataStatus).every(s => s.loaded) 
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-400' 
+                          : 'bg-gradient-to-r from-blue-500 to-cyan-400'
+                      }`}
+                      style={{ 
+                        width: `${(Object.values(dataStatus).filter(s => s.loaded).length / 4) * 100}%` 
+                      }}
+                    ></div>
+                  </div>
+                  
+                  {/* Real-time stats when data is loaded */}
+                  {Object.values(dataStatus).every(s => s.loaded) && (
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+                      <span>📊 {stats.totalPoints.toLocaleString()} total points</span>
+                      <span>🏆 Rank: {stats.rank}</span>
+                      <span>⏱️ Last update: {lastFetchTime ? new Date(lastFetchTime).toLocaleTimeString() : 'Never'}</span>
+                    </div>
+                  )}
+                </div>
+
+                {fetchError && (
+                  <div className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+                    <div className="text-red-400 text-sm font-medium">System Error:</div>
+                    <div className="text-red-300 text-sm">{fetchError}</div>
+                  </div>
+                )}
               </div>
 
               {/* Główna sekcja karty */}
@@ -707,10 +1673,25 @@ export default function IdentityComponent() {
                         </div>
                       </div>
                     </div>
+                    
+                    {/* Claim Identity */}
+                    <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ${activeTab === 'claim' ? 'opacity-100 z-10' : 'opacity-0 -z-10'}`}>
+                      <div className="flex justify-center items-center h-full p-4">
+                        <ClaimIdentityCard
+                          address={address}
+                          stats={stats}
+                          earnedBadges={earnedBadges}
+                          onClaim={handleClaim}
+                          isClaiming={isClaiming}
+                          enableTilt={true}
+                          className="w-full max-w-sm mx-auto"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-
+              
               {/* BaseScan Link */}
               <div className="text-center">
                 <a

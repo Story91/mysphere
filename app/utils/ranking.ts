@@ -284,7 +284,7 @@ const POINTS = {
   HIGH_VALUE_TX_MULTIPLIER: 2.0
 };
 
-interface RankingStats {
+export interface RankingStats {
   totalPoints: number;
   rank: UserRank;
   percentile: number;
