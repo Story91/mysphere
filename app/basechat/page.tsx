@@ -1062,10 +1062,11 @@ export default function BaseChat() {
 
       await addComment(postId, comment);
       
-      // Clear comment input and refresh posts
+      // Clear comment input
       setNewComments(prev => ({...prev, [postId]: ''}));
-      const { posts: updatedPosts } = await fetchPosts({ userId: address });
-      setPosts(updatedPosts);
+      
+      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update w PostList już pokazuje komentarz
+      // Oszczędność: 50 Firebase reads po każdym komentarzu
       
       toast.success('Comment added successfully!');
     } catch (error) {
