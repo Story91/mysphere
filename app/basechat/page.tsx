@@ -1390,13 +1390,25 @@ export default function BaseChat() {
 
     try {
       if (confirm('Are you sure you want to delete this post?')) {
-        await deletePost(postId, address);
-        // Odśwież posty po usunięciu
-        const { posts: updatedPosts } = await fetchPosts({ userId: address });
+        // ✅ OPTIMISTIC UPDATE: Usuń post z UI natychmiast
+        const updatedPosts = posts.filter(post => post.id !== postId);
         setPosts(updatedPosts);
+        
+        // Wykonaj rzeczywistą operację w tle
+        await deletePost(postId, address);
+        
+        // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już usunął post
+        // Oszczędność: 50 Firebase reads po każdym usunięciu posta
       }
     } catch (error) {
       console.error('Error deleting post:', error);
+      // W przypadku błędu, przywróć dane z serwera
+      try {
+        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
+        setPosts(refreshedPosts);
+      } catch {
+        console.error('Failed to restore posts state after delete error');
+      }
     }
   };
 
@@ -1772,20 +1784,43 @@ export default function BaseChat() {
     if (!address) return;
     
     try {
+      // ✅ OPTIMISTIC UPDATE: Zaktualizuj post w UI natychmiast
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            content: newContent,
+            lastEdited: Date.now()
+          };
+        }
+        return post;
+      });
+      
+      setPosts(updatedPosts);
+      setEditingPost(null);
+      setEditedContent('');
+      
+      // Wykonaj rzeczywistą operację w tle
       const postRef = doc(db, 'posts', postId);
       await updateDoc(postRef, {
         content: newContent,
         lastEdited: serverTimestamp()
       });
       
-      // Odśwież posty
-      const { posts: updatedPosts } = await fetchPosts({ userId: address });
-      setPosts(updatedPosts);
-      setEditingPost(null);
-      setEditedContent('');
+      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował post
+      // Oszczędność: 50 Firebase reads po każdej edycji posta
+      
     } catch (error) {
       console.error('Error editing post:', error);
       alert('Wystąpił błąd podczas edycji posta. Spróbuj ponownie.');
+      
+      // W przypadku błędu, przywróć dane z serwera
+      try {
+        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
+        setPosts(refreshedPosts);
+      } catch {
+        console.error('Failed to restore posts state after edit error');
+      }
     }
   };
 
@@ -1794,16 +1829,45 @@ export default function BaseChat() {
     if (!address) return;
     
     try {
-      await editComment(postId, commentId, newContent);
+      // ✅ OPTIMISTIC UPDATE: Zaktualizuj komentarz w UI natychmiast
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          const updatedComments = post.comments?.map(comment => {
+            if (comment.id === commentId) {
+              return {
+                ...comment,
+                content: newContent,
+                lastEdited: Date.now()
+              };
+            }
+            return comment;
+          });
+          return { ...post, comments: updatedComments };
+        }
+        return post;
+      });
       
-      // Odśwież posty
-      const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
       setEditingComment(null);
       setEditedCommentContent('');
+      
+      // Wykonaj rzeczywistą operację w tle
+      await editComment(postId, commentId, newContent);
+      
+      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował komentarz
+      // Oszczędność: 50 Firebase reads po każdej edycji komentarza
+      
     } catch (error) {
       console.error('Error editing comment:', error);
       alert('An error occurred while editing the comment. Please try again.');
+      
+      // W przypadku błędu, przywróć dane z serwera
+      try {
+        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
+        setPosts(refreshedPosts);
+      } catch {
+        console.error('Failed to restore posts state after comment edit error');
+      }
     }
   };
 
@@ -1813,15 +1877,34 @@ export default function BaseChat() {
     
     try {
       if (confirm('Are you sure you want to delete this comment?')) {
+        // ✅ OPTIMISTIC UPDATE: Usuń komentarz z UI natychmiast
+        const updatedPosts = posts.map(post => {
+          if (post.id === postId) {
+            const updatedComments = post.comments?.filter(comment => comment.id !== commentId);
+            return { ...post, comments: updatedComments };
+          }
+          return post;
+        });
+        
+        setPosts(updatedPosts);
+        
+        // Wykonaj rzeczywistą operację w tle
         await deleteComment(postId, commentId, address);
         
-        // Odśwież posty
-        const { posts: updatedPosts } = await fetchPosts({ userId: address });
-        setPosts(updatedPosts);
+        // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już usunął komentarz
+        // Oszczędność: 50 Firebase reads po każdym usunięciu komentarza
       }
     } catch (error) {
       console.error('Error deleting comment:', error);
       alert('An error occurred while deleting the comment. Please try again.');
+      
+      // W przypadku błędu, przywróć dane z serwera
+      try {
+        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
+        setPosts(refreshedPosts);
+      } catch {
+        console.error('Failed to restore posts state after comment delete error');
+      }
     }
   };
 
