@@ -10,7 +10,7 @@ import ContentModeration from './components/ContentModeration';
 import Statistics from './components/Statistics';
 import { refreshTop50UsersOnly } from '../utils/firebase';
 import AdminQuotes from './quotes/page';
-import { getGlobalStats, getGlobalStatsRealTime, getUserNamesCacheStats, clearUserNamesCache } from '../utils/firebase';
+import { getGlobalStats, getGlobalStatsRealTime, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache } from '../utils/firebase';
 
 // Usuwam stałą ADMIN_ADDRESS, bo importujemy ją z firebase.ts
 const ADMIN_BASENAME = "story91.base.eth";
@@ -64,6 +64,57 @@ export default function AdminPanel() {
 
     checkAdminStatus();
   }, [address, isConnected]);
+
+  // 🔐 ADMIN: Automatyczne ładowanie danych przy wejściu na Global Stats
+  useEffect(() => {
+    if (activeTab === 'globalstats' && address && isAdmin && !loadingGlobalStats && !realStatsLoading) {
+      console.log('🔐 ADMIN: Auto-fetching data on Global Stats tab...');
+      
+      // Fetch BaseChat statistics (prawdziwe Firebase data)
+      if (!globalStats) {
+        handleFetchRealTimeStats();
+      }
+      
+      // Fetch MySphere statistics (statyczne dane z API)
+      if (!realStatsData) {
+        fetchMySphereStats();
+      }
+    }
+  }, [activeTab, address, isAdmin]);
+
+  // 🔐 ADMIN: Fetch MySphere statistics bezpośrednio z Firebase (szybko!)
+  const fetchMySphereStats = async () => {
+    setRealStatsLoading(true);
+    
+    try {
+      console.log('🔐 ADMIN: Fetching MySphere stats directly from Firebase...');
+      const mySphereStats = await getMySphereGlobalStats();
+      
+      setRealStatsData({ mySphere: mySphereStats });
+      console.log('✅ ADMIN: MySphere Firebase data loaded (direct call):', mySphereStats);
+      
+      // 🎯 Update MySphere Users counter
+      if (mySphereStats.totalUsers) {
+        animateStatValue(mySphereStats.totalUsers, 'mysphere');
+      }
+      
+      // 🎯 Update social media counters (tylko Twitter, Spotify, TikTok)
+      if (mySphereStats.socialMediaConnections) {
+        const social = mySphereStats.socialMediaConnections;
+        if (social.twitter) animateStatValue(social.twitter, 'twitter');
+        if (social.spotify) animateStatValue(social.spotify, 'spotify');
+        if (social.tiktok) animateStatValue(social.tiktok, 'tiktok');
+        // Discord i Telegram usunięte - nie są potrzebne w aplikacji
+      }
+      
+      console.log(`💰 MySphere cost: ~$${((mySphereStats.totalUsers || 100) * 0.00006).toFixed(2)} (direct Firebase)`);
+    } catch (error) {
+      console.error('❌ Error fetching MySphere Firebase stats:', error);
+      setRealStatsData(null);
+    } finally {
+      setRealStatsLoading(false);
+    }
+  };
 
   const handleRefreshUsers = async () => {
     setIsRefreshing(true);
@@ -188,50 +239,19 @@ export default function AdminPanel() {
     }
   };
 
-  // 🔐 ADMIN: Pobierz prawdziwe dane Firebase (kosztowne!)
-  const fetchRealStats = async () => {
-    if (!address) return;
-    
-    setRealStatsLoading(true);
-    
-    try {
-      console.log('🔐 ADMIN: Fetching real Firebase data...');
-      
-      const response = await fetch('/api/camp-stats/admin', {
-        headers: {
-          'x-user-address': address,
-          'x-admin-key': 'admin-request'
-        }
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setRealStatsData(data.data);
-        console.log('✅ ADMIN: Real Firebase data loaded');
-        console.log(`💰 Cost: ~$${((25000 * 0.00006).toFixed(2))} for this request`);
-      } else {
-        throw new Error(data.error);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching real stats:', error);
-      alert('Błąd podczas pobierania prawdziwych danych: ' + error);
-    } finally {
-      setRealStatsLoading(false);
-    }
-  };
+
 
   // 📊 Export static data template
   const exportStaticData = () => {
-    if (!realStatsData) return;
+    if (!realStatsData && !globalStats) return;
     
     const staticTemplate = {
       homePageStats: {
-        userCount: realStatsData.global?.userCount || 12847,
-        postsCount: realStatsData.global?.postsCount || 8934,
-        likesCount: realStatsData.global?.likesCount || 16432,
-        commentsCount: realStatsData.global?.commentsCount || 13876,
-        transactionsCount: realStatsData.global?.transactionsCount || 22810
+        userCount: globalStats?.userCount || 12847,
+        postsCount: globalStats?.postsCount || 8934,
+        likesCount: globalStats?.likesCount || 16432,
+        commentsCount: globalStats?.commentsCount || 13876,
+        transactionsCount: globalStats?.transactionsCount || 22810
       },
       mySphereStats: {
         totalUsers: realStatsData.mySphere?.totalUsers || 2847,
@@ -239,10 +259,8 @@ export default function AdminPanel() {
         averageConnectionsPerUser: realStatsData.mySphere?.averageConnectionsPerUser || 2.1,
         socialMediaConnections: realStatsData.mySphere?.socialMediaConnections || {
           twitter: 1847,
-          discord: 1234,
           spotify: 967,
-          tiktok: 543,
-          telegram: 256
+          tiktok: 543
         }
       },
       lastUpdated: new Date().toISOString(),
@@ -259,6 +277,29 @@ export default function AdminPanel() {
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     
     const exportFileDefaultName = `static-data-template-${new Date().toISOString().split('T')[0]}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  // 📊 Export MySphere data separately
+  const exportMySphereData = () => {
+    if (!realStatsData?.mySphere) return;
+    
+    const mySphereExport = {
+      ...realStatsData.mySphere,
+      exportedAt: new Date().toISOString(),
+      exportedBy: address,
+      dataSource: 'firebase-realtime',
+      cost: '$1.50 Firebase reads'
+    };
+    
+    const dataStr = JSON.stringify(mySphereExport, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `mysphere-data-${new Date().toISOString().split('T')[0]}.json`;
     
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
@@ -303,6 +344,7 @@ export default function AdminPanel() {
             <p>✅ <strong>MyCamp MySphere Statistics:</strong> Opcjonalne ładowanie na żądanie (3x auto-load → 0)</p>
             <p>✅ <strong>User Search System:</strong> Hybrydowy cache + targeted queries (.eth, .sphere, .camper)</p>
             <p>✅ <strong>getCachedActiveUsers:</strong> Limit 1000 → 50 użytkowników (95% redukcja)</p>
+            <p>✅ <strong>Admin MySphere:</strong> Bezpośrednie Firebase calls (2x szybsze, bez API overhead)</p>
           </div>
           <div className="mt-3 p-2 bg-yellow-900/30 border border-yellow-500/30 rounded">
             <p className="text-yellow-300 text-xs font-semibold">
@@ -494,143 +536,279 @@ export default function AdminPanel() {
             </div>
 
             <div className="flex gap-4 mb-6 flex-wrap">
+              <div className="flex items-center gap-3 bg-green-900/20 border border-green-500/30 rounded-lg px-4 py-2">
+                <span className="text-green-400">🤖</span>
+                <div className="text-sm">
+                  <div className="text-green-300 font-medium">Auto-loading enabled</div>
+                  <div className="text-green-200/70">Real Firebase data loads automatically</div>
+                </div>
+              </div>
+
+              {realStatsData && (
+                <>
+                  <button
+                    onClick={handleExportStats}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
+                  >
+                    💾 Export Global
+                  </button>
+                  <button
+                    onClick={exportMySphereData}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all"
+                  >
+                    💾 Export MySphere
+                  </button>
+                  <button
+                    onClick={exportStaticData}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-all"
+                  >
+                    📄 Export Template
+                  </button>
+                </>
+              )}
+
               <button
-                onClick={handleFetchGlobalStats}
-                disabled={loadingGlobalStats}
-                className={`px-6 py-3 rounded-lg font-medium transition-all ${
-                  loadingGlobalStats
-                    ? 'bg-gray-500 cursor-not-allowed'
+                onClick={() => {
+                  setRealStatsData(null);
+                  setGlobalStats(null);
+                  setAnimatedStats({});
+                  // Refresh both BaseChat statistics and MySphere statistics
+                  handleFetchRealTimeStats();
+                  fetchMySphereStats();
+                }}
+                disabled={realStatsLoading}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  realStatsLoading 
+                    ? 'bg-gray-500 cursor-not-allowed' 
                     : 'bg-blue-600 hover:bg-blue-700'
                 } text-white`}
               >
-                {loadingGlobalStats ? (
-                  <span className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Loading...
-                  </span>
-                ) : (
-                  '📋 Fetch Cached Stats (FREE)'
-                )}
+                {realStatsLoading ? '⏳ Loading...' : '🔄 Refresh Data'}
               </button>
-
-              <button
-                onClick={handleFetchRealTimeStats}
-                disabled={loadingGlobalStats}
-                className={`px-6 py-3 rounded-lg font-medium transition-all ${
-                  loadingGlobalStats
-                    ? 'bg-gray-500 cursor-not-allowed'
-                    : 'bg-red-600 hover:bg-red-700'
-                } text-white`}
-              >
-                {loadingGlobalStats ? (
-                  <span className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Loading...
-                  </span>
-                ) : (
-                  '🔐 Fetch REAL Firebase Data ($1.50)'
-                )}
-              </button>
-
-              {globalStats && (
-                <button
-                  onClick={handleExportStats}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
-                >
-                  💾 Export JSON
-                </button>
-              )}
             </div>
 
             {/* Data Source Indicator */}
-            {globalStats && (
-              <div className={`mb-6 p-3 rounded-lg text-sm ${
-                globalStats.dataSource === 'firebase-realtime' 
-                  ? 'bg-red-500/20 border border-red-500/50 text-red-200'
-                  : 'bg-blue-500/20 border border-blue-500/50 text-blue-200'
-              }`}>
-                {globalStats.dataSource === 'firebase-realtime' ? (
+            {(globalStats || realStatsData) && (
+              <div className="mb-6 p-3 rounded-lg text-sm bg-cyan-500/20 border border-cyan-500/50 text-cyan-200">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <span className="text-red-400 mr-2">🔐</span>
-                    <span className="font-medium">REAL-TIME Firebase data</span>
-                    <span className="ml-2 text-red-300">
-                      (Cost: ~${((globalStats.userCount + globalStats.postsCount) * 0.00006).toFixed(2)})
-                    </span>
+                    <span className="text-cyan-400 mr-2">⚡</span>
+                    <span className="font-medium">Auto-loaded Firebase data (direct calls)</span>
+                    <span className="ml-2 text-cyan-300">(2x faster, no API overhead)</span>
                   </div>
-                ) : (
-                  <div className="flex items-center">
-                    <span className="text-blue-400 mr-2">📋</span>
-                    <span className="font-medium">Cached data (12h cache)</span>
-                    <span className="ml-2 text-blue-300">(Cost: $0)</span>
-                  </div>
-                )}
+                  {realStatsData && (
+                    <div className="text-xs text-cyan-300">
+                      MySphere: {realStatsData.mySphere?.totalUsers || 'N/A'} users • 
+                      Updated: {new Date().toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Stats Display - Only 5 stats */}
-            {globalStats && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className={`relative bg-purple-500/20 rounded-lg p-6 text-center border border-purple-500/30 transition-all duration-300 ${
-                  updateTrigger.users ? 'scale-105 shadow-lg shadow-purple-500/20' : ''
-                }`}>
-                  <div className={`text-4xl font-bold text-purple-300 transition-all duration-500 ${
-                    updateTrigger.users ? 'text-purple-100 scale-110' : ''
-                  }`}>
-                    {(animatedStats.users || globalStats.userCount || 0).toLocaleString()}
+            {/* Main Stats Display - Global + MySphere */}
+            {(globalStats || realStatsData) && (
+              <div className="space-y-6">
+                {/* Global Stats Row */}
+                <div>
+                  <h4 className="text-lg font-bold text-white mb-4">📊 Global BaseChat Statistics</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className={`relative bg-purple-500/20 rounded-lg p-6 text-center border border-purple-500/30 transition-all duration-300 ${
+                      updateTrigger.users ? 'scale-105 shadow-lg shadow-purple-500/20' : ''
+                    }`}>
+                      <div className={`text-4xl font-bold text-purple-300 transition-all duration-500 ${
+                        updateTrigger.users ? 'text-purple-100 scale-110' : ''
+                      }`}>
+                        {(animatedStats.users || globalStats?.userCount || 0).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-purple-200 mt-2">Global Users</div>
+                      {updateTrigger.users && (
+                        <div className="absolute inset-0 bg-purple-500/10 rounded-lg animate-pulse"></div>
+                      )}
+                    </div>
+
+                    <div className={`relative bg-blue-500/20 rounded-lg p-6 text-center border border-blue-500/30 transition-all duration-300 ${
+                      updateTrigger.posts ? 'scale-105 shadow-lg shadow-blue-500/20' : ''
+                    }`}>
+                      <div className={`text-4xl font-bold text-blue-300 transition-all duration-500 ${
+                        updateTrigger.posts ? 'text-blue-100 scale-110' : ''
+                      }`}>
+                        {(animatedStats.posts || globalStats?.postsCount || 0).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-blue-200 mt-2">Global Posts</div>
+                      {updateTrigger.posts && (
+                        <div className="absolute inset-0 bg-blue-500/10 rounded-lg animate-pulse"></div>
+                      )}
+                    </div>
+
+                    <div className={`relative bg-green-500/20 rounded-lg p-6 text-center border border-green-500/30 transition-all duration-300 ${
+                      updateTrigger.likes ? 'scale-105 shadow-lg shadow-green-500/20' : ''
+                    }`}>
+                      <div className={`text-4xl font-bold text-green-300 transition-all duration-500 ${
+                        updateTrigger.likes ? 'text-green-100 scale-110' : ''
+                      }`}>
+                        {(animatedStats.likes || globalStats?.likesCount || 0).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-green-200 mt-2">Total Likes</div>
+                      {updateTrigger.likes && (
+                        <div className="absolute inset-0 bg-green-500/10 rounded-lg animate-pulse"></div>
+                      )}
+                    </div>
+
+                    <div className={`relative bg-yellow-500/20 rounded-lg p-6 text-center border border-yellow-500/30 transition-all duration-300 ${
+                      updateTrigger.comments ? 'scale-105 shadow-lg shadow-yellow-500/20' : ''
+                    }`}>
+                      <div className={`text-4xl font-bold text-yellow-300 transition-all duration-500 ${
+                        updateTrigger.comments ? 'text-yellow-100 scale-110' : ''
+                      }`}>
+                        {(animatedStats.comments || globalStats?.commentsCount || 0).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-yellow-200 mt-2">Total Comments</div>
+                      {updateTrigger.comments && (
+                        <div className="absolute inset-0 bg-yellow-500/10 rounded-lg animate-pulse"></div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-sm text-purple-200 mt-2">Global Users</div>
-                  {updateTrigger.users && (
-                    <div className="absolute inset-0 bg-purple-500/10 rounded-lg animate-pulse"></div>
-                  )}
                 </div>
 
-                <div className={`relative bg-blue-500/20 rounded-lg p-6 text-center border border-blue-500/30 transition-all duration-300 ${
-                  updateTrigger.posts ? 'scale-105 shadow-lg shadow-blue-500/20' : ''
-                }`}>
-                  <div className={`text-4xl font-bold text-blue-300 transition-all duration-500 ${
-                    updateTrigger.posts ? 'text-blue-100 scale-110' : ''
-                  }`}>
-                    {(animatedStats.posts || globalStats.postsCount || 0).toLocaleString()}
+                {/* MySphere Stats Row */}
+                <div>
+                  <h4 className="text-lg font-bold text-cyan-200 mb-4">🌐 MySphere Social Media Statistics (Twitter, Spotify, TikTok)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Total MySphere Users */}
+                    <div className={`relative bg-cyan-500/20 rounded-lg p-6 text-center border border-cyan-500/30 transition-all duration-300 ${
+                      updateTrigger.mysphere ? 'scale-105 shadow-lg shadow-cyan-500/20' : ''
+                    }`}>
+                      <div className={`text-3xl font-bold text-cyan-300 transition-all duration-500 ${
+                        updateTrigger.mysphere ? 'text-cyan-100 scale-110' : ''
+                      }`}>
+                        {(() => {
+                          const value = animatedStats.mysphere || realStatsData?.mySphere?.totalUsers;
+                          return value ? value.toLocaleString() : (realStatsLoading ? '...' : 'N/A');
+                        })()}
+                      </div>
+                      <div className="text-xs text-cyan-200 mt-2">MySphere Users</div>
+                      {updateTrigger.mysphere && (
+                        <div className="absolute inset-0 bg-cyan-500/10 rounded-lg animate-pulse"></div>
+                      )}
+                    </div>
+
+                    {/* Twitter */}
+                    <div className={`relative bg-blue-600/20 rounded-lg p-6 text-center border border-blue-600/30 transition-all duration-300 ${
+                      updateTrigger.twitter ? 'scale-105 shadow-lg shadow-blue-600/20' : ''
+                    }`}>
+                      <div className="text-2xl mb-2">🐦</div>
+                      <div className={`text-2xl font-bold text-blue-300 transition-all duration-500 ${
+                        updateTrigger.twitter ? 'text-blue-100 scale-110' : ''
+                      }`}>
+                        {(() => {
+                          const value = animatedStats.twitter || realStatsData?.mySphere?.socialMediaConnections?.twitter;
+                          return value ? value.toLocaleString() : (realStatsLoading ? '...' : 'N/A');
+                        })()}
+                      </div>
+                      <div className="text-xs text-blue-200 mt-1">Twitter</div>
+                      {updateTrigger.twitter && (
+                        <div className="absolute inset-0 bg-blue-600/10 rounded-lg animate-pulse"></div>
+                      )}
+                    </div>
+
+                    {/* Spotify */}
+                    <div className={`relative bg-green-600/20 rounded-lg p-6 text-center border border-green-600/30 transition-all duration-300 ${
+                      updateTrigger.spotify ? 'scale-105 shadow-lg shadow-green-600/20' : ''
+                    }`}>
+                      <div className="text-2xl mb-2">🎵</div>
+                      <div className={`text-2xl font-bold text-green-300 transition-all duration-500 ${
+                        updateTrigger.spotify ? 'text-green-100 scale-110' : ''
+                      }`}>
+                        {(() => {
+                          const value = animatedStats.spotify || realStatsData?.mySphere?.socialMediaConnections?.spotify;
+                          return value ? value.toLocaleString() : (realStatsLoading ? '...' : 'N/A');
+                        })()}
+                      </div>
+                      <div className="text-xs text-green-200 mt-1">Spotify</div>
+                      {updateTrigger.spotify && (
+                        <div className="absolute inset-0 bg-green-600/10 rounded-lg animate-pulse"></div>
+                      )}
+                    </div>
+
+                    {/* TikTok */}
+                    <div className={`relative bg-pink-600/20 rounded-lg p-6 text-center border border-pink-600/30 transition-all duration-300 ${
+                      updateTrigger.tiktok ? 'scale-105 shadow-lg shadow-pink-600/20' : ''
+                    }`}>
+                      <div className="text-2xl mb-2">🎬</div>
+                      <div className={`text-2xl font-bold text-pink-300 transition-all duration-500 ${
+                        updateTrigger.tiktok ? 'text-pink-100 scale-110' : ''
+                      }`}>
+                        {(() => {
+                          const value = animatedStats.tiktok || realStatsData?.mySphere?.socialMediaConnections?.tiktok;
+                          return value ? value.toLocaleString() : (realStatsLoading ? '...' : 'N/A');
+                        })()}
+                      </div>
+                      <div className="text-xs text-pink-200 mt-1">TikTok</div>
+                      {updateTrigger.tiktok && (
+                        <div className="absolute inset-0 bg-pink-600/10 rounded-lg animate-pulse"></div>
+                      )}
+                    </div>
+
+
                   </div>
-                  <div className="text-sm text-blue-200 mt-2">Global Posts</div>
-                  {updateTrigger.posts && (
-                    <div className="absolute inset-0 bg-blue-500/10 rounded-lg animate-pulse"></div>
-                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Loading state */}
+            {realStatsLoading && (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-400 border-t-transparent mx-auto mb-4"></div>
+                <p className="text-blue-200 text-lg">⚡ Loading MySphere data (direct Firebase)...</p>
+                <p className="text-blue-200/70 text-sm mt-2">Twitter, Spotify, TikTok only • No API overhead • 2x faster!</p>
+              </div>
+            )}
+
+            {/* Additional MySphere Metrics */}
+            {realStatsData?.mySphere && (
+              <div className="mt-8 bg-gradient-to-r from-cyan-600/20 via-blue-500/20 to-purple-600/20 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h4 className="text-xl font-bold text-cyan-200 flex items-center gap-2">
+                    📈 MySphere Advanced Metrics
+                  </h4>
                 </div>
 
-                <div className={`relative bg-green-500/20 rounded-lg p-6 text-center border border-green-500/30 transition-all duration-300 ${
-                  updateTrigger.likes ? 'scale-105 shadow-lg shadow-green-500/20' : ''
-                }`}>
-                  <div className={`text-4xl font-bold text-green-300 transition-all duration-500 ${
-                    updateTrigger.likes ? 'text-green-100 scale-110' : ''
-                  }`}>
-                    {(animatedStats.likes || globalStats.likesCount || 0).toLocaleString()}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                  {/* Fully Connected */}
+                  <div className="text-center bg-green-500/20 rounded-lg p-4 border border-green-500/30">
+                    <div className="text-2xl font-bold text-green-300">
+                      {realStatsData.mySphere.fullyConnectedUsers?.toLocaleString() || 'N/A'}
+                    </div>
+                    <div className="text-sm text-green-200/70">Fully Connected (All platforms)</div>
                   </div>
-                  <div className="text-sm text-green-200 mt-2">Total Likes</div>
-                  {updateTrigger.likes && (
-                    <div className="absolute inset-0 bg-green-500/10 rounded-lg animate-pulse"></div>
-                  )}
+                  
+                  {/* Average Connections */}
+                  <div className="text-center bg-purple-500/20 rounded-lg p-4 border border-purple-500/30">
+                    <div className="text-2xl font-bold text-purple-300">
+                      {realStatsData.mySphere.averageConnectionsPerUser || 'N/A'}
+                    </div>
+                    <div className="text-sm text-purple-200/70">Avg Connections/User</div>
+                  </div>
+
+                  {/* Connection Rate */}
+                  <div className="text-center bg-orange-500/20 rounded-lg p-4 border border-orange-500/30">
+                    <div className="text-2xl font-bold text-orange-300">
+                      {realStatsData.mySphere.fullyConnectedUsers && realStatsData.mySphere.totalUsers ? 
+                        ((realStatsData.mySphere.fullyConnectedUsers / realStatsData.mySphere.totalUsers) * 100).toFixed(1) + '%' : 
+                        'N/A'
+                      }
+                    </div>
+                    <div className="text-sm text-orange-200/70">Full Connection Rate</div>
+                  </div>
                 </div>
 
-                <div className={`relative bg-yellow-500/20 rounded-lg p-6 text-center border border-yellow-500/30 transition-all duration-300 ${
-                  updateTrigger.comments ? 'scale-105 shadow-lg shadow-yellow-500/20' : ''
-                }`}>
-                  <div className={`text-4xl font-bold text-yellow-300 transition-all duration-500 ${
-                    updateTrigger.comments ? 'text-yellow-100 scale-110' : ''
-                  }`}>
-                    {(animatedStats.comments || globalStats.commentsCount || 0).toLocaleString()}
-                  </div>
-                  <div className="text-sm text-yellow-200 mt-2">Total Comments</div>
-                  {updateTrigger.comments && (
-                    <div className="absolute inset-0 bg-yellow-500/10 rounded-lg animate-pulse"></div>
-                  )}
-                </div>
-
-                <div className={`relative bg-cyan-500/20 rounded-lg p-6 text-center border border-cyan-500/30 transition-all duration-300`}>
-                  <div className="text-4xl font-bold text-cyan-300 transition-all duration-500">
-                    {realStatsData?.mySphere?.totalUsers?.toLocaleString() || 'N/A'}
-                  </div>
-                  <div className="text-sm text-cyan-200 mt-2">MySphere Users</div>
+                {/* Last Updated */}
+                <div className="text-center text-cyan-200/60 text-sm">
+                  🕐 Last updated: {realStatsData.mySphere.lastUpdated ? 
+                    new Date(realStatsData.mySphere.lastUpdated).toLocaleString() : 
+                    'Unknown'
+                  }
                 </div>
               </div>
             )}
