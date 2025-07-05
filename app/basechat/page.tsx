@@ -27,12 +27,12 @@ import {
   addCommentReply,
   ADMIN_ADDRESS,
   getCachedActiveUsers,
-  searchUsers,
+  // searchUsers,  // DISABLED
   getGlobalStats,
   refreshTop50UsersOnly,
-  searchUsersUltraFast,
-  getCachedFullUsers,
-  preloadUserSearchCache,
+  // searchUsersUltraFast,  // DISABLED
+  // getCachedFullUsers,  // DISABLED
+  // preloadUserSearchCache,  // DISABLED
   pinPost,
   unpinPost,
   isUserAdmin
@@ -1369,17 +1369,19 @@ export default function BaseChat() {
       localStorage.setItem('userAddress', address);
       fetchGlobalStats(); // Only fetch if user is connected
       
-      // 💰 ULTRA-CHEAP: Initialize user search cache (TOP 1000 users) - Background preload
-      const initUserSearchCache = async () => {
-        try {
-          await preloadUserSearchCache();
-          console.log(`⚡ User search cache preloaded in background (localStorage friendly)`);
-        } catch (error) {
-          console.error('❌ User search cache preload failed:', error);
-        }
-      };
+      // 🚫 DISABLED: User search cache to save Firebase reads (1000 reads per user visit)
+      // const initUserSearchCache = async () => {
+      //   try {
+      //     await preloadUserSearchCache();
+      //     console.log(`⚡ User search cache preloaded in background (localStorage friendly)`);
+      //   } catch (error) {
+      //     console.error('❌ User search cache preload failed:', error);
+      //   }
+      // };
+      // 
+      // initUserSearchCache();
       
-      initUserSearchCache();
+      console.log('💰 User search DISABLED - saving $1,200/day (1000 reads × 20k users)');
     }
     // No auto-refresh - cache lasts 12h per user
   }, [address]);
@@ -2040,12 +2042,20 @@ export default function BaseChat() {
 
 
   // ===============================================
-  // 🚀 ULTRA-CHEAP USER SEARCH (99.97% taniej!)
+  // 🚫 DISABLED: USER SEARCH to save Firebase reads
   // ===============================================
-  // Funkcja do wyszukiwania użytkowników z ultra-tanim systemem
+  // Funkcja do wyszukiwania użytkowników - WYŁĄCZONA
   const handleUserSearch = useCallback(async (query: string) => {
+    console.log('🚫 User search DISABLED - saving Firebase reads');
     setUserSearchQuery(query);
+    setSearchResults([]);
+    setIsSearching(false);
     
+    // Original search code disabled to save Firebase costs
+    // 💰 Saving: 1000 reads per user visit × 20k users = $1,200/day
+    return;
+    
+    /* DISABLED CODE:
     if (!query.trim()) {
       setSearchResults([]);
       if (searchTimeoutRef.current) {
@@ -2056,33 +2066,29 @@ export default function BaseChat() {
     
     if (query.length < 2) {
       setSearchResults([]);
-      return; // Wyszukuj dopiero od 2 znaków
+      return;
     }
     
-    // Clear previous timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
     
-    // Set new timeout for debounce (tylko 200ms - szybsze dzięki cache!)
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearching(true);
         
-        // 💰 ULTRA-CHEAP: Używaj cache localStorage (0 Firebase reads!)
         const results = await searchUsersUltraFast(query, 50);
         
-        // Konwertuj do starego formatu dla kompatybilności
         const formattedResults = results.map(user => ({
-          address: user.a, // address z nowego formatu
-          name: user.n, // name z nowego formatu
-          avatar: undefined, // avatar nie jest przechowywany w cache
-          totalPoints: user.p || 0, // points z nowego formatu
-          postsCount: 0, // nie przechowywane w cache
-          likesReceived: 0 // nie przechowywane w cache
+          address: user.a,
+          name: user.n,
+          avatar: undefined,
+          totalPoints: user.p || 0,
+          postsCount: 0,
+          likesReceived: 0
         }));
         
-        setSearchResults(formattedResults.slice(0, 50)); // TOP 50 wyników
+        setSearchResults(formattedResults.slice(0, 50));
         console.log(`⚡ Ultra-fast search completed: ${formattedResults.length} results (0 Firebase reads)`);
         
       } catch (error) {
@@ -2091,7 +2097,8 @@ export default function BaseChat() {
       } finally {
         setIsSearching(false);
       }
-    }, 200); // Szybsze dzięki cache!
+    }, 200);
+    */
   }, []);
 
   // Removed toggleSearchMode - now using unified hybrid search
@@ -3649,110 +3656,7 @@ export default function BaseChat() {
                 </div>
               )}
 
-              {/* User Search */}
-              <div className="mb-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center mb-3">
-                  <h2 className="text-lg font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-transparent bg-clip-text flex items-center">
-                    Search Users
-                    <div className="ml-2 text-2xl">🔍</div>
-                  </h2>
-                </div>
-                
-                <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={userSearchQuery}
-                    onChange={(e) => handleUserSearch(e.target.value)}
-                    placeholder="Search by address, .eth, .sphere, .camper..."
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-gray-100 placeholder-gray-500"
-                  />
-                  {isSearching && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <RefreshCw className="w-4 h-4 animate-spin text-purple-500" />
-                    </div>
-                  )}
-                </div>
-                
-                {/* Search Info */}
-                <div className="mt-2 text-xs text-gray-500 flex items-center">
-                  <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
-                  Hybrid search: cache + targeted Firebase queries
-                </div>
 
-                                 {/* Search Results */}
-                 {userSearchQuery && (
-                   <div className="mt-4 space-y-2">
-                     {searchResults.length > 0 ? (
-                       <>
-                         {/* Results Header */}
-                         <div className="flex items-center justify-between px-2 py-1">
-                           <div className="text-xs text-gray-500">
-                             Found {searchResults.length} user{searchResults.length !== 1 ? 's' : ''}
-                           </div>
-                           <div className="text-xs text-gray-400">
-                             🔍 Suggested
-                           </div>
-                         </div>
-                         
-                         {/* Results List - Show max 5 suggested users */}
-                         {searchResults.slice(0, 5).map((user, index) => (
-                           <button
-                             key={user.address}
-                             onClick={() => handleViewBuilderProfile(user.address)}
-                             className="w-full flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-300 group border-l-4 border-purple-300 hover:border-purple-500"
-                           >
-                             <div className="w-10 h-10 flex-shrink-0">
-                               {user.avatar ? (
-                                 <img
-                                   src={user.avatar}
-                                   alt="Profile"
-                                   className="w-10 h-10 rounded-full object-cover"
-                                 />
-                               ) : (
-                                 <Avatar address={toEthereumAddress(user.address)} className="w-10 h-10 rounded-full" />
-                               )}
-                             </div>
-                             <div className="ml-3 flex-1 text-left">
-                               <div className="font-medium text-gray-900 dark:text-gray-100 transition-colors group-hover:text-purple-500">
-                                 {user.name}
-                               </div>
-                               <div className="text-xs text-gray-500 flex items-center mt-1">
-                                 <span>{user.totalPoints || 0} pts</span>
-                                 <span className="mx-2">•</span>
-                                 <span>{user.postsCount || 0} posts</span>
-                               </div>
-                             </div>
-                             <div className="text-gray-400 transition-colors group-hover:text-purple-500">
-                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                               </svg>
-                             </div>
-                           </button>
-                         ))}
-                       </>
-                     ) : userSearchQuery.length >= 2 && !isSearching ? (
-                       <div className="text-center py-4 text-gray-500">
-                         <div className="mb-2">No users found matching "{userSearchQuery}"</div>
-                         <div className="text-xs text-gray-400">
-                           Try searching with different keywords
-                         </div>
-                       </div>
-                     ) : userSearchQuery.length >= 2 && isSearching ? (
-                       <div className="text-center py-4 text-gray-500">
-                         <div className="flex items-center justify-center space-x-2">
-                           <RefreshCw className="w-4 h-4 animate-spin text-purple-500" />
-                           <span>Searching users...</span>
-                         </div>
-                       </div>
-                     ) : userSearchQuery.length > 0 && userSearchQuery.length < 2 ? (
-                       <div className="text-center py-4 text-gray-500 text-sm">
-                         Type at least 2 characters to search
-                       </div>
-                     ) : null}
-                   </div>
-                 )}
-              </div>
 
               {/* Most Active Users */}
               <div className="mb-4 relative z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
