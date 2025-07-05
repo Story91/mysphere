@@ -36,6 +36,70 @@ import {
 
 const CAMP_NFT_CONTRACT = '0x1eD74B27f846C699A90926daD057A7f6FD22C126';
 
+// Static MySphere data
+const STATIC_MYSPHERE_DATA = {
+  totalUsers: 23880,
+  socialMediaConnections: {
+    twitter: 11791,
+    spotify: 978,
+    tiktok: 1344
+  },
+  fullyConnectedUsers: 13,
+  averageConnectionsPerUser: 0.6,
+  lastUpdated: "2025-07-05T01:30:43.937Z",
+  growthTrendData: [
+    {
+      date: "2025-06-29",
+      users: 9,
+      twitter: 3,
+      spotify: 1,
+      tiktok: 3
+    },
+    {
+      date: "2025-06-30",
+      users: 9,
+      twitter: 3,
+      spotify: 1,
+      tiktok: 3
+    },
+    {
+      date: "2025-07-01",
+      users: 1338,
+      twitter: 861,
+      spotify: 88,
+      tiktok: 131
+    },
+    {
+      date: "2025-07-02",
+      users: 8010,
+      twitter: 4102,
+      spotify: 432,
+      tiktok: 615
+    },
+    {
+      date: "2025-07-03",
+      users: 12623,
+      twitter: 6788,
+      spotify: 672,
+      tiktok: 926
+    },
+    {
+      date: "2025-07-04",
+      users: 18689,
+      twitter: 9317,
+      spotify: 833,
+      tiktok: 1137
+    },
+    {
+      date: "2025-07-05",
+      users: 23880,
+      twitter: 11791,
+      spotify: 978,
+      tiktok: 1344
+    }
+  ]
+};
+
 export default function MyCampPage() {
   const { address, isConnected } = useAccount();
   const router = useRouter();
@@ -674,7 +738,7 @@ export default function MyCampPage() {
         >
 
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
             {/* Home Button */}
             <motion.button
               initial={{ opacity: 0, y: 20 }}
@@ -713,6 +777,49 @@ export default function MyCampPage() {
                 <motion.div
                   layoutId="activeGlow"
                   className="absolute inset-0 bg-gradient-to-br from-orange-500/30 to-red-500/30 rounded-2xl"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </motion.button>
+
+            {/* Daily Quests Button */}
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.35, duration: 0.5 }}
+              whileHover={{ 
+                scale: 1.05, 
+                y: -5,
+                boxShadow: "0 20px 40px rgba(34, 197, 94, 0.4)"
+              }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setActiveTab('quests')}
+              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
+                activeTab === 'quests'
+                  ? 'bg-gradient-to-br from-green-500/80 to-emerald-500/80 text-white shadow-2xl shadow-green-500/25 border border-green-400/50'
+                  : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-green-400/40'
+              }`}
+            >
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-emerald-400/20"
+                initial={{ opacity: 0 }}
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+              <div className="relative z-10">
+                <motion.div 
+                  className="text-center"
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">QUESTS</div>
+                  <div className="text-xs opacity-80 uppercase tracking-widest">Daily Tasks</div>
+                </motion.div>
+              </div>
+              {activeTab === 'quests' && (
+                <motion.div
+                  layoutId="activeGlow"
+                  className="absolute inset-0 bg-gradient-to-br from-green-500/30 to-emerald-500/30 rounded-2xl"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
@@ -1242,111 +1349,53 @@ export default function MyCampPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {!showStats ? (
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleLoadStats}
-                      disabled={globalStatsLoading}
-                      className="bg-green-500/80 hover:bg-green-500/90 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
-                    >
-                      <span className={globalStatsLoading ? 'animate-spin' : ''}>
-                        {getRefreshStatus().buttonIcon}
-                      </span>
-                      {globalStatsLoading ? 'Loading...' : getRefreshStatus().buttonText}
-                    </motion.button>
-                  ) : (
-                    <>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={hideGlobalStats}
-                        className="bg-red-500/80 hover:bg-red-500/90 text-white px-3 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
-                      >
-                        <span>❌</span>
-                        Hide
-                      </motion.button>
-                    </>
-                  )}
+                                <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowStats(!showStats)}
+                className="bg-green-500/80 hover:bg-green-500/90 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
+              >
+                <span>{showStats ? '❌' : '📊'}</span>
+                {showStats ? 'Hide Statistics' : 'Show Statistics'}
+              </motion.button>
                 </div>
               </div>
               
               {!showStats ? (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">💤</div>
-                  <p className="text-blue-200 text-lg">Statistics Disabled</p>
-                  <p className="text-blue-200/70 text-sm mt-2">Click "Load Statistics" to view MySphere data</p>
-                  <p className="text-blue-200/60 text-xs mt-1">⚡ Smart caching: Fresh data loads instantly, server refresh limited to once daily</p>
+                  <p className="text-blue-200 text-lg">Statistics Hidden</p>
+                  <p className="text-blue-200/70 text-sm mt-2">Click "Show Statistics" to view MySphere data</p>
+                  <p className="text-blue-200/60 text-xs mt-1">⚡ Static data from MySphere database</p>
                   <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
                     <p className="text-green-300 text-xs">
-                      ✅ Smart Performance: Statistics cached locally, server refresh once daily
+                      ✅ Real MySphere Data: {STATIC_MYSPHERE_DATA.totalUsers.toLocaleString()} users tracked
                     </p>
-                    {(() => {
-                      const cacheInfo = getCacheInfo();
-                      const canRefresh = canRefreshToday();
-                      
-                      if (cacheInfo.exists && cacheInfo.isValid) {
-                        return (
-                          <div className="mt-2 pt-2 border-t border-green-500/20">
-                            <p className="text-green-300/80 text-xs">
-                              🗂️ Fresh data cached ({cacheInfo.age}h old) - instant loading
-                            </p>
-                          </div>
-                        );
-                      } else if (cacheInfo.exists && !canRefresh) {
-                        return (
-                          <div className="mt-2 pt-2 border-t border-green-500/20">
-                            <p className="text-yellow-300/80 text-xs">
-                              ⏰ Data expired but daily limit reached - using cached version
-                            </p>
-                            <p className="text-yellow-300/60 text-xs mt-1">
-                              Next refresh available tomorrow
-                            </p>
-                          </div>
-                        );
-                      } else if (cacheInfo.exists && canRefresh) {
-                        return (
-                          <div className="mt-2 pt-2 border-t border-green-500/20">
-                            <p className="text-blue-300/80 text-xs">
-                              🔄 Data expired - will refresh from server (1x daily limit)
-                            </p>
-                          </div>
-                        );
-                      }
-                      return (
-                        <div className="mt-2 pt-2 border-t border-green-500/20">
-                          <p className="text-blue-300/80 text-xs">
-                            🆕 First time loading - fetching fresh data
-                          </p>
-                        </div>
-                      );
-                    })()}
+                    <div className="mt-2 pt-2 border-t border-green-500/20">
+                      <p className="text-green-300/80 text-xs">
+                        📊 Last updated: {new Date(STATIC_MYSPHERE_DATA.lastUpdated).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              ) : globalStatsLoading ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4 animate-spin">⏳</div>
-                  <p className="text-blue-200 text-lg">Loading MySphere statistics...</p>
-                  <p className="text-blue-200/70 text-sm mt-2">Fetching real-time user data</p>
-                </div>
-              ) : globalStats ? (
+              ) : (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
                     {/* Total Users */}
                     <div className="text-center bg-blue-500/20 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-blue-300">{globalStats.totalUsers.toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-blue-300">{STATIC_MYSPHERE_DATA.totalUsers.toLocaleString()}</div>
                       <div className="text-sm text-blue-200/70">MySphere Users</div>
                     </div>
                     
                     {/* Fully Connected Users */}
                     <div className="text-center bg-green-500/20 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-green-300">{globalStats.fullyConnectedUsers.toLocaleString()}</div>
-                      <div className="text-sm text-green-200/70">All 5 Platforms Connected</div>
+                      <div className="text-2xl font-bold text-green-300">{STATIC_MYSPHERE_DATA.fullyConnectedUsers.toLocaleString()}</div>
+                      <div className="text-sm text-green-200/70">All 3 Platforms Connected</div>
                     </div>
                     
                     {/* Average Connections */}
                     <div className="text-center bg-purple-500/20 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-purple-300">{globalStats.averageConnectionsPerUser}</div>
+                      <div className="text-2xl font-bold text-purple-300">{STATIC_MYSPHERE_DATA.averageConnectionsPerUser}</div>
                       <div className="text-sm text-purple-200/70">Avg Connections/User</div>
                     </div>
                   </div>
@@ -1365,7 +1414,7 @@ export default function MyCampPage() {
                             {platform.icon}
                           </div>
                           <div className="text-lg font-bold text-white">
-                            {globalStats.socialMediaConnections[platform.key].toLocaleString()}
+                            {STATIC_MYSPHERE_DATA.socialMediaConnections[platform.key as keyof typeof STATIC_MYSPHERE_DATA.socialMediaConnections].toLocaleString()}
                           </div>
                           <div className="text-xs text-gray-300">
                             {platform.name}
@@ -1384,7 +1433,7 @@ export default function MyCampPage() {
                       </div>
                       {connectedSocialsCount === 3 && (
                         <div className="text-sm text-green-400 mt-1">
-                          🎉 You're among the {globalStats.fullyConnectedUsers} MySphere users with all platforms connected!
+                          🎉 You're among the {STATIC_MYSPHERE_DATA.fullyConnectedUsers} MySphere users with all platforms connected!
                         </div>
                       )}
                     </div>
@@ -1404,7 +1453,7 @@ export default function MyCampPage() {
                       </h6>
                       <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={globalStats.growthTrendData}>
+                          <LineChart data={STATIC_MYSPHERE_DATA.growthTrendData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                             <XAxis 
                               dataKey="date" 
@@ -1453,12 +1502,6 @@ export default function MyCampPage() {
                     {/* Platform Distribution section removed for optimization */}
                   </div>
                 </>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-4">📊</div>
-                  <p className="text-blue-200 text-lg">Error loading statistics</p>
-                  <p className="text-blue-200/70 text-sm mt-2">Please try again or check your connection</p>
-                </div>
               )}
             </motion.div>
 
@@ -1520,6 +1563,55 @@ export default function MyCampPage() {
               </div>
             </motion.div>
           </>
+        )}
+
+        {/* Daily Quests Tab Content */}
+        {activeTab === 'quests' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8"
+          >
+            <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-200 mb-4 sm:mb-6 flex items-center gap-2">
+              🎯 Daily Quests
+              <span className="text-sm bg-green-500/20 text-green-300 px-2 py-1 rounded-full">
+                Coming Soon
+              </span>
+            </h3>
+            
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🚧</div>
+              <p className="text-orange-200 text-lg">Daily Quests Coming Soon!</p>
+              <p className="text-orange-200/70 text-sm mt-2 mb-4">
+                Complete daily tasks to earn rewards and boost your MySphere ranking
+              </p>
+              
+              <div className="max-w-md mx-auto">
+                <div className="bg-gradient-to-br from-green-600/20 via-green-500/10 to-green-800/20 backdrop-blur-sm border border-green-500/30 rounded-xl p-6">
+                  <h4 className="text-lg font-bold text-green-200 mb-4">🎁 Upcoming Features</h4>
+                  <div className="space-y-3 text-left">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-green-200/80 text-sm">Connect Social Media Accounts</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-green-200/80 text-sm">Complete On-Chain Transactions</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-green-200/80 text-sm">Participate in Community Events</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-green-200/80 text-sm">Earn Special Badges & Rewards</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         )}
 
         {/* Statistics Tab Content */}
