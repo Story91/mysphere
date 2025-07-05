@@ -1287,96 +1287,72 @@ export default function MyCampPage() {
               </p>
             </motion.div>
 
-            {/* Global Camp Network Statistics - OPTIONAL LOADING */}
+            {/* MySphere IP Connect Statistics - SIMPLIFIED */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.9 }}
-              className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 rounded-xl p-4 sm:p-6 mb-8 min-h-[400px]"
+              className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 rounded-xl p-4 sm:p-6 mb-8"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
                 <div>
                   <h4 className="text-lg sm:text-xl font-bold text-blue-200 flex items-center gap-2">
-                    🌍 MySphere User Statistics
-                    {!showStats && (
-                      <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full ml-2">
-                        Optional
-                      </span>
-                    )}
+                    🌐 MySphere IP Connect Statistics
                   </h4>
-                  {globalStats && showStats && (
+                  {showStats && (
                     <div className="text-xs text-blue-200/60 mt-1">
-                      Last updated: {new Date(globalStats.lastUpdated).toLocaleTimeString()} • 
-                      Source: Real-time Database
-                      {(() => {
-                        const cacheInfo = getCacheInfo();
-                        const canRefresh = canRefreshToday();
-                        
-                        if (cacheInfo.exists) {
-                          return (
-                            <span className="ml-2">
-                              • Cache: {cacheInfo.age}h old {cacheInfo.isValid ? '✅' : '⏰'}
-                              {!canRefresh && ' • Daily limit used'}
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  )}
-                  {!showStats && (
-                    <div className="text-xs text-blue-200/60 mt-1">
-                      💡 Click "Load Statistics" to view data
-                      {(() => {
-                        const cacheInfo = getCacheInfo();
-                        const canRefresh = canRefreshToday();
-                        
-                        if (cacheInfo.exists) {
-                          return (
-                            <span className="ml-2">
-                              • Cache available ({cacheInfo.age}h old)
-                              {!canRefresh && ' • Daily refresh used'}
-                            </span>
-                          );
-                        }
-                        return (
-                          <span className="ml-2">
-                            • Server refresh: {canRefresh ? 'Available' : 'Used today'}
-                          </span>
-                        );
-                      })()}
+                      Last updated: {new Date(STATIC_MYSPHERE_DATA.lastUpdated).toLocaleString()} • 
+                      Real-time Database
                     </div>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                                <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowStats(!showStats)}
-                className="bg-green-500/80 hover:bg-green-500/90 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-sm"
-              >
-                <span>{showStats ? '❌' : '📊'}</span>
-                {showStats ? 'Hide Statistics' : 'Show Statistics'}
-              </motion.button>
+                  <motion.button
+                    whileHover={{ 
+                      scale: 1.05,
+                      boxShadow: "0 0 20px rgba(59, 130, 246, 0.4)"
+                    }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowStats(!showStats)}
+                    className="group relative bg-black/80 hover:bg-black/90 border border-white/30 hover:border-blue-400/60 text-white px-4 py-2 rounded-xl font-medium transition-all duration-300 flex items-center gap-2 text-sm backdrop-blur-sm"
+                  >
+                    <motion.div
+                      animate={showStats ? { scale: [1, 1.2, 1] } : {}}
+                      transition={{ duration: 0.3 }}
+                      className="relative"
+                    >
+                      <svg 
+                        className="w-4 h-4 text-white group-hover:text-blue-300 transition-colors" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          strokeWidth={2} 
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" 
+                        />
+                        <path 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          strokeWidth={2} 
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" 
+                        />
+                      </svg>
+                      <div className="absolute inset-0 bg-blue-400/20 rounded-full blur-md group-hover:bg-blue-400/40 transition-all"></div>
+                    </motion.div>
+                    {showStats ? 'Hide Preview' : 'Preview Data'}
+                  </motion.button>
                 </div>
               </div>
               
               {!showStats ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">💤</div>
-                  <p className="text-blue-200 text-lg">Statistics Hidden</p>
-                  <p className="text-blue-200/70 text-sm mt-2">Click "Show Statistics" to view MySphere data</p>
-                  <p className="text-blue-200/60 text-xs mt-1">⚡ Static data from MySphere database</p>
-                  <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
-                    <p className="text-green-300 text-xs">
-                      ✅ Real MySphere Data: {STATIC_MYSPHERE_DATA.totalUsers.toLocaleString()} users tracked
-                    </p>
-                    <div className="mt-2 pt-2 border-t border-green-500/20">
-                      <p className="text-green-300/80 text-xs">
-                        📊 Last updated: {new Date(STATIC_MYSPHERE_DATA.lastUpdated).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-3">📊</div>
+                  <p className="text-blue-200/80 text-sm">
+                    MySphere network statistics available
+                  </p>
                 </div>
               ) : (
                 <>
