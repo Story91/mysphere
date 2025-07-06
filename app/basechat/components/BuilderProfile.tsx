@@ -177,7 +177,7 @@ const fetchTalentProfile = async (walletAddress: string): Promise<TalentProfile 
     }
     
     const data = await response.json();
-    console.log('Talent Protocol Profile Response:', data); // Debug log
+            // console.log('Talent Protocol Profile Response:', data); // Debug log
     
     return data.profile || null;
   } catch (error) {

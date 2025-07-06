@@ -49,15 +49,15 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   
-  // Mobile debugging
-  useEffect(() => {
-    console.log('📱 Mobile Debug - Wallet state:', {
-      isConnected,
-      address,
-      chainId,
-      isCorrectNetwork: chainId === base.id
-    });
-  }, [isConnected, address, chainId]);
+  // Mobile debugging - DISABLED
+  // useEffect(() => {
+  //   console.log('📱 Mobile Debug - Wallet state:', {
+  //     isConnected,
+  //     address,
+  //     chainId,
+  //     isCorrectNetwork: chainId === base.id
+  //   });
+  // }, [isConnected, address, chainId]);
   
   // Prevent body scroll when modal is open (mobile fix)
   useEffect(() => {
@@ -90,22 +90,22 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
     chainId: base.id
   });
   
-  // Mobile debugging for balances
-  useEffect(() => {
-    console.log('📱 Balance Debug - Full state:', {
-      address,
-      chainId,
-      baseId: base.id,
-      usdcAddress: USDC_ADDRESS,
-      ethBalance: ethBalance ? formatEther(ethBalance.value) : 'null',
-      usdcBalance: usdcBalance ? formatUnits(usdcBalance.value, 6) : 'null',
-      ethBalanceError: ethBalanceError?.message || 'none',
-      usdcBalanceError: usdcBalanceError?.message || 'none',
-      ethLoading,
-      usdcLoading,
-      isCorrectNetwork: chainId === base.id
-    });
-  }, [address, chainId, ethBalance, usdcBalance, ethBalanceError, usdcBalanceError, ethLoading, usdcLoading]);
+  // Mobile debugging for balances - DISABLED
+  // useEffect(() => {
+  //   console.log('📱 Balance Debug - Full state:', {
+  //     address,
+  //     chainId,
+  //     baseId: base.id,
+  //     usdcAddress: USDC_ADDRESS,
+  //     ethBalance: ethBalance ? formatEther(ethBalance.value) : 'null',
+  //     usdcBalance: usdcBalance ? formatUnits(usdcBalance.value, 6) : 'null',
+  //     ethBalanceError: ethBalanceError?.message || 'none',
+  //     usdcBalanceError: usdcBalanceError?.message || 'none',
+  //     ethLoading,
+  //     usdcLoading,
+  //     isCorrectNetwork: chainId === base.id
+  //   });
+  // }, [address, chainId, ethBalance, usdcBalance, ethBalanceError, usdcBalanceError, ethLoading, usdcLoading]);
 
   // Check if user is trying to tip themselves
   const isSelfTip = address?.toLowerCase() === recipientAddress.toLowerCase();
@@ -114,7 +114,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   const isCorrectNetwork = chainId === base.id;
 
   const handleTransactionStatus = useCallback(async (status: any) => {
-    console.log('🔄 Transaction status:', status); // Debug log
+    // console.log('🔄 Transaction status:', status); // Debug log
     
     if (status.statusName === 'success') {
       try {
@@ -193,23 +193,23 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   }, [address, recipientAddress, tipAmount, selectedToken, postId]);
 
   const getCalls = useCallback(() => {
-    console.log('📱 Mobile Debug - getCalls:', {
-      isConnected,
-      address,
-      recipientAddress,
-      tipAmount,
-      selectedToken,
-      chainId
-    });
+    // console.log('📱 Mobile Debug - getCalls:', {
+    //   isConnected,
+    //   address,
+    //   recipientAddress,
+    //   tipAmount,
+    //   selectedToken,
+    //   chainId
+    // });
     
     if (!isConnected || !address || !recipientAddress || !tipAmount) {
-      console.log('❌ Mobile Debug - Missing required params for transaction');
+      // console.log('❌ Mobile Debug - Missing required params for transaction');
       return [];
     }
 
     const amount = parseFloat(tipAmount);
     if (amount <= 0) {
-      console.log('❌ Mobile Debug - Invalid amount:', amount);
+      // console.log('❌ Mobile Debug - Invalid amount:', amount);
       return [];
     }
 
@@ -219,7 +219,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         to: recipientAddress as `0x${string}`,
         value: parseEther(tipAmount)
       };
-      console.log('📱 Mobile Debug - ETH transfer call:', call);
+      // console.log('📱 Mobile Debug - ETH transfer call:', call);
       return [call];
     } else {
       // USDC transfer (ERC20)
@@ -234,7 +234,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         to: USDC_ADDRESS as `0x${string}`,
         data
       };
-      console.log('📱 Mobile Debug - USDC transfer call:', call);
+      // console.log('📱 Mobile Debug - USDC transfer call:', call);
       return [call];
     }
   }, [address, recipientAddress, tipAmount, selectedToken, isConnected, chainId]);
@@ -267,7 +267,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
     <>
       <button
         onClick={() => {
-          console.log('📱 Mobile Debug - Tip button clicked');
+          // console.log('📱 Mobile Debug - Tip button clicked');
           setIsOpen(!isOpen);
           setTransactionSuccess(false); // Reset success state
         }}

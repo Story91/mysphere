@@ -30,23 +30,23 @@ export default function SocialLinksManager() {
     unlinkTiktok
   } = useLinkSocials();
 
-  // Debug logging
-  console.log('🔍 SocialLinksManager Debug:', {
-    authenticated,
-    isLoading,
-    error,
-    socialsData,
-    hasSocialsData: !!socialsData,
-    socialsDataKeys: socialsData ? Object.keys(socialsData) : [],
-    linkFunctions: {
-      linkTwitter: typeof linkTwitter,
-      linkSpotify: typeof linkSpotify,
-      linkTiktok: typeof linkTiktok,
-      unlinkTwitter: typeof unlinkTwitter,
-      unlinkSpotify: typeof unlinkSpotify,
-      unlinkTiktok: typeof unlinkTiktok
-    }
-  });
+  // Debug logging - DISABLED
+  // console.log('🔍 SocialLinksManager Debug:', {
+  //   authenticated,
+  //   isLoading,
+  //   error,
+  //   socialsData,
+  //   hasSocialsData: !!socialsData,
+  //   socialsDataKeys: socialsData ? Object.keys(socialsData) : [],
+  //   linkFunctions: {
+  //     linkTwitter: typeof linkTwitter,
+  //     linkSpotify: typeof linkSpotify,
+  //     linkTiktok: typeof linkTiktok,
+  //     unlinkTwitter: typeof unlinkTwitter,
+  //     unlinkSpotify: typeof unlinkSpotify,
+  //     unlinkTiktok: typeof unlinkTiktok
+  //   }
+  // });
 
   if (!authenticated) {
     return (
@@ -80,7 +80,7 @@ export default function SocialLinksManager() {
         modal.openModal();
       } else {
         // Na mobile próbujemy bezpośrednio
-        console.log('📱 Mobile detected - trying direct social action...');
+        // console.log('📱 Mobile detected - trying direct social action...');
         switch (platform.id) {
           case 'twitter':
             if (isConnected) {
