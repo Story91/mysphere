@@ -2483,7 +2483,7 @@ export default function BaseChat() {
       const profile = await fetchUserProfile(userAddress, { loadSocialLinks: true });
       
       if (profile) {
-        // Pobierz dodatkowe dane o użytkowniku z referencji
+        // Pobierz dodatkowe dane o użytkowniku z referencji (tylko punkty i ranking)
         const userRef = doc(db, 'users', userAddress);
         const userDoc = await getDoc(userRef);
         const userData = userDoc.data();
@@ -2497,12 +2497,7 @@ export default function BaseChat() {
           postCount: profile.postsCount || 0,
           likesReceived: profile.likesReceived || 0,
           socialLinks: profile.socialLinks,
-          stats: userData?.stats as {
-            transactions: number;
-            tokens: number;
-            nfts: number;
-            contracts: number;
-          },
+
           totalPoints: userData?.totalPoints as number,
           currentRank: userData?.currentRank as UserRank
         });
