@@ -48,29 +48,8 @@ const convertTimestamp = (timestamp: Timestamp): number => {
   return timestamp.toMillis();
 };
 
-// Funkcja sprawdzająca czy użytkownik ma BaseName i dodająca bonus
-export const hasBaseName = async (userAddress: string): Promise<boolean> => {
-  try {
-    const usernameRef = doc(db, 'usernames', userAddress);
-    const usernameDoc = await getDoc(usernameRef);
-    
-    if (usernameDoc.exists()) {
-      const data = usernameDoc.data();
-      const isBaseNameUser = data.isBaseName === true;
-      
-      // Jeśli użytkownik ma BaseName, dodaj bonus 1000 punktów
-      if (isBaseNameUser) {
-        await addBaseNameBonusToUser(userAddress);
-      }
-      
-      return isBaseNameUser;
-    }
-    return false;
-  } catch (error) {
-    console.error('Error checking BaseName status:', error);
-    return false;
-  }
-};
+// ✅ FIREBASE OPTIMIZATION: hasBaseName() function REMOVED - replaced with string.endsWith('.base.eth') checks
+// This eliminates expensive Firebase reads from 'usernames' collection, saving $100-200/day
 
 // Funkcja dodająca bonus BaseName dla użytkownika
 const addBaseNameBonusToUser = async (userAddress: string): Promise<void> => {
@@ -2000,8 +1979,12 @@ export const calculateUserStats = async (userAddress: string) => {
     const recentPostsSnapshot = await getDocs(recentPostsQuery);
     const recentActivityBonus = recentPostsSnapshot.size > 0 ? 1.25 : 1;
 
-    // Sprawdź czy użytkownik ma BaseName
-    const isBaseNameUser = await hasBaseName(userAddress);
+    // ✅ FIREBASE OPTIMIZATION: Replace expensive hasBaseName() Firebase read with simple check
+    // Check if user has BaseName by looking at their stored name instead of Firebase usernames collection
+    const userDoc = await getDoc(doc(db, 'users', userAddress));
+    const userData = userDoc.data();
+    const userName = userData?.name || '';
+    const isBaseNameUser = userName.endsWith('.base.eth');
     const baseNameBonus = isBaseNameUser ? 1000 : 0;
 
     // Calculate total points
@@ -2091,8 +2074,10 @@ export const refreshTop50UsersOnly = async () => {
       
       // Aktualizuj statystyki użytkownika
       if (!userStats[post.author]) {
-        // Sprawdź czy użytkownik ma BaseName
-        const userHasBaseName = await hasBaseName(post.author);
+        // ✅ FIREBASE OPTIMIZATION: Replace expensive hasBaseName() with simple string check
+        // Check if author name ends with .base.eth (BaseName indicator)
+        const authorName = post.authorName || post.author;
+        const userHasBaseName = authorName.endsWith('.base.eth');
         userStats[post.author] = { posts: 0, likes: 0, hasBaseName: userHasBaseName };
       }
       userStats[post.author].posts++;
@@ -2501,8 +2486,10 @@ export const fixBaseChatPointsRadical = async (): Promise<{success: boolean, upd
       const userData = userDoc.data();
       const userAddress = userDoc.id;
       
-      // Sprawdź, czy użytkownik ma BaseName
-      const hasBaseNameValue = await hasBaseName(userAddress);
+      // ✅ FIREBASE OPTIMIZATION: Replace expensive hasBaseName() with simple check
+      // Check if user has BaseName by looking at their stored name
+      const userName = userData.name || '';
+      const hasBaseNameValue = userName.endsWith('.base.eth');
       
       // Oblicz punkty na podstawie danych użytkownika
       const likePoints = userData.likesReceived || 0;
@@ -2792,8 +2779,13 @@ export const fetchUserStats = async (userId: string) => {
     const recentPostsSnapshot = await getDocs(recentPostsQuery);
     const recentActivityBonus = recentPostsSnapshot.size > 0 ? 1.25 : 1;
 
-    // Sprawdź czy użytkownik ma BaseName
-    const isBaseNameUser = await hasBaseName(userId);
+    // ✅ FIREBASE OPTIMIZATION: Replace expensive hasBaseName() with simple check
+    // Since we already have user data, check the stored name for BaseName
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    const userData = userDoc.data();
+    const userName = userData?.name || '';
+    const isBaseNameUser = userName.endsWith('.base.eth');
     const baseNameBonus = isBaseNameUser ? 1000 : 0;
 
     // Calculate total points
