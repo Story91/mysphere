@@ -428,10 +428,10 @@ export default function HomePage() {
       try {
         // ✅ ULTRA-CHEAP: Statyczne dane zamiast Firebase (oszczędność 800M reads/dzień!)
         const stats = {
-          userCount: 49185,
-          postsCount: 47799,
-          likesCount: 10078,
-          commentsCount: 2451,
+          userCount: 55273,
+          postsCount: 54000,
+          likesCount: 10500,
+          commentsCount: 2625,
           transactionsCount: 40818
         };
         
