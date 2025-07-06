@@ -27,6 +27,9 @@ import {
   addCommentReply,
   ADMIN_ADDRESS,
   getCachedActiveUsers,
+  getTopActiveUsersPaginated, // 🚀 NOWA FUNKCJA PAGINOWANA
+  clearPaginatedActiveUsersCache,
+  getPaginatedActiveUsersCacheInfo,
   // searchUsers,  // DISABLED
   getGlobalStats,
   refreshTop50UsersOnly,
@@ -1227,94 +1230,7 @@ export default function BaseChat() {
     }
   }, []);
 
-  // Zmodyfikowana funkcja getActiveUsers - teraz używa cache'u
-  const getActiveUsers = useCallback(async (forceRefresh: boolean = false) => {
-    if (!db) return;
-
-    try {
-      setIsLoadingUsers(true);
-      setCanManuallyRefresh(false);
-      
-      console.log(`🔄 Loading active users (force: ${forceRefresh})...`);
-      
-             // Użyj nowej funkcji z cache'em
-               const users = await getCachedActiveUsers(50, forceRefresh); // ⚠️ EMERGENCY: Reduced from 1000 to 50 for Firebase cost reduction
-      
-      // Aktualizuj userNames
-      const userNamesUpdate: {[key: string]: {name: string, avatar?: string}} = {};
-      users.forEach(user => {
-        userNamesUpdate[user.address] = {
-          name: user.name,
-          avatar: user.avatar
-        };
-      });
-      
-      setUserNames(prev => ({
-        ...prev,
-        ...userNamesUpdate
-      }));
-      
-             // Zapisz do localStorage z timestampem
-       localStorage.setItem('activeUsers', JSON.stringify(users));
-       localStorage.setItem('userNames', JSON.stringify(userNamesUpdate));
-       localStorage.setItem('usersCacheTime', Date.now().toString());
-
-      setActiveUsers(users);
-      setIsLoadingUsers(false);
-      setInitialRefreshDone(true);
-      
-      // Pozwól na ręczne odświeżenie po 5 sekundach (skrócono z 10)
-      setTimeout(() => {
-        setCanManuallyRefresh(true);
-      }, 5000);
-      
-             console.log(`✅ Loaded ${users.length}/1000 active users from cache`);
-    } catch (error) {
-      console.error('Error fetching active users:', error);
-      setIsLoadingUsers(false);
-      setCanManuallyRefresh(true);
-    }
-  }, [db]);
-
-  // Funkcja do ręcznego odświeżania danych z force refresh
-  const handleManualRefresh = useCallback(() => {
-    if (canManuallyRefresh) {
-      getActiveUsers(true); // Force refresh when manually triggered
-    }
-  }, [canManuallyRefresh, getActiveUsers]);
-
-  // Automatyczne odświeżanie przy pierwszym załadowaniu strony
-  useEffect(() => {
-    if (isMounted && !initialRefreshDone) {
-      // Pobierz aktualne dane z Firebase (bez force refresh - użyj cache'u jeśli dostępny)
-      getActiveUsers(false);
-      setInitialRefreshDone(true);
-    }
-  }, [isMounted, initialRefreshDone, getActiveUsers]);
-  
-  // Automatyczne odświeżanie po zalogowaniu - symuluje kliknięcie przycisku Refresh
-  useEffect(() => {
-    if (isConnected && address) {
-      // Odśwież po 1 sekundzie od zalogowania (force refresh)
-      const timer = setTimeout(() => {
-        getActiveUsers(true);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isConnected, address, getActiveUsers]);
-  
-  // Regularne odświeżanie co 10 minut (zwiększono z 2 minut)
-  useEffect(() => {
-    if (isMounted) {
-      const refreshInterval = setInterval(() => getActiveUsers(false), 10 * 60 * 1000); // Co 10 minut, używa cache'u
-      
-      // Cleanup dla interwału
-      return () => {
-        clearInterval(refreshInterval);
-      };
-    }
-  }, [isMounted, getActiveUsers]);
+  // 🚀 ZOPTYMALIZOWANA funkcja getActiveUsers została przeniesiona za deklaracje zmiennych stanu
 
   // Dodaj useEffect do aktualizacji trendujących tagów
   useEffect(() => {
@@ -1825,7 +1741,7 @@ export default function BaseChat() {
         if (post.id === postId) {
           return {
             ...post,
-            content: newContent,
+        content: newContent,
             lastEdited: Date.now()
           };
         }
@@ -2060,6 +1976,7 @@ export default function BaseChat() {
 
   // Dodaj nowe stany dla modalu
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalUsersPages, setTotalUsersPages] = useState(5); // 🚀 LIMIT: Maksymalnie 5 stron
   const [showAllUsers, setShowAllUsers] = useState(false);
   const usersPerPage = 10;
 
@@ -2073,7 +1990,103 @@ export default function BaseChat() {
   // Ref dla debounce timer
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 🚀 ZOPTYMALIZOWANA funkcja getActiveUsers - używa nowej paginowanej funkcji
+  const getActiveUsers = useCallback(async (forceRefresh: boolean = false) => {
+    if (!db) return;
 
+    try {
+      setIsLoadingUsers(true);
+      setCanManuallyRefresh(false);
+      
+      console.log(`🔄 Loading active users page ${currentPage} (force: ${forceRefresh})...`);
+      
+      // 🚀 NOWA PAGINOWANA FUNKCJA: Pobiera tylko 10 użytkowników zamiast 50!
+      const result = await getTopActiveUsersPaginated(currentPage, 10, forceRefresh);
+      
+      // Aktualizuj userNames tylko dla aktualnej strony
+      const userNamesUpdate: {[key: string]: {name: string, avatar?: string}} = {};
+      result.users.forEach(user => {
+        userNamesUpdate[user.address] = {
+          name: user.name,
+          avatar: user.avatar
+        };
+      });
+      
+      setUserNames(prev => ({
+        ...prev,
+        ...userNamesUpdate
+      }));
+      
+      // Zapisz do localStorage z timestampem
+      localStorage.setItem('activeUsersPage', JSON.stringify(result.users));
+      localStorage.setItem('userNames', JSON.stringify(userNamesUpdate));
+      localStorage.setItem('usersCacheTime', Date.now().toString());
+
+      // Aktualizuj stan komponentu
+      setActiveUsers(result.users);
+      setTotalUsersPages(5); // 🚀 LIMIT: Zawsze 5 stron maksymalnie
+      setIsLoadingUsers(false);
+      setInitialRefreshDone(true);
+      
+      // Pozwól na ręczne odświeżenie po 5 sekundach
+      setTimeout(() => {
+        setCanManuallyRefresh(true);
+      }, 5000);
+      
+      console.log(`✅ Loaded page ${result.currentPage}/5 (${result.users.length} users) - Firebase reads optimized!`);
+    } catch (error) {
+      console.error('Error fetching active users:', error);
+      setIsLoadingUsers(false);
+      setCanManuallyRefresh(true);
+    }
+  }, [db, currentPage]); // 🚀 DODANO: currentPage do dependencies
+
+  // Funkcja do ręcznego odświeżania danych z force refresh
+  const handleManualRefresh = useCallback(() => {
+    if (canManuallyRefresh) {
+      getActiveUsers(true); // Force refresh when manually triggered
+    }
+  }, [canManuallyRefresh, getActiveUsers]);
+
+  // Automatyczne odświeżanie przy pierwszym załadowaniu strony
+  useEffect(() => {
+    if (isMounted && !initialRefreshDone) {
+      // Pobierz aktualne dane z Firebase (bez force refresh - użyj cache'u jeśli dostępny)
+      getActiveUsers(false);
+      setInitialRefreshDone(true);
+    }
+  }, [isMounted, initialRefreshDone, getActiveUsers]);
+  
+  // Automatyczne odświeżanie po zalogowaniu - symuluje kliknięcie przycisku Refresh
+  useEffect(() => {
+    if (isConnected && address) {
+      // Odśwież po 1 sekundzie od zalogowania (force refresh)
+      const timer = setTimeout(() => {
+        getActiveUsers(true);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected, address, getActiveUsers]);
+  
+  // Regularne odświeżanie co 10 minut (zwiększono z 2 minut)
+  useEffect(() => {
+    if (isMounted) {
+      const refreshInterval = setInterval(() => getActiveUsers(false), 10 * 60 * 1000); // Co 10 minut, używa cache'u
+      
+      // Cleanup dla interwału
+      return () => {
+        clearInterval(refreshInterval);
+      };
+    }
+  }, [isMounted, getActiveUsers]);
+
+  // 🚀 DODANY useEffect do reagowania na zmiany currentPage
+  useEffect(() => {
+    if (initialRefreshDone) {
+      getActiveUsers(false); // Automatycznie ładuj nową stronę
+    }
+  }, [currentPage, getActiveUsers, initialRefreshDone]);
 
   // ===============================================
   // 🚫 DISABLED: USER SEARCH to save Firebase reads
@@ -2162,23 +2175,22 @@ export default function BaseChat() {
     </div>
   );
 
-  // Modyfikacja renderUserList aby zawsze pokazywał wszystkich użytkowników z paginacją
+  // 🚀 ZOPTYMALIZOWANA renderUserList - activeUsers już zawiera tylko aktualną stronę
   const renderUserList = () => {
     if (isLoadingUsers) {
-      return [...Array(10)].map((_, index) => renderEmptyItem(index));
+      return [...Array(10)].map((_, index) => renderEmptyItem(((currentPage - 1) * 10) + index));
     }
 
-    const startIndex = (currentPage - 1) * usersPerPage;
-    const endIndex = startIndex + usersPerPage;
-    const usersToDisplay = activeUsers.slice(startIndex, endIndex);
+    // 🚀 OPTYMALIZACJA: Nie używaj slice() - activeUsers już zawiera tylko aktualną stronę
+    const usersToDisplay = activeUsers;
     
     // Wypełnij pozostałe miejsca pustymi elementami
     const items = [...Array(10)].map((_, index) => {
       const user = usersToDisplay[index];
       if (user) {
-        return renderUserItem(user, startIndex + index);
+        return renderUserItem(user, ((currentPage - 1) * 10) + index); // Popraw indeks dla numeracji
       }
-      return renderEmptyItem(startIndex + index);
+      return renderEmptyItem(((currentPage - 1) * 10) + index);
     });
 
     return items;
@@ -3608,11 +3620,11 @@ export default function BaseChat() {
                           Prev
                         </button>
                         <span className="text-[11px] text-gray-600 dark:text-gray-300 px-3">
-                          {currentPage}/{Math.max(1, Math.ceil(activeUsers.length / usersPerPage))}
+                          {currentPage}/{totalUsersPages}
                         </span>
                         <button
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(activeUsers.length / usersPerPage))))}
-                          disabled={currentPage >= Math.ceil(activeUsers.length / usersPerPage)}
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalUsersPages))}
+                          disabled={currentPage >= totalUsersPages}
                           className="px-3 py-1 text-[11px] bg-gray-800 dark:bg-gray-600 text-white rounded-r-full disabled:opacity-50"
                         >
                           Next

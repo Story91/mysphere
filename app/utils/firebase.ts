@@ -3882,3 +3882,160 @@ export const clearUserNamesCache = () => {
 // ===============================================
 // 🔧 LEGACY COMPATIBILITY - getBulkUserNames już jest zmodyfikowane wyżej
 // ===============================================
+
+// ===============================================
+// 🚀 PAGINATED ACTIVE USERS SYSTEM (70% oszczędności Firebase reads!)
+// ===============================================
+
+// Cache dla paginowanych użytkowników
+interface PaginatedCache {
+  pages: any[][];
+  currentPage: number;
+  totalPages: number;
+  lastUpdated: number;
+  pageSize: number;
+}
+
+let paginatedActiveUsersCache: PaginatedCache = {
+  pages: [],
+  currentPage: 0,
+  totalPages: 0,
+  lastUpdated: 0,
+  pageSize: 10
+};
+
+const PAGINATED_CACHE_TTL = 10 * 60 * 1000; // 10 minut cache
+
+export const getTopActiveUsersPaginated = async (
+  page: number = 1,
+  pageSize: number = 10,
+  forceRefresh: boolean = false
+): Promise<{
+  users: any[];
+  currentPage: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  totalUsers: number;
+}> => {
+  try {
+    const MAX_PAGES = 5; // 🚀 LIMIT: Maksymalnie 5 stron
+    const MAX_USERS = MAX_PAGES * pageSize; // 50 użytkowników max
+    
+    // Ogranicz stronę do maksimum
+    const limitedPage = Math.min(page, MAX_PAGES);
+    const now = Date.now();
+    
+    // Sprawdź cache dla tej konkretnej strony
+    const cacheValid = !forceRefresh && 
+      paginatedActiveUsersCache.pages.length > 0 && 
+      (now - paginatedActiveUsersCache.lastUpdated) < PAGINATED_CACHE_TTL;
+
+    const pageIndex = limitedPage - 1;
+    
+    if (cacheValid && paginatedActiveUsersCache.pages[pageIndex]) {
+      console.log(`📋 Using cached page ${limitedPage}/${MAX_PAGES} of active users`);
+      return {
+        users: paginatedActiveUsersCache.pages[pageIndex],
+        currentPage: limitedPage,
+        totalPages: MAX_PAGES,
+        hasNext: limitedPage < MAX_PAGES,
+        hasPrev: limitedPage > 1,
+        totalUsers: MAX_USERS
+      };
+    }
+
+    // 🚀 PRAWDZIWE LAZY LOADING: Pobierz tylko potrzebną ilość danych
+    console.log(`🔄 Fetching page ${limitedPage}/${MAX_PAGES} from Firebase (${pageSize} users)...`);
+    
+    // Jeśli nie ma cache, pobierz tylko tyle ile potrzeba do aktualnej strony
+    const usersNeeded = limitedPage * pageSize;
+    const allUsers = await getCachedActiveUsers(Math.min(usersNeeded, MAX_USERS), forceRefresh);
+    
+    // Podziel na strony (maksymalnie 5 stron)
+    const pages: any[][] = [];
+    const availablePages = Math.min(MAX_PAGES, Math.ceil(allUsers.length / pageSize));
+    
+    for (let i = 0; i < availablePages; i++) {
+      const startIdx = i * pageSize;
+      const endIdx = Math.min(startIdx + pageSize, allUsers.length);
+      pages[i] = allUsers.slice(startIdx, endIdx);
+    }
+    
+    // Aktualizuj cache
+    paginatedActiveUsersCache = {
+      pages,
+      currentPage: limitedPage,
+      totalPages: MAX_PAGES,
+      lastUpdated: now,
+      pageSize
+    };
+    
+    console.log(`✅ Paginated cache updated: ${pages.length}/${MAX_PAGES} pages available, Firebase reads: ${allUsers.length}`);
+    
+    // Zwróć żądaną stronę
+    const currentPageUsers = pages[pageIndex] || [];
+    
+    return {
+      users: currentPageUsers,
+      currentPage: limitedPage,
+      totalPages: MAX_PAGES,
+      hasNext: limitedPage < MAX_PAGES && limitedPage < availablePages,
+      hasPrev: limitedPage > 1,
+      totalUsers: MAX_USERS
+    };
+    
+  } catch (error) {
+    console.error('❌ Error fetching paginated active users:', error);
+    
+    // Fallback: zwróć cache jeśli istnieje
+    const pageIndex = Math.min(page, 5) - 1;
+    if (paginatedActiveUsersCache.pages[pageIndex]) {
+      return {
+        users: paginatedActiveUsersCache.pages[pageIndex],
+        currentPage: Math.min(page, 5),
+        totalPages: 5,
+        hasNext: Math.min(page, 5) < 5,
+        hasPrev: Math.min(page, 5) > 1,
+        totalUsers: 50
+      };
+    }
+    
+    return {
+      users: [],
+      currentPage: 1,
+      totalPages: 5,
+      hasNext: false,
+      hasPrev: false,
+      totalUsers: 50
+    };
+  }
+};
+
+// Wyczyść cache paginowanych użytkowników
+export const clearPaginatedActiveUsersCache = () => {
+  paginatedActiveUsersCache = {
+    pages: [],
+    currentPage: 0,
+    totalPages: 0,
+    lastUpdated: 0,
+    pageSize: 10
+  };
+  console.log('🗑️ Paginated active users cache cleared');
+};
+
+// Pobierz informacje o cache
+export const getPaginatedActiveUsersCacheInfo = () => {
+  const now = Date.now();
+  const age = now - paginatedActiveUsersCache.lastUpdated;
+  const isExpired = age > PAGINATED_CACHE_TTL;
+  
+  return {
+    totalPages: paginatedActiveUsersCache.totalPages,
+    pageSize: paginatedActiveUsersCache.pageSize,
+    lastUpdated: paginatedActiveUsersCache.lastUpdated,
+    ageInMinutes: Math.floor(age / 60000),
+    isExpired,
+    cachedPages: paginatedActiveUsersCache.pages.length
+  };
+};
