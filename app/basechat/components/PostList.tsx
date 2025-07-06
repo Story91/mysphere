@@ -328,7 +328,7 @@ export default function PostList({
         if (post.id === postId) {
           return {
             ...post,
-            content: newContent,
+        content: newContent,
             lastEdited: Date.now()
           };
         }

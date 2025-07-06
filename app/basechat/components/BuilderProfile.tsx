@@ -8,6 +8,7 @@ import { Avatar } from '@coinbase/onchainkit/identity';
 import TipButton from './TipButton';
 import TipStats from './TipStats';
 import RecentTips from './RecentTips';
+import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 
 // Talent Protocol API types
 interface TalentScore {
@@ -239,6 +240,9 @@ export default function BuilderProfile({
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [newBio, setNewBio] = useState(profile.bio || '');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // BaseChatPoints section state
+  const [isBaseChatPointsExpanded, setIsBaseChatPointsExpanded] = useState(false);
   
   // Talent Protocol state
   const [talentScore, setTalentScore] = useState<TalentScore | null>(null);
@@ -660,34 +664,124 @@ export default function BuilderProfile({
           </div>
         )}
         
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl p-6 text-center transition-transform duration-300 hover:scale-[1.02]">
-            <div className="absolute -top-4 -right-4 w-16 h-16 bg-blue-300/20 rounded-full filter blur-xl"></div>
-            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm"></div>
-            <div className="relative z-10">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-500/20 backdrop-blur-sm border border-blue-400/30 mb-3 shadow-lg">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
+        {/* BaseChatPoints - Zunifikowana sekcja z kafelkami */}
+        <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+          
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-light text-gray-900 dark:text-gray-100 flex items-center">
+              BaseChat Points
+              <div className="ml-2 text-3xl animate-bounce">⚡</div>
+            </h2>
+            
+            {/* Total Score - zawsze widoczny */}
+            <div className="flex items-center bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 p-0.5 rounded-xl">
+              <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-xl flex items-center">
+                <span className="text-gray-600 dark:text-gray-400 text-sm mr-2">Total Score:</span>
+                <div className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text animate-pulse">
+                  {Math.round(((profile.postCount || 0) * 5 + (profile.likesReceived || 0)) * 1.25)}
+                </div>
+                <div className="ml-2 text-lg">✨</div>
               </div>
-              <div className="text-blue-600 text-3xl font-light drop-shadow-sm">{profile.postCount || 0}</div>
-              <div className="text-sm text-blue-500 font-light mt-1">Posts</div>
             </div>
           </div>
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl p-6 text-center transition-transform duration-300 hover:scale-[1.02]">
-            <div className="absolute -top-4 -right-4 w-16 h-16 bg-blue-300/20 rounded-full filter blur-xl"></div>
-            <div className="absolute inset-0 bg-white/20 backdrop-blur-sm"></div>
-            <div className="relative z-10">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-pink-400/20 to-pink-500/20 backdrop-blur-sm border border-pink-400/30 mb-3 shadow-lg">
-                <svg className="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
+
+          {/* Kafelki z punktami */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl p-6 text-center transition-transform duration-300 hover:scale-[1.02]">
+              <div className="absolute -top-4 -right-4 w-16 h-16 bg-blue-300/20 rounded-full filter blur-xl"></div>
+              <div className="absolute inset-0 bg-white/20 backdrop-blur-sm"></div>
+              <div className="relative z-10">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-500/20 backdrop-blur-sm border border-blue-400/30 mb-3 shadow-lg">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </div>
+                <div className="text-blue-600 text-3xl font-light drop-shadow-sm">{profile.postCount || 0}</div>
+                <div className="text-sm text-blue-500 font-light mt-1">Posts</div>
+                <div className="text-xs text-blue-400 font-medium mt-2 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-full">
+                  {(profile.postCount || 0) * 5} points
+                </div>
               </div>
-              <div className="text-pink-600 text-3xl font-light drop-shadow-sm">{profile.likesReceived || 0}</div>
-              <div className="text-sm text-pink-500 font-light mt-1">Likes Received</div>
+            </div>
+            
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-pink-50 to-pink-100 border border-pink-200/50 backdrop-blur-xl shadow-xl p-6 text-center transition-transform duration-300 hover:scale-[1.02]">
+              <div className="absolute -top-4 -right-4 w-16 h-16 bg-pink-300/20 rounded-full filter blur-xl"></div>
+              <div className="absolute inset-0 bg-white/20 backdrop-blur-sm"></div>
+              <div className="relative z-10">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-pink-400/20 to-pink-500/20 backdrop-blur-sm border border-pink-400/30 mb-3 shadow-lg">
+                  <svg className="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </div>
+                <div className="text-pink-600 text-3xl font-light drop-shadow-sm">{profile.likesReceived || 0}</div>
+                <div className="text-sm text-pink-500 font-light mt-1">Likes Received</div>
+                <div className="text-xs text-pink-400 font-medium mt-2 bg-pink-50 dark:bg-pink-900/20 px-2 py-1 rounded-full">
+                  {profile.likesReceived || 0} points
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Rozwijane szczegóły */}
+          <button
+            onClick={() => setIsBaseChatPointsExpanded(!isBaseChatPointsExpanded)}
+            className="w-full flex items-center justify-center text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-300 border-t border-gray-200 dark:border-gray-600 pt-4"
+          >
+            <span className="text-sm font-medium mr-2">
+              {isBaseChatPointsExpanded ? 'Hide Details' : 'Show Details'}
+            </span>
+            {isBaseChatPointsExpanded ? (
+              <ChevronUpIcon className="w-4 h-4" />
+            ) : (
+              <ChevronDownIcon className="w-4 h-4" />
+            )}
+          </button>
+
+          {isBaseChatPointsExpanded && (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
+                <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                  <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Activity Bonus
+                </span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-400">+25%</span>
+                  <span className="text-purple-500 font-semibold">
+                    {Math.round(((profile.postCount || 0) * 5 + (profile.likesReceived || 0)) * 0.25)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                <div className="p-4 bg-gray-100 dark:bg-gray-600 rounded-lg">
+                  <div className="font-medium text-gray-700 dark:text-gray-200 mb-2 flex items-center">
+                    BaseBook Tips
+                    <span className="ml-2">💡</span>
+                  </div>
+                  <ul className="space-y-2">
+                    <li className="flex items-center text-xs">
+                      <span className="mr-2">🎯</span>
+                      Share your Base journey and experiences
+                    </li>
+                    <li className="flex items-center text-xs">
+                      <span className="mr-2">🤝</span>
+                      Engage with other Base enthusiasts
+                    </li>
+                    <li className="flex items-center text-xs">
+                      <span className="mr-2">🌟</span>
+                      Stay active to unlock special features
+                    </li>
+                  </ul>
+                  <div className="mt-2 text-xs italic text-gray-500 dark:text-gray-400">
+                    Building the Base community together!
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* On-chain Stats */}
@@ -786,14 +880,7 @@ export default function BuilderProfile({
           </div>
         )}
         
-        {/* Recent Tips */}
-        <div className="mt-6">
-          <RecentTips 
-            userAddress={userAddress}
-            limit={10}
-            className="w-full"
-          />
-        </div>
+
       </div>
     </div>
   );

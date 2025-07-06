@@ -2034,7 +2034,7 @@ export default function BaseChat() {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [isBaseChatPointsExpanded, setIsBaseChatPointsExpanded] = useState(false); // ⚠️ COLLAPSED by default - expand on user request
+  // ✅ USUNIĘTO: State dla BaseChatPoints - przeniesiono do BuilderProfile
   // Removed isSearchingAll - now using hybrid search by default
 
   // Ref dla debounce timer
@@ -3553,109 +3553,7 @@ export default function BaseChat() {
                 </div>
               </div>
 
-              {/* BaseChat Points - Collapsible */}
-              {isConnected && (
-                <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 static-gradient"></div>
-                  
-                  <button
-                    onClick={() => setIsBaseChatPointsExpanded(!isBaseChatPointsExpanded)}
-                    className="w-full flex items-center justify-between text-left hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg transition-all duration-300"
-                  >
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
-                      BaseChat Points
-                      <div className="ml-2 text-3xl animate-bounce">⚡</div>
-                    </h2>
-                    {isBaseChatPointsExpanded ? (
-                      <ChevronUpIcon className="w-5 h-5 text-gray-500" />
-                    ) : (
-                      <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-                    )}
-                  </button>
-
-                  {isBaseChatPointsExpanded && (
-                    <div className="mt-3 space-y-3">
-                      <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg">
-                        <span className="text-gray-500 flex items-center">
-                          <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          Posts
-                        </span>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs text-gray-400">{userProfile.postCount} × 5</span>
-                          <span className="text-blue-500 font-semibold">{userProfile.postCount * 5}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg">
-                        <span className="text-gray-500 flex items-center">
-                          <svg className="w-4 h-4 mr-2 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                          </svg>
-                          Likes Received
-                        </span>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs text-gray-400">{userProfile.likesReceived} × 1</span>
-                          <span className="text-pink-500 font-semibold">{userProfile.likesReceived}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-lg">
-                        <span className="text-gray-500 flex items-center">
-                          <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          Activity Bonus
-                        </span>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs text-gray-400">+25%</span>
-                          <span className="text-purple-500 font-semibold">
-                            {Math.round((userProfile.postCount * 5 + userProfile.likesReceived) * 0.25)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-10 rounded-lg"></div>
-                        <div className="flex items-center justify-between p-3 relative">
-                          <span className="text-gray-700 dark:text-gray-300 font-bold">Total Score</span>
-                          <div className="flex items-center">
-                            <div className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text animate-pulse">
-                              {Math.round((userProfile.postCount * 5 + userProfile.likesReceived) * 1.25)}
-                            </div>
-                            <div className="ml-2 text-lg">✨</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 text-sm text-gray-400">
-                        <div className="p-3 bg-gray-100 dark:bg-gray-600 rounded-lg">
-                          <div className="font-medium text-gray-700 dark:text-gray-200 mb-2 flex items-center">
-                            BaseBook Tips
-                            <span className="ml-2">💡</span>
-                          </div>
-                          <ul className="space-y-2">
-                            <li className="flex items-center text-xs">
-                              <span className="mr-2">🎯</span>
-                              Share your Base journey and experiences
-                            </li>
-                            <li className="flex items-center text-xs">
-                              <span className="mr-2">🤝</span>
-                              Engage with other Base enthusiasts
-                            </li>
-                            <li className="flex items-center text-xs">
-                              <span className="mr-2">🌟</span>
-                              Stay active to unlock special features
-                            </li>
-                          </ul>
-                          <div className="mt-2 text-xs italic text-gray-500">Building the Base community together!</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* ✅ USUNIĘTO: BaseChat Points - przeniesiono do BuilderProfile po kliknięciu */}
 
 
 

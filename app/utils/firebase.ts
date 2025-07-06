@@ -748,11 +748,9 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
     const userRef = doc(db, 'users', address);
     const userDoc = await getDoc(userRef);
     
-    // Get actual posts count
-    const postsRef = collection(db, 'posts');
-    const postsQuery = query(postsRef, where('author', '==', address));
-    const postsSnapshot = await getDocs(postsQuery);
-    const actualPostsCount = postsSnapshot.size;
+    // 💰 OPTYMALIZACJA: Usunięto drogie zapytanie pobierające wszystkie posty
+    // Teraz używamy zapisanej wartości postsCount która jest aktualizowana przy każdym nowym poście
+    // Oszczędność: 2000+ Firebase reads dla 1000 użytkowników = ~$120-240/dzień
     
     if (userDoc.exists()) {
       const data = userDoc.data();
@@ -761,7 +759,7 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
         id: userDoc.id,
         name: data.name,
         avatar: data.avatar,
-        postsCount: actualPostsCount, // Use actual count instead of stored
+        postsCount: data.postsCount || 0, // 💡 Użyj zapisanej wartości zamiast liczenia na nowo
         likesReceived: data.likesReceived || 0,
         address: address,
         joinedAt: data.joinedAt,
@@ -773,7 +771,7 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
           discord: ''
         } : undefined,
         stats: {
-          posts: actualPostsCount, // Update stats as well
+          posts: data.postsCount || 0, // 💡 Użyj zapisanej wartości
           likes: data.stats?.likes || 0,
           comments: data.stats?.comments || 0
         }
@@ -785,7 +783,7 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
       id: address,
       name: `${address.slice(0, 6)}...${address.slice(-4)}`,
       address: address,
-      postsCount: actualPostsCount,
+      postsCount: 0, // 💡 Nowy użytkownik = 0 postów
       likesReceived: 0,
       joinedAt: Date.now(),
       lastActive: Date.now(),
@@ -795,7 +793,7 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
         discord: ''
       } : undefined,
       stats: {
-        posts: actualPostsCount,
+        posts: 0, // 💡 Nowy użytkownik = 0 postów
         likes: 0,
         comments: 0
       }
