@@ -113,7 +113,7 @@ interface ActiveUser {
 }
 
 const BASESCAN_API_KEY = 'YB9ZQ71MVDJU3CQQXFJ6GQ4Y17MPKEQCBN';
-const REFRESH_INTERVAL = 5000; // 5 seconds
+// 🚨 USUNIĘTO: REFRESH_INTERVAL - już nie jest potrzebne bo usunęliśmy funkcję fetchData
 
 // Usuwamy animację gradientu która obciąża przeglądarkę
 const gradientAnimation = `
@@ -282,9 +282,6 @@ export default function BaseChat() {
   const [replyContent, setReplyContent] = useState('');
   const [expandedComments, setExpandedComments] = useState<{[key: string]: boolean}>({});
   const [showOnlyUserPosts, setShowOnlyUserPosts] = useState(false);
-  const [currentRank, setCurrentRank] = useState<UserRank>(UserRank.NEWBIE);
-  const [nextRank, setNextRank] = useState<UserRank>(UserRank.EXPLORER);
-  const [progress, setProgress] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
@@ -1534,130 +1531,12 @@ export default function BaseChat() {
 
   // Dodaj funkcję do pobierania danych z BaseScan
   useEffect(() => {
-    async function fetchData() {
-      if (!address) {
-        setStats({
-          transactions: 0,
-          tokens: 0,
-          nfts: 0,
-          contracts: 0,
-          transactionPoints: 0,
-          tokenPoints: 0,
-          nftPoints: 0,
-          contractPoints: 0
-        });
-        setCurrentRank(UserRank.NEWBIE);
-        setNextRank(UserRank.EXPLORER);
-        setProgress(0);
-        return;
-      }
-
-      try {
-        // Fetch data from BaseScan
-        const [txResponse, nftResponse, tokenResponse] = await Promise.all([
-          fetch(`https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&sort=desc&apikey=${BASESCAN_API_KEY}`),
-          fetch(`https://api.basescan.org/api?module=account&action=tokennfttx&address=${address}&apikey=${BASESCAN_API_KEY}`),
-          fetch(`https://api.basescan.org/api?module=account&action=tokentx&address=${address}&apikey=${BASESCAN_API_KEY}`)
-        ]);
-
-        const [txData, nftData, tokenData] = await Promise.all([
-          txResponse.json(),
-          nftResponse.json(),
-          tokenResponse.json()
-        ]);
-
-        // Calculate ranking using the same function as in Identity component
-        const rankingStats = calculateRanking(
-          txData.status === '1' ? txData.result : [],
-          tokenData.status === '1' ? tokenData.result : [],
-          nftData.status === '1' ? nftData.result : []
-        );
-
-        // Update stats
-        setStats({
-          transactions: rankingStats.stats.transactions,
-          tokens: rankingStats.stats.tokens,
-          nfts: rankingStats.stats.nfts,
-          contracts: rankingStats.stats.contracts,
-          transactionPoints: rankingStats.breakdown.transactionPoints,
-          tokenPoints: rankingStats.breakdown.tokenPoints,
-          nftPoints: rankingStats.breakdown.nftPoints,
-          contractPoints: rankingStats.breakdown.uniqueContractPoints
-        });
-
-        // Calculate total points
-        const totalPoints = rankingStats.totalPoints;
-
-        // Update rank and progress
-        let currentRankValue = UserRank.NEWBIE;
-        let nextRankValue = UserRank.EXPLORER;
-        let progressValue = 0;
-
-        if (totalPoints >= 450_000) {
-          currentRankValue = UserRank.LEGEND;
-          nextRankValue = UserRank.LEGEND;
-          progressValue = 100;
-        } else if (totalPoints >= 225_000) {
-          currentRankValue = UserRank.WHALE;
-          nextRankValue = UserRank.LEGEND;
-          progressValue = ((totalPoints - 225_000) / (450_000 - 225_000)) * 100;
-        } else if (totalPoints >= 90_000) {
-          currentRankValue = UserRank.INVESTOR;
-          nextRankValue = UserRank.WHALE;
-          progressValue = ((totalPoints - 90_000) / (225_000 - 90_000)) * 100;
-        } else if (totalPoints >= 22_500) {
-          currentRankValue = UserRank.TRADER;
-          nextRankValue = UserRank.INVESTOR;
-          progressValue = ((totalPoints - 22_500) / (90_000 - 22_500)) * 100;
-        } else if (totalPoints >= 4_500) {
-          currentRankValue = UserRank.EXPLORER;
-          nextRankValue = UserRank.TRADER;
-          progressValue = ((totalPoints - 4_500) / (22_500 - 4_500)) * 100;
-        } else {
-          progressValue = (totalPoints / 4_500) * 100;
-        }
-
-        setCurrentRank(currentRankValue);
-        setNextRank(nextRankValue);
-        setProgress(progressValue);
-
-        // Update user profile in Firebase
-        const userRef = doc(db, 'users', address);
-        
-        // Sprawdź czy dokument istnieje
-        const userDoc = await getDoc(userRef);
-        
-        if (userDoc.exists()) {
-          // Aktualizuj istniejący dokument
-          await updateDoc(userRef, {
-            totalPoints,
-            currentRank: currentRankValue,
-            lastUpdated: serverTimestamp(),
-            stats: rankingStats.stats
-          });
-        } else {
-          // Utwórz nowy dokument
-          await setDoc(userRef, {
-            address,
-            name: baseName || `${address.slice(0, 6)}...${address.slice(-4)}`,
-            totalPoints,
-            currentRank: currentRankValue,
-            joinedAt: serverTimestamp(),
-            lastUpdated: serverTimestamp(),
-            stats: rankingStats.stats
-          });
-        }
-
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    }
-
-    if (isConnected && address) {
-      fetchData();
-      const interval = setInterval(fetchData, REFRESH_INTERVAL);
-      return () => clearInterval(interval);
-    }
+    // 🚨 USUNIĘTO: Funkcja fetchData - generowała ogromne koszty Firebase!
+    // Była wywoływana co 5 sekund dla każdego użytkownika i wykonywała:
+    // - getDoc(userRef) - 1 Firebase READ
+    // - updateDoc(userRef) - 1 Firebase WRITE
+    // = 144,000 Firebase operations/godzinę dla 100 użytkowników = $6,892/dzień!
+    // ✅ OSZCZĘDNOŚĆ: Brak niepotrzebnych Firebase reads/writes na stronie BaseChat
   }, [address, isConnected, baseName]);
 
   // 🚀 ULTRA-CHEAP Funkcja do pobierania nazw użytkowników (95% oszczędności!)
