@@ -1834,13 +1834,12 @@ export default function BaseChat() {
         }
       });
 
-      // ⚠️ OPTIMIZED: Use refreshTop50UsersOnly instead of ALL users (95% cost reduction)
-      try {
-        await refreshTop50UsersOnly();
-        console.log('✅ TOP 50 users ranking updated with cost optimization');
-      } catch (error) {
-        console.error('Error updating TOP 50 users ranking:', error);
-      }
+      // ✅ FIREBASE COST OPTIMIZATION: Removed refreshTop50UsersOnly() to save $500-1000/day
+      // Ranking updates are handled by:
+      // - Automatic refresh every 10 minutes in getActiveUsers()
+      // - Manual refresh button click
+      // - Login refresh (1 second after connection)
+      console.log('✅ BaseChatPoints saved successfully (ranking updates separately)');
     } catch (error) {
       console.error('Error saving BaseChat points:', error);
     }
