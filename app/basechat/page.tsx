@@ -641,8 +641,30 @@ export default function BaseChat() {
       const tags = Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1))));
       const mentions = Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))));
 
-      // 2. Save to Firebase bez tokena Zora
-      await createPost({
+      // 2. ✅ OPTIMISTIC UPDATE: Dodaj post na górę NATYCHMIAST (zamiast 15 Firebase reads)
+      const tempPostId = 'temp-' + Date.now();
+      const newPostObject = {
+        id: tempPostId,
+        author: address,
+        content: newPost,
+        timestamp: Date.now(),
+        image: imageUrl,
+        video: videoUrl,
+        tags: tags,
+        mentions: mentions,
+        likes: 0,
+        likedBy: [],
+        comments: [],
+        txHash: txHash,
+        network: 'base' as 'base' | 'basecamp',
+        isPinned: false
+      };
+
+      // Dodaj post na górę listy NATYCHMIAST
+      setPosts(currentPosts => [newPostObject, ...currentPosts]);
+
+      // 3. Save to Firebase w tle (bez czekania na UI)
+      createPost({
         author: address,
         content: newPost,
         timestamp: Date.now(),
@@ -653,16 +675,27 @@ export default function BaseChat() {
         visibility: 'public',
         txHash: txHash, // Zapisz hash transakcji onchain
         network: 'base' // Identify as a Base network post
+      }).then((realPostId) => {
+        // Zaktualizuj tempPost z prawdziwym ID z Firebase
+        setPosts(currentPosts => 
+          currentPosts.map(post => 
+            post.id === tempPostId ? { ...post, id: realPostId } : post
+          )
+        );
+      }).catch((error) => {
+        console.error('Error saving post to Firebase:', error);
+        // W przypadku błędu, usuń optimistic post
+        setPosts(currentPosts => currentPosts.filter(post => post.id !== tempPostId));
+        toast.error('Failed to save post');
       });
 
-      // 3. Update UI
+      // 4. Update UI
       toast.success('Post created successfully!', { id: toastId });
       setNewPost('');
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
       
-      // 4. Refresh posts
-      await refreshPosts();
+      // ✅ OPTYMALIZACJA: Usunięto refreshPosts() - oszczędność 15 Firebase reads po każdym poście!
       
       // 5. Increment daily count
       setDailyPostCount(prev => prev + 1);
@@ -1758,9 +1791,9 @@ export default function BaseChat() {
   });
 
   // ⚡ OPTYMALIZACJA: Lazy loading - start z 25, maksymalnie 250 postów
-  const [displayLimit, setDisplayLimit] = useState(25);
+  const [displayLimit, setDisplayLimit] = useState(15);
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
-  const MAX_DISPLAY_LIMIT = 250; // Maksymalnie 250 postów
+  const MAX_DISPLAY_LIMIT = 150; // Maksymalnie 150 postów (zmniejszono dla oszczędności)
 
   const displayedPosts = expandedPosts ? sortedPosts : sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT));
 
@@ -1768,7 +1801,7 @@ export default function BaseChat() {
     if (expandedPosts) return; // Gdy mamy pełny widok, nie korzystamy z infinite scroll
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && sortedPosts.length > displayLimit && displayLimit < MAX_DISPLAY_LIMIT) {
-        setDisplayLimit(prev => Math.min(prev + 25, MAX_DISPLAY_LIMIT)); // ⚡ OPTYMALIZACJA: Ładuj po 25 postów, max 250
+        setDisplayLimit(prev => Math.min(prev + 15, MAX_DISPLAY_LIMIT)); // ⚡ OPTYMALIZACJA: Ładuj po 15 postów (-40% Firebase reads)
       }
     }, { threshold: 1.0 });
 

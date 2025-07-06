@@ -672,8 +672,8 @@ export default function PostList({
     }
   });
 
-  const [displayLimit, setDisplayLimit] = useState(25); // ⚡ OPTYMALIZACJA: Start z 25 postów
-  const MAX_DISPLAY_LIMIT = 250; // Maksymalnie 250 postów
+  const [displayLimit, setDisplayLimit] = useState(15); // ⚡ OPTYMALIZACJA: Start z 15 postów (-40% Firebase reads)
+  const MAX_DISPLAY_LIMIT = 150; // Maksymalnie 150 postów (zmniejszono dla oszczędności)
   const displayedPosts = sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT));
 
   // ❌ USUNIĘTO DRUGI INFINITE SCROLL obserwator - oszczędność Firebase reads/writes
@@ -688,7 +688,7 @@ export default function PostList({
       const { posts: morePosts, lastVisible: newLastVisible } = await fetchPosts({
         userId: address,
         startAfter: lastVisible,
-        limit: 25 // ⚡ OPTYMALIZACJA: Pobieraj 25 postów za razem
+        limit: 15 // ⚡ OPTYMALIZACJA: Pobieraj 15 postów za razem (-40% Firebase reads)
       });
       
       if (morePosts.length > 0) {
