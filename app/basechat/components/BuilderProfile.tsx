@@ -3,7 +3,7 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import ProfileSocials from './ProfileSocials';
 import { toast } from 'react-hot-toast';
-import { UserRank, RANK_DESCRIPTIONS } from '../../utils/ranking';
+// ✅ USUNIĘTO: UserRank i RANK_DESCRIPTIONS - nie używane już
 import { Avatar } from '@coinbase/onchainkit/identity';
 import TipButton from './TipButton';
 import TipStats from './TipStats';
@@ -204,12 +204,11 @@ interface BuilderProfileProps {
       discord?: string;
     };
 
-    totalPoints?: number;
-    currentRank?: UserRank;
+
   };
   onBackToFeed: () => void;
   toEthereumAddress?: (address: string) => `0x${string}`; // Opcjonalne teraz
-  RANK_DESCRIPTIONS?: Record<string, string>; // Opcjonalne - używane będzie importowane
+  // ✅ USUNIĘTO: RANK_DESCRIPTIONS - nie potrzebne już
   onSocialLinksUpdate?: (links: { twitter: string; farcaster: string; discord: string }) => void;
 }
 
@@ -220,14 +219,12 @@ export default function BuilderProfile({
   profile, 
   onBackToFeed,
   toEthereumAddress: externalToEthereumAddress,
-  RANK_DESCRIPTIONS: externalRankDescriptions,
   onSocialLinksUpdate
 }: BuilderProfileProps) {
   // Używaj dostarczonej funkcji lub wewnętrznej implementacji
   const convertAddress = externalToEthereumAddress || toEthereumAddress;
   
-  // Używaj dostarczonych opisów rang lub importowanych
-  const rankDescriptions = externalRankDescriptions || RANK_DESCRIPTIONS;
+  // ✅ USUNIĘTO: rankDescriptions - nie potrzebne już bo usunęliśmy Builder Rank
   
   // Sprawdź czy to profil Vitalika
   const isVitalik = profile.name === 'vitalik.eth';
@@ -781,56 +778,9 @@ export default function BuilderProfile({
         
 
         
-        {/* Builder Rank */}
-        {profile.currentRank && (
-          <div className="mb-6 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-sm p-6 border border-blue-50 dark:border-blue-900/30 transition-transform duration-300 hover:scale-[1.01] relative overflow-hidden">
-            {/* Efekt świecenia */}
-            <div className="absolute -top-10 right-0 w-32 h-32 bg-blue-400 rounded-full filter blur-3xl opacity-10"></div>
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-400 rounded-full filter blur-3xl opacity-10"></div>
-            
-            <div className="text-center relative z-10">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 mb-4 shadow-lg">
-                <span className="text-white text-2xl">✨</span>
-              </div>
-              <div className="text-2xl font-light bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 text-transparent bg-clip-text">
-                {profile.currentRank}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md mx-auto font-light">
-                {rankDescriptions[profile.currentRank]}
-              </div>
-            </div>
-          </div>
-        )}
+
         
-        {/* Points */}
-        {profile.totalPoints !== undefined && (
-          <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl shadow-lg p-6 relative overflow-hidden">
-            {/* Efekt świecenia */}
-            <div className="absolute -top-10 right-0 w-32 h-32 bg-blue-300 rounded-full filter blur-3xl opacity-20"></div>
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-300 rounded-full filter blur-3xl opacity-20"></div>
-            
-            <div className="flex justify-between items-center relative z-10">
-              <div className="text-xl font-light text-white">
-                Total Points
-              </div>
-              <div className="text-3xl font-light text-white flex items-center">
-                <span>{profile.totalPoints}</span>
-                <span className="ml-2 text-lg">⚡</span>
-              </div>
-            </div>
-            
-            {/* Pasek postępu */}
-            <div className="mt-4 w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-white rounded-full"
-                style={{ width: `${Math.min(100, (profile.totalPoints / 2000) * 100)}%` }}
-              ></div>
-            </div>
-            <div className="mt-2 text-xs text-white/70 text-right font-light">
-              {Math.min(100, Math.round((profile.totalPoints / 2000) * 100))}% to next level
-            </div>
-          </div>
-        )}
+
         
 
       </div>

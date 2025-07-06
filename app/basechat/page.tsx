@@ -2483,10 +2483,7 @@ export default function BaseChat() {
       const profile = await fetchUserProfile(userAddress, { loadSocialLinks: true });
       
       if (profile) {
-        // Pobierz dodatkowe dane o użytkowniku z referencji (tylko punkty i ranking)
-        const userRef = doc(db, 'users', userAddress);
-        const userDoc = await getDoc(userRef);
-        const userData = userDoc.data();
+        // ✅ USUNIĘTO: Nie pobieramy już dodatkowych danych (totalPoints, currentRank) - oszczędność Firebase reads!
         
         // Ustaw wybrany profil
         setSelectedBuilderProfile({
@@ -2496,10 +2493,7 @@ export default function BaseChat() {
           bio: profile.bio,
           postCount: profile.postsCount || 0,
           likesReceived: profile.likesReceived || 0,
-          socialLinks: profile.socialLinks,
-
-          totalPoints: userData?.totalPoints as number,
-          currentRank: userData?.currentRank as UserRank
+                    socialLinks: profile.socialLinks
         });
         
         // Przełącz panel
