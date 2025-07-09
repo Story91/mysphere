@@ -1,0 +1,89 @@
+{
+  "name": "Common Habitat Pod",
+  "description": "A basic living module that provides essential life support and crew quarters. Features standard atmospheric controls and basic living amenities for base personnel.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/living_module_common.png",
+  "background_color": "1a2e1a",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Living Module",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Common",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Crew Capacity",
+      "value": "10",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Life Support",
+      "value": "Basic",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Comfort Level",
+      "value": "Standard",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Life Support",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Automated Habitat",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Crew Efficiency Boost",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Life Support",
+    "subcategory": "Basic Housing",
+    "generation": "Gen-1",
+    "fusion_cost": "3 units",
+    "fusion_result": "Uncommon Living Module",
+    "special_abilities": [],
+    "synergies": ["Reactor", "Storage", "Tech Lab"],
+    "counters": ["Atmospheric failures", "Overcrowding"],
+    "lore": "The Common Habitat Pod provides essential living quarters for base personnel. With basic life support systems and standard amenities, it ensures crew survival and maintains basic operational capacity.",
+    "utility": {
+      "primary": "Houses crew and provides life support",
+      "secondary": "Provides 100% crew support efficiency",
+      "passive": "Increases crew productivity by 10%, maintains base morale"
+    },
+    "visual_effects": {
+      "glow_color": "#88ff88",
+      "particle_system": "atmospheric_indicators",
+      "animation_type": "breathing_lights"
+    },
+
+    "stats": {
+      "power_base": 100,
+      "power_per_level": 100,
+      "rarity_multiplier": 1.0,
+      "energy_consumption": 15,
+      "maintenance_cost": 8
+    }
+  }
+} 

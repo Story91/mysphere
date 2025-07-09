@@ -1,0 +1,90 @@
+{
+  "name": "Rare Quantum Storage Matrix",
+  "description": "A cutting-edge storage facility utilizing quantum compression technology. Features dimensional pocket storage and quantum encryption for maximum security and virtually unlimited capacity.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/storage_rare.png",
+  "background_color": "5e3e5e",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Storage",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Rare",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Storage Capacity",
+      "value": "3000",
+      "display_type": "number",
+      "max_value": 10000
+    },
+    {
+      "trait_type": "Security Level",
+      "value": "Quantum",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Access Speed",
+      "value": "90",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Resource Management",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Dimensional Storage",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Quantum Compression Field",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Infrastructure",
+    "subcategory": "Quantum Storage",
+    "generation": "Gen-3",
+    "fusion_cost": "3 units",
+    "fusion_result": "Epic Storage",
+    "special_abilities": ["Quantum Compression", "Dimensional Pockets", "Matter Restructuring"],
+    "synergies": ["Reactor", "Tech Lab", "Living Module", "Defense Tower"],
+    "counters": [],
+    "lore": "The Rare Quantum Storage Matrix transcends traditional storage limitations through quantum compression technology. By folding space-time itself, it creates virtually unlimited storage capacity while maintaining instant access to all stored resources.",
+    "utility": {
+      "primary": "Stores resources with quantum compression",
+      "secondary": "Provides 150% resource protection and quantum encryption",
+      "passive": "Increases resource efficiency by 25%, creates dimensional storage pockets"
+    },
+    "visual_effects": {
+      "glow_color": "#ff66aa",
+      "particle_system": "quantum_matrix",
+      "animation_type": "dimensional_rifts"
+    },
+
+    "stats": {
+      "power_base": 300,
+      "power_per_level": 100,
+      "rarity_multiplier": 3.0,
+      "energy_consumption": 25,
+      "maintenance_cost": 12
+    }
+  }
+} 

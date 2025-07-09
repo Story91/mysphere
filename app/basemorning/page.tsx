@@ -10,6 +10,14 @@ import GamePanel from "./components/GamePanel";
 import GameGuide from "./components/GameGuide";
 import NFTCollection from "./components/NFTCollection";
 import BaseElementComponent from "./components/BaseElement";
+import MintButton from "./components/MintButton";
+import BatchMintButton from "./components/BatchMintButton";
+import Leaderboard from "./components/Leaderboard";
+import AdminPanel from "./components/AdminPanel";
+import MissionsPanel from "./components/MissionsPanel";
+import MarketplacePanel from "./components/MarketplacePanel";
+import BonusesPanel from "./components/BonusesPanel";
+import PublicStatsComponent from "./components/PublicStats";
 import { Achievement, BaseElement, ElementType, Rarity } from "@/types/contract";
 import { useBaseMorningContract } from "./hooks/useBaseMorningContract";
 import { BeakerIcon } from "@heroicons/react/24/solid";
@@ -24,7 +32,13 @@ import {
   HelpCircle,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  Trophy,
+  Swords,
+  Shield,
+  Target,
+  Lock,
+  ShoppingCart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -107,6 +121,56 @@ export default function BaseMorning() {
     }
   };
 
+  const handleStartMission = async (missionId: number, elementIds: string[]) => {
+    try {
+      console.log(`Starting mission ${missionId} with elements:`, elementIds);
+      // TODO: Implement actual contract call
+      // await startMission(missionId, elementIds);
+    } catch (error) {
+      console.error("Failed to start mission:", error);
+    }
+  };
+
+  const handleCompleteMission = async (missionId: number) => {
+    try {
+      console.log(`Completing mission ${missionId}`);
+      // TODO: Implement actual contract call
+      // await completeMission(missionId);
+    } catch (error) {
+      console.error("Failed to complete mission:", error);
+    }
+  };
+
+  const handleCreateTrade = async (tokenId: string, price: bigint) => {
+    try {
+      console.log(`Creating trade for token ${tokenId} at price ${price}`);
+      // TODO: Implement actual contract call
+      // await createTrade(tokenId, price);
+    } catch (error) {
+      console.error("Failed to create trade:", error);
+    }
+  };
+
+  const handleCancelTrade = async (tradeId: number) => {
+    try {
+      console.log(`Cancelling trade ${tradeId}`);
+      // TODO: Implement actual contract call
+      // await cancelTrade(tradeId);
+    } catch (error) {
+      console.error("Failed to cancel trade:", error);
+    }
+  };
+
+  const handleCompleteTrade = async (tradeId: number, price: bigint) => {
+    try {
+      console.log(`Completing trade ${tradeId} for price ${price}`);
+      // TODO: Implement actual contract call
+      // await completeTrade(tradeId, price);
+    } catch (error) {
+      console.error("Failed to complete trade:", error);
+    }
+  };
+
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -138,7 +202,7 @@ export default function BaseMorning() {
       name: "Dashboard",
       icon: Home,
       view: "dashboard",
-      description: "Overview of your base"
+      description: "Command center overview"
     },
     {
       name: "Player Stats",
@@ -147,60 +211,74 @@ export default function BaseMorning() {
       description: "Your progress and achievements"
     },
     {
-      name: "Game Panel",
+      name: "Leaderboard",
+      icon: Trophy,
+      view: "leaderboard",
+      description: "Global player rankings"
+    },
+    {
+      name: "Game Stats",
+      icon: Target,
+      view: "game-stats",
+      description: "Live game statistics"
+    },
+    {
+      name: "PvP Arena",
+      icon: Swords,
+      view: "pvp-arena",
+      description: "Battle other commanders"
+    },
+    {
+      name: "Alliances",
+      icon: Shield,
+      view: "alliances",
+      description: "Join or create alliances"
+    },
+    {
+      name: "Missions",
+      icon: Target,
+      view: "missions",
+      description: "Active objectives & rewards"
+    },
+    {
+      name: "Marketplace",
+      icon: ShoppingCart,
+      view: "marketplace",
+      description: "Trade elements with others"
+    },
+    {
+      name: "Bonuses",
+      icon: Trophy,
+      view: "bonuses",
+      description: "Base Level bonuses & rewards"
+    },
+    {
+      name: "Element Forge",
       icon: Gamepad2,
       view: "game-panel",
-      description: "Manage your base elements"
+      description: "Manage and fuse elements"
+    },
+    {
+      name: "Collection",
+      icon: Layers,
+      view: "nft-collection",
+      description: "Your element vault"
     },
     {
       name: "Game Guide",
       icon: BookOpen,
       view: "game-guide",
-      description: "Learn how to play"
+      description: "Strategic handbook"
     },
     {
-      name: "Base Collection",
-      icon: FolderArchive,
-      view: "base-collection",
-      description: "View your base elements"
-    },
-    {
-      name: "NFT Collection",
-      icon: Layers,
-      view: "nft-collection",
-      description: "Your NFT collection"
+      name: "Admin Panel",
+      icon: Lock,
+      view: "admin-panel",
+      description: "Admin control center"
     },
   ];
 
   const renderContent = () => {
-    if (!isConnected && mounted) {
-      return (
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          className="text-center"
-        >
-          <motion.h2 
-            variants={itemVariants}
-            className="text-3xl font-bold text-white mb-6"
-          >
-            Connect to start your journey
-          </motion.h2>
-          <motion.button
-            variants={itemVariants}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-lg shadow-lg shadow-blue-500/20"
-            onClick={() => {}}
-          >
-            Connect Wallet
-          </motion.button>
-        </motion.div>
-      );
-    }
-
     switch (activeView) {
       case "player-stats":
         return (
@@ -236,6 +314,7 @@ export default function BaseMorning() {
                 onElementSelect={handleElementSelect}
                 onFuse={handleFuse}
                 isLoading={isLoading}
+                allElements={elements || []}
               />
             </motion.div>
           </AnimatePresence>
@@ -254,17 +333,127 @@ export default function BaseMorning() {
             </motion.div>
           </AnimatePresence>
         );
-      case "base-collection":
+      case "leaderboard":
         return (
           <AnimatePresence mode="wait">
             <motion.div
-              key="base-collection"
+              key="leaderboard"
               variants={containerVariants}
               initial="hidden"
               animate="visible"
               exit="exit"
             >
-              <BaseCollection elements={elements || []} />
+              <Leaderboard />
+            </motion.div>
+          </AnimatePresence>
+        );
+      case "pvp-arena":
+        return (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="pvp-arena"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="text-center py-20"
+            >
+              <h2 className="text-3xl font-bold text-cyan-400 mb-4">⚔️ PvP Arena</h2>
+              <p className="text-gray-400 mb-8">Coming Soon - Battle other commanders!</p>
+              <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border border-red-500/30 rounded-xl p-8 max-w-2xl mx-auto">
+                <p className="text-red-300">Feature under development. Prepare your elements for epic battles!</p>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        );
+      case "game-stats":
+        return (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="game-stats"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <PublicStatsComponent />
+            </motion.div>
+          </AnimatePresence>
+        );
+      case "alliances":
+        return (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="alliances"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="text-center py-20"
+            >
+              <h2 className="text-3xl font-bold text-cyan-400 mb-4">🛡️ Alliances</h2>
+              <p className="text-gray-400 mb-8">Coming Soon - Form powerful alliances!</p>
+              <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl p-8 max-w-2xl mx-auto">
+                <p className="text-blue-300">Unite with other commanders to dominate the nexus!</p>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        );
+      case "missions":
+        return (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="missions"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <MissionsPanel
+                player={playerData}
+                userElements={elements || []}
+                isLoading={isLoading}
+                onStartMission={handleStartMission}
+                onCompleteMission={handleCompleteMission}
+              />
+            </motion.div>
+          </AnimatePresence>
+        );
+      case "marketplace":
+        return (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="marketplace"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <MarketplacePanel
+                player={playerData}
+                userElements={elements || []}
+                isLoading={isLoading}
+                onCreateTrade={handleCreateTrade}
+                onCancelTrade={handleCancelTrade}
+                onCompleteTrade={handleCompleteTrade}
+              />
+            </motion.div>
+          </AnimatePresence>
+        );
+      case "bonuses":
+        return (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="bonuses"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <BonusesPanel
+                playerLevel={playerData?.baseLevel || 1}
+                playerXp={playerData ? Number(playerData.xp) : 0}
+              />
             </motion.div>
           </AnimatePresence>
         );
@@ -279,6 +468,20 @@ export default function BaseMorning() {
               exit="exit"
             >
               <NFTCollection userElements={elements || []} />
+            </motion.div>
+          </AnimatePresence>
+        );
+      case "admin-panel":
+        return (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="admin-panel"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <AdminPanel />
             </motion.div>
           </AnimatePresence>
         );
@@ -298,7 +501,7 @@ export default function BaseMorning() {
                 <GameGuide />
               </motion.div>
 
-              {/* Center Column - Game Panel and Daily Check-in */}
+              {/* Center Column - Game Panel and Actions */}
               <motion.div variants={itemVariants} className="xl:col-span-6">
                 <div className="space-y-8">
                   <GamePanel
@@ -307,8 +510,10 @@ export default function BaseMorning() {
                     onElementSelect={handleElementSelect}
                     onFuse={handleFuse}
                     isLoading={isLoading}
+                    allElements={elements || []}
                   />
 
+                  {/* Daily Check-in for XP */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -326,12 +531,12 @@ export default function BaseMorning() {
                         damping: 15
                       }}
                       className={`
-                        px-12 py-6 rounded-lg font-bold text-2xl 
+                        px-12 py-6 rounded-lg font-bold text-xl 
                         flex items-center gap-3 
                         relative overflow-hidden
                         ${isLoading
                           ? "bg-gray-700 cursor-not-allowed"
-                          : "bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-700 hover:via-blue-800 hover:to-blue-900"
+                          : "bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 hover:from-purple-700 hover:via-purple-800 hover:to-purple-900"
                         }
                         before:absolute before:inset-0 
                         before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent
@@ -342,7 +547,7 @@ export default function BaseMorning() {
                       disabled={isLoading}
                     >
                       <BeakerIcon className="w-8 h-8" />
-                      {isLoading ? "Processing..." : "BM"}
+                      {isLoading ? "Processing..." : "🎯 Collect Daily XP"}
                       <style jsx>{`
                         @keyframes shine {
                           100% {
@@ -352,6 +557,24 @@ export default function BaseMorning() {
                       `}</style>
                     </motion.button>
                   </motion.div>
+
+                  {/* Mint Element Buttons */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                    >
+                      <MintButton />
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      <BatchMintButton />
+                    </motion.div>
+                  </div>
 
                   <NFTCollection userElements={elements || []} />
                 </div>
@@ -399,7 +622,7 @@ export default function BaseMorning() {
               transition={{ delay: 0.2, duration: 0.5 }}
               className="text-2xl font-bold text-white"
             >
-              Base<span className="text-blue-400">Morning</span>
+              Nexus<span className="text-cyan-400">Core</span>
             </motion.h1>
           </div>
 
@@ -467,10 +690,10 @@ export default function BaseMorning() {
             transition={{ duration: 0.5 }}
             className="text-center mb-12"
           >
-            <h1 className="text-5xl font-bold mb-4 text-white">
-              {activeView === "dashboard" ? "Base Morning" : navigationItems.find(item => item.view === activeView)?.name}
+            <h1 className="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
+              {activeView === "dashboard" ? "NEXUS CORE" : navigationItems.find(item => item.view === activeView)?.name}
             </h1>
-            <p className="text-xl text-blue-300">Build your base, day by day</p>
+            <p className="text-xl text-cyan-300">Forge the future. Command your elements. Build an empire.</p>
           </motion.div>
 
           <AnimatePresence mode="wait">

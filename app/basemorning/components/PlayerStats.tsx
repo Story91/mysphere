@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import CountUp from "react-countup";
-import { Achievement, Player, BaseElement as BaseElementType } from "../types/contract";
+import { Achievement, Player, BaseElement as BaseElementType } from "@/types/contract";
 import {
   FireIcon,
   ClockIcon,
@@ -40,6 +40,15 @@ export default function PlayerStats({
     }
   }, [lastCompletedAchievement]);
 
+  const calculateLevelBonuses = () => {
+    const level = player?.baseLevel || 1;
+    const powerBonus = level * 5; // 5 power per level from contract
+    const xpMultiplier = 1 + (level - 1) * 0.05; // 5% per level above 1
+    return { powerBonus, xpMultiplier };
+  };
+
+  const { powerBonus, xpMultiplier } = calculateLevelBonuses();
+
   const stats = [
     {
       name: "Base Level",
@@ -47,6 +56,7 @@ export default function PlayerStats({
       icon: TrophyIcon,
       color: "text-yellow-400",
       bgColor: "bg-yellow-400/10",
+      bonus: `+${powerBonus} Power`,
     },
     {
       name: "Current Streak",
@@ -62,14 +72,14 @@ export default function PlayerStats({
       icon: SparklesIcon,
       color: "text-purple-400",
       bgColor: "bg-purple-400/10",
+      bonus: `${xpMultiplier.toFixed(2)}x Multiplier`,
     },
     {
-      name: "Last Check-in",
-      value: player?.lastCheckIn ? new Date(Number(player.lastCheckIn) * 1000).toLocaleString() : "Never",
-      icon: ClockIcon,
-      color: "text-blue-400",
-      bgColor: "bg-blue-400/10",
-      isDate: true,
+      name: "Resources",
+      value: player?.resources || 0,
+      icon: CubeTransparentIcon,
+      color: "text-green-400",
+      bgColor: "bg-green-400/10",
     },
   ];
 
@@ -100,15 +110,18 @@ export default function PlayerStats({
                 <div className="text-sm text-gray-400">{stat.name}</div>
               </div>
               <div className={`text-xl font-bold ${stat.color}`}>
-                {stat.isDate ? (
-                  stat.value
-                ) : typeof stat.value === 'number' ? (
+                {typeof stat.value === 'number' ? (
                   <CountUp end={stat.value} duration={2} />
                 ) : (
                   stat.value
                 )}
                 {stat.suffix && <span className="text-sm ml-1">{stat.suffix}</span>}
               </div>
+              {stat.bonus && (
+                <div className="text-xs text-gray-400 mt-1">
+                  {stat.bonus}
+                </div>
+              )}
             </motion.div>
           ))}
         </div>

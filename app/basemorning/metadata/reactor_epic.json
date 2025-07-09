@@ -1,0 +1,90 @@
+{
+  "name": "Epic Singularity Core",
+  "description": "The pinnacle of reactor technology - a contained singularity that generates infinite energy through controlled black hole manipulation. This legendary reactor transcends conventional physics, providing limitless power to fuel the most advanced base operations.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/reactor_epic.png",
+  "background_color": "1a0033",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Reactor",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Epic",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Energy Output",
+      "value": "400",
+      "display_type": "number",
+      "max_value": 1000
+    },
+    {
+      "trait_type": "Efficiency",
+      "value": "95",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Durability",
+      "value": "Legendary",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Energy Generation",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Transcendent",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Singularity Field",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Energy",
+    "subcategory": "Singularity Power",
+    "generation": "Gen-4",
+    "fusion_cost": "3 units",
+    "fusion_result": "Transcendent Reactor",
+    "special_abilities": ["Singularity Control", "Infinite Energy", "Reality Warping", "Time Dilation"],
+    "synergies": ["All Elements"],
+    "counters": [],
+    "lore": "The Epic Singularity Core represents the ultimate achievement in energy technology. By harnessing the power of a controlled singularity, it provides infinite energy while bending spacetime around your base. This legendary reactor is said to unlock the secrets of the universe itself.",
+    "utility": {
+      "primary": "Generates infinite base energy continuously",
+      "secondary": "Powers all elements at 200% efficiency",
+      "passive": "Reduces all costs by 50%, creates singularity field affecting entire base"
+    },
+    "visual_effects": {
+      "glow_color": "#ff6600",
+      "particle_system": "singularity_distortion",
+      "animation_type": "spacetime_warp"
+    },
+
+    "stats": {
+      "power_base": 400,
+      "power_per_level": 100,
+      "rarity_multiplier": 4.0,
+      "energy_consumption": 0,
+      "maintenance_cost": 50
+    }
+  }
+} 

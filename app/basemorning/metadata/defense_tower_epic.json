@@ -1,0 +1,91 @@
+{
+  "name": "Epic Singularity Destroyer",
+  "description": "The ultimate defense system that manipulates reality itself to eliminate threats. Features singularity weapons and omnipotent protection fields that make your base truly impregnable.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/defense_tower_epic.png",
+  "background_color": "331122",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Defense Tower",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Epic",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Defense Power",
+      "value": "600",
+      "display_type": "number",
+      "max_value": 1000
+    },
+    {
+      "trait_type": "Range",
+      "value": "150",
+      "display_type": "number",
+      "max_value": 200
+    },
+    {
+      "trait_type": "Fire Rate",
+      "value": "100",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Base Defense",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Transcendent Guardian",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Reality Distortion Field",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Defense",
+    "subcategory": "Reality Weapons",
+    "generation": "Gen-4",
+    "fusion_cost": "3 units",
+    "fusion_result": "Transcendent Guardian",
+    "special_abilities": ["Singularity Weapons", "Reality Manipulation", "Omnipotent Protection", "Temporal Shields"],
+    "synergies": ["All Elements"],
+    "counters": [],
+    "lore": "The Epic Singularity Destroyer represents the pinnacle of defensive technology, capable of manipulating reality itself to eliminate any threat. With singularity weapons and omnipotent protection fields, it makes your base truly invincible.",
+    "utility": {
+      "primary": "Provides omnipotent base protection",
+      "secondary": "Provides 200% base security with reality shields",
+      "passive": "Increases base defense by 50%, creates reality distortion field"
+    },
+    "visual_effects": {
+      "glow_color": "#ff6600",
+      "particle_system": "reality_distortion",
+      "animation_type": "singularity_formation"
+    },
+
+    "stats": {
+      "power_base": 400,
+      "power_per_level": 100,
+      "rarity_multiplier": 4.0,
+      "energy_consumption": 60,
+      "maintenance_cost": 40
+    }
+  }
+} 

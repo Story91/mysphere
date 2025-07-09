@@ -1,0 +1,84 @@
+.mintButtonContainer {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 2px solid #00ff88;
+  border-radius: 15px;
+  padding: 20px;
+  margin: 20px 0;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+}
+
+.mintInfo h3 {
+  color: #00ff88;
+  font-size: 24px;
+  margin-bottom: 10px;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+.price {
+  font-size: 18px;
+  color: #ffffff;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.balance {
+  font-size: 14px;
+  color: #cccccc;
+  margin-bottom: 20px;
+}
+
+.mintButton {
+  background: linear-gradient(45deg, #00ff88, #00cc6a);
+  color: #000000;
+  border: none;
+  padding: 15px 30px;
+  font-size: 18px;
+  font-weight: bold;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 auto;
+  min-width: 200px;
+}
+
+.mintButton.enabled:hover {
+  background: linear-gradient(45deg, #00cc6a, #00ff88);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 255, 136, 0.4);
+}
+
+.mintButton.disabled {
+  background: #666666;
+  color: #999999;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #000000;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.warning {
+  color: #ff6b6b;
+  font-size: 14px;
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+} 

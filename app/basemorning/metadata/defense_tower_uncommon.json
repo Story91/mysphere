@@ -1,0 +1,91 @@
+{
+  "name": "Uncommon Plasma Turret",
+  "description": "An advanced defense system equipped with plasma weaponry and enhanced targeting algorithms. Features energy-based projectiles and improved threat detection capabilities.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/defense_tower_uncommon.png",
+  "background_color": "3e2a2a",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Defense Tower",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Uncommon",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Defense Power",
+      "value": "300",
+      "display_type": "number",
+      "max_value": 1000
+    },
+    {
+      "trait_type": "Range",
+      "value": "75",
+      "display_type": "number",
+      "max_value": 200
+    },
+    {
+      "trait_type": "Fire Rate",
+      "value": "75",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Base Defense",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Quantum Cannon",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Plasma Shield Field",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Defense",
+    "subcategory": "Energy Weapons",
+    "generation": "Gen-2",
+    "fusion_cost": "3 units",
+    "fusion_result": "Rare Defense Tower",
+    "special_abilities": ["Plasma Burst", "Enhanced Targeting"],
+    "synergies": ["Reactor", "Storage", "Tech Lab"],
+    "counters": ["Stealth attacks", "Energy overload"],
+    "lore": "The Uncommon Plasma Turret represents a significant advancement in base defense technology. With energy-based weaponry and improved targeting systems, it delivers superior protection against advanced threats.",
+    "utility": {
+      "primary": "Protects base with plasma weapons",
+      "secondary": "Provides 120% base security with energy shields",
+      "passive": "Increases base defense by 25%, creates plasma shield field"
+    },
+    "visual_effects": {
+      "glow_color": "#44aaff",
+      "particle_system": "plasma_bolts",
+      "animation_type": "charging_capacitors"
+    },
+
+    "stats": {
+      "power_base": 200,
+      "power_per_level": 100,
+      "rarity_multiplier": 2.0,
+      "energy_consumption": 30,
+      "maintenance_cost": 20
+    }
+  }
+} 

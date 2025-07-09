@@ -1,0 +1,89 @@
+{
+  "name": "Epic Reality Research Complex",
+  "description": "The ultimate research facility that manipulates reality itself to conduct impossible experiments. Features reality distortion chambers and transcendent research capabilities that unlock the secrets of existence.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/tech_lab_epic.png",
+  "background_color": "6a6a8e",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Tech Lab",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Epic",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Research Speed",
+      "value": "100",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Innovation Level",
+      "value": "Transcendent",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Analysis Capability",
+      "value": "Reality Manipulation",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Research & Development",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Universal Knowledge Engine",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Reality Transcendence Field",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Research",
+    "subcategory": "Reality Manipulation",
+    "generation": "Gen-4",
+    "fusion_cost": "3 units",
+    "fusion_result": "Universal Knowledge Engine",
+    "special_abilities": ["Reality Distortion", "Transcendent Research", "Universal Knowledge", "Temporal Experiments"],
+    "synergies": ["All Elements"],
+    "counters": [],
+    "lore": "The Epic Reality Research Complex represents the pinnacle of scientific achievement, capable of manipulating reality itself to conduct impossible experiments. It unlocks the fundamental secrets of existence and enables transcendent technological advancement.",
+    "utility": {
+      "primary": "Researches reality manipulation and transcendent technologies",
+      "secondary": "Provides 200% research efficiency",
+      "passive": "Increases base technology level by 50%, enables reality-warping upgrades"
+    },
+    "visual_effects": {
+      "glow_color": "#ff6600",
+      "particle_system": "reality_distortion_field",
+      "animation_type": "dimensional_experiments"
+    },
+
+    "stats": {
+      "power_base": 400,
+      "power_per_level": 100,
+      "rarity_multiplier": 4.0,
+      "energy_consumption": 80,
+      "maintenance_cost": 50
+    }
+  }
+} 

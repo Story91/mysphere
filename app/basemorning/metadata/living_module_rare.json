@@ -1,0 +1,89 @@
+{
+  "name": "Rare Luxury Complex",
+  "description": "A sophisticated living complex with luxury amenities and advanced life support systems. Features recreational facilities, advanced medical bay, and premium crew quarters for maximum comfort and productivity.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/living_module_rare.png",
+  "background_color": "3e4e3e",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Living Module",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Rare",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Crew Capacity",
+      "value": "30",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Life Support",
+      "value": "Advanced",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Comfort Level",
+      "value": "Luxury",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Life Support",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Dimensional Habitat",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Peak Crew Performance",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Life Support",
+    "subcategory": "Luxury Housing",
+    "generation": "Gen-3",
+    "fusion_cost": "3 units",
+    "fusion_result": "Epic Living Module",
+    "special_abilities": ["Medical Bay", "Recreation Facilities", "Advanced Climate Control"],
+    "synergies": ["All Elements"],
+    "counters": [],
+    "lore": "The Rare Luxury Complex provides the pinnacle of crew comfort and productivity. With advanced medical facilities, recreational areas, and luxury amenities, it ensures crew operates at peak performance levels.",
+    "utility": {
+      "primary": "Houses crew with luxury amenities and medical facilities",
+      "secondary": "Provides 150% crew support efficiency",
+      "passive": "Increases crew productivity by 30%, provides medical support"
+    },
+    "visual_effects": {
+      "glow_color": "#88ffcc",
+      "particle_system": "luxury_ambiance",
+      "animation_type": "recreational_activities"
+    },
+
+    "stats": {
+      "power_base": 300,
+      "power_per_level": 100,
+      "rarity_multiplier": 3.0,
+      "energy_consumption": 40,
+      "maintenance_cost": 18
+    }
+  }
+} 

@@ -1,0 +1,89 @@
+{
+  "name": "Common Research Lab",
+  "description": "A basic research facility that enables technology development and scientific advancement. Features standard research equipment and basic analysis capabilities for base improvements.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/tech_lab_common.png",
+  "background_color": "1a1a2e",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Tech Lab",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Common",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Research Speed",
+      "value": "50",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Innovation Level",
+      "value": "Basic",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Analysis Capability",
+      "value": "Standard",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Research & Development",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Advanced Laboratory",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Technology Advancement",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Research",
+    "subcategory": "Basic Development",
+    "generation": "Gen-1",
+    "fusion_cost": "3 units",
+    "fusion_result": "Uncommon Tech Lab",
+    "special_abilities": [],
+    "synergies": ["Reactor", "Storage", "Living Module"],
+    "counters": ["Research failures", "Equipment malfunction"],
+    "lore": "The Common Research Lab provides the foundation for technological advancement. With basic research equipment and standard analysis capabilities, it enables the development of improved base systems and technologies.",
+    "utility": {
+      "primary": "Researches new technologies and improvements",
+      "secondary": "Provides 100% research efficiency",
+      "passive": "Increases base technology level by 10%, enables upgrades"
+    },
+    "visual_effects": {
+      "glow_color": "#4488ff",
+      "particle_system": "research_data",
+      "animation_type": "scanning_beams"
+    },
+
+    "stats": {
+      "power_base": 100,
+      "power_per_level": 100,
+      "rarity_multiplier": 1.0,
+      "energy_consumption": 25,
+      "maintenance_cost": 20
+    }
+  }
+} 

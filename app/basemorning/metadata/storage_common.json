@@ -1,0 +1,90 @@
+{
+  "name": "Common Storage Bay",
+  "description": "A basic storage facility that safely houses resources and materials. Features standard containment systems and basic security protocols. Essential for any growing base's resource management needs.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/storage_common.png",
+  "background_color": "2e2e2e",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Storage",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Common",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Storage Capacity",
+      "value": "1000",
+      "display_type": "number",
+      "max_value": 10000
+    },
+    {
+      "trait_type": "Security Level",
+      "value": "Basic",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Access Speed",
+      "value": "60",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Resource Management",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Automated Storage",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Resource Organization",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Infrastructure",
+    "subcategory": "Basic Storage",
+    "generation": "Gen-1",
+    "fusion_cost": "3 units",
+    "fusion_result": "Uncommon Storage",
+    "special_abilities": [],
+    "synergies": ["Reactor", "Tech Lab"],
+    "counters": ["Resource overflow"],
+    "lore": "The Common Storage Bay is the backbone of efficient base operations. With reliable containment systems and organized storage protocols, it ensures your resources are safe and accessible when needed.",
+    "utility": {
+      "primary": "Stores base resources safely",
+      "secondary": "Provides 100% resource protection",
+      "passive": "Increases resource efficiency by 10%"
+    },
+    "visual_effects": {
+      "glow_color": "#888888",
+      "particle_system": "storage_indicators",
+      "animation_type": "access_doors"
+    },
+
+    "stats": {
+      "power_base": 100,
+      "power_per_level": 100,
+      "rarity_multiplier": 1.0,
+      "energy_consumption": 10,
+      "maintenance_cost": 5
+    }
+  }
+} 

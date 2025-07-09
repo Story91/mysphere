@@ -1,0 +1,27 @@
+{
+  "name": "Genesis Core",
+  "description": "The heart of a dying star, forged from the unison of all five core elements. It hums with unbound energy and alters the very fabric of the game for its wielder.",
+  "image": "https://gateway.pinata.cloud/ipfs/YOUR_GENESIS_IMAGE_HASH_HERE",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Genesis"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Genesis"
+    },
+    {
+      "trait_type": "Level",
+      "value": 1
+    },
+    {
+      "trait_type": "Power",
+      "value": "Overwhelming"
+    },
+    {
+      "trait_type": "Special Ability",
+      "value": "Global Passive Bonuses"
+    }
+  ]
+} 

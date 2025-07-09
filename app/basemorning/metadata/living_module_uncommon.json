@@ -1,0 +1,89 @@
+{
+  "name": "Uncommon Automated Habitat",
+  "description": "An advanced living module with automated systems and enhanced comfort features. Includes AI-managed environment controls and premium crew amenities for optimal productivity.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/living_module_uncommon.png",
+  "background_color": "2a3e2a",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Living Module",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Uncommon",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Crew Capacity",
+      "value": "20",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Life Support",
+      "value": "Enhanced",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Comfort Level",
+      "value": "Premium",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Life Support",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Luxury Complex",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Enhanced Crew Performance",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Life Support",
+    "subcategory": "Automated Housing",
+    "generation": "Gen-2",
+    "fusion_cost": "3 units",
+    "fusion_result": "Rare Living Module",
+    "special_abilities": ["AI Management", "Automated Systems"],
+    "synergies": ["Reactor", "Storage", "Tech Lab", "Defense Tower"],
+    "counters": ["Atmospheric failures", "Overcrowding"],
+    "lore": "The Uncommon Automated Habitat represents a significant advancement in crew comfort and efficiency. With AI-managed systems and premium amenities, it ensures optimal crew performance and morale.",
+    "utility": {
+      "primary": "Houses crew with enhanced comfort systems",
+      "secondary": "Provides 120% crew support efficiency",
+      "passive": "Increases crew productivity by 20%, boosts morale significantly"
+    },
+    "visual_effects": {
+      "glow_color": "#88ffaa",
+      "particle_system": "comfort_indicators",
+      "animation_type": "automated_systems"
+    },
+
+    "stats": {
+      "power_base": 200,
+      "power_per_level": 100,
+      "rarity_multiplier": 2.0,
+      "energy_consumption": 25,
+      "maintenance_cost": 12
+    }
+  }
+} 

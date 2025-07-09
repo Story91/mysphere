@@ -1,0 +1,91 @@
+{
+  "name": "Rare Quantum Cannon",
+  "description": "A cutting-edge defense system utilizing quantum weaponry and AI-driven targeting. Features quantum disintegration beams and predictive threat analysis for maximum protection.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/defense_tower_rare.png",
+  "background_color": "5e3a3a",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Defense Tower",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Rare",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Defense Power",
+      "value": "450",
+      "display_type": "number",
+      "max_value": 1000
+    },
+    {
+      "trait_type": "Range",
+      "value": "100",
+      "display_type": "number",
+      "max_value": 200
+    },
+    {
+      "trait_type": "Fire Rate",
+      "value": "90",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Base Defense",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Singularity Destroyer",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Quantum Defense Matrix",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Defense",
+    "subcategory": "Quantum Weapons",
+    "generation": "Gen-3",
+    "fusion_cost": "3 units",
+    "fusion_result": "Epic Defense Tower",
+    "special_abilities": ["Quantum Disintegration", "AI Targeting", "Predictive Analysis"],
+    "synergies": ["Reactor", "Storage", "Tech Lab", "Living Module"],
+    "counters": [],
+    "lore": "The Rare Quantum Cannon harnesses the power of quantum mechanics to create devastating defensive capabilities. With AI-driven targeting and quantum disintegration beams, it can neutralize any threat before it reaches your base.",
+    "utility": {
+      "primary": "Protects base with quantum weapons",
+      "secondary": "Provides 150% base security with quantum shields",
+      "passive": "Increases base defense by 35%, creates quantum defense matrix"
+    },
+    "visual_effects": {
+      "glow_color": "#aa44ff",
+      "particle_system": "quantum_beams",
+      "animation_type": "quantum_charging"
+    },
+
+    "stats": {
+      "power_base": 300,
+      "power_per_level": 100,
+      "rarity_multiplier": 3.0,
+      "energy_consumption": 45,
+      "maintenance_cost": 30
+    }
+  }
+} 

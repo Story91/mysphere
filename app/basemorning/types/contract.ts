@@ -12,7 +12,8 @@ export enum Rarity {
   COMMON = "COMMON",
   UNCOMMON = "UNCOMMON",
   RARE = "RARE",
-  EPIC = "EPIC"
+  EPIC = "EPIC",
+  GENESIS = "GENESIS"
 }
 
 export interface BaseElement {
@@ -57,6 +58,31 @@ export interface GameStats {
   totalElements: number;
   topStreak: number;
   topLevel: number;
+}
+
+// NEW: Fusion types for different fusion modes
+export enum FusionType {
+  STANDARD = "STANDARD",    // 3 identical -> higher rarity
+  EPIC = "EPIC",           // 3 identical Epic -> higher level
+  GENESIS = "GENESIS"      // 5 different Epic -> Genesis
+}
+
+export interface FusionPreview {
+  type: FusionType;
+  requiredElements: number;
+  inputElements: BaseElement[];
+  outputPreview: {
+    elementType: ElementType;
+    rarity: Rarity;
+    level: number;
+    estimatedPower: number;
+  };
+  cost: {
+    eth: string;
+    resources?: number;
+  };
+  isValid: boolean;
+  errorMessage?: string;
 }
 
 export interface ContractFunctions {

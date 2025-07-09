@@ -1,0 +1,89 @@
+{
+  "name": "Uncommon Advanced Laboratory",
+  "description": "An advanced research facility with AI-assisted analysis and enhanced experimental capabilities. Features automated research systems and improved innovation potential.",
+  "image": "https://gateway.pinata.cloud/ipfs/QmYourImageHash/tech_lab_uncommon.png",
+  "background_color": "2a2a4e",
+  "attributes": [
+    {
+      "trait_type": "Element Type",
+      "value": "Tech Lab",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Uncommon",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Level",
+      "value": "Dynamic",
+      "display_type": "number",
+      "description": "Level is retrieved from contract"
+    },
+    {
+      "trait_type": "Research Speed",
+      "value": "70",
+      "display_type": "number",
+      "max_value": 100
+    },
+    {
+      "trait_type": "Innovation Level",
+      "value": "Advanced",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Analysis Capability",
+      "value": "AI-Assisted",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Power Category",
+      "value": "Research & Development",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Upgrade Path",
+      "value": "Quantum Laboratory",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Environmental Effect",
+      "value": "Accelerated Innovation",
+      "display_type": "string"
+    },
+    {
+      "trait_type": "Base Compatibility",
+      "value": "Universal",
+      "display_type": "string"
+    }
+  ],
+  "properties": {
+    "category": "Research",
+    "subcategory": "Advanced Development",
+    "generation": "Gen-2",
+    "fusion_cost": "3 units",
+    "fusion_result": "Rare Tech Lab",
+    "special_abilities": ["AI Research Assistant", "Automated Analysis"],
+    "synergies": ["Reactor", "Storage", "Living Module", "Defense Tower"],
+    "counters": ["Research failures", "Equipment malfunction"],
+    "lore": "The Uncommon Advanced Laboratory represents significant progress in research capabilities. With AI-assisted analysis and automated systems, it accelerates innovation and enables breakthrough discoveries.",
+    "utility": {
+      "primary": "Researches advanced technologies with AI assistance",
+      "secondary": "Provides 120% research efficiency",
+      "passive": "Increases base technology level by 20%, enables advanced upgrades"
+    },
+    "visual_effects": {
+      "glow_color": "#4488ff",
+      "particle_system": "ai_analysis_streams",
+      "animation_type": "automated_experiments"
+    },
+
+    "stats": {
+      "power_base": 200,
+      "power_per_level": 100,
+      "rarity_multiplier": 2.0,
+      "energy_consumption": 35,
+      "maintenance_cost": 25
+    }
+  }
+} 

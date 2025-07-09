@@ -14,7 +14,7 @@ interface BaseElementProps {
 
 const getElementImage = (elementType: ElementType, rarity: Rarity) => {
   // Specjalna obsługa dla Defense Tower, który ma już obrazki
-  if (elementType === ElementType.DEFENSE_TOWER) {
+  if (elementType === ElementType.DEFENSE_TOWER && rarity !== Rarity.GENESIS) {
     const imageNumber = {
       [Rarity.COMMON]: "1",
       [Rarity.EPIC]: "2",
@@ -24,11 +24,17 @@ const getElementImage = (elementType: ElementType, rarity: Rarity) => {
     return `/nft-assets/defense-tower/${rarity.toLowerCase()}/${imageNumber}.png`;
   }
 
+  // Specjalna obsługa dla Genesis NFT
+  if (rarity === Rarity.GENESIS) {
+    return `/nft-assets/genesis/genesis.png`;
+  }
+
   // Dla pozostałych elementów używamy placeholderów SVG
   const color = encodeURIComponent(rarityColors[rarity]);
   const svgPaths = {
     [ElementType.REACTOR]: "M13 10V3L4 14h7v7l9-11h-7z",
     [ElementType.STORAGE]: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
+    [ElementType.DEFENSE_TOWER]: "M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z",
     [ElementType.LIVING_MODULE]: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
     [ElementType.TECH_LAB]: "M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
   };
@@ -41,6 +47,7 @@ const rarityColors = {
   [Rarity.UNCOMMON]: "#60A5FA", // blue-400
   [Rarity.RARE]: "#C084FC", // purple-400
   [Rarity.EPIC]: "#FBBF24", // yellow-400
+  [Rarity.GENESIS]: "#F59E0B", // amber-500 with rainbow effect
 };
 
 const rarityBorders = {
@@ -48,6 +55,7 @@ const rarityBorders = {
   [Rarity.UNCOMMON]: "border-blue-400",
   [Rarity.RARE]: "border-purple-400",
   [Rarity.EPIC]: "border-yellow-400",
+  [Rarity.GENESIS]: "border-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500",
 };
 
 const rarityGlow = {
@@ -55,6 +63,7 @@ const rarityGlow = {
   [Rarity.UNCOMMON]: "shadow-blue-400/50",
   [Rarity.RARE]: "shadow-purple-400/50",
   [Rarity.EPIC]: "shadow-yellow-400/50",
+  [Rarity.GENESIS]: "shadow-amber-500/70",
 };
 
 const elementNames = {
