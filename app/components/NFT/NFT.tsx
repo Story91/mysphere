@@ -398,107 +398,8 @@ export default function NFTComponent() {
         </div>
       ) : (
         <>
-          {/* Collection info */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <motion.div 
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
-              className={`cyber-card bg-black/50 backdrop-blur-xl rounded-xl p-6 border shadow-lg transition-all duration-300 ${
-                activeTheme.id === 'base'
-                  ? 'border-[#0052FF]/30 shadow-[0_0_15px_rgba(0,82,255,0.3)] hover:shadow-[0_0_30px_rgba(0,82,255,0.5)]'
-                  : activeTheme.id === 'cyberpunk'
-                  ? 'border-[#FF00FF]/30 shadow-[0_0_15px_rgba(255,0,255,0.3)] hover:shadow-[0_0_30px_rgba(255,0,255,0.5)]'
-                  : 'border-[#00FF00]/30 shadow-[0_0_15px_rgba(0,255,0,0.3)] hover:shadow-[0_0_30px_rgba(0,255,0,0.5)]'
-              }`}
-              style={{ fontFamily: '"Share Tech Mono", monospace' }}
-            >
-              <div className={`text-xl font-bold mb-2 cyber-glitch ${
-                activeTheme.id === 'base'
-                  ? 'text-[#0052FF]'
-                  : activeTheme.id === 'cyberpunk'
-                  ? 'text-[#FF00FF]'
-                  : 'text-[#00FF00]'
-              }`}>SPHERE Pioneer</div>
-              <p className="text-[#4C8FFF] text-sm">
-                Your gateway to the SPHERE universe. As a Pioneer, you gain access to core platform features, exclusive events, and future rewards. Begin your journey in the SPHERE ecosystem and shape the future of decentralized innovation.
-              </p>
-              <div className={`absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-transparent ${
-                activeTheme.id === 'base'
-                  ? 'via-[#0052FF]'
-                  : activeTheme.id === 'cyberpunk'
-                  ? 'via-[#FF00FF]'
-                  : 'via-[#00FF00]'
-              } to-transparent`}></div>
-            </motion.div>
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className={`cyber-card bg-black/50 backdrop-blur-xl rounded-xl p-6 border shadow-lg transition-all duration-300 ${
-                activeTheme.id === 'base'
-                  ? 'border-[#0052FF]/30 shadow-[0_0_15px_rgba(0,82,255,0.3)] hover:shadow-[0_0_30px_rgba(0,82,255,0.5)]'
-                  : activeTheme.id === 'cyberpunk'
-                  ? 'border-[#FF00FF]/30 shadow-[0_0_15px_rgba(255,0,255,0.3)] hover:shadow-[0_0_30px_rgba(255,0,255,0.5)]'
-                  : 'border-[#00FF00]/30 shadow-[0_0_15px_rgba(0,255,0,0.3)] hover:shadow-[0_0_30px_rgba(0,255,0,0.5)]'
-              }`}
-              style={{ fontFamily: '"Share Tech Mono", monospace' }}
-            >
-              <div className={`text-xl font-bold mb-2 cyber-glitch ${
-                activeTheme.id === 'base'
-                  ? 'text-[#0052FF]'
-                  : activeTheme.id === 'cyberpunk'
-                  ? 'text-[#FF00FF]'
-                  : 'text-[#00FF00]'
-              }`}>SPHERE Guardian</div>
-              <p className="text-[#4C8FFF] text-sm">
-                Guardian of the SPHERE ecosystem. This tier unlocks advanced features, priority access to new functionalities, and special rewards. Join an elite group of Guardians and help protect and grow the network.
-              </p>
-              <div className={`absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-transparent ${
-                activeTheme.id === 'base'
-                  ? 'via-[#0052FF]'
-                  : activeTheme.id === 'cyberpunk'
-                  ? 'via-[#FF00FF]'
-                  : 'via-[#00FF00]'
-              } to-transparent`}></div>
-            </motion.div>
-
-            <motion.div 
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className={`cyber-card bg-black/50 backdrop-blur-xl rounded-xl p-6 border shadow-lg transition-all duration-300 ${
-                activeTheme.id === 'base'
-                  ? 'border-[#0052FF]/30 shadow-[0_0_15px_rgba(0,82,255,0.3)] hover:shadow-[0_0_30px_rgba(0,82,255,0.5)]'
-                  : activeTheme.id === 'cyberpunk'
-                  ? 'border-[#FF00FF]/30 shadow-[0_0_15px_rgba(255,0,255,0.3)] hover:shadow-[0_0_30px_rgba(255,0,255,0.5)]'
-                  : 'border-[#00FF00]/30 shadow-[0_0_15px_rgba(0,255,0,0.3)] hover:shadow-[0_0_30px_rgba(0,255,0,0.5)]'
-              }`}
-              style={{ fontFamily: '"Share Tech Mono", monospace' }}
-            >
-              <div className={`text-xl font-bold mb-2 cyber-glitch ${
-                activeTheme.id === 'base'
-                  ? 'text-[#0052FF]'
-                  : activeTheme.id === 'cyberpunk'
-                  ? 'text-[#FF00FF]'
-                  : 'text-[#00FF00]'
-              }`}>SPHERE Master</div>
-              <p className="text-[#4C8FFF] text-sm">
-                The highest tier in the SPHERE hierarchy. As a Master, you receive full access to all features, exclusive VIP privileges, participation in key decisions, and maximum rewards. Become a SPHERE legend.
-              </p>
-              <div className={`absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-transparent ${
-                activeTheme.id === 'base'
-                  ? 'via-[#0052FF]'
-                  : activeTheme.id === 'cyberpunk'
-                  ? 'via-[#FF00FF]'
-                  : 'via-[#00FF00]'
-              } to-transparent`}></div>
-            </motion.div>
-          </div>
-
           {/* NFT Minting Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             {/* SPHERE Pioneer */}
             <div className="group relative">
               <div className="absolute -inset-[1px] bg-gradient-to-r from-[#0052FF]/50 via-[#4C8FFF]/50 to-[#0052FF]/50 rounded-xl blur-md group-hover:blur-xl transition-all duration-300 opacity-20 group-hover:opacity-30"></div>
@@ -564,6 +465,51 @@ export default function NFTComponent() {
                 />
               </NFTMintCard>
             </div>
+          </div>
+
+          {/* Collection info */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <motion.div 
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6 }}
+              className="cyber-card bg-black/50 backdrop-blur-xl rounded-xl p-6 border border-[#0052FF]/30 shadow-lg shadow-[0_0_15px_rgba(0,82,255,0.3)] hover:shadow-[0_0_30px_rgba(0,82,255,0.5)] transition-all duration-300"
+              style={{ fontFamily: '"Share Tech Mono", monospace' }}
+            >
+              <div className="text-xl font-bold mb-2 cyber-glitch text-[#0052FF]">SPHERE Pioneer</div>
+              <p className="text-[#4C8FFF] text-sm">
+                Your gateway to the SPHERE universe. As a Pioneer, you gain access to core platform features, exclusive events, and future rewards. Begin your journey in the SPHERE ecosystem and shape the future of decentralized innovation.
+              </p>
+              <div className="absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent"></div>
+            </motion.div>
+            
+            <motion.div 
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="cyber-card bg-black/50 backdrop-blur-xl rounded-xl p-6 border border-[#0052FF]/30 shadow-lg shadow-[0_0_15px_rgba(0,82,255,0.3)] hover:shadow-[0_0_30px_rgba(0,82,255,0.5)] transition-all duration-300"
+              style={{ fontFamily: '"Share Tech Mono", monospace' }}
+            >
+              <div className="text-xl font-bold mb-2 cyber-glitch text-[#0052FF]">SPHERE Guardian</div>
+              <p className="text-[#4C8FFF] text-sm">
+                Guardian of the SPHERE ecosystem. This tier unlocks advanced features, priority access to new functionalities, and special rewards. Join an elite group of Guardians and help protect and grow the network.
+              </p>
+              <div className="absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent"></div>
+            </motion.div>
+
+            <motion.div 
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="cyber-card bg-black/50 backdrop-blur-xl rounded-xl p-6 border border-[#0052FF]/30 shadow-lg shadow-[0_0_15px_rgba(0,82,255,0.3)] hover:shadow-[0_0_30px_rgba(0,82,255,0.5)] transition-all duration-300"
+              style={{ fontFamily: '"Share Tech Mono", monospace' }}
+            >
+              <div className="text-xl font-bold mb-2 cyber-glitch text-[#0052FF]">SPHERE Master</div>
+              <p className="text-[#4C8FFF] text-sm">
+                The highest tier in the SPHERE hierarchy. As a Master, you receive full access to all features, exclusive VIP privileges, participation in key decisions, and maximum rewards. Become a SPHERE legend.
+              </p>
+              <div className="absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent"></div>
+            </motion.div>
           </div>
 
           {/* FAQ Section */}

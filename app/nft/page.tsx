@@ -2,19 +2,19 @@
 
 import NFTComponent from '../components/NFT/NFT';
 import { motion } from 'framer-motion';
-import NeonRoomBackground from '../components/Backgrounds/NeonRoomBackground';
 import { useState } from 'react';
 
 export default function NFTPage() {
   const [hoveredSwitch, setHoveredSwitch] = useState<string | null>(null);
 
   return (
-    <div className="min-h-screen bg-black relative">
-      {/* 3D Neon Room background */}
-      <NeonRoomBackground intensity={1.8} />
-      
-      {/* Delikatna nakładka dla lepszej czytelności treści */}
-      <div className="absolute inset-0 bg-black bg-opacity-30" />
+    <div className="min-h-screen relative" style={{
+      background: 'linear-gradient(135deg, #000000 0%, #0a0a0a 25%, #001122 50%, #001a33 75%, #002244 100%)'
+    }}>
+      {/* Animated gradient overlay for depth */}
+      <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-blue-950/20 to-blue-900/30 animate-pulse" style={{
+        animation: 'gradientShift 8s ease-in-out infinite'
+      }} />
 
       {/* Main content */}
       <div className="relative container mx-auto px-4 py-12 z-30">
@@ -137,6 +137,12 @@ export default function NFTPage() {
 
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap');
+
+        @keyframes gradientShift {
+          0% { opacity: 0.3; }
+          50% { opacity: 0.6; }
+          100% { opacity: 0.3; }
+        }
 
         .cyber-glitch {
           position: relative;

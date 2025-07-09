@@ -63,6 +63,7 @@ const ALL_RARITIES = [
   Rarity.UNCOMMON,
   Rarity.RARE,
   Rarity.EPIC,
+  Rarity.GENESIS,
 ];
 
 const NFTPreview = ({ elementType, rarity, isDiscovered }: { 
@@ -75,6 +76,7 @@ const NFTPreview = ({ elementType, rarity, isDiscovered }: {
     [Rarity.UNCOMMON]: "from-blue-400/20 to-blue-600/20",
     [Rarity.RARE]: "from-purple-400/20 to-purple-600/20",
     [Rarity.EPIC]: "from-yellow-400/20 to-yellow-600/20",
+    [Rarity.GENESIS]: "from-pink-400/20 to-pink-600/20",
   };
 
   // Zawsze pokazuj obrazki dla Defense Tower
