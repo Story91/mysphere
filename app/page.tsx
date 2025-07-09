@@ -891,6 +891,45 @@ export default function HomePage() {
               </Link>
             </div>
 
+            {/* Sphere Genesis NFT Card - FEATURED */}
+            <div className="group">
+              <Link href="/nft" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
+                <div 
+                  className="h-full bg-gradient-to-br from-purple-400/30 via-pink-500/25 to-purple-600/30 backdrop-blur-xl rounded-xl overflow-hidden border-2 border-purple-400/60 hover:border-purple-300/80 transition-all duration-500 group-hover:scale-[1.05] group-hover:shadow-2xl shadow-[0_0_25px_rgba(147,51,234,0.4)] p-6 relative"
+                  onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
+                >
+                  {/* Animated border glow */}
+                  <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 opacity-60 group-hover:opacity-100 animate-[spin_3s_linear_infinite] transition-opacity duration-500"></div>
+                  <div className="absolute inset-[2px] rounded-xl bg-gradient-to-br from-purple-400/30 via-pink-500/25 to-purple-600/30 backdrop-blur-xl"></div>
+                  
+                  {/* Enhanced hover overlay */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-400/40 to-pink-600/40 rounded-xl blur-xl transition-all duration-500"></div>
+                  </div>
+                  
+                  {/* Enhanced NFT badge */}
+                  <div className="absolute top-3 right-3">
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-purple-500/30 border-2 border-purple-400/50 shadow-[0_0_15px_rgba(147,51,234,0.6)]">
+                      <span className="w-3 h-3 rounded-full bg-purple-400 animate-pulse mr-2 shadow-[0_0_8px_rgba(147,51,234,0.8)]"></span>
+                      <span className="text-purple-100 text-sm font-bold">NFT</span>
+                    </span>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-purple-200 text-purple-100 filter drop-shadow-[0_0_8px_rgba(147,51,234,0.6)]">
+                        Sphere Genesis
+                      </h2>
+                    </div>
+                    <p className="text-purple-50/90 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed filter drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+                      Get your exclusive Sphere Genesis NFT collection. Early supporters receive special benefits and access to premium features.
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
             {/* Identity Card (wcześniej Profile) */}
             <div className="group">
               <Link href="/profile" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
@@ -935,33 +974,6 @@ export default function HomePage() {
                     </div>
                     <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
                       Learn everything about MySphere platform features, how it works, and how to get the most out of your social experience.
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            </div>
-
-            {/* Bridge Card - Changed to GenesisNFT */}
-            <div className="group">
-              <Link href="/nft" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
-                <div 
-                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
-                  onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
-                >
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-yellow-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">
-                        Sphere Genesis
-                      </h2>
-                    </div>
-                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                      Get your exclusive Sphere Genesis NFT collection. Early supporters receive special benefits and access to premium features.
                     </p>
                   </div>
                 </div>
