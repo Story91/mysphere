@@ -1,6 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCollection, COLLECTIONS } from '../../../utils/mongodb';
-import { MongoPlayer, MongoElement, MongoTrade, ContractEvent } from '../../../basemorning/types/mongodb-schema';
+
+// Conditional imports to avoid build errors when MongoDB is not available
+let getCollection: any = null;
+let COLLECTIONS: any = null;
+
+if (process.env.MONGODB_URI) {
+  try {
+    const mongoModule = require('../../../utils/mongodb');
+    getCollection = mongoModule.getCollection;
+    COLLECTIONS = mongoModule.COLLECTIONS;
+  } catch (error) {
+    console.warn('Failed to import MongoDB module:', error);
+  }
+}
+
+// Types are kept for type checking but won't cause runtime errors
+interface MongoPlayer {
+  address: string;
+  baseLevel: number;
+  xp: number;
+  streak?: number;
+  isActive: boolean;
+  lastSeen: Date;
+  createdAt: Date;
+}
+
+interface MongoElement {
+  tokenId: number;
+  rarity: string;
+  elementType: string;
+  isFused: boolean;
+}
+
+interface MongoTrade {
+  isActive: boolean;
+}
+
+interface ContractEvent {
+  eventName: string;
+  playerAddress: string;
+  timestamp: Date;
+  data: any;
+}
 
 // Types for analytics data
 interface AdminAnalytics {
@@ -158,6 +199,19 @@ async function getPublicStats(): Promise<PublicStats> {
   const cached = getFromCache('public-stats');
   if (cached) return cached;
 
+  // Return mock data if MongoDB is not available
+  if (!getCollection || !COLLECTIONS) {
+    const mockStats: PublicStats = {
+      players: { total: 0, online: 0, newToday: 0, averageLevel: 1 },
+      game: { totalElements: 0, elementsMinted24h: 0, totalFusions: 0, fusions24h: 0, activeTrades: 0 },
+      leaderboard: { topPlayers: [] },
+      activity: { recentActivities: [] },
+      health: { status: 'critical', uptime: 0 }
+    };
+    setCache('public-stats', mockStats);
+    return mockStats;
+  }
+
   try {
     const playersCollection = await getCollection(COLLECTIONS.PLAYERS);
     const elementsCollection = await getCollection(COLLECTIONS.ELEMENTS);
@@ -224,7 +278,7 @@ async function getPublicStats(): Promise<PublicStats> {
       .limit(15)
       .toArray();
 
-    const recentActivities = recentEvents.map(event => ({
+    const recentActivities = recentEvents.map((event: any) => ({
       type: mapEventToActivityType(event.eventName),
       player: maskAddress(event.data.player || event.data.address || 'Unknown'),
       timestamp: event.timestamp,
@@ -246,7 +300,7 @@ async function getPublicStats(): Promise<PublicStats> {
         activeTrades
       },
       leaderboard: {
-        topPlayers: topPlayers.map((player, index) => ({
+        topPlayers: topPlayers.map((player: any, index: number) => ({
           rank: index + 1,
           address: maskAddress(player.address),
           xp: player.xp,
