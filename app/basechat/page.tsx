@@ -1275,10 +1275,10 @@ export default function BaseChat() {
       
       // ✅ ULTRA-CHEAP: Statyczne dane zamiast Firebase (oszczędność $15,000+/dzień!)
       const stats = {
-        userCount: 63505,
-        postsCount: 63610,
-        likesCount: 11441,
-        commentsCount: 2938,
+        userCount: 74166,
+        postsCount: 77849,
+        likesCount: 12587,
+        commentsCount: 3437,
         transactionsCount: 40818
       };
       
@@ -1301,10 +1301,10 @@ export default function BaseChat() {
     } catch (error) {
       console.error('Error fetching BaseChat global stats:', error);
       // Fallback values
-      setTotalUsers(63505);
-      setTotalLikes(11441);
-      setTotalPosts(63610);
-      setTotalComments(2938);
+      setTotalUsers(74166);
+      setTotalLikes(12587);
+      setTotalPosts(77849);
+      setTotalComments(3437);
     }
   };
 
