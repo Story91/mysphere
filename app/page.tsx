@@ -818,16 +818,28 @@ export default function HomePage() {
           <div
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 auto-rows-fr mb-28 w-full"
           >
-            {/* BaseChat Card - przeniesiony na początek */}
+            {/* BaseChat Card - FEATURED */}
             <div className="group">
               <Link href="/basechat" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
                 <div 
-                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
+                  className="h-full bg-gradient-to-br from-[#0052FF]/30 via-[#1E4DD8]/25 to-[#4C8FFF]/30 backdrop-blur-xl rounded-xl overflow-hidden border-2 border-[#0052FF]/60 hover:border-[#4C8FFF]/80 transition-all duration-500 group-hover:scale-[1.05] group-hover:shadow-2xl shadow-[0_0_25px_rgba(0,82,255,0.4)] p-6 relative"
                   onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
                 >
-                  {/* Hover efekt */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-[#4C8FFF]/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                  {/* Animated border glow */}
+                  <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-[#0052FF] via-[#1E4DD8] to-[#4C8FFF] opacity-60 group-hover:opacity-100 animate-[spin_3s_linear_infinite] transition-opacity duration-500"></div>
+                  <div className="absolute inset-[2px] rounded-xl bg-gradient-to-br from-[#0052FF]/30 via-[#1E4DD8]/25 to-[#4C8FFF]/30 backdrop-blur-xl"></div>
+                  
+                  {/* Enhanced hover overlay */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/40 to-[#4C8FFF]/40 rounded-xl blur-xl transition-all duration-500"></div>
+                  </div>
+                  
+                  {/* Enhanced LIVE badge */}
+                  <div className="absolute top-3 right-3">
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-[#0052FF]/30 border-2 border-[#0052FF]/50 shadow-[0_0_15px_rgba(0,82,255,0.6)]">
+                      <span className="w-3 h-3 rounded-full bg-[#0052FF] animate-pulse mr-2 shadow-[0_0_8px_rgba(0,82,255,0.8)]"></span>
+                      <span className="text-blue-100 text-sm font-bold">LIVE</span>
+                    </span>
                   </div>
                   
                   {/* Content */}
@@ -838,15 +850,15 @@ export default function HomePage() {
                         alt="SPHERE"
                         width={36}
                         height={36}
-                        className="object-contain w-[36px] h-auto transform hover:scale-105 transition-transform duration-300"
+                        className="object-contain w-[36px] h-auto transform hover:scale-105 transition-transform duration-300 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
                         style={{ width: 'auto', height: 'auto', maxHeight: '36px' }}
                       />
-                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#0052FF]/10 border border-[#0052FF]/20">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#0052FF]/20 border border-[#0052FF]/30">
                         <span className="w-2 h-2 rounded-full bg-[#0052FF] animate-pulse mr-2"></span>
-                        <span className="text-[#0052FF] text-sm font-['Share_Tech_Mono']">LAUNCH APP</span>
+                        <span className="text-[#0052FF] text-sm font-['Share_Tech_Mono'] font-bold">LAUNCH APP</span>
                       </span>
                     </div>
-                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed text-center">
+                    <p className="text-blue-50/90 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed text-center filter drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
                       Connect with other .base.eth owners, share updates, create daily posts about base and earn sphere points!
                     </p>
                   </div>
