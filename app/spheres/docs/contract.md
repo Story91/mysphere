@@ -250,7 +250,7 @@ function openMysteryBox(uint256 _communityId) external payable
 
 function openUtilityBox(uint256 _communityId) external payable
 // Cost: fixed 0.0001 ETH (100% goes to platform)
-// Rewards: NFT (1%), Voucher (4%), Streak Saver (10%), Boosts (15%), Respect Points (40%), Nothing (30%)
+// Rewards: NFT (1%), Voucher (4%), Streak Saver (10%), 3-Day Boost (5%), 1-Day Boost (10%), +25 Respect (20%), +5 Respect (20%), Nothing (30%)
 ```
 
 #### **🏆 Achievement System:**
@@ -619,15 +619,15 @@ const mysteryBoxProbabilities = [
     { multiplier: 0.5, chance: 13, reward: "0.5x your bet" }
 ];
 
-// UtilityBox Outcomes
+// UtilityBox Outcomes (EXACT FROM CONTRACT CODE)
 const utilityBoxProbabilities = [
     { item: "Legendary NFT", chance: 1 },
     { item: "Achievement Voucher", chance: 4 },
     { item: "Streak Saver", chance: 10 },
-    { item: "3-Day Boost", chance: 5 },
-    { item: "1-Day Boost", chance: 10 },
-    { item: "25 Respect Points", chance: 20 },
-    { item: "5 Respect Points", chance: 20 },
+    { item: "3-Day Boost (Random Type)", chance: 5 },
+    { item: "1-Day Boost (Random Type)", chance: 10 },
+    { item: "+25 Respect Points", chance: 20 },
+    { item: "+5 Respect Points", chance: 20 },
     { item: "Nothing", chance: 30 }
 ];
 ```
@@ -672,6 +672,8 @@ const boostTypes = {
     REPUTATION_MULTIPLIER: 1, // 1.5x reputation
     EVENT_DISCOUNT: 2         // 20% event discount
 };
+
+// NOTE: UtilityBox boosts are randomly assigned using randomValue % 3
 
 // Check Active Boosts
 const checkBoost = async (userAddress, boostType) => {

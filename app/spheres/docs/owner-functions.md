@@ -2,7 +2,7 @@
 *Guide for contract owner functions (Przewodnik funkcji dla właściciela kontraktu)*
 
 ## 🔐 **Overview**
-As the contract owner, you have full administrative control over the platform. This guide covers all owner-only functions with detailed explanations and usage examples.
+As the contract owner, you have full administrative control over the HybridCommunityPlatform. This guide covers all owner-only functions with detailed explanations and usage examples based on the actual contract implementation.
 
 ## 📋 **Core Administrative Functions**
 
@@ -15,7 +15,7 @@ As the contract owner, you have full administrative control over the platform. T
 function suspendCommunity(uint256 _communityId) external onlyOwner
 ```
 - **When to use:** Community violates terms, suspicious activity
-- **Effect:** Members can't join, events are disabled
+- **Effect:** Sets status to SUSPENDED, decrements activeCommunities counter
 - **Reversible:** Yes, using `reactivateCommunity()`
 
 #### `reactivateCommunity(uint256 _communityId)`
@@ -24,7 +24,7 @@ function suspendCommunity(uint256 _communityId) external onlyOwner
 function reactivateCommunity(uint256 _communityId) external onlyOwner
 ```
 - **When to use:** After resolving issues with suspended community
-- **Effect:** Community returns to normal operation
+- **Effect:** Sets status to ACTIVE, increments activeCommunities counter
 
 ### 2. **User Management**
 *Zarządzanie użytkownikami*
@@ -35,7 +35,7 @@ function reactivateCommunity(uint256 _communityId) external onlyOwner
 function globalBanUser(address _user) external onlyOwner
 ```
 - **When to use:** Serious violations, spam, abuse
-- **Effect:** User can't join any community or participate
+- **Effect:** User can't join any community or participate in any functions
 - **Permanent:** Until `globalUnbanUser()` is called
 
 #### `globalUnbanUser(address _user)`
@@ -44,7 +44,7 @@ function globalBanUser(address _user) external onlyOwner
 function globalUnbanUser(address _user) external onlyOwner
 ```
 - **When to use:** Appeal accepted, wrongful ban
-- **Effect:** User can participate again
+- **Effect:** User can participate again in all platform functions
 
 ### 3. **Fee Management**
 *Zarządzanie opłatami*
@@ -56,7 +56,9 @@ function setPlatformFeePercentage(uint256 _communityId, uint256 _percentage) ext
 ```
 - **Parameters:**
   - `_communityId`: Community ID
-  - `_percentage`: 0-1000 (0.1% = 1, max 10%)
+  - `_percentage`: 0-100 (maximum 10% = 100)
+- **Default:** 25 (2.5%)
+- **Maximum:** 100 (10%)
 - **When to use:** Custom fee structure, partnerships, penalties
 
 #### `setCreationFee(uint256 _newFee)`
@@ -67,15 +69,15 @@ function setCreationFee(uint256 _newFee) external onlyOwner
 - **Default:** 0.01 ETH
 - **When to use:** Market conditions, platform growth strategy
 
-#### **Transaction Fee Percentage** **(CONSTANT!)** (STAŁA!)
-**Purpose:** Transaction fee is now a constant value (Opłata transakcyjna jest teraz stałą wartością)
+#### **Transaction Fee Percentage (CONSTANT!)**
+**Purpose:** Transaction fee is hardcoded constant (Opłata transakcyjna jest stałą wartością)
 ```solidity
-uint256 constant public TRANSACTION_FEE_PERCENTAGE = 5; // 0.5% = 5/1000 (CONSTANT!)
+uint256 constant public TRANSACTION_FEE_PERCENTAGE = 5; // 0.5% = 5/1000
 ```
 - **Value:** 5 (0.5%) - CANNOT BE CHANGED
 - **Reason:** Ensures predictable fees for users and stable revenue
 
-#### `setWithdrawalFeePercentage(uint256 _newPercentage)` **(NEW!)**
+#### `setWithdrawalFeePercentage(uint256 _newPercentage)`
 **Purpose:** Set withdrawal fee percentage (Ustawienie procentowej opłaty za wypłatę)
 ```solidity
 function setWithdrawalFeePercentage(uint256 _newPercentage) external onlyOwner
@@ -84,31 +86,31 @@ function setWithdrawalFeePercentage(uint256 _newPercentage) external onlyOwner
 - **Maximum:** 100 (10%)
 - **When to use:** Revenue optimization, prevent frequent withdrawals
 
-#### `setAchievementUnlockFee(uint256 _newFee)` **(NEW!)**
+#### `setAchievementUnlockFee(uint256 _newFee)`
 **Purpose:** Set premium achievement unlock fee (Ustawienie opłaty za odblokowanie premium achievement)
 ```solidity
 function setAchievementUnlockFee(uint256 _newFee) external onlyOwner
 ```
-- **Default:** 0.0005 ETH (~$1.50) (LOWERED!)
+- **Default:** 0.0005 ETH (~$1.50 at $3000 ETH)
 - **When to use:** Balance premium feature pricing
 
-#### `setBoostPurchaseFee(uint256 _newFee)` **(NEW!)**
+#### `setBoostPurchaseFee(uint256 _newFee)`
 **Purpose:** Set boost purchase fee (Ustawienie opłaty za zakup boosta)
 ```solidity
 function setBoostPurchaseFee(uint256 _newFee) external onlyOwner
 ```
-- **Default:** 0.0005 ETH (~$1.50) (LOWERED!)
+- **Default:** 0.0005 ETH (~$1.50 at $3000 ETH)
 - **When to use:** Adjust boost system profitability
 
-#### `setEventPlatformFee(uint256 _newFee)` **(NEW!)**
+#### `setEventPlatformFee(uint256 _newFee)`
 **Purpose:** Set event creation fee (Ustawienie opłaty za stworzenie eventu)
 ```solidity
 function setEventPlatformFee(uint256 _newFee) external onlyOwner
 ```
-- **Default:** 0.002 ETH
+- **Default:** 0.002 ETH (~$6 at $3000 ETH)
 - **When to use:** Balance event creation costs vs. accessibility
 
-### 4. **🎲 Game Management (NEW!)**
+### 4. **🎲 Game Management**
 *Zarządzanie grami MysteryBox i UtilityBox*
 
 #### `fundMysteryBoxPool()`
@@ -116,41 +118,45 @@ function setEventPlatformFee(uint256 _newFee) external onlyOwner
 ```solidity
 function fundMysteryBoxPool() external payable onlyOwner
 ```
-- **When to use:** **Crucial before platform launch!** The pool must be funded to cover initial, potentially high winnings before players contribute enough. Refill as needed. (Konieczne przed uruchomieniem platformy! Należy zasilić pulę, aby pokryć pierwsze, potencjalnie wysokie wygrane. Regularne zasilanie w miarę potrzeby.)
-- **Effect:** Increases `mysteryBoxPrizePool`.
+- **When to use:** **Critical before platform launch!** Initial funding required to cover big wins
+- **Effect:** Increases `mysteryBoxPrizePool` by `msg.value`
+- **Strategy:** Fund with enough ETH to cover maximum potential payouts
 
 #### `withdrawFromPrizePool(uint256 _amount)`
 **Purpose:** Withdraw excess funds from prize pool (Wypłata nadwyżki z puli nagród)
 ```solidity
 function withdrawFromPrizePool(uint256 _amount) external onlyOwner
 ```
-- **When to use:** When the prize pool has a significant surplus beyond what's needed to cover current winnings. (Gdy w puli nagród zgromadzi się znaczna nadwyżka.)
-- **Effect:** Decreases `mysteryBoxPrizePool`.
+- **Requirements:** Prize pool must have sufficient balance
+- **When to use:** When prize pool has accumulated excess funds
+- **Effect:** Decreases `mysteryBoxPrizePool` by `_amount`
 
 #### `setMysteryBoxBetLimits(uint256 _minBet, uint256 _maxBet)`
 **Purpose:** Set min/max bet for MysteryBox (Ustawienie limitów stawek dla MysteryBox)
 ```solidity
 function setMysteryBoxBetLimits(uint256 _minBet, uint256 _maxBet) external onlyOwner
 ```
-- **When to use:** To adjust the game to ETH prices, control risk, and manage the game's economy. (Aby dostosować grę do cen ETH, kontrolować ryzyko i zarządzać ekonomią gry.)
-- **Defaults:** min: `0.00035 ETH`, max: `0.01 ETH`.
+- **Requirements:** `_minBet > 0` and `_minBet < _maxBet`
+- **Defaults:** min: 0.00035 ETH, max: 0.01 ETH
+- **When to use:** Adjust for ETH price changes, control risk exposure
 
 #### `setUtilityBoxFee(uint256 _newFee)`
 **Purpose:** Set the fee for the UtilityBox (Ustawienie opłaty za UtilityBox)
 ```solidity
 function setUtilityBoxFee(uint256 _newFee) external onlyOwner
 ```
-- **Default:** `0.0001 ETH`.
-- **When to use:** To adjust the price according to the value of rewards and demand. (Aby dostosować cenę do wartości nagród i popytu.)
+- **Requirements:** `_newFee > 0`
+- **Default:** 0.0001 ETH (~$0.30 at $3000 ETH)
+- **When to use:** Adjust price based on reward value and demand
 
 #### `setUtilityBoxNftUri(string memory _newUri)`
-**Purpose:** Set the metadata URI for the jackpot NFT (Ustawienie URI metadanych dla NFT)
+**Purpose:** Set the metadata URI for the UtilityBox NFT reward (Ustawienie URI metadanych dla NFT)
 ```solidity
 function setUtilityBoxNftUri(string memory _newUri) external onlyOwner
 ```
-- **When to use:** **Crucial before platform launch!** You must set the link to the `.json` metadata file (hosted on IPFS) so the contract can mint the NFT prize. (Konieczne przed uruchomieniem platformy! Należy ustawić link do pliku `.json` z metadanymi (hostowanego na IPFS).)
-- **Effect:** Updates `utilityBoxNftUri` string.
-
+- **When to use:** **Required before platform launch!** Must set IPFS URI for NFT metadata
+- **Effect:** Updates `utilityBoxNftUri` string
+- **Format:** Usually IPFS hash like "ipfs://QmXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
 ### 5. **Seasonal Events**
 *Wydarzenia sezonowe*
@@ -165,11 +171,15 @@ function createSeasonalEvent(
     uint32[] memory _participatingCommunities
 ) external onlyOwner
 ```
+- **Requirements:** 
+  - `_startTime` must be in future
+  - `_endTime` must be after `_startTime`
 - **Parameters:**
   - `_name`: Event name (e.g., "Winter Championship")
   - `_startTime`: Unix timestamp
-  - `_endTime`: Unix timestamp
+  - `_endTime`: Unix timestamp  
   - `_participatingCommunities`: Array of community IDs
+- **Effect:** Creates new seasonal event, emits `SeasonalEventCreated`
 - **When to use:** Platform-wide competitions, special occasions
 
 #### `startNewSeason()`
@@ -177,7 +187,8 @@ function createSeasonalEvent(
 ```solidity
 function startNewSeason() external onlyOwner
 ```
-- **Effect:** Increments season counter, enables seasonal features
+- **Effect:** Increments `currentSeason` counter
+- **Event:** Emits `SeasonalEventCreated` with "New Season Started"
 - **When to use:** Quarterly/yearly, major platform updates
 
 ### 6. **NFT Management**
@@ -190,8 +201,12 @@ function mintCollectibleNFT(address _recipient, string memory _tokenURI, string 
 ```
 - **Parameters:**
   - `_recipient`: User receiving NFT
-  - `_tokenURI`: Metadata URI
+  - `_tokenURI`: Metadata URI (IPFS link)
   - `_category`: NFT category (e.g., "SpecialEvent", "Founder")
+- **Effect:** 
+  - Mints new NFT with incremented token ID
+  - Unlocks COLLECTIBLE_RECEIVED achievement
+  - Emits `CollectibleMinted` event
 - **When to use:** Special rewards, partnerships, unique events
 
 ### 7. **Emergency Functions**
@@ -203,7 +218,7 @@ function mintCollectibleNFT(address _recipient, string memory _tokenURI, string 
 function pause() external onlyOwner
 ```
 - **When to use:** Security vulnerability, maintenance, emergency
-- **Effect:** All user functions disabled
+- **Effect:** All user functions disabled (whenNotPaused modifier)
 
 #### `unpause()`
 **Purpose:** Resume platform operations (Wznowienie działania platformy)
@@ -211,6 +226,7 @@ function pause() external onlyOwner
 function unpause() external onlyOwner
 ```
 - **When to use:** After resolving emergency situation
+- **Effect:** All user functions re-enabled
 
 #### `emergencyWithdraw()`
 **Purpose:** Emergency withdrawal of all funds (Awaryjna wypłata wszystkich środków)
@@ -218,8 +234,8 @@ function unpause() external onlyOwner
 function emergencyWithdraw() external onlyOwner
 ```
 - **When to use:** Critical security issue, platform shutdown
-- **Effect:** All ETH sent to owner address
-- **⚠️ WARNING:** Use only in extreme situations
+- **Effect:** All contract ETH sent to owner address
+- **⚠️ WARNING:** Use only in extreme situations - will break all game functions
 
 ## 🎯 **Best Practices**
 
@@ -227,116 +243,107 @@ function emergencyWithdraw() external onlyOwner
 - **Regular monitoring:** Check community activity and reports
 - **Graduated responses:** Warning → Suspension → Ban
 - **Documentation:** Keep records of all actions taken
+- **Appeal process:** Allow communities to appeal suspensions
 
 ### **2. Fee Management**
-- **Market research:** Monitor competitor fees
-- **User feedback:** Consider community input
+- **Market research:** Monitor competitor fees and ETH price
+- **User feedback:** Consider community input before changes
 - **Gradual changes:** Avoid sudden large fee increases
+- **Testing:** Use testnet to verify fee changes work correctly
 
-### **3. Event Planning**
+### **3. Game Pool Management**
+- **Initial funding:** Fund MysteryBox pool with substantial amount before launch
+- **Regular monitoring:** Check pool balance vs. potential max payouts
+- **Rebalancing:** Withdraw excess or add funds as needed
+- **Risk management:** Set bet limits appropriate for pool size
+
+### **4. Event Planning**
 - **Advance notice:** Announce seasonal events early
 - **Fair participation:** Ensure all communities can participate
 - **Reward distribution:** Plan prize pools carefully
+- **Cross-community coordination:** Encourage collaboration
 
-### **4. Emergency Preparedness**
+### **5. Emergency Preparedness**
 - **Monitoring tools:** Set up alerts for unusual activity
 - **Response plan:** Have clear procedures for emergencies
 - **Communication:** Keep users informed during issues
+- **Security audits:** Regular code reviews and testing
 
-## 📊 **Monitoring Dashboard**
+## 📊 **Owner Dashboard Metrics**
 
-### **Key Metrics to Track:**
-- Total communities created
-- Active users per day/week/month
-- Revenue from fees (transaction, platform, withdrawal)
-- Mystery box participation
-- Event participation rates
-- Boost system usage and revenue
-- Premium achievement unlocks
-- Community withdrawal patterns
-- Support tickets/complaints
+### **Key Statistics to Monitor:**
+- **Platform Stats:** via `getPlatformStats()`
+  - Total communities: `platformStats.totalCommunities`
+  - Active communities: `platformStats.activeCommunities`
+  - Total members: `platformStats.totalMembers`
+  - Total volume: `platformStats.totalVolume`
+  - Platform fees collected: `platformStats.totalPlatformFees`
 
-### **New Revenue Tracking:**
-- **Transaction fees:** 0.5% from all payments
-- **Boost purchases:** Track most popular boost types
-- **Event creation fees:** Monitor event creation trends
-- **Premium achievements:** Track unlock patterns
-- **Withdrawal fees:** Monitor community cash-out behavior
+### **Financial Metrics:**
+- **MysteryBox pool balance:** `mysteryBoxPrizePool`
+- **Daily/weekly fee collection:** Track via events
+- **Top communities by revenue:** Analyze community balances
+- **User activity trends:** Monitor transaction patterns
 
-### **Red Flags to Watch:**
-- Sudden drop in activity
-- Unusual transaction patterns
-- Community creator complaints
-- High support ticket volume
-- Negative social media mentions
-- **Excessive boost usage** (potential exploitation)
-- **Unusual withdrawal patterns** (potential fraud)
-- **Mystery box addiction indicators** (responsible gaming)
+### **Security Metrics:**
+- **Global bans issued:** Track banned users
+- **Community suspensions:** Monitor suspended communities
+- **Failed transactions:** Watch for unusual patterns
+- **Contract balance:** Ensure sufficient liquidity
 
-## 🔧 **Common Administrative Tasks**
+## 🔧 **Technical Implementation**
 
-### **Initial Setup Checklist (before launch):**
-1. ✅ Deploy the contract.
-2. ✅ Fund the `mysteryBoxPrizePool` with a sufficient amount to cover initial jackpots.
-3. ✅ Set the `utilityBoxNftUri` to point to the IPFS metadata file for the collectible NFT.
-4. ✅ Review and set all platform fees (`setMysteryBoxBetLimits`, `setUtilityBoxFee`, etc.).
-5. ✅ Transfer ownership to a secure multi-sig wallet.
+### **Fee Collection Mechanism:**
+All owner functions automatically collect fees where applicable:
+- Transaction fees (0.5%) collected on all paid functions
+- Platform fees (2.5%) collected on community revenue
+- 100% of game fees go directly to owner
 
-### **Weekly Tasks:**
-1. Review new communities for compliance
-2. Check support tickets and user reports
-3. Monitor platform statistics
-4. Update seasonal events if needed
-5. Monitor prize pool balance for `MysteryBox`
+### **Event Monitoring:**
+Key events to monitor:
+- `PlatformFeeCollected` - Revenue tracking
+- `TransactionFeeCharged` - Volume tracking
+- `FundsWithdrawn` - Community activity
+- `CommunityCreated` - Growth metrics
 
-### **Monthly Tasks:**
-1. Analyze revenue and fee structure
-2. Review suspended communities
-3. Plan upcoming seasonal events
-4. Update documentation
+### **Security Features:**
+- **Reentrancy protection:** All functions use nonReentrant where needed
+- **Access control:** Strict onlyOwner modifiers
+- **Input validation:** All parameters validated
+- **Emergency controls:** Pause/unpause system
 
-### **Quarterly Tasks:**
-1. Consider starting new season
-2. Review platform fee percentages
-3. Audit emergency procedures
-4. Platform feature updates
+## 📈 **Growth Strategy**
 
-## 🎖️ **Special Privileges**
+### **Platform Development:**
+- **Regular fee optimization:** Adjust fees based on usage and market
+- **New features:** Add seasonal events and special promotions
+- **Community incentives:** Use NFT rewards to drive engagement
+- **Partnership programs:** Custom fee structures for partners
 
-### **NFT Rewards:**
-- Mint commemorative NFTs for milestones
-- Create founder/early adopter NFTs
-- Reward top community creators
-- Partnership collaboration NFTs
+### **Revenue Optimization:**
+- **Game balancing:** Optimize MysteryBox probabilities for profitability
+- **Premium features:** Introduce new paid features
+- **Volume incentives:** Encourage high-volume communities
+- **Cross-promotion:** Use seasonal events to drive engagement
 
-### **Community Partnerships:**
-- Set custom fee structures
-- Create exclusive events
-- Provide technical support
-- Marketing collaboration
+### **Risk Management:**
+- **Liquidity management:** Maintain sufficient ETH reserves
+- **Legal compliance:** Ensure all features meet regulations
+- **Community health:** Monitor and maintain platform reputation
+- **Technical security:** Regular audits and updates
 
-### **Platform Evolution:**
-- Add new features
-- Modify game mechanics
-- Integrate with external platforms
-- Expand to new networks
+## 🎮 **Game Economics Management**
 
-## ⚠️ **Important Warnings**
+### **MysteryBox Economics:**
+- **House edge:** Built into probabilities (~3% expected profit)
+- **Pool management:** Maintain 2-3x maximum payout in reserve
+- **Risk assessment:** Monitor large bets vs. pool size
+- **Profitability:** Track revenue vs. payouts over time
 
-### **Security Considerations:**
-- **Never share private keys** - use a multi-sig wallet (używaj multi-sig wallet)
-- **Test on testnet first** - before mainnet deployment (przed mainnet deployment)
-- **Monitor gas prices** - optimize transaction costs (optymalizuj koszty transakcji)
-- **Keep emergency contacts** - list of developers and experts (lista deweloperów i ekspertów)
+### **UtilityBox Economics:**
+- **Pure profit:** 100% of fees (rewards are virtual)
+- **Demand optimization:** Adjust price based on usage
+- **Reward balancing:** Ensure rewards drive engagement
+- **Volume tracking:** Monitor daily/weekly usage patterns
 
-### **Legal Considerations:**
-- **Comply with regulations** - different countries have different laws (różne kraje mają różne przepisy)
-- **Terms of service** - clear platform rules (jasne zasady platformy)
-- **Data protection** - GDPR and other regulations (GDPR i inne regulacje)
-- **Tax implications** - consult with accountants (konsultuj z księgowymi)
-
----
-
-**Remember:** Great power comes with great responsibility. Use these functions wisely to create a thriving, safe, and profitable platform for all users.
-
-*Pamiętaj: Wielka władza wiąże się z wielką odpowiedzialnością. Używaj tych funkcji mądrze, aby stworzyć kwitnącą, bezpieczną i zyskowną platformę dla wszystkich użytkowników.* 
+This comprehensive guide provides everything needed to effectively manage and grow the HybridCommunityPlatform as the contract owner. Regular monitoring and strategic adjustments will ensure long-term success and profitability. 
