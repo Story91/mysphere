@@ -575,9 +575,18 @@ export default function MyCampPage() {
   }, [socialDropdownOpen, buttonRef]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-orange-800 to-orange-600 overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden relative">
+      {/* Background Image */}
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat" 
+        style={{ backgroundImage: 'url(/CampBack.jpg)' }}
+      ></div>
+      
+      {/* Background Overlay */}
+      <div className="fixed inset-0 bg-gradient-to-br from-black/70 via-orange-800/60 to-orange-600/70"></div>
+      
       {/* Background Effects */}
-      <div className="fixed inset-0 bg-[linear-gradient(90deg,transparent_24%,rgba(249,115,22,0.08)_25%,rgba(249,115,22,0.08)_26%,transparent_27%,transparent_74%,rgba(249,115,22,0.08)_75%,rgba(249,115,22,0.08)_76%,transparent_77%,transparent),linear-gradient(0deg,transparent_24%,rgba(249,115,22,0.08)_25%,rgba(249,115,22,0.08)_26%,transparent_27%,transparent_74%,rgba(249,115,22,0.08)_75%,rgba(249,115,22,0.08)_76%,transparent_77%,transparent)] bg-[length:30px_30px] opacity-60"></div>
+      <div className="fixed inset-0 bg-[linear-gradient(90deg,transparent_24%,rgba(249,115,22,0.08)_25%,rgba(249,115,22,0.08)_26%,transparent_27%,transparent_74%,rgba(249,115,22,0.08)_75%,rgba(249,115,22,0.08)_76%,transparent_77%,transparent),linear-gradient(0deg,transparent_24%,rgba(249,115,22,0.08)_25%,rgba(249,115,22,0.08)_26%,transparent_27%,transparent_74%,rgba(249,115,22,0.08)_75%,rgba(249,115,22,0.08)_76%,transparent_77%,transparent)] bg-[length:30px_30px] opacity-40"></div>
       
       {/* Success Message */}
       {showSuccessMessage && (
