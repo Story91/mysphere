@@ -1,0 +1,36 @@
+{
+  "name": "Soulbound Community Member",
+  "description": "A soulbound NFT that represents permanent membership in the HybridCommunityPlatform. This NFT cannot be transferred and is permanently bound to the holder's wallet, serving as proof of their community participation and achievements.",
+  "image": "https://beige-real-eagle-159.mypinata.cloud/ipfs/bafybeiaixmpno6bv43x7wz3zgqggcjvp6vxlqhrlyu53heytwsvcesfklu",
+  "attributes": [
+    {
+      "trait_type": "Type",
+      "value": "Soulbound"
+    },
+    {
+      "trait_type": "Collection",
+      "value": "CommunityMembership"
+    },
+    {
+      "trait_type": "Transferable",
+      "value": "No"
+    },
+    {
+      "trait_type": "Utility",
+      "value": "Community Access"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Unique"
+    }
+  ],
+  "properties": {
+    "category": "Membership",
+    "soulbound": true,
+    "transferable": false,
+    "utility": "Community platform access and participation"
+  },
+  "external_url": "https://mysphere.fun/spheres",
+  "animation_url": null,
+  "background_color": "000000"
+} 

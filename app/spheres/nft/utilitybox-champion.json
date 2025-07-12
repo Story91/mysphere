@@ -1,0 +1,19 @@
+{
+  "name": "UtilityBox Champion",
+  "description": "A super rare collectible NFT, awarded only to the luckiest players of the UtilityBox. A symbol of ultimate luck and dedication.",
+  "image": "https://beige-real-eagle-159.mypinata.cloud/ipfs/bafybeidn7ams2h2ncjpvx55hkr4or4cypjivu23fhpwchyqyyjqkkp2sem",
+  "attributes": [
+    {
+      "trait_type": "Rarity",
+      "value": "Legendary"
+    },
+    {
+      "trait_type": "Origin",
+      "value": "UtilityBox"
+    },
+    {
+      "trait_type": "Award",
+      "value": "Jackpot"
+    }
+  ]
+}
