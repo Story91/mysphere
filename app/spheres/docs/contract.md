@@ -51,6 +51,27 @@ uint256 public boostPurchaseFee = 0.0005 ether;
 uint256 public eventPlatformFee = 0.002 ether;
 uint256 public withdrawalFeePercentage = 10; // 1%
 uint256 public defaultPlatformFeePercentage = 25; // 2.5%
+uint256 public maxPlatformFeePercentage = 100; // 10% (maximum allowed)
+```
+
+### **Public State Variables:**
+```solidity
+// Counters
+uint256 public communityIdCounter = 1;
+uint256 public membershipTokenIdCounter = 1;
+uint256 public challengeIdCounter = 1;
+uint256 public seasonalEventIdCounter = 1;
+uint256 public visitIdCounter = 1;
+uint256 public currentSeason = 1;
+
+// Game State
+uint256 public mysteryBoxPrizePool; // Dynamic prize pool for MysteryBox
+string public utilityBoxNftUri; // URI for UtilityBox NFT rewards
+
+// Public mappings for utility rewards
+mapping(address => uint256) public streakSavers;
+mapping(address => uint256) public achievementVouchers;
+mapping(uint256 => uint256) public communityProposalCount;
 ```
 
 ---
@@ -326,6 +347,11 @@ function getCommunityDetails(uint256 _communityId) external view returns (
     uint32 totalMembers,
     CommunityStatus status
 )
+// Note: Community struct also contains:
+// - uint32 createdAt (timestamp when community was created)
+// - uint16 platformFeePercentage (individual platform fee for this community)
+// - uint32 eventIdCounter (counter for events in this community)
+// - string[] announcements (array of announcements)
 
 function getCommunityAnnouncements(uint256 _communityId) external view returns (string[] memory)
 function getCommunityWithdrawableBalance(uint256 _communityId) external view returns (uint128)
@@ -345,6 +371,17 @@ function getMemberDetails(uint256 _communityId, address _member) external view r
     address mentor,
     uint256 menteeCount
 )
+// Note: Member struct also contains:
+// - uint32 communityId (community ID)
+// - uint32 subscriptionExpiresAt (subscription expiration timestamp)
+// - uint32 totalSpent (total ETH spent in community)
+// - uint32 lastActiveTime (last activity timestamp)
+// - uint16 referralCount (number of successful referrals)
+// - uint16 totalRatings (total ratings received)
+// - uint32 ratingSum (sum of all ratings)
+// - bool lifetime (true if lifetime member)
+// - uint256 achievementFlags (bitflags for achievements)
+// - address[] mentees (array of mentees)
 
 function getUserAchievements(address _user) external view returns (uint256[] memory)
 function getUserAchievementUnlocks(address _user) external view returns (AchievementUnlock[] memory)
@@ -444,6 +481,87 @@ mapping(address => uint256) public achievementVouchers;
 mapping(uint256 => uint256) public mysteryBoxPrizePool;
 ```
 
+#### **🔧 Technical Functions:**
+```solidity
+// ERC721 Override Functions
+function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool)
+// Returns true if contract supports given interface
+
+function _beforeTokenTransfer(
+    address from,
+    address to,
+    uint256 tokenId,
+    uint256 batchSize
+) internal virtual override
+// Enforces soulbound NFT behavior - prevents transfers except minting/burning
+```
+
+---
+
+## 🎭 **Complete Event Reference** (Kompletna Lista Eventów)
+
+### **🏘️ Community Events:**
+```solidity
+event CommunityCreated(uint256 indexed communityId, address indexed creator, string name);
+event MemberJoined(uint256 indexed communityId, address indexed member);
+event MemberBanned(uint256 indexed communityId, address indexed member);
+event MemberRoleChanged(uint256 indexed communityId, address indexed member, MemberRole newRole);
+event AnnouncementMade(uint256 indexed communityId, string announcement);
+```
+
+### **🎪 Event System Events:**
+```solidity
+event EventCreated(uint256 indexed communityId, uint256 indexed eventId);
+event EventParticipation(uint256 indexed communityId, uint256 indexed eventId, address indexed participant);
+event SeasonalEventCreated(uint256 indexed eventId, string name);
+```
+
+### **🏆 Achievement & Progression Events:**
+```solidity
+event AchievementUnlocked(address indexed user, AchievementType achievement);
+event PremiumAchievementUnlocked(address indexed user, AchievementType achievement, uint256 fee);
+event LevelUp(address indexed user, uint256 newLevel);
+event CollectibleMinted(address indexed recipient, uint256 indexed tokenId, string category);
+```
+
+### **⚔️ Challenge & Governance Events:**
+```solidity
+event ChallengeCreated(uint256 indexed challengeId, address indexed challenger, address indexed challenged);
+event ChallengeCompleted(uint256 indexed challengeId, address indexed winner);
+event ProposalCreated(uint256 indexed communityId, uint256 indexed proposalId);
+event ProposalVoted(uint256 indexed communityId, uint256 indexed proposalId, address indexed voter, bool support);
+```
+
+### **🎁 Game & Utility Events:**
+```solidity
+event MysteryBoxOpened(address indexed user, uint256 reward);
+event UtilityBoxOpened(address indexed user, string prizeType, uint256 value);
+event StreakSaverWon(address indexed user, uint256 newTotal);
+event StreakSaverUsed(address indexed user, uint256 streakPreserved);
+event AchievementVoucherWon(address indexed user, uint256 newTotal);
+event AchievementVoucherUsed(address indexed user, AchievementType achievementType);
+```
+
+### **🚀 Boost System Events:**
+```solidity
+event BoostPurchased(address indexed user, BoostType boostType, uint256 fee, uint32 duration);
+event BoostActivated(address indexed user, BoostType boostType);
+```
+
+### **👨‍🏫 Mentorship & Social Events:**
+```solidity
+event MentorAssigned(uint256 indexed communityId, address indexed mentor, address indexed mentee);
+event MemberRated(uint256 indexed communityId, address indexed rated, address indexed rater, uint256 rating);
+event CrossCommunityVisitStarted(uint256 indexed visitId, address indexed visitor, uint256 fromCommunity, uint256 toCommunity);
+```
+
+### **💰 Financial Events:**
+```solidity
+event FundsWithdrawn(uint256 indexed communityId, address indexed creator, uint256 amount, uint256 fee);
+event TransactionFeeCharged(address indexed user, uint256 fee);
+event PlatformFeeCollected(uint256 amount, string source);
+```
+
 ---
 
 ## 🎯 **Frontend Integration Guide** (Przewodnik Integracji Frontendu)
@@ -514,6 +632,37 @@ const utilityBoxProbabilities = [
 ];
 ```
 
+### **🎲 Randomization System:**
+
+```javascript
+// Contract uses internal nonce + block data for randomization
+// NOTE: This is pseudo-random, not cryptographically secure
+// For production, consider using Chainlink VRF for true randomness
+
+// Internal function in contract:
+function _generateRandomNumber() internal returns (uint256) {
+    nonce++; // Increments with each call
+    return uint256(keccak256(abi.encodePacked(
+        block.timestamp,
+        block.difficulty, 
+        nonce,
+        msg.sender
+    )));
+}
+
+// Frontend prediction (for testing only):
+const predictRandom = (nonce, timestamp, difficulty, userAddress) => {
+    // This is for testing purposes only
+    // Actual randomness depends on block mining
+    return ethers.utils.keccak256(
+        ethers.utils.defaultAbiCoder.encode(
+            ["uint256", "uint256", "uint256", "address"],
+            [timestamp, difficulty, nonce, userAddress]
+        )
+    );
+};
+```
+
 ### **🚀 Boost System Integration:**
 
 ```javascript
@@ -568,6 +717,49 @@ const useVoucher = async (achievementType) => {
 };
 ```
 
+### **🎁 Utility Items System:**
+
+```javascript
+// Check user's utility items
+const checkUtilityItems = async (userAddress) => {
+    const streakSavers = await contract.streakSavers(userAddress);
+    const vouchers = await contract.achievementVouchers(userAddress);
+    
+    return {
+        streakSavers: streakSavers.toNumber(),
+        achievementVouchers: vouchers.toNumber()
+    };
+};
+
+// Streak Savers Usage
+// - Won from UtilityBox (10% chance)
+// - Automatically used when user would lose streak (24-48h gap)
+// - Preserves daily activity streak
+// - Cannot be manually activated - automatic protection
+
+// Achievement Vouchers Usage
+// - Won from UtilityBox (4% chance)
+// - Can be manually used instead of paying 0.0005 ETH
+// - Unlocks ANY premium achievement for FREE
+// - Strategic use recommended for expensive achievements
+
+// Usage Example:
+const useUtilityItems = async () => {
+    const items = await checkUtilityItems(userAddress);
+    
+    if (items.achievementVouchers > 0) {
+        console.log(`You have ${items.achievementVouchers} achievement vouchers`);
+        // Use voucher instead of paying
+        await contract.useAchievementVoucher(achievementTypes.COLLECTIBLE_RECEIVED);
+    }
+    
+    if (items.streakSavers > 0) {
+        console.log(`You have ${items.streakSavers} streak savers (automatic protection)`);
+        // Streak savers are used automatically - no manual activation needed
+    }
+};
+```
+
 ### **📱 Event Listening:**
 
 ```javascript
@@ -586,6 +778,45 @@ contract.on("UtilityBoxOpened", (user, prizeType, value) => {
 
 contract.on("LevelUp", (user, newLevel) => {
     console.log(`${user} reached level ${newLevel}!`);
+});
+
+// Financial events
+contract.on("TransactionFeeCharged", (user, fee) => {
+    console.log(`Transaction fee charged: ${ethers.utils.formatEther(fee)} ETH`);
+});
+
+contract.on("PlatformFeeCollected", (amount, source) => {
+    console.log(`Platform fee collected: ${ethers.utils.formatEther(amount)} ETH from ${source}`);
+});
+
+contract.on("FundsWithdrawn", (communityId, creator, amount, fee) => {
+    console.log(`Community ${communityId} withdrew ${ethers.utils.formatEther(amount)} ETH (fee: ${ethers.utils.formatEther(fee)} ETH)`);
+});
+
+// Utility reward events
+contract.on("StreakSaverWon", (user, newTotal) => {
+    console.log(`${user} won streak saver! Total: ${newTotal}`);
+});
+
+contract.on("StreakSaverUsed", (user, streakPreserved) => {
+    console.log(`${user} used streak saver to preserve ${streakPreserved} day streak`);
+});
+
+contract.on("AchievementVoucherWon", (user, newTotal) => {
+    console.log(`${user} won achievement voucher! Total: ${newTotal}`);
+});
+
+contract.on("AchievementVoucherUsed", (user, achievementType) => {
+    console.log(`${user} used voucher to unlock achievement: ${achievementType}`);
+});
+
+// Boost events
+contract.on("BoostPurchased", (user, boostType, fee, duration) => {
+    console.log(`${user} purchased ${boostType} boost for ${duration} seconds`);
+});
+
+contract.on("BoostActivated", (user, boostType) => {
+    console.log(`${user} activated ${boostType} boost`);
 });
 ```
 
@@ -679,6 +910,115 @@ Instead of making it upgradable, consider:
 - **🔗 Migration Tools:** Build tools to help users migrate to V2
 
 **The current contract design with owner-editable parameters provides the perfect balance of flexibility and security for a gaming/DeFi platform.**
+
+---
+
+## 📈 **Level System & Progression Formula** (System Poziomów i Wzór Progresji)
+
+### **🎯 Level Calculation:**
+
+```javascript
+// Contract function: _calculateLevel(uint32 _respectPoints)
+function calculateLevel(respectPoints) {
+    if (respectPoints >= 10000) return 5; // Master
+    if (respectPoints >= 5000) return 4;  // Expert
+    if (respectPoints >= 2000) return 3;  // Advanced
+    if (respectPoints >= 500) return 2;   // Intermediate
+    if (respectPoints >= 100) return 1;   // Beginner
+    return 0; // Newcomer
+}
+
+// Level progression requirements:
+const levelRequirements = {
+    0: { name: "Newcomer", minPoints: 0, maxPoints: 99 },
+    1: { name: "Beginner", minPoints: 100, maxPoints: 499 },
+    2: { name: "Intermediate", minPoints: 500, maxPoints: 1999 },
+    3: { name: "Advanced", minPoints: 2000, maxPoints: 4999 },
+    4: { name: "Expert", minPoints: 5000, maxPoints: 9999 },
+    5: { name: "Master", minPoints: 10000, maxPoints: Infinity }
+};
+
+// Progress calculation for frontend:
+const calculateProgress = (respectPoints) => {
+    const currentLevel = calculateLevel(respectPoints);
+    const levelData = levelRequirements[currentLevel];
+    
+    if (currentLevel === 5) {
+        return { level: 5, progress: 100, pointsToNext: 0 };
+    }
+    
+    const nextLevelData = levelRequirements[currentLevel + 1];
+    const currentLevelPoints = respectPoints - levelData.minPoints;
+    const pointsNeeded = nextLevelData.minPoints - levelData.minPoints;
+    const progress = (currentLevelPoints / pointsNeeded) * 100;
+    const pointsToNext = nextLevelData.minPoints - respectPoints;
+    
+    return {
+        level: currentLevel,
+        progress: Math.min(progress, 100),
+        pointsToNext: Math.max(pointsToNext, 0)
+    };
+};
+```
+
+### **💎 Respect Points Sources:**
+
+```javascript
+// Ways to earn respect points:
+const respectPointSources = {
+    // Automatic rewards
+    memberJoin: 25,           // When someone joins via your referral
+    referralReward: 50,       // When you refer someone
+    eventParticipation: 0,    // Base participation (can be boosted)
+    eventWin: 100,            // Winning an event
+    challengeWin: 100,        // Winning a challenge
+    mentorshipComplete: 50,   // Completing mentorship (mentor)
+    menteeComplete: 25,       // Completing mentorship (mentee)
+    crossCommunityVisit: 10,  // Visiting other communities
+    seasonalEvent: 50,        // Participating in seasonal events
+    proposalVote: 5,          // Voting on proposals
+    becomeMentor: 25,         // Becoming a mentor
+    collectibleAward: 200,    // Top performer collectible
+    
+    // UtilityBox rewards
+    utilityBoxSmall: 5,       // Small respect reward (20% chance)
+    utilityBoxMedium: 25,     // Medium respect reward (20% chance)
+    
+    // Boosted rewards (with EXPERIENCE_MULTIPLIER boost)
+    // All above values are multiplied by 2x when boost is active
+};
+```
+
+### **🔄 Activity Streak System:**
+
+```javascript
+// Streak calculation logic (from contract):
+const updateStreak = (lastActiveTime, currentTime, streakSavers) => {
+    const timeDiff = currentTime - lastActiveTime;
+    const oneDayInSeconds = 24 * 60 * 60;
+    const twoDaysInSeconds = 48 * 60 * 60;
+    
+    if (timeDiff > oneDayInSeconds && timeDiff < twoDaysInSeconds) {
+        // 24-48h gap - streak can be saved
+        if (streakSavers > 0) {
+            return { streakSaved: true, streakSaversUsed: 1 };
+        } else {
+            return { streakReset: true, newStreak: 1 };
+        }
+    } else if (timeDiff > twoDaysInSeconds) {
+        // 48+ hours - streak always resets
+        return { streakReset: true, newStreak: 1 };
+    } else {
+        // Less than 24h - streak continues
+        return { streakContinues: true };
+    }
+};
+
+// Streak benefits:
+// - 7+ day streak unlocks STREAK_KEEPER achievement
+// - Longer streaks may unlock special rewards in future updates
+// - Streak Savers provide automatic protection against accidental breaks
+```
 
 ---
 
