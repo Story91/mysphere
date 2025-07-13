@@ -1,6 +1,6 @@
 'use client';
 
-import { base } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 import { OnchainKitProvider } from '@coinbase/onchainkit';
 import { createContext, useContext, useState } from 'react';
 import { createConfig, http } from 'wagmi';
@@ -39,8 +39,9 @@ const queryClient = new QueryClient();
  * Wagmi Configuration
  * 
  * We define our configuration with multiple chains:
- * 1. Base Mainnet (base) - Primary network for the app
- * 2. BaseCamp (baseCampChain) - Secondary network for specific functionality
+ * 1. Base Sepolia (baseSepolia) - Primary network for the app (for testing)
+ * 2. Base Mainnet (base) - Will be used in production
+ * 3. BaseCamp (baseCampChain) - Secondary network for specific functionality
  * 
  * When using transactions for BaseCamp, ensure you explicitly specify 
  * the chain in both simulateContract and writeContract calls.
@@ -48,9 +49,10 @@ const queryClient = new QueryClient();
  * for an example implementation.
  */
 const wagmiConfig = createConfig({
-  chains: [base, baseCampChain],
+  chains: [base, baseSepolia, baseCampChain],
   transports: {
     [base.id]: http('https://mainnet.base.org'),
+    [baseSepolia.id]: http(),
     [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
   },
   connectors: [
@@ -88,8 +90,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <FarcasterFrameProvider>
               <OnchainKitProvider
                 apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-                // We're using base as default, but the WagmiConfig above already supports BaseCamp
-                chain={base}
+                // We're using baseSepolia as default now for testing
+                chain={baseSepolia}
                 config={{
                   appearance: {
                     name: 'MySphere',

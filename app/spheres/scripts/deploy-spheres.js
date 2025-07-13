@@ -102,7 +102,7 @@ async function deploySpheresContract() {
 
     // --- Step 3: Fund Mystery Box Pool (Optional) ---
     console.log("\n💰 Step 3: Funding Mystery Box Pool...");
-    const mysteryBoxFunding = ethers.parseEther("0.1"); // Fund with 0.1 ETH
+    const mysteryBoxFunding = ethers.parseEther("0.01"); // Fund with 0.01 ETH
     const fundMysteryBoxTx = await spheresContract.fundMysteryBoxPool({ value: mysteryBoxFunding });
     await fundMysteryBoxTx.wait();
     console.log(`✅ Mystery Box Pool funded with ${ethers.formatEther(mysteryBoxFunding)} ETH`);

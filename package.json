@@ -49,7 +49,7 @@
     "dotenv": "^16.4.1",
     "ethers": "^6.11.1",
     "firebase": "^11.4.0",
-    "framer-motion": "^11.0.3",
+    "framer-motion": "^11.18.2",
     "gray-matter": "^4.0.3",
     "hardhat": "^2.19.5",
     "html2canvas": "^1.4.1",

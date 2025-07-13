@@ -23,128 +23,49 @@ import type {
   TypedContractMethod,
 } from "../../../../common";
 
-export declare namespace HybridCommunityPlatform {
-  export type PlatformStatsStruct = {
-    totalCommunities: BigNumberish;
-    totalMembers: BigNumberish;
-    totalTransactions: BigNumberish;
-    activeCommunities: BigNumberish;
-    totalVolume: BigNumberish;
-    totalPlatformFees: BigNumberish;
-  };
-
-  export type PlatformStatsStructOutput = [
-    totalCommunities: bigint,
-    totalMembers: bigint,
-    totalTransactions: bigint,
-    activeCommunities: bigint,
-    totalVolume: bigint,
-    totalPlatformFees: bigint
-  ] & {
-    totalCommunities: bigint;
-    totalMembers: bigint;
-    totalTransactions: bigint;
-    activeCommunities: bigint;
-    totalVolume: bigint;
-    totalPlatformFees: bigint;
-  };
-
-  export type AchievementUnlockStruct = {
-    achievementType: BigNumberish;
-    unlockedAt: BigNumberish;
-    unlockFee: BigNumberish;
-    isPremium: boolean;
-  };
-
-  export type AchievementUnlockStructOutput = [
-    achievementType: bigint,
-    unlockedAt: bigint,
-    unlockFee: bigint,
-    isPremium: boolean
-  ] & {
-    achievementType: bigint;
-    unlockedAt: bigint;
-    unlockFee: bigint;
-    isPremium: boolean;
-  };
-}
-
 export interface HybridCommunityPlatformInterface extends Interface {
   getFunction(
     nameOrSignature:
       | "TRANSACTION_FEE_PERCENTAGE"
-      | "acceptChallenge"
       | "achievementUnlockFee"
       | "achievementVouchers"
       | "activateBoost"
       | "approve"
       | "assignMentor"
-      | "awardTopPerformerCollectible"
       | "balanceOf"
       | "banMember"
       | "becomeMentor"
       | "boostPurchaseFee"
-      | "challengeIdCounter"
-      | "challenges"
       | "communities"
       | "communityBannedUsers"
       | "communityIdCounter"
-      | "communityProposalCount"
-      | "completeChallenge"
       | "completeMentorship"
-      | "createChallenge"
       | "createCommunity"
       | "createEvent"
-      | "createProposal"
-      | "createSeasonalEvent"
       | "creationFeeEth"
-      | "crossVisits"
-      | "currentSeason"
       | "defaultPlatformFeePercentage"
       | "emergencyWithdraw"
-      | "endCrossCommunityVisit"
       | "eventPlatformFee"
       | "finalizeEvent"
-      | "fundMysteryBoxPool"
-      | "getActiveCrossVisits"
-      | "getAllPlatformFees"
       | "getApproved"
-      | "getChallengeDetails"
-      | "getCommunityAnnouncements"
       | "getCommunityDetails"
-      | "getCommunityWithdrawableBalance"
-      | "getCrossVisitDetails"
-      | "getEventDetails"
       | "getMemberDetails"
-      | "getPlatformStats"
-      | "getProposalDetails"
-      | "getSeasonalEventDetails"
-      | "getUserAchievementUnlocks"
-      | "getUserAchievements"
-      | "getUserBoost"
       | "globalBanUser"
       | "globalBannedUsers"
       | "globalUnbanUser"
       | "isActiveMember"
       | "isApprovedForAll"
       | "joinCommunity"
-      | "makeAnnouncement"
-      | "maxMysteryBoxBet"
       | "maxPlatformFeePercentage"
       | "memberRatings"
       | "memberRoles"
       | "members"
       | "membershipTokenIdCounter"
-      | "minMysteryBoxBet"
-      | "mintCollectibleNFT"
-      | "mysteryBoxPrizePool"
       | "name"
-      | "openMysteryBox"
       | "openUtilityBox"
       | "owner"
       | "ownerOf"
       | "participateInEvent"
-      | "participateInSeasonalEvent"
       | "pause"
       | "paused"
       | "platformStats"
@@ -154,21 +75,16 @@ export interface HybridCommunityPlatformInterface extends Interface {
       | "renounceOwnership"
       | "safeTransferFrom(address,address,uint256)"
       | "safeTransferFrom(address,address,uint256,bytes)"
-      | "seasonalEventIdCounter"
-      | "seasonalEvents"
       | "setAchievementUnlockFee"
       | "setApprovalForAll"
       | "setBoostPurchaseFee"
       | "setCreationFee"
       | "setEventPlatformFee"
       | "setMemberRole"
-      | "setMysteryBoxBetLimits"
       | "setPlatformFeePercentage"
       | "setUtilityBoxFee"
       | "setUtilityBoxNftUri"
       | "setWithdrawalFeePercentage"
-      | "startCrossCommunityVisit"
-      | "startNewSeason"
       | "streakSavers"
       | "supportsInterface"
       | "suspendCommunity"
@@ -180,15 +96,11 @@ export interface HybridCommunityPlatformInterface extends Interface {
       | "unlockPremiumAchievement"
       | "unpause"
       | "useAchievementVoucher"
-      | "userAchievementUnlocks"
       | "userAchievements"
       | "userBoosts"
       | "utilityBoxFee"
       | "utilityBoxNftUri"
-      | "visitIdCounter"
-      | "voteOnProposal"
       | "withdrawCommunityFunds"
-      | "withdrawFromPrizePool"
       | "withdrawalFeePercentage"
   ): FunctionFragment;
 
@@ -197,38 +109,28 @@ export interface HybridCommunityPlatformInterface extends Interface {
       | "AchievementUnlocked"
       | "AchievementVoucherUsed"
       | "AchievementVoucherWon"
-      | "AnnouncementMade"
       | "Approval"
       | "ApprovalForAll"
       | "BatchMetadataUpdate"
       | "BoostActivated"
       | "BoostPurchased"
-      | "ChallengeCompleted"
-      | "ChallengeCreated"
       | "CollectibleMinted"
       | "CommunityCreated"
-      | "CrossCommunityVisitStarted"
       | "EventCreated"
       | "EventParticipation"
-      | "FundsWithdrawn"
       | "LevelUp"
       | "MemberBanned"
       | "MemberJoined"
       | "MemberRated"
       | "MemberRoleChanged"
       | "MentorAssigned"
+      | "MentorshipCompleted"
       | "MetadataUpdate"
-      | "MysteryBoxOpened"
       | "OwnershipTransferred"
       | "Paused"
-      | "PlatformFeeCollected"
       | "PremiumAchievementUnlocked"
-      | "ProposalCreated"
-      | "ProposalVoted"
-      | "SeasonalEventCreated"
       | "StreakSaverUsed"
       | "StreakSaverWon"
-      | "TransactionFeeCharged"
       | "Transfer"
       | "Unpaused"
       | "UtilityBoxOpened"
@@ -237,10 +139,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
   encodeFunctionData(
     functionFragment: "TRANSACTION_FEE_PERCENTAGE",
     values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "acceptChallenge",
-    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "achievementUnlockFee",
@@ -263,10 +161,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values: [BigNumberish, AddressLike, AddressLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "awardTopPerformerCollectible",
-    values: [BigNumberish, AddressLike]
-  ): string;
-  encodeFunctionData(
     functionFragment: "balanceOf",
     values: [AddressLike]
   ): string;
@@ -283,14 +177,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "challengeIdCounter",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "challenges",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "communities",
     values: [BigNumberish]
   ): string;
@@ -303,20 +189,8 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "communityProposalCount",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "completeChallenge",
-    values: [BigNumberish, AddressLike]
-  ): string;
-  encodeFunctionData(
     functionFragment: "completeMentorship",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "createChallenge",
-    values: [BigNumberish, AddressLike, string, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "createCommunity",
@@ -335,23 +209,7 @@ export interface HybridCommunityPlatformInterface extends Interface {
     ]
   ): string;
   encodeFunctionData(
-    functionFragment: "createProposal",
-    values: [BigNumberish, string, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "createSeasonalEvent",
-    values: [string, BigNumberish, BigNumberish, BigNumberish[]]
-  ): string;
-  encodeFunctionData(
     functionFragment: "creationFeeEth",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "crossVisits",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "currentSeason",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -363,39 +221,15 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "endCrossCommunityVisit",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "eventPlatformFee",
     values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "finalizeEvent",
-    values: [BigNumberish, BigNumberish, AddressLike[], BigNumberish[]]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "fundMysteryBoxPool",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getActiveCrossVisits",
-    values: [AddressLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getAllPlatformFees",
-    values?: undefined
+    values: [BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "getApproved",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getChallengeDetails",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getCommunityAnnouncements",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -403,44 +237,8 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "getCommunityWithdrawableBalance",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getCrossVisitDetails",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getEventDetails",
-    values: [BigNumberish, BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "getMemberDetails",
     values: [BigNumberish, AddressLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getPlatformStats",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getProposalDetails",
-    values: [BigNumberish, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getSeasonalEventDetails",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getUserAchievementUnlocks",
-    values: [AddressLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getUserAchievements",
-    values: [AddressLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getUserBoost",
-    values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "globalBanUser",
@@ -467,14 +265,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values: [BigNumberish, boolean, AddressLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "makeAnnouncement",
-    values: [BigNumberish, string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "maxMysteryBoxBet",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "maxPlatformFeePercentage",
     values?: undefined
   ): string;
@@ -494,23 +284,7 @@ export interface HybridCommunityPlatformInterface extends Interface {
     functionFragment: "membershipTokenIdCounter",
     values?: undefined
   ): string;
-  encodeFunctionData(
-    functionFragment: "minMysteryBoxBet",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "mintCollectibleNFT",
-    values: [AddressLike, string, string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "mysteryBoxPrizePool",
-    values?: undefined
-  ): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "openMysteryBox",
-    values: [BigNumberish]
-  ): string;
   encodeFunctionData(
     functionFragment: "openUtilityBox",
     values: [BigNumberish]
@@ -522,10 +296,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "participateInEvent",
-    values: [BigNumberish, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "participateInSeasonalEvent",
     values: [BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "pause", values?: undefined): string;
@@ -559,14 +329,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values: [AddressLike, AddressLike, BigNumberish, BytesLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "seasonalEventIdCounter",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "seasonalEvents",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "setAchievementUnlockFee",
     values: [BigNumberish]
   ): string;
@@ -591,10 +353,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values: [BigNumberish, AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "setMysteryBoxBetLimits",
-    values: [BigNumberish, BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "setPlatformFeePercentage",
     values: [BigNumberish, BigNumberish]
   ): string;
@@ -609,14 +367,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
   encodeFunctionData(
     functionFragment: "setWithdrawalFeePercentage",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "startCrossCommunityVisit",
-    values: [BigNumberish, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "startNewSeason",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "streakSavers",
@@ -657,10 +407,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "userAchievementUnlocks",
-    values: [AddressLike, BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "userAchievements",
     values: [AddressLike, BigNumberish]
   ): string;
@@ -677,20 +423,8 @@ export interface HybridCommunityPlatformInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "visitIdCounter",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "voteOnProposal",
-    values: [BigNumberish, BigNumberish, boolean]
-  ): string;
-  encodeFunctionData(
     functionFragment: "withdrawCommunityFunds",
     values: [BigNumberish, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "withdrawFromPrizePool",
-    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "withdrawalFeePercentage",
@@ -699,10 +433,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
 
   decodeFunctionResult(
     functionFragment: "TRANSACTION_FEE_PERCENTAGE",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "acceptChallenge",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -722,10 +452,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     functionFragment: "assignMentor",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(
-    functionFragment: "awardTopPerformerCollectible",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "banMember", data: BytesLike): Result;
   decodeFunctionResult(
@@ -736,11 +462,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     functionFragment: "boostPurchaseFee",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(
-    functionFragment: "challengeIdCounter",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "challenges", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "communities",
     data: BytesLike
@@ -754,19 +475,7 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "communityProposalCount",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "completeChallenge",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "completeMentorship",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "createChallenge",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -778,23 +487,7 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "createProposal",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "createSeasonalEvent",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "creationFeeEth",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "crossVisits",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "currentSeason",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -806,10 +499,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "endCrossCommunityVisit",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "eventPlatformFee",
     data: BytesLike
   ): Result;
@@ -818,27 +507,7 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "fundMysteryBoxPool",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getActiveCrossVisits",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getAllPlatformFees",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "getApproved",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getChallengeDetails",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getCommunityAnnouncements",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -846,43 +515,7 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "getCommunityWithdrawableBalance",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getCrossVisitDetails",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getEventDetails",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "getMemberDetails",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getPlatformStats",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getProposalDetails",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getSeasonalEventDetails",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getUserAchievementUnlocks",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getUserAchievements",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getUserBoost",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -910,14 +543,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "makeAnnouncement",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "maxMysteryBoxBet",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "maxPlatformFeePercentage",
     data: BytesLike
   ): Result;
@@ -934,23 +559,7 @@ export interface HybridCommunityPlatformInterface extends Interface {
     functionFragment: "membershipTokenIdCounter",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(
-    functionFragment: "minMysteryBoxBet",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "mintCollectibleNFT",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "mysteryBoxPrizePool",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "openMysteryBox",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "openUtilityBox",
     data: BytesLike
@@ -959,10 +568,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
   decodeFunctionResult(functionFragment: "ownerOf", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "participateInEvent",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "participateInSeasonalEvent",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "pause", data: BytesLike): Result;
@@ -993,14 +598,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "seasonalEventIdCounter",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "seasonalEvents",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "setAchievementUnlockFee",
     data: BytesLike
   ): Result;
@@ -1025,10 +622,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "setMysteryBoxBetLimits",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "setPlatformFeePercentage",
     data: BytesLike
   ): Result;
@@ -1042,14 +635,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "setWithdrawalFeePercentage",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "startCrossCommunityVisit",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "startNewSeason",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -1088,10 +673,6 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "userAchievementUnlocks",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "userAchievements",
     data: BytesLike
   ): Result;
@@ -1105,19 +686,7 @@ export interface HybridCommunityPlatformInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "visitIdCounter",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "voteOnProposal",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "withdrawCommunityFunds",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "withdrawFromPrizePool",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -1158,19 +727,6 @@ export namespace AchievementVoucherWonEvent {
   export interface OutputObject {
     user: string;
     newTotal: bigint;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace AnnouncementMadeEvent {
-  export type InputTuple = [communityId: BigNumberish, announcement: string];
-  export type OutputTuple = [communityId: bigint, announcement: string];
-  export interface OutputObject {
-    communityId: bigint;
-    announcement: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -1272,41 +828,6 @@ export namespace BoostPurchasedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace ChallengeCompletedEvent {
-  export type InputTuple = [challengeId: BigNumberish, winner: AddressLike];
-  export type OutputTuple = [challengeId: bigint, winner: string];
-  export interface OutputObject {
-    challengeId: bigint;
-    winner: string;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace ChallengeCreatedEvent {
-  export type InputTuple = [
-    challengeId: BigNumberish,
-    challenger: AddressLike,
-    challenged: AddressLike
-  ];
-  export type OutputTuple = [
-    challengeId: bigint,
-    challenger: string,
-    challenged: string
-  ];
-  export interface OutputObject {
-    challengeId: bigint;
-    challenger: string;
-    challenged: string;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
 export namespace CollectibleMintedEvent {
   export type InputTuple = [
     recipient: AddressLike,
@@ -1351,31 +872,6 @@ export namespace CommunityCreatedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace CrossCommunityVisitStartedEvent {
-  export type InputTuple = [
-    visitId: BigNumberish,
-    visitor: AddressLike,
-    fromCommunity: BigNumberish,
-    toCommunity: BigNumberish
-  ];
-  export type OutputTuple = [
-    visitId: bigint,
-    visitor: string,
-    fromCommunity: bigint,
-    toCommunity: bigint
-  ];
-  export interface OutputObject {
-    visitId: bigint;
-    visitor: string;
-    fromCommunity: bigint;
-    toCommunity: bigint;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
 export namespace EventCreatedEvent {
   export type InputTuple = [communityId: BigNumberish, eventId: BigNumberish];
   export type OutputTuple = [communityId: bigint, eventId: bigint];
@@ -1404,31 +900,6 @@ export namespace EventParticipationEvent {
     communityId: bigint;
     eventId: bigint;
     participant: string;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace FundsWithdrawnEvent {
-  export type InputTuple = [
-    communityId: BigNumberish,
-    creator: AddressLike,
-    amount: BigNumberish,
-    fee: BigNumberish
-  ];
-  export type OutputTuple = [
-    communityId: bigint,
-    creator: string,
-    amount: bigint,
-    fee: bigint
-  ];
-  export interface OutputObject {
-    communityId: bigint;
-    creator: string;
-    amount: bigint;
-    fee: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -1544,11 +1015,21 @@ export namespace MentorAssignedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace MetadataUpdateEvent {
-  export type InputTuple = [_tokenId: BigNumberish];
-  export type OutputTuple = [_tokenId: bigint];
+export namespace MentorshipCompletedEvent {
+  export type InputTuple = [
+    communityId: BigNumberish,
+    mentor: AddressLike,
+    mentee: AddressLike
+  ];
+  export type OutputTuple = [
+    communityId: bigint,
+    mentor: string,
+    mentee: string
+  ];
   export interface OutputObject {
-    _tokenId: bigint;
+    communityId: bigint;
+    mentor: string;
+    mentee: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -1556,12 +1037,11 @@ export namespace MetadataUpdateEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace MysteryBoxOpenedEvent {
-  export type InputTuple = [user: AddressLike, reward: BigNumberish];
-  export type OutputTuple = [user: string, reward: bigint];
+export namespace MetadataUpdateEvent {
+  export type InputTuple = [_tokenId: BigNumberish];
+  export type OutputTuple = [_tokenId: bigint];
   export interface OutputObject {
-    user: string;
-    reward: bigint;
+    _tokenId: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -1594,19 +1074,6 @@ export namespace PausedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace PlatformFeeCollectedEvent {
-  export type InputTuple = [amount: BigNumberish, source: string];
-  export type OutputTuple = [amount: bigint, source: string];
-  export interface OutputObject {
-    amount: bigint;
-    source: string;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
 export namespace PremiumAchievementUnlockedEvent {
   export type InputTuple = [
     user: AddressLike,
@@ -1618,60 +1085,6 @@ export namespace PremiumAchievementUnlockedEvent {
     user: string;
     achievement: bigint;
     fee: bigint;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace ProposalCreatedEvent {
-  export type InputTuple = [
-    communityId: BigNumberish,
-    proposalId: BigNumberish
-  ];
-  export type OutputTuple = [communityId: bigint, proposalId: bigint];
-  export interface OutputObject {
-    communityId: bigint;
-    proposalId: bigint;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace ProposalVotedEvent {
-  export type InputTuple = [
-    communityId: BigNumberish,
-    proposalId: BigNumberish,
-    voter: AddressLike,
-    support: boolean
-  ];
-  export type OutputTuple = [
-    communityId: bigint,
-    proposalId: bigint,
-    voter: string,
-    support: boolean
-  ];
-  export interface OutputObject {
-    communityId: bigint;
-    proposalId: bigint;
-    voter: string;
-    support: boolean;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace SeasonalEventCreatedEvent {
-  export type InputTuple = [eventId: BigNumberish, name: string];
-  export type OutputTuple = [eventId: bigint, name: string];
-  export interface OutputObject {
-    eventId: bigint;
-    name: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -1698,19 +1111,6 @@ export namespace StreakSaverWonEvent {
   export interface OutputObject {
     user: string;
     newTotal: bigint;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace TransactionFeeChargedEvent {
-  export type InputTuple = [user: AddressLike, fee: BigNumberish];
-  export type OutputTuple = [user: string, fee: bigint];
-  export interface OutputObject {
-    user: string;
-    fee: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -1811,12 +1211,6 @@ export interface HybridCommunityPlatform extends BaseContract {
 
   TRANSACTION_FEE_PERCENTAGE: TypedContractMethod<[], [bigint], "view">;
 
-  acceptChallenge: TypedContractMethod<
-    [_challengeId: BigNumberish],
-    [void],
-    "payable"
-  >;
-
   achievementUnlockFee: TypedContractMethod<[], [bigint], "view">;
 
   achievementVouchers: TypedContractMethod<
@@ -1843,12 +1237,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "nonpayable"
   >;
 
-  awardTopPerformerCollectible: TypedContractMethod<
-    [_communityId: BigNumberish, _performer: AddressLike],
-    [void],
-    "nonpayable"
-  >;
-
   balanceOf: TypedContractMethod<[owner: AddressLike], [bigint], "view">;
 
   banMember: TypedContractMethod<
@@ -1864,36 +1252,6 @@ export interface HybridCommunityPlatform extends BaseContract {
   >;
 
   boostPurchaseFee: TypedContractMethod<[], [bigint], "view">;
-
-  challengeIdCounter: TypedContractMethod<[], [bigint], "view">;
-
-  challenges: TypedContractMethod<
-    [arg0: BigNumberish],
-    [
-      [
-        string,
-        string,
-        bigint,
-        bigint,
-        bigint,
-        boolean,
-        boolean,
-        string,
-        string
-      ] & {
-        challenger: string;
-        challenged: string;
-        communityId: bigint;
-        deadline: bigint;
-        stakeAmount: bigint;
-        active: boolean;
-        completed: boolean;
-        winner: string;
-        description: string;
-      }
-    ],
-    "view"
-  >;
 
   communities: TypedContractMethod<
     [arg0: BigNumberish],
@@ -1939,33 +1297,10 @@ export interface HybridCommunityPlatform extends BaseContract {
 
   communityIdCounter: TypedContractMethod<[], [bigint], "view">;
 
-  communityProposalCount: TypedContractMethod<
-    [arg0: BigNumberish],
-    [bigint],
-    "view"
-  >;
-
-  completeChallenge: TypedContractMethod<
-    [_challengeId: BigNumberish, _winner: AddressLike],
-    [void],
-    "nonpayable"
-  >;
-
   completeMentorship: TypedContractMethod<
     [_communityId: BigNumberish],
     [void],
     "nonpayable"
-  >;
-
-  createChallenge: TypedContractMethod<
-    [
-      _communityId: BigNumberish,
-      _challenged: AddressLike,
-      _description: string,
-      _deadline: BigNumberish
-    ],
-    [void],
-    "payable"
   >;
 
   createCommunity: TypedContractMethod<
@@ -1994,114 +1329,21 @@ export interface HybridCommunityPlatform extends BaseContract {
     "payable"
   >;
 
-  createProposal: TypedContractMethod<
-    [_communityId: BigNumberish, _description: string, _deadline: BigNumberish],
-    [bigint],
-    "nonpayable"
-  >;
-
-  createSeasonalEvent: TypedContractMethod<
-    [
-      _name: string,
-      _startTime: BigNumberish,
-      _endTime: BigNumberish,
-      _participatingCommunities: BigNumberish[]
-    ],
-    [void],
-    "nonpayable"
-  >;
-
   creationFeeEth: TypedContractMethod<[], [bigint], "view">;
-
-  crossVisits: TypedContractMethod<
-    [arg0: BigNumberish],
-    [
-      [bigint, bigint, string, bigint, bigint, boolean] & {
-        fromCommunityId: bigint;
-        toCommunityId: bigint;
-        visitor: string;
-        visitTime: bigint;
-        duration: bigint;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-
-  currentSeason: TypedContractMethod<[], [bigint], "view">;
 
   defaultPlatformFeePercentage: TypedContractMethod<[], [bigint], "view">;
 
   emergencyWithdraw: TypedContractMethod<[], [void], "nonpayable">;
 
-  endCrossCommunityVisit: TypedContractMethod<
-    [_visitId: BigNumberish],
-    [void],
-    "nonpayable"
-  >;
-
   eventPlatformFee: TypedContractMethod<[], [bigint], "view">;
 
   finalizeEvent: TypedContractMethod<
-    [
-      _communityId: BigNumberish,
-      _eventId: BigNumberish,
-      _winners: AddressLike[],
-      _rewards: BigNumberish[]
-    ],
+    [_communityId: BigNumberish, _eventId: BigNumberish],
     [void],
     "nonpayable"
   >;
 
-  fundMysteryBoxPool: TypedContractMethod<[], [void], "payable">;
-
-  getActiveCrossVisits: TypedContractMethod<
-    [_user: AddressLike],
-    [bigint[]],
-    "view"
-  >;
-
-  getAllPlatformFees: TypedContractMethod<
-    [],
-    [
-      [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] & {
-        creationFee: bigint;
-        transactionFeePercentage: bigint;
-        withdrawalFeePercentage: bigint;
-        achievementUnlockFee: bigint;
-        boostPurchaseFee: bigint;
-        eventPlatformFee: bigint;
-        _minMysteryBoxBet: bigint;
-        _utilityBoxFee: bigint;
-      }
-    ],
-    "view"
-  >;
-
   getApproved: TypedContractMethod<[tokenId: BigNumberish], [string], "view">;
-
-  getChallengeDetails: TypedContractMethod<
-    [_challengeId: BigNumberish],
-    [
-      [string, string, bigint, string, bigint, bigint, boolean, string] & {
-        challenger: string;
-        challenged: string;
-        communityId: bigint;
-        description: string;
-        stakeAmount: bigint;
-        deadline: bigint;
-        active: boolean;
-        winner: string;
-      }
-    ],
-    "view"
-  >;
-
-  getCommunityAnnouncements: TypedContractMethod<
-    [_communityId: BigNumberish],
-    [string[]],
-    "view"
-  >;
 
   getCommunityDetails: TypedContractMethod<
     [_communityId: BigNumberish],
@@ -2133,44 +1375,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "view"
   >;
 
-  getCommunityWithdrawableBalance: TypedContractMethod<
-    [_communityId: BigNumberish],
-    [bigint],
-    "view"
-  >;
-
-  getCrossVisitDetails: TypedContractMethod<
-    [_visitId: BigNumberish],
-    [
-      [bigint, bigint, string, bigint, bigint, boolean] & {
-        fromCommunityId: bigint;
-        toCommunityId: bigint;
-        visitor: string;
-        visitTime: bigint;
-        duration: bigint;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-
-  getEventDetails: TypedContractMethod<
-    [_communityId: BigNumberish, _eventId: BigNumberish],
-    [
-      [string, bigint, bigint, bigint, bigint, bigint, bigint, boolean] & {
-        description: string;
-        eventType: bigint;
-        startTime: bigint;
-        endTime: bigint;
-        currentParticipants: bigint;
-        maxParticipants: bigint;
-        totalPrizePool: bigint;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-
   getMemberDetails: TypedContractMethod<
     [_communityId: BigNumberish, _member: AddressLike],
     [
@@ -2194,66 +1398,6 @@ export interface HybridCommunityPlatform extends BaseContract {
         totalEventsWon: bigint;
         mentor: string;
         menteeCount: bigint;
-      }
-    ],
-    "view"
-  >;
-
-  getPlatformStats: TypedContractMethod<
-    [],
-    [HybridCommunityPlatform.PlatformStatsStructOutput],
-    "view"
-  >;
-
-  getProposalDetails: TypedContractMethod<
-    [_communityId: BigNumberish, _proposalId: BigNumberish],
-    [
-      [string, bigint, bigint, bigint, boolean] & {
-        description: string;
-        deadline: bigint;
-        votesFor: bigint;
-        votesAgainst: bigint;
-        executed: boolean;
-      }
-    ],
-    "view"
-  >;
-
-  getSeasonalEventDetails: TypedContractMethod<
-    [_eventId: BigNumberish],
-    [
-      [string, bigint, bigint, bigint, bigint, boolean] & {
-        name: string;
-        startTime: bigint;
-        endTime: bigint;
-        seasonId: bigint;
-        totalPrizePool: bigint;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-
-  getUserAchievementUnlocks: TypedContractMethod<
-    [_user: AddressLike],
-    [HybridCommunityPlatform.AchievementUnlockStructOutput[]],
-    "view"
-  >;
-
-  getUserAchievements: TypedContractMethod<
-    [_user: AddressLike],
-    [bigint[]],
-    "view"
-  >;
-
-  getUserBoost: TypedContractMethod<
-    [_user: AddressLike, _boostType: BigNumberish],
-    [
-      [bigint, bigint, bigint, boolean] & {
-        boostType: bigint;
-        expiresAt: bigint;
-        multiplier: bigint;
-        active: boolean;
       }
     ],
     "view"
@@ -2295,14 +1439,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "payable"
   >;
 
-  makeAnnouncement: TypedContractMethod<
-    [_communityId: BigNumberish, _announcement: string],
-    [void],
-    "nonpayable"
-  >;
-
-  maxMysteryBoxBet: TypedContractMethod<[], [bigint], "view">;
-
   maxPlatformFeePercentage: TypedContractMethod<[], [bigint], "view">;
 
   memberRatings: TypedContractMethod<
@@ -2336,8 +1472,7 @@ export interface HybridCommunityPlatform extends BaseContract {
         bigint,
         bigint,
         boolean,
-        string,
-        bigint
+        string
       ] & {
         communityId: bigint;
         subscriptionExpiresAt: bigint;
@@ -2355,7 +1490,6 @@ export interface HybridCommunityPlatform extends BaseContract {
         ratingSum: bigint;
         lifetime: boolean;
         mentorAddress: string;
-        achievementFlags: bigint;
       }
     ],
     "view"
@@ -2363,23 +1497,7 @@ export interface HybridCommunityPlatform extends BaseContract {
 
   membershipTokenIdCounter: TypedContractMethod<[], [bigint], "view">;
 
-  minMysteryBoxBet: TypedContractMethod<[], [bigint], "view">;
-
-  mintCollectibleNFT: TypedContractMethod<
-    [_recipient: AddressLike, _tokenURI: string, _category: string],
-    [void],
-    "nonpayable"
-  >;
-
-  mysteryBoxPrizePool: TypedContractMethod<[], [bigint], "view">;
-
   name: TypedContractMethod<[], [string], "view">;
-
-  openMysteryBox: TypedContractMethod<
-    [_communityId: BigNumberish],
-    [void],
-    "payable"
-  >;
 
   openUtilityBox: TypedContractMethod<
     [_communityId: BigNumberish],
@@ -2393,12 +1511,6 @@ export interface HybridCommunityPlatform extends BaseContract {
 
   participateInEvent: TypedContractMethod<
     [_communityId: BigNumberish, _eventId: BigNumberish],
-    [void],
-    "payable"
-  >;
-
-  participateInSeasonalEvent: TypedContractMethod<
-    [_eventId: BigNumberish, _communityId: BigNumberish],
     [void],
     "payable"
   >;
@@ -2459,24 +1571,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "nonpayable"
   >;
 
-  seasonalEventIdCounter: TypedContractMethod<[], [bigint], "view">;
-
-  seasonalEvents: TypedContractMethod<
-    [arg0: BigNumberish],
-    [
-      [bigint, bigint, bigint, bigint, bigint, string, boolean] & {
-        id: bigint;
-        startTime: bigint;
-        endTime: bigint;
-        seasonId: bigint;
-        totalPrizePool: bigint;
-        name: string;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-
   setAchievementUnlockFee: TypedContractMethod<
     [_newFee: BigNumberish],
     [void],
@@ -2513,12 +1607,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "nonpayable"
   >;
 
-  setMysteryBoxBetLimits: TypedContractMethod<
-    [_minBet: BigNumberish, _maxBet: BigNumberish],
-    [void],
-    "nonpayable"
-  >;
-
   setPlatformFeePercentage: TypedContractMethod<
     [_communityId: BigNumberish, _percentage: BigNumberish],
     [void],
@@ -2542,14 +1630,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     [void],
     "nonpayable"
   >;
-
-  startCrossCommunityVisit: TypedContractMethod<
-    [_fromCommunityId: BigNumberish, _toCommunityId: BigNumberish],
-    [void],
-    "nonpayable"
-  >;
-
-  startNewSeason: TypedContractMethod<[], [void], "nonpayable">;
 
   streakSavers: TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
 
@@ -2601,19 +1681,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "nonpayable"
   >;
 
-  userAchievementUnlocks: TypedContractMethod<
-    [arg0: AddressLike, arg1: BigNumberish],
-    [
-      [bigint, bigint, bigint, boolean] & {
-        achievementType: bigint;
-        unlockedAt: bigint;
-        unlockFee: bigint;
-        isPremium: boolean;
-      }
-    ],
-    "view"
-  >;
-
   userAchievements: TypedContractMethod<
     [arg0: AddressLike, arg1: BigNumberish],
     [bigint],
@@ -2638,22 +1705,8 @@ export interface HybridCommunityPlatform extends BaseContract {
 
   utilityBoxNftUri: TypedContractMethod<[], [string], "view">;
 
-  visitIdCounter: TypedContractMethod<[], [bigint], "view">;
-
-  voteOnProposal: TypedContractMethod<
-    [_communityId: BigNumberish, _proposalId: BigNumberish, _support: boolean],
-    [void],
-    "nonpayable"
-  >;
-
   withdrawCommunityFunds: TypedContractMethod<
     [_communityId: BigNumberish, _amount: BigNumberish],
-    [void],
-    "nonpayable"
-  >;
-
-  withdrawFromPrizePool: TypedContractMethod<
-    [_amount: BigNumberish],
     [void],
     "nonpayable"
   >;
@@ -2667,9 +1720,6 @@ export interface HybridCommunityPlatform extends BaseContract {
   getFunction(
     nameOrSignature: "TRANSACTION_FEE_PERCENTAGE"
   ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "acceptChallenge"
-  ): TypedContractMethod<[_challengeId: BigNumberish], [void], "payable">;
   getFunction(
     nameOrSignature: "achievementUnlockFee"
   ): TypedContractMethod<[], [bigint], "view">;
@@ -2694,13 +1744,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "nonpayable"
   >;
   getFunction(
-    nameOrSignature: "awardTopPerformerCollectible"
-  ): TypedContractMethod<
-    [_communityId: BigNumberish, _performer: AddressLike],
-    [void],
-    "nonpayable"
-  >;
-  getFunction(
     nameOrSignature: "balanceOf"
   ): TypedContractMethod<[owner: AddressLike], [bigint], "view">;
   getFunction(
@@ -2716,38 +1759,6 @@ export interface HybridCommunityPlatform extends BaseContract {
   getFunction(
     nameOrSignature: "boostPurchaseFee"
   ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "challengeIdCounter"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "challenges"
-  ): TypedContractMethod<
-    [arg0: BigNumberish],
-    [
-      [
-        string,
-        string,
-        bigint,
-        bigint,
-        bigint,
-        boolean,
-        boolean,
-        string,
-        string
-      ] & {
-        challenger: string;
-        challenged: string;
-        communityId: bigint;
-        deadline: bigint;
-        stakeAmount: bigint;
-        active: boolean;
-        completed: boolean;
-        winner: string;
-        description: string;
-      }
-    ],
-    "view"
-  >;
   getFunction(
     nameOrSignature: "communities"
   ): TypedContractMethod<
@@ -2796,30 +1807,8 @@ export interface HybridCommunityPlatform extends BaseContract {
     nameOrSignature: "communityIdCounter"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
-    nameOrSignature: "communityProposalCount"
-  ): TypedContractMethod<[arg0: BigNumberish], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "completeChallenge"
-  ): TypedContractMethod<
-    [_challengeId: BigNumberish, _winner: AddressLike],
-    [void],
-    "nonpayable"
-  >;
-  getFunction(
     nameOrSignature: "completeMentorship"
   ): TypedContractMethod<[_communityId: BigNumberish], [void], "nonpayable">;
-  getFunction(
-    nameOrSignature: "createChallenge"
-  ): TypedContractMethod<
-    [
-      _communityId: BigNumberish,
-      _challenged: AddressLike,
-      _description: string,
-      _deadline: BigNumberish
-    ],
-    [void],
-    "payable"
-  >;
   getFunction(
     nameOrSignature: "createCommunity"
   ): TypedContractMethod<
@@ -2849,45 +1838,7 @@ export interface HybridCommunityPlatform extends BaseContract {
     "payable"
   >;
   getFunction(
-    nameOrSignature: "createProposal"
-  ): TypedContractMethod<
-    [_communityId: BigNumberish, _description: string, _deadline: BigNumberish],
-    [bigint],
-    "nonpayable"
-  >;
-  getFunction(
-    nameOrSignature: "createSeasonalEvent"
-  ): TypedContractMethod<
-    [
-      _name: string,
-      _startTime: BigNumberish,
-      _endTime: BigNumberish,
-      _participatingCommunities: BigNumberish[]
-    ],
-    [void],
-    "nonpayable"
-  >;
-  getFunction(
     nameOrSignature: "creationFeeEth"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "crossVisits"
-  ): TypedContractMethod<
-    [arg0: BigNumberish],
-    [
-      [bigint, bigint, string, bigint, bigint, boolean] & {
-        fromCommunityId: bigint;
-        toCommunityId: bigint;
-        visitor: string;
-        visitTime: bigint;
-        duration: bigint;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
-    nameOrSignature: "currentSeason"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "defaultPlatformFeePercentage"
@@ -2896,71 +1847,18 @@ export interface HybridCommunityPlatform extends BaseContract {
     nameOrSignature: "emergencyWithdraw"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
-    nameOrSignature: "endCrossCommunityVisit"
-  ): TypedContractMethod<[_visitId: BigNumberish], [void], "nonpayable">;
-  getFunction(
     nameOrSignature: "eventPlatformFee"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "finalizeEvent"
   ): TypedContractMethod<
-    [
-      _communityId: BigNumberish,
-      _eventId: BigNumberish,
-      _winners: AddressLike[],
-      _rewards: BigNumberish[]
-    ],
+    [_communityId: BigNumberish, _eventId: BigNumberish],
     [void],
     "nonpayable"
   >;
   getFunction(
-    nameOrSignature: "fundMysteryBoxPool"
-  ): TypedContractMethod<[], [void], "payable">;
-  getFunction(
-    nameOrSignature: "getActiveCrossVisits"
-  ): TypedContractMethod<[_user: AddressLike], [bigint[]], "view">;
-  getFunction(
-    nameOrSignature: "getAllPlatformFees"
-  ): TypedContractMethod<
-    [],
-    [
-      [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] & {
-        creationFee: bigint;
-        transactionFeePercentage: bigint;
-        withdrawalFeePercentage: bigint;
-        achievementUnlockFee: bigint;
-        boostPurchaseFee: bigint;
-        eventPlatformFee: bigint;
-        _minMysteryBoxBet: bigint;
-        _utilityBoxFee: bigint;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
     nameOrSignature: "getApproved"
   ): TypedContractMethod<[tokenId: BigNumberish], [string], "view">;
-  getFunction(
-    nameOrSignature: "getChallengeDetails"
-  ): TypedContractMethod<
-    [_challengeId: BigNumberish],
-    [
-      [string, string, bigint, string, bigint, bigint, boolean, string] & {
-        challenger: string;
-        challenged: string;
-        communityId: bigint;
-        description: string;
-        stakeAmount: bigint;
-        deadline: bigint;
-        active: boolean;
-        winner: string;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
-    nameOrSignature: "getCommunityAnnouncements"
-  ): TypedContractMethod<[_communityId: BigNumberish], [string[]], "view">;
   getFunction(
     nameOrSignature: "getCommunityDetails"
   ): TypedContractMethod<
@@ -2988,43 +1886,6 @@ export interface HybridCommunityPlatform extends BaseContract {
         withdrawableBalance: bigint;
         totalMembers: bigint;
         status: bigint;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
-    nameOrSignature: "getCommunityWithdrawableBalance"
-  ): TypedContractMethod<[_communityId: BigNumberish], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "getCrossVisitDetails"
-  ): TypedContractMethod<
-    [_visitId: BigNumberish],
-    [
-      [bigint, bigint, string, bigint, bigint, boolean] & {
-        fromCommunityId: bigint;
-        toCommunityId: bigint;
-        visitor: string;
-        visitTime: bigint;
-        duration: bigint;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
-    nameOrSignature: "getEventDetails"
-  ): TypedContractMethod<
-    [_communityId: BigNumberish, _eventId: BigNumberish],
-    [
-      [string, bigint, bigint, bigint, bigint, bigint, bigint, boolean] & {
-        description: string;
-        eventType: bigint;
-        startTime: bigint;
-        endTime: bigint;
-        currentParticipants: bigint;
-        maxParticipants: bigint;
-        totalPrizePool: bigint;
-        active: boolean;
       }
     ],
     "view"
@@ -3059,68 +1920,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "view"
   >;
   getFunction(
-    nameOrSignature: "getPlatformStats"
-  ): TypedContractMethod<
-    [],
-    [HybridCommunityPlatform.PlatformStatsStructOutput],
-    "view"
-  >;
-  getFunction(
-    nameOrSignature: "getProposalDetails"
-  ): TypedContractMethod<
-    [_communityId: BigNumberish, _proposalId: BigNumberish],
-    [
-      [string, bigint, bigint, bigint, boolean] & {
-        description: string;
-        deadline: bigint;
-        votesFor: bigint;
-        votesAgainst: bigint;
-        executed: boolean;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
-    nameOrSignature: "getSeasonalEventDetails"
-  ): TypedContractMethod<
-    [_eventId: BigNumberish],
-    [
-      [string, bigint, bigint, bigint, bigint, boolean] & {
-        name: string;
-        startTime: bigint;
-        endTime: bigint;
-        seasonId: bigint;
-        totalPrizePool: bigint;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
-    nameOrSignature: "getUserAchievementUnlocks"
-  ): TypedContractMethod<
-    [_user: AddressLike],
-    [HybridCommunityPlatform.AchievementUnlockStructOutput[]],
-    "view"
-  >;
-  getFunction(
-    nameOrSignature: "getUserAchievements"
-  ): TypedContractMethod<[_user: AddressLike], [bigint[]], "view">;
-  getFunction(
-    nameOrSignature: "getUserBoost"
-  ): TypedContractMethod<
-    [_user: AddressLike, _boostType: BigNumberish],
-    [
-      [bigint, bigint, bigint, boolean] & {
-        boostType: bigint;
-        expiresAt: bigint;
-        multiplier: bigint;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
     nameOrSignature: "globalBanUser"
   ): TypedContractMethod<[_user: AddressLike], [void], "nonpayable">;
   getFunction(
@@ -3150,16 +1949,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     [void],
     "payable"
   >;
-  getFunction(
-    nameOrSignature: "makeAnnouncement"
-  ): TypedContractMethod<
-    [_communityId: BigNumberish, _announcement: string],
-    [void],
-    "nonpayable"
-  >;
-  getFunction(
-    nameOrSignature: "maxMysteryBoxBet"
-  ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "maxPlatformFeePercentage"
   ): TypedContractMethod<[], [bigint], "view">;
@@ -3198,8 +1987,7 @@ export interface HybridCommunityPlatform extends BaseContract {
         bigint,
         bigint,
         boolean,
-        string,
-        bigint
+        string
       ] & {
         communityId: bigint;
         subscriptionExpiresAt: bigint;
@@ -3217,7 +2005,6 @@ export interface HybridCommunityPlatform extends BaseContract {
         ratingSum: bigint;
         lifetime: boolean;
         mentorAddress: string;
-        achievementFlags: bigint;
       }
     ],
     "view"
@@ -3226,24 +2013,8 @@ export interface HybridCommunityPlatform extends BaseContract {
     nameOrSignature: "membershipTokenIdCounter"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
-    nameOrSignature: "minMysteryBoxBet"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "mintCollectibleNFT"
-  ): TypedContractMethod<
-    [_recipient: AddressLike, _tokenURI: string, _category: string],
-    [void],
-    "nonpayable"
-  >;
-  getFunction(
-    nameOrSignature: "mysteryBoxPrizePool"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
     nameOrSignature: "name"
   ): TypedContractMethod<[], [string], "view">;
-  getFunction(
-    nameOrSignature: "openMysteryBox"
-  ): TypedContractMethod<[_communityId: BigNumberish], [void], "payable">;
   getFunction(
     nameOrSignature: "openUtilityBox"
   ): TypedContractMethod<[_communityId: BigNumberish], [void], "payable">;
@@ -3257,13 +2028,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     nameOrSignature: "participateInEvent"
   ): TypedContractMethod<
     [_communityId: BigNumberish, _eventId: BigNumberish],
-    [void],
-    "payable"
-  >;
-  getFunction(
-    nameOrSignature: "participateInSeasonalEvent"
-  ): TypedContractMethod<
-    [_eventId: BigNumberish, _communityId: BigNumberish],
     [void],
     "payable"
   >;
@@ -3329,26 +2093,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "nonpayable"
   >;
   getFunction(
-    nameOrSignature: "seasonalEventIdCounter"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "seasonalEvents"
-  ): TypedContractMethod<
-    [arg0: BigNumberish],
-    [
-      [bigint, bigint, bigint, bigint, bigint, string, boolean] & {
-        id: bigint;
-        startTime: bigint;
-        endTime: bigint;
-        seasonId: bigint;
-        totalPrizePool: bigint;
-        name: string;
-        active: boolean;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
     nameOrSignature: "setAchievementUnlockFee"
   ): TypedContractMethod<[_newFee: BigNumberish], [void], "nonpayable">;
   getFunction(
@@ -3375,13 +2119,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "nonpayable"
   >;
   getFunction(
-    nameOrSignature: "setMysteryBoxBetLimits"
-  ): TypedContractMethod<
-    [_minBet: BigNumberish, _maxBet: BigNumberish],
-    [void],
-    "nonpayable"
-  >;
-  getFunction(
     nameOrSignature: "setPlatformFeePercentage"
   ): TypedContractMethod<
     [_communityId: BigNumberish, _percentage: BigNumberish],
@@ -3397,16 +2134,6 @@ export interface HybridCommunityPlatform extends BaseContract {
   getFunction(
     nameOrSignature: "setWithdrawalFeePercentage"
   ): TypedContractMethod<[_newPercentage: BigNumberish], [void], "nonpayable">;
-  getFunction(
-    nameOrSignature: "startCrossCommunityVisit"
-  ): TypedContractMethod<
-    [_fromCommunityId: BigNumberish, _toCommunityId: BigNumberish],
-    [void],
-    "nonpayable"
-  >;
-  getFunction(
-    nameOrSignature: "startNewSeason"
-  ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "streakSavers"
   ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
@@ -3453,20 +2180,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     "nonpayable"
   >;
   getFunction(
-    nameOrSignature: "userAchievementUnlocks"
-  ): TypedContractMethod<
-    [arg0: AddressLike, arg1: BigNumberish],
-    [
-      [bigint, bigint, bigint, boolean] & {
-        achievementType: bigint;
-        unlockedAt: bigint;
-        unlockFee: bigint;
-        isPremium: boolean;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
     nameOrSignature: "userAchievements"
   ): TypedContractMethod<
     [arg0: AddressLike, arg1: BigNumberish],
@@ -3495,25 +2208,12 @@ export interface HybridCommunityPlatform extends BaseContract {
     nameOrSignature: "utilityBoxNftUri"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
-    nameOrSignature: "visitIdCounter"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "voteOnProposal"
-  ): TypedContractMethod<
-    [_communityId: BigNumberish, _proposalId: BigNumberish, _support: boolean],
-    [void],
-    "nonpayable"
-  >;
-  getFunction(
     nameOrSignature: "withdrawCommunityFunds"
   ): TypedContractMethod<
     [_communityId: BigNumberish, _amount: BigNumberish],
     [void],
     "nonpayable"
   >;
-  getFunction(
-    nameOrSignature: "withdrawFromPrizePool"
-  ): TypedContractMethod<[_amount: BigNumberish], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "withdrawalFeePercentage"
   ): TypedContractMethod<[], [bigint], "view">;
@@ -3538,13 +2238,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     AchievementVoucherWonEvent.InputTuple,
     AchievementVoucherWonEvent.OutputTuple,
     AchievementVoucherWonEvent.OutputObject
-  >;
-  getEvent(
-    key: "AnnouncementMade"
-  ): TypedContractEvent<
-    AnnouncementMadeEvent.InputTuple,
-    AnnouncementMadeEvent.OutputTuple,
-    AnnouncementMadeEvent.OutputObject
   >;
   getEvent(
     key: "Approval"
@@ -3582,20 +2275,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     BoostPurchasedEvent.OutputObject
   >;
   getEvent(
-    key: "ChallengeCompleted"
-  ): TypedContractEvent<
-    ChallengeCompletedEvent.InputTuple,
-    ChallengeCompletedEvent.OutputTuple,
-    ChallengeCompletedEvent.OutputObject
-  >;
-  getEvent(
-    key: "ChallengeCreated"
-  ): TypedContractEvent<
-    ChallengeCreatedEvent.InputTuple,
-    ChallengeCreatedEvent.OutputTuple,
-    ChallengeCreatedEvent.OutputObject
-  >;
-  getEvent(
     key: "CollectibleMinted"
   ): TypedContractEvent<
     CollectibleMintedEvent.InputTuple,
@@ -3610,13 +2289,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     CommunityCreatedEvent.OutputObject
   >;
   getEvent(
-    key: "CrossCommunityVisitStarted"
-  ): TypedContractEvent<
-    CrossCommunityVisitStartedEvent.InputTuple,
-    CrossCommunityVisitStartedEvent.OutputTuple,
-    CrossCommunityVisitStartedEvent.OutputObject
-  >;
-  getEvent(
     key: "EventCreated"
   ): TypedContractEvent<
     EventCreatedEvent.InputTuple,
@@ -3629,13 +2301,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     EventParticipationEvent.InputTuple,
     EventParticipationEvent.OutputTuple,
     EventParticipationEvent.OutputObject
-  >;
-  getEvent(
-    key: "FundsWithdrawn"
-  ): TypedContractEvent<
-    FundsWithdrawnEvent.InputTuple,
-    FundsWithdrawnEvent.OutputTuple,
-    FundsWithdrawnEvent.OutputObject
   >;
   getEvent(
     key: "LevelUp"
@@ -3680,18 +2345,18 @@ export interface HybridCommunityPlatform extends BaseContract {
     MentorAssignedEvent.OutputObject
   >;
   getEvent(
+    key: "MentorshipCompleted"
+  ): TypedContractEvent<
+    MentorshipCompletedEvent.InputTuple,
+    MentorshipCompletedEvent.OutputTuple,
+    MentorshipCompletedEvent.OutputObject
+  >;
+  getEvent(
     key: "MetadataUpdate"
   ): TypedContractEvent<
     MetadataUpdateEvent.InputTuple,
     MetadataUpdateEvent.OutputTuple,
     MetadataUpdateEvent.OutputObject
-  >;
-  getEvent(
-    key: "MysteryBoxOpened"
-  ): TypedContractEvent<
-    MysteryBoxOpenedEvent.InputTuple,
-    MysteryBoxOpenedEvent.OutputTuple,
-    MysteryBoxOpenedEvent.OutputObject
   >;
   getEvent(
     key: "OwnershipTransferred"
@@ -3708,39 +2373,11 @@ export interface HybridCommunityPlatform extends BaseContract {
     PausedEvent.OutputObject
   >;
   getEvent(
-    key: "PlatformFeeCollected"
-  ): TypedContractEvent<
-    PlatformFeeCollectedEvent.InputTuple,
-    PlatformFeeCollectedEvent.OutputTuple,
-    PlatformFeeCollectedEvent.OutputObject
-  >;
-  getEvent(
     key: "PremiumAchievementUnlocked"
   ): TypedContractEvent<
     PremiumAchievementUnlockedEvent.InputTuple,
     PremiumAchievementUnlockedEvent.OutputTuple,
     PremiumAchievementUnlockedEvent.OutputObject
-  >;
-  getEvent(
-    key: "ProposalCreated"
-  ): TypedContractEvent<
-    ProposalCreatedEvent.InputTuple,
-    ProposalCreatedEvent.OutputTuple,
-    ProposalCreatedEvent.OutputObject
-  >;
-  getEvent(
-    key: "ProposalVoted"
-  ): TypedContractEvent<
-    ProposalVotedEvent.InputTuple,
-    ProposalVotedEvent.OutputTuple,
-    ProposalVotedEvent.OutputObject
-  >;
-  getEvent(
-    key: "SeasonalEventCreated"
-  ): TypedContractEvent<
-    SeasonalEventCreatedEvent.InputTuple,
-    SeasonalEventCreatedEvent.OutputTuple,
-    SeasonalEventCreatedEvent.OutputObject
   >;
   getEvent(
     key: "StreakSaverUsed"
@@ -3755,13 +2392,6 @@ export interface HybridCommunityPlatform extends BaseContract {
     StreakSaverWonEvent.InputTuple,
     StreakSaverWonEvent.OutputTuple,
     StreakSaverWonEvent.OutputObject
-  >;
-  getEvent(
-    key: "TransactionFeeCharged"
-  ): TypedContractEvent<
-    TransactionFeeChargedEvent.InputTuple,
-    TransactionFeeChargedEvent.OutputTuple,
-    TransactionFeeChargedEvent.OutputObject
   >;
   getEvent(
     key: "Transfer"
@@ -3819,17 +2449,6 @@ export interface HybridCommunityPlatform extends BaseContract {
       AchievementVoucherWonEvent.OutputObject
     >;
 
-    "AnnouncementMade(uint256,string)": TypedContractEvent<
-      AnnouncementMadeEvent.InputTuple,
-      AnnouncementMadeEvent.OutputTuple,
-      AnnouncementMadeEvent.OutputObject
-    >;
-    AnnouncementMade: TypedContractEvent<
-      AnnouncementMadeEvent.InputTuple,
-      AnnouncementMadeEvent.OutputTuple,
-      AnnouncementMadeEvent.OutputObject
-    >;
-
     "Approval(address,address,uint256)": TypedContractEvent<
       ApprovalEvent.InputTuple,
       ApprovalEvent.OutputTuple,
@@ -3885,28 +2504,6 @@ export interface HybridCommunityPlatform extends BaseContract {
       BoostPurchasedEvent.OutputObject
     >;
 
-    "ChallengeCompleted(uint256,address)": TypedContractEvent<
-      ChallengeCompletedEvent.InputTuple,
-      ChallengeCompletedEvent.OutputTuple,
-      ChallengeCompletedEvent.OutputObject
-    >;
-    ChallengeCompleted: TypedContractEvent<
-      ChallengeCompletedEvent.InputTuple,
-      ChallengeCompletedEvent.OutputTuple,
-      ChallengeCompletedEvent.OutputObject
-    >;
-
-    "ChallengeCreated(uint256,address,address)": TypedContractEvent<
-      ChallengeCreatedEvent.InputTuple,
-      ChallengeCreatedEvent.OutputTuple,
-      ChallengeCreatedEvent.OutputObject
-    >;
-    ChallengeCreated: TypedContractEvent<
-      ChallengeCreatedEvent.InputTuple,
-      ChallengeCreatedEvent.OutputTuple,
-      ChallengeCreatedEvent.OutputObject
-    >;
-
     "CollectibleMinted(address,uint256,string)": TypedContractEvent<
       CollectibleMintedEvent.InputTuple,
       CollectibleMintedEvent.OutputTuple,
@@ -3929,17 +2526,6 @@ export interface HybridCommunityPlatform extends BaseContract {
       CommunityCreatedEvent.OutputObject
     >;
 
-    "CrossCommunityVisitStarted(uint256,address,uint256,uint256)": TypedContractEvent<
-      CrossCommunityVisitStartedEvent.InputTuple,
-      CrossCommunityVisitStartedEvent.OutputTuple,
-      CrossCommunityVisitStartedEvent.OutputObject
-    >;
-    CrossCommunityVisitStarted: TypedContractEvent<
-      CrossCommunityVisitStartedEvent.InputTuple,
-      CrossCommunityVisitStartedEvent.OutputTuple,
-      CrossCommunityVisitStartedEvent.OutputObject
-    >;
-
     "EventCreated(uint256,uint256)": TypedContractEvent<
       EventCreatedEvent.InputTuple,
       EventCreatedEvent.OutputTuple,
@@ -3960,17 +2546,6 @@ export interface HybridCommunityPlatform extends BaseContract {
       EventParticipationEvent.InputTuple,
       EventParticipationEvent.OutputTuple,
       EventParticipationEvent.OutputObject
-    >;
-
-    "FundsWithdrawn(uint256,address,uint256,uint256)": TypedContractEvent<
-      FundsWithdrawnEvent.InputTuple,
-      FundsWithdrawnEvent.OutputTuple,
-      FundsWithdrawnEvent.OutputObject
-    >;
-    FundsWithdrawn: TypedContractEvent<
-      FundsWithdrawnEvent.InputTuple,
-      FundsWithdrawnEvent.OutputTuple,
-      FundsWithdrawnEvent.OutputObject
     >;
 
     "LevelUp(address,uint256)": TypedContractEvent<
@@ -4039,6 +2614,17 @@ export interface HybridCommunityPlatform extends BaseContract {
       MentorAssignedEvent.OutputObject
     >;
 
+    "MentorshipCompleted(uint256,address,address)": TypedContractEvent<
+      MentorshipCompletedEvent.InputTuple,
+      MentorshipCompletedEvent.OutputTuple,
+      MentorshipCompletedEvent.OutputObject
+    >;
+    MentorshipCompleted: TypedContractEvent<
+      MentorshipCompletedEvent.InputTuple,
+      MentorshipCompletedEvent.OutputTuple,
+      MentorshipCompletedEvent.OutputObject
+    >;
+
     "MetadataUpdate(uint256)": TypedContractEvent<
       MetadataUpdateEvent.InputTuple,
       MetadataUpdateEvent.OutputTuple,
@@ -4048,17 +2634,6 @@ export interface HybridCommunityPlatform extends BaseContract {
       MetadataUpdateEvent.InputTuple,
       MetadataUpdateEvent.OutputTuple,
       MetadataUpdateEvent.OutputObject
-    >;
-
-    "MysteryBoxOpened(address,uint256)": TypedContractEvent<
-      MysteryBoxOpenedEvent.InputTuple,
-      MysteryBoxOpenedEvent.OutputTuple,
-      MysteryBoxOpenedEvent.OutputObject
-    >;
-    MysteryBoxOpened: TypedContractEvent<
-      MysteryBoxOpenedEvent.InputTuple,
-      MysteryBoxOpenedEvent.OutputTuple,
-      MysteryBoxOpenedEvent.OutputObject
     >;
 
     "OwnershipTransferred(address,address)": TypedContractEvent<
@@ -4083,17 +2658,6 @@ export interface HybridCommunityPlatform extends BaseContract {
       PausedEvent.OutputObject
     >;
 
-    "PlatformFeeCollected(uint256,string)": TypedContractEvent<
-      PlatformFeeCollectedEvent.InputTuple,
-      PlatformFeeCollectedEvent.OutputTuple,
-      PlatformFeeCollectedEvent.OutputObject
-    >;
-    PlatformFeeCollected: TypedContractEvent<
-      PlatformFeeCollectedEvent.InputTuple,
-      PlatformFeeCollectedEvent.OutputTuple,
-      PlatformFeeCollectedEvent.OutputObject
-    >;
-
     "PremiumAchievementUnlocked(address,uint8,uint256)": TypedContractEvent<
       PremiumAchievementUnlockedEvent.InputTuple,
       PremiumAchievementUnlockedEvent.OutputTuple,
@@ -4103,39 +2667,6 @@ export interface HybridCommunityPlatform extends BaseContract {
       PremiumAchievementUnlockedEvent.InputTuple,
       PremiumAchievementUnlockedEvent.OutputTuple,
       PremiumAchievementUnlockedEvent.OutputObject
-    >;
-
-    "ProposalCreated(uint256,uint256)": TypedContractEvent<
-      ProposalCreatedEvent.InputTuple,
-      ProposalCreatedEvent.OutputTuple,
-      ProposalCreatedEvent.OutputObject
-    >;
-    ProposalCreated: TypedContractEvent<
-      ProposalCreatedEvent.InputTuple,
-      ProposalCreatedEvent.OutputTuple,
-      ProposalCreatedEvent.OutputObject
-    >;
-
-    "ProposalVoted(uint256,uint256,address,bool)": TypedContractEvent<
-      ProposalVotedEvent.InputTuple,
-      ProposalVotedEvent.OutputTuple,
-      ProposalVotedEvent.OutputObject
-    >;
-    ProposalVoted: TypedContractEvent<
-      ProposalVotedEvent.InputTuple,
-      ProposalVotedEvent.OutputTuple,
-      ProposalVotedEvent.OutputObject
-    >;
-
-    "SeasonalEventCreated(uint256,string)": TypedContractEvent<
-      SeasonalEventCreatedEvent.InputTuple,
-      SeasonalEventCreatedEvent.OutputTuple,
-      SeasonalEventCreatedEvent.OutputObject
-    >;
-    SeasonalEventCreated: TypedContractEvent<
-      SeasonalEventCreatedEvent.InputTuple,
-      SeasonalEventCreatedEvent.OutputTuple,
-      SeasonalEventCreatedEvent.OutputObject
     >;
 
     "StreakSaverUsed(address,uint256)": TypedContractEvent<
@@ -4158,17 +2689,6 @@ export interface HybridCommunityPlatform extends BaseContract {
       StreakSaverWonEvent.InputTuple,
       StreakSaverWonEvent.OutputTuple,
       StreakSaverWonEvent.OutputObject
-    >;
-
-    "TransactionFeeCharged(address,uint256)": TypedContractEvent<
-      TransactionFeeChargedEvent.InputTuple,
-      TransactionFeeChargedEvent.OutputTuple,
-      TransactionFeeChargedEvent.OutputObject
-    >;
-    TransactionFeeCharged: TypedContractEvent<
-      TransactionFeeChargedEvent.InputTuple,
-      TransactionFeeChargedEvent.OutputTuple,
-      TransactionFeeChargedEvent.OutputObject
     >;
 
     "Transfer(address,address,uint256)": TypedContractEvent<

@@ -1,8 +1,10 @@
 # 🔧 Technical Deployment Guide
-*Technical guide for deployment and configuration (Przewodnik techniczny deployment i konfiguracji)*
+*Complete technical deployment guide for HybridCommunityPlatform on Base network*
 
 ## 📋 **Overview**
-Complete guide for deploying and configuring the HybridCommunityPlatform contract on Base network.
+This guide provides comprehensive instructions for deploying and configuring the HybridCommunityPlatform contract on Base network, including setup, deployment, verification, and post-deployment configuration.
+
+---
 
 ## 🏗️ **Pre-Deployment Requirements**
 
@@ -20,7 +22,7 @@ Complete guide for deploying and configuring the HybridCommunityPlatform contrac
 - **Block Explorer:** `https://sepolia.basescan.org`
 
 ### **2. Contract Dependencies**
-**OpenZeppelin Contracts Required:**
+**Required OpenZeppelin Contracts:**
 ```solidity
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -29,26 +31,42 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 ```
 
-**✅ ETH Only Implementation:** No token addresses needed - contract uses BASE ETH exclusively
+**✅ ETH Only Implementation:** No external token dependencies required
 
 ### **3. Wallet Configuration**
-- **Minimum ETH balance:** 0.1 ETH for deployment + initial funding
-- **Recommended:** Use multi-sig wallet for mainnet ownership
-- **Gas settings:** Use `gasLimit: 8,000,000` for deployment
-- **Gas price:** Monitor Base network congestion
+- **Minimum ETH Balance:** 0.1 ETH for deployment + gas fees
+- **Recommended:** Multi-signature wallet for mainnet ownership
+- **Gas Settings:** `gasLimit: 8,000,000` for deployment
+- **Gas Price:** Monitor Base network congestion
 
-## 🚀 **Deployment Steps**
+---
 
-### **Step 1: Environment Setup**
+## 🚀 **Deployment Setup**
+
+### **Step 1: Environment Configuration**
 ```bash
-# Install dependencies
-npm install --save-dev @nomiclabs/hardhat-ethers ethers @openzeppelin/contracts
+# Install required dependencies
+npm install --save-dev @nomiclabs/hardhat-ethers ethers @openzeppelin/contracts hardhat
 
 # Create .env file
+touch .env
+```
+
+**.env Configuration:**
+```bash
+# Private key for deployment (use with caution)
 PRIVATE_KEY=your_private_key_here
+
+# Network RPC URLs
 BASE_RPC_URL=https://mainnet.base.org
 BASE_TESTNET_RPC_URL=https://sepolia.base.org
+
+# BaseScan API key for contract verification
 BASESCAN_API_KEY=your_basescan_api_key
+
+# Optional: Infura/Alchemy for backup RPC
+INFURA_API_KEY=your_infura_key
+ALCHEMY_API_KEY=your_alchemy_key
 ```
 
 ### **Step 2: Hardhat Configuration**
@@ -56,6 +74,7 @@ BASESCAN_API_KEY=your_basescan_api_key
 // hardhat.config.js
 require("@nomiclabs/hardhat-ethers");
 require("@nomiclabs/hardhat-etherscan");
+require("dotenv").config();
 
 module.exports = {
   solidity: {
@@ -68,17 +87,22 @@ module.exports = {
     }
   },
   networks: {
+    // Base Mainnet
     base: {
       url: process.env.BASE_RPC_URL,
       accounts: [process.env.PRIVATE_KEY],
       gasPrice: 1000000000, // 1 gwei
-      gasLimit: 8000000
+      gasLimit: 8000000,
+      chainId: 8453
     },
+    
+    // Base Testnet (Sepolia)
     "base-sepolia": {
       url: process.env.BASE_TESTNET_RPC_URL,
       accounts: [process.env.PRIVATE_KEY],
       gasPrice: 1000000000,
-      gasLimit: 8000000
+      gasLimit: 8000000,
+      chainId: 84532
     }
   },
   etherscan: {
@@ -112,21 +136,38 @@ module.exports = {
 ```javascript
 // scripts/deploy.js
 const { ethers } = require("hardhat");
+const fs = require("fs");
 
 async function main() {
   console.log("🚀 Deploying HybridCommunityPlatform...");
   
-  // Get deployer info
+  // Get deployer account
   const [deployer] = await ethers.getSigners();
   console.log("🔑 Deploying with account:", deployer.address);
-  console.log("💰 Account balance:", ethers.utils.formatEther(await deployer.getBalance()), "ETH");
   
-  // Get the contract factory
+  // Check balance
+  const balance = await deployer.getBalance();
+  console.log("💰 Account balance:", ethers.utils.formatEther(balance), "ETH");
+  
+  if (balance.lt(ethers.utils.parseEther("0.1"))) {
+    console.error("❌ Insufficient balance for deployment");
+    process.exit(1);
+  }
+  
+  // Deploy contract
+  console.log("📝 Deploying contract...");
   const HybridCommunityPlatform = await ethers.getContractFactory("HybridCommunityPlatform");
   
-  // Deploy contract (no constructor parameters)
-  console.log("📝 Deploying contract...");
-  const contract = await HybridCommunityPlatform.deploy();
+  // Estimate gas
+  const deploymentGas = await HybridCommunityPlatform.signer.estimateGas(
+    HybridCommunityPlatform.getDeployTransaction()
+  );
+  console.log("⛽ Estimated gas:", deploymentGas.toString());
+  
+  // Deploy with gas limit
+  const contract = await HybridCommunityPlatform.deploy({
+    gasLimit: deploymentGas.mul(120).div(100) // 20% buffer
+  });
   
   // Wait for deployment
   await contract.deployed();
@@ -135,43 +176,89 @@ async function main() {
   console.log("📍 Contract address:", contract.address);
   console.log("🔗 Transaction hash:", contract.deployTransaction.hash);
   
-  // Verify initial contract state
+  // Verify deployment
   console.log("\n🔍 Verifying deployment...");
-  const owner = await contract.owner();
-  const creationFee = await contract.creationFeeEth();
-  const transactionFeePercentage = await contract.TRANSACTION_FEE_PERCENTAGE();
-  const defaultPlatformFee = await contract.defaultPlatformFeePercentage();
-  const utilityBoxFee = await contract.utilityBoxFee();
-  const minMysteryBoxBet = await contract.minMysteryBoxBet();
-  const maxMysteryBoxBet = await contract.maxMysteryBoxBet();
-  const achievementFee = await contract.achievementUnlockFee();
-  const boostFee = await contract.boostPurchaseFee();
-  const eventFee = await contract.eventPlatformFee();
-  const withdrawalFee = await contract.withdrawalFeePercentage();
+  const code = await ethers.provider.getCode(contract.address);
+  if (code === "0x") {
+    console.error("❌ Contract deployment failed - no code at address");
+    process.exit(1);
+  }
   
-  console.log("👑 Owner:", owner);
-  console.log("💎 Creation Fee:", ethers.utils.formatEther(creationFee), "ETH");
-  console.log("🔄 Transaction Fee:", transactionFeePercentage.toNumber() / 10, "% (CONSTANT)");
-  console.log("🏢 Default Platform Fee:", defaultPlatformFee.toNumber() / 10, "%");
-  console.log("🎁 Utility Box Fee:", ethers.utils.formatEther(utilityBoxFee), "ETH");
-  console.log("🎰 Mystery Box Bet Range:", ethers.utils.formatEther(minMysteryBoxBet), "-", ethers.utils.formatEther(maxMysteryBoxBet), "ETH");
-  console.log("🏆 Achievement Unlock Fee:", ethers.utils.formatEther(achievementFee), "ETH");
-  console.log("🚀 Boost Purchase Fee:", ethers.utils.formatEther(boostFee), "ETH");
-  console.log("🎪 Event Creation Fee:", ethers.utils.formatEther(eventFee), "ETH");
-  console.log("💸 Withdrawal Fee:", withdrawalFee.toNumber() / 10, "%");
-  
-  console.log("\n✅ Deployment completed successfully!");
-  console.log("📝 Next steps: Run post-deployment configuration");
-  
-  return {
+  // Get deployment info
+  const deploymentInfo = {
     contractAddress: contract.address,
-    owner: owner,
-    contract: contract
+    deployerAddress: deployer.address,
+    transactionHash: contract.deployTransaction.hash,
+    blockNumber: contract.deployTransaction.blockNumber,
+    gasUsed: contract.deployTransaction.gasLimit.toString(),
+    timestamp: new Date().toISOString(),
+    network: network.name
   };
+  
+  // Save deployment info
+  fs.writeFileSync(
+    "deployment-info.json",
+    JSON.stringify(deploymentInfo, null, 2)
+  );
+  
+  // Verify contract state
+  await verifyContractState(contract);
+  
+  // Display next steps
+  displayNextSteps(contract.address);
+  
+  return contract;
 }
 
+async function verifyContractState(contract) {
+  console.log("\n📊 Verifying contract state...");
+  
+  try {
+    const owner = await contract.owner();
+    const creationFee = await contract.creationFeeEth();
+    const utilityBoxFee = await contract.utilityBoxFee();
+    const achievementFee = await contract.achievementUnlockFee();
+    const boostFee = await contract.boostPurchaseFee();
+    const eventFee = await contract.eventPlatformFee();
+    const withdrawalFee = await contract.withdrawalFeePercentage();
+    const defaultPlatformFee = await contract.defaultPlatformFeePercentage();
+    const transactionFee = await contract.TRANSACTION_FEE_PERCENTAGE();
+    
+    console.log("👑 Owner:", owner);
+    console.log("🏗️ Creation Fee:", ethers.utils.formatEther(creationFee), "ETH");
+    console.log("🎁 Utility Box Fee:", ethers.utils.formatEther(utilityBoxFee), "ETH");
+    console.log("🏆 Achievement Fee:", ethers.utils.formatEther(achievementFee), "ETH");
+    console.log("🚀 Boost Fee:", ethers.utils.formatEther(boostFee), "ETH");
+    console.log("🎪 Event Fee:", ethers.utils.formatEther(eventFee), "ETH");
+    console.log("💸 Withdrawal Fee:", withdrawalFee.toNumber() / 10, "%");
+    console.log("🏢 Default Platform Fee:", defaultPlatformFee.toNumber() / 10, "%");
+    console.log("🔄 Transaction Fee:", transactionFee.toNumber() / 10, "% (CONSTANT)");
+    
+    console.log("✅ Contract state verified successfully!");
+    
+  } catch (error) {
+    console.error("❌ Contract state verification failed:", error.message);
+    process.exit(1);
+  }
+}
+
+function displayNextSteps(contractAddress) {
+  console.log("\n🎯 Next Steps:");
+  console.log("1. Verify contract on BaseScan:");
+  console.log(`   npx hardhat verify --network ${network.name} ${contractAddress}`);
+  console.log("2. Set UtilityBox NFT URI:");
+  console.log(`   await contract.setUtilityBoxNftUri("ipfs://your-metadata-hash")`);
+  console.log("3. Configure platform settings if needed");
+  console.log("4. Test all functions before public launch");
+  console.log("5. Consider transferring ownership to multisig");
+}
+
+// Execute deployment
 main()
-  .then(() => process.exit(0))
+  .then(() => {
+    console.log("\n🎉 Deployment completed successfully!");
+    process.exit(0);
+  })
   .catch((error) => {
     console.error("❌ Deployment failed:", error);
     process.exit(1);
@@ -180,260 +267,195 @@ main()
 
 ### **Step 4: Deploy Commands**
 ```bash
+# Deploy to Base testnet (recommended first)
+npx hardhat run scripts/deploy.js --network base-sepolia
+
 # Deploy to Base mainnet
 npx hardhat run scripts/deploy.js --network base
 
-# Deploy to Base testnet
-npx hardhat run scripts/deploy.js --network base-sepolia
-
-# Save deployment info
-npx hardhat run scripts/deploy.js --network base > deployment.log
+# Save deployment output
+npx hardhat run scripts/deploy.js --network base > deployment.log 2>&1
 ```
+
+---
 
 ## ⚙️ **Post-Deployment Configuration**
 
-### **🚨 CRITICAL SETUP STEPS (Required before platform launch)**
+### **🚨 CRITICAL SETUP STEPS**
 
-#### **Step 1: Fund MysteryBox Prize Pool**
-```javascript
-// scripts/setup-mysterybox.js
-async function setupMysteryBox(contractAddress) {
-  const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
-  
-  console.log("💰 Funding MysteryBox prize pool...");
-  
-  // Fund with substantial amount to cover initial wins
-  const fundingAmount = ethers.utils.parseEther("5.0"); // 5 ETH recommended for production
-  const fundTx = await contract.fundMysteryBoxPool({ value: fundingAmount });
-  await fundTx.wait();
-  
-  const prizePool = await contract.mysteryBoxPrizePool();
-  console.log("✅ Prize pool funded with:", ethers.utils.formatEther(fundingAmount), "ETH");
-  console.log("🎰 Current prize pool balance:", ethers.utils.formatEther(prizePool), "ETH");
-  
-  return prizePool;
-}
-```
-
-#### **Step 2: Set UtilityBox NFT Metadata**
-```javascript
-// scripts/setup-utilitybox.js
-async function setupUtilityBox(contractAddress) {
-  const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
-  
-  console.log("🎨 Setting UtilityBox NFT URI...");
-  
-  // IMPORTANT: Replace with your actual IPFS metadata URI
-  const nftUri = "ipfs://QmYourMetadataHashHere/utilitybox-champion.json";
-  const uriTx = await contract.setUtilityBoxNftUri(nftUri);
-  await uriTx.wait();
-  
-  const currentUri = await contract.utilityBoxNftUri();
-  console.log("✅ NFT URI set to:", currentUri);
-  
-  return currentUri;
-}
-```
-
-#### **Step 3: Configure Bet Limits and Fees**
-```javascript
-// scripts/configure-fees.js
-async function configureFees(contractAddress) {
-  const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
-  
-  console.log("⚙️ Configuring bet limits and fees...");
-  
-  // Set MysteryBox bet limits (adjust based on ETH price)
-  const minBet = ethers.utils.parseEther("0.00035"); // ~$1.05 at $3000 ETH
-  const maxBet = ethers.utils.parseEther("0.01");    // ~$30 at $3000 ETH
-  const limitsTx = await contract.setMysteryBoxBetLimits(minBet, maxBet);
-  await limitsTx.wait();
-  console.log("🎰 MysteryBox bet limits set:", ethers.utils.formatEther(minBet), "-", ethers.utils.formatEther(maxBet), "ETH");
-  
-  // Set UtilityBox fee
-  const utilityFee = ethers.utils.parseEther("0.0001"); // ~$0.30 at $3000 ETH
-  const utilityTx = await contract.setUtilityBoxFee(utilityFee);
-  await utilityTx.wait();
-  console.log("🎁 UtilityBox fee set:", ethers.utils.formatEther(utilityFee), "ETH");
-  
-  // Optional: Adjust other fees based on market conditions
-  // const newCreationFee = ethers.utils.parseEther("0.008");
-  // await contract.setCreationFee(newCreationFee);
-  
-  // const newAchievementFee = ethers.utils.parseEther("0.0004");
-  // await contract.setAchievementUnlockFee(newAchievementFee);
-  
-  console.log("✅ All fees configured successfully");
-}
-```
-
-#### **Step 4: Complete Setup Script**
-```javascript
-// scripts/complete-setup.js
-const { setupMysteryBox } = require('./setup-mysterybox');
-const { setupUtilityBox } = require('./setup-utilitybox');
-const { configureFees } = require('./configure-fees');
-
-async function completeSetup() {
-  const contractAddress = "0xYourContractAddressHere";
-  
-  console.log("🚀 Starting complete post-deployment setup...");
-  console.log("📍 Contract address:", contractAddress);
-  
-  try {
-    // Step 1: Fund MysteryBox
-    await setupMysteryBox(contractAddress);
-    console.log("1/3 ✅ MysteryBox setup complete");
-    
-    // Step 2: Set UtilityBox NFT URI
-    await setupUtilityBox(contractAddress);
-    console.log("2/3 ✅ UtilityBox setup complete");
-    
-    // Step 3: Configure fees
-    await configureFees(contractAddress);
-    console.log("3/3 ✅ Fee configuration complete");
-    
-    console.log("🎉 Platform setup completed successfully!");
-    console.log("🚀 Platform is ready for launch!");
-    
-  } catch (error) {
-    console.error("❌ Setup failed:", error);
-    throw error;
-  }
-}
-
-completeSetup()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
-```
-
-### **Step 5: Verify Contract on BaseScan**
+#### **Step 1: Contract Verification**
 ```bash
-# Install verification plugin
-npm install --save-dev @nomiclabs/hardhat-etherscan
-
-# Verify contract (no constructor parameters)
+# Verify contract on BaseScan
 npx hardhat verify --network base CONTRACT_ADDRESS
 
 # For testnet
 npx hardhat verify --network base-sepolia CONTRACT_ADDRESS
+
+# If verification fails, try with constructor args (none for this contract)
+npx hardhat verify --network base CONTRACT_ADDRESS --constructor-args arguments.js
 ```
 
-### **Step 6: Transfer Ownership (Recommended)**
+#### **Step 2: UtilityBox NFT Metadata Setup**
 ```javascript
-// scripts/transfer-ownership.js
-async function transferOwnership(contractAddress, newOwner) {
+// scripts/setup-utility-box.js
+async function setupUtilityBox() {
+  const contractAddress = "0xYourContractAddress";
   const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
   
-  console.log("🔄 Transferring ownership...");
-  console.log("📍 Contract:", contractAddress);
-  console.log("👑 Current owner:", await contract.owner());
-  console.log("🎯 New owner:", newOwner);
+  console.log("🎨 Setting up UtilityBox NFT metadata...");
   
-  const transferTx = await contract.transferOwnership(newOwner);
-  await transferTx.wait();
+  // Upload metadata to IPFS first
+  const metadataURI = "ipfs://QmYourMetadataHashHere/metadata.json";
   
-  console.log("✅ Ownership transferred successfully!");
-  console.log("👑 New owner:", await contract.owner());
+  // Set the NFT URI
+  const tx = await contract.setUtilityBoxNftUri(metadataURI);
+  await tx.wait();
+  
+  console.log("✅ UtilityBox NFT URI set to:", metadataURI);
+  console.log("📝 Transaction hash:", tx.hash);
 }
 
-// Usage:
-// transferOwnership("0xContractAddress", "0xMultiSigAddress");
+// Example metadata.json structure
+const exampleMetadata = {
+  name: "UtilityBox Champion",
+  description: "Legendary collectible from HybridCommunityPlatform UtilityBox",
+  image: "ipfs://QmYourImageHashHere/image.png",
+  attributes: [
+    {
+      trait_type: "Type",
+      value: "Legendary"
+    },
+    {
+      trait_type: "Source",
+      value: "UtilityBox"
+    },
+    {
+      trait_type: "Rarity",
+      value: "1%"
+    }
+  ]
+};
 ```
 
-## 🎯 **Advanced Configuration**
-
-### **1. Fee Optimization**
+#### **Step 3: Initial Configuration**
 ```javascript
-// Adjust fees based on ETH price and usage
-async function optimizeFees(contractAddress, ethPriceUSD) {
+// scripts/initial-config.js
+async function initialConfiguration() {
+  const contractAddress = "0xYourContractAddress";
   const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
   
-  // Target: ~$1.50 for achievement unlocks
-  const targetAchievementUSD = 1.50;
-  const newAchievementFee = ethers.utils.parseEther((targetAchievementUSD / ethPriceUSD).toString());
-  await contract.setAchievementUnlockFee(newAchievementFee);
+  console.log("⚙️ Setting initial configuration...");
   
-  // Target: ~$0.30 for UtilityBox
-  const targetUtilityUSD = 0.30;
-  const newUtilityFee = ethers.utils.parseEther((targetUtilityUSD / ethPriceUSD).toString());
-  await contract.setUtilityBoxFee(newUtilityFee);
+  // Check if fees need adjustment based on ETH price
+  const ethPriceUSD = await getCurrentETHPrice(); // Implement price fetching
   
-  console.log("💰 Fees optimized for ETH price:", ethPriceUSD, "USD");
-}
-```
-
-### **2. Prize Pool Management**
-```javascript
-// Monitor and manage MysteryBox prize pool
-async function managePrizePool(contractAddress) {
-  const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
-  
-  const prizePool = await contract.mysteryBoxPrizePool();
-  const maxBet = await contract.maxMysteryBoxBet();
-  const maxPayout = maxBet.mul(2); // 2x maximum
-  
-  console.log("🎰 Current prize pool:", ethers.utils.formatEther(prizePool), "ETH");
-  console.log("💥 Maximum single payout:", ethers.utils.formatEther(maxPayout), "ETH");
-  
-  // Recommended: Keep 3-5x max payout in reserve
-  const recommendedMinimum = maxPayout.mul(3);
-  
-  if (prizePool.lt(recommendedMinimum)) {
-    console.log("⚠️ Prize pool below recommended minimum!");
-    console.log("💡 Consider funding with:", ethers.utils.formatEther(recommendedMinimum.sub(prizePool)), "ETH");
+  if (ethPriceUSD) {
+    console.log("💰 Current ETH price:", ethPriceUSD, "USD");
+    
+    // Calculate USD-equivalent fees
+    const targetCreationUSD = 30; // $30
+    const targetUtilityUSD = 0.30; // $0.30
+    const targetAchievementUSD = 1.50; // $1.50
+    
+    const creationFeeETH = targetCreationUSD / ethPriceUSD;
+    const utilityFeeETH = targetUtilityUSD / ethPriceUSD;
+    const achievementFeeETH = targetAchievementUSD / ethPriceUSD;
+    
+    // Only adjust if significantly different from defaults
+    const currentCreationFee = await contract.creationFeeEth();
+    const currentUtilityFee = await contract.utilityBoxFee();
+    const currentAchievementFee = await contract.achievementUnlockFee();
+    
+    const creationFeeWei = ethers.utils.parseEther(creationFeeETH.toString());
+    const utilityFeeWei = ethers.utils.parseEther(utilityFeeETH.toString());
+    const achievementFeeWei = ethers.utils.parseEther(achievementFeeETH.toString());
+    
+    // Adjust fees if needed (more than 20% difference)
+    if (Math.abs(currentCreationFee.sub(creationFeeWei).div(currentCreationFee)) > 0.2) {
+      console.log("🔧 Adjusting creation fee...");
+      const tx = await contract.setCreationFee(creationFeeWei);
+      await tx.wait();
+    }
+    
+    if (Math.abs(currentUtilityFee.sub(utilityFeeWei).div(currentUtilityFee)) > 0.2) {
+      console.log("🔧 Adjusting utility box fee...");
+      const tx = await contract.setUtilityBoxFee(utilityFeeWei);
+      await tx.wait();
+    }
+    
+    if (Math.abs(currentAchievementFee.sub(achievementFeeWei).div(currentAchievementFee)) > 0.2) {
+      console.log("🔧 Adjusting achievement fee...");
+      const tx = await contract.setAchievementUnlockFee(achievementFeeWei);
+      await tx.wait();
+    }
   }
   
-  // Auto-fund if needed (optional)
-  // const fundingNeeded = recommendedMinimum.sub(prizePool);
-  // if (fundingNeeded.gt(0)) {
-  //   await contract.fundMysteryBoxPool({ value: fundingNeeded });
-  // }
+  console.log("✅ Initial configuration completed!");
+}
+
+// Helper function to get current ETH price
+async function getCurrentETHPrice() {
+  try {
+    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+    const data = await response.json();
+    return data.ethereum.usd;
+  } catch (error) {
+    console.warn("⚠️ Could not fetch ETH price, using default fees");
+    return null;
+  }
 }
 ```
 
-### **3. Emergency Procedures**
+#### **Step 4: Security Configuration**
 ```javascript
-// Emergency pause and recovery procedures
-async function emergencyPause(contractAddress) {
+// scripts/security-setup.js
+async function securitySetup() {
+  const contractAddress = "0xYourContractAddress";
   const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
   
-  console.log("🚨 EMERGENCY: Pausing contract...");
-  const pauseTx = await contract.pause();
-  await pauseTx.wait();
+  console.log("🛡️ Setting up security configuration...");
   
+  // Verify contract is not paused
   const isPaused = await contract.paused();
-  console.log("⏸️ Contract paused:", isPaused);
-}
-
-async function emergencyUnpause(contractAddress) {
-  const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
+  if (isPaused) {
+    console.log("⚠️ Contract is paused, unpausing...");
+    const tx = await contract.unpause();
+    await tx.wait();
+  }
   
-  console.log("▶️ Unpausing contract...");
-  const unpauseTx = await contract.unpause();
-  await unpauseTx.wait();
+  // Verify owner is correct
+  const owner = await contract.owner();
+  console.log("👑 Contract owner:", owner);
   
-  const isPaused = await contract.paused();
-  console.log("▶️ Contract running:", !isPaused);
+  // Optional: Transfer ownership to multisig
+  const multisigAddress = "0xYourMultisigAddress"; // Replace with actual multisig
+  if (multisigAddress && multisigAddress !== "0xYourMultisigAddress") {
+    console.log("🔄 Transferring ownership to multisig...");
+    const tx = await contract.transferOwnership(multisigAddress);
+    await tx.wait();
+    console.log("✅ Ownership transferred to:", multisigAddress);
+  }
+  
+  console.log("✅ Security setup completed!");
 }
 ```
 
-## 🔍 **Testing & Verification**
+---
 
-### **1. Comprehensive Function Tests**
+## 🧪 **Testing & Verification**
+
+### **🔬 Comprehensive Testing Suite**
 ```javascript
-// scripts/test-functions.js
-async function testAllFunctions(contractAddress) {
+// scripts/test-deployment.js
+async function testDeployment() {
+  const contractAddress = "0xYourContractAddress";
   const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
   const [deployer] = await ethers.getSigners();
   
-  console.log("🧪 Testing all contract functions...");
+  console.log("🧪 Testing deployed contract...");
   
   try {
-    // Test 1: Community creation
+    // Test 1: Community Creation
     console.log("1️⃣ Testing community creation...");
     const createTx = await contract.createCommunity(
       "Test Community",
@@ -446,7 +468,7 @@ async function testAllFunctions(contractAddress) {
     await createTx.wait();
     console.log("✅ Community creation successful");
     
-    // Test 2: Join community
+    // Test 2: Community Join
     console.log("2️⃣ Testing community join...");
     const joinTx = await contract.joinCommunity(
       1, // communityId
@@ -457,17 +479,8 @@ async function testAllFunctions(contractAddress) {
     await joinTx.wait();
     console.log("✅ Community join successful");
     
-    // Test 3: MysteryBox
-    console.log("3️⃣ Testing MysteryBox...");
-    const mysteryTx = await contract.openMysteryBox(
-      1, // communityId
-      { value: ethers.utils.parseEther("0.00035") } // min bet
-    );
-    await mysteryTx.wait();
-    console.log("✅ MysteryBox test successful");
-    
-    // Test 4: UtilityBox
-    console.log("4️⃣ Testing UtilityBox...");
+    // Test 3: UtilityBox
+    console.log("3️⃣ Testing UtilityBox...");
     const utilityTx = await contract.openUtilityBox(
       1, // communityId
       { value: ethers.utils.parseEther("0.0001") } // utility box fee
@@ -475,7 +488,16 @@ async function testAllFunctions(contractAddress) {
     await utilityTx.wait();
     console.log("✅ UtilityBox test successful");
     
-    // Test 5: Boost purchase
+    // Test 4: Premium Achievement
+    console.log("4️⃣ Testing premium achievement...");
+    const achievementTx = await contract.unlockPremiumAchievement(
+      0, // AchievementType.FIRST_JOIN
+      { value: ethers.utils.parseEther("0.0005") }
+    );
+    await achievementTx.wait();
+    console.log("✅ Premium achievement test successful");
+    
+    // Test 5: Boost Purchase
     console.log("5️⃣ Testing boost purchase...");
     const boostTx = await contract.purchaseBoost(
       0, // BoostType.EXPERIENCE_MULTIPLIER
@@ -483,18 +505,24 @@ async function testAllFunctions(contractAddress) {
       { value: ethers.utils.parseEther("0.0005") }
     );
     await boostTx.wait();
-    console.log("✅ Boost purchase successful");
+    console.log("✅ Boost purchase test successful");
     
-    // Test 6: Premium achievement unlock
-    console.log("6️⃣ Testing premium achievement unlock...");
-    const achievementTx = await contract.unlockPremiumAchievement(
-      0, // AchievementType.FIRST_JOIN
-      { value: ethers.utils.parseEther("0.0005") }
+    // Test 6: Event Creation
+    console.log("6️⃣ Testing event creation...");
+    const eventTx = await contract.createEvent(
+      1, // communityId
+      "Test Event",
+      ethers.utils.parseEther("0.001"), // participation fee
+      0, // EventType.STANDARD
+      Math.floor(Date.now() / 1000) + 3600, // start in 1 hour
+      Math.floor(Date.now() / 1000) + 7200, // end in 2 hours
+      100, // max participants
+      { value: ethers.utils.parseEther("0.002") } // event platform fee
     );
-    await achievementTx.wait();
-    console.log("✅ Premium achievement unlock successful");
+    await eventTx.wait();
+    console.log("✅ Event creation test successful");
     
-    console.log("🎉 All function tests passed!");
+    console.log("🎉 All tests passed successfully!");
     
   } catch (error) {
     console.error("❌ Test failed:", error);
@@ -503,70 +531,149 @@ async function testAllFunctions(contractAddress) {
 }
 ```
 
-### **2. Event Monitoring Setup**
+### **📊 Performance Monitoring**
 ```javascript
-// scripts/monitor-events.js
-async function setupEventMonitoring(contractAddress) {
+// scripts/monitor-performance.js
+async function monitorPerformance() {
+  const contractAddress = "0xYourContractAddress";
   const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
   
-  console.log("👂 Setting up event monitoring...");
+  console.log("📊 Monitoring contract performance...");
   
-  // Community events
-  contract.on("CommunityCreated", (communityId, creator, name) => {
-    console.log(`🏘️ Community created: ${name} (ID: ${communityId}) by ${creator}`);
-  });
+  // Get platform statistics
+  const stats = await contract.getPlatformStats();
+  console.log("📈 Platform Statistics:");
+  console.log("  Total Communities:", stats.totalCommunities.toString());
+  console.log("  Active Communities:", stats.activeCommunities.toString());
+  console.log("  Total Members:", stats.totalMembers.toString());
+  console.log("  Total Transactions:", stats.totalTransactions.toString());
+  console.log("  Total Volume:", ethers.utils.formatEther(stats.totalVolume), "ETH");
+  console.log("  Platform Fees:", ethers.utils.formatEther(stats.totalPlatformFees), "ETH");
   
-  contract.on("MemberJoined", (communityId, member) => {
-    console.log(`👥 Member joined: ${member} → Community ${communityId}`);
-  });
+  // Monitor gas usage
+  const provider = ethers.provider;
+  const latestBlock = await provider.getBlockNumber();
+  const blockData = await provider.getBlock(latestBlock);
   
-  // Game events
-  contract.on("MysteryBoxOpened", (user, reward) => {
-    console.log(`🎰 MysteryBox: ${user} won ${ethers.utils.formatEther(reward)} ETH`);
-  });
+  console.log("⛽ Network Status:");
+  console.log("  Latest Block:", latestBlock);
+  console.log("  Block Gas Limit:", blockData.gasLimit.toString());
+  console.log("  Block Gas Used:", blockData.gasUsed.toString());
+  console.log("  Gas Usage:", (blockData.gasUsed.toNumber() / blockData.gasLimit.toNumber() * 100).toFixed(2), "%");
   
-  contract.on("UtilityBoxOpened", (user, prizeType, value) => {
-    console.log(`🎁 UtilityBox: ${user} won ${prizeType} (${value})`);
-  });
-  
-  // Achievement events
-  contract.on("AchievementUnlocked", (user, achievement) => {
-    console.log(`🏆 Achievement: ${user} unlocked achievement ${achievement}`);
-  });
-  
-  contract.on("LevelUp", (user, newLevel) => {
-    console.log(`📈 Level up: ${user} reached level ${newLevel}`);
-  });
-  
-  // Financial events
-  contract.on("TransactionFeeCharged", (user, fee) => {
-    console.log(`💰 Transaction fee: ${ethers.utils.formatEther(fee)} ETH from ${user}`);
-  });
-  
-  contract.on("PlatformFeeCollected", (amount, source) => {
-    console.log(`🏢 Platform fee: ${ethers.utils.formatEther(amount)} ETH from ${source}`);
-  });
-  
-  // Utility item events
-  contract.on("StreakSaverWon", (user, newTotal) => {
-    console.log(`🛡️ Streak Saver won: ${user} (total: ${newTotal})`);
-  });
-  
-  contract.on("AchievementVoucherWon", (user, newTotal) => {
-    console.log(`🎫 Achievement Voucher won: ${user} (total: ${newTotal})`);
-  });
-  
-  console.log("✅ Event monitoring active");
+  console.log("✅ Performance monitoring completed!");
 }
 ```
 
-### **3. Health Check Script**
+---
+
+## 📱 **Frontend Integration**
+
+### **🔧 Contract Integration Setup**
+```javascript
+// frontend/src/config/contract.js
+export const contractConfig = {
+  address: "0xYourContractAddress",
+  abi: [], // Import from artifacts
+  network: {
+    chainId: 8453,
+    name: "Base Mainnet",
+    rpcUrl: "https://mainnet.base.org",
+    blockExplorer: "https://basescan.org"
+  }
+};
+
+// Frontend contract instance
+import { ethers } from "ethers";
+import { contractConfig } from "./config/contract";
+
+export const getContract = (signerOrProvider) => {
+  return new ethers.Contract(
+    contractConfig.address,
+    contractConfig.abi,
+    signerOrProvider
+  );
+};
+```
+
+### **📊 Event Listening Setup**
+```javascript
+// frontend/src/hooks/useContractEvents.js
+import { useEffect, useState } from "react";
+import { getContract } from "../config/contract";
+
+export const useContractEvents = (provider) => {
+  const [events, setEvents] = useState([]);
+  
+  useEffect(() => {
+    if (!provider) return;
+    
+    const contract = getContract(provider);
+    
+    // Listen to important events
+    const eventHandlers = {
+      CommunityCreated: (communityId, creator, name) => {
+        setEvents(prev => [...prev, {
+          type: "CommunityCreated",
+          data: { communityId, creator, name },
+          timestamp: Date.now()
+        }]);
+      },
+      
+      MemberJoined: (communityId, member) => {
+        setEvents(prev => [...prev, {
+          type: "MemberJoined",
+          data: { communityId, member },
+          timestamp: Date.now()
+        }]);
+      },
+      
+      UtilityBoxOpened: (user, prizeType, value) => {
+        setEvents(prev => [...prev, {
+          type: "UtilityBoxOpened",
+          data: { user, prizeType, value },
+          timestamp: Date.now()
+        }]);
+      },
+      
+      LevelUp: (user, newLevel) => {
+        setEvents(prev => [...prev, {
+          type: "LevelUp",
+          data: { user, newLevel },
+          timestamp: Date.now()
+        }]);
+      }
+    };
+    
+    // Register event listeners
+    Object.entries(eventHandlers).forEach(([event, handler]) => {
+      contract.on(event, handler);
+    });
+    
+    // Cleanup
+    return () => {
+      Object.keys(eventHandlers).forEach(event => {
+        contract.removeAllListeners(event);
+      });
+    };
+  }, [provider]);
+  
+  return events;
+};
+```
+
+---
+
+## 🔍 **Monitoring & Maintenance**
+
+### **📈 Health Monitoring**
 ```javascript
 // scripts/health-check.js
-async function healthCheck(contractAddress) {
+async function healthCheck() {
+  const contractAddress = "0xYourContractAddress";
   const contract = await ethers.getContractAt("HybridCommunityPlatform", contractAddress);
   
-  console.log("🏥 Running platform health check...");
+  console.log("🏥 Running health check...");
   
   // Check contract status
   const isPaused = await contract.paused();
@@ -576,21 +683,9 @@ async function healthCheck(contractAddress) {
   console.log("  Paused:", isPaused ? "❌ YES" : "✅ NO");
   console.log("  Owner:", owner);
   
-  // Check prize pool
-  const prizePool = await contract.mysteryBoxPrizePool();
-  const maxBet = await contract.maxMysteryBoxBet();
-  const maxPayout = maxBet.mul(2);
-  const poolRatio = prizePool.div(maxPayout);
-  
-  console.log("🎰 MysteryBox Health:");
-  console.log("  Prize Pool:", ethers.utils.formatEther(prizePool), "ETH");
-  console.log("  Max Payout:", ethers.utils.formatEther(maxPayout), "ETH");
-  console.log("  Safety Ratio:", poolRatio.toString() + "x");
-  console.log("  Status:", poolRatio.gte(3) ? "✅ HEALTHY" : "⚠️ LOW RESERVES");
-  
   // Check platform stats
   const stats = await contract.getPlatformStats();
-  console.log("📈 Platform Stats:");
+  console.log("📈 Platform Health:");
   console.log("  Total Communities:", stats.totalCommunities.toString());
   console.log("  Active Communities:", stats.activeCommunities.toString());
   console.log("  Total Members:", stats.totalMembers.toString());
@@ -601,97 +696,135 @@ async function healthCheck(contractAddress) {
   const nftUri = await contract.utilityBoxNftUri();
   console.log("🎨 UtilityBox NFT URI:", nftUri || "❌ NOT SET");
   
-  console.log(isPaused ? "❌ PLATFORM OFFLINE" : "✅ PLATFORM HEALTHY");
+  // Check fee configuration
+  const fees = {
+    creation: await contract.creationFeeEth(),
+    utility: await contract.utilityBoxFee(),
+    achievement: await contract.achievementUnlockFee(),
+    boost: await contract.boostPurchaseFee(),
+    event: await contract.eventPlatformFee()
+  };
+  
+  console.log("💰 Fee Configuration:");
+  console.log("  Creation:", ethers.utils.formatEther(fees.creation), "ETH");
+  console.log("  Utility Box:", ethers.utils.formatEther(fees.utility), "ETH");
+  console.log("  Achievement:", ethers.utils.formatEther(fees.achievement), "ETH");
+  console.log("  Boost:", ethers.utils.formatEther(fees.boost), "ETH");
+  console.log("  Event:", ethers.utils.formatEther(fees.event), "ETH");
+  
+  // Overall health assessment
+  const overallHealth = !isPaused && nftUri && stats.totalCommunities.gt(0);
+  console.log("🎯 Overall Health:", overallHealth ? "✅ HEALTHY" : "⚠️ NEEDS ATTENTION");
+  
+  if (!overallHealth) {
+    console.log("📋 Action Items:");
+    if (isPaused) console.log("  - Unpause contract");
+    if (!nftUri) console.log("  - Set UtilityBox NFT URI");
+    if (stats.totalCommunities.eq(0)) console.log("  - Platform needs user adoption");
+  }
 }
 ```
 
-## 📈 **Monitoring & Maintenance**
-
-### **Daily Monitoring**
+### **⚙️ Maintenance Scripts**
 ```bash
-# Check contract health
+# Daily monitoring
 npx hardhat run scripts/health-check.js --network base
 
-# Monitor events
-npx hardhat run scripts/monitor-events.js --network base
-
-# Check prize pool levels
-npx hardhat run scripts/check-prize-pool.js --network base
-```
-
-### **Weekly Maintenance**
-```bash
-# Optimize fees based on ETH price
+# Weekly fee optimization
 npx hardhat run scripts/optimize-fees.js --network base
 
-# Review platform statistics
-npx hardhat run scripts/platform-stats.js --network base
+# Monthly platform review
+npx hardhat run scripts/platform-review.js --network base
 
-# Backup configuration
-npx hardhat run scripts/backup-config.js --network base
-```
-
-### **Emergency Response**
-```bash
-# Pause contract
+# Emergency pause (if needed)
 npx hardhat run scripts/emergency-pause.js --network base
-
-# Unpause contract
-npx hardhat run scripts/emergency-unpause.js --network base
-
-# Emergency fund management
-npx hardhat run scripts/emergency-funds.js --network base
 ```
 
-## 🛡️ **Security Checklist**
+---
 
-### **Pre-Launch Security Verification**
+## 🛡️ **Security & Best Practices**
+
+### **🔒 Security Checklist**
 - [ ] Contract verified on BaseScan
-- [ ] Ownership transferred to multi-sig
-- [ ] Prize pool adequately funded (5x max payout)
-- [ ] UtilityBox NFT URI properly set
+- [ ] Owner key secured (preferably multisig)
+- [ ] UtilityBox NFT URI set properly
 - [ ] All fees configured appropriately
-- [ ] Emergency procedures tested
+- [ ] Emergency pause tested
+- [ ] Test transactions successful
 - [ ] Event monitoring active
-- [ ] Health check script running
+- [ ] Backup procedures documented
 
-### **Post-Launch Monitoring**
-- [ ] Daily health checks
-- [ ] Prize pool level monitoring
-- [ ] Event log analysis
-- [ ] Fee optimization based on usage
-- [ ] Community growth tracking
-- [ ] Security incident response plan active
-
-## 📋 **Deployment Checklist**
-
-### **Pre-Deployment**
-- [ ] Hardhat configuration verified
+### **📋 Deployment Checklist**
+- [ ] Environment setup completed
 - [ ] Dependencies installed
-- [ ] Network settings confirmed
-- [ ] Deployment script tested on testnet
-- [ ] Gas estimation completed
-
-### **Deployment**
-- [ ] Contract deployed successfully
-- [ ] Contract verified on BaseScan
-- [ ] Initial state verified
-- [ ] Transaction hash saved
-
-### **Post-Deployment**
-- [ ] MysteryBox prize pool funded
-- [ ] UtilityBox NFT URI set
-- [ ] Bet limits and fees configured
-- [ ] Ownership transferred (if applicable)
-- [ ] Event monitoring setup
-- [ ] Health check implemented
-- [ ] Documentation updated
-
-### **Launch Ready**
-- [ ] All functions tested
-- [ ] Platform health verified
+- [ ] Network configuration verified
+- [ ] Wallet funded adequately
+- [ ] Contract compiled successfully
+- [ ] Deployment script tested
+- [ ] Contract deployed to testnet first
+- [ ] All tests passing
+- [ ] Contract verified on explorer
+- [ ] Initial configuration completed
+- [ ] Security measures implemented
 - [ ] Monitoring systems active
-- [ ] Emergency procedures ready
-- [ ] Team trained on operations
 
-**🎉 Platform ready for launch!** All technical requirements satisfied and monitoring systems active. 
+---
+
+## 📞 **Support & Troubleshooting**
+
+### **🔧 Common Issues**
+
+#### **Deployment Failures:**
+- **Insufficient Gas:** Increase gas limit to 8,000,000
+- **Network Issues:** Check RPC URL and network status
+- **Nonce Issues:** Reset MetaMask account or use fresh wallet
+- **Balance Issues:** Ensure adequate ETH balance
+
+#### **Verification Issues:**
+- **Constructor Args:** Contract has no constructor arguments
+- **Compiler Version:** Use Solidity 0.8.19
+- **Optimization:** Use optimizer with 200 runs
+- **Network:** Ensure correct network selection
+
+#### **Configuration Issues:**
+- **NFT URI:** Must be valid IPFS URL
+- **Fee Adjustments:** Check owner permissions
+- **Paused State:** Contract may be paused
+- **Gas Price:** Use appropriate gas price for network
+
+### **📚 Additional Resources**
+- **Base Documentation:** https://docs.base.org
+- **OpenZeppelin Docs:** https://docs.openzeppelin.com
+- **Hardhat Documentation:** https://hardhat.org/docs
+- **BaseScan:** https://basescan.org
+
+---
+
+## 🎯 **Post-Launch Checklist**
+
+### **📊 Week 1:**
+- [ ] Monitor deployment health daily
+- [ ] Check for any transaction failures
+- [ ] Verify user adoption metrics
+- [ ] Ensure all systems operational
+- [ ] Document any issues found
+
+### **📈 Month 1:**
+- [ ] Analyze usage patterns
+- [ ] Optimize fees based on market conditions
+- [ ] Review security logs
+- [ ] Plan feature updates
+- [ ] Collect user feedback
+
+### **🚀 Long-term:**
+- [ ] Regular security audits
+- [ ] Fee optimization based on usage
+- [ ] Platform growth strategies
+- [ ] Community feedback integration
+- [ ] Scalability planning
+
+---
+
+**🎉 Congratulations! Your HybridCommunityPlatform is now successfully deployed and ready to revolutionize Web3 communities!**
+
+*Remember: Deployment is just the beginning. Continuous monitoring, optimization, and community building are key to platform success.* 

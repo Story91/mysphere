@@ -11,7 +11,7 @@ const config = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 10
+        runs: 50
       },
       viaIR: true
     }

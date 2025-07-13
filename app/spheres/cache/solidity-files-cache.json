@@ -1,16 +1,16 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\app\\spheres\\contracts\\spheres.sol": {
-      "lastModificationDate": 1752362443501,
-      "contentHash": "c9a50f7e298ac6fa4bbd891bb4322a5b",
-      "sourceName": "app/spheres/contracts/spheres.sol",
+    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\app\\spheres\\contracts\\spheres-core.sol": {
+      "lastModificationDate": 1752409498400,
+      "contentHash": "91f91739a72f5bb6b8aff2102033678c",
+      "sourceName": "app/spheres/contracts/spheres-core.sol",
       "solcConfig": {
         "version": "0.8.19",
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -43,80 +43,6 @@
         "HybridCommunityPlatform"
       ]
     },
-    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\utils\\Counters.sol": {
-      "lastModificationDate": 1745272735788,
-      "contentHash": "74654e3ae5d7f39555055dfe244dab7a",
-      "sourceName": "@openzeppelin/contracts/utils/Counters.sol",
-      "solcConfig": {
-        "version": "0.8.19",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 10
-          },
-          "viaIR": true,
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        "^0.8.0"
-      ],
-      "artifacts": [
-        "Counters"
-      ]
-    },
-    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
-      "lastModificationDate": 1745272735947,
-      "contentHash": "5a20b2cad87ddb61c7a3a6af21289e28",
-      "sourceName": "@openzeppelin/contracts/access/Ownable.sol",
-      "solcConfig": {
-        "version": "0.8.19",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 10
-          },
-          "viaIR": true,
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "../utils/Context.sol"
-      ],
-      "versionPragmas": [
-        "^0.8.0"
-      ],
-      "artifacts": [
-        "Ownable"
-      ]
-    },
     "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\security\\ReentrancyGuard.sol": {
       "lastModificationDate": 1745272735953,
       "contentHash": "1535f8c0c68463f8c1b5239f7584e71f",
@@ -126,7 +52,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -153,6 +79,42 @@
         "ReentrancyGuard"
       ]
     },
+    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\utils\\Counters.sol": {
+      "lastModificationDate": 1745272735788,
+      "contentHash": "74654e3ae5d7f39555055dfe244dab7a",
+      "sourceName": "@openzeppelin/contracts/utils/Counters.sol",
+      "solcConfig": {
+        "version": "0.8.19",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 50
+          },
+          "viaIR": true,
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "Counters"
+      ]
+    },
     "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\security\\Pausable.sol": {
       "lastModificationDate": 1745272735949,
       "contentHash": "25c8108f36fdd472bc78d4c4af240c11",
@@ -162,7 +124,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -191,6 +153,44 @@
         "Pausable"
       ]
     },
+    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
+      "lastModificationDate": 1745272735947,
+      "contentHash": "5a20b2cad87ddb61c7a3a6af21289e28",
+      "sourceName": "@openzeppelin/contracts/access/Ownable.sol",
+      "solcConfig": {
+        "version": "0.8.19",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 50
+          },
+          "viaIR": true,
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../utils/Context.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "Ownable"
+      ]
+    },
     "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\extensions\\ERC721URIStorage.sol": {
       "lastModificationDate": 1745272735869,
       "contentHash": "de368c6a87e159c86544ae5041b58cf3",
@@ -200,7 +200,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -239,7 +239,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -275,7 +275,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -314,7 +314,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -358,7 +358,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -394,7 +394,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -430,7 +430,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -466,7 +466,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -504,7 +504,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -540,7 +540,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -570,6 +570,42 @@
         "Strings"
       ]
     },
+    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\IERC721Receiver.sol": {
+      "lastModificationDate": 1745272735922,
+      "contentHash": "c22d4395e33763de693fd440c6fd10e1",
+      "sourceName": "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol",
+      "solcConfig": {
+        "version": "0.8.19",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 50
+          },
+          "viaIR": true,
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "IERC721Receiver"
+      ]
+    },
     "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\utils\\introspection\\ERC165.sol": {
       "lastModificationDate": 1745272735823,
       "contentHash": "0e7db055ce108f9da7bb6686a00287c0",
@@ -579,7 +615,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -608,42 +644,6 @@
         "ERC165"
       ]
     },
-    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\IERC721Receiver.sol": {
-      "lastModificationDate": 1745272735922,
-      "contentHash": "c22d4395e33763de693fd440c6fd10e1",
-      "sourceName": "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol",
-      "solcConfig": {
-        "version": "0.8.19",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 10
-          },
-          "viaIR": true,
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        "^0.8.0"
-      ],
-      "artifacts": [
-        "IERC721Receiver"
-      ]
-    },
     "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\token\\ERC721\\extensions\\IERC721Metadata.sol": {
       "lastModificationDate": 1745272735921,
       "contentHash": "efbc0d15b80a74e34dbe8da0f3e879bb",
@@ -653,7 +653,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -682,42 +682,6 @@
         "IERC721Metadata"
       ]
     },
-    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\utils\\math\\SignedMath.sol": {
-      "lastModificationDate": 1745272735959,
-      "contentHash": "9488ebd4daacfee8ad04811600d7d061",
-      "sourceName": "@openzeppelin/contracts/utils/math/SignedMath.sol",
-      "solcConfig": {
-        "version": "0.8.19",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 10
-          },
-          "viaIR": true,
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        "^0.8.0"
-      ],
-      "artifacts": [
-        "SignedMath"
-      ]
-    },
     "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\utils\\math\\Math.sol": {
       "lastModificationDate": 1745272735944,
       "contentHash": "fe63409d8a06818b926cf89e0ea88b1b",
@@ -727,7 +691,7 @@
         "settings": {
           "optimizer": {
             "enabled": true,
-            "runs": 10
+            "runs": 50
           },
           "viaIR": true,
           "outputSelection": {
@@ -752,6 +716,42 @@
       ],
       "artifacts": [
         "Math"
+      ]
+    },
+    "C:\\Users\\Cezary\\Desktop\\CreateOnchain 17.01 with Cursor\\BaseBook\\node_modules\\@openzeppelin\\contracts\\utils\\math\\SignedMath.sol": {
+      "lastModificationDate": 1745272735959,
+      "contentHash": "9488ebd4daacfee8ad04811600d7d061",
+      "sourceName": "@openzeppelin/contracts/utils/math/SignedMath.sol",
+      "solcConfig": {
+        "version": "0.8.19",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 50
+          },
+          "viaIR": true,
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "SignedMath"
       ]
     }
   }
