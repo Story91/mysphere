@@ -7,19 +7,20 @@ require("dotenv").config();
 
 const config = {
   solidity: {
-    version: "0.8.20",
+    version: "0.8.19",
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200
-      }
+        runs: 10
+      },
+      viaIR: true
     }
   },
   paths: {
-    sources: "./app/basemorning/contracts",
-    tests: "./app/basemorning/test",
-    cache: "./app/basemorning/cache",
-    artifacts: "./app/basemorning/artifacts"
+    sources: "./app/spheres/contracts",
+    tests: "./app/spheres/test",
+    cache: "./app/spheres/cache",
+    artifacts: "./app/spheres/artifacts"
   },
   networks: {
     "base-sepolia": {
@@ -72,7 +73,7 @@ const config = {
     ]
   },
   typechain: {
-    outDir: "app/basemorning/typechain-types",
+    outDir: "app/spheres/typechain-types",
     target: "ethers-v6"
   },
   gasReporter: {
