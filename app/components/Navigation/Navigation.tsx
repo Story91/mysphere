@@ -24,6 +24,7 @@ import {
 import { useAccount } from 'wagmi';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
+import { NetworkSwitcher } from '../NetworkSwitcher';
 
 // Stały adres administratora
 const ADMIN_ADDRESS = "0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd";
@@ -323,7 +324,8 @@ export default function Navigation() {
               </svg>
             </button>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <NetworkSwitcher />
             <Wallet>
               <ConnectWallet className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2">
                 <ConnectWalletText>Log In</ConnectWalletText>
