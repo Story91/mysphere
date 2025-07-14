@@ -133,7 +133,7 @@ const MemberList: React.FC<MemberListProps> = ({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Szukaj członków..."
+              placeholder="Search members..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -149,7 +149,7 @@ const MemberList: React.FC<MemberListProps> = ({
               className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-700/50 transition-colors"
             >
               <Filter className="w-4 h-4" />
-              Filtry
+              Filters
             </button>
             
             <AnimatePresence>
@@ -172,8 +172,8 @@ const MemberList: React.FC<MemberListProps> = ({
                           activeFilter === filter ? 'bg-purple-500/20 text-purple-400' : 'hover:bg-gray-700'
                         }`}
                       >
-                        {filter === 'all' ? 'Wszyscy' : filter === 'online' ? 'Online' : filter === 'offline' ? 'Offline' : 
-                         filter === 'banned' ? 'Zbanowani' : filter === 'premium' ? 'Premium' : 
+                        {filter === 'all' ? 'All' : filter === 'online' ? 'Online' : filter === 'offline' ? 'Offline' : 
+                         filter === 'banned' ? 'Banned' : filter === 'premium' ? 'Premium' : 
                          filter.charAt(0).toUpperCase() + filter.slice(1)}
                       </button>
                     ))}
@@ -188,10 +188,10 @@ const MemberList: React.FC<MemberListProps> = ({
             onChange={(e) => setSortBy(e.target.value)}
             className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500"
           >
-            <option value="joinedAt">Data dołączenia</option>
-            <option value="reputation">Reputacja</option>
-            <option value="lastActive">Ostatnia aktywność</option>
-            <option value="messages">Liczba wiadomości</option>
+            <option value="joinedAt">Join Date</option>
+            <option value="reputation">Reputation</option>
+            <option value="lastActive">Last Active</option>
+            <option value="messages">Message Count</option>
           </select>
         </div>
       </div>
@@ -200,7 +200,7 @@ const MemberList: React.FC<MemberListProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
           <div className="text-2xl font-bold text-white">{members.length}</div>
-          <div className="text-sm text-gray-400">Wszyscy członkowie</div>
+          <div className="text-sm text-gray-400">Total Members</div>
         </div>
         <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
           <div className="text-2xl font-bold text-green-400">{members.filter(m => m.isOnline).length}</div>
@@ -212,7 +212,7 @@ const MemberList: React.FC<MemberListProps> = ({
         </div>
         <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
           <div className="text-2xl font-bold text-red-400">{members.filter(m => m.isBanned).length}</div>
-          <div className="text-sm text-gray-400">Zbanowani</div>
+          <div className="text-sm text-gray-400">Banned</div>
         </div>
       </div>
 
@@ -262,7 +262,7 @@ const MemberList: React.FC<MemberListProps> = ({
                       )}
                       {member.isBanned && (
                         <span className="px-2 py-1 text-xs bg-red-500/20 text-red-400 rounded-full">
-                          Zbanowany
+                          Banned
                         </span>
                       )}
                     </div>
@@ -309,28 +309,28 @@ const MemberList: React.FC<MemberListProps> = ({
                                 className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-700 flex items-center gap-2"
                               >
                                 <Crown className="w-4 h-4" />
-                                Awansuj
+                                Promote
                               </button>
                               <button
                                 onClick={() => onMemberAction(member.id, 'demote')}
                                 className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-700 flex items-center gap-2"
                               >
                                 <UserMinus className="w-4 h-4" />
-                                Degraduj
+                                Demote
                               </button>
                               <button
                                 onClick={() => onMemberAction(member.id, 'mentor')}
                                 className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-700 flex items-center gap-2"
                               >
                                 <UserPlus className="w-4 h-4" />
-                                Przypisz mentora
+                                Assign Mentor
                               </button>
                               <button
                                 onClick={() => onMemberAction(member.id, member.isBanned ? 'unban' : 'ban')}
                                 className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-700 flex items-center gap-2 text-red-400"
                               >
                                 <Ban className="w-4 h-4" />
-                                {member.isBanned ? 'Odbanuj' : 'Zbanuj'}
+                                {member.isBanned ? 'Unban' : 'Ban'}
                               </button>
                             </div>
                           </motion.div>
@@ -348,8 +348,8 @@ const MemberList: React.FC<MemberListProps> = ({
       {/* Brak wyników */}
       {filteredMembers.length === 0 && (
         <div className="text-center py-12">
-          <div className="text-gray-400 text-lg">Brak członków spełniających kryteria</div>
-          <div className="text-gray-500 text-sm mt-1">Spróbuj zmienić filtry lub zapytanie wyszukiwania</div>
+          <div className="text-gray-400 text-lg">No members match the criteria</div>
+          <div className="text-gray-500 text-sm mt-1">Try changing the filters or search query</div>
         </div>
       )}
     </div>

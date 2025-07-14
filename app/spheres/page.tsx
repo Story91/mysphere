@@ -1,18 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useAccount } from 'wagmi';
 import { Toaster } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import UserDashboard from './components/UserDashboard/UserDashboard';
-import CommunityBrowser from './components/CommunityBrowser/CommunityBrowser';
-import CreatorDashboard from './components/CreatorDashboard/CreatorDashboard';
-import CreateCommunityForm from './components/CommunityCreation/CreateCommunityForm';
 import { useSpheresContract } from './hooks/useSpheresContract';
 
 export default function SpheresPage() {
   const { address, isConnected } = useAccount();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'browser' | 'create' | 'creator'>('dashboard');
   const { isLoading, error } = useSpheresContract();
 
   // Redirect to wallet connection if not connected
@@ -37,58 +33,6 @@ export default function SpheresPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Header Navigation */}
-      <header className="sticky top-0 z-50 bg-black/20 backdrop-blur-sm border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold">S</span>
-                </div>
-                <h1 className="text-xl font-bold text-white">Spheres</h1>
-              </div>
-            </div>
-            
-            {/* Tab Navigation */}
-            <nav className="flex space-x-1 bg-white/5 rounded-full p-1">
-                          {[
-              { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-              { id: 'browser', label: 'Browse', icon: '🔍' },
-              { id: 'creator', label: 'Creator', icon: '🎨' },
-              { id: 'create', label: 'Create', icon: '➕' }
-            ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-                    activeTab === tab.id
-                      ? 'bg-purple-500 text-white shadow-lg'
-                      : 'text-gray-300 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  <span>{tab.icon}</span>
-                  <span className="font-medium">{tab.label}</span>
-                </button>
-              ))}
-            </nav>
-
-            {/* User Info */}
-            <div className="flex items-center space-x-3">
-              <div className="text-right">
-                <p className="text-sm text-gray-300">Connected</p>
-                <p className="text-xs text-gray-400">
-                  {address?.slice(0, 6)}...{address?.slice(-4)}
-                </p>
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm">👤</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Loading State */}
@@ -109,18 +53,8 @@ export default function SpheresPage() {
           </motion.div>
         )}
 
-        {/* Tab Content */}
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {activeTab === 'dashboard' && <UserDashboard />}
-          {activeTab === 'browser' && <CommunityBrowser />}
-          {activeTab === 'creator' && <CreatorDashboard />}
-          {activeTab === 'create' && <CreateCommunityForm />}
-        </motion.div>
+        {/* Main Dashboard */}
+        <UserDashboard />
       </main>
 
       {/* Toast Notifications */}

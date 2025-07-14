@@ -28,7 +28,7 @@ interface CommunityFormData {
 
 export default function CreateCommunityForm() {
   const { address, isConnected } = useAccount();
-  const { createCommunity, creationFee, isLoading, parseEther } = useSpheresContract();
+  const { createCommunity, creationFee, isLoading } = useSpheresContract();
   
   const [currentStep, setCurrentStep] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
@@ -134,9 +134,9 @@ export default function CreateCommunityForm() {
       await createCommunity(
         formData.name,
         formData.description,
-        parseEther(formData.joinFee),
-        parseEther(formData.monthlyFee),
-        parseEther(formData.lifetimeFee)
+        formData.joinFee,
+        formData.monthlyFee,
+        formData.lifetimeFee
       );
       
       setCreatedCommunityId(1); // Temporary ID - in real app would be returned from contract

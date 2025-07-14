@@ -67,81 +67,67 @@ const BanManagement: React.FC<BanManagementProps> = ({
   onHandleAppeal,
   currentUserRole
 }) => {
-  const [banRecords, setBanRecords] = useState<BanRecord[]>([]);
-  const [autoRules, setAutoRules] = useState<AutoModerationRule[]>([]);
-  const [activeTab, setActiveTab] = useState<'bans' | 'appeals' | 'rules' | 'create'>('bans');
+  const [activeTab, setActiveTab] = useState<'bans' | 'rules' | 'create'>('bans');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired'>('all');
-  const [showCreateBan, setShowCreateBan] = useState(false);
   const [showCreateRule, setShowCreateRule] = useState(false);
-
-  // Formularz nowego bana
-  const [newBan, setNewBan] = useState({
-    userId: '',
-    username: '',
-    banType: 'temporary' as const,
-    reason: '',
-    category: 'spam' as const,
-    duration: 24
-  });
-
-  // Formularz nowej reguły
-  const [newRule, setNewRule] = useState({
+  const [banRecords, setBanRecords] = useState<BanRecord[]>([]);
+  const [autoRules, setAutoRules] = useState<AutoModerationRule[]>([]);
+  const [newRule, setNewRule] = useState<Partial<AutoModerationRule>>({
     name: '',
-    category: 'spam' as const,
+    category: 'spam',
     triggerCount: 3,
     timeWindow: 24,
-    action: 'warning' as const,
-    duration: 24
+    action: 'warning',
+    duration: 0,
+    isActive: true
   });
 
-  // Przykładowe dane
+  // Przykładowe dane banów
   useEffect(() => {
-    // Symulowane dane banów
-    setBanRecords([
+    const mockBans: BanRecord[] = [
       {
         id: '1',
         userId: '0x123',
-        username: 'UserSpammer',
+        username: 'SpamUser',
         avatar: '',
         banType: 'temporary',
-        reason: 'Wielokrotne wysyłanie spam wiadomości',
+        reason: 'Multiple spam messages',
         category: 'spam',
         bannedBy: 'Admin',
-        bannedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+        bannedAt: new Date(Date.now() - 86400000),
+        expiresAt: new Date(Date.now() + 86400000),
         isActive: true,
-        appealStatus: 'pending',
-        appealMessage: 'Przepraszam za spam, to nie będzie się więcej powtarzać.',
-        appealedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
+        appealStatus: 'none'
       },
       {
         id: '2',
         userId: '0x456',
-        username: 'ToxicUser',
+        username: 'TrollUser',
         avatar: '',
         banType: 'permanent',
-        reason: 'Nękanie innych użytkowników',
+        reason: 'Harassment and toxicity',
         category: 'harassment',
-        bannedBy: 'Moderator',
-        bannedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        bannedBy: 'Admin',
+        bannedAt: new Date(Date.now() - 172800000),
         isActive: true,
-        appealStatus: 'rejected'
+        appealStatus: 'pending',
+        appealMessage: 'I was just joking, please unban me',
+        appealedAt: new Date(Date.now() - 86400000)
       }
-    ]);
+    ];
 
-    // Symulowane reguły automatyczne
-    setAutoRules([
+    const mockRules: AutoModerationRule[] = [
       {
         id: '1',
-        name: 'Anti-Spam Protection',
+        name: 'Spam Detection',
         category: 'spam',
         triggerCount: 5,
         timeWindow: 1,
         action: 'mute',
         duration: 24,
         isActive: true,
-        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        createdAt: new Date()
       },
       {
         id: '2',
@@ -150,105 +136,81 @@ const BanManagement: React.FC<BanManagementProps> = ({
         triggerCount: 3,
         timeWindow: 24,
         action: 'ban',
-        duration: 168, // 7 dni
+        duration: 168,
         isActive: true,
-        createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
+        createdAt: new Date()
       }
-    ]);
+    ];
+
+    setBanRecords(mockBans);
+    setAutoRules(mockRules);
   }, []);
 
-  // Filtrowanie rekordów banów
+  // Filtrowanie banów
   const filteredBans = banRecords.filter(ban => {
     const matchesSearch = ban.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          ban.reason.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesFilter = filterStatus === 'all' || 
+    const matchesStatus = filterStatus === 'all' || 
                          (filterStatus === 'active' && ban.isActive) ||
                          (filterStatus === 'expired' && !ban.isActive);
     
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesStatus;
   });
 
-  // Obsługa tworzenia nowego bana
   const handleCreateBan = () => {
-    const banData: Partial<BanRecord> = {
-      userId: newBan.userId,
-      banType: newBan.banType,
-      reason: newBan.reason,
-      category: newBan.category,
-      bannedBy: currentUserRole,
-      bannedAt: new Date(),
-      expiresAt: newBan.banType === 'temporary' ? 
-        new Date(Date.now() + newBan.duration * 60 * 60 * 1000) : undefined,
-      isActive: true,
-      appealStatus: 'none'
-    };
-
-    onBanUser(newBan.userId, banData);
-    setShowCreateBan(false);
-    setNewBan({
-      userId: '',
-      username: '',
-      banType: 'temporary',
-      reason: '',
-      category: 'spam',
-      duration: 24
-    });
+    // Logika tworzenia bana
+    console.log('Creating ban');
   };
 
-  // Obsługa tworzenia nowej reguły
   const handleCreateRule = () => {
-    const rule: AutoModerationRule = {
-      id: Date.now().toString(),
-      name: newRule.name,
-      category: newRule.category,
-      triggerCount: newRule.triggerCount,
-      timeWindow: newRule.timeWindow,
-      action: newRule.action,
-      duration: newRule.duration,
-      isActive: true,
-      createdAt: new Date()
-    };
+    if (newRule.name && newRule.category && newRule.triggerCount && newRule.timeWindow) {
+      const rule: AutoModerationRule = {
+        id: Date.now().toString(),
+        name: newRule.name,
+        category: newRule.category,
+        triggerCount: newRule.triggerCount,
+        timeWindow: newRule.timeWindow,
+        action: newRule.action || 'warning',
+        duration: newRule.duration || 0,
+        isActive: newRule.isActive || true,
+        createdAt: new Date()
+      };
 
-    setAutoRules([...autoRules, rule]);
-    setShowCreateRule(false);
-    setNewRule({
-      name: '',
-      category: 'spam',
-      triggerCount: 3,
-      timeWindow: 24,
-      action: 'warning',
-      duration: 24
-    });
+      setAutoRules([...autoRules, rule]);
+      setNewRule({
+        name: '',
+        category: 'spam',
+        triggerCount: 3,
+        timeWindow: 24,
+        action: 'warning',
+        duration: 0,
+        isActive: true
+      });
+      setShowCreateRule(false);
+    }
   };
 
-  // Funkcja formatowania czasu
   const formatTime = (date: Date) => {
-    return new Date(date).toLocaleString();
+    return date.toLocaleString();
   };
 
-  // Funkcja obliczania pozostałego czasu
   const getRemainingTime = (expiresAt: Date) => {
     const now = new Date();
-    const remaining = expiresAt.getTime() - now.getTime();
-    
-    if (remaining <= 0) return 'Wygasł';
-    
-    const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
-    return `${days}d ${hours}h`;
+    const diff = expiresAt.getTime() - now.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m left`;
   };
 
   return (
     <div className="space-y-6">
-      {/* Nawigacja */}
-      <div className="flex flex-wrap gap-2 mb-6">
+      {/* Tab navigation */}
+      <div className="flex space-x-2">
         {[
-          { id: 'bans', label: 'Aktywne bany', icon: Ban },
-          { id: 'appeals', label: 'Odwołania', icon: MessageSquare },
-          { id: 'rules', label: 'Reguły auto', icon: Shield },
-          { id: 'create', label: 'Nowy ban', icon: Plus }
+          { id: 'bans', label: 'Active Bans', icon: Ban },
+          { id: 'rules', label: 'Auto Rules', icon: Shield },
+          { id: 'create', label: 'New Ban', icon: Plus }
         ].map(tab => (
           <button
             key={tab.id}
@@ -275,7 +237,7 @@ const BanManagement: React.FC<BanManagementProps> = ({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Szukaj banów..."
+                  placeholder="Search bans..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500"
@@ -286,16 +248,16 @@ const BanManagement: React.FC<BanManagementProps> = ({
                 onChange={(e) => setFilterStatus(e.target.value as any)}
                 className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500"
               >
-                <option value="all">Wszystkie</option>
-                <option value="active">Aktywne</option>
-                <option value="expired">Wygasłe</option>
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="expired">Expired</option>
               </select>
             </div>
             
             <div className="flex gap-2">
               <div className="text-sm text-gray-400 flex items-center gap-2">
                 <Ban className="w-4 h-4" />
-                {filteredBans.filter(b => b.isActive).length} aktywnych banów
+                {filteredBans.filter(b => b.isActive).length} active bans
               </div>
             </div>
           </div>
@@ -337,8 +299,8 @@ const BanManagement: React.FC<BanManagementProps> = ({
                               ? 'bg-yellow-500/20 text-yellow-400'
                               : 'bg-orange-500/20 text-orange-400'
                           }`}>
-                            {ban.banType === 'permanent' ? 'Permanentny' : 
-                             ban.banType === 'temporary' ? 'Tymczasowy' : 'Ostrzeżenie'}
+                            {ban.banType === 'permanent' ? 'Permanent' : 
+                             ban.banType === 'temporary' ? 'Temporary' : 'Warning'}
                           </span>
                           <span className="px-2 py-1 text-xs bg-gray-600/20 text-gray-400 rounded-full">
                             {ban.category}
@@ -350,7 +312,7 @@ const BanManagement: React.FC<BanManagementProps> = ({
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3" />
-                            przez {ban.bannedBy}
+                            by {ban.bannedBy}
                           </span>
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
@@ -371,7 +333,7 @@ const BanManagement: React.FC<BanManagementProps> = ({
                       {ban.appealStatus === 'pending' && (
                         <div className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
                           <AlertCircle className="w-3 h-3" />
-                          Odwołanie
+                          Appeal
                         </div>
                       )}
                       {ban.isActive && (
@@ -379,7 +341,7 @@ const BanManagement: React.FC<BanManagementProps> = ({
                           onClick={() => onUnbanUser(ban.userId)}
                           className="px-3 py-1 bg-green-500/20 text-green-400 rounded text-xs hover:bg-green-500/30 transition-colors"
                         >
-                          Odbanuj
+                          Unban
                         </button>
                       )}
                     </div>
@@ -390,7 +352,7 @@ const BanManagement: React.FC<BanManagementProps> = ({
                     <div className="mt-3 p-3 bg-gray-700/30 rounded-lg border border-gray-600">
                       <div className="flex items-center gap-2 mb-2">
                         <MessageSquare className="w-4 h-4 text-yellow-400" />
-                        <span className="text-sm font-medium text-yellow-400">Odwołanie</span>
+                        <span className="text-sm font-medium text-yellow-400">Appeal</span>
                         <span className="text-xs text-gray-500">
                           {ban.appealedAt && formatTime(ban.appealedAt)}
                         </span>
@@ -402,14 +364,14 @@ const BanManagement: React.FC<BanManagementProps> = ({
                           className="flex items-center gap-1 px-3 py-1 bg-green-500/20 text-green-400 rounded text-xs hover:bg-green-500/30 transition-colors"
                         >
                           <CheckCircle className="w-3 h-3" />
-                          Zatwierdź
+                          Approve
                         </button>
                         <button
                           onClick={() => onHandleAppeal(ban.id, 'rejected')}
                           className="flex items-center gap-1 px-3 py-1 bg-red-500/20 text-red-400 rounded text-xs hover:bg-red-500/30 transition-colors"
                         >
                           <XCircle className="w-3 h-3" />
-                          Odrzuć
+                          Reject
                         </button>
                       </div>
                     </div>
@@ -425,13 +387,13 @@ const BanManagement: React.FC<BanManagementProps> = ({
       {activeTab === 'rules' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-white">Reguły automatycznej moderacji</h3>
+            <h3 className="text-lg font-semibold text-white">Auto-Moderation Rules</h3>
             <button
               onClick={() => setShowCreateRule(true)}
               className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Nowa reguła
+              New Rule
             </button>
           </div>
 
@@ -445,26 +407,22 @@ const BanManagement: React.FC<BanManagementProps> = ({
                       <span className={`px-2 py-1 text-xs rounded-full ${
                         rule.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
                       }`}>
-                        {rule.isActive ? 'Aktywna' : 'Nieaktywna'}
+                        {rule.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </div>
-                    
                     <div className="text-sm text-gray-400 mb-2">
-                      {rule.triggerCount} naruszeń w ciągu {rule.timeWindow}h → {rule.action}
-                      {rule.duration > 0 && ` na ${rule.duration}h`}
+                      {rule.triggerCount} violations in {rule.timeWindow}h → {rule.action}
+                      {rule.duration > 0 && ` for ${rule.duration}h`}
                     </div>
-                    
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span>Kategoria: {rule.category}</span>
-                      <span>Utworzona: {formatTime(rule.createdAt)}</span>
+                    <div className="text-xs text-gray-500">
+                      Category: {rule.category}
                     </div>
                   </div>
-                  
                   <div className="flex items-center gap-2">
-                    <button className="p-2 hover:bg-gray-700/50 rounded transition-colors">
+                    <button className="p-1 text-gray-400 hover:text-white">
                       <Edit className="w-4 h-4" />
                     </button>
-                    <button className="p-2 hover:bg-gray-700/50 rounded transition-colors text-red-400">
+                    <button className="p-1 text-gray-400 hover:text-red-400">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -475,106 +433,7 @@ const BanManagement: React.FC<BanManagementProps> = ({
         </div>
       )}
 
-      {/* Tab: Tworzenie nowego bana */}
-      {activeTab === 'create' && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-white">Nowy ban</h3>
-          
-          <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  ID użytkownika
-                </label>
-                <input
-                  type="text"
-                  value={newBan.userId}
-                  onChange={(e) => setNewBan({...newBan, userId: e.target.value})}
-                  placeholder="0x..."
-                  className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Typ bana
-                </label>
-                <select
-                  value={newBan.banType}
-                  onChange={(e) => setNewBan({...newBan, banType: e.target.value as any})}
-                  className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="warning">Ostrzeżenie</option>
-                  <option value="temporary">Tymczasowy</option>
-                  <option value="permanent">Permanentny</option>
-                </select>
-              </div>
-
-              {newBan.banType === 'temporary' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Czas trwania (godziny)
-                  </label>
-                  <input
-                    type="number"
-                    value={newBan.duration}
-                    onChange={(e) => setNewBan({...newBan, duration: parseInt(e.target.value)})}
-                    className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Kategoria
-                </label>
-                <select
-                  value={newBan.category}
-                  onChange={(e) => setNewBan({...newBan, category: e.target.value as any})}
-                  className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="spam">Spam</option>
-                  <option value="harassment">Nękanie</option>
-                  <option value="inappropriate">Niestosowne treści</option>
-                  <option value="violation">Naruszenie zasad</option>
-                  <option value="other">Inne</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Powód
-                </label>
-                <textarea
-                  value={newBan.reason}
-                  onChange={(e) => setNewBan({...newBan, reason: e.target.value})}
-                  placeholder="Opisz szczegółowo powód bana..."
-                  rows={3}
-                  className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCreateBan}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
-                >
-                  <Ban className="w-4 h-4" />
-                  Zastosuj ban
-                </button>
-                <button
-                  onClick={() => setActiveTab('bans')}
-                  className="px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors"
-                >
-                  Anuluj
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Nowa reguła */}
+      {/* Create Rule Modal */}
       <AnimatePresence>
         {showCreateRule && (
           <motion.div
@@ -587,14 +446,14 @@ const BanManagement: React.FC<BanManagementProps> = ({
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-700"
+              className="bg-gray-800/90 backdrop-blur-sm rounded-xl p-6 max-w-md w-full mx-4 border border-gray-700"
             >
-              <h3 className="text-lg font-semibold text-white mb-4">Nowa reguła automatyczna</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Create Auto-Moderation Rule</h3>
               
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Nazwa reguły
+                    Rule Name
                   </label>
                   <input
                     type="text"
@@ -606,7 +465,7 @@ const BanManagement: React.FC<BanManagementProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Kategoria
+                    Category
                   </label>
                   <select
                     value={newRule.category}
@@ -614,16 +473,16 @@ const BanManagement: React.FC<BanManagementProps> = ({
                     className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="spam">Spam</option>
-                    <option value="harassment">Nękanie</option>
-                    <option value="inappropriate">Niestosowne treści</option>
-                    <option value="violation">Naruszenie zasad</option>
+                    <option value="harassment">Harassment</option>
+                    <option value="inappropriate">Inappropriate Content</option>
+                    <option value="violation">Rule Violation</option>
                   </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Próg naruszeń
+                      Violation Threshold
                     </label>
                     <input
                       type="number"
@@ -634,7 +493,7 @@ const BanManagement: React.FC<BanManagementProps> = ({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Okno czasowe (h)
+                      Time Window (h)
                     </label>
                     <input
                       type="number"
@@ -647,24 +506,24 @@ const BanManagement: React.FC<BanManagementProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Akcja
+                    Action
                   </label>
                   <select
                     value={newRule.action}
                     onChange={(e) => setNewRule({...newRule, action: e.target.value as any})}
                     className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="warning">Ostrzeżenie</option>
-                    <option value="mute">Wyciszenie</option>
+                    <option value="warning">Warning</option>
+                    <option value="mute">Mute</option>
                     <option value="ban">Ban</option>
-                    <option value="kick">Wyrzucenie</option>
+                    <option value="kick">Kick</option>
                   </select>
                 </div>
 
                 {newRule.action !== 'warning' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Czas trwania (h, 0 = permanent)
+                      Duration (h, 0 = permanent)
                     </label>
                     <input
                       type="number"
@@ -680,13 +539,13 @@ const BanManagement: React.FC<BanManagementProps> = ({
                     onClick={handleCreateRule}
                     className="flex-1 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
                   >
-                    Utwórz reguły
+                    Create Rule
                   </button>
                   <button
                     onClick={() => setShowCreateRule(false)}
                     className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors"
                   >
-                    Anuluj
+                    Cancel
                   </button>
                 </div>
               </div>

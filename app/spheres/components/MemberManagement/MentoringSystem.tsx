@@ -27,14 +27,14 @@ import {
   Zap
 } from 'lucide-react';
 
-// Interfejs dla mentora
+// Mentor interface
 interface Mentor {
   id: string;
   userId: string;
   username: string;
   avatar: string;
   specialization: string[];
-  experience: number; // w miesiącach
+  experience: number; // in months
   rating: number;
   totalMentees: number;
   activeMentees: number;
@@ -46,7 +46,7 @@ interface Mentor {
   achievements: string[];
 }
 
-// Interfejs dla ucznia
+// Mentee interface
 interface Mentee {
   id: string;
   userId: string;
@@ -64,31 +64,34 @@ interface Mentee {
   notes: string;
 }
 
-// Interfejs dla sesji mentoringu
-interface MentorshipSession {
+// Mentoring session interface
+interface MentoringSession {
   id: string;
   mentorId: string;
   menteeId: string;
   scheduledAt: Date;
-  duration: number; // w minutach
-  status: 'scheduled' | 'completed' | 'cancelled';
+  duration: number;
   topic: string;
-  notes: string;
-  rating?: number;
-  feedback?: string;
   goals: string[];
-  completedGoals: string[];
+  status: 'scheduled' | 'completed' | 'cancelled';
+  notes?: string;
+  feedback?: {
+    mentorRating: number;
+    menteeRating: number;
+    mentorFeedback: string;
+    menteeFeedback: string;
+  };
 }
 
 interface MentoringSystemProps {
   communityId: string;
   mentors: Mentor[];
   mentees: Mentee[];
-  sessions: MentorshipSession[];
+  sessions: MentoringSession[];
   onAssignMentor: (menteeId: string, mentorId: string) => void;
   onRemoveMentor: (menteeId: string) => void;
-  onUpdateProgress: (menteeId: string, progress: Partial<Mentee>) => void;
-  onScheduleSession: (sessionData: Partial<MentorshipSession>) => void;
+  onUpdateProgress: (menteeId: string, progress: number) => void;
+  onScheduleSession: (sessionData: Partial<MentoringSession>) => void;
   currentUserId: string;
 }
 
@@ -111,7 +114,7 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
 
-  // Formularz nowej sesji
+  // New session form
   const [newSession, setNewSession] = useState({
     mentorId: '',
     menteeId: '',
@@ -121,80 +124,41 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
     goals: [] as string[]
   });
 
-  // Przykładowe dane
-  const [allMentors, setAllMentors] = useState<Mentor[]>([
-    {
-      id: '1',
-      userId: 'mentor1',
-      username: 'AliceExpert',
-      avatar: '',
-      specialization: ['DeFi', 'Smart Contracts', 'Tokenomics'],
-      experience: 24,
-      rating: 4.8,
-      totalMentees: 15,
-      activeMentees: 3,
-      completedSessions: 45,
-      joinedAt: new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000),
-      isAvailable: true,
-      maxMentees: 5,
-      description: 'Ekspert DeFi z 2-letnim doświadczeniem w mentoringu',
-      achievements: ['Top Mentor', 'DeFi Expert', 'Community Leader']
-    },
-    {
-      id: '2',
-      userId: 'mentor2',
-      username: 'BobBuilder',
-      avatar: '',
-      specialization: ['Frontend', 'React', 'Web3 Integration'],
-      experience: 18,
-      rating: 4.6,
-      totalMentees: 12,
-      activeMentees: 4,
-      completedSessions: 38,
-      joinedAt: new Date(Date.now() - 4 * 30 * 24 * 60 * 60 * 1000),
-      isAvailable: true,
-      maxMentees: 6,
-      description: 'Full-stack developer specjalizujący się w Web3',
-      achievements: ['Code Mentor', 'React Expert']
-    }
-  ]);
+  // Example data - will be replaced with real contract data
+  const [allMentors, setAllMentors] = useState<Mentor[]>([]);
+  const [allMentees, setAllMentees] = useState<Mentee[]>([]);
 
-  const [allMentees, setAllMentees] = useState<Mentee[]>([
-    {
-      id: '1',
-      userId: 'mentee1',
-      username: 'NewbieDev',
-      avatar: '',
-      mentorId: '1',
-      startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      currentGoals: ['Nauczyć się Solidity', 'Zrozumieć DeFi protokoły'],
-      completedGoals: ['Podstawy blockchain', 'Konfiguracja środowiska'],
-      progressScore: 65,
-      lastSessionDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      nextSessionDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-      totalSessions: 8,
-      status: 'active',
-      notes: 'Bardzo zaangażowany uczeń, szybko się uczy'
-    },
-    {
-      id: '2',
-      userId: 'mentee2',
-      username: 'JuniorCoder',
-      avatar: '',
-      mentorId: '2',
-      startDate: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
-      currentGoals: ['Integracja z MetaMask', 'Pierwszy dApp'],
-      completedGoals: ['React podstawy', 'Web3.js setup', 'Pierwszy smart contract'],
-      progressScore: 80,
-      lastSessionDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      nextSessionDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-      totalSessions: 12,
-      status: 'active',
-      notes: 'Gotowy do zaawansowanych tematów'
-    }
-  ]);
+  // Load real mentor and mentee data from contract
+  useEffect(() => {
+    const loadMentoringData = async () => {
+      try {
+        // Convert actual mentors data from props
+        const mentorData = mentors.map(mentor => ({
+          ...mentor,
+          achievements: mentor.achievements || []
+        }));
+        
+        // Convert actual mentees data from props
+        const menteeData = mentees.map(mentee => ({
+          ...mentee,
+          currentGoals: mentee.currentGoals || [],
+          completedGoals: mentee.completedGoals || []
+        }));
+        
+        setAllMentors(mentorData);
+        setAllMentees(menteeData);
+      } catch (error) {
+        console.error('Failed to load mentoring data:', error);
+        // Fallback to empty arrays if loading fails
+        setAllMentors([]);
+        setAllMentees([]);
+      }
+    };
 
-  // Filtrowanie mentorów
+    loadMentoringData();
+  }, [mentors, mentees]);
+
+  // Filter mentors
   const filteredMentors = allMentors.filter(mentor => {
     const matchesSearch = mentor.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          mentor.specialization.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -206,23 +170,30 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
     return matchesSearch && matchesFilter;
   });
 
-  // Filtrowanie uczniów
+  // Filter mentees
   const filteredMentees = allMentees.filter(mentee => {
     const matchesSearch = mentee.username.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || filterStatus === mentee.status;
+    
+    const matchesFilter = filterStatus === 'all' || 
+                         (filterStatus === 'active' && mentee.status === 'active') ||
+                         (filterStatus === 'completed' && mentee.status === 'completed');
     
     return matchesSearch && matchesFilter;
   });
 
-  // Funkcja przypisania mentora
-  const handleAssignMentor = (menteeId: string, mentorId: string) => {
-    onAssignMentor(menteeId, mentorId);
-    setShowAssignModal(false);
+  // Statistics
+  const stats = {
+    totalMentors: allMentors.length,
+    activeMentors: allMentors.filter(m => m.activeMentees > 0).length,
+    totalMentees: allMentees.length,
+    activeMentees: allMentees.filter(m => m.status === 'active').length,
+    completedSessions: allMentors.reduce((sum, m) => sum + m.completedSessions, 0),
+    avgRating: allMentors.reduce((sum, m) => sum + m.rating, 0) / allMentors.length
   };
 
-  // Funkcja planowania sesji
+  // Handle session scheduling
   const handleScheduleSession = () => {
-    const sessionData: Partial<MentorshipSession> = {
+    const sessionData: Partial<MentoringSession> = {
       mentorId: newSession.mentorId,
       menteeId: newSession.menteeId,
       scheduledAt: new Date(newSession.scheduledAt),
@@ -244,36 +215,15 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
     });
   };
 
-  // Funkcja obliczania statystyk
-  const getStats = () => {
-    const totalMentors = allMentors.length;
-    const activeMentors = allMentors.filter(m => m.activeMentees > 0).length;
-    const totalMentees = allMentees.length;
-    const activeMentees = allMentees.filter(m => m.status === 'active').length;
-    const averageProgress = allMentees.reduce((sum, m) => sum + m.progressScore, 0) / allMentees.length;
-    const completedSessions = allMentors.reduce((sum, m) => sum + m.completedSessions, 0);
-
-    return {
-      totalMentors,
-      activeMentors,
-      totalMentees,
-      activeMentees,
-      averageProgress,
-      completedSessions
-    };
-  };
-
-  const stats = getStats();
-
   return (
     <div className="space-y-6">
-      {/* Nawigacja */}
+      {/* Navigation */}
       <div className="flex flex-wrap gap-2 mb-6">
         {[
-          { id: 'overview', label: 'Przegląd', icon: TrendingUp },
-          { id: 'mentors', label: 'Mentorzy', icon: Users },
-          { id: 'mentees', label: 'Uczniowie', icon: BookOpen },
-          { id: 'sessions', label: 'Sesje', icon: Calendar }
+          { id: 'overview', label: 'Overview', icon: TrendingUp },
+          { id: 'mentors', label: 'Mentors', icon: Users },
+          { id: 'mentees', label: 'Mentees', icon: BookOpen },
+          { id: 'sessions', label: 'Sessions', icon: Calendar }
         ].map(tab => (
           <button
             key={tab.id}
@@ -290,11 +240,11 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
         ))}
       </div>
 
-      {/* Tab: Przegląd */}
+      {/* Tab: Overview */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          {/* Statystyki */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Statistics */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
@@ -302,33 +252,8 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-white">{stats.totalMentors}</div>
-                  <div className="text-sm text-gray-400">Mentorzy</div>
-                  <div className="text-xs text-green-400">{stats.activeMentors} aktywnych</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                  <BookOpen className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-white">{stats.totalMentees}</div>
-                  <div className="text-sm text-gray-400">Uczniowie</div>
-                  <div className="text-xs text-green-400">{stats.activeMentees} aktywnych</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                  <Target className="w-5 h-5 text-yellow-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-white">{stats.averageProgress.toFixed(0)}%</div>
-                  <div className="text-sm text-gray-400">Średni postęp</div>
+                  <div className="text-sm text-gray-400">Total Mentors</div>
+                  <div className="text-xs text-green-400">{stats.activeMentors} active</div>
                 </div>
               </div>
             </div>
@@ -336,43 +261,56 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
             <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-400" />
+                  <BookOpen className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-white">{stats.totalMentees}</div>
+                  <div className="text-sm text-gray-400">Total Mentees</div>
+                  <div className="text-xs text-blue-400">{stats.activeMentees} active</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-purple-400" />
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-white">{stats.completedSessions}</div>
-                  <div className="text-sm text-gray-400">Sesje ukończone</div>
+                  <div className="text-sm text-gray-400">Sessions</div>
+                  <div className="text-xs text-green-400">Completed</div>
                 </div>
               </div>
             </div>
 
             <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                  <Heart className="w-5 h-5 text-red-400" />
+                <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                  <Star className="w-5 h-5 text-yellow-400" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-white">4.7</div>
-                  <div className="text-sm text-gray-400">Średnia ocena</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-orange-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-white">85%</div>
-                  <div className="text-sm text-gray-400">Wskaźnik sukcesu</div>
+                  <div className="text-2xl font-bold text-white">{stats.avgRating.toFixed(1)}</div>
+                  <div className="text-sm text-gray-400">Avg Rating</div>
+                  <div className="text-xs text-purple-400">Out of 5</div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Najlepsi mentorzy */}
+          {/* Top mentors */}
           <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-            <h3 className="text-lg font-semibold text-white mb-4">Najlepsi mentorzy</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-white">Top Mentors</h3>
+              <button
+                onClick={() => setActiveTab('mentors')}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
+              >
+                <Eye className="w-4 h-4" />
+                View All
+              </button>
+            </div>
+            
             <div className="space-y-3">
               {allMentors.slice(0, 3).map((mentor, index) => (
                 <div key={mentor.id} className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
@@ -393,7 +331,7 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                         <Star className="w-4 h-4 text-yellow-400 fill-current" />
                         <span className="text-sm font-medium text-white">{mentor.rating}</span>
                       </div>
-                      <div className="text-xs text-gray-400">{mentor.completedSessions} sesji</div>
+                      <div className="text-xs text-gray-400">{mentor.completedSessions} sessions</div>
                     </div>
                     <div className="text-2xl font-bold text-purple-400">#{index + 1}</div>
                   </div>
@@ -402,16 +340,16 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
             </div>
           </div>
 
-          {/* Nadchodzące sesje */}
+          {/* Upcoming sessions */}
           <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-white">Nadchodzące sesje</h3>
+              <h3 className="text-lg font-semibold text-white">Upcoming Sessions</h3>
               <button
                 onClick={() => setShowSessionModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                Zaplanuj sesję
+                Schedule Session
               </button>
             </div>
             
@@ -428,7 +366,7 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                       </div>
                       <div>
                         <div className="font-semibold text-white">{mentee.username}</div>
-                        <div className="text-sm text-gray-400">z {mentor?.username}</div>
+                        <div className="text-sm text-gray-400">with {mentor?.username}</div>
                       </div>
                     </div>
                     <div className="text-right">
@@ -448,17 +386,17 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
         </div>
       )}
 
-      {/* Tab: Mentorzy */}
+      {/* Tab: Mentors */}
       {activeTab === 'mentors' && (
         <div className="space-y-4">
-          {/* Nagłówek z wyszukiwarką */}
+          {/* Header with search */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
             <div className="flex gap-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Szukaj mentorów..."
+                  placeholder="Search mentors..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500"
@@ -469,9 +407,9 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                 onChange={(e) => setFilterStatus(e.target.value as any)}
                 className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500"
               >
-                <option value="all">Wszyscy</option>
-                <option value="active">Aktywni</option>
-                <option value="available">Dostępni</option>
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="available">Available</option>
               </select>
             </div>
             
@@ -480,12 +418,12 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
               className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
             >
               <UserPlus className="w-4 h-4" />
-              Przypisz mentora
+              Assign Mentor
             </button>
           </div>
 
-          {/* Lista mentorów */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Mentors list */}
+          <div className="space-y-4">
             {filteredMentors.map(mentor => (
               <div key={mentor.id} className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4 border border-gray-700">
                 <div className="flex items-start justify-between mb-3">
@@ -509,12 +447,12 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                       mentor.isAvailable ? 'bg-green-500' : 'bg-gray-500'
                     }`} />
                     <span className="text-xs text-gray-400">
-                      {mentor.isAvailable ? 'Dostępny' : 'Niedostępny'}
+                      {mentor.isAvailable ? 'Available' : 'Unavailable'}
                     </span>
                   </div>
                 </div>
 
-                <div className="space-y-2 mb-4">
+                <div className="space-y-2 mb-3">
                   <div className="text-sm text-gray-300">{mentor.description}</div>
                   <div className="flex flex-wrap gap-1">
                     {mentor.specialization.map(spec => (
@@ -528,30 +466,30 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <div className="text-lg font-bold text-white">{mentor.activeMentees}</div>
-                    <div className="text-xs text-gray-400">Aktywni uczniowie</div>
+                    <div className="text-xs text-gray-400">Active Students</div>
                   </div>
                   <div>
                     <div className="text-lg font-bold text-white">{mentor.completedSessions}</div>
-                    <div className="text-xs text-gray-400">Sesje</div>
+                    <div className="text-xs text-gray-400">Sessions</div>
                   </div>
                   <div>
                     <div className="text-lg font-bold text-white">{mentor.experience}</div>
-                    <div className="text-xs text-gray-400">Mies. doświadczenia</div>
+                    <div className="text-xs text-gray-400">Months Experience</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 mt-4">
+                <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => setSelectedMentor(mentor)}
                     className="flex-1 px-3 py-2 bg-gray-700/50 text-gray-300 rounded-lg hover:bg-gray-600/50 transition-colors text-sm"
                   >
-                    Szczegóły
+                    Details
                   </button>
                   <button
                     disabled={!mentor.isAvailable || mentor.activeMentees >= mentor.maxMentees}
                     className="flex-1 px-3 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Przypisz
+                    Assign
                   </button>
                 </div>
               </div>
@@ -560,17 +498,17 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
         </div>
       )}
 
-      {/* Tab: Uczniowie */}
+      {/* Tab: Mentees */}
       {activeTab === 'mentees' && (
         <div className="space-y-4">
-          {/* Nagłówek z wyszukiwarką */}
+          {/* Header with search */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
             <div className="flex gap-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Szukaj uczniów..."
+                  placeholder="Search mentees..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500"
@@ -581,15 +519,15 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                 onChange={(e) => setFilterStatus(e.target.value as any)}
                 className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500"
               >
-                <option value="all">Wszyscy</option>
-                <option value="active">Aktywni</option>
-                <option value="completed">Ukończeni</option>
-                <option value="paused">Wstrzymani</option>
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="paused">Paused</option>
               </select>
             </div>
           </div>
 
-          {/* Lista uczniów */}
+          {/* Mentees list */}
           <div className="space-y-4">
             {filteredMentees.map(mentee => {
               const mentor = allMentors.find(m => m.id === mentee.mentorId);
@@ -611,13 +549,13 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                             mentee.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
                             'bg-yellow-500/20 text-yellow-400'
                           }`}>
-                            {mentee.status === 'active' ? 'Aktywny' :
-                             mentee.status === 'completed' ? 'Ukończony' : 'Wstrzymany'}
+                            {mentee.status === 'active' ? 'Active' :
+                             mentee.status === 'completed' ? 'Completed' : 'Paused'}
                           </span>
                         </div>
                         
                         <div className="text-sm text-gray-400 mb-2">
-                          Mentor: {mentor?.username || 'Brak mentora'}
+                          Mentor: {mentor?.username || 'No mentor assigned'}
                         </div>
                         
                         <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
@@ -627,43 +565,32 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {mentee.totalSessions} sesji
+                            {mentee.totalSessions} sessions
                           </span>
                           <span className="flex items-center gap-1">
                             <Target className="w-3 h-3" />
-                            {mentee.completedGoals.length} celów ukończonych
+                            {mentee.completedGoals.length} goals completed
                           </span>
                         </div>
 
-                        {/* Pasek postępu */}
+                        {/* Progress bar */}
                         <div className="mb-3">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm text-gray-400">Postęp</span>
-                            <span className="text-sm font-medium text-white">{mentee.progressScore}%</span>
+                          <div className="flex justify-between text-xs text-gray-400 mb-1">
+                            <span>Progress</span>
+                            <span>{mentee.progressScore}%</span>
                           </div>
                           <div className="w-full bg-gray-700 rounded-full h-2">
-                            <div 
-                              className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
+                            <div
+                              className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300"
                               style={{ width: `${mentee.progressScore}%` }}
                             />
                           </div>
                         </div>
 
-                        {/* Aktualne cele */}
-                        <div className="space-y-2">
-                          <div className="text-sm font-medium text-gray-300">Aktualne cele:</div>
-                          <div className="flex flex-wrap gap-1">
-                            {mentee.currentGoals.map(goal => (
-                              <span key={goal} className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-full">
-                                {goal}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+                        <div className="text-xs text-gray-500">{mentee.notes}</div>
                       </div>
                     </div>
 
-                    {/* Akcje */}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setSelectedMentee(mentee)}
@@ -680,12 +607,12 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                     </div>
                   </div>
 
-                  {/* Następna sesja */}
+                  {/* Next session */}
                   {mentee.nextSessionDate && (
                     <div className="mt-3 pt-3 border-t border-gray-700">
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar className="w-4 h-4 text-green-400" />
-                        <span className="text-gray-400">Następna sesja:</span>
+                        <span className="text-gray-400">Next session:</span>
                         <span className="text-white font-medium">
                           {mentee.nextSessionDate.toLocaleDateString()} {mentee.nextSessionDate.toLocaleTimeString()}
                         </span>
@@ -699,7 +626,7 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
         </div>
       )}
 
-      {/* Modal: Planowanie sesji */}
+      {/* Modal: Schedule session */}
       <AnimatePresence>
         {showSessionModal && (
           <motion.div
@@ -714,7 +641,7 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-700"
             >
-              <h3 className="text-lg font-semibold text-white mb-4">Zaplanuj sesję</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Schedule Session</h3>
               
               <div className="space-y-4">
                 <div>
@@ -726,7 +653,7 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                     onChange={(e) => setNewSession({...newSession, mentorId: e.target.value})}
                     className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="">Wybierz mentora</option>
+                    <option value="">Select mentor</option>
                     {allMentors.map(mentor => (
                       <option key={mentor.id} value={mentor.id}>
                         {mentor.username}
@@ -737,14 +664,14 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Uczeń
+                    Mentee
                   </label>
                   <select
                     value={newSession.menteeId}
                     onChange={(e) => setNewSession({...newSession, menteeId: e.target.value})}
                     className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="">Wybierz ucznia</option>
+                    <option value="">Select mentee</option>
                     {allMentees.map(mentee => (
                       <option key={mentee.id} value={mentee.id}>
                         {mentee.username}
@@ -755,7 +682,7 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Data i godzina
+                    Date and Time
                   </label>
                   <input
                     type="datetime-local"
@@ -767,7 +694,7 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Czas trwania (minuty)
+                    Duration (minutes)
                   </label>
                   <input
                     type="number"
@@ -779,7 +706,7 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Temat sesji
+                    Session Topic
                   </label>
                   <input
                     type="text"
@@ -794,13 +721,13 @@ const MentoringSystem: React.FC<MentoringSystemProps> = ({
                     onClick={handleScheduleSession}
                     className="flex-1 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
                   >
-                    Zaplanuj
+                    Schedule
                   </button>
                   <button
                     onClick={() => setShowSessionModal(false)}
                     className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors"
                   >
-                    Anuluj
+                    Cancel
                   </button>
                 </div>
               </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpheresContract } from '../../hooks/useSpheresContract';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 import { 
   Calendar, 
   Users, 
@@ -28,7 +29,7 @@ import {
   Bookmark
 } from 'lucide-react';
 
-// Interfejsy
+// Interfaces
 interface EventParticipation {
   eventId: string;
   userId: string;
@@ -82,6 +83,7 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
   eventId,
   currentUserAddress
 }) => {
+  const router = useRouter();
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [participants, setParticipants] = useState<EventParticipation[]>([]);
   const [currentUserParticipation, setCurrentUserParticipation] = useState<EventParticipation | null>(null);
@@ -91,13 +93,13 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  // Formularz feedback
+  // Feedback form
   const [feedback, setFeedback] = useState({
     rating: 5,
     comment: ''
   });
 
-  // Przykładowe dane eventu
+  // Example event data
   useEffect(() => {
     const loadEventData = async () => {
       setLoading(true);
@@ -105,7 +107,7 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
       const mockEvent: EventDetails = {
         id: eventId,
         title: 'DeFi Workshop: Yield Farming Strategies',
-        description: 'Kompleksowy warsztat na temat strategii yield farming w DeFi. Nauczysz się jak maksymalizować zyski przy minimalnym ryzyku. Warsztat obejmuje praktyczne przykłady, case studies i hands-on ćwiczenia.',
+        description: 'Comprehensive workshop on yield farming strategies in DeFi. Learn how to maximize profits with minimal risk. Workshop includes practical examples, case studies and hands-on exercises.',
         creator: '0x1234567890123456789012345678901234567890',
         startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000),
@@ -116,15 +118,15 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
         maxParticipants: 30,
         currentParticipants: 18,
         status: 'upcoming',
-        requirements: ['Podstawowa wiedza o DeFi', 'Portfel MetaMask', 'Komputer z internetem'],
+        requirements: ['Basic DeFi knowledge', 'MetaMask wallet', 'Computer with internet'],
         tags: ['DeFi', 'Yield Farming', 'Blockchain', 'Workshop'],
         rewards: [
-          { type: 'token', amount: 100, description: 'Community tokens za ukończenie' },
+          { type: 'token', amount: 100, description: 'Community tokens for completion' },
           { type: 'badge', amount: 1, description: 'DeFi Expert Badge' },
           { type: 'nft', amount: 1, description: 'Workshop completion NFT' }
         ],
         participantRanking: true,
-        competitionRules: 'Ranking oparty na aktywności, zadawanych pytaniach i ukończonych zadaniach praktycznych.'
+        competitionRules: 'Ranking based on activity, questions asked and practical tasks completed.'
       };
 
       const mockParticipants: EventParticipation[] = [
@@ -178,7 +180,7 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
     loadEventData();
   }, [eventId, currentUserAddress]);
 
-  // Funkcja rejestracji na event
+  // Event registration function
   const handleRegister = async () => {
     if (!event) return;
     
@@ -190,19 +192,19 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
         await registerForFreeEvent();
       }
     } catch (error) {
-      toast.error('Błąd podczas rejestracji');
+      toast.error('Error during registration');
     } finally {
       setProcessing(false);
     }
   };
 
-  // Funkcja płatności
+  // Payment function
   const handlePayment = async () => {
     if (!event) return;
     
     setProcessing(true);
     try {
-      // Symulacja płatności
+      // Payment simulation
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       const newParticipation: EventParticipation = {
@@ -221,15 +223,15 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
       setEvent(prev => prev ? { ...prev, currentParticipants: prev.currentParticipants + 1 } : null);
       setShowPaymentModal(false);
       
-      toast.success('Płatność zakończona pomyślnie! Jesteś zarejestrowany na event.');
+      toast.success('Payment completed successfully! You are registered for the event.');
     } catch (error) {
-      toast.error('Błąd podczas płatności');
+      toast.error('Payment error');
     } finally {
       setProcessing(false);
     }
   };
 
-  // Funkcja rejestracji na darmowy event
+  // Free event registration function
   const registerForFreeEvent = async () => {
     if (!event) return;
     
@@ -247,10 +249,10 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
     setCurrentUserParticipation(newParticipation);
     setEvent(prev => prev ? { ...prev, currentParticipants: prev.currentParticipants + 1 } : null);
     
-    toast.success('Zostałeś zarejestrowany na event!');
+    toast.success('You have been registered for the event!');
   };
 
-  // Funkcja anulowania rejestracji
+  // Unregistration function
   const handleUnregister = async () => {
     if (!currentUserParticipation) return;
     
@@ -262,15 +264,15 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
       setCurrentUserParticipation(null);
       setEvent(prev => prev ? { ...prev, currentParticipants: prev.currentParticipants - 1 } : null);
       
-      toast.success('Rejestracja anulowana pomyślnie');
+      toast.success('Registration cancelled successfully');
     } catch (error) {
-      toast.error('Błąd podczas anulowania rejestracji');
+      toast.error('Error cancelling registration');
     } finally {
       setProcessing(false);
     }
   };
 
-  // Funkcja wysyłania feedback
+  // Feedback submission function
   const handleSubmitFeedback = async () => {
     if (!currentUserParticipation) return;
     
@@ -291,17 +293,17 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
       ));
       
       setShowFeedbackModal(false);
-      toast.success('Feedback wysłany pomyślnie!');
+      toast.success('Feedback sent successfully!');
     } catch (error) {
-      toast.error('Błąd podczas wysyłania feedback');
+      toast.error('Error sending feedback');
     } finally {
       setProcessing(false);
     }
   };
 
-  // Funkcja formatowania daty
+  // Date formatting function
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('pl-PL', {
+    return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -310,7 +312,7 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
     });
   };
 
-  // Funkcja określająca kolor statusu
+  // Status color function
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'upcoming': return 'text-blue-400 bg-blue-500/20';
@@ -321,7 +323,7 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
     }
   };
 
-  // Funkcja określająca kolor statusu płatności
+  // Payment status color function
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
       case 'paid': return 'text-green-400 bg-green-500/20';
@@ -349,7 +351,7 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-pink-900/20 p-6">
         <div className="max-w-4xl mx-auto">
           <div className="text-center py-12">
-            <div className="text-red-400 text-lg">Event nie został znaleziony</div>
+            <div className="text-red-400 text-lg">Event not found</div>
           </div>
         </div>
       </div>
@@ -359,458 +361,483 @@ const EventParticipationSystem: React.FC<EventParticipationSystemProps> = ({
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-pink-900/20 p-6">
       <div className="max-w-4xl mx-auto">
-        {/* Nagłówek eventu */}
-        <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 mb-6 border border-gray-700">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-white mb-2">{event.title}</h1>
-              <div className="flex items-center gap-4 text-sm text-gray-400 mb-4">
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  {formatDate(event.startDate)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  {event.isVirtual ? 'Virtual Event' : event.location}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Users className="w-4 h-4" />
-                  {event.currentParticipants}/{event.maxParticipants}
-                </span>
-                {event.price > 0 && (
-                  <span className="flex items-center gap-1">
-                    <DollarSign className="w-4 h-4" />
-                    {event.price} ETH
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 mb-4">
-                <span className={`px-3 py-1 text-sm rounded-full ${getStatusColor(event.status)}`}>
-                  {event.status}
-                </span>
-                <span className="px-3 py-1 text-sm bg-gray-600/20 text-gray-400 rounded-full">
-                  {event.category}
-                </span>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
-                <Share2 className="w-5 h-5 text-gray-400" />
-              </button>
-              <button className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
-                <Bookmark className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-          </div>
-
-          {/* Akcje rejestracji */}
-          <div className="flex items-center gap-4">
-            {!currentUserParticipation ? (
-              <button
-                onClick={handleRegister}
-                disabled={processing || event.currentParticipants >= event.maxParticipants}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {processing ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <>
-                    <CheckCircle className="w-5 h-5" />
-                    {event.price > 0 ? `Kup za ${event.price} ETH` : 'Zarejestruj się'}
-                  </>
-                )}
-              </button>
-            ) : (
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-lg">
-                  <CheckCircle className="w-5 h-5" />
-                  <span>Zarejestrowany</span>
-                </div>
+        <div className="bg-slate-900 text-white min-h-screen p-8">
+          {loading ? (
+            <p>Loading event...</p>
+          ) : !event ? (
+            <p>Event not found.</p>
+          ) : (
+            <div>
+              <div className="flex items-center space-x-4 mb-8">
                 <button
-                  onClick={handleUnregister}
-                  disabled={processing}
-                  className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                    onClick={() => router.back()}
+                    className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
                 >
-                  Anuluj rejestrację
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
                 </button>
-                {event.status === 'completed' && !currentUserParticipation.rating && (
-                  <button
-                    onClick={() => setShowFeedbackModal(true)}
-                    className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
-                  >
-                    Oceń event
-                  </button>
-                )}
+                <div>
+                    <h1 className="text-4xl font-bold">{event.title}</h1>
+                    <p className="text-slate-400">Participate and engage in community events</p>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Nawigacja */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {[
-            { id: 'details', label: 'Szczegóły', icon: Eye },
-            { id: 'participants', label: 'Uczestnicy', icon: Users },
-            { id: 'ranking', label: 'Ranking', icon: Trophy, condition: event.participantRanking },
-            { id: 'rewards', label: 'Nagrody', icon: Gift }
-          ].filter(tab => tab.condition !== false).map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                  : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab: Szczegóły */}
-        {activeTab === 'details' && (
-          <div className="space-y-6">
-            {/* Opis */}
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Opis eventu</h3>
-              <p className="text-gray-300 leading-relaxed">{event.description}</p>
-            </div>
-
-            {/* Wymagania */}
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Wymagania</h3>
-              <ul className="space-y-2">
-                {event.requirements.map((requirement, index) => (
-                  <li key={index} className="flex items-center gap-2 text-gray-300">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    {requirement}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Tagi */}
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Tagi</h3>
-              <div className="flex flex-wrap gap-2">
-                {event.tags.map((tag, index) => (
-                  <span key={index} className="px-3 py-1 text-sm bg-purple-500/20 text-purple-400 rounded-full">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Reguły konkursu */}
-            {event.participantRanking && event.competitionRules && (
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-4">Reguły konkursu</h3>
-                <p className="text-gray-300">{event.competitionRules}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab: Uczestnicy */}
-        {activeTab === 'participants' && (
-          <div className="space-y-4">
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                Uczestnicy ({participants.length}/{event.maxParticipants})
-              </h3>
-              <div className="space-y-3">
-                {participants.map((participant, index) => (
-                  <div key={participant.userId} className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold">
-                          {participant.username.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-white">{participant.username}</h4>
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                          <span>Zarejestrowany: {formatDate(participant.registeredAt)}</span>
-                          {participant.userId === currentUserAddress && (
-                            <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-full">
-                              Ty
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getPaymentStatusColor(participant.paymentStatus)}`}>
-                        {participant.paymentStatus}
+              
+              {/* Event header */}
+              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 mb-6 border border-gray-700">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h1 className="text-3xl font-bold text-white mb-2">{event.title}</h1>
+                    <div className="flex items-center gap-4 text-sm text-gray-400 mb-4">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        {formatDate(event.startDate)}
                       </span>
-                      {participant.position && (
-                        <div className="flex items-center gap-1 text-sm text-yellow-400">
-                          <Medal className="w-4 h-4" />
-                          #{participant.position}
-                        </div>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-4 h-4" />
+                        {event.isVirtual ? 'Virtual Event' : event.location}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        {event.currentParticipants}/{event.maxParticipants}
+                      </span>
+                      {event.price > 0 && (
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="w-4 h-4" />
+                          {event.price} ETH
+                        </span>
                       )}
                     </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className={`px-3 py-1 text-sm rounded-full ${getStatusColor(event.status)}`}>
+                        {event.status}
+                      </span>
+                      <span className="px-3 py-1 text-sm bg-gray-600/20 text-gray-400 rounded-full">
+                        {event.category}
+                      </span>
+                    </div>
                   </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
+                      <Share2 className="w-5 h-5 text-gray-400" />
+                    </button>
+                    <button className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
+                      <Bookmark className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Registration actions */}
+                <div className="flex items-center gap-4">
+                  {!currentUserParticipation ? (
+                    <button
+                      onClick={handleRegister}
+                      disabled={processing || event.currentParticipants >= event.maxParticipants}
+                      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {processing ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-5 h-5" />
+                          {event.price > 0 ? `Buy for ${event.price} ETH` : 'Register'}
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-lg">
+                        <CheckCircle className="w-5 h-5" />
+                        <span>Registered</span>
+                      </div>
+                      <button
+                        onClick={handleUnregister}
+                        disabled={processing}
+                        className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                      >
+                        Cancel Registration
+                      </button>
+                      {event.status === 'completed' && !currentUserParticipation.rating && (
+                        <button
+                          onClick={() => setShowFeedbackModal(true)}
+                          className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
+                        >
+                          Rate Event
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Navigation */}
+              <div className="flex flex-wrap gap-2 mb-6">
+                {[
+                  { id: 'details', label: 'Details', icon: Eye },
+                  { id: 'participants', label: 'Participants', icon: Users },
+                  { id: 'ranking', label: 'Ranking', icon: Trophy, condition: event.participantRanking },
+                  { id: 'rewards', label: 'Rewards', icon: Gift }
+                ].filter(tab => tab.condition !== false).map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                      activeTab === tab.id
+                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <tab.icon className="w-4 h-4" />
+                    {tab.label}
+                  </button>
                 ))}
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* Tab: Ranking */}
-        {activeTab === 'ranking' && event.participantRanking && (
-          <div className="space-y-4">
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Ranking uczestników</h3>
-              <div className="space-y-3">
-                {participants
-                  .filter(p => p.position)
-                  .sort((a, b) => (a.position || 0) - (b.position || 0))
-                  .map((participant, index) => (
-                    <div key={participant.userId} className={`flex items-center justify-between p-4 rounded-lg ${
-                      participant.userId === currentUserAddress ? 'bg-purple-500/20 border border-purple-500/30' : 'bg-gray-700/30'
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                          participant.position === 1 ? 'bg-yellow-500 text-black' :
-                          participant.position === 2 ? 'bg-gray-400 text-black' :
-                          participant.position === 3 ? 'bg-orange-500 text-black' :
-                          'bg-gray-600 text-white'
-                        }`}>
-                          {participant.position}
-                        </div>
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                          <span className="text-white font-bold">
-                            {participant.username.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-white">{participant.username}</h4>
-                          <div className="text-sm text-gray-400">
-                            Wynik: {participant.score || 0} punktów
+              {/* Tab: Details */}
+              {activeTab === 'details' && (
+                <div className="space-y-6">
+                  {/* Description */}
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                    <h3 className="text-lg font-semibold text-white mb-4">Event Description</h3>
+                    <p className="text-gray-300 leading-relaxed">{event.description}</p>
+                  </div>
+
+                  {/* Requirements */}
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                    <h3 className="text-lg font-semibold text-white mb-4">Requirements</h3>
+                    <ul className="space-y-2">
+                      {event.requirements.map((requirement, index) => (
+                        <li key={index} className="flex items-center gap-2 text-gray-300">
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                          {requirement}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Tags */}
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                    <h3 className="text-lg font-semibold text-white mb-4">Tags</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {event.tags.map((tag, index) => (
+                        <span key={index} className="px-3 py-1 text-sm bg-purple-500/20 text-purple-400 rounded-full">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Competition rules */}
+                  {event.participantRanking && event.competitionRules && (
+                    <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                      <h3 className="text-lg font-semibold text-white mb-4">Competition Rules</h3>
+                      <p className="text-gray-300">{event.competitionRules}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab: Participants */}
+              {activeTab === 'participants' && (
+                <div className="space-y-4">
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                    <h3 className="text-lg font-semibold text-white mb-4">
+                      Participants ({participants.length}/{event.maxParticipants})
+                    </h3>
+                    <div className="space-y-3">
+                      {participants.map((participant, index) => (
+                        <div key={participant.userId} className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                              <span className="text-white font-bold">
+                                {participant.username.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-white">{participant.username}</h4>
+                              <div className="flex items-center gap-2 text-sm text-gray-400">
+                                <span>Registered: {formatDate(participant.registeredAt)}</span>
+                                {participant.userId === currentUserAddress && (
+                                  <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-full">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 text-xs rounded-full ${getPaymentStatusColor(participant.paymentStatus)}`}>
+                              {participant.paymentStatus}
+                            </span>
+                            {participant.position && (
+                              <div className="flex items-center gap-1 text-sm text-yellow-400">
+                                <Medal className="w-4 h-4" />
+                                #{participant.position}
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-                      
-                      {participant.position && participant.position <= 3 && (
-                        <div className="flex items-center gap-1">
-                          <Trophy className={`w-5 h-5 ${
-                            participant.position === 1 ? 'text-yellow-500' :
-                            participant.position === 2 ? 'text-gray-400' :
-                            'text-orange-500'
-                          }`} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab: Nagrody */}
-        {activeTab === 'rewards' && (
-          <div className="space-y-4">
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Nagrody za uczestnictwo</h3>
-              <div className="space-y-3">
-                {event.rewards.map((reward, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                      {reward.type === 'token' ? <Star className="w-5 h-5 text-white" /> :
-                       reward.type === 'nft' ? <Award className="w-5 h-5 text-white" /> :
-                       reward.type === 'badge' ? <Medal className="w-5 h-5 text-white" /> :
-                       <Zap className="w-5 h-5 text-white" />}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-white">
-                        {reward.amount > 1 ? `${reward.amount}x ` : ''}{reward.description}
-                      </h4>
-                      <p className="text-sm text-gray-400">
-                        Typ: {reward.type === 'token' ? 'Token' : 
-                              reward.type === 'nft' ? 'NFT' :
-                              reward.type === 'badge' ? 'Badge' : 'Punkty'}
-                      </p>
-                    </div>
-                    {currentUserParticipation?.rewardsReceived ? (
-                      <div className="flex items-center gap-1 text-green-400">
-                        <CheckCircle className="w-4 h-4" />
-                        <span className="text-sm">Otrzymano</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-gray-400">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm">Oczekuje</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {event.participantRanking && (
-                <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                  <h4 className="font-semibold text-yellow-400 mb-2">Dodatkowe nagrody za ranking</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">🥇 1. miejsce:</span>
-                      <span className="text-yellow-400">500 bonus tokens + Exclusive NFT</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">🥈 2. miejsce:</span>
-                      <span className="text-gray-400">300 bonus tokens + Rare Badge</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-300">🥉 3. miejsce:</span>
-                      <span className="text-orange-400">200 bonus tokens + Badge</span>
+                      ))}
                     </div>
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        )}
 
-        {/* Modal płatności */}
-        <AnimatePresence>
-          {showPaymentModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-gray-800 rounded-lg w-full max-w-md border border-gray-700"
-              >
-                <div className="p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Płatność za event</h3>
-                  
-                  <div className="space-y-4">
-                    <div className="bg-gray-700/30 rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-gray-400">Event:</span>
-                        <span className="text-white">{event.title}</span>
-                      </div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-gray-400">Cena:</span>
-                        <span className="text-white">{event.price} ETH</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Sieć:</span>
-                        <span className="text-white">Base</span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handlePayment}
-                        disabled={processing}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-50"
-                      >
-                        {processing ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <>
-                            <CreditCard className="w-4 h-4" />
-                            Zapłać
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setShowPaymentModal(false)}
-                        disabled={processing}
-                        className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors disabled:opacity-50"
-                      >
-                        Anuluj
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Modal feedback */}
-        <AnimatePresence>
-          {showFeedbackModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-gray-800 rounded-lg w-full max-w-md border border-gray-700"
-              >
-                <div className="p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Oceń event</h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Ocena (1-5 gwiazdek)
-                      </label>
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            onClick={() => setFeedback({ ...feedback, rating: star })}
-                            className={`w-8 h-8 ${
-                              star <= feedback.rating ? 'text-yellow-400' : 'text-gray-600'
-                            }`}
-                          >
-                            <Star className="w-full h-full fill-current" />
-                          </button>
+              {/* Tab: Ranking */}
+              {activeTab === 'ranking' && event.participantRanking && (
+                <div className="space-y-4">
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                    <h3 className="text-lg font-semibold text-white mb-4">Participant Ranking</h3>
+                    <div className="space-y-3">
+                      {participants
+                        .filter(p => p.position)
+                        .sort((a, b) => (a.position || 0) - (b.position || 0))
+                        .map((participant, index) => (
+                          <div key={participant.userId} className={`flex items-center justify-between p-4 rounded-lg ${
+                            participant.userId === currentUserAddress ? 'bg-purple-500/20 border border-purple-500/30' : 'bg-gray-700/30'
+                          }`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                                participant.position === 1 ? 'bg-yellow-500 text-black' :
+                                participant.position === 2 ? 'bg-gray-400 text-black' :
+                                participant.position === 3 ? 'bg-orange-500 text-black' :
+                                'bg-gray-600 text-white'
+                              }`}>
+                                {participant.position}
+                              </div>
+                              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                                <span className="text-white font-bold">
+                                  {participant.username.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-white">{participant.username}</h4>
+                                <div className="text-sm text-gray-400">
+                                  Score: {participant.score || 0} points
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {participant.position && participant.position <= 3 && (
+                              <div className="flex items-center gap-1">
+                                <Trophy className={`w-5 h-5 ${
+                                  participant.position === 1 ? 'text-yellow-500' :
+                                  participant.position === 2 ? 'text-gray-400' :
+                                  'text-orange-500'
+                                }`} />
+                              </div>
+                            )}
+                          </div>
                         ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Komentarz (opcjonalnie)
-                      </label>
-                      <textarea
-                        value={feedback.comment}
-                        onChange={(e) => setFeedback({ ...feedback, comment: e.target.value })}
-                        rows={3}
-                        className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
-                        placeholder="Podziel się swoimi wrażeniami..."
-                      />
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleSubmitFeedback}
-                        disabled={processing}
-                        className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-50"
-                      >
-                        {processing ? 'Wysyłanie...' : 'Wyślij feedback'}
-                      </button>
-                      <button
-                        onClick={() => setShowFeedbackModal(false)}
-                        disabled={processing}
-                        className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors disabled:opacity-50"
-                      >
-                        Anuluj
-                      </button>
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            </motion.div>
+              )}
+
+              {/* Tab: Rewards */}
+              {activeTab === 'rewards' && (
+                <div className="space-y-4">
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                    <h3 className="text-lg font-semibold text-white mb-4">Participation Rewards</h3>
+                    <div className="space-y-3">
+                      {event.rewards.map((reward, index) => (
+                        <div key={index} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
+                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                            {reward.type === 'token' ? <Star className="w-5 h-5 text-white" /> :
+                             reward.type === 'nft' ? <Award className="w-5 h-5 text-white" /> :
+                             reward.type === 'badge' ? <Medal className="w-5 h-5 text-white" /> :
+                             <Zap className="w-5 h-5 text-white" />}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-white">
+                              {reward.amount > 1 ? `${reward.amount}x ` : ''}{reward.description}
+                            </h4>
+                            <p className="text-sm text-gray-400">
+                              Type: {reward.type === 'token' ? 'Token' : 
+                                    reward.type === 'nft' ? 'NFT' :
+                                    reward.type === 'badge' ? 'Badge' : 'Points'}
+                            </p>
+                          </div>
+                          {currentUserParticipation?.rewardsReceived ? (
+                            <div className="flex items-center gap-1 text-green-400">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="text-sm">Received</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-gray-400">
+                              <Clock className="w-4 h-4" />
+                              <span className="text-sm">Pending</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {event.participantRanking && (
+                      <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <h4 className="font-semibold text-yellow-400 mb-2">Additional Ranking Rewards</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">🥇 1st place:</span>
+                            <span className="text-yellow-400">500 bonus tokens + Exclusive NFT</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">🥈 2nd place:</span>
+                            <span className="text-gray-400">300 bonus tokens + Rare Badge</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">🥉 3rd place:</span>
+                            <span className="text-orange-400">200 bonus tokens + Badge</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Payment modal */}
+              <AnimatePresence>
+                {showPaymentModal && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                  >
+                    <motion.div
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.9, opacity: 0 }}
+                      className="bg-gray-800 rounded-lg w-full max-w-md border border-gray-700"
+                    >
+                      <div className="p-6">
+                        <h3 className="text-lg font-semibold text-white mb-4">Event Payment</h3>
+                        
+                        <div className="space-y-4">
+                          <div className="bg-gray-700/30 rounded-lg p-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-gray-400">Event:</span>
+                              <span className="text-white">{event.title}</span>
+                            </div>
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-gray-400">Price:</span>
+                              <span className="text-white">{event.price} ETH</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-400">Network:</span>
+                              <span className="text-white">Base</span>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handlePayment}
+                              disabled={processing}
+                              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-50"
+                            >
+                              {processing ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              ) : (
+                                <>
+                                  <CreditCard className="w-4 h-4" />
+                                  Pay
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => setShowPaymentModal(false)}
+                              disabled={processing}
+                              className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Feedback modal */}
+              <AnimatePresence>
+                {showFeedbackModal && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                  >
+                    <motion.div
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.9, opacity: 0 }}
+                      className="bg-gray-800 rounded-lg w-full max-w-md border border-gray-700"
+                    >
+                      <div className="p-6">
+                        <h3 className="text-lg font-semibold text-white mb-4">Rate Event</h3>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                              Rating (1-5 stars)
+                            </label>
+                            <div className="flex gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  key={star}
+                                  onClick={() => setFeedback({ ...feedback, rating: star })}
+                                  className={`w-8 h-8 ${
+                                    star <= feedback.rating ? 'text-yellow-400' : 'text-gray-600'
+                                  }`}
+                                >
+                                  <Star className="w-full h-full fill-current" />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                              Comment (optional)
+                            </label>
+                            <textarea
+                              value={feedback.comment}
+                              onChange={(e) => setFeedback({ ...feedback, comment: e.target.value })}
+                              rows={3}
+                              className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
+                              placeholder="Share your thoughts..."
+                            />
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleSubmitFeedback}
+                              disabled={processing}
+                              className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-50"
+                            >
+                              {processing ? 'Sending...' : 'Send Feedback'}
+                            </button>
+                            <button
+                              onClick={() => setShowFeedbackModal(false)}
+                              disabled={processing}
+                              className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
       </div>
     </div>
   );

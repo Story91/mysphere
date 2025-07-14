@@ -99,7 +99,7 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
 
   // Funkcja formatowania daty
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pl-PL', {
+    return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -113,20 +113,20 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    if (diffDays === 1) return 'wczoraj';
-    if (diffDays < 7) return `${diffDays} dni temu`;
-    if (diffDays < 30) return `${Math.ceil(diffDays / 7)} tygodni temu`;
-    return `${Math.ceil(diffDays / 30)} miesięcy temu`;
+    if (diffDays === 1) return 'yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+    return `${Math.ceil(diffDays / 30)} months ago`;
   };
 
   // Funkcja obliczająca poziom aktywności
   const getActivityLevel = () => {
     const daysSinceLastActive = Math.ceil((new Date().getTime() - new Date(member.lastActive).getTime()) / (1000 * 60 * 60 * 24));
     
-    if (daysSinceLastActive <= 1) return { level: 'Bardzo aktywny', color: 'text-green-400', icon: Zap };
-    if (daysSinceLastActive <= 7) return { level: 'Aktywny', color: 'text-blue-400', icon: Activity };
-    if (daysSinceLastActive <= 30) return { level: 'Umiarkowany', color: 'text-yellow-400', icon: Clock };
-    return { level: 'Nieaktywny', color: 'text-red-400', icon: AlertTriangle };
+    if (daysSinceLastActive <= 1) return { level: 'Very Active', color: 'text-green-400', icon: Zap };
+    if (daysSinceLastActive <= 7) return { level: 'Active', color: 'text-blue-400', icon: Activity };
+    if (daysSinceLastActive <= 30) return { level: 'Moderate', color: 'text-yellow-400', icon: Clock };
+    return { level: 'Inactive', color: 'text-red-400', icon: AlertTriangle };
   };
 
   const activityLevel = getActivityLevel();
@@ -186,30 +186,30 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <User className="w-5 h-5" />
-                Podstawowe informacje
+                Basic Information
               </h3>
               
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Adres:</span>
+                  <span className="text-gray-400">Address:</span>
                   <span className="text-white font-mono text-sm">
                     {member.address.slice(0, 6)}...{member.address.slice(-4)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Poziom:</span>
+                  <span className="text-gray-400">Level:</span>
                   <span className="text-white font-semibold">{member.level}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Punkty szacunku:</span>
+                  <span className="text-gray-400">Respect Points:</span>
                   <span className="text-purple-400 font-semibold">{member.respectPoints}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Reputacja:</span>
+                  <span className="text-gray-400">Reputation:</span>
                   <span className="text-yellow-400 font-semibold">{member.reputation}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Średnia ocena:</span>
+                  <span className="text-gray-400">Average Rating:</span>
                   <div className="flex items-center gap-1">
                     <Star className="w-4 h-4 text-yellow-400 fill-current" />
                     <span className="text-white">{getAverageRating()}</span>
@@ -222,31 +222,31 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <Activity className="w-5 h-5" />
-                Aktywność
+                Activity
               </h3>
               
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Status aktywności:</span>
+                  <span className="text-gray-400">Activity Status:</span>
                   <div className="flex items-center gap-2">
                     <activityLevel.icon className={`w-4 h-4 ${activityLevel.color}`} />
                     <span className={activityLevel.color}>{activityLevel.level}</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Ostatnio aktywny:</span>
+                  <span className="text-gray-400">Last Active:</span>
                   <span className="text-white">{formatRelativeTime(member.lastActive)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Aktualna seria:</span>
-                  <span className="text-green-400 font-semibold">{member.currentStreak} dni</span>
+                  <span className="text-gray-400">Current Streak:</span>
+                  <span className="text-green-400 font-semibold">{member.currentStreak} days</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Najdłuższa seria:</span>
-                  <span className="text-blue-400 font-semibold">{member.longestStreak} dni</span>
+                  <span className="text-gray-400">Longest Streak:</span>
+                  <span className="text-blue-400 font-semibold">{member.longestStreak} days</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Eventy:</span>
+                  <span className="text-gray-400">Events:</span>
                   <span className="text-white">{member.eventsParticipated}</span>
                 </div>
               </div>
@@ -257,28 +257,28 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
           <div className="bg-gray-700/30 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <TrendingUp className="w-5 h-5" />
-              Subskrypcja i finanse
+              Subscription & Finance
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Typ subskrypcji:</span>
+                <span className="text-gray-400">Subscription Type:</span>
                 <span className="text-white">
-                  {member.isLifetime ? 'Lifetime' : 'Standardowa'}
+                  {member.isLifetime ? 'Lifetime' : 'Standard'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Wygasa:</span>
+                <span className="text-gray-400">Expires:</span>
                 <span className="text-white">
-                  {member.subscriptionExpires ? formatDate(member.subscriptionExpires) : 'Nie wygasa'}
+                  {member.subscriptionExpires ? formatDate(member.subscriptionExpires) : 'Never'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Łącznie wydane:</span>
+                <span className="text-gray-400">Total Spent:</span>
                 <span className="text-green-400 font-semibold">{member.totalSpent} ETH</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Data dołączenia:</span>
+                <span className="text-gray-400">Joined Date:</span>
                 <span className="text-white">{formatDate(member.joinedDate)}</span>
               </div>
             </div>
@@ -303,7 +303,7 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
                 )}
                 {member.mentees.length > 0 && (
                   <div>
-                    <span className="text-gray-400">Podopieczni ({member.mentees.length}):</span>
+                    <span className="text-gray-400">Mentees ({member.mentees.length}):</span>
                     <div className="mt-1 space-y-1">
                       {member.mentees.map((menteeId, index) => (
                         <div key={index} className="text-sm text-blue-400 font-mono">
@@ -322,25 +322,25 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">
                 <Ban className="w-5 h-5" />
-                Informacje o banie
+                Ban Information
               </h3>
               
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Powód:</span>
+                  <span className="text-gray-400">Reason:</span>
                   <span className="text-white">{member.banInfo.reason}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Zbanowany przez:</span>
+                  <span className="text-gray-400">Banned By:</span>
                   <span className="text-white">{member.banInfo.bannedBy}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Data bana:</span>
+                  <span className="text-gray-400">Ban Date:</span>
                   <span className="text-white">{formatDate(member.banInfo.bannedAt)}</span>
                 </div>
                 {member.banInfo.expiresAt && (
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Wygasa:</span>
+                    <span className="text-gray-400">Expires:</span>
                     <span className="text-white">{formatDate(member.banInfo.expiresAt)}</span>
                   </div>
                 )}
@@ -355,7 +355,7 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
               className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
             >
               <Shield className="w-4 h-4" />
-              Zmień rolę
+              Change Role
             </button>
             
             {member.status !== 'banned' && (
@@ -364,7 +364,7 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
                 className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
               >
                 <Ban className="w-4 h-4" />
-                Zbanuj
+                Ban User
               </button>
             )}
             
@@ -373,7 +373,7 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
               className="flex items-center gap-2 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors"
             >
               <X className="w-4 h-4" />
-              Zamknij
+              Close
             </button>
           </div>
         </div>
@@ -394,18 +394,18 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
                 className="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-700"
               >
                 <h3 className="text-lg font-semibold text-white mb-4">
-                  Zbanuj użytkownika
+                  Ban User
                 </h3>
                 
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Powód bana
+                      Ban Reason
                     </label>
                     <textarea
                       value={banReason}
                       onChange={(e) => setBanReason(e.target.value)}
-                      placeholder="Opisz powód banowania..."
+                      placeholder="Describe the reason for banning..."
                       rows={3}
                       className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
@@ -423,7 +423,7 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
                       disabled={!banReason.trim()}
                       className="flex-1 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Zbanuj
+                      Ban User
                     </button>
                     <button
                       onClick={() => {
@@ -432,7 +432,7 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
                       }}
                       className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors"
                     >
-                      Anuluj
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -457,20 +457,20 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
                 className="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-700"
               >
                 <h3 className="text-lg font-semibold text-white mb-4">
-                  Zmień rolę użytkownika
+                  Change User Role
                 </h3>
                 
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Nowa rola
+                      New Role
                     </label>
                     <select
                       value={selectedRole}
                       onChange={(e) => setSelectedRole(e.target.value as 'member' | 'moderator' | 'admin')}
                       className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="member">Członek</option>
+                      <option value="member">Member</option>
                       <option value="moderator">Moderator</option>
                       <option value="admin">Administrator</option>
                     </select>
@@ -484,7 +484,7 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
                       }}
                       className="flex-1 px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
                     >
-                      Zmień rolę
+                      Change Role
                     </button>
                     <button
                       onClick={() => {
@@ -493,7 +493,7 @@ const MemberDetails: React.FC<MemberDetailsProps> = ({
                       }}
                       className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors"
                     >
-                      Anuluj
+                      Cancel
                     </button>
                   </div>
                 </div>

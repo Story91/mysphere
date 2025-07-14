@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { 
   Trophy, 
   Star, 
@@ -87,6 +88,7 @@ const UserProgressionDashboard: React.FC<UserProgressionDashboardProps> = ({
   userId,
   communityId
 }) => {
+  const router = useRouter();
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [currentLevel, setCurrentLevel] = useState<Level | null>(null);
   const [nextLevel, setNextLevel] = useState<Level | null>(null);
@@ -362,395 +364,416 @@ const UserProgressionDashboard: React.FC<UserProgressionDashboardProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-pink-900/20 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Nagłówek */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Dashboard progresji
-          </h1>
-          <p className="text-gray-400">
-            Śledź swoje postępy, osiągnięcia i rozwój w społeczności
-          </p>
+    <div className="min-h-screen bg-slate-900 text-white p-4 md:p-8">
+      <div className="flex items-center space-x-4 mb-8">
+        <button
+            onClick={() => router.back()}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+        </button>
+        <div>
+            <h1 className="text-3xl md:text-4xl font-bold">User Progression</h1>
+            <p className="text-slate-400">Track your progress, achievements, and rewards</p>
         </div>
-
-        {/* Nawigacja */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          {[
-            { id: 'overview', label: 'Przegląd', icon: TrendingUp },
-            { id: 'achievements', label: 'Osiągnięcia', icon: Trophy },
-            { id: 'levels', label: 'Poziomy', icon: Star },
-            { id: 'rewards', label: 'Nagrody', icon: Gift }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                  : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
+      </div>
+      
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500"></div>
         </div>
-
-        {/* Tab: Przegląd */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {/* Aktualny poziom */}
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <div className="flex items-center gap-4 mb-4">
-                <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${currentLevel.color} flex items-center justify-center text-2xl`}>
-                  {currentLevel.badge}
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">{currentLevel.name}</h2>
-                  <p className="text-gray-400">{currentLevel.description}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-sm text-gray-400">Poziom {currentLevel.level}</span>
-                    <span className="text-sm text-purple-400">•</span>
-                    <span className="text-sm text-purple-400">{userStats.totalXP} XP</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pasek postępu */}
-              {nextLevel && (
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-gray-400">Postęp do następnego poziomu</span>
-                    <span className="text-sm text-white">
-                      {userStats.totalXP} / {nextLevel.xpRequired} XP
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-700 rounded-full h-3">
-                    <div 
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-1000"
-                      style={{ width: `${getProgressToNextLevel()}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs text-gray-500">
-                      {nextLevel.xpRequired - userStats.totalXP} XP do następnego poziomu
-                    </span>
-                    <span className="text-xs text-purple-400">
-                      {nextLevel.name}
-                    </span>
-                  </div>
-                </div>
-              )}
+      ) : (
+        <div className="space-y-8">
+            {/* Nagłówek */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-white mb-2">
+                Dashboard progresji
+              </h1>
+              <p className="text-gray-400">
+                Śledź swoje postępy, osiągnięcia i rozwój w społeczności
+              </p>
             </div>
 
-            {/* Statystyki */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-blue-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">{userStats.totalMessages}</div>
-                    <div className="text-sm text-gray-400">Wiadomości</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-green-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">{userStats.totalEvents}</div>
-                    <div className="text-sm text-gray-400">Eventy</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                    <Flame className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">{userStats.currentStreak}</div>
-                    <div className="text-sm text-gray-400">Aktualna seria</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                    <Trophy className="w-5 h-5 text-yellow-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">{userStats.completedAchievements}</div>
-                    <div className="text-sm text-gray-400">Osiągnięcia</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Ostatnie osiągnięcia */}
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Ostatnie osiągnięcia</h3>
-              <div className="space-y-3">
-                {achievements.filter(a => a.isCompleted).slice(-3).map(achievement => (
-                  <div key={achievement.id} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
-                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getRarityColor(achievement.rarity)} flex items-center justify-center`}>
-                      <achievement.icon className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-white">{achievement.name}</h4>
-                      <p className="text-sm text-gray-400">{achievement.description}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-green-400">+{achievement.xpReward} XP</div>
-                      {achievement.tokenReward && (
-                        <div className="text-xs text-purple-400">+{achievement.tokenReward} tokens</div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab: Osiągnięcia */}
-        {activeTab === 'achievements' && (
-          <div className="space-y-4">
-            {/* Filtry */}
-            <div className="flex flex-wrap gap-2">
-              {['all', 'social', 'financial', 'creative', 'technical', 'leadership'].map(category => (
+            {/* Nawigacja */}
+            <div className="flex flex-wrap gap-2 mb-8">
+              {[
+                { id: 'overview', label: 'Przegląd', icon: TrendingUp },
+                { id: 'achievements', label: 'Osiągnięcia', icon: Trophy },
+                { id: 'levels', label: 'Poziomy', icon: Star },
+                { id: 'rewards', label: 'Nagrody', icon: Gift }
+              ].map(tab => (
                 <button
-                  key={category}
-                  onClick={() => setSelectedCategory(category as any)}
-                  className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                    selectedCategory === category
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                    activeTab === tab.id
                       ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
                       : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
                   }`}
                 >
-                  {category === 'all' ? 'Wszystkie' : 
-                   category === 'social' ? 'Społeczne' :
-                   category === 'financial' ? 'Finansowe' :
-                   category === 'creative' ? 'Kreatywne' :
-                   category === 'technical' ? 'Techniczne' :
-                   'Liderskie'}
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
                 </button>
               ))}
             </div>
 
-            {/* Lista osiągnięć */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredAchievements.map(achievement => (
-                <div key={achievement.id} className={`bg-gray-800/30 backdrop-blur-sm rounded-lg p-4 border ${
-                  achievement.isCompleted ? 'border-green-500/50' : 'border-gray-700'
-                }`}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${getRarityColor(achievement.rarity)} flex items-center justify-center`}>
-                      <achievement.icon className="w-6 h-6 text-white" />
+            {/* Tab: Przegląd */}
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
+                {/* Aktualny poziom */}
+                <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${currentLevel.color} flex items-center justify-center text-2xl`}>
+                      {currentLevel.badge}
                     </div>
-                    <div className="flex items-center gap-2">
-                      {achievement.isCompleted ? (
-                        <CheckCircle className="w-5 h-5 text-green-400" />
-                      ) : (
-                        <div className="w-5 h-5 border-2 border-gray-600 rounded-full" />
-                      )}
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        achievement.rarity === 'common' ? 'bg-gray-500/20 text-gray-400' :
-                        achievement.rarity === 'rare' ? 'bg-blue-500/20 text-blue-400' :
-                        achievement.rarity === 'epic' ? 'bg-purple-500/20 text-purple-400' :
-                        'bg-yellow-500/20 text-yellow-400'
-                      }`}>
-                        {achievement.rarity}
-                      </span>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">{currentLevel.name}</h2>
+                      <p className="text-gray-400">{currentLevel.description}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-sm text-gray-400">Poziom {currentLevel.level}</span>
+                        <span className="text-sm text-purple-400">•</span>
+                        <span className="text-sm text-purple-400">{userStats.totalXP} XP</span>
+                      </div>
                     </div>
                   </div>
-
-                  <h4 className="font-semibold text-white mb-1">{achievement.name}</h4>
-                  <p className="text-sm text-gray-400 mb-3">{achievement.description}</p>
 
                   {/* Pasek postępu */}
-                  {!achievement.isCompleted && (
-                    <div className="mb-3">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs text-gray-500">Postęp</span>
-                        <span className="text-xs text-white">
-                          {achievement.progress} / {achievement.maxProgress}
+                  {nextLevel && (
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-gray-400">Postęp do następnego poziomu</span>
+                        <span className="text-sm text-white">
+                          {userStats.totalXP} / {nextLevel.xpRequired} XP
                         </span>
                       </div>
-                      <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div className="w-full bg-gray-700 rounded-full h-3">
                         <div 
-                          className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${(achievement.progress / achievement.maxProgress) * 100}%` }}
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-1000"
+                          style={{ width: `${getProgressToNextLevel()}%` }}
                         />
                       </div>
-                    </div>
-                  )}
-
-                  {/* Nagrody */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-yellow-400" />
-                      <span className="text-sm text-yellow-400">+{achievement.xpReward} XP</span>
-                    </div>
-                    {achievement.tokenReward && (
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-purple-400" />
-                        <span className="text-sm text-purple-400">+{achievement.tokenReward}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Data ukończenia */}
-                  {achievement.isCompleted && achievement.completedAt && (
-                    <div className="mt-2 pt-2 border-t border-gray-700">
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <Clock className="w-3 h-3" />
-                        Ukończono: {achievement.completedAt.toLocaleDateString()}
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-xs text-gray-500">
+                          {nextLevel.xpRequired - userStats.totalXP} XP do następnego poziomu
+                        </span>
+                        <span className="text-xs text-purple-400">
+                          {nextLevel.name}
+                        </span>
                       </div>
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Tab: Poziomy */}
-        {activeTab === 'levels' && (
-          <div className="space-y-4">
-            {levels.map((level, index) => (
-              <div key={level.level} className={`bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border ${
-                level.level === currentLevel.level ? 'border-purple-500/50' : 
-                level.level < currentLevel.level ? 'border-green-500/50' : 'border-gray-700'
-              }`}>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${level.color} flex items-center justify-center text-2xl`}>
-                    {level.badge}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-xl font-bold text-white">{level.name}</h3>
-                      <span className="text-sm text-gray-400">Poziom {level.level}</span>
-                      {level.level === currentLevel.level && (
-                        <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-full">
-                          Aktualny
-                        </span>
-                      )}
-                      {level.level < currentLevel.level && (
-                        <CheckCircle className="w-5 h-5 text-green-400" />
-                      )}
-                      {level.level > currentLevel.level && (
-                        <Lock className="w-5 h-5 text-gray-600" />
-                      )}
+                {/* Statystyki */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                        <MessageSquare className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">{userStats.totalMessages}</div>
+                        <div className="text-sm text-gray-400">Wiadomości</div>
+                      </div>
                     </div>
-                    <p className="text-gray-400 mt-1">{level.description}</p>
-                    <div className="text-sm text-gray-500 mt-1">
-                      {level.xpRequired} XP wymagane
-                      {level.xpToNext > 0 && ` • ${level.xpToNext} XP do następnego poziomu`}
+                  </div>
+
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                        <Calendar className="w-5 h-5 text-green-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">{userStats.totalEvents}</div>
+                        <div className="text-sm text-gray-400">Eventy</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                        <Flame className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">{userStats.currentStreak}</div>
+                        <div className="text-sm text-gray-400">Aktualna seria</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                        <Trophy className="w-5 h-5 text-yellow-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">{userStats.completedAchievements}</div>
+                        <div className="text-sm text-gray-400">Osiągnięcia</div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Nagrody */}
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-white">Nagrody za poziom:</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {level.rewards.map((reward, rewardIndex) => (
-                      <div key={rewardIndex} className="flex items-center gap-2 p-2 bg-gray-700/30 rounded-lg">
-                        <reward.icon className="w-4 h-4 text-purple-400" />
-                        <span className="text-sm text-gray-300">
-                          {reward.amount && `${reward.amount}x `}{reward.description}
-                        </span>
+                {/* Ostatnie osiągnięcia */}
+                <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                  <h3 className="text-lg font-semibold text-white mb-4">Ostatnie osiągnięcia</h3>
+                  <div className="space-y-3">
+                    {achievements.filter(a => a.isCompleted).slice(-3).map(achievement => (
+                      <div key={achievement.id} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
+                        <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getRarityColor(achievement.rarity)} flex items-center justify-center`}>
+                          <achievement.icon className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-white">{achievement.name}</h4>
+                          <p className="text-sm text-gray-400">{achievement.description}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-green-400">+{achievement.xpReward} XP</div>
+                          {achievement.tokenReward && (
+                            <div className="text-xs text-purple-400">+{achievement.tokenReward} tokens</div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {/* Tab: Nagrody */}
-        {activeTab === 'rewards' && (
-          <div className="space-y-6">
-            {/* Podsumowanie nagród */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                    <Star className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">1,250</div>
-                    <div className="text-sm text-gray-400">Tokeny zdobyte</div>
-                  </div>
+            {/* Tab: Osiągnięcia */}
+            {activeTab === 'achievements' && (
+              <div className="space-y-4">
+                {/* Filtry */}
+                <div className="flex flex-wrap gap-2">
+                  {['all', 'social', 'financial', 'creative', 'technical', 'leadership'].map(category => (
+                    <button
+                      key={category}
+                      onClick={() => setSelectedCategory(category as any)}
+                      className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                        selectedCategory === category
+                          ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                          : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                      }`}
+                    >
+                      {category === 'all' ? 'Wszystkie' : 
+                       category === 'social' ? 'Społeczne' :
+                       category === 'financial' ? 'Finansowe' :
+                       category === 'creative' ? 'Kreatywne' :
+                       category === 'technical' ? 'Techniczne' :
+                       'Liderskie'}
+                    </button>
+                  ))}
                 </div>
-              </div>
 
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                    <Gem className="w-5 h-5 text-blue-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">3</div>
-                    <div className="text-sm text-gray-400">NFT zdobyte</div>
-                  </div>
-                </div>
-              </div>
+                {/* Lista osiągnięć */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredAchievements.map(achievement => (
+                    <div key={achievement.id} className={`bg-gray-800/30 backdrop-blur-sm rounded-lg p-4 border ${
+                      achievement.isCompleted ? 'border-green-500/50' : 'border-gray-700'
+                    }`}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${getRarityColor(achievement.rarity)} flex items-center justify-center`}>
+                          <achievement.icon className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {achievement.isCompleted ? (
+                            <CheckCircle className="w-5 h-5 text-green-400" />
+                          ) : (
+                            <div className="w-5 h-5 border-2 border-gray-600 rounded-full" />
+                          )}
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            achievement.rarity === 'common' ? 'bg-gray-500/20 text-gray-400' :
+                            achievement.rarity === 'rare' ? 'bg-blue-500/20 text-blue-400' :
+                            achievement.rarity === 'epic' ? 'bg-purple-500/20 text-purple-400' :
+                            'bg-yellow-500/20 text-yellow-400'
+                          }`}>
+                            {achievement.rarity}
+                          </span>
+                        </div>
+                      </div>
 
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                    <Award className="w-5 h-5 text-yellow-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">5</div>
-                    <div className="text-sm text-gray-400">Badges zdobyte</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                      <h4 className="font-semibold text-white mb-1">{achievement.name}</h4>
+                      <p className="text-sm text-gray-400 mb-3">{achievement.description}</p>
 
-            {/* Historia nagród */}
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Historia nagród</h3>
-              <div className="space-y-3">
-                {[
-                  { type: 'badge', name: 'Newcomer Badge', date: '2024-01-15', source: 'Poziom 1' },
-                  { type: 'token', name: '50 Community Tokens', date: '2024-01-20', source: 'Achievement: Pierwsza wiadomość' },
-                  { type: 'nft', name: 'Early Adopter NFT', date: '2024-01-25', source: 'Poziom 2' },
-                  { type: 'token', name: '100 Community Tokens', date: '2024-02-01', source: 'Poziom 3' },
-                  { type: 'badge', name: 'Contributor Badge', date: '2024-02-05', source: 'Poziom 3' }
-                ].map((reward, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                      {reward.type === 'token' ? <Star className="w-5 h-5 text-white" /> :
-                       reward.type === 'nft' ? <Gem className="w-5 h-5 text-white" /> :
-                       <Award className="w-5 h-5 text-white" />}
+                      {/* Pasek postępu */}
+                      {!achievement.isCompleted && (
+                        <div className="mb-3">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs text-gray-500">Postęp</span>
+                            <span className="text-xs text-white">
+                              {achievement.progress} / {achievement.maxProgress}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-700 rounded-full h-2">
+                            <div 
+                              className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${(achievement.progress / achievement.maxProgress) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Nagrody */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-yellow-400" />
+                          <span className="text-sm text-yellow-400">+{achievement.xpReward} XP</span>
+                        </div>
+                        {achievement.tokenReward && (
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4 text-purple-400" />
+                            <span className="text-sm text-purple-400">+{achievement.tokenReward}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Data ukończenia */}
+                      {achievement.isCompleted && achievement.completedAt && (
+                        <div className="mt-2 pt-2 border-t border-gray-700">
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <Clock className="w-3 h-3" />
+                            Ukończono: {achievement.completedAt.toLocaleDateString()}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-white">{reward.name}</h4>
-                      <p className="text-sm text-gray-400">Źródło: {reward.source}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Poziomy */}
+            {activeTab === 'levels' && (
+              <div className="space-y-4">
+                {levels.map((level, index) => (
+                  <div key={level.level} className={`bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border ${
+                    level.level === currentLevel.level ? 'border-purple-500/50' : 
+                    level.level < currentLevel.level ? 'border-green-500/50' : 'border-gray-700'
+                  }`}>
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${level.color} flex items-center justify-center text-2xl`}>
+                        {level.badge}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl font-bold text-white">{level.name}</h3>
+                          <span className="text-sm text-gray-400">Poziom {level.level}</span>
+                          {level.level === currentLevel.level && (
+                            <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-full">
+                              Aktualny
+                            </span>
+                          )}
+                          {level.level < currentLevel.level && (
+                            <CheckCircle className="w-5 h-5 text-green-400" />
+                          )}
+                          {level.level > currentLevel.level && (
+                            <Lock className="w-5 h-5 text-gray-600" />
+                          )}
+                        </div>
+                        <p className="text-gray-400 mt-1">{level.description}</p>
+                        <div className="text-sm text-gray-500 mt-1">
+                          {level.xpRequired} XP wymagane
+                          {level.xpToNext > 0 && ` • ${level.xpToNext} XP do następnego poziomu`}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-400">{reward.date}</div>
+
+                    {/* Nagrody */}
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-white">Nagrody za poziom:</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {level.rewards.map((reward, rewardIndex) => (
+                          <div key={rewardIndex} className="flex items-center gap-2 p-2 bg-gray-700/30 rounded-lg">
+                            <reward.icon className="w-4 h-4 text-purple-400" />
+                            <span className="text-sm text-gray-300">
+                              {reward.amount && `${reward.amount}x `}{reward.description}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-        )}
-      </div>
+            )}
+
+            {/* Tab: Nagrody */}
+            {activeTab === 'rewards' && (
+              <div className="space-y-6">
+                {/* Podsumowanie nagród */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                        <Star className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">1,250</div>
+                        <div className="text-sm text-gray-400">Tokeny zdobyte</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                        <Gem className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">3</div>
+                        <div className="text-sm text-gray-400">NFT zdobyte</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                        <Award className="w-5 h-5 text-yellow-400" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">5</div>
+                        <div className="text-sm text-gray-400">Badges zdobyte</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Historia nagród */}
+                <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                  <h3 className="text-lg font-semibold text-white mb-4">Historia nagród</h3>
+                  <div className="space-y-3">
+                    {[
+                      { type: 'badge', name: 'Newcomer Badge', date: '2024-01-15', source: 'Poziom 1' },
+                      { type: 'token', name: '50 Community Tokens', date: '2024-01-20', source: 'Achievement: Pierwsza wiadomość' },
+                      { type: 'nft', name: 'Early Adopter NFT', date: '2024-01-25', source: 'Poziom 2' },
+                      { type: 'token', name: '100 Community Tokens', date: '2024-02-01', source: 'Poziom 3' },
+                      { type: 'badge', name: 'Contributor Badge', date: '2024-02-05', source: 'Poziom 3' }
+                    ].map((reward, index) => (
+                      <div key={index} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                          {reward.type === 'token' ? <Star className="w-5 h-5 text-white" /> :
+                           reward.type === 'nft' ? <Gem className="w-5 h-5 text-white" /> :
+                           <Award className="w-5 h-5 text-white" />}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-white">{reward.name}</h4>
+                          <p className="text-sm text-gray-400">Źródło: {reward.source}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-gray-400">{reward.date}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+        </div>
+      )}
     </div>
   );
 };

@@ -99,16 +99,8 @@ export default function MemberManagementCard({ community }: MemberManagementCard
     >
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold text-white">Member Management</h3>
-        <div className="flex items-center space-x-2">
-          <button className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm transition-colors">
-            Export CSV
-          </button>
-          <button className="px-3 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm transition-colors">
-            Add Member
-          </button>
-        </div>
       </div>
-
+      
       {/* Member Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="text-center p-3 bg-white/5 rounded-xl">
@@ -232,22 +224,6 @@ export default function MemberManagementCard({ community }: MemberManagementCard
             </div>
           </motion.div>
         ))}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="mt-6 pt-4 border-t border-white/10">
-        <h4 className="text-sm font-semibold text-white mb-3">Quick Actions</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <button className="p-3 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm transition-colors">
-            Mass Message
-          </button>
-          <button className="p-3 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm transition-colors">
-            Create Event
-          </button>
-          <button className="p-3 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm transition-colors">
-            Member Analytics
-          </button>
-        </div>
       </div>
     </motion.div>
   );

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpheresContract } from '../../hooks/useSpheresContract';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 import { 
   Calendar, 
   Plus, 
@@ -25,7 +26,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-// Interfejsy
+// Interfaces
 interface Event {
   id: string;
   title: string;
@@ -78,13 +79,14 @@ const EventManagement: React.FC<EventManagementProps> = ({
   currentUserAddress,
   isCreator
 }) => {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'create' | 'participants' | 'analytics'>('overview');
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Formularz nowego eventu
+  // New event form
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
@@ -100,17 +102,17 @@ const EventManagement: React.FC<EventManagementProps> = ({
     rewards: [] as Event['rewards']
   });
 
-  // Przykładowe dane
+  // Example data
   useEffect(() => {
     const loadEvents = async () => {
       setLoading(true);
       
-      // Symulowane dane eventów
+      // Mock event data
       const mockEvents: Event[] = [
         {
           id: '1',
           title: 'DeFi Workshop: Yield Farming Strategies',
-          description: 'Kompleksowy warsztat na temat strategii yield farming w DeFi. Nauczysz się jak maksymalizować zyski przy minimalnym ryzyku.',
+          description: 'Comprehensive workshop on yield farming strategies in DeFi. Learn how to maximize profits with minimal risk.',
           creator: currentUserAddress,
           startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000),
@@ -121,7 +123,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
           maxParticipants: 30,
           currentParticipants: 18,
           status: 'published',
-          requirements: ['Podstawowa wiedza o DeFi', 'Portfel MetaMask'],
+          requirements: ['Basic DeFi knowledge', 'MetaMask wallet'],
           tags: ['DeFi', 'Yield Farming', 'Blockchain'],
           rewards: [
             { type: 'token', amount: 100, description: 'Community tokens' },
@@ -135,7 +137,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
         {
           id: '2',
           title: 'NFT Art Showcase & Networking',
-          description: 'Wystawa prac NFT członków społeczności z sesją networkingową. Prezentacja portfolio, feedback i możliwości współpracy.',
+          description: 'Exhibition of NFT works by community members with networking session. Portfolio presentation, feedback and collaboration opportunities.',
           creator: currentUserAddress,
           startDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
           endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000),
@@ -146,7 +148,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
           maxParticipants: 50,
           currentParticipants: 35,
           status: 'published',
-          requirements: ['Portfolio NFT (opcjonalnie)'],
+          requirements: ['NFT Portfolio (optional)'],
           tags: ['NFT', 'Art', 'Networking'],
           rewards: [
             { type: 'points', amount: 50, description: 'Social points' },
@@ -160,7 +162,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
         {
           id: '3',
           title: 'Blockchain Hackathon 2024',
-          description: '48-godzinny hackathon z tematyk blockchain i Web3. Zespoły do 4 osób, mentoring, cenne nagrody.',
+          description: '48-hour hackathon focused on blockchain and Web3 topics. Teams up to 4 people, mentoring, valuable prizes.',
           creator: currentUserAddress,
           startDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           endDate: new Date(Date.now() + 32 * 24 * 60 * 60 * 1000),
@@ -171,7 +173,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
           maxParticipants: 100,
           currentParticipants: 67,
           status: 'published',
-          requirements: ['Doświadczenie programistyczne', 'Laptop', 'Zespół (opcjonalnie)'],
+          requirements: ['Programming experience', 'Laptop', 'Team (optional)'],
           tags: ['Hackathon', 'Blockchain', 'Web3', 'Programming'],
           rewards: [
             { type: 'token', amount: 1000, description: 'Winning team tokens' },
@@ -192,7 +194,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
     loadEvents();
   }, [communityId, currentUserAddress]);
 
-  // Funkcja tworzenia eventu
+  // Event creation function
   const handleCreateEvent = async () => {
     try {
       const eventData: Partial<Event> = {
@@ -226,41 +228,41 @@ const EventManagement: React.FC<EventManagementProps> = ({
         rewards: []
       });
       
-      toast.success('Event utworzony pomyślnie!');
+      toast.success('Event created successfully!');
     } catch (error) {
-      toast.error('Błąd podczas tworzenia eventu');
+      toast.error('Error creating event');
     }
   };
 
-  // Funkcja aktualizacji statusu eventu
+  // Event status update function
   const handleUpdateEventStatus = async (eventId: string, newStatus: Event['status']) => {
     try {
       setEvents(prev => prev.map(event => 
         event.id === eventId ? { ...event, status: newStatus, updatedAt: new Date() } : event
       ));
       
-      toast.success(`Status eventu zaktualizowany na: ${newStatus}`);
+      toast.success(`Event status updated to: ${newStatus}`);
     } catch (error) {
-      toast.error('Błąd podczas aktualizacji statusu');
+      toast.error('Error updating status');
     }
   };
 
-  // Funkcja usuwania eventu
+  // Event deletion function
   const handleDeleteEvent = async (eventId: string) => {
     try {
       setEvents(prev => prev.filter(event => event.id !== eventId));
       if (selectedEvent?.id === eventId) {
         setSelectedEvent(null);
       }
-      toast.success('Event usunięty pomyślnie');
+      toast.success('Event deleted successfully');
     } catch (error) {
-      toast.error('Błąd podczas usuwania eventu');
+      toast.error('Error deleting event');
     }
   };
 
-  // Funkcja formatowania daty
+  // Date formatting function
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('pl-PL', {
+    return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -269,7 +271,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
     });
   };
 
-  // Funkcja określająca kolor statusu
+  // Status color function
   const getStatusColor = (status: Event['status']) => {
     switch (status) {
       case 'draft': return 'text-gray-400 bg-gray-500/20';
@@ -281,7 +283,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
     }
   };
 
-  // Funkcja określająca ikonę kategorii
+  // Category icon function
   const getCategoryIcon = (category: Event['category']) => {
     switch (category) {
       case 'workshop': return <Settings className="w-4 h-4" />;
@@ -293,7 +295,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
     }
   };
 
-  // Obliczanie statystyk
+  // Statistics calculation
   const getStats = () => {
     const totalEvents = events.length;
     const publishedEvents = events.filter(e => e.status === 'published').length;
@@ -329,37 +331,41 @@ const EventManagement: React.FC<EventManagementProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-pink-900/20 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Nagłówek */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Zarządzanie eventami
-            </h1>
-            <p className="text-gray-400">
-              Twórz, zarządzaj i analizuj eventy społeczności
-            </p>
-          </div>
-          
-          {isCreator && (
+    <div className="bg-slate-900 text-white min-h-screen p-8">
+        <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-4">
+                <button
+                    onClick={() => router.back()}
+                    className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <div>
+                    <h1 className="text-4xl font-bold">Event Management</h1>
+                    <p className="text-slate-400">Create, manage, and analyze your community events</p>
+                </div>
+            </div>
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+            onClick={() => {
+                setSelectedEvent(null);
+                setActiveTab('create');
+            }}
+            className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-lg transition-all"
             >
-              <Plus className="w-5 h-5" />
-              Nowy event
+            <Plus size={20} />
+            <span>Create Event</span>
             </button>
-          )}
         </div>
 
-        {/* Nawigacja */}
+        {/* Navigation */}
         <div className="flex flex-wrap gap-2 mb-8">
           {[
-            { id: 'overview', label: 'Przegląd', icon: TrendingUp },
-            { id: 'events', label: 'Eventy', icon: Calendar },
-            { id: 'participants', label: 'Uczestnicy', icon: Users },
-            { id: 'analytics', label: 'Analityka', icon: DollarSign }
+            { id: 'overview', label: 'Overview', icon: TrendingUp },
+            { id: 'events', label: 'Events', icon: Calendar },
+            { id: 'participants', label: 'Participants', icon: Users },
+            { id: 'analytics', label: 'Analytics', icon: DollarSign }
           ].map(tab => (
             <button
               key={tab.id}
@@ -376,10 +382,10 @@ const EventManagement: React.FC<EventManagementProps> = ({
           ))}
         </div>
 
-        {/* Tab: Przegląd */}
+        {/* Tab: Overview */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Statystyki */}
+            {/* Statistics */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
                 <div className="flex items-center gap-3">
@@ -388,8 +394,8 @@ const EventManagement: React.FC<EventManagementProps> = ({
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-white">{stats.totalEvents}</div>
-                    <div className="text-sm text-gray-400">Wszystkie eventy</div>
-                    <div className="text-xs text-green-400">{stats.publishedEvents} opublikowanych</div>
+                    <div className="text-sm text-gray-400">Total Events</div>
+                    <div className="text-xs text-green-400">{stats.publishedEvents} published</div>
                   </div>
                 </div>
               </div>
@@ -401,8 +407,8 @@ const EventManagement: React.FC<EventManagementProps> = ({
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-white">{stats.totalParticipants}</div>
-                    <div className="text-sm text-gray-400">Uczestnicy</div>
-                    <div className="text-xs text-blue-400">{stats.avgParticipants.toFixed(1)} średnio</div>
+                    <div className="text-sm text-gray-400">Participants</div>
+                    <div className="text-xs text-blue-400">{stats.avgParticipants.toFixed(1)} avg</div>
                   </div>
                 </div>
               </div>
@@ -414,8 +420,8 @@ const EventManagement: React.FC<EventManagementProps> = ({
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-white">{stats.totalRevenue.toFixed(2)}</div>
-                    <div className="text-sm text-gray-400">ETH przychód</div>
-                    <div className="text-xs text-green-400">+15% w tym miesiącu</div>
+                    <div className="text-sm text-gray-400">ETH Revenue</div>
+                    <div className="text-xs text-green-400">+15% this month</div>
                   </div>
                 </div>
               </div>
@@ -427,16 +433,16 @@ const EventManagement: React.FC<EventManagementProps> = ({
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-white">{stats.completedEvents}</div>
-                    <div className="text-sm text-gray-400">Ukończone</div>
-                    <div className="text-xs text-purple-400">{stats.ongoingEvents} w trakcie</div>
+                    <div className="text-sm text-gray-400">Completed</div>
+                    <div className="text-xs text-purple-400">{stats.ongoingEvents} ongoing</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Nadchodzące eventy */}
+            {/* Upcoming events */}
             <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Nadchodzące eventy</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Upcoming Events</h3>
               <div className="space-y-3">
                 {events.filter(e => e.status === 'published' && e.startDate > new Date()).slice(0, 3).map(event => (
                   <div key={event.id} className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
@@ -480,30 +486,30 @@ const EventManagement: React.FC<EventManagementProps> = ({
           </div>
         )}
 
-        {/* Tab: Lista eventów */}
+        {/* Tab: Events list */}
         {activeTab === 'events' && (
           <div className="space-y-4">
-            {/* Filtry */}
+            {/* Filters */}
             <div className="flex flex-wrap gap-2 mb-4">
               <select className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500">
-                <option value="all">Wszystkie statusy</option>
-                <option value="draft">Drafty</option>
-                <option value="published">Opublikowane</option>
-                <option value="ongoing">W trakcie</option>
-                <option value="completed">Ukończone</option>
-                <option value="cancelled">Anulowane</option>
+                <option value="all">All statuses</option>
+                <option value="draft">Drafts</option>
+                <option value="published">Published</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
               <select className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500">
-                <option value="all">Wszystkie kategorie</option>
-                <option value="workshop">Warsztaty</option>
-                <option value="conference">Konferencje</option>
-                <option value="meetup">Spotkania</option>
-                <option value="hackathon">Hackathony</option>
-                <option value="social">Społeczne</option>
+                <option value="all">All categories</option>
+                <option value="workshop">Workshops</option>
+                <option value="conference">Conferences</option>
+                <option value="meetup">Meetups</option>
+                <option value="hackathon">Hackathons</option>
+                <option value="social">Social</option>
               </select>
             </div>
 
-            {/* Lista eventów */}
+            {/* Events list */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {events.map(event => (
                 <div key={event.id} className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
@@ -533,7 +539,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
                       {isCreator && (
                         <>
                           <button
-                            onClick={() => {/* Implementacja edycji */}}
+                            onClick={() => {/* Edit implementation */}}
                             className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
                           >
                             <Edit3 className="w-4 h-4" />
@@ -562,7 +568,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-400">
                       <Users className="w-4 h-4" />
-                      <span>{event.currentParticipants}/{event.maxParticipants} uczestników</span>
+                      <span>{event.currentParticipants}/{event.maxParticipants} participants</span>
                     </div>
                     {event.price > 0 && (
                       <div className="flex items-center gap-2 text-sm text-gray-400">
@@ -587,7 +593,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
                         className="flex items-center gap-1 px-3 py-1 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-sm"
                       >
                         <Play className="w-3 h-3" />
-                        Opublikuj
+                        Publish
                       </button>
                     )}
                   </div>
@@ -597,7 +603,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
           </div>
         )}
 
-        {/* Modal tworzenia eventu */}
+        {/* Event creation modal */}
         <AnimatePresence>
           {showCreateModal && (
             <motion.div
@@ -613,39 +619,39 @@ const EventManagement: React.FC<EventManagementProps> = ({
                 className="bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-700"
               >
                 <div className="p-6 space-y-6">
-                  <h3 className="text-xl font-semibold text-white">Utwórz nowy event</h3>
+                  <h3 className="text-xl font-semibold text-white">Create New Event</h3>
                   
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Tytuł eventu
+                        Event Title
                       </label>
                       <input
                         type="text"
                         value={newEvent.title}
                         onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
                         className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
-                        placeholder="Podaj tytuł eventu..."
+                        placeholder="Enter event title..."
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Opis
+                        Description
                       </label>
                       <textarea
                         value={newEvent.description}
                         onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
                         rows={3}
                         className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
-                        placeholder="Opisz szczegóły eventu..."
+                        placeholder="Describe event details..."
                       />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Data rozpoczęcia
+                          Start Date
                         </label>
                         <input
                           type="datetime-local"
@@ -656,7 +662,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Data zakończenia
+                          End Date
                         </label>
                         <input
                           type="datetime-local"
@@ -669,14 +675,14 @@ const EventManagement: React.FC<EventManagementProps> = ({
 
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Lokalizacja
+                        Location
                       </label>
                       <input
                         type="text"
                         value={newEvent.location}
                         onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
                         className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
-                        placeholder="Podaj miejsce lub link do wydarzenia..."
+                        placeholder="Enter location or event link..."
                       />
                       <label className="flex items-center gap-2 mt-2">
                         <input
@@ -685,31 +691,31 @@ const EventManagement: React.FC<EventManagementProps> = ({
                           onChange={(e) => setNewEvent({...newEvent, isVirtual: e.target.checked})}
                           className="w-4 h-4 rounded border-gray-600 text-purple-600 focus:ring-purple-500"
                         />
-                        <span className="text-sm text-gray-300">Event wirtualny</span>
+                        <span className="text-sm text-gray-300">Virtual event</span>
                       </label>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Kategoria
+                          Category
                         </label>
                         <select
                           value={newEvent.category}
                           onChange={(e) => setNewEvent({...newEvent, category: e.target.value as Event['category']})}
                           className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500"
                         >
-                          <option value="workshop">Warsztat</option>
-                          <option value="conference">Konferencja</option>
-                          <option value="meetup">Spotkanie</option>
+                          <option value="workshop">Workshop</option>
+                          <option value="conference">Conference</option>
+                          <option value="meetup">Meetup</option>
                           <option value="hackathon">Hackathon</option>
-                          <option value="social">Społeczne</option>
-                          <option value="other">Inne</option>
+                          <option value="social">Social</option>
+                          <option value="other">Other</option>
                         </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Cena (ETH)
+                          Price (ETH)
                         </label>
                         <input
                           type="number"
@@ -721,7 +727,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Max uczestników
+                          Max Participants
                         </label>
                         <input
                           type="number"
@@ -737,13 +743,13 @@ const EventManagement: React.FC<EventManagementProps> = ({
                         onClick={handleCreateEvent}
                         className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200"
                       >
-                        Utwórz event
+                        Create Event
                       </button>
                       <button
                         onClick={() => setShowCreateModal(false)}
                         className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 rounded-lg hover:bg-gray-600/50 transition-colors"
                       >
-                        Anuluj
+                        Cancel
                       </button>
                     </div>
                   </div>
@@ -752,7 +758,6 @@ const EventManagement: React.FC<EventManagementProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
     </div>
   );
 };

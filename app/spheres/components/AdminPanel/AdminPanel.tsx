@@ -10,6 +10,7 @@ import AdminUserManagement from './AdminUserManagement';
 import AdminFeeManagement from './AdminFeeManagement';
 import AdminSecurityPanel from './AdminSecurityPanel';
 import { useSpheresContract } from '../../hooks/useSpheresContract';
+import { useRouter } from 'next/navigation';
 
 interface AdminPanelProps {
   className?: string;
@@ -54,6 +55,7 @@ const adminTabs = [
 ];
 
 export default function AdminPanel({ className = '' }: AdminPanelProps) {
+  const router = useRouter();
   const { address, isConnected, isAdmin, isPaused, isLoading } = useSpheresContract();
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -114,6 +116,14 @@ export default function AdminPanel({ className = '' }: AdminPanelProps) {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
+                <button
+                    onClick={() => router.back()}
+                    className="p-2 rounded-full bg-slate-700 hover:bg-slate-600 transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
               <div className="p-2 bg-blue-500 rounded-lg">
                 <Crown className="h-6 w-6 text-white" />
               </div>

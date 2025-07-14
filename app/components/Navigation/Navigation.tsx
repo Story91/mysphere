@@ -42,6 +42,7 @@ type NavLink = {
     isHighlighted?: boolean;
     isFlashBlock?: boolean;
     isExternal?: boolean;
+    isDisabled?: boolean;
   }>;
 };
 
@@ -54,6 +55,7 @@ type NavLinkWithDropdown = {
     isHighlighted?: boolean;
     isFlashBlock?: boolean;
     isExternal?: boolean;
+    isDisabled?: boolean;
   }>;
   isHighlighted?: boolean;
   icon?: ReactNode;
@@ -99,28 +101,15 @@ export default function Navigation() {
       ]
     },
     {
-      label: 'MiniApps',
+      label: 'Mini-Apps',
+      isHighlighted: true,
       dropdownItems: [
-        { 
-          href: '/flashblock', 
-          label: 'FLASHBLOCK',
-          isHighlighted: true,
-          isFlashBlock: true
-        },
-        {
-          href: 'https://mini-tv.app',
-          label: 'MiniTV',
-          isExternal: true
-        },
-        {
-          href: 'https://justcoinit.vercel.app',
-          label: 'JustCoinIT',
-          isExternal: true
-        }
-      ]
+        { href: '/ai-agent', label: 'Spherian' },
+        { href: '#', label: 'Spheres', isDisabled: true },
+      ],
     },
     { href: '/Docs', label: 'Docs' },
-    ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : [])
+    ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ];
 
   return (
@@ -170,32 +159,97 @@ export default function Navigation() {
                     </button>
                     {activeDropdown === link.label && (
                       <div className="absolute left-1/2 transform -translate-x-1/2 w-max mt-2 bg-white/95 backdrop-blur-xl rounded-xl shadow-[0_8px_16px_rgba(0,0,0,0.1)] border border-[#0052FF]/10 overflow-hidden">
-                        {link.dropdownItems.map((item) => (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            onClick={() => setActiveDropdown(null)}
-                            className="flex items-center gap-2 px-4 py-2.5 text-gray-900 hover:bg-[#0052FF]/5 transition-colors duration-200 whitespace-nowrap"
-                            target={item.isExternal ? "_blank" : undefined}
-                            rel={item.isExternal ? "noopener noreferrer" : undefined}
-                          >
-                            {item.label === 'Buy&Swap' ? (
-                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M3 7L9 13M9 7L3 13M21 11L15 17M15 11L21 17" stroke="#0052FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        {link.dropdownItems.map((item) =>
+                          item.isDisabled ? (
+                            <span
+                              key={item.href}
+                              className="flex items-center gap-2 px-4 py-2.5 text-gray-400 cursor-not-allowed whitespace-nowrap"
+                              title="Coming soon"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M8 7H4M4 7V11M4 7L9 12M16 17H20M20 17V13M20 17L15 12"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
                               </svg>
-                            ) : (
-                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M8 7H4M4 7V11M4 7L9 12M16 17H20M20 17V13M20 17L15 12" stroke="#0052FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            )}
-                            <span className="font-['Coinbase_Display']">{item.label}</span>
-                            {item.isExternal && (
-                              <svg className="w-3 h-3 ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14M14 4H20M20 4V10M20 4L10 14" stroke="#0052FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            )}
-                          </Link>
-                        ))}
+                              <span className="font-['Coinbase_Display']">
+                                {item.label}
+                              </span>
+                            </span>
+                          ) : (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => setActiveDropdown(null)}
+                              className="flex items-center gap-2 px-4 py-2.5 text-gray-900 hover:bg-[#0052FF]/5 transition-colors duration-200 whitespace-nowrap"
+                              target={item.isExternal ? '_blank' : undefined}
+                              rel={
+                                item.isExternal
+                                  ? 'noopener noreferrer'
+                                  : undefined
+                              }
+                            >
+                              {item.label === 'Buy&Swap' ? (
+                                <svg
+                                  className="w-4 h-4"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M3 7L9 13M9 7L3 13M21 11L15 17M15 11L21 17"
+                                    stroke="#0052FF"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              ) : (
+                                <svg
+                                  className="w-4 h-4"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M8 7H4M4 7V11M4 7L9 12M16 17H20M20 17V13M20 17L15 12"
+                                    stroke="#0052FF"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
+                              <span className="font-['Coinbase_Display']">
+                                {item.label}
+                              </span>
+                              {item.isExternal && (
+                                <svg
+                                  className="w-3 h-3 ml-1"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14M14 4H20M20 4V10M20 4L10 14"
+                                    stroke="#0052FF"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
+                            </Link>
+                          ),
+                        )}
                       </div>
                     )}
                   </div>
@@ -270,25 +324,6 @@ export default function Navigation() {
             </button>
           </div>
           <div className="flex items-center space-x-4">
-            {/* Ultra Modern Spherian Button */}
-            <Link href="/ai-agent" className="relative group scale-80">
-              <div className="absolute -inset-[2px] bg-gradient-to-r from-[#00F0FF] via-[#00A3FF] to-[#0047FF] rounded-xl blur-lg opacity-75 group-hover:opacity-100 animate-gradient-shift transition duration-1000 group-hover:duration-200"></div>
-              <div className="relative px-5 py-1.5 bg-white rounded-xl overflow-hidden">
-                {/* Animated lines in background */}
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#0047FF0f_1px,transparent_1px),linear-gradient(to_bottom,#0047FF0f_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#fff_70%,transparent_100%)]"></div>
-                
-                {/* Radial gradient overlay */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle_500px_at_50%_50%,#00A3FF15,transparent)]"></div>
-
-                {/* Text with gradient and animation */}
-                <span className="relative font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#00F0FF] via-[#00A3FF] to-[#0047FF] animate-gradient-shift">
-                  Spherian
-                </span>
-
-                {/* Shine effect */}
-                <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000"></div>
-              </div>
-            </Link>
             <Wallet>
               <ConnectWallet className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2">
                 <ConnectWalletText>Log In</ConnectWalletText>
@@ -369,19 +404,29 @@ export default function Navigation() {
                   </button>
                   {activeDropdown === link.label && (
                     <div className="pl-4">
-                      {link.dropdownItems.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          onClick={() => {
-                            setActiveDropdown(null);
-                            setIsMobileMenuOpen(false);
-                          }}
-                          className="block px-4 py-2 text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5 rounded-xl transition-colors duration-200"
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
+                      {link.dropdownItems.map((item) =>
+                        item.isDisabled ? (
+                          <span
+                            key={item.href}
+                            className="block px-4 py-2 text-gray-500 cursor-not-allowed"
+                            title="Coming soon"
+                          >
+                            {item.label}
+                          </span>
+                        ) : (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => {
+                              setActiveDropdown(null);
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className="block px-4 py-2 text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5 rounded-xl transition-colors duration-200"
+                          >
+                            {item.label}
+                          </Link>
+                        ),
+                      )}
                     </div>
                   )}
                 </div>
