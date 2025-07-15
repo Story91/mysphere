@@ -592,7 +592,7 @@ export function useSpheresContract() {
       setIsLoading(true);
       setError(null);
 
-      await writeContractFn({
+      const txHash = await writeContractFn({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
         functionName,
@@ -600,22 +600,33 @@ export function useSpheresContract() {
         value,
       });
 
-      toast.success(successMessage);
-      
+      // Return a simple object with hash and wait method
+      const result = {
+        hash: txHash,
+        wait: async () => {
+          // Wait for transaction receipt
+          if (publicClient && txHash) {
+            return await publicClient.waitForTransactionReceipt({ hash: txHash });
+          }
+          throw new Error('Public client not available');
+        }
+      };
+
       // Refetch contract data after successful transaction
       setTimeout(() => {
         refetchAll();
-      }, 2000);
+      }, 3000);
+
+      return result;
 
     } catch (err: any) {
       const errorMessage = err?.message || 'Transaction failed';
       setError(errorMessage);
-      toast.error(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [writeContractFn]);
+  }, [writeContractFn, publicClient]);
 
   // Helper functions
   const getCommunityDetails = useCallback(async (communityId: number): Promise<Community | null> => {
