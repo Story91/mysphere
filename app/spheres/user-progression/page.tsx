@@ -5,9 +5,11 @@ import { useAccount } from 'wagmi';
 import { Toaster } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import UserProgressionDashboard from '../components/UserProgression/UserProgressionDashboard';
+import { useSpheresContract } from '../hooks/useSpheresContract';
 
 export default function UserProgressionPage() {
   const { address, isConnected } = useAccount();
+  const { isLoading, error } = useSpheresContract();
 
   // Redirect to wallet connection if not connected
   if (!isConnected) {
@@ -33,9 +35,27 @@ export default function UserProgressionPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 mb-6"
+          >
+            <p className="text-red-400">Error: {error}</p>
+          </motion.div>
+        )}
+
+        {/* Main Dashboard */}
         <UserProgressionDashboard 
           userId={address || ''}
-          communityId="1"
         />
       </main>
 

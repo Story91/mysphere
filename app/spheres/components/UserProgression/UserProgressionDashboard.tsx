@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { useSpheresContract, UserAchievement, UserBoost, AchievementType, BoostType } from '../../hooks/useSpheresContract';
 import { 
   Trophy, 
   Star, 
@@ -25,63 +26,99 @@ import {
   Medal,
   Gift,
   Clock,
-  Activity
+  Activity,
+  ArrowRight,
+  Sparkles,
+  User,
+  BookOpen,
+  Coins
 } from 'lucide-react';
 
-// Interfejsy
+// Interfaces
 interface Level {
   level: number;
   name: string;
   description: string;
-  xpRequired: number;
-  xpToNext: number;
+  respectPointsRequired: number;
+  respectPointsToNext: number;
   color: string;
   badge: string;
   rewards: LevelReward[];
 }
 
 interface LevelReward {
-  type: 'token' | 'nft' | 'badge' | 'access' | 'title';
+  type: 'respect_points' | 'nft' | 'badge' | 'access' | 'title';
   amount?: number;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
-interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  category: 'social' | 'financial' | 'creative' | 'technical' | 'leadership';
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
-  icon: React.ComponentType<{ className?: string }>;
-  progress: number;
-  maxProgress: number;
-  isCompleted: boolean;
-  completedAt?: Date;
-  xpReward: number;
-  tokenReward?: number;
-  prerequisites?: string[];
-}
+// Use UserAchievement from hook instead of local interface
+// interface Achievement moved to useSpheresContract.ts
 
-interface UserStats {
-  totalXP: number;
-  currentLevel: number;
-  nextLevelXP: number;
-  totalMessages: number;
-  totalEvents: number;
-  totalTransactions: number;
-  totalSpent: number;
-  daysActive: number;
-  longestStreak: number;
-  currentStreak: number;
-  totalReferrals: number;
-  completedAchievements: number;
-  totalAchievements: number;
-}
+// Get icon component for achievement
+const getAchievementIcon = (iconName: string) => {
+  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+    'Users': Users,
+    'Trophy': Trophy,
+    'Star': Star,
+    'Flame': Flame
+  };
+  return iconMap[iconName] || Star;
+};
+
+// Get icon component for boost
+const getBoostIcon = (iconName: string) => {
+  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+    'Zap': Zap,
+    'Star': Star,
+    'DollarSign': Coins
+  };
+  return iconMap[iconName] || Zap;
+};
+
+// DailyStreakButton Component
+const DailyStreakButton: React.FC<{ communityId: number }> = ({ communityId }) => {
+  const { updateDailyActivity, isLoading } = useSpheresContract();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleUpdateActivity = async () => {
+    try {
+      setIsUpdating(true);
+      await updateDailyActivity(communityId);
+      // Data will be refetched automatically by the hook
+    } catch (err: any) {
+      console.error('Failed to update daily activity:', err);
+      // Error is already handled by the hook with toast
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleUpdateActivity}
+      disabled={isUpdating || isLoading}
+      className="px-3 py-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm rounded-lg hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+    >
+      {isUpdating ? (
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+          <span>Updating...</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1">
+          <Flame className="w-3 h-3" />
+          <span>Check In</span>
+        </div>
+      )}
+    </button>
+  );
+};
 
 interface UserProgressionDashboardProps {
   userId: string;
-  communityId: string;
+  communityId?: string;
 }
 
 const UserProgressionDashboard: React.FC<UserProgressionDashboardProps> = ({
@@ -89,257 +126,227 @@ const UserProgressionDashboard: React.FC<UserProgressionDashboardProps> = ({
   communityId
 }) => {
   const router = useRouter();
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [currentLevel, setCurrentLevel] = useState<Level | null>(null);
-  const [nextLevel, setNextLevel] = useState<Level | null>(null);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'achievements' | 'levels' | 'rewards'>('overview');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | Achievement['category']>('all');
+  const { 
+    userStats, 
+    userMemberships, 
+    isLoading,
+    streakSaversCount,
+    achievementVouchersCount,
+    userAchievements,
+    userBoosts,
+    useAchievementVoucher,
+    unlockPremiumAchievement,
+    purchaseBoost,
+    activateBoost,
+    utilityBoxFee,
+    achievementUnlockFee,
+    boostPurchaseFee,
+    isConnected 
+  } = useSpheresContract();
 
-  // Definicja poziomów
+  const [activeTab, setActiveTab] = useState<'overview' | 'achievements' | 'levels' | 'boosts' | 'rewards'>('overview');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | UserAchievement['category']>('all');
+
+  // Level definitions based on smart contract
   const levels: Level[] = [
     {
-      level: 1,
+      level: 0,
       name: 'Newcomer',
-      description: 'Witaj w społeczności! Rozpocznij swoją przygodę z Web3.',
-      xpRequired: 0,
-      xpToNext: 100,
+      description: 'Welcome to the community! Start your Web3 journey.',
+      respectPointsRequired: 0,
+      respectPointsToNext: 100,
       color: 'from-gray-500 to-gray-600',
       badge: '👋',
       rewards: [
-        { type: 'token', amount: 10, description: 'Powitalne tokeny', icon: Star },
+        { type: 'respect_points', amount: 10, description: 'Welcome bonus', icon: Star },
         { type: 'badge', description: 'Newcomer Badge', icon: Award }
       ]
     },
     {
-      level: 2,
+      level: 1,
       name: 'Explorer',
-      description: 'Poznajesz podstawy i eksploruje możliwości społeczności.',
-      xpRequired: 100,
-      xpToNext: 250,
+      description: 'Learning the basics and exploring community possibilities.',
+      respectPointsRequired: 100,
+      respectPointsToNext: 400,
       color: 'from-blue-500 to-blue-600',
       badge: '🔍',
       rewards: [
-        { type: 'token', amount: 25, description: 'Tokeny za eksplorację', icon: Star },
-        { type: 'access', description: 'Dostęp do kanałów Explorer', icon: Shield }
+        { type: 'respect_points', amount: 25, description: 'Exploration bonus', icon: Star },
+        { type: 'access', description: 'Explorer channels access', icon: Shield }
+      ]
+    },
+    {
+      level: 2,
+      name: 'Contributor',
+      description: 'Actively participating in the community and sharing knowledge.',
+      respectPointsRequired: 500,
+      respectPointsToNext: 1500,
+      color: 'from-green-500 to-green-600',
+      badge: '💡',
+      rewards: [
+        { type: 'respect_points', amount: 50, description: 'Contribution bonus', icon: Star },
+        { type: 'badge', description: 'Contributor Badge', icon: Award },
+        { type: 'access', description: 'Exclusive events access', icon: Calendar }
       ]
     },
     {
       level: 3,
-      name: 'Contributor',
-      description: 'Aktywnie uczestniczysz w społeczności i dzielisz się wiedzą.',
-      xpRequired: 350,
-      xpToNext: 500,
-      color: 'from-green-500 to-green-600',
-      badge: '💡',
-      rewards: [
-        { type: 'token', amount: 50, description: 'Tokeny za wkład', icon: Star },
-        { type: 'badge', description: 'Contributor Badge', icon: Award },
-        { type: 'access', description: 'Dostęp do ekskluzywnych eventów', icon: Calendar }
-      ]
-    },
-    {
-      level: 4,
       name: 'Specialist',
-      description: 'Jesteś ekspertem w swojej dziedzinie i pomagasz innym.',
-      xpRequired: 850,
-      xpToNext: 1000,
+      description: 'Expert in your field helping others grow.',
+      respectPointsRequired: 2000,
+      respectPointsToNext: 3000,
       color: 'from-purple-500 to-purple-600',
       badge: '🎓',
       rewards: [
-        { type: 'token', amount: 100, description: 'Tokeny specjalisty', icon: Star },
+        { type: 'respect_points', amount: 100, description: 'Specialist bonus', icon: Star },
         { type: 'nft', description: 'Specialist NFT', icon: Gem },
         { type: 'title', description: 'Specialist Title', icon: Crown }
       ]
     },
     {
-      level: 5,
+      level: 4,
       name: 'Mentor',
-      description: 'Prowadzisz innych i dzielisz się swoim doświadczeniem.',
-      xpRequired: 1850,
-      xpToNext: 1500,
+      description: 'Leading others and sharing your experience.',
+      respectPointsRequired: 5000,
+      respectPointsToNext: 5000,
       color: 'from-orange-500 to-orange-600',
       badge: '👨‍🏫',
       rewards: [
-        { type: 'token', amount: 200, description: 'Tokeny mentora', icon: Star },
-        { type: 'access', description: 'Panel mentora', icon: Users },
+        { type: 'respect_points', amount: 200, description: 'Mentor bonus', icon: Star },
+        { type: 'access', description: 'Mentor panel', icon: Users },
         { type: 'nft', description: 'Mentor NFT', icon: Gem }
       ]
     },
     {
-      level: 6,
+      level: 5,
       name: 'Master',
-      description: 'Mistrz swojego fachu z głęboką wiedzą i doświadczeniem.',
-      xpRequired: 3350,
-      xpToNext: 0,
+      description: 'Master of your craft with deep knowledge and experience.',
+      respectPointsRequired: 10000,
+      respectPointsToNext: 0,
       color: 'from-yellow-500 to-yellow-600',
       badge: '🏆',
       rewards: [
-        { type: 'token', amount: 500, description: 'Tokeny mistrza', icon: Star },
+        { type: 'respect_points', amount: 500, description: 'Master bonus', icon: Star },
         { type: 'nft', description: 'Master NFT', icon: Gem },
         { type: 'title', description: 'Master Title', icon: Crown },
-        { type: 'access', description: 'Wszystkie uprawnienia', icon: Shield }
+        { type: 'access', description: 'All privileges', icon: Shield }
       ]
     }
   ];
 
-  // Definicja achievementów
-  const achievementDefinitions: Achievement[] = [
+
+
+  // Calculate current level based on total respect points
+  const calculateCurrentLevel = (totalRespectPoints: number) => {
+    for (let i = levels.length - 1; i >= 0; i--) {
+      if (totalRespectPoints >= levels[i].respectPointsRequired) {
+        return levels[i];
+      }
+    }
+    return levels[0];
+  };
+
+  // Calculate next level
+  const calculateNextLevel = (currentLevel: Level) => {
+    const nextLevelIndex = levels.findIndex(l => l.level === currentLevel.level) + 1;
+    return nextLevelIndex < levels.length ? levels[nextLevelIndex] : null;
+  };
+
+  // Calculate progress to next level
+  const calculateProgress = (totalRespectPoints: number, currentLevel: Level, nextLevel: Level | null) => {
+    if (!nextLevel) return 100;
+    
+    const pointsInCurrentLevel = totalRespectPoints - currentLevel.respectPointsRequired;
+    const pointsNeededForNext = nextLevel.respectPointsRequired - currentLevel.respectPointsRequired;
+    
+    return Math.min(100, (pointsInCurrentLevel / pointsNeededForNext) * 100);
+  };
+
+  const totalRespectPoints = userStats?.totalRespectPoints || 0;
+  const currentLevel = calculateCurrentLevel(totalRespectPoints);
+  const nextLevel = calculateNextLevel(currentLevel);
+  const progressToNext = calculateProgress(totalRespectPoints, currentLevel, nextLevel);
+  const pointsToNext = nextLevel ? nextLevel.respectPointsRequired - totalRespectPoints : 0;
+
+  // All available achievements (both unlocked and locked)
+  const allAchievements: (UserAchievement & { isUnlocked: boolean })[] = [
     {
-      id: 'first_message',
-      name: 'Pierwsza wiadomość',
-      description: 'Napisz swoją pierwszą wiadomość w społeczności',
-      category: 'social',
+      id: 'first_join',
+      name: 'First Steps',
+      description: 'Join your first community',
+      category: 'community',
       rarity: 'common',
-      icon: MessageSquare,
-      progress: 1,
-      maxProgress: 1,
-      isCompleted: true,
-      completedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      xpReward: 10,
-      tokenReward: 5
+      icon: 'Users',
+      respectPointsReward: 25,
+      contractType: AchievementType.FIRST_JOIN,
+      isUnlocked: userAchievements.some(a => a.contractType === AchievementType.FIRST_JOIN)
     },
     {
-      id: 'active_week',
-      name: 'Aktywny tydzień',
-      description: 'Bądź aktywny przez 7 dni z rzędu',
-      category: 'social',
+      id: 'level_up',
+      name: 'Rising Star',
+      description: 'Level up in a community',
+      category: 'community',
       rarity: 'common',
-      icon: Calendar,
-      progress: 5,
-      maxProgress: 7,
-      isCompleted: false,
-      xpReward: 50,
-      tokenReward: 20
+      icon: 'Star',
+      respectPointsReward: 50,
+      contractType: AchievementType.LEVEL_UP,
+      isUnlocked: userAchievements.some(a => a.contractType === AchievementType.LEVEL_UP)
     },
     {
-      id: 'big_spender',
-      name: 'Wielki wydawca',
-      description: 'Wydaj łącznie 1 ETH w społeczności',
-      category: 'financial',
+      id: 'event_winner',
+      name: 'Champion',
+      description: 'Win your first event',
+      category: 'events',
       rarity: 'rare',
-      icon: Gem,
-      progress: 0.65,
-      maxProgress: 1,
-      isCompleted: false,
-      xpReward: 200,
-      tokenReward: 100
+      icon: 'Trophy',
+      respectPointsReward: 100,
+      contractType: AchievementType.EVENT_WINNER,
+      isUnlocked: userAchievements.some(a => a.contractType === AchievementType.EVENT_WINNER)
     },
     {
-      id: 'event_master',
-      name: 'Mistrz eventów',
-      description: 'Weź udział w 10 eventach społeczności',
-      category: 'social',
-      rarity: 'rare',
-      icon: Trophy,
-      progress: 7,
-      maxProgress: 10,
-      isCompleted: false,
-      xpReward: 150,
-      tokenReward: 75
-    },
-    {
-      id: 'creator_supreme',
-      name: 'Najwyższy twórca',
-      description: 'Stwórz społeczność z 100+ członkami',
+      id: 'referral_master',
+      name: 'Community Builder',
+      description: 'Refer 5 new members',
       category: 'leadership',
       rarity: 'epic',
-      icon: Crown,
-      progress: 0,
-      maxProgress: 100,
-      isCompleted: false,
-      xpReward: 500,
-      tokenReward: 250,
-      prerequisites: ['mentor_level']
+      icon: 'Users',
+      respectPointsReward: 150,
+      contractType: AchievementType.REFERRAL_MASTER,
+      isUnlocked: userAchievements.some(a => a.contractType === AchievementType.REFERRAL_MASTER)
     },
     {
-      id: 'social_butterfly',
-      name: 'Społeczny motyl',
-      description: 'Napisz 1000 wiadomości w społeczności',
+      id: 'streak_keeper',
+      name: 'Consistency Master',
+      description: 'Maintain a 7-day activity streak',
       category: 'social',
-      rarity: 'epic',
-      icon: Heart,
-      progress: 245,
-      maxProgress: 1000,
-      isCompleted: false,
-      xpReward: 300,
-      tokenReward: 150
-    },
-    {
-      id: 'legend',
-      name: 'Legenda',
-      description: 'Osiągnij poziom Master i ukończ wszystkie inne achievementy',
-      category: 'leadership',
-      rarity: 'legendary',
-      icon: Medal,
-      progress: 0,
-      maxProgress: 1,
-      isCompleted: false,
-      xpReward: 1000,
-      tokenReward: 500,
-      prerequisites: ['master_level', 'all_achievements']
+      rarity: 'rare',
+      icon: 'Flame',
+      respectPointsReward: 75,
+      contractType: AchievementType.STREAK_KEEPER,
+      isUnlocked: userAchievements.some(a => a.contractType === AchievementType.STREAK_KEEPER)
     }
   ];
 
-  // Przykładowe dane użytkownika
-  useEffect(() => {
-    const loadUserData = async () => {
-      setLoading(true);
-      
-      const mockStats: UserStats = {
-        totalXP: 1250,
-        currentLevel: 3,
-        nextLevelXP: 1850,
-        totalMessages: 245,
-        totalEvents: 7,
-        totalTransactions: 12,
-        totalSpent: 0.65,
-        daysActive: 45,
-        longestStreak: 14,
-        currentStreak: 5,
-        totalReferrals: 3,
-        completedAchievements: 1,
-        totalAchievements: achievementDefinitions.length
-      };
-
-      setUserStats(mockStats);
-      setCurrentLevel(levels[mockStats.currentLevel - 1]);
-      setNextLevel(levels[mockStats.currentLevel]);
-      setAchievements(achievementDefinitions);
-      setLoading(false);
-    };
-
-    loadUserData();
-  }, [userId, communityId]);
-
-  // Funkcja określająca kolor rarify
-  const getRarityColor = (rarity: Achievement['rarity']) => {
-    switch (rarity) {
-      case 'common': return 'from-gray-500 to-gray-600';
-      case 'rare': return 'from-blue-500 to-blue-600';
-      case 'epic': return 'from-purple-500 to-purple-600';
-      case 'legendary': return 'from-yellow-500 to-yellow-600';
-      default: return 'from-gray-500 to-gray-600';
-    }
-  };
-
-  // Funkcja filtrowania achievementów
-  const filteredAchievements = achievements.filter(achievement => 
+  // Filter achievements
+  const filteredAchievements = allAchievements.filter(achievement => 
     selectedCategory === 'all' || achievement.category === selectedCategory
   );
 
-  // Funkcja obliczająca postęp do następnego poziomu
-  const getProgressToNextLevel = () => {
-    if (!userStats || !currentLevel || !nextLevel) return 0;
-    const currentLevelXP = currentLevel.xpRequired;
-    const nextLevelXP = nextLevel.xpRequired;
-    const userXP = userStats.totalXP;
-    
-    return ((userXP - currentLevelXP) / (nextLevelXP - currentLevelXP)) * 100;
-  };
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-pink-900/20 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🔗</div>
+            <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
+            <p className="text-gray-400">Please connect your wallet to view your progression</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-pink-900/20 p-6">
         <div className="max-w-7xl mx-auto">
@@ -351,429 +358,805 @@ const UserProgressionDashboard: React.FC<UserProgressionDashboardProps> = ({
     );
   }
 
-  if (!userStats || !currentLevel) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-pink-900/20 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center py-12">
-            <div className="text-red-400 text-lg">Błąd ładowania danych użytkownika</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-4 md:p-8">
-      <div className="flex items-center space-x-4 mb-8">
-        <button
-            onClick={() => router.back()}
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-        </button>
-        <div>
-            <h1 className="text-3xl md:text-4xl font-bold">User Progression</h1>
-            <p className="text-slate-400">Track your progress, achievements, and rewards</p>
-        </div>
-      </div>
-      
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500"></div>
-        </div>
-      ) : (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-pink-900/20 p-6">
+      <div className="max-w-7xl mx-auto">
         <div className="space-y-8">
-            {/* Nagłówek */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-white mb-2">
-                Dashboard progresji
-              </h1>
-              <p className="text-gray-400">
-                Śledź swoje postępy, osiągnięcia i rozwój w społeczności
-              </p>
-            </div>
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Progression Dashboard
+            </h1>
+            <p className="text-gray-400">
+              Track your progress, achievements and growth in the community
+            </p>
+          </div>
 
-            {/* Nawigacja */}
-            <div className="flex flex-wrap gap-2 mb-8">
-              {[
-                { id: 'overview', label: 'Przegląd', icon: TrendingUp },
-                { id: 'achievements', label: 'Osiągnięcia', icon: Trophy },
-                { id: 'levels', label: 'Poziomy', icon: Star },
-                { id: 'rewards', label: 'Nagrody', icon: Gift }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                      : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
-                  }`}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+          {/* Navigation */}
+          <div className="flex flex-wrap gap-2 mb-8">
+            {[
+              { id: 'overview', label: 'Overview', icon: TrendingUp },
+              { id: 'achievements', label: 'Achievements', icon: Trophy },
+              { id: 'levels', label: 'Levels', icon: Star },
+              { id: 'boosts', label: 'Boosts', icon: Zap },
+              { id: 'rewards', label: 'Rewards', icon: Gift }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+                }`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-            {/* Tab: Przegląd */}
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                {/* Aktualny poziom */}
-                <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${currentLevel.color} flex items-center justify-center text-2xl`}>
-                      {currentLevel.badge}
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">{currentLevel.name}</h2>
-                      <p className="text-gray-400">{currentLevel.description}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-sm text-gray-400">Poziom {currentLevel.level}</span>
-                        <span className="text-sm text-purple-400">•</span>
-                        <span className="text-sm text-purple-400">{userStats.totalXP} XP</span>
+          {/* Tab: Overview */}
+          {activeTab === 'overview' && (
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                {/* Current Level Card */}
+                <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-16 h-16 rounded-full bg-gradient-to-r ${currentLevel.color} flex items-center justify-center text-2xl`}>
+                        {currentLevel.badge}
                       </div>
+                      <div>
+                        <h3 className="text-2xl font-bold text-white">Level {currentLevel.level}</h3>
+                        <p className="text-xl text-purple-400">{currentLevel.name}</p>
+                        <p className="text-gray-400 text-sm">{currentLevel.description}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-white">{totalRespectPoints}</div>
+                      <div className="text-sm text-gray-400">Respect Points</div>
                     </div>
                   </div>
 
-                  {/* Pasek postępu */}
+                  {/* Progress Bar */}
                   {nextLevel && (
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-gray-400">Postęp do następnego poziomu</span>
-                        <span className="text-sm text-white">
-                          {userStats.totalXP} / {nextLevel.xpRequired} XP
-                        </span>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Progress to {nextLevel.name}</span>
+                        <span className="text-purple-400">{pointsToNext} points needed</span>
                       </div>
                       <div className="w-full bg-gray-700 rounded-full h-3">
-                        <div 
-                          className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-1000"
-                          style={{ width: `${getProgressToNextLevel()}%` }}
+                        <motion.div 
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progressToNext}%` }}
+                          transition={{ duration: 1, ease: "easeOut" }}
                         />
                       </div>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-xs text-gray-500">
-                          {nextLevel.xpRequired - userStats.totalXP} XP do następnego poziomu
-                        </span>
-                        <span className="text-xs text-purple-400">
-                          {nextLevel.name}
-                        </span>
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>{currentLevel.respectPointsRequired}</span>
+                        <span>{nextLevel.respectPointsRequired}</span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Statystyki */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                        <MessageSquare className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-white">{userStats.totalMessages}</div>
-                        <div className="text-sm text-gray-400">Wiadomości</div>
-                      </div>
-                    </div>
-                  </div>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    title="Communities"
+                    value={userStats?.totalCommunitiesJoined || 0}
+                    icon={Users}
+                    color="from-blue-500 to-cyan-500"
+                    description="Joined communities"
+                  />
+                  <StatCard
+                    title="Events"
+                    value={userStats?.totalEventsAttended || 0}
+                    icon={Calendar}
+                    color="from-green-500 to-teal-500"
+                    description="Events attended"
+                  />
+                  <StatCard
+                    title="ETH Earned"
+                    value={parseFloat(userStats?.totalEthEarned || '0').toFixed(4)}
+                    icon={Coins}
+                    color="from-yellow-500 to-orange-500"
+                    description="Total earnings"
+                  />
+                  <StatCard
+                    title="Achievements"
+                    value={allAchievements.filter(a => a.isUnlocked).length}
+                    icon={Trophy}
+                    color="from-purple-500 to-pink-500"
+                    description="Unlocked achievements"
+                  />
+                </div>
 
-                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                        <Calendar className="w-5 h-5 text-green-400" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-white">{userStats.totalEvents}</div>
-                        <div className="text-sm text-gray-400">Eventy</div>
-                      </div>
+                {/* Community Memberships */}
+                <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20">
+                  <h3 className="text-xl font-bold text-white mb-4">Community Memberships</h3>
+                  {userMemberships.length > 0 ? (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {userMemberships.map((membership) => (
+                        <MembershipCard key={membership.communityId} membership={membership} />
+                      ))}
                     </div>
-                  </div>
-
-                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                        <Flame className="w-5 h-5 text-purple-400" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-white">{userStats.currentStreak}</div>
-                        <div className="text-sm text-gray-400">Aktualna seria</div>
-                      </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="w-12 h-12 text-gray-500 mx-auto mb-2" />
+                      <p className="text-gray-400">No community memberships yet</p>
+                      <button 
+                        onClick={() => router.push('/spheres/community-browser')}
+                        className="mt-4 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                      >
+                        Browse Communities
+                      </button>
                     </div>
-                  </div>
+                  )}
+                </div>
 
-                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                        <Trophy className="w-5 h-5 text-yellow-400" />
+                {/* Utility Box System */}
+                <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <Gift className="w-6 h-6" />
+                    Utility Box System
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Streak Savers */}
+                    <div className="bg-gray-700/50 rounded-xl p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-lg bg-green-500/20">
+                          <Shield className="w-5 h-5 text-green-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-white">Streak Savers</h4>
+                          <div className="text-2xl font-bold text-green-400">{streakSaversCount}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-2xl font-bold text-white">{userStats.completedAchievements}</div>
-                        <div className="text-sm text-gray-400">Osiągnięcia</div>
+                      <p className="text-gray-400 text-sm mb-3">Automatically protect your activity streak when you miss a day</p>
+                      <div className="text-xs text-gray-500">Used automatically when needed</div>
+                    </div>
+
+                    {/* Achievement Vouchers */}
+                    <div className="bg-gray-700/50 rounded-xl p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-lg bg-orange-500/20">
+                          <Trophy className="w-5 h-5 text-orange-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-white">Achievement Vouchers</h4>
+                          <div className="text-2xl font-bold text-orange-400">{achievementVouchersCount}</div>
+                        </div>
+                      </div>
+                      <p className="text-gray-400 text-sm mb-3">Unlock premium achievements without paying fees</p>
+                      {achievementVouchersCount > 0 && (
+                        <div className="text-xs text-green-400">Ready to use in Achievements tab!</div>
+                      )}
+                    </div>
+
+                    {/* Utility Box Info */}
+                    <div className="bg-gray-700/50 rounded-xl p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-lg bg-purple-500/20">
+                          <Gift className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-white">Open Utility Box</h4>
+                          <div className="text-sm text-purple-400">Cost: {utilityBoxFee || '0.0001'} ETH</div>
+                        </div>
+                      </div>
+                      <p className="text-gray-400 text-sm mb-3">Get random rewards from opening utility boxes</p>
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <div>• 1% - NFT Collectible 🎨</div>
+                        <div>• 4% - Achievement Voucher 🏆</div>
+                        <div>• 10% - Streak Saver 🛡️</div>
+                        <div>• 15% - Temporary Boosts ⚡</div>
+                        <div>• 40% - Respect Points 💎</div>
+                        <div>• 30% - Nothing 😔</div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Ostatnie osiągnięcia */}
-                <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-                  <h3 className="text-lg font-semibold text-white mb-4">Ostatnie osiągnięcia</h3>
-                  <div className="space-y-3">
-                    {achievements.filter(a => a.isCompleted).slice(-3).map(achievement => (
-                      <div key={achievement.id} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
-                        <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getRarityColor(achievement.rarity)} flex items-center justify-center`}>
-                          <achievement.icon className="w-5 h-5 text-white" />
+                {/* Active Boosts Section */}
+                <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <Zap className="w-6 h-6" />
+                    Active Boosts
+                  </h3>
+                  {userBoosts && userBoosts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {userBoosts.filter(boost => boost.active && boost.expiresAt > Date.now() / 1000).map((boost) => (
+                        <BoostCard key={boost.id} boost={boost} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <Zap className="w-12 h-12 text-gray-500 mx-auto mb-2" />
+                      <p className="text-gray-400">No active boosts</p>
+                      <p className="text-sm text-gray-500">Open Utility Boxes or purchase boosts to get started!</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Daily Activity Section */}
+                <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <Flame className="w-6 h-6" />
+                    Daily Activity
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="text-lg font-semibold text-white mb-2">Current Streaks</h4>
+                      {userMemberships.length > 0 ? (
+                        <div className="space-y-3">
+                          {userMemberships.map((membership) => (
+                            <div key={membership.communityId} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+                              <div>
+                                <div className="text-white font-medium">Community #{membership.communityId}</div>
+                                <div className="text-sm text-gray-400">Current: {membership.currentStreak} days</div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <div className="text-orange-400 font-bold">{membership.currentStreak}🔥</div>
+                                  <div className="text-xs text-gray-500">Best: {membership.longestStreak}</div>
+                                </div>
+                                <DailyStreakButton communityId={membership.communityId} />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-white">{achievement.name}</h4>
-                          <p className="text-sm text-gray-400">{achievement.description}</p>
+                      ) : (
+                        <div className="text-center py-6">
+                          <p className="text-gray-400">No active streaks yet</p>
                         </div>
-                        <div className="text-right">
-                          <div className="text-sm font-semibold text-green-400">+{achievement.xpReward} XP</div>
-                          {achievement.tokenReward && (
-                            <div className="text-xs text-purple-400">+{achievement.tokenReward} tokens</div>
-                          )}
+                      )}
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-lg font-semibold text-white mb-2">Streak Tips</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-400 mt-0.5" />
+                          <p className="text-sm text-gray-300">Visit daily to maintain your streak</p>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Shield className="w-4 h-4 text-blue-400 mt-0.5" />
+                          <p className="text-sm text-gray-300">Use Streak Savers if you miss a day</p>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Trophy className="w-4 h-4 text-yellow-400 mt-0.5" />
+                          <p className="text-sm text-gray-300">Reach 7 days for special achievements</p>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Gift className="w-4 h-4 text-purple-400 mt-0.5" />
+                          <p className="text-sm text-gray-300">Longer streaks unlock better rewards</p>
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              </motion.div>
+            </AnimatePresence>
+          )}
 
-            {/* Tab: Osiągnięcia */}
-            {activeTab === 'achievements' && (
-              <div className="space-y-4">
-                {/* Filtry */}
+          {/* Tab: Achievements */}
+          {activeTab === 'achievements' && (
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                {/* Achievement Categories */}
                 <div className="flex flex-wrap gap-2">
-                  {['all', 'social', 'financial', 'creative', 'technical', 'leadership'].map(category => (
+                  {['all', 'social', 'financial', 'events', 'community', 'leadership'].map(category => (
                     <button
                       key={category}
                       onClick={() => setSelectedCategory(category as any)}
-                      className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                      className={`px-4 py-2 rounded-lg transition-colors ${
                         selectedCategory === category
                           ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
                           : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
                       }`}
                     >
-                      {category === 'all' ? 'Wszystkie' : 
-                       category === 'social' ? 'Społeczne' :
-                       category === 'financial' ? 'Finansowe' :
-                       category === 'creative' ? 'Kreatywne' :
-                       category === 'technical' ? 'Techniczne' :
-                       'Liderskie'}
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
                     </button>
                   ))}
                 </div>
 
-                {/* Lista osiągnięć */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredAchievements.map(achievement => (
-                    <div key={achievement.id} className={`bg-gray-800/30 backdrop-blur-sm rounded-lg p-4 border ${
-                      achievement.isCompleted ? 'border-green-500/50' : 'border-gray-700'
-                    }`}>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${getRarityColor(achievement.rarity)} flex items-center justify-center`}>
-                          <achievement.icon className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {achievement.isCompleted ? (
-                            <CheckCircle className="w-5 h-5 text-green-400" />
-                          ) : (
-                            <div className="w-5 h-5 border-2 border-gray-600 rounded-full" />
-                          )}
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            achievement.rarity === 'common' ? 'bg-gray-500/20 text-gray-400' :
-                            achievement.rarity === 'rare' ? 'bg-blue-500/20 text-blue-400' :
-                            achievement.rarity === 'epic' ? 'bg-purple-500/20 text-purple-400' :
-                            'bg-yellow-500/20 text-yellow-400'
-                          }`}>
-                            {achievement.rarity}
-                          </span>
-                        </div>
-                      </div>
-
-                      <h4 className="font-semibold text-white mb-1">{achievement.name}</h4>
-                      <p className="text-sm text-gray-400 mb-3">{achievement.description}</p>
-
-                      {/* Pasek postępu */}
-                      {!achievement.isCompleted && (
-                        <div className="mb-3">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs text-gray-500">Postęp</span>
-                            <span className="text-xs text-white">
-                              {achievement.progress} / {achievement.maxProgress}
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-700 rounded-full h-2">
-                            <div 
-                              className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${(achievement.progress / achievement.maxProgress) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Nagrody */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Zap className="w-4 h-4 text-yellow-400" />
-                          <span className="text-sm text-yellow-400">+{achievement.xpReward} XP</span>
-                        </div>
-                        {achievement.tokenReward && (
-                          <div className="flex items-center gap-1">
-                            <Star className="w-4 h-4 text-purple-400" />
-                            <span className="text-sm text-purple-400">+{achievement.tokenReward}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Data ukończenia */}
-                      {achievement.isCompleted && achievement.completedAt && (
-                        <div className="mt-2 pt-2 border-t border-gray-700">
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Clock className="w-3 h-3" />
-                            Ukończono: {achievement.completedAt.toLocaleDateString()}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                {/* Achievements Grid */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredAchievements.map((achievement) => (
+                    <AchievementCard 
+                      key={achievement.id} 
+                      achievement={achievement}
+                      onPurchase={async (achievementType) => {
+                        try {
+                          await unlockPremiumAchievement(achievementType);
+                        } catch (error) {
+                          console.error('Error purchasing achievement:', error);
+                        }
+                      }}
+                      onUseVoucher={async (achievementType) => {
+                        try {
+                          await useAchievementVoucher(achievementType);
+                        } catch (error) {
+                          console.error('Error using voucher:', error);
+                        }
+                      }}
+                      achievementVouchersCount={achievementVouchersCount}
+                      achievementUnlockFee={achievementUnlockFee}
+                    />
                   ))}
                 </div>
-              </div>
-            )}
+              </motion.div>
+            </AnimatePresence>
+          )}
 
-            {/* Tab: Poziomy */}
-            {activeTab === 'levels' && (
-              <div className="space-y-4">
-                {levels.map((level, index) => (
-                  <div key={level.level} className={`bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border ${
-                    level.level === currentLevel.level ? 'border-purple-500/50' : 
-                    level.level < currentLevel.level ? 'border-green-500/50' : 'border-gray-700'
-                  }`}>
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${level.color} flex items-center justify-center text-2xl`}>
-                        {level.badge}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-xl font-bold text-white">{level.name}</h3>
-                          <span className="text-sm text-gray-400">Poziom {level.level}</span>
-                          {level.level === currentLevel.level && (
-                            <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded-full">
-                              Aktualny
-                            </span>
-                          )}
-                          {level.level < currentLevel.level && (
-                            <CheckCircle className="w-5 h-5 text-green-400" />
-                          )}
-                          {level.level > currentLevel.level && (
-                            <Lock className="w-5 h-5 text-gray-600" />
-                          )}
-                        </div>
-                        <p className="text-gray-400 mt-1">{level.description}</p>
-                        <div className="text-sm text-gray-500 mt-1">
-                          {level.xpRequired} XP wymagane
-                          {level.xpToNext > 0 && ` • ${level.xpToNext} XP do następnego poziomu`}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Nagrody */}
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-white">Nagrody za poziom:</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {level.rewards.map((reward, rewardIndex) => (
-                          <div key={rewardIndex} className="flex items-center gap-2 p-2 bg-gray-700/30 rounded-lg">
-                            <reward.icon className="w-4 h-4 text-purple-400" />
-                            <span className="text-sm text-gray-300">
-                              {reward.amount && `${reward.amount}x `}{reward.description}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Tab: Nagrody */}
-            {activeTab === 'rewards' && (
-              <div className="space-y-6">
-                {/* Podsumowanie nagród */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                        <Star className="w-5 h-5 text-purple-400" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-white">1,250</div>
-                        <div className="text-sm text-gray-400">Tokeny zdobyte</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                        <Gem className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-white">3</div>
-                        <div className="text-sm text-gray-400">NFT zdobyte</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                        <Award className="w-5 h-5 text-yellow-400" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-white">5</div>
-                        <div className="text-sm text-gray-400">Badges zdobyte</div>
-                      </div>
-                    </div>
-                  </div>
+          {/* Tab: Levels */}
+          {activeTab === 'levels' && (
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <div className="space-y-4">
+                  {levels.map((level) => (
+                    <LevelCard 
+                      key={level.level} 
+                      level={level} 
+                      isCurrentLevel={level.level === currentLevel.level}
+                      isUnlocked={totalRespectPoints >= level.respectPointsRequired}
+                    />
+                  ))}
                 </div>
+              </motion.div>
+            </AnimatePresence>
+          )}
 
-                {/* Historia nagród */}
-                <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
-                  <h3 className="text-lg font-semibold text-white mb-4">Historia nagród</h3>
-                  <div className="space-y-3">
-                    {[
-                      { type: 'badge', name: 'Newcomer Badge', date: '2024-01-15', source: 'Poziom 1' },
-                      { type: 'token', name: '50 Community Tokens', date: '2024-01-20', source: 'Achievement: Pierwsza wiadomość' },
-                      { type: 'nft', name: 'Early Adopter NFT', date: '2024-01-25', source: 'Poziom 2' },
-                      { type: 'token', name: '100 Community Tokens', date: '2024-02-01', source: 'Poziom 3' },
-                      { type: 'badge', name: 'Contributor Badge', date: '2024-02-05', source: 'Poziom 3' }
-                    ].map((reward, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg">
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                          {reward.type === 'token' ? <Star className="w-5 h-5 text-white" /> :
-                           reward.type === 'nft' ? <Gem className="w-5 h-5 text-white" /> :
-                           <Award className="w-5 h-5 text-white" />}
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-white">{reward.name}</h4>
-                          <p className="text-sm text-gray-400">Źródło: {reward.source}</p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm text-gray-400">{reward.date}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+          {/* Tab: Boosts */}
+          {activeTab === 'boosts' && (
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <BoostManagement 
+                  userBoosts={userBoosts}
+                  onPurchaseBoost={purchaseBoost}
+                  onActivateBoost={activateBoost}
+                  boostPurchaseFee={boostPurchaseFee}
+                />
+              </motion.div>
+            </AnimatePresence>
+          )}
+
+          {/* Tab: Rewards */}
+          {activeTab === 'rewards' && (
+            <AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <div className="text-center py-12">
+                  <Gift className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-white mb-2">Rewards System</h3>
+                  <p className="text-gray-400">Earn rewards through achievements and level progression</p>
                 </div>
-              </div>
-            )}
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// StatCard Component
+const StatCard: React.FC<{
+  title: string;
+  value: string | number;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  description: string;
+}> = ({ title, value, icon: Icon, color, description }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className={`bg-gradient-to-r ${color}/20 rounded-2xl p-4 border border-white/10`}
+  >
+    <div className="flex items-center justify-between mb-2">
+      <Icon className="w-6 h-6 text-white" />
+      <div className="text-right">
+        <div className="text-lg font-bold text-white">{value}</div>
+        <div className="text-xs text-gray-300">{title}</div>
+      </div>
+    </div>
+    <div className="text-xs text-gray-400">{description}</div>
+  </motion.div>
+);
+
+// MembershipCard Component
+const MembershipCard: React.FC<{ membership: any }> = ({ membership }) => (
+  <div className="bg-gray-700/50 rounded-xl p-4 border border-gray-600/20">
+    <div className="flex items-center justify-between mb-3">
+      <h4 className="font-semibold text-white">Community #{membership.communityId}</h4>
+      <div className="text-sm text-purple-400">Level {membership.level}</div>
+    </div>
+    <div className="space-y-2 text-sm">
+      <div className="flex justify-between">
+        <span className="text-gray-400">Respect Points:</span>
+        <span className="text-white">{membership.respectPoints}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-gray-400">Events Won:</span>
+        <span className="text-green-400">{membership.totalEventsWon}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-gray-400">Longest Streak:</span>
+        <span className="text-orange-400">{membership.longestStreak}</span>
+      </div>
+    </div>
+  </div>
+);
+
+// Enhanced AchievementCard Component with Premium Features
+const AchievementCard: React.FC<{ 
+  achievement: UserAchievement & { isUnlocked: boolean };
+  onPurchase?: (achievementType: AchievementType) => void;
+  onUseVoucher?: (achievementType: AchievementType) => void;
+  achievementVouchersCount?: number;
+  achievementUnlockFee?: string;
+}> = ({ achievement, onPurchase, onUseVoucher, achievementVouchersCount, achievementUnlockFee }) => {
+  const IconComponent = getAchievementIcon(achievement.icon);
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={`p-4 rounded-xl border ${
+        achievement.isUnlocked
+          ? 'bg-green-500/10 border-green-500/30'
+          : 'bg-gray-800/50 border-gray-600/20'
+      }`}
+    >
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`p-2 rounded-lg ${
+          achievement.isUnlocked 
+            ? 'bg-green-500/20 text-green-400' 
+            : 'bg-gray-700/50 text-gray-400'
+        }`}>
+          <IconComponent className="w-5 h-5" />
+        </div>
+        <div className="flex-1">
+          <h4 className="font-semibold text-white">{achievement.name}</h4>
+          <p className="text-sm text-gray-400">{achievement.description}</p>
+        </div>
+        {achievement.isUnlocked && (
+          <CheckCircle className="w-5 h-5 text-green-400" />
+        )}
+        {!achievement.isUnlocked && (
+          <Lock className="w-5 h-5 text-gray-500" />
+        )}
+      </div>
+      
+      <div className="flex items-center justify-between text-sm mb-3">
+        <span className={`px-2 py-1 rounded-full text-xs ${
+          achievement.rarity === 'legendary' ? 'bg-yellow-500/20 text-yellow-400' :
+          achievement.rarity === 'epic' ? 'bg-purple-500/20 text-purple-400' :
+          achievement.rarity === 'rare' ? 'bg-blue-500/20 text-blue-400' :
+          'bg-gray-500/20 text-gray-400'
+        }`}>
+          {achievement.rarity.charAt(0).toUpperCase() + achievement.rarity.slice(1)}
+        </span>
+        <span className="text-purple-400">+{achievement.respectPointsReward} RP</span>
+      </div>
+
+      {/* Premium unlock buttons for locked achievements */}
+      {!achievement.isUnlocked && (
+        <div className="space-y-2">
+          {/* Use Voucher Button */}
+          {achievementVouchersCount && achievementVouchersCount > 0 && (
+            <button
+              onClick={() => onUseVoucher?.(achievement.contractType)}
+              className="w-full py-2 bg-orange-500/20 text-orange-400 rounded-lg text-sm hover:bg-orange-500/30 transition-colors flex items-center justify-center gap-2"
+            >
+              <Gift className="w-4 h-4" />
+              Use Voucher (Free)
+            </button>
+          )}
+          
+          {/* Purchase Button */}
+          <button
+            onClick={() => onPurchase?.(achievement.contractType)}
+            className="w-full py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm hover:bg-purple-500/30 transition-colors flex items-center justify-center gap-2"
+          >
+            <Coins className="w-4 h-4" />
+            Buy for {achievementUnlockFee || '0.0005'} ETH
+          </button>
         </div>
       )}
+    </motion.div>
+  );
+};
+
+// BoostCard Component
+const BoostCard: React.FC<{ boost: UserBoost }> = ({ boost }) => {
+  const IconComponent = getBoostIcon(boost.icon);
+  const timeLeft = Math.max(0, boost.expiresAt - Date.now() / 1000);
+  const hoursLeft = Math.floor(timeLeft / 3600);
+  const minutesLeft = Math.floor((timeLeft % 3600) / 60);
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={`p-4 rounded-xl border ${
+        boost.active && timeLeft > 0
+          ? 'bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/30'
+          : 'bg-gray-800/50 border-gray-600/20'
+      }`}
+    >
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`p-2 rounded-lg bg-gradient-to-r ${boost.color}`}>
+          <IconComponent className="w-5 h-5 text-white" />
+        </div>
+        <div className="flex-1">
+          <h4 className="font-semibold text-white">{boost.name}</h4>
+          <p className="text-sm text-gray-400">{boost.description}</p>
+        </div>
+        {boost.active && timeLeft > 0 && (
+          <div className="text-center">
+            <div className="text-sm font-bold text-purple-400">{boost.multiplier}%</div>
+            <div className="text-xs text-gray-400">Multiplier</div>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-between text-sm">
+        <span className={`px-2 py-1 rounded-full text-xs ${
+          boost.active && timeLeft > 0
+            ? 'bg-green-500/20 text-green-400'
+            : 'bg-gray-500/20 text-gray-400'
+        }`}>
+          {boost.active && timeLeft > 0 ? 'Active' : 'Inactive'}
+        </span>
+        <span className="text-gray-400">
+          {timeLeft > 0 ? `${hoursLeft}h ${minutesLeft}m left` : 'Expired'}
+        </span>
+      </div>
+    </motion.div>
+  );
+};
+
+// LevelCard Component
+const LevelCard: React.FC<{ 
+  level: Level; 
+  isCurrentLevel: boolean; 
+  isUnlocked: boolean; 
+}> = ({ level, isCurrentLevel, isUnlocked }) => (
+  <motion.div
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    className={`p-6 rounded-xl border ${
+      isCurrentLevel
+        ? 'bg-purple-500/10 border-purple-500/30'
+        : isUnlocked
+        ? 'bg-gray-800/50 border-gray-600/20'
+        : 'bg-gray-900/50 border-gray-700/20 opacity-60'
+    }`}
+  >
+    <div className="flex items-center gap-4 mb-4">
+      <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${level.color} flex items-center justify-center text-xl`}>
+        {isUnlocked ? level.badge : <Lock className="w-5 h-5" />}
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-bold text-white">Level {level.level}: {level.name}</h3>
+          {isCurrentLevel && (
+            <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full">
+              Current
+            </span>
+          )}
+        </div>
+        <p className="text-gray-400 text-sm">{level.description}</p>
+        <p className="text-purple-400 text-sm">{level.respectPointsRequired} Respect Points required</p>
+      </div>
+    </div>
+    
+    {level.rewards.length > 0 && (
+      <div className="space-y-2">
+        <h4 className="text-sm font-semibold text-white">Rewards:</h4>
+        <div className="grid gap-2">
+          {level.rewards.map((reward, index) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <reward.icon className="w-4 h-4 text-purple-400" />
+              <span className="text-gray-300">{reward.description}</span>
+              {reward.amount && (
+                <span className="text-purple-400">+{reward.amount}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </motion.div>
+);
+
+// Boost Management Component
+const BoostManagement: React.FC<{
+  userBoosts: UserBoost[];
+  onPurchaseBoost: (boostType: BoostType, durationHours: number) => Promise<void>;
+  onActivateBoost: (boostType: BoostType) => Promise<void>;
+  boostPurchaseFee?: string;
+}> = ({ userBoosts, onPurchaseBoost, onActivateBoost, boostPurchaseFee }) => {
+  const [selectedDuration, setSelectedDuration] = useState<number>(24);
+
+  // Calculate dynamic pricing based on duration
+  const calculateBoostPrice = (durationHours: number): string => {
+    if (!boostPurchaseFee) return '0.0005';
+    const baseFee = parseFloat(boostPurchaseFee);
+    const durationMultiplier = Math.max(1, durationHours / 24);
+    const dynamicFee = baseFee * durationMultiplier;
+    return dynamicFee.toFixed(4);
+  };
+
+  const availableBoosts = [
+    {
+      type: BoostType.EXPERIENCE_MULTIPLIER,
+      name: 'Experience Multiplier',
+      description: 'Double your respect points gain from all activities',
+      icon: 'Zap',
+      color: 'from-yellow-500 to-orange-500',
+      multiplier: '2x'
+    },
+    {
+      type: BoostType.REPUTATION_MULTIPLIER,
+      name: 'Reputation Multiplier',
+      description: '1.5x reputation gain from member ratings',
+      icon: 'Star',
+      color: 'from-purple-500 to-pink-500',
+      multiplier: '1.5x'
+    },
+    {
+      type: BoostType.EVENT_DISCOUNT,
+      name: 'Event Discount',
+      description: '20% discount on all event participation fees',
+      icon: 'DollarSign',
+      color: 'from-green-500 to-teal-500',
+      multiplier: '20% off'
+    }
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Active Boosts Section */}
+      <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20">
+        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <Zap className="w-6 h-6" />
+          Active Boosts
+        </h3>
+        {userBoosts && userBoosts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userBoosts.filter(boost => boost.active && boost.expiresAt > Date.now() / 1000).map((boost) => (
+              <BoostCard key={boost.id} boost={boost} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Zap className="w-12 h-12 text-gray-500 mx-auto mb-2" />
+            <p className="text-gray-400">No active boosts</p>
+          </div>
+        )}
+      </div>
+
+      {/* Purchase Boosts Section */}
+      <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-600/20">
+        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <Coins className="w-6 h-6" />
+          Purchase Boosts
+        </h3>
+        
+        {/* Duration Selector */}
+        <div className="mb-6">
+          <h4 className="text-lg font-semibold text-white mb-3">Select Duration</h4>
+          <div className="flex flex-wrap gap-2">
+            {[1, 6, 12, 24, 72, 168].map((hours) => (
+              <button
+                key={hours}
+                onClick={() => setSelectedDuration(hours)}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  selectedDuration === hours
+                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                    : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50'
+                }`}
+              >
+                {hours < 24 ? `${hours}h` : `${hours / 24}d`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Available Boosts */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {availableBoosts.map((boost) => {
+            const IconComponent = getBoostIcon(boost.icon);
+            const userBoost = userBoosts.find(ub => ub.boostType === boost.type);
+            const isActive = userBoost?.active && userBoost?.expiresAt > Date.now() / 1000;
+            
+            return (
+              <div
+                key={boost.type}
+                className="bg-gray-700/50 rounded-xl p-4 border border-gray-600/20"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`p-2 rounded-lg bg-gradient-to-r ${boost.color}`}>
+                    <IconComponent className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-white">{boost.name}</h4>
+                    <p className="text-sm text-gray-400">{boost.description}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-bold text-purple-400">{boost.multiplier}</div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="text-xs text-gray-500 mb-2">
+                    Cost: {calculateBoostPrice(selectedDuration)} ETH for {selectedDuration < 24 ? `${selectedDuration}h` : `${selectedDuration / 24}d`}
+                  </div>
+                  
+                  <button
+                    onClick={async () => {
+                      try {
+                        await onPurchaseBoost(boost.type, selectedDuration);
+                      } catch (error) {
+                        console.error('Error purchasing boost:', error);
+                      }
+                    }}
+                    disabled={isActive}
+                    className={`w-full py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${
+                      isActive
+                        ? 'bg-gray-600/50 text-gray-500 cursor-not-allowed'
+                        : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+                    }`}
+                  >
+                    <Coins className="w-4 h-4" />
+                    {isActive ? 'Already Active' : 'Purchase'}
+                  </button>
+                  
+                  {userBoost && !userBoost.active && userBoost.expiresAt > Date.now() / 1000 && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await onActivateBoost(boost.type);
+                        } catch (error) {
+                          console.error('Error activating boost:', error);
+                        }
+                      }}
+                      className="w-full py-2 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Zap className="w-4 h-4" />
+                      Activate
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { parseEther, formatEther, Address, Abi } from 'viem';
 import { toast } from 'react-hot-toast';
 
@@ -25,6 +25,20 @@ export enum MemberRole {
   MEMBER = 0,
   MODERATOR = 1,
   ADMIN = 2
+}
+
+export enum AchievementType {
+  FIRST_JOIN = 0,
+  LEVEL_UP = 1,
+  EVENT_WINNER = 2,
+  REFERRAL_MASTER = 3,
+  STREAK_KEEPER = 4
+}
+
+export enum BoostType {
+  EXPERIENCE_MULTIPLIER = 0,
+  REPUTATION_MULTIPLIER = 1,
+  EVENT_DISCOUNT = 2
 }
 
 // Enum for system permissions
@@ -231,9 +245,143 @@ export interface CommunityMembership {
   menteeCount: number;
 }
 
+export interface UserAchievement {
+  id: string;
+  name: string;
+  description: string;
+  category: 'social' | 'financial' | 'events' | 'community' | 'leadership';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  icon: string;
+  respectPointsReward: number;
+  contractType: AchievementType;
+}
+
+export interface UserBoost {
+  id: string;
+  name: string;
+  description: string;
+  boostType: BoostType;
+  multiplier: number;
+  duration: number;
+  expiresAt: number;
+  active: boolean;
+  icon: string;
+  color: string;
+}
+
+// Achievement mapping function
+export const mapContractAchievements = (contractAchievements: bigint[]): UserAchievement[] => {
+  const achievementDefinitions: Record<AchievementType, UserAchievement> = {
+    [AchievementType.FIRST_JOIN]: {
+      id: 'first_join',
+      name: 'First Steps',
+      description: 'Join your first community',
+      category: 'community',
+      rarity: 'common',
+      icon: 'Users',
+      respectPointsReward: 25,
+      contractType: AchievementType.FIRST_JOIN
+    },
+    [AchievementType.LEVEL_UP]: {
+      id: 'level_up',
+      name: 'Rising Star',
+      description: 'Level up in a community',
+      category: 'community',
+      rarity: 'common',
+      icon: 'Star',
+      respectPointsReward: 50,
+      contractType: AchievementType.LEVEL_UP
+    },
+    [AchievementType.EVENT_WINNER]: {
+      id: 'event_winner',
+      name: 'Champion',
+      description: 'Win your first event',
+      category: 'events',
+      rarity: 'rare',
+      icon: 'Trophy',
+      respectPointsReward: 100,
+      contractType: AchievementType.EVENT_WINNER
+    },
+    [AchievementType.REFERRAL_MASTER]: {
+      id: 'referral_master',
+      name: 'Community Builder',
+      description: 'Refer 5 new members',
+      category: 'leadership',
+      rarity: 'epic',
+      icon: 'Users',
+      respectPointsReward: 150,
+      contractType: AchievementType.REFERRAL_MASTER
+    },
+    [AchievementType.STREAK_KEEPER]: {
+      id: 'streak_keeper',
+      name: 'Consistency Master',
+      description: 'Maintain a 7-day activity streak',
+      category: 'social',
+      rarity: 'rare',
+      icon: 'Flame',
+      respectPointsReward: 75,
+      contractType: AchievementType.STREAK_KEEPER
+    }
+  };
+
+  return contractAchievements.map(achievementId => {
+    const achievementType = Number(achievementId) as AchievementType;
+    return achievementDefinitions[achievementType];
+  }).filter(Boolean);
+};
+
+// Boost mapping function
+export const mapContractBoosts = (contractBoosts: any[]): UserBoost[] => {
+  const boostDefinitions: Record<BoostType, Omit<UserBoost, 'multiplier' | 'duration' | 'expiresAt' | 'active'>> = {
+    [BoostType.EXPERIENCE_MULTIPLIER]: {
+      id: 'experience_multiplier',
+      name: 'Experience Multiplier',
+      description: 'Double your respect points gain',
+      boostType: BoostType.EXPERIENCE_MULTIPLIER,
+      icon: 'Zap',
+      color: 'from-yellow-500 to-orange-500'
+    },
+    [BoostType.REPUTATION_MULTIPLIER]: {
+      id: 'reputation_multiplier',
+      name: 'Reputation Multiplier',
+      description: '1.5x reputation gain from activities',
+      boostType: BoostType.REPUTATION_MULTIPLIER,
+      icon: 'Star',
+      color: 'from-purple-500 to-pink-500'
+    },
+    [BoostType.EVENT_DISCOUNT]: {
+      id: 'event_discount',
+      name: 'Event Discount',
+      description: '20% discount on event participation fees',
+      boostType: BoostType.EVENT_DISCOUNT,
+      icon: 'DollarSign',
+      color: 'from-green-500 to-teal-500'
+    }
+  };
+
+  return contractBoosts.map(boostData => {
+    if (!boostData || !Array.isArray(boostData) || boostData.length < 5) return null;
+    
+    const [boostType, duration, expiresAt, multiplier, active] = boostData;
+    const boostTypeNum = Number(boostType) as BoostType;
+    const definition = boostDefinitions[boostTypeNum];
+    
+    if (!definition) return null;
+    
+    return {
+      ...definition,
+      multiplier: Number(multiplier),
+      duration: Number(duration),
+      expiresAt: Number(expiresAt),
+      active: Boolean(active)
+    };
+  }).filter(Boolean) as UserBoost[];
+};
+
 // Main hook
 export function useSpheresContract() {
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -431,20 +579,7 @@ export function useSpheresContract() {
     maxPlatformFeePercentage: Number(maxPlatformFeePercentageRaw || 0),
   };
 
-  const refetchAll = useCallback(() => {
-    refetchCommunityIdCounter();
-    refetchCommunities();
-    refetchPaused();
-    refetchOwner();
-    refetchCreationFee();
-    refetchUtilityBoxFee();
-    refetchAchievementUnlockFee();
-    refetchBoostPurchaseFee();
-    refetchEventPlatformFee();
-    refetchWithdrawalFeePercentage();
-    refetchDefaultPlatformFeePercentage();
-    refetchMaxPlatformFeePercentage();
-  }, [refetchCommunityIdCounter, refetchCommunities, refetchPaused, refetchOwner, refetchCreationFee, refetchUtilityBoxFee, refetchAchievementUnlockFee, refetchBoostPurchaseFee, refetchEventPlatformFee, refetchWithdrawalFeePercentage, refetchDefaultPlatformFeePercentage, refetchMaxPlatformFeePercentage]);
+
 
   // Helper function to execute transactions
   const executeTransaction = useCallback(async (
@@ -480,7 +615,7 @@ export function useSpheresContract() {
     } finally {
       setIsLoading(false);
     }
-  }, [writeContractFn, refetchAll]);
+  }, [writeContractFn]);
 
   // Helper functions
   const getCommunityDetails = useCallback(async (communityId: number): Promise<Community | null> => {
@@ -496,14 +631,45 @@ export function useSpheresContract() {
 
   const getMemberDetails = useCallback(async (communityId: number, memberAddress: Address): Promise<Member | null> => {
     try {
-      // TODO: Implement with useReadContract for getMemberDetails view function
-      // For now, return null as placeholder until proper implementation
+      if (!publicClient) return null;
+      
+      const memberDetails = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'getMemberDetails',
+        args: [BigInt(communityId), memberAddress],
+      });
+      
+      if (memberDetails && Array.isArray(memberDetails)) {
+        const [level, respectPoints, reputation, currentStreak, longestStreak, 
+               totalEventsParticipated, totalEventsWon, mentor] = memberDetails;
+        
+        return {
+          communityId,
+          subscriptionExpiresAt: 0, // TODO: Get from contract if available
+          respectPoints: Number(respectPoints),
+          totalSpent: 0, // TODO: Calculate from contract data
+          lastActiveTime: 0, // TODO: Get from contract if available
+          referralCount: 0, // TODO: Get from contract if available
+          level: Number(level),
+          reputation: Number(reputation),
+          currentStreak: Number(currentStreak),
+          longestStreak: Number(longestStreak),
+          totalEventsParticipated: Number(totalEventsParticipated),
+          totalEventsWon: Number(totalEventsWon),
+          totalRatings: 0, // TODO: Get from contract if available
+          ratingSum: 0, // TODO: Get from contract if available
+          lifetime: false, // TODO: Get from contract if available
+          mentorAddress: mentor as Address
+        };
+      }
+      
       return null;
     } catch (err) {
       console.error('Error fetching member details:', err);
       return null;
     }
-  }, []);
+  }, [publicClient]);
 
   const isGloballyBanned = useCallback(async (userAddress: Address): Promise<boolean> => {
     try {
@@ -600,6 +766,37 @@ export function useSpheresContract() {
     return executeTransaction('openUtilityBox', [communityId], fee, 'Opening Utility Box...');
   }, [executeTransaction, contractData?.utilityBoxFee]);
 
+  const useAchievementVoucher = useCallback(async (achievementType: AchievementType) => {
+    return executeTransaction('useAchievementVoucher', [achievementType], 0n, 'Using Achievement Voucher...');
+  }, [executeTransaction]);
+
+  const unlockPremiumAchievement = useCallback(async (achievementType: AchievementType) => {
+    const fee = contractData?.achievementUnlockFee ? parseEther(contractData.achievementUnlockFee) : 0n;
+    if (fee === 0n) {
+        throw new Error("Achievement unlock fee is not set or is zero.");
+    }
+    return executeTransaction('unlockPremiumAchievement', [achievementType], fee, 'Unlocking Premium Achievement...');
+  }, [executeTransaction, contractData?.achievementUnlockFee]);
+
+  const purchaseBoost = useCallback(async (boostType: BoostType, durationHours: number) => {
+    const baseFee = contractData?.boostPurchaseFee ? parseEther(contractData.boostPurchaseFee) : 0n;
+    if (baseFee === 0n) {
+        throw new Error("Boost purchase fee is not set or is zero.");
+    }
+    
+    // Calculate dynamic pricing based on duration
+    // Base fee * duration multiplier
+    const durationMultiplier = Math.max(1, durationHours / 24); // Per day pricing
+    const dynamicFee = (baseFee * BigInt(Math.ceil(durationMultiplier * 100))) / 100n;
+    
+    const durationSeconds = durationHours * 3600; // Convert hours to seconds
+    return executeTransaction('purchaseBoost', [boostType, durationSeconds], dynamicFee, 'Purchasing Boost...');
+  }, [executeTransaction, contractData?.boostPurchaseFee]);
+
+  const activateBoost = useCallback(async (boostType: BoostType) => {
+    return executeTransaction('activateBoost', [boostType], 0n, 'Activating Boost...');
+  }, [executeTransaction]);
+
   // Community member management functions
   const banMember = useCallback(async (communityId: number, memberAddress: Address) => {
     return executeTransaction('banMember', [BigInt(communityId), memberAddress], 0n, 'Member banned from community!');
@@ -612,6 +809,32 @@ export function useSpheresContract() {
   const setMemberRole = useCallback(async (communityId: number, memberAddress: Address, role: number) => {
     return executeTransaction('setMemberRole', [BigInt(communityId), memberAddress, BigInt(role)], 0n, 'Member role updated!');
   }, [executeTransaction]);
+
+  // Daily activity function - uses becomeMentor as a way to update activity
+  // In a real implementation, there would be a dedicated updateActivity function
+  const updateDailyActivity = useCallback(async (communityId: number) => {
+    try {
+      // For now, we'll use the becomeMentor function call to trigger _updateMemberActivity
+      // This is a workaround until we add a dedicated updateActivity function to the contract
+      const memberDetails = await getMemberDetails(communityId, address as Address);
+      
+      if (memberDetails && memberDetails.level >= 3 && memberDetails.reputation >= 70) {
+        // User can become mentor, which will update their activity
+        return executeTransaction('becomeMentor', [BigInt(communityId)], 0n, 'Daily activity updated!');
+      } else {
+        // Alternative: open utility box to update activity (requires fee)
+        const fee = contractData?.utilityBoxFee ? parseEther(contractData.utilityBoxFee) : 0n;
+        if (fee > 0) {
+          return executeTransaction('openUtilityBox', [BigInt(communityId)], fee, 'Daily activity updated via Utility Box!');
+        } else {
+          throw new Error('Cannot update daily activity - requirements not met and no utility box available');
+        }
+      }
+    } catch (err) {
+      console.error('Error updating daily activity:', err);
+      throw err;
+    }
+  }, [executeTransaction, getMemberDetails, address, contractData?.utilityBoxFee]);
 
   // Computed values - with debugging
   console.log('🔍 Admin Check Debug:');
@@ -631,7 +854,7 @@ export function useSpheresContract() {
   }, [communities]);
 
   // Get user's achievements
-  const { data: userAchievementsRaw } = useReadContract({
+  const { data: userAchievementsRaw, refetch: refetchUserAchievements } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'userAchievements',
@@ -639,8 +862,33 @@ export function useSpheresContract() {
     query: { enabled: !!address },
   });
 
+  // Get user's boosts for all boost types
+  const { data: experienceBoostRaw, refetch: refetchExperienceBoost } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'userBoosts',
+    args: [address, BoostType.EXPERIENCE_MULTIPLIER],
+    query: { enabled: !!address },
+  });
+
+  const { data: reputationBoostRaw, refetch: refetchReputationBoost } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'userBoosts',
+    args: [address, BoostType.REPUTATION_MULTIPLIER],
+    query: { enabled: !!address },
+  });
+
+  const { data: eventDiscountBoostRaw, refetch: refetchEventDiscountBoost } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'userBoosts',
+    args: [address, BoostType.EVENT_DISCOUNT],
+    query: { enabled: !!address },
+  });
+
   // Get user's utility box items
-  const { data: streakSaversCount } = useReadContract({
+  const { data: streakSaversCount, refetch: refetchStreakSavers } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'streakSavers',
@@ -648,7 +896,7 @@ export function useSpheresContract() {
     query: { enabled: !!address },
   });
 
-  const { data: achievementVouchersCount } = useReadContract({
+  const { data: achievementVouchersCount, refetch: refetchAchievementVouchers } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'achievementVouchers',
@@ -656,37 +904,153 @@ export function useSpheresContract() {
     query: { enabled: !!address },
   });
 
-  // User data functions - simplified approach using existing data
+  // RefetchAll function - defined after all refetch variables are available
+  const refetchAll = useCallback(() => {
+    refetchCommunityIdCounter();
+    refetchCommunities();
+    refetchPaused();
+    refetchOwner();
+    refetchCreationFee();
+    refetchUtilityBoxFee();
+    refetchAchievementUnlockFee();
+    refetchBoostPurchaseFee();
+    refetchEventPlatformFee();
+    refetchWithdrawalFeePercentage();
+    refetchDefaultPlatformFeePercentage();
+    refetchMaxPlatformFeePercentage();
+    // User data refetch
+    refetchUserAchievements();
+    refetchStreakSavers();
+    refetchAchievementVouchers();
+    refetchExperienceBoost();
+    refetchReputationBoost();
+    refetchEventDiscountBoost();
+  }, [refetchCommunityIdCounter, refetchCommunities, refetchPaused, refetchOwner, refetchCreationFee, refetchUtilityBoxFee, refetchAchievementUnlockFee, refetchBoostPurchaseFee, refetchEventPlatformFee, refetchWithdrawalFeePercentage, refetchDefaultPlatformFeePercentage, refetchMaxPlatformFeePercentage, refetchUserAchievements, refetchStreakSavers, refetchAchievementVouchers, refetchExperienceBoost, refetchReputationBoost, refetchEventDiscountBoost]);
+
+  // User data functions - using real contract data
   const getUserMembershipData = useCallback(async (communityId: number): Promise<CommunityMembership | null> => {
-    if (!address) return null;
+    if (!address || !publicClient) return null;
     
     try {
-      // For now, return placeholder data that will be replaced with actual contract calls
-      // This ensures the UI works while we implement proper contract integration
-      return {
-        communityId,
-        level: 0,
-        respectPoints: 0,
-        reputation: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-        totalEventsParticipated: 0,
-        totalEventsWon: 0,
-        mentor: null,
-        menteeCount: 0
-      };
+      // Check if user is active member first
+      const isActiveMemberData = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'isActiveMember',
+        args: [BigInt(communityId), address],
+      });
+      
+      if (!isActiveMemberData) return null;
+      
+      // Get member details from contract
+      const memberDetails = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'getMemberDetails',
+        args: [BigInt(communityId), address],
+      });
+      
+      if (memberDetails && Array.isArray(memberDetails)) {
+        const [level, respectPoints, reputation, currentStreak, longestStreak, 
+               totalEventsParticipated, totalEventsWon, mentor, menteeCount] = memberDetails;
+        
+        return {
+          communityId,
+          level: Number(level),
+          respectPoints: Number(respectPoints),
+          reputation: Number(reputation),
+          currentStreak: Number(currentStreak),
+          longestStreak: Number(longestStreak),
+          totalEventsParticipated: Number(totalEventsParticipated),
+          totalEventsWon: Number(totalEventsWon),
+          mentor: mentor as Address,
+          menteeCount: Number(menteeCount)
+        };
+      }
+      
+      return null;
     } catch (err) {
       console.error('Error fetching user membership data:', err);
       return null;
     }
-  }, [address]);
+  }, [address, publicClient]);
 
   const getAllUserMemberships = useCallback(async (): Promise<CommunityMembership[]> => {
-    if (!address || !contractData.communityIdCounter) return [];
+    if (!address || !contractData.communityIdCounter || !publicClient) {
+      console.log('❌ Missing requirements for getAllUserMemberships:', { 
+        address: !!address, 
+        communityIdCounter: contractData.communityIdCounter, 
+        publicClient: !!publicClient 
+      });
+      return [];
+    }
     
-    // For now, return empty array - will be implemented with proper contract calls
-    return [];
-  }, [address, contractData.communityIdCounter]);
+    try {
+      const memberships: CommunityMembership[] = [];
+      
+      console.log(`🔍 Sprawdzanie członkostwa w ${contractData.communityIdCounter - 1} społecznościach...`);
+      
+      // Iterować przez wszystkie społeczności i sprawdzić członkostwo użytkownika
+      for (let i = 1; i < contractData.communityIdCounter; i++) {
+        try {
+          console.log(`📋 Sprawdzanie społeczności ${i}...`);
+          
+          // Sprawdzić czy użytkownik jest aktywnym członkiem tej społeczności
+          const isActiveMemberData = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'isActiveMember',
+            args: [BigInt(i), address],
+          });
+          
+          console.log(`🤝 Community ${i} - isActiveMember:`, isActiveMemberData);
+          
+          if (isActiveMemberData) {
+            // Pobrać szczegóły członkostwa
+            const memberDetails = await publicClient.readContract({
+              address: CONTRACT_ADDRESS,
+              abi: CONTRACT_ABI,
+              functionName: 'getMemberDetails',
+              args: [BigInt(i), address],
+            });
+            
+            console.log(`📊 Community ${i} - memberDetails:`, memberDetails);
+            
+            if (memberDetails && Array.isArray(memberDetails)) {
+              const [level, respectPoints, reputation, currentStreak, longestStreak, 
+                     totalEventsParticipated, totalEventsWon, mentor, menteeCount] = memberDetails;
+              
+              const membership = {
+                communityId: i,
+                level: Number(level),
+                respectPoints: Number(respectPoints),
+                reputation: Number(reputation),
+                currentStreak: Number(currentStreak),
+                longestStreak: Number(longestStreak),
+                totalEventsParticipated: Number(totalEventsParticipated),
+                totalEventsWon: Number(totalEventsWon),
+                mentor: mentor as Address,
+                menteeCount: Number(menteeCount)
+              };
+              
+              console.log(`✅ Dodano członkostwo ${i}:`, membership);
+              memberships.push(membership);
+            }
+          }
+        } catch (err) {
+          console.warn(`⚠️ Błąd podczas pobierania danych członkostwa dla społeczności ${i}:`, err);
+          // Kontynuować z następną społecznością
+        }
+      }
+      
+      console.log(`🎉 Pobrano dane członkostwa dla ${memberships.length} społeczności:`, memberships);
+      return memberships;
+      
+    } catch (err) {
+      console.error('💥 Błąd podczas pobierania wszystkich członkostw użytkownika:', err);
+      return [];
+    }
+  }, [address, contractData.communityIdCounter, publicClient]);
 
   const calculateUserStats = useCallback(async (): Promise<UserStats> => {
     if (!address) {
@@ -743,14 +1107,32 @@ export function useSpheresContract() {
 
   // Auto-fetch user data when address changes
   useEffect(() => {
-    if (address && contractData.communityIdCounter) {
-      calculateUserStats().then(setUserStats);
-      getAllUserMemberships().then(setUserMemberships);
+    if (address && contractData.communityIdCounter && publicClient) {
+      console.log('🔄 Pobieranie danych użytkownika...', { 
+        address, 
+        communityCount: contractData.communityIdCounter 
+      });
+      
+      setIsLoading(true);
+      
+      Promise.all([
+        calculateUserStats(),
+        getAllUserMemberships()
+      ]).then(([stats, memberships]) => {
+        console.log('✅ Dane użytkownika pobrane:', { stats, membershipsCount: memberships.length });
+        setUserStats(stats);
+        setUserMemberships(memberships);
+      }).catch(err => {
+        console.error('❌ Błąd podczas pobierania danych użytkownika:', err);
+        setError(err.message);
+      }).finally(() => {
+        setIsLoading(false);
+      });
     } else {
       setUserStats(null);
       setUserMemberships([]);
     }
-  }, [address, contractData.communityIdCounter, calculateUserStats, getAllUserMemberships]);
+  }, [address, contractData.communityIdCounter, publicClient, calculateUserStats, getAllUserMemberships]);
 
   return {
     // Contract data
@@ -767,11 +1149,16 @@ export function useSpheresContract() {
     createCommunity,
     joinCommunity,
     openUtilityBox,
+    useAchievementVoucher,
+    unlockPremiumAchievement,
+    purchaseBoost,
+    activateBoost,
     
     // Member management functions
     banMember,
     unbanMember,
     setMemberRole,
+    updateDailyActivity,
     
     // Admin functions
     globalBanUser,
@@ -831,8 +1218,18 @@ export function useSpheresContract() {
     getAllUserMemberships,
     calculateUserStats,
     
-    // Utility box data
-    streakSaversCount: Number(streakSaversCount || 0),
-    achievementVouchersCount: Number(achievementVouchersCount || 0),
+      // Utility box data
+  streakSaversCount: Number(streakSaversCount || 0),
+  achievementVouchersCount: Number(achievementVouchersCount || 0),
+  
+  // User achievements data
+  userAchievements: mapContractAchievements((userAchievementsRaw as bigint[]) || []),
+  
+  // User boosts data
+  userBoosts: mapContractBoosts([
+    experienceBoostRaw,
+    reputationBoostRaw,
+    eventDiscountBoostRaw
+  ].filter(Boolean)),
   };
 } 
