@@ -1570,6 +1570,14 @@ export default function BaseChat() {
     }
   }, [posts, baseName, address]);
 
+  // 🚀 NOWA FUNKCJA: Aktualizacja nazw użytkowników z PinnedPosts
+  const handleUserNamesUpdate = useCallback((newUserNames: {[key: string]: {name: string, avatar?: string}}) => {
+    setUserNames(prev => ({
+      ...prev,
+      ...newUserNames // Dodaj nowe nazwy do cache
+    }));
+  }, []);
+
   // Simplified post filtering - show all posts since we removed search and "My Posts"
   const searchFilteredPosts = posts;
 
@@ -3354,6 +3362,7 @@ export default function BaseChat() {
                       <PinnedPosts
                         displayUserName={displayUserName}
                         userNames={userNames}
+                        onUserNamesUpdate={handleUserNamesUpdate}
                       />
 
                       {/* Tutaj zastępuję kod wyświetlający posty komponentem PostList */}

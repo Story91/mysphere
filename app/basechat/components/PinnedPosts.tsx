@@ -3,32 +3,56 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { useAccount } from 'wagmi';
 import PostList, { ExtendedPost } from './PostList';
-import { fetchPinnedPosts } from '../../utils/firebase';
+import { fetchPinnedPosts, getBulkUserNamesVisibleOnly } from '../../utils/firebase';
 
 interface PinnedPostsProps {
   displayUserName: (userAddress: string, elementId: string, showAvatar?: boolean) => JSX.Element;
   userNames: {[key: string]: {name: string, avatar?: string}};
+  onUserNamesUpdate?: (newUserNames: {[key: string]: {name: string, avatar?: string}}) => void;
 }
 
 function PinnedPosts({ 
   displayUserName, 
-  userNames
+  userNames,
+  onUserNamesUpdate
 }: PinnedPostsProps) {
   const [pinnedPosts, setPinnedPosts] = useState<ExtendedPost[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { address } = useAccount();
+
+  // 🚀 NOWA FUNKCJA: Pobieranie nazw użytkowników dla pinned posts
+  const fetchPinnedPostsUserNames = useCallback(async (posts: ExtendedPost[]) => {
+    try {
+      if (posts.length === 0) return;
+      
+      // Użyj tej samej funkcji co główny feed
+      const names = await getBulkUserNamesVisibleOnly(posts, 3);
+      
+      // Aktualizuj cache nazw w głównym komponencie
+      if (onUserNamesUpdate && Object.keys(names).length > 0) {
+        onUserNamesUpdate(names);
+      }
+      
+      console.log(`📌 PinnedPosts: Pobrano nazwy dla ${Object.keys(names).length} użytkowników`);
+    } catch (error) {
+      console.error('❌ PinnedPosts: Błąd podczas pobierania nazw użytkowników:', error);
+    }
+  }, [onUserNamesUpdate]);
 
   const loadPinnedPosts = useCallback(async () => {
     try {
       setIsLoading(true);
       const pinnedPosts = await fetchPinnedPosts();
       setPinnedPosts(pinnedPosts);
+      
+      // 🚀 POBIERZ NAZWY UŻYTKOWNIKÓW dla pinned posts
+      await fetchPinnedPostsUserNames(pinnedPosts);
     } catch (error) {
       console.error('❌ PinnedPosts: Błąd podczas ładowania przypiętych postów:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchPinnedPostsUserNames]);
 
   useEffect(() => {
     loadPinnedPosts();
@@ -47,11 +71,14 @@ function PinnedPosts({
       });
       
       setPinnedPosts(pinned);
+      
+      // 🚀 POBIERZ NAZWY dla nowych pinned posts
+      await fetchPinnedPostsUserNames(pinned);
     } else {
       // Tylko gdy nie mamy nowych postów, odświeżamy z Firebase
       await loadPinnedPosts();
     }
-  }, [loadPinnedPosts]);
+  }, [loadPinnedPosts, fetchPinnedPostsUserNames]);
 
   const handleRefreshClick = useCallback(() => {
     handleRefreshPinnedPosts(); // Bez parametrów - odświeżenie z Firebase
