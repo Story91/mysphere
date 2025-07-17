@@ -586,7 +586,8 @@ export function useSpheresContract() {
     functionName: string,
     args: any[],
     value: bigint = 0n,
-    successMessage: string = 'Transaction successful!'
+    successMessage: string = 'Transaction successful!',
+    includeTransactionLink: boolean = false
   ) => {
     try {
       setIsLoading(true);
@@ -600,33 +601,54 @@ export function useSpheresContract() {
         value,
       });
 
-      // Return a simple object with hash and wait method
-      const result = {
-        hash: txHash,
-        wait: async () => {
-          // Wait for transaction receipt
-          if (publicClient && txHash) {
-            return await publicClient.waitForTransactionReceipt({ hash: txHash });
-          }
-          throw new Error('Public client not available');
+      // Enhanced success notification with transaction link
+      if (includeTransactionLink && txHash) {
+        const basescanUrl = `https://sepolia.basescan.org/tx/${txHash}`;
+        
+        // Primary success toast
+        toast.success(successMessage, { duration: 4000 });
+        
+        // Secondary toast with transaction link  
+        setTimeout(() => {
+          const hashString = String(txHash);
+          const shortHash = `${hashString.slice(0, 10)}...${hashString.slice(-8)}`;
+          toast.success(`📄 BaseScan: ${shortHash}`, {
+            duration: 8000
+          });
+          
+          // Log the BaseScan link for easy access
+          console.log(`🔗 Transaction on BaseScan: ${basescanUrl}`);
+        }, 500);
+        
+        // Store transaction hash for potential event listening
+        (window as any).lastTxHash = String(txHash);
+        
+        // Special handling for utility box transactions
+        if (functionName === 'openUtilityBox') {
+          (window as any).lastUtilityBoxTxHash = String(txHash);
+          console.log('🎁 Utility Box transaction hash set:', String(txHash));
         }
-      };
-
+        
+      } else {
+        toast.success(successMessage);
+      }
+      
       // Refetch contract data after successful transaction
       setTimeout(() => {
         refetchAll();
-      }, 3000);
+      }, 2000);
 
-      return result;
+      return txHash;
 
     } catch (err: any) {
       const errorMessage = err?.message || 'Transaction failed';
       setError(errorMessage);
+      toast.error(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [writeContractFn, publicClient]);
+  }, [writeContractFn]);
 
   // Helper functions
   const getCommunityDetails = useCallback(async (communityId: number): Promise<Community | null> => {
@@ -774,7 +796,13 @@ export function useSpheresContract() {
     if (fee === 0n) {
         throw new Error("Utility Box fee is not set or is zero.");
     }
-    return executeTransaction('openUtilityBox', [communityId], fee, 'Opening Utility Box...');
+    return executeTransaction(
+      'openUtilityBox', 
+      [communityId], 
+      fee, 
+      '🎁 UtilityBox otwarte! Sprawdź swoją nagrodę...', 
+      true // Include transaction link
+    );
   }, [executeTransaction, contractData?.utilityBoxFee]);
 
   const useAchievementVoucher = useCallback(async (achievementType: AchievementType) => {
