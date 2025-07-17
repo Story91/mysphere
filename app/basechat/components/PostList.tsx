@@ -1077,11 +1077,6 @@ export default function PostList({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
-                      {address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase() && comment.author !== address && (
-                        <span className="text-xs text-red-500 bg-red-100 dark:bg-red-900/20 px-1 py-0.5 rounded">
-                          Admin
-                        </span>
-                      )}
                     </div>
                   )}
                 </div>
@@ -1671,7 +1666,24 @@ export default function PostList({
             </a>
           )}
 
-          {(canEdit || canDelete) && (
+          {/* 🗑️ ADMIN DELETE BUTTON - Dedykowana ikonka dla admina */}
+          {address && isUserAdmin(address) && post.author !== address && (
+            <button
+              onClick={() => {
+                if (confirm('Are you sure you want to delete this post?')) {
+                  handleDeletePost(post.id);
+                }
+              }}
+              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors ml-auto p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+              title="Delete post (Admin)"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
+
+          {(canEdit || (canDelete && post.author === address)) && (
             <div className="relative group ml-auto">
               <button className="hover:text-gray-700 dark:hover:text-gray-300">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
@@ -1697,7 +1709,8 @@ export default function PostList({
                     {post.isPinned ? '📌 Unpin' : '📌 Pin'}
                   </button>
                 )}
-                {canDelete && (
+                {/* ✅ TYLKO AUTOR może usuwać przez menu (admin ma dedykowaną ikonkę) */}
+                {canDelete && post.author === address && (
                   <button
                     onClick={() => handleDeletePost(post.id)}
                     className="block w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/50"

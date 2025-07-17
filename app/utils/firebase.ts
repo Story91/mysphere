@@ -335,19 +335,26 @@ export const deletePost = async (postId: string, authorAddress: string) => {
     }
 
     const postData = postSnap.data();
-    if (postData.author !== authorAddress) {
+    
+    // ✅ NAPRAWKA: Sprawdź czy użytkownik to autor LUB admin
+    const isAdmin = authorAddress.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
+    const isAuthor = postData.author === authorAddress;
+    
+    if (!isAuthor && !isAdmin) {
       throw new Error('Unauthorized to delete this post');
     }
 
     // Prepare batch for atomic operations
     const batch = writeBatch(db);
 
-    // Odejmij lajki od autora
-    const authorRef = doc(db, 'users', authorAddress);
-    batch.update(authorRef, {
-      likesReceived: increment(-(postData.likes || 0)),
-      lastActive: serverTimestamp()
-    });
+    // Odejmij lajki od autora (tylko gdy usuwamy własny post)
+    if (isAuthor) {
+      const authorRef = doc(db, 'users', authorAddress);
+      batch.update(authorRef, {
+        likesReceived: increment(-(postData.likes || 0)),
+        lastActive: serverTimestamp()
+      });
+    }
 
     // Delete post comments
     const commentsRef = collection(db, 'comments');
