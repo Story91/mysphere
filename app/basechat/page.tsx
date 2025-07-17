@@ -2440,6 +2440,12 @@ export default function BaseChat() {
   return (
     <FarcasterFrameProvider>
       <BanPage>
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
         <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
         <div className="min-h-screen relative">
           {/* Prosty gradient w tle zamiast skomplikowanych efektów */}

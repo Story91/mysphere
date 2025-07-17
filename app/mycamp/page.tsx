@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Script from 'next/script';
 import { 
   CampModal, 
   useAuth, 
@@ -576,6 +577,12 @@ export default function MyCampPage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden relative">
+      <Script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
+        crossOrigin="anonymous"
+        strategy="afterInteractive"
+      />
       {/* Background Image */}
       <div 
         className="fixed inset-0 bg-cover bg-center bg-no-repeat" 
