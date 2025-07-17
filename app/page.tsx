@@ -692,12 +692,6 @@ export default function HomePage() {
 
   return (
     <>
-      <Script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
-        crossOrigin="anonymous"
-        strategy="afterInteractive"
-      />
       <style jsx global>{`
         @keyframes orbit {
           0% { transform: rotate(0deg) translateX(50px) rotate(0deg); }
