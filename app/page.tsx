@@ -428,10 +428,10 @@ export default function HomePage() {
       try {
         // ✅ ULTRA-CHEAP: Statyczne dane zamiast Firebase (oszczędność 800M reads/dzień!)
         const stats = {
-          userCount: 107197,
-          postsCount: 125034,
-          likesCount: 14435,
-          commentsCount: 6035,
+          userCount: 112704,
+          postsCount: 142291,
+          likesCount: 14563,
+          commentsCount: 7079,
           transactionsCount: 40818
         };
         
@@ -613,15 +613,19 @@ export default function HomePage() {
     // Funkcja do pobierania łącznego stanu ETH z kontraktów i portfela MySphere
     const fetchTotalEthBalance = async () => {
       try {
+        // Definiujemy bazową, historyczną wartość przychodów, która będzie stała
+        const historicalBaseRevenue = 0.2562;
+
         const contract1Balance = await fetchEthBalance("0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7");
         const contract2Balance = await fetchEthBalance("0x9c44802843a670732383f62b2f3304f92ec1702b");
         const mysphereBalance = await fetchEthBalance("0x9fB014812E5C22643640A5885866f499b1bbB5e0");
         
-        const totalBalance = contract1Balance + contract2Balance + mysphereBalance;
+        // Sumujemy bazę historyczną z aktualnymi, bieżącymi saldami
+        const totalBalance = historicalBaseRevenue + contract1Balance + contract2Balance + mysphereBalance;
         setEthRevenue(totalBalance);
       } catch (error) {
         console.error("Błąd podczas pobierania łącznego salda ETH:", error);
-        setEthRevenue(0.0012); // Wartość domyślna w przypadku błędu
+        setEthRevenue(0.2562); // Wartość domyślna w przypadku błędu to nasza historyczna baza
       }
     };
     
