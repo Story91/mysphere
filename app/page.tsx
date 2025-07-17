@@ -5,6 +5,7 @@ import { useAccount, useContractRead, useContractReads } from 'wagmi';
 import { motion } from 'framer-motion';
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
+import Script from 'next/script';
 import OnchainkitSvg from './svg/OnchainKit';
 // import HomeNeonBackground from './components/Backgrounds/HomeNeonBackground';
 import { getGlobalStats } from './utils/firebase';
@@ -691,6 +692,12 @@ export default function HomePage() {
 
   return (
     <>
+      <Script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
+        crossOrigin="anonymous"
+        strategy="afterInteractive"
+      />
       <style jsx global>{`
         @keyframes orbit {
           0% { transform: rotate(0deg) translateX(50px) rotate(0deg); }
