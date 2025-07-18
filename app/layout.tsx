@@ -23,11 +23,17 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <head>
+        <link rel="preconnect" href="https://pagead2.googlesyndication.com" />
+        <link
+          rel="preconnect"
+          href="https://googleads.g.doubleclick.net"
+          crossOrigin="anonymous"
+        />
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
           crossOrigin="anonymous"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
         {/* Usunięto skrypt reCAPTCHA - obciążał stronę */}
         {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}

@@ -9,9 +9,12 @@ type MockPostProps = {
   content: string;
   avatar: string;
   timestamp: string;
+  likes: number;
+  comments: number;
+  tips: number;
 };
 
-const MockPost: React.FC<MockPostProps> = ({ userName, userHandle, network, content, avatar, timestamp }) => {
+const MockPost: React.FC<MockPostProps> = ({ userName, userHandle, network, content, avatar, timestamp, likes, comments, tips }) => {
   const isBaseName = userName.endsWith('.base.eth');
   const isSphereName = userName.endsWith('.sphere');
   const isCamperName = userName.endsWith('.camper');
@@ -55,9 +58,9 @@ const MockPost: React.FC<MockPostProps> = ({ userName, userHandle, network, cont
 
           {/* Actions */}
           <div className="flex items-center space-x-4 mt-3 text-gray-500 text-xs">
-            <span>🤍 0</span>
-            <span>💬 0</span>
-            <span>💰 Tip</span>
+            <span>🤍 {likes}</span>
+            <span>💬 {comments}</span>
+            <span>💰 Tip ({tips})</span>
             <span>⚡ Transaction</span>
           </div>
         </div>
