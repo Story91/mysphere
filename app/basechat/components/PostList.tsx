@@ -108,6 +108,9 @@ interface PostListProps {
   isLoading?: boolean;
   disableInfiniteScroll?: boolean; // Nowy prop do wyłączenia infinite scroll
   showMyFeed?: boolean; // Nowy prop dla trybu My Feed
+  getCachedPosts?: (cacheKey: string) => ExtendedPost[] | null; // Funkcje cache'owania
+  setCachedPosts?: (cacheKey: string, posts: ExtendedPost[]) => void;
+  clearPostsCache?: () => void;
 }
 
 // Utility function for extracting hashtags from text
@@ -137,7 +140,10 @@ export default function PostList({
   posts,
   isLoading = false,
   disableInfiniteScroll = false,
-  showMyFeed = false
+  showMyFeed = false,
+  getCachedPosts,
+  setCachedPosts,
+  clearPostsCache
 }: PostListProps) {
   const [newComments, setNewComments] = useState<{[key: string]: string}>({});
   const [expandedPosts, setExpandedPosts] = useState<{[key: string]: boolean}>({});
@@ -725,6 +731,10 @@ export default function PostList({
       
     } catch (error) {
       console.error('Error loading more posts:', error);
+      // 🗑️ Wyczyść cache w przypadku błędu
+      if (clearPostsCache) {
+        clearPostsCache();
+      }
       toast.error('Failed to load more posts');
     } finally {
       setIsLoadingMore(false);
@@ -747,6 +757,10 @@ export default function PostList({
           setLastVisible(newLastVisible);
     } catch (error) {
           console.error('Error setting initial lastVisible:', error);
+          // 🗑️ Wyczyść cache w przypadku błędu
+          if (clearPostsCache) {
+            clearPostsCache();
+          }
         }
       }
     };

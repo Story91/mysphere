@@ -193,6 +193,56 @@ async function uploadMetadataJson(metadata: object): Promise<string> {
   return data.uri; // Should be like "ipfs://<hash>" or "https://<...>/metadata.json"
 }
 
+// 🚀 POSTS CACHE FUNCTIONS - localStorage cache z 5-minutowym TTL
+const POSTS_CACHE_DURATION = 5 * 60 * 1000; // 5 minut w ms
+
+const getCachedPosts = (cacheKey: string): ExtendedPost[] | null => {
+  try {
+    const cached = localStorage.getItem(`posts_${cacheKey}`);
+    const timestamp = localStorage.getItem(`posts_${cacheKey}_timestamp`);
+    
+    if (cached && timestamp) {
+      const age = Date.now() - parseInt(timestamp);
+      if (age < POSTS_CACHE_DURATION) {
+        console.log(`🎯 Posts loaded from cache (${Math.round(age/1000)}s old) - ZERO Firebase reads!`);
+        return JSON.parse(cached);
+      } else {
+        // Cache wygasł, usuń stare dane
+        localStorage.removeItem(`posts_${cacheKey}`);
+        localStorage.removeItem(`posts_${cacheKey}_timestamp`);
+        console.log(`⏰ Posts cache expired (${Math.round(age/1000)}s old) - fetching fresh data`);
+      }
+    }
+  } catch (error) {
+    console.error('Error reading posts cache:', error);
+  }
+  return null;
+};
+
+const setCachedPosts = (cacheKey: string, posts: ExtendedPost[]) => {
+  try {
+    localStorage.setItem(`posts_${cacheKey}`, JSON.stringify(posts));
+    localStorage.setItem(`posts_${cacheKey}_timestamp`, Date.now().toString());
+    console.log(`💾 Cached ${posts.length} posts for key: ${cacheKey}`);
+  } catch (error) {
+    console.error('Error saving posts cache:', error);
+  }
+};
+
+const clearPostsCache = () => {
+  try {
+    // Usuń wszystkie cache'owane posty
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('posts_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    console.log('🗑️ Posts cache cleared');
+  } catch (error) {
+    console.error('Error clearing posts cache:', error);
+  }
+};
+
 export default function BaseChat() {
   const [isMounted, setIsMounted] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
@@ -485,16 +535,34 @@ export default function BaseChat() {
     if (isConnected && address) {
       const loadPosts = async () => {
         try {
-          setIsLoadingPosts(true); // Ustaw ładowanie na true przed rozpoczęciem pobierania
+          setIsLoadingPosts(true);
+          
+          // 🎯 Unikalna kombinacja dla cache'a (adres + tryb)
+          const cacheKey = showMyFeed ? `my_feed_${address}` : `all_posts_${address}`;
+          
+          // 🚀 Sprawdź cache najpierw
+          const cachedPosts = getCachedPosts(cacheKey);
+          if (cachedPosts) {
+            setPosts(cachedPosts);
+            setIsLoadingPosts(false);
+            return; // Użyj cache'a, nie pobieraj z Firebase!
+          }
+          
+          // 💰 Pobierz z Firebase tylko gdy brak cache'a lub wygasł
+          console.log(`🔥 Fetching fresh posts from Firebase for: ${cacheKey}`);
           const { posts: fetchedPosts } = await fetchPosts({ 
             userId: address,
             ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
           });
+          
+          // 💾 Zapisz do cache'a dla przyszłych użyć
+          setCachedPosts(cacheKey, fetchedPosts);
           setPosts(fetchedPosts);
+          
         } catch (error) {
           console.error('Error fetching posts:', error);
         } finally {
-          setIsLoadingPosts(false); // Ustaw ładowanie na false po zakończeniu
+          setIsLoadingPosts(false);
         }
       };
       loadPosts();
@@ -532,11 +600,27 @@ export default function BaseChat() {
       } else {
         // ✅ OPTYMALIZACJA: Przypadek 2 - tylko gdy rzeczywiście potrzebujemy odświeżenia
         // Większość wywołań będzie używać optimistic update (newPosts)
-        const { posts: refreshedPosts } = await fetchPosts({ 
-          userId: address,
-          ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
-        });
-        setPosts(refreshedPosts);
+        
+        // 🎯 Unikalna kombinacja dla cache'a (adres + tryb)
+        const cacheKey = showMyFeed ? `my_feed_${address}` : `all_posts_${address}`;
+        
+        // 🚀 Sprawdź cache najpierw
+        const cachedPosts = getCachedPosts(cacheKey);
+        if (cachedPosts) {
+          console.log(`🎯 Refresh using cached posts - ZERO Firebase reads!`);
+          setPosts(cachedPosts);
+        } else {
+          // 💰 Pobierz z Firebase tylko gdy brak cache'a lub wygasł
+          console.log(`🔥 Refresh fetching fresh posts from Firebase for: ${cacheKey}`);
+          const { posts: refreshedPosts } = await fetchPosts({ 
+            userId: address,
+            ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
+          });
+          
+          // 💾 Zapisz do cache'a dla przyszłych użyć
+          setCachedPosts(cacheKey, refreshedPosts);
+          setPosts(refreshedPosts);
+        }
       }
     } catch (error) {
       console.error('Error refreshing posts:', error);
@@ -957,6 +1041,9 @@ export default function BaseChat() {
       // Successfully created, now increment daily count
       setDailyPostCount(prev => prev + 1);
 
+      // 🗑️ Wyczyść cache bo mamy nowy post
+      clearPostsCache();
+      
       // Refresh posts list from Firebase to get the real ID
       const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
@@ -1130,6 +1217,8 @@ export default function BaseChat() {
       console.error('Error toggling like:', error);
       // W przypadku błędu, przywróć dane z serwera
       try {
+        // 🗑️ Wyczyść cache bo może być niespójny po błędzie
+        clearPostsCache();
         const { posts: refreshedPosts } = await fetchPosts({ userId: address });
         setPosts(refreshedPosts);
       } catch {
@@ -1343,6 +1432,8 @@ export default function BaseChat() {
       console.error('Error deleting post:', error);
       // W przypadku błędu, przywróć dane z serwera
       try {
+        // 🗑️ Wyczyść cache bo może być niespójny po błędzie
+        clearPostsCache();
         const { posts: refreshedPosts } = await fetchPosts({ userId: address });
         setPosts(refreshedPosts);
       } catch {
@@ -3413,6 +3504,9 @@ export default function BaseChat() {
                         posts={posts} // Dodajemy przekazywanie postów jako prop
                         isLoading={isLoadingPosts} // Przekaż stan ładowania do PostList
                         showMyFeed={showMyFeed} // Przekaż stan My Feed do PostList
+                        getCachedPosts={getCachedPosts} // Przekaż funkcje cache'owania
+                        setCachedPosts={setCachedPosts}
+                        clearPostsCache={clearPostsCache}
                       />
                                 </>
                               ) : (
