@@ -4038,3 +4038,164 @@ export const getPaginatedActiveUsersCacheInfo = () => {
     cachedPages: paginatedActiveUsersCache.pages.length
   };
 };
+
+// ================================
+// 💰 PAID PINS FUNCTIONS
+// ================================
+
+/**
+ * Pin Duration types for paid pins
+ */
+export type PinDuration = 'HOUR_1' | 'HOURS_6' | 'HOURS_24' | 'DAYS_7';
+
+/**
+ * Calculate expiration time for pin duration
+ */
+export const calculatePinExpirationTime = (duration: PinDuration, startTime?: number): number => {
+  const start = startTime || Date.now();
+  const durations = {
+    'HOUR_1': 60 * 60 * 1000,
+    'HOURS_6': 6 * 60 * 60 * 1000, 
+    'HOURS_24': 24 * 60 * 60 * 1000,
+    'DAYS_7': 7 * 24 * 60 * 60 * 1000
+  };
+  return start + durations[duration];
+};
+
+/**
+ * Płatne przypięcie posta - wywołane po udanej transakcji smart contract
+ */
+export const createPaidPin = async (
+  postId: string, 
+  userAddress: string, 
+  duration: PinDuration,
+  txHash: string,
+  amountPaid: string
+): Promise<boolean> => {
+  try {
+    const expiresAt = calculatePinExpirationTime(duration);
+    const now = Date.now();
+
+    // 1. Dodaj rekord do kolekcji paidPins dla tracking
+    const paidPinData = {
+      postId,
+      owner: userAddress,
+      duration,
+      expiresAt,
+      paidAmount: amountPaid,
+      txHash,
+      isActive: true,
+      createdAt: now,
+      network: 'base'
+    };
+
+    await addDoc(collection(db, 'paidPins'), paidPinData);
+
+    // 2. Zaktualizuj post z paid pin informacjami
+    const postRef = doc(db, 'posts', postId);
+    await updateDoc(postRef, {
+      isPinned: true,
+      isPaidPin: true,
+      pinnedAt: serverTimestamp(),
+      pinExpiresAt: expiresAt,
+      pinDuration: duration,
+      pinOwner: userAddress,
+      pinAmountPaid: amountPaid,
+      pinTxHash: txHash
+    });
+
+    console.log(`✅ Paid pin created successfully: ${postId} for ${duration}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error creating paid pin:', error);
+    return false;
+  }
+};
+
+/**
+ * Sprawdź czy post może być przypięty (nie jest już przypięty)
+ */
+export const canPinPost = async (postId: string): Promise<boolean> => {
+  try {
+    const postRef = doc(db, 'posts', postId);
+    const postDoc = await getDoc(postRef);
+    
+    if (!postDoc.exists()) {
+      return false;
+    }
+
+    const postData = postDoc.data();
+    return !postData.isPinned;
+  } catch (error) {
+    console.error('❌ Error checking if post can be pinned:', error);
+    return false;
+  }
+};
+
+/**
+ * Automatyczne usuwanie wygasłych paid pins - dla cron job
+ */
+export const cleanupExpiredPaidPins = async (): Promise<{
+  expiredCount: number;
+  errors: string[];
+}> => {
+  try {
+    const now = Date.now();
+    const result = {
+      expiredCount: 0,
+      errors: [] as string[]
+    };
+
+    // Znajdź wszystkie wygasłe paid pins
+    const expiredQuery = query(
+      collection(db, 'posts'),
+      where('isPaidPin', '==', true),
+      where('pinExpiresAt', '<=', now)
+    );
+
+    const expiredPosts = await getDocs(expiredQuery);
+
+    // Usuń pin z każdego wygasłego posta
+    for (const postDoc of expiredPosts.docs) {
+      try {
+        await updateDoc(postDoc.ref, {
+          isPinned: false,
+          isPaidPin: false,
+          pinExpiresAt: deleteField(),
+          pinDuration: deleteField(),
+          pinOwner: deleteField(),
+          pinAmountPaid: deleteField(),
+          pinTxHash: deleteField()
+        });
+
+        // Zaktualizuj status w kolekcji paidPins
+        const paidPinsQuery = query(
+          collection(db, 'paidPins'),
+          where('postId', '==', postDoc.id),
+          where('isActive', '==', true)
+        );
+        
+        const paidPinsSnapshot = await getDocs(paidPinsQuery);
+        for (const paidPinDoc of paidPinsSnapshot.docs) {
+          await updateDoc(paidPinDoc.ref, {
+            isActive: false,
+            expiredAt: serverTimestamp()
+          });
+        }
+
+        result.expiredCount++;
+      } catch (error) {
+        result.errors.push(`Failed to cleanup post ${postDoc.id}: ${error}`);
+      }
+    }
+
+    console.log(`🧹 Cleanup completed: ${result.expiredCount} expired pins removed`);
+    return result;
+  } catch (error) {
+    console.error('❌ Error during cleanup:', error);
+    return {
+      expiredCount: 0,
+      errors: [`Cleanup failed: ${error}`]
+    };
+  }
+};

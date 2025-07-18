@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import UserManagement from './components/UserManagement';
 import ContentModeration from './components/ContentModeration';
 import Statistics from './components/Statistics';
+import PaidPinsManagement from './components/PaidPinsManagement';
 import { refreshTop50UsersOnly } from '../utils/firebase';
 import AdminQuotes from './quotes/page';
 import { getGlobalStats, getGlobalStatsRealTime, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache } from '../utils/firebase';
@@ -20,7 +21,7 @@ export default function AdminPanel() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'content' | 'stats' | 'quotes' | 'globalstats'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'content' | 'stats' | 'quotes' | 'paidpins' | 'globalstats'>('users');
   const [refreshStatus, setRefreshStatus] = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [globalStats, setGlobalStats] = useState<any>(null);
@@ -397,6 +398,16 @@ export default function AdminPanel() {
           }`}
         >
           Cytaty
+        </button>
+        <button
+          onClick={() => setActiveTab('paidpins')}
+          className={`px-4 py-2 rounded-lg ${
+            activeTab === 'paidpins'
+              ? 'bg-yellow-500 text-white'
+              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+          }`}
+        >
+          💰 Paid Pins
         </button>
         <button
           onClick={() => setActiveTab('globalstats')}
@@ -823,6 +834,7 @@ export default function AdminPanel() {
           {activeTab === 'content' && <ContentModeration />}
           {activeTab === 'stats' && <Statistics />}
           {activeTab === 'quotes' && <AdminQuotes />}
+          {activeTab === 'paidpins' && <PaidPinsManagement />}
         </div>
       )}
     </div>

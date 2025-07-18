@@ -4,5 +4,16 @@
       "source": "/flashblock/:path*",
       "destination": "https://base-is-10x-faster.vercel.app/:path*"
     }
-  ]
+  ],
+  "crons": [
+    {
+      "path": "/api/cleanup-expired-pins",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "functions": {
+    "app/api/cleanup-expired-pins/route.ts": {
+      "maxDuration": 60
+    }
+  }
 } 

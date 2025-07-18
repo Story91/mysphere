@@ -24,6 +24,9 @@ import { Address as ViemAddress } from 'viem';
 // Import icons
 import { Users, Coins, ShoppingCart, Tag, ExternalLink, X, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
 
+// 🚀 Import PinnedJobs components
+import { PaidPinButton, PinTimer, ExtendPinModal, PinDuration } from '../PinnedJobs';
+
 // Utility function for formatting large numbers with K, M, B suffixes
 const formatNumberWithSuffix = (value: number | string): string => {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -53,6 +56,13 @@ const formatNumberWithSuffix = (value: number | string): string => {
 export interface ExtendedPost extends Post {
   pollId?: string;
   network?: 'base' | 'basecamp';
+  // 🚀 Paid Pin fields
+  isPaidPin?: boolean;
+  pinExpiresAt?: number;
+  pinDuration?: string;
+  pinOwner?: string;
+  pinAmountPaid?: string;
+  pinTxHash?: string;
 }
 
 // Placeholder type for Zora Coin data
@@ -176,6 +186,11 @@ export default function PostList({
   const [transactionAmount, setTransactionAmount] = useState('0.01');
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [isTransacting, setIsTransacting] = useState(false);
+  
+  // Extend Pin Modal state
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [extendingPostId, setExtendingPostId] = useState<string | null>(null);
+  const [extendingExpiresAt, setExtendingExpiresAt] = useState<number>(0);
   
   // ❌ Usunięto loadMoreTriggerRef - nie potrzebny bez infinite scroll
   const { address, isConnected } = useAccount();
@@ -1239,11 +1254,31 @@ export default function PostList({
               </svg>
               <span>Load {Math.min(LOAD_MORE_COMMENTS_COUNT, mainComments.length - visibleCount)} more comments ({mainComments.length - visibleCount} remaining)</span>
             </button>
-          </div>
-        )}
-      </div>
-    );
-  };
+                  </div>
+      )}
+
+      {/* Extend Pin Modal */}
+      <ExtendPinModal
+        isOpen={showExtendModal}
+        onClose={() => {
+          setShowExtendModal(false);
+          setExtendingPostId(null);
+          setExtendingExpiresAt(0);
+        }}
+        postId={extendingPostId || ''}
+        currentExpiresAt={extendingExpiresAt}
+        onExtendSuccess={(txHash: string, additionalDuration: PinDuration) => {
+          console.log('Pin extended successfully:', { postId: extendingPostId, txHash, additionalDuration });
+          setShowExtendModal(false);
+          // Refresh posts to show updated expiration
+          if (onRefreshPosts) {
+            onRefreshPosts();
+          }
+        }}
+      />
+    </div>
+  );
+};
 
   const renderPost = (post: ExtendedPost) => {
     const isLiked = post.likedBy?.includes(address ?? '');
@@ -1633,6 +1668,24 @@ export default function PostList({
         )}
         {/* --- END NEW ZORA TOKEN INFO & ACTIONS --- */}
 
+        {/* 🚀 Pin Timer for Paid Pins */}
+        {post.isPinned && post.isPaidPin && post.pinExpiresAt && (
+          <div className="mt-3">
+            <PinTimer
+              postId={post.id}
+              expiresAt={post.pinExpiresAt}
+              isPaidPin={true}
+              pinOwner={post.pinOwner}
+              duration={post.pinDuration as PinDuration}
+              onExtendClick={() => {
+                setExtendingPostId(post.id);
+                setExtendingExpiresAt(post.pinExpiresAt || 0);
+                setShowExtendModal(true);
+              }}
+            />
+          </div>
+        )}
+
         <div className="flex items-center space-x-4 text-gray-900 dark:text-gray-200 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
           <button
             onClick={() => handleToggleLike(post.id)}
@@ -1640,7 +1693,7 @@ export default function PostList({
             disabled={!isConnected}
           >
             <svg className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
             <span className="text-xs">{post.likes || 0}</span>
           </button>
@@ -1654,6 +1707,22 @@ export default function PostList({
             </svg>
             <span className="text-xs">{commentCount}</span>
           </button>
+
+          {/* 💰 Paid Pin Button - Show for non-pinned posts */}
+          <PaidPinButton
+            postId={post.id}
+            postContent={post.content}
+            authorAddress={post.author}
+            isPinned={post.isPinned}
+            isPaidPin={post.isPaidPin}
+            onPinSuccess={(txHash: string, duration: PinDuration) => {
+              console.log('Post pinned successfully:', { postId: post.id, txHash, duration });
+              // TODO: Update post state with pin info
+              if (onRefreshPosts) {
+                onRefreshPosts();
+              }
+            }}
+          />
 
           {/* Tip Button - Show for all posts */}
           <TipButton

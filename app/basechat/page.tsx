@@ -74,6 +74,7 @@ import { Address as ViemAddress, Hex } from 'viem';
 import CreatePostBaseCamp from './components/BaseCampPosts/CreatePostBaseCamp';
 import ClaimPortalBanner from './components/BaseCampPosts/ClaimPortalBanner';
 import MockFeed from './prelogin/MockFeed';
+import { ContractEventListener } from './PinnedJobs';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -2536,6 +2537,9 @@ export default function BaseChat() {
 
   return (
     <FarcasterFrameProvider>
+      {/* Contract Event Listener - listens for PinCreated events and refreshes feed */}
+      <ContractEventListener onPinCreated={refreshPosts} />
+      
       <BanPage>
         <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
         <div className="min-h-screen relative">
@@ -3563,7 +3567,7 @@ export default function BaseChat() {
 
 
               {/* Most Active Users */}
-              <div className="mb-4 relative z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+              <div className="mb-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
                 <div className="flex justify-between items-center mb-3">
                   <h2 className="text-lg font-semibold mb-0 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
                     Most Active Users

@@ -22,6 +22,13 @@ export interface Post {
   isPinned?: boolean;
   pinnedAt?: number;
   pinnedBy?: string;
+  // 🚀 Paid Pin fields
+  isPaidPin?: boolean;
+  pinExpiresAt?: number;
+  pinDuration?: string;
+  pinOwner?: string;
+  pinAmountPaid?: string;
+  pinTxHash?: string;
 }
 
 export interface Comment {
