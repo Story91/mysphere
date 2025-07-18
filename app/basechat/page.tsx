@@ -2966,8 +2966,98 @@ export default function BaseChat() {
                       </div>
                   </div>
                 ) : (
-                  <div className="text-center py-4 text-gray-500">
-                    Connect wallet to view profile
+                  <div className="space-y-4 pointer-events-none">
+                    {/* ProfileCard at the top */}
+                    <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
+                      <div className="relative z-10 flex justify-center items-start w-full">
+                        <ProfileCard
+                          name={'MySphere User'}
+                          handle={'mysphere-user'}
+                          status={'0x0000...0000'}
+                          fullAddress={'0x0000000000000000000000000000000000000000'}
+                          contactText="Edit"
+                          avatarUrl={`/favicon_io (1)/android-chrome-192x1921.png`}
+                          miniAvatarUrl={`/favicon_io (1)/android-chrome-192x1921.png`}
+                          socialLinks={{}}
+                          showUserInfo={true}
+                          enableTilt={true}
+                          onContactClick={() => {}}
+                          className="w-full max-w-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* YapYap Integration */}
+                    <div className="mb-4">
+                      <div className="bg-white dark:bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                        <YapsMetrics address={''} />
+                        <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-center">
+                          <div className="flex items-center">
+                            <div className="text-xs text-gray-400 mr-1">Powered by</div>
+                            <div className="text-xs font-medium text-blue-600 flex items-center">
+                              <svg className="w-4 h-4 mx-1" viewBox="0 0 24 24" fill="currentColor">
+                                <circle cx="12" cy="12" r="10" fill="currentColor" />
+                                <path d="M12 8v4M12 16h.01" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                              Kaito.ai
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bio Section */}
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center space-x-2">
+                          <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          <div className="text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">About Me</div>
+                        </div>
+                        <button className="flex items-center space-x-1 text-sm text-blue-500 hover:text-blue-600 transition-colors duration-200">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span>Edit</span>
+                        </button>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
+                        <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                          Building the future of DeFi on Base 🚀 Love Web3, NFTs, and innovative blockchain solutions. Always learning, always building! 💙
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Base Tracking Identity Link */}
+                    <div className="mt-4">
+                      <div className="block w-full p-6 bg-gradient-to-r from-gray-900 via-blue-900 to-black rounded-xl text-center hover:from-black hover:via-blue-800 hover:to-gray-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
+                        <div className="flex items-center justify-center mb-3">
+                          <svg className="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                          </svg>
+                          <div className="flex items-center">
+                            <span className="text-white text-xl font-bold mr-2">Sphere Identity</span>
+                            <div className="flex items-center gap-1 px-2 py-1 bg-white/10 rounded-full">
+                              <svg className="w-4 h-4" viewBox="0 0 146 146" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="73" cy="73" r="73" fill="#0052FF"/>
+                                <path d="M73.323 123.729C101.617 123.729 124.553 100.832 124.553 72.5875C124.553 44.343 101.617 21.4463 73.323 21.4463C46.4795 21.4463 24.4581 42.0558 22.271 68.2887H89.9859V76.8864H22.271C24.4581 103.119 46.4795 123.729 73.323 123.729Z" fill="white"/>
+                              </svg>
+                              <span className="text-white text-xs font-medium">Base</span>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-blue-200 text-sm mb-2">
+                          View your complete on-chain identity & activity
+                        </p>
+                        <div className="flex items-center justify-center text-blue-300 text-xs">
+                          <span>Transactions • Tokens • NFTs • Contracts</span>
+                          <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
                   </div>
           )}
               </div>
