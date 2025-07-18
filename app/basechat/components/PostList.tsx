@@ -25,7 +25,7 @@ import { Address as ViemAddress } from 'viem';
 import { Users, Coins, ShoppingCart, Tag, ExternalLink, X, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
 
 // 🚀 Import PinnedJobs components
-import { PaidPinButton, PinTimer, ExtendPinModal, PinDuration } from '../PinnedJobs';
+import { PaidPinButton, PinTimer, PendingPinTimer, ExtendPinModal, PinDuration } from '../PinnedJobs';
 
 // Utility function for formatting large numbers with K, M, B suffixes
 const formatNumberWithSuffix = (value: number | string): string => {
@@ -63,6 +63,11 @@ export interface ExtendedPost extends Post {
   pinOwner?: string;
   pinAmountPaid?: string;
   pinTxHash?: string;
+  // ⏳ Pending Pin fields
+  pendingPin?: boolean;
+  pendingPinTx?: string;
+  pendingPinExpectedAt?: number;
+  pendingPinDuration?: string;
 }
 
 // Placeholder type for Zora Coin data
@@ -121,6 +126,13 @@ interface PostListProps {
   getCachedPosts?: (cacheKey: string) => ExtendedPost[] | null; // Funkcje cache'owania
   setCachedPosts?: (cacheKey: string, posts: ExtendedPost[]) => void;
   clearPostsCache?: () => void;
+  // Pending pins props
+  pendingPins?: {[postId: string]: {
+    txHash: string;
+    duration: string;
+    expectedAt: number;
+  }};
+  onPinPending?: (postId: string, txHash: string, duration: string) => void;
 }
 
 // Utility function for extracting hashtags from text
@@ -153,7 +165,9 @@ export default function PostList({
   showMyFeed = false,
   getCachedPosts,
   setCachedPosts,
-  clearPostsCache
+  clearPostsCache,
+  pendingPins = {},
+  onPinPending
 }: PostListProps) {
   const [newComments, setNewComments] = useState<{[key: string]: string}>({});
   const [expandedPosts, setExpandedPosts] = useState<{[key: string]: boolean}>({});
@@ -192,6 +206,8 @@ export default function PostList({
   const [extendingPostId, setExtendingPostId] = useState<string | null>(null);
   const [extendingExpiresAt, setExtendingExpiresAt] = useState<number>(0);
   
+  // Pending Pin state is now managed by parent component via props
+  
   // ❌ Usunięto loadMoreTriggerRef - nie potrzebny bez infinite scroll
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
@@ -205,6 +221,8 @@ export default function PostList({
       return 'recently';
     }
   };
+
+  // Pending Pin management is now handled by parent component
 
   const refreshPosts = async () => {
     if (onRefreshPosts) {
@@ -1668,8 +1686,20 @@ export default function PostList({
         )}
         {/* --- END NEW ZORA TOKEN INFO & ACTIONS --- */}
 
-        {/* 🚀 Pin Timer for Paid Pins */}
-        {post.isPinned && post.isPaidPin && post.pinExpiresAt && (
+        {/* ⏳ Pending Pin Timer - Shows while waiting for confirmation */}
+        {pendingPins[post.id] && (
+          <div className="mt-3">
+            <PendingPinTimer
+              postId={post.id}
+              txHash={pendingPins[post.id].txHash}
+              expectedAt={pendingPins[post.id].expectedAt}
+              duration={pendingPins[post.id].duration as PinDuration}
+            />
+          </div>
+        )}
+
+        {/* 🚀 Pin Timer for Confirmed Paid Pins */}
+        {post.isPinned && post.isPaidPin && post.pinExpiresAt && !pendingPins[post.id] && (
           <div className="mt-3">
             <PinTimer
               postId={post.id}
@@ -1716,10 +1746,10 @@ export default function PostList({
             isPinned={post.isPinned}
             isPaidPin={post.isPaidPin}
             onPinSuccess={(txHash: string, duration: PinDuration) => {
-              console.log('Post pinned successfully:', { postId: post.id, txHash, duration });
-              // TODO: Update post state with pin info
-              if (onRefreshPosts) {
-                onRefreshPosts();
+              console.log('Pin transaction sent:', { postId: post.id, txHash, duration });
+              // Set post to pending state with countdown
+              if (onPinPending) {
+                onPinPending(post.id, txHash, duration);
               }
             }}
           />

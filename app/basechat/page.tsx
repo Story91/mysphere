@@ -297,6 +297,13 @@ export default function BaseChat() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [posts, setPosts] = useState<ExtendedPost[]>([]);
   const [newPost, setNewPost] = useState('');
+  
+  // Pending Pin state management
+  const [pendingPins, setPendingPins] = useState<{[postId: string]: {
+    txHash: string;
+    duration: string;
+    expectedAt: number;
+  }}>({});
   const [newComments, setNewComments] = useState<{[key: string]: string}>({});
   const [userProfile, setUserProfile] = useState<LocalUserProfile>({
     name: '',
@@ -2528,6 +2535,32 @@ export default function BaseChat() {
   // Na początku pliku po inicjalizacji wszystkich stanów, dodajmy funkcję refreshPosts i zmienną today
   const today = new Date().toISOString().split('T')[0];
 
+  // Pending Pin management functions
+  const handlePinPending = (postId: string, txHash: string, duration: string) => {
+    const expectedAt = Date.now() + (5 * 60 * 1000); // Expected confirmation in 5 minutes
+    
+    setPendingPins(prev => ({
+      ...prev,
+      [postId]: {
+        txHash,
+        duration,
+        expectedAt
+      }
+    }));
+    
+    console.log(`⏳ BaseChat: Post ${postId} set to pending pin state`, { txHash, duration, expectedAt });
+  };
+
+  const handlePinConfirmed = (postId: string) => {
+    setPendingPins(prev => {
+      const updated = { ...prev };
+      delete updated[postId];
+      return updated;
+    });
+    
+    console.log(`✅ BaseChat: Post ${postId} pin confirmed, removing pending state`);
+  };
+
   // Funkcja do odświeżania postów
   const refreshPosts = async () => {
     if (onRefreshPosts) {
@@ -2538,7 +2571,10 @@ export default function BaseChat() {
   return (
     <FarcasterFrameProvider>
       {/* Contract Event Listener - listens for PinCreated events and refreshes feed */}
-      <ContractEventListener onPinCreated={refreshPosts} />
+      <ContractEventListener 
+        onPinCreated={refreshPosts} 
+        onPinConfirmed={handlePinConfirmed}
+      />
       
       <BanPage>
         <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
@@ -3521,6 +3557,8 @@ export default function BaseChat() {
                         getCachedPosts={getCachedPosts} // Przekaż funkcje cache'owania
                         setCachedPosts={setCachedPosts}
                         clearPostsCache={clearPostsCache}
+                        pendingPins={pendingPins} // Przekaż pending pins state
+                        onPinPending={handlePinPending} // Przekaż pending pin handler
                       />
                                 </>
                               ) : (

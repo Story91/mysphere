@@ -8,9 +8,10 @@ import { toast } from 'react-hot-toast';
 
 interface ContractEventListenerProps {
   onPinCreated?: () => void; // Callback to refresh feed
+  onPinConfirmed?: (postId: string) => void; // Callback to remove pending state
 }
 
-export default function ContractEventListener({ onPinCreated }: ContractEventListenerProps) {
+export default function ContractEventListener({ onPinCreated, onPinConfirmed }: ContractEventListenerProps) {
   
   // Listen for PinCreated events from contract
   useWatchContractEvent({
@@ -60,7 +61,15 @@ export default function ContractEventListener({ onPinCreated }: ContractEventLis
               console.log('✅ Pin data saved to Firebase successfully');
               
               // Show success notification
-              toast.success(`📌 Post pinned for ${mappedDuration.replace('_', ' ').toLowerCase()}!`);
+              toast.success(`📌 Post pinned for ${mappedDuration.replace('_', ' ').toLowerCase()}!`, {
+                duration: 5000,
+                icon: '🎉',
+              });
+              
+              // Remove pending state for this post
+              if (onPinConfirmed) {
+                onPinConfirmed(postId);
+              }
               
               // Trigger feed refresh
               if (onPinCreated) {

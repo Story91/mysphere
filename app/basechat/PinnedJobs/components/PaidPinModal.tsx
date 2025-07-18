@@ -141,7 +141,19 @@ export default function PaidPinModal({
         });
         
         console.log("📜 Transaction sent, waiting for confirmation...");
-        toast.success("Transaction sent! Pin will activate after confirmation.");
+        
+        // Enhanced user feedback with countdown expectation
+        toast.success("💰 Transaction sent! Your post will be pinned in 1-5 minutes after blockchain confirmation.", {
+          duration: 8000,
+          icon: '⏳',
+        });
+        
+        setTimeout(() => {
+          toast("🕐 Meanwhile, your post will show a 'pending pin' status with countdown timer.", {
+            duration: 6000,
+            icon: '⏱️',
+          });
+        }, 2000); // Show second toast after 2 seconds
         
         // ❌ REMOVED: No longer pin immediately in Firebase
         // ✅ Contract event listener will handle pinning after confirmation

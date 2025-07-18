@@ -2,6 +2,7 @@
 export { default as PaidPinModal } from './components/PaidPinModal';
 export { default as PaidPinButton } from './components/PaidPinButton';
 export { default as PinTimer } from './components/PinTimer';
+export { default as PendingPinTimer } from './components/PendingPinTimer';
 export { default as ExtendPinModal } from './components/ExtendPinModal';
 export { default as ContractEventListener } from './components/ContractEventListener';
 
