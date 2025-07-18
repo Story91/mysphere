@@ -1454,42 +1454,47 @@ export default function BaseChat() {
     if (!event.target.files || !event.target.files[0] || !address) return;
     
     const file = event.target.files[0];
+    const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
     
-    // Sprawdź rozmiar pliku (max 1MB)
-    if (file.size > 1024 * 1024) {
-      setModalMessage('Maximum file size is 1MB');
+    // Sprawdź rozmiar pliku - admin bez limitów, użytkownicy max 3MB
+    if (!isAdmin && file.size > 3 * 1024 * 1024) {
+      setModalMessage('Maximum file size is 3MB');
       setModalType('error');
       setShowModal(true);
       return;
     }
 
-    // Sprawdź czy można zmienić zdjęcie
-          const userRef = doc(db, 'users', address);
-          const userDoc = await getDoc(userRef);
-    const userData = userDoc.data();
-    
-    if (userData?.lastImageUpdate) {
-      const lastUpdate = userData.lastImageUpdate.toDate();
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    // Sprawdź czy można zmienić zdjęcie (tylko dla zwykłych użytkowników)
+    if (!isAdmin) {
+      const userRef = doc(db, 'users', address);
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
       
-      if (lastUpdate > oneMonthAgo) {
-        const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
-        const now = new Date();
-        const diff = timeToWait.getTime() - now.getTime();
+      if (userData?.lastImageUpdate) {
+        const lastUpdate = userData.lastImageUpdate.toDate();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
         
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        
-        setModalMessage(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
-        setModalType('warning');
-        setShowModal(true);
-        return;
+        if (lastUpdate > oneMonthAgo) {
+          const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
+          const now = new Date();
+          const diff = timeToWait.getTime() - now.getTime();
+          
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          
+          setModalMessage(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
+          setModalType('warning');
+          setShowModal(true);
+          return;
+        }
       }
     }
 
     setSelectedFile(file);
-    setModalMessage('Are you sure you want to change your profile picture?\nNext change will be possible in one month.\nMaximum file size: 1MB');
+    const maxSizeText = isAdmin ? 'No file size limit for admin' : 'Maximum file size: 3MB';
+    const timeRestrictionText = isAdmin ? 'Admin can change anytime.' : 'Next change will be possible in one month.';
+    setModalMessage(`Are you sure you want to change your profile picture?\n${timeRestrictionText}\n${maxSizeText}`);
     setModalType('confirm');
     setShowModal(true);
   };
@@ -2583,36 +2588,42 @@ export default function BaseChat() {
                                         if (!e.target.files || !e.target.files[0] || !address) return;
                                         
                                         const file = e.target.files[0];
+                                        const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
                                         
-                                        if (file.size > 1024 * 1024) {
-                                          alert('Maximum file size is 1MB');
+                                        if (!isAdmin && file.size > 3 * 1024 * 1024) {
+                                          alert('Maximum file size is 3MB');
                                           return;
                                         }
 
-                                        const userRef = doc(db, 'users', address);
-                                        const userDoc = await getDoc(userRef);
-                                        const userData = userDoc.data();
+                                        // Sprawdź ograniczenia czasowe tylko dla zwykłych użytkowników
+                                        if (!isAdmin) {
+                                          const userRef = doc(db, 'users', address);
+                                          const userDoc = await getDoc(userRef);
+                                          const userData = userDoc.data();
 
-                                        if (userData?.lastImageUpdate) {
-                                          const lastUpdate = userData.lastImageUpdate.toDate();
-                                          const oneMonthAgo = new Date();
-                                          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                                          
-                                          if (lastUpdate > oneMonthAgo) {
-                                            const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
-                                            const now = new Date();
-                                            const diff = timeToWait.getTime() - now.getTime();
+                                          if (userData?.lastImageUpdate) {
+                                            const lastUpdate = userData.lastImageUpdate.toDate();
+                                            const oneMonthAgo = new Date();
+                                            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
                                             
-                                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                                            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                            
-                                            alert(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
-                                            return;
+                                            if (lastUpdate > oneMonthAgo) {
+                                              const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
+                                              const now = new Date();
+                                              const diff = timeToWait.getTime() - now.getTime();
+                                              
+                                              const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                              const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                              
+                                              alert(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
+                                              return;
+                                            }
                                           }
                                         }
 
                                         setSelectedFile(file);
-                                        setModalMessage('Are you sure you want to change your profile picture?\nNext change will be possible in one month.\nMaximum file size: 1MB');
+                                        const maxSizeText = isAdmin ? 'No file size limit for admin' : 'Maximum file size: 3MB';
+                                        const timeRestrictionText = isAdmin ? 'Admin can change anytime.' : 'Next change will be possible in one month.';
+                                        setModalMessage(`Are you sure you want to change your profile picture?\n${timeRestrictionText}\n${maxSizeText}`);
                                         setModalType('confirm');
                                         setShowModal(true);
                                       }}
@@ -2629,7 +2640,7 @@ export default function BaseChat() {
                                       Upload
                                     </label>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                      Max 1MB
+                                      Max 3MB
                                     </p>
                                   </div>
                                 </div>
