@@ -288,6 +288,7 @@
 
 .pc-avatar-content .avatar {
   width: 100%;
+  height: 100%;
   position: absolute;
   left: 50%;
   transform: translateX(-50%) scale(1);
