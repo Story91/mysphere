@@ -107,6 +107,7 @@ interface PostListProps {
   posts: ExtendedPost[];
   isLoading?: boolean;
   disableInfiniteScroll?: boolean; // Nowy prop do wyłączenia infinite scroll
+  showMyFeed?: boolean; // Nowy prop dla trybu My Feed
 }
 
 // Utility function for extracting hashtags from text
@@ -135,7 +136,8 @@ export default function PostList({
   userNames,
   posts,
   isLoading = false,
-  disableInfiniteScroll = false
+  disableInfiniteScroll = false,
+  showMyFeed = false
 }: PostListProps) {
   const [newComments, setNewComments] = useState<{[key: string]: string}>({});
   const [expandedPosts, setExpandedPosts] = useState<{[key: string]: boolean}>({});
@@ -688,7 +690,8 @@ export default function PostList({
       const { posts: morePosts, lastVisible: newLastVisible } = await fetchPosts({
         userId: address,
         startAfter: lastVisible,
-        limit: 15 // ⚡ OPTYMALIZACJA: Pobieraj 15 postów za razem (-40% Firebase reads)
+        limit: 15, // ⚡ OPTYMALIZACJA: Pobieraj 15 postów za razem (-40% Firebase reads)
+        ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
       });
       
       if (morePosts.length > 0) {
@@ -737,7 +740,8 @@ export default function PostList({
         try {
           const { posts: fetchedPosts, lastVisible: newLastVisible } = await fetchPosts({
             userId: address,
-            limit: posts.length // Pobierz tyle postów, ile już mamy, żeby uzyskać poprawny lastVisible
+            limit: posts.length, // Pobierz tyle postów, ile już mamy, żeby uzyskać poprawny lastVisible
+            ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
           });
           
           setLastVisible(newLastVisible);
@@ -748,7 +752,7 @@ export default function PostList({
     };
     
     setInitialLastVisible();
-  }, [posts, address, lastVisible]);
+  }, [posts, address, lastVisible, showMyFeed]);
 
   useEffect(() => {
     const fetchAllTokenData = async () => {
