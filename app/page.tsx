@@ -830,43 +830,33 @@ export default function HomePage() {
             <div className="group">
               <Link href="/basechat" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
                 <div 
-                  className="h-full bg-gradient-to-br from-[#0052FF]/30 via-[#1E4DD8]/25 to-[#4C8FFF]/30 backdrop-blur-xl rounded-xl overflow-hidden border-2 border-[#0052FF]/60 hover:border-[#4C8FFF]/80 transition-all duration-500 group-hover:scale-[1.05] group-hover:shadow-2xl shadow-[0_0_25px_rgba(0,82,255,0.4)] p-6 relative"
+                  className="h-full bg-gradient-to-br from-[#0052FF]/50 via-[#1E4DD8]/45 to-[#4C8FFF]/50 backdrop-blur-2xl rounded-xl overflow-hidden border-2 border-[#0052FF]/80 hover:border-[#4C8FFF]/90 transition-colors duration-300 p-6 relative shadow-[0_8px_32px_rgba(0,82,255,0.15)]"
                   onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
                 >
-                  {/* Animated border glow */}
-                  <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-[#0052FF] via-[#1E4DD8] to-[#4C8FFF] opacity-60 group-hover:opacity-100 animate-[spin_3s_linear_infinite] transition-opacity duration-500"></div>
-                  <div className="absolute inset-[2px] rounded-xl bg-gradient-to-br from-[#0052FF]/30 via-[#1E4DD8]/25 to-[#4C8FFF]/30 backdrop-blur-xl"></div>
-                  
-                  {/* Enhanced hover overlay */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/40 to-[#4C8FFF]/40 rounded-xl blur-xl transition-all duration-500"></div>
-                  </div>
+                  {/* Glass effect overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-xl"></div>
                   
                   {/* Enhanced LIVE badge */}
                   <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-[#0052FF]/30 border-2 border-[#0052FF]/50 shadow-[0_0_15px_rgba(0,82,255,0.6)]">
-                      <span className="w-3 h-3 rounded-full bg-[#0052FF] animate-pulse mr-2 shadow-[0_0_8px_rgba(0,82,255,0.8)]"></span>
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-[#0052FF]/40 border-2 border-[#0052FF]/60 backdrop-blur-sm">
+                      <span className="w-3 h-3 rounded-full bg-[#0052FF] mr-2"></span>
                       <span className="text-blue-100 text-sm font-bold">LIVE</span>
                     </span>
                   </div>
                   
                   {/* Content */}
                   <div className="relative z-10">
-                    <div className="flex items-center justify-center gap-8 mb-4">
+                    <div className="flex items-center justify-start mb-4">
                       <Image
                         src="/elo2.png"
                         alt="SPHERE"
-                        width={36}
-                        height={36}
-                        className="object-contain w-[36px] h-auto transform hover:scale-105 transition-transform duration-300 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
-                        style={{ width: 'auto', height: 'auto', maxHeight: '36px' }}
+                        width={48}
+                        height={48}
+                        className="object-contain w-[48px] h-auto"
+                        style={{ width: 'auto', height: 'auto', maxHeight: '48px' }}
                       />
-                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#0052FF]/20 border border-[#0052FF]/30">
-                        <span className="w-2 h-2 rounded-full bg-[#0052FF] animate-pulse mr-2"></span>
-                        <span className="text-[#0052FF] text-sm font-['Share_Tech_Mono'] font-bold">LAUNCH APP</span>
-                      </span>
                     </div>
-                    <p className="text-blue-50/90 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed text-center filter drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+                    <p className="text-blue-50/95 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed text-left">
                       Connect with other .base.eth owners, share updates, create daily posts about base and earn sphere points!
                     </p>
                   </div>
@@ -878,22 +868,16 @@ export default function HomePage() {
             <div className="group">
               <Link href="/mycamp" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
                 <div 
-                  className="h-full bg-gradient-to-br from-orange-400/30 via-orange-500/25 to-orange-600/30 backdrop-blur-xl rounded-xl overflow-hidden border-2 border-orange-400/60 hover:border-orange-300/80 transition-all duration-500 group-hover:scale-[1.05] group-hover:shadow-2xl shadow-[0_0_25px_rgba(249,115,22,0.4)] p-6 relative"
+                  className="h-full bg-gradient-to-br from-orange-400/50 via-orange-500/45 to-orange-600/50 backdrop-blur-2xl rounded-xl overflow-hidden border-2 border-orange-400/80 hover:border-orange-300/90 transition-colors duration-300 p-6 relative shadow-[0_8px_32px_rgba(249,115,22,0.15)]"
                   onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
                 >
-                  {/* Animated border glow */}
-                  <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 opacity-60 group-hover:opacity-100 animate-[spin_3s_linear_infinite] transition-opacity duration-500"></div>
-                  <div className="absolute inset-[2px] rounded-xl bg-gradient-to-br from-orange-400/30 via-orange-500/25 to-orange-600/30 backdrop-blur-xl"></div>
-                  
-                  {/* Enhanced hover overlay */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                    <div className="absolute inset-0 bg-gradient-to-r from-orange-400/40 to-orange-600/40 rounded-xl blur-xl transition-all duration-500"></div>
-                  </div>
+                  {/* Glass effect overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-xl"></div>
                   
                   {/* Enhanced NEW badge */}
                   <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-orange-500/30 border-2 border-orange-400/50 shadow-[0_0_15px_rgba(249,115,22,0.6)]">
-                      <span className="w-3 h-3 rounded-full bg-orange-400 animate-pulse mr-2 shadow-[0_0_8px_rgba(249,115,22,0.8)]"></span>
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-orange-500/40 border-2 border-orange-400/60 backdrop-blur-sm">
+                      <span className="w-3 h-3 rounded-full bg-orange-400 mr-2"></span>
                       <span className="text-orange-100 text-sm font-bold">HOT</span>
                     </span>
                   </div>
@@ -901,9 +885,9 @@ export default function HomePage() {
                   {/* Content */}
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-orange-200 text-orange-100 filter drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]">Camp Network</h2>
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title text-orange-100">Camp Network</h2>
                     </div>
-                    <p className="text-orange-50/90 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed filter drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+                    <p className="text-orange-50/95 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
                       Explore the new Camp Network integration! Connect your social accounts, manage your onchain identity, and access exclusive features.
                     </p>
                   </div>
@@ -915,34 +899,28 @@ export default function HomePage() {
             <div className="group">
               <Link href="/nft" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
                 <div 
-                  className="h-full bg-gradient-to-br from-purple-400/30 via-pink-500/25 to-purple-600/30 backdrop-blur-xl rounded-xl overflow-hidden border-2 border-purple-400/60 hover:border-purple-300/80 transition-all duration-500 group-hover:scale-[1.05] group-hover:shadow-2xl shadow-[0_0_25px_rgba(147,51,234,0.4)] p-6 relative"
+                  className="h-full bg-gradient-to-br from-green-400/50 via-green-500/45 to-green-600/50 backdrop-blur-2xl rounded-xl overflow-hidden border-2 border-green-400/80 hover:border-green-300/90 transition-colors duration-300 p-6 relative shadow-[0_8px_32px_rgba(34,197,94,0.15)]"
                   onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
                 >
-                  {/* Animated border glow */}
-                  <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 opacity-60 group-hover:opacity-100 animate-[spin_3s_linear_infinite] transition-opacity duration-500"></div>
-                  <div className="absolute inset-[2px] rounded-xl bg-gradient-to-br from-purple-400/30 via-pink-500/25 to-purple-600/30 backdrop-blur-xl"></div>
-                  
-                  {/* Enhanced hover overlay */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-400/40 to-pink-600/40 rounded-xl blur-xl transition-all duration-500"></div>
-                  </div>
+                  {/* Glass effect overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-xl"></div>
                   
                   {/* Enhanced NFT badge */}
                   <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-purple-500/30 border-2 border-purple-400/50 shadow-[0_0_15px_rgba(147,51,234,0.6)]">
-                      <span className="w-3 h-3 rounded-full bg-purple-400 animate-pulse mr-2 shadow-[0_0_8px_rgba(147,51,234,0.8)]"></span>
-                      <span className="text-purple-100 text-sm font-bold">NFT</span>
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-green-500/40 border-2 border-green-400/60 backdrop-blur-sm">
+                      <span className="w-3 h-3 rounded-full bg-green-400 mr-2"></span>
+                      <span className="text-green-100 text-sm font-bold">NFT</span>
                     </span>
                   </div>
                   
                   {/* Content */}
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-purple-200 text-purple-100 filter drop-shadow-[0_0_8px_rgba(147,51,234,0.6)]">
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title text-green-100">
                         Sphere Genesis
                       </h2>
                     </div>
-                    <p className="text-purple-50/90 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed filter drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+                    <p className="text-green-50/95 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
                       Get your exclusive Sphere Genesis NFT collection. Early supporters receive special benefits and access to premium features.
                     </p>
                   </div>
