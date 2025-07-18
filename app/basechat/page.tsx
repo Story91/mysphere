@@ -263,10 +263,10 @@ export default function BaseChat() {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [trendingTags, setTrendingTags] = useState<{tag: string, count: number}[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [totalLikes, setTotalLikes] = useState(0);
-  const [totalPosts, setTotalPosts] = useState(0);
-  const [totalComments, setTotalComments] = useState(0);
+  const [totalUsers, setTotalUsers] = useState(112704);
+  const [totalLikes, setTotalLikes] = useState(14563);
+  const [totalPosts, setTotalPosts] = useState(142291);
+  const [totalComments, setTotalComments] = useState(7079);
   const [expandedUsersList, setExpandedUsersList] = useState(false);
   const [expandedTagsList, setExpandedTagsList] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -1272,8 +1272,6 @@ export default function BaseChat() {
   // ⚠️ OPTIMIZED - 12h cache per user for global stats using same system as main page
   const fetchGlobalStats = async () => {
     try {
-      if (!address) return;
-      
       // ✅ ULTRA-CHEAP: Statyczne dane zamiast Firebase (oszczędność $15,000+/dzień!)
       const stats = {
         userCount: 112704,
@@ -1309,12 +1307,17 @@ export default function BaseChat() {
     }
   };
 
-  // ⚠️ OPTIMIZED: Global stats with 12h cache per user (same as main page)
+  // ⚠️ OPTIMIZED: Global stats loaded immediately on component mount
+  useEffect(() => {
+    // Load global stats immediately for all visitors
+    fetchGlobalStats();
+  }, []); // Run only once on component mount
+
+  // ⚠️ OPTIMIZED: User-specific features with 12h cache per user
   useEffect(() => {
     if (address) {
       // Store user address for cache system
       localStorage.setItem('userAddress', address);
-      fetchGlobalStats(); // Only fetch if user is connected
       
       // 🚫 DISABLED: User search cache to save Firebase reads (1000 reads per user visit)
       // const initUserSearchCache = async () => {
