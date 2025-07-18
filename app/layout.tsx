@@ -10,7 +10,6 @@ import { ThemeProvider } from './context/ThemeContext';
 import ClientOnly from './components/ClientOnly';
 import ContextProvider from '@/context';
 import { usePathname } from 'next/navigation';
-import Script from 'next/script';
 
 export default function RootLayout({
   children,
@@ -23,20 +22,9 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <head>
-        <link rel="preconnect" href="https://pagead2.googlesyndication.com" />
-        <link
-          rel="preconnect"
-          href="https://googleads.g.doubleclick.net"
-          crossOrigin="anonymous"
-        />
-        <Script
-          id="adsbygoogle-script"
-          async
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID}`}
-          crossOrigin="anonymous"
-          strategy="beforeInteractive"
-          suppressHydrationWarning={true}
-        />
+        <link rel="preconnect" href="https://pagead2.googlesyndication.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://googleads.g.doubleclick.net" crossOrigin="anonymous" />
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205" crossOrigin="anonymous"></script>
         {/* Usunięto skrypt reCAPTCHA - obciążał stronę */}
         {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}
         <title>MySphere.fun</title>
