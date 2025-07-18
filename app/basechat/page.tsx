@@ -2976,8 +2976,8 @@ export default function BaseChat() {
                           status={'0x0000...0000'}
                           fullAddress={'0x0000000000000000000000000000000000000000'}
                           contactText="Edit"
-                          avatarUrl={`/favicon_io (1)/android-chrome-192x1921.png`}
-                          miniAvatarUrl={`/favicon_io (1)/android-chrome-192x1921.png`}
+                          avatarUrl={`/ghostavatar.png`}
+                          miniAvatarUrl={`/ghostavatar.png`}
                           socialLinks={{}}
                           showUserInfo={true}
                           enableTilt={true}
