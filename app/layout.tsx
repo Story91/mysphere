@@ -1,5 +1,6 @@
 'use client';
 
+import Script from 'next/script';
 import '@coinbase/onchainkit/styles.css';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
@@ -22,9 +23,12 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <head>
-        <link rel="preconnect" href="https://pagead2.googlesyndication.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://googleads.g.doubleclick.net" crossOrigin="anonymous" />
-        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205" crossOrigin="anonymous"></script>
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
         {/* Usunięto skrypt reCAPTCHA - obciążał stronę */}
         {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}
         <title>MySphere.fun</title>

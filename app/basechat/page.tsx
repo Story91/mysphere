@@ -150,7 +150,17 @@ function BanPage({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <Script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
+        crossOrigin="anonymous"
+        strategy="afterInteractive"
+      />
+      {children}
+    </>
+  );
 }
 
 type EthereumAddress = `0x${string}`;
@@ -3048,7 +3058,7 @@ export default function BaseChat() {
                           <div className="flex items-center justify-center text-blue-300 text-xs">
                             <span>Transactions • Tokens • NFTs • Contracts</span>
                             <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           </div>
                         </a>
