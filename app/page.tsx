@@ -8,6 +8,7 @@ import Image from 'next/image';
 import Script from 'next/script';
 import OnchainkitSvg from './svg/OnchainKit';
 // import HomeNeonBackground from './components/Backgrounds/HomeNeonBackground';
+import DarkVeil from './components/Backgrounds/DarkVeil';
 import { getGlobalStats } from './utils/firebase';
 import { FiUsers, FiFileText, FiMessageCircle, FiHeart } from 'react-icons/fi';
 import { BiGasPump } from 'react-icons/bi';
@@ -787,8 +788,10 @@ export default function HomePage() {
         </Link>
       </div>
       
-      {/* Pomarańczowo-czarno-niebieski gradient w tle */}
-      <div className="fixed inset-0 bg-gradient-to-br from-orange-500/40 via-gray-900 to-blue-800/50 z-0"></div>
+      {/* DarkVeil tło z customowymi ustawieniami */}
+      <div className="fixed inset-0 z-0">
+        <DarkVeil />
+      </div>
 
       {/* Main content */}
       <div className={`relative z-10 ${isAppleDevice ? 'apple-touch-scroll' : ''}`}>
