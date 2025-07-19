@@ -1,4 +1,7 @@
-export type PinDuration = 'HOUR_1' | 'HOURS_6' | 'HOURS_24' | 'DAYS_7';
+import { PinDuration } from '../../../utils/firebase';
+
+// Re-export PinDuration for convenience
+export type { PinDuration } from '../../../utils/firebase';
 
 export interface PinPrice {
   duration: PinDuration;

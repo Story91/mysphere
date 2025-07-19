@@ -37,6 +37,9 @@ export {
   CONTRACT_PIN_PRICES
 } from './config/contractConfig';
 
+// Demo Components (for testing/showcase)
+export { default as PaidPinDemo } from './demo/PaidPinDemo';
+
 // Mock Utilities (for testing)
 export {
   createMockPinnedPost,

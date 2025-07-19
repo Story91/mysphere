@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { Crown, Clock, DollarSign, Zap } from 'lucide-react';
-import { PaidPinButton, PinTimer, PinDuration, getAllDurations, formatTimeLeft } from '../index';
+import { PaidPinButton, PinTimer, getAllDurations, formatTimeLeft } from '../index';
+import { PinDuration } from '../../../utils/firebase';
 
 export default function PaidPinDemo() {
   const { address } = useAccount();

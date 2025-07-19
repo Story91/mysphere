@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Clock, AlertCircle, ExternalLink } from 'lucide-react';
-import { PinDuration } from '../types/pinTypes';
+import { PinDuration } from '../../../utils/firebase';
 import { PAID_PIN_CONTRACT_CONFIG } from '../config/contractConfig';
 
 interface PendingPinTimerProps {

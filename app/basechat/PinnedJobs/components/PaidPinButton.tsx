@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { Crown, DollarSign } from 'lucide-react';
-import { PinDuration } from '../types/pinTypes';
+import { PinDuration } from '../../../utils/firebase';
 import PaidPinModal from './PaidPinModal';
 
 interface PaidPinButtonProps {

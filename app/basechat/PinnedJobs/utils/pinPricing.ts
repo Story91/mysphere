@@ -1,4 +1,5 @@
-import { PinDuration, PinPrice } from '../types/pinTypes';
+import { PinPrice } from '../types/pinTypes';
+import { PinDuration } from '../../../utils/firebase';
 
 // Tańsze ceny jak ustaliliśmy
 export const PIN_PRICES: Record<PinDuration, PinPrice> = {

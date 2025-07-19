@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { Clock, Plus, Crown } from 'lucide-react';
 import { formatTimeLeft } from '../utils/pinPricing';
-import { PinDuration } from '../types/pinTypes';
+import { PinDuration } from '../../../utils/firebase';
 
 interface PinTimerProps {
   postId: string;

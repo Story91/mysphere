@@ -4076,18 +4076,25 @@ export const createPaidPin = async (
     // Check if pin already exists (prevent duplicates)
     const existingPinQuery = query(
       collection(db, 'paidPins'),
-      where('postId', '==', postId),
-      where('txHash', '==', txHash)
+      where('txHash', '==', txHash) // Użyj txHash jako unikalnego identyfikatora
     );
     const existingPins = await getDocs(existingPinQuery);
     
     if (!existingPins.empty) {
-      console.log(`ℹ️ Pin already exists for post ${postId}, tx: ${txHash}`);
+      console.log(`ℹ️ Pin already processed for tx: ${txHash}`);
       return false; // Not an error, just already exists
     }
 
     const expiresAt = calculatePinExpirationTime(duration);
     const now = Date.now();
+    
+    // NEW: Check if post document exists before doing anything
+    const postRef = doc(db, 'posts', postId);
+    const postDoc = await getDoc(postRef);
+    if (!postDoc.exists()) {
+      console.error(`❌ Post with ID ${postId} does not exist. Cannot create a pin.`);
+      return false;
+    }
 
     // 1. Dodaj rekord do kolekcji paidPins dla tracking
     const paidPinData = {
@@ -4103,9 +4110,9 @@ export const createPaidPin = async (
     };
 
     await addDoc(collection(db, 'paidPins'), paidPinData);
+    console.log(`✅ Created document in 'paidPins' for postId: ${postId}`);
 
     // 2. Zaktualizuj post z paid pin informacjami
-    const postRef = doc(db, 'posts', postId);
     await updateDoc(postRef, {
       isPinned: true,
       isPaidPin: true,
@@ -4117,10 +4124,10 @@ export const createPaidPin = async (
       pinTxHash: txHash
     });
 
-    console.log(`✅ Paid pin created successfully: ${postId} for ${duration}`);
+    console.log(`✅ Updated document in 'posts' successfully: ${postId} is now pinned.`);
     return true;
   } catch (error) {
-    console.error('❌ Error creating paid pin:', error);
+    console.error(`❌ Error in createPaidPin for postId ${postId}:`, error);
     return false;
   }
 };

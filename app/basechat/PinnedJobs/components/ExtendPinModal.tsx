@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useAccount, useWriteContract, useReadContract } from 'wagmi';
 import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI } from '../config/contractConfig';
 import { getPriceForDuration, calculateTotalCost, getDurationInMilliseconds } from '../utils/pinPricing';
-import { PinDuration } from '../types/pinTypes';
+import { PinDuration } from '../../../utils/firebase';
 import { parseEther, formatEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { Clock, Plus, X } from 'lucide-react';
