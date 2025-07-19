@@ -4073,6 +4073,19 @@ export const createPaidPin = async (
   amountPaid: string
 ): Promise<boolean> => {
   try {
+    // Check if pin already exists (prevent duplicates)
+    const existingPinQuery = query(
+      collection(db, 'paidPins'),
+      where('postId', '==', postId),
+      where('txHash', '==', txHash)
+    );
+    const existingPins = await getDocs(existingPinQuery);
+    
+    if (!existingPins.empty) {
+      console.log(`ℹ️ Pin already exists for post ${postId}, tx: ${txHash}`);
+      return false; // Not an error, just already exists
+    }
+
     const expiresAt = calculatePinExpirationTime(duration);
     const now = Date.now();
 

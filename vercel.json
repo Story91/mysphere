@@ -9,6 +9,10 @@
     {
       "path": "/api/cleanup-expired-pins",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/sync-recent-events",
+      "schedule": "*/2 * * * *"
     }
   ],
   "functions": {

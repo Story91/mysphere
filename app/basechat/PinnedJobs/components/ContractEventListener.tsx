@@ -45,39 +45,41 @@ export default function ContractEventListener({ onPinCreated, onPinConfirmed }: 
             });
 
             // Map contract duration enum to our duration type
-            const durationMapping = ['HOUR_1', 'HOURS_6', 'HOURS_24', 'DAYS_7'] as const;
-            const mappedDuration = durationMapping[duration] || 'HOURS_24';
+            if (duration !== undefined && duration !== null) {
+              const durationMapping = ['HOUR_1', 'HOURS_6', 'HOURS_24', 'DAYS_7'] as const;
+              const mappedDuration = durationMapping[duration] || 'HOURS_24';
 
-            // Save to Firebase (this will update the post)
-            const success = await createPaidPin(
-              postId,
-              owner,
-              mappedDuration,
-              transactionHash,
-              (Number(amount) / 1e18).toString() // Convert from wei to ETH
-            );
+              // Save to Firebase (this will update the post)
+              const success = await createPaidPin(
+                postId,
+                owner,
+                mappedDuration,
+                transactionHash,
+                (Number(amount) / 1e18).toString() // Convert from wei to ETH
+              );
 
-            if (success) {
-              console.log('✅ Pin data saved to Firebase successfully');
-              
-              // Show success notification
-              toast.success(`📌 Post pinned for ${mappedDuration.replace('_', ' ').toLowerCase()}!`, {
-                duration: 5000,
-                icon: '🎉',
-              });
-              
-              // Remove pending state for this post
-              if (onPinConfirmed) {
-                onPinConfirmed(postId);
+              if (success) {
+                console.log('✅ Pin data saved to Firebase successfully');
+                
+                // Show success notification
+                toast.success(`📌 Post pinned for ${mappedDuration.replace('_', ' ').toLowerCase()}!`, {
+                  duration: 5000,
+                  icon: '🎉',
+                });
+                
+                // Remove pending state for this post
+                if (onPinConfirmed) {
+                  onPinConfirmed(postId);
+                }
+                
+                // Trigger feed refresh
+                if (onPinCreated) {
+                  onPinCreated();
+                }
+              } else {
+                console.error('❌ Failed to save pin data to Firebase');
+                toast.error('Pin detected but failed to save data');
               }
-              
-              // Trigger feed refresh
-              if (onPinCreated) {
-                onPinCreated();
-              }
-            } else {
-              console.error('❌ Failed to save pin data to Firebase');
-              toast.error('Pin detected but failed to save data');
             }
           }
         } catch (error) {
