@@ -72,7 +72,7 @@ export default function PendingPinTimer({
   };
 
   const getProgress = () => {
-    const totalTime = 5 * 60 * 1000; // 5 minutes expected
+    const totalTime = 90 * 1000; // 1.5 minutes expected
     const elapsed = totalTime - timeLeft;
     return Math.min(100, Math.max(0, (elapsed / totalTime) * 100));
   };

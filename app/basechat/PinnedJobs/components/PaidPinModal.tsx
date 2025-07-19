@@ -49,7 +49,7 @@ export default function PaidPinModal({
       toast.loading('Processing transaction... Please wait.', { id: hash });
     }
     if (isConfirmed) {
-      toast.success('Transaction successful! Pinning post...', { id: hash });
+      toast.success('Transaction successful! Your post will be pinned in ~5 minutes.', { id: hash, duration: 6000 });
       // The actual pin creation logic will now be triggered here
       handleFirebasePinning();
     }

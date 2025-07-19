@@ -1296,26 +1296,6 @@ export default function PostList({
             </button>
                   </div>
       )}
-
-      {/* Extend Pin Modal */}
-      <ExtendPinModal
-        isOpen={showExtendModal}
-        onClose={() => {
-          setShowExtendModal(false);
-          setExtendingPostId(null);
-          setExtendingExpiresAt(0);
-        }}
-        postId={extendingPostId || ''}
-        currentExpiresAt={extendingExpiresAt}
-        onExtendSuccess={(txHash: string, additionalDuration: PinDuration) => {
-          console.log('Pin extended successfully:', { postId: extendingPostId, txHash, additionalDuration });
-          setShowExtendModal(false);
-          // Refresh posts to show updated expiration
-          if (onRefreshPosts) {
-            onRefreshPosts();
-          }
-        }}
-      />
     </div>
   );
 };
@@ -2007,7 +1987,25 @@ export default function PostList({
         </div>
       )}
 
-      {/* Transaction modal removed - trading now handled via direct Zora.co links */}
+      {/* Extend Pin Modal - moved to the top level */}
+      <ExtendPinModal
+        isOpen={showExtendModal}
+        onClose={() => {
+          setShowExtendModal(false);
+          setExtendingPostId(null);
+          setExtendingExpiresAt(0);
+        }}
+        postId={extendingPostId || ''}
+        currentExpiresAt={extendingExpiresAt}
+        onExtendSuccess={(txHash: string, additionalDuration: PinDuration) => {
+          console.log('Pin extended successfully:', { postId: extendingPostId, txHash, additionalDuration });
+          setShowExtendModal(false);
+          // Refresh posts to show updated expiration
+          if (onRefreshPosts) {
+            onRefreshPosts();
+          }
+        }}
+      />
     </div>
   );
 } 
