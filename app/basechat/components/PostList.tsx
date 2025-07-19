@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { Post, Comment } from '../../types';
 import { doc, updateDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
-import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, ADMIN_ADDRESS, pinPost, unpinPost, isUserAdmin } from '../../utils/firebase';
+import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, ADMIN_ADDRESS, pinPost, unpinPost, isUserAdmin, PinDuration } from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { Avatar as CoinbaseAvatar } from '@coinbase/onchainkit/identity';
@@ -25,7 +25,10 @@ import { Address as ViemAddress } from 'viem';
 import { Users, Coins, ShoppingCart, Tag, ExternalLink, X, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
 
 // 🚀 Import PinnedJobs components
-import { PaidPinButton, PinTimer, PendingPinTimer, ExtendPinModal, PinDuration } from '../PinnedJobs';
+import PaidPinButton from '../PinnedJobs/components/PaidPinButton';
+import PinTimer from '../PinnedJobs/components/PinTimer';
+import PendingPinTimer from '../PinnedJobs/components/PendingPinTimer';
+import ExtendPinModal from '../PinnedJobs/components/ExtendPinModal';
 
 // Utility function for formatting large numbers with K, M, B suffixes
 const formatNumberWithSuffix = (value: number | string): string => {
@@ -200,6 +203,11 @@ export default function PostList({
   const [transactionAmount, setTransactionAmount] = useState('0.01');
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [isTransacting, setIsTransacting] = useState(false);
+  const [internalPosts, setInternalPosts] = useState<ExtendedPost[]>(posts);
+  
+  useEffect(() => {
+    setInternalPosts(posts);
+  }, [posts]);
   
   // Extend Pin Modal state
   const [showExtendModal, setShowExtendModal] = useState(false);
@@ -213,6 +221,20 @@ export default function PostList({
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const networkChainId = useChainId();
+
+  useEffect(() => {
+    const handleNewPost = (event: Event) => {
+      const newPost = (event as CustomEvent).detail as ExtendedPost;
+      // Add the new post to the beginning of the list
+      setInternalPosts(prevPosts => [newPost, ...prevPosts]);
+    };
+
+    document.addEventListener('post-created', handleNewPost);
+
+    return () => {
+      document.removeEventListener('post-created', handleNewPost);
+    };
+  }, []);
 
   const formatTimestamp = (timestamp: number) => {
     try {
@@ -270,7 +292,7 @@ export default function PostList({
     
     try {
       // ✅ OPTIMISTIC UPDATE: Zaktualizuj post w UI natychmiast
-      const updatedPosts = posts.map(post => {
+      const updatedPosts = internalPosts.map(post => {
         if (post.id === postId) {
           return {
             ...post,
@@ -319,7 +341,7 @@ export default function PostList({
     
     try {
       // ✅ OPTIMISTIC UPDATE: Zaktualizuj post w UI natychmiast
-      const updatedPosts = posts.map(post => {
+      const updatedPosts = internalPosts.map(post => {
         if (post.id === postId) {
           return {
             ...post,
@@ -365,7 +387,7 @@ export default function PostList({
     
     try {
       // ✅ OPTIMISTIC UPDATE: Zaktualizuj post w UI natychmiast
-      const updatedPosts = posts.map(post => {
+      const updatedPosts = internalPosts.map(post => {
         if (post.id === postId) {
           return {
             ...post,
@@ -433,7 +455,7 @@ export default function PostList({
       toast.success('Comment added successfully');
       
       // Optymistyczna aktualizacja UI - dodajemy komentarz lokalnie
-      const updatedPosts = posts.map(post => {
+      const updatedPosts = internalPosts.map(post => {
         if (post.id === postId) {
           return {
             ...post,
@@ -462,14 +484,14 @@ export default function PostList({
     
     try {
       // Znajdź post w obecnej liście
-      const postIndex = posts.findIndex(p => p.id === postId);
+      const postIndex = internalPosts.findIndex(p => p.id === postId);
       if (postIndex === -1) return;
       
-      const post = posts[postIndex];
+      const post = internalPosts[postIndex];
       const isLiked = post.likedBy?.includes(address);
       
       // Utwórz kopię postów, aby nie modyfikować bezpośrednio stanu
-      const updatedPosts = [...posts];
+      const updatedPosts = [...internalPosts];
       
       // Zaktualizuj konkretny post
       updatedPosts[postIndex] = {
@@ -502,7 +524,7 @@ export default function PostList({
     
     try {
       // ✅ OPTIMISTIC UPDATE: Zaktualizuj komentarz w UI natychmiast
-      const updatedPosts = posts.map(post => {
+      const updatedPosts = internalPosts.map(post => {
         if (post.id === postId) {
           const updatedComments = post.comments?.map(comment => {
             if (comment.id === commentId) {
@@ -552,7 +574,7 @@ export default function PostList({
     try {
       if (confirm('Are you sure you want to delete this comment?')) {
         // ✅ OPTIMISTIC UPDATE: Usuń komentarz z UI natychmiast
-        const updatedPosts = posts.map(post => {
+        const updatedPosts = internalPosts.map(post => {
           if (post.id === postId) {
             const updatedComments = post.comments?.filter(comment => comment.id !== commentId);
             return { ...post, comments: updatedComments };
@@ -589,10 +611,10 @@ export default function PostList({
     
     try {
       // Znajdź post i komentarz
-      const postIndex = posts.findIndex(p => p.id === postId);
+      const postIndex = internalPosts.findIndex(p => p.id === postId);
       if (postIndex === -1) return;
       
-      const post = posts[postIndex];
+      const post = internalPosts[postIndex];
       const comments = post.comments || [];
       const commentIndex = comments.findIndex(c => c.id === commentId);
       if (commentIndex === -1) return;
@@ -601,7 +623,7 @@ export default function PostList({
       const isLiked = comment.likedBy?.includes(address);
       
       // Utwórz kopię postów, aby nie modyfikować bezpośrednio stanu
-      const updatedPosts = [...posts];
+      const updatedPosts = [...internalPosts];
       
       // Zaktualizuj komentarze dla posta
       const updatedComments = [...comments];
@@ -651,7 +673,7 @@ export default function PostList({
       setReplyContent('');
       
       // Optymistyczna aktualizacja UI - dodajemy odpowiedź lokalnie
-      const updatedPosts = posts.map(post => {
+      const updatedPosts = internalPosts.map(post => {
         if (post.id === postId) {
           // Tworzymy nową odpowiedź zgodną z typem Comment
           const newReplyComment: Comment = {
@@ -692,7 +714,7 @@ export default function PostList({
     }
   };
 
-  const filteredPosts = showOnlyUserPosts ? posts.filter(post => post.author === address) : posts;
+  const filteredPosts = showOnlyUserPosts ? internalPosts.filter(post => post.author === address) : internalPosts;
 
   const searchFilteredPosts = filteredPosts.filter(post => {
     const matchesSearch = searchTerm === '' || 
@@ -735,7 +757,7 @@ export default function PostList({
       
       if (morePosts.length > 0) {
         // Sprawdź, czy nowe posty nie są duplikatami (porównaj przez ID)
-        const existingPostIds = new Set(posts.map(post => post.id));
+        const existingPostIds = new Set(internalPosts.map(post => post.id));
         const uniqueNewPosts = morePosts.filter(post => !existingPostIds.has(post.id));
         
         if (uniqueNewPosts.length > 0) {
@@ -745,7 +767,7 @@ export default function PostList({
           // Dodaj nowe posty do istniejących bez resetowania widoku
           if (onRefreshPosts) {
             // Połącz istniejące posty z nowymi
-            const allPosts = [...posts, ...uniqueNewPosts];
+            const allPosts = [...internalPosts, ...uniqueNewPosts];
             await onRefreshPosts(allPosts);
             console.log(`Załadowano ${uniqueNewPosts.length} nowych postów`);
           }
@@ -779,11 +801,11 @@ export default function PostList({
 
   useEffect(() => {
     const setInitialLastVisible = async () => {
-      if (posts.length > 0 && !lastVisible && address) {
+      if (internalPosts.length > 0 && !lastVisible && address) {
         try {
           const { posts: fetchedPosts, lastVisible: newLastVisible } = await fetchPosts({
             userId: address,
-            limit: posts.length, // Pobierz tyle postów, ile już mamy, żeby uzyskać poprawny lastVisible
+            limit: internalPosts.length, // Pobierz tyle postów, ile już mamy, żeby uzyskać poprawny lastVisible
             ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
           });
           
@@ -799,12 +821,12 @@ export default function PostList({
     };
     
     setInitialLastVisible();
-  }, [posts, address, lastVisible, showMyFeed]);
+  }, [internalPosts, address, lastVisible, showMyFeed]);
 
   useEffect(() => {
     const fetchAllTokenData = async () => {
       // Pobierz tylko posty z adresami zoraCoinAddress, które nie mają jeszcze danych w cache
-      const tokenPostsToFetch = posts.filter(post => 
+      const tokenPostsToFetch = internalPosts.filter(post => 
         post.zoraCoinAddress && 
         (!postTokenData[post.id] || !postTokenData[post.id].isFetched)
       );
@@ -886,13 +908,13 @@ export default function PostList({
       });
     };
 
-    if (posts?.length > 0) {
+    if (internalPosts?.length > 0) {
       fetchAllTokenData();
     }
 
     // Teraz zależymy tylko od długości tablicy postów zamiast całej tablicy
     // co zapobiega niepotrzebnym re-renderom i wielokrotnym zapytaniom API
-  }, [posts.length, postTokenData]); // Zmienione zależności
+  }, [internalPosts.length, postTokenData]); // Zmienione zależności
 
   useEffect(() => {
     // Fetch user token balances
@@ -903,7 +925,7 @@ export default function PostList({
         setIsLoadingBalances(true);
         
         // Get all unique token addresses from posts
-        const tokenAddresses = posts
+        const tokenAddresses = internalPosts
           .filter(post => post.zoraCoinAddress)
           .map(post => post.zoraCoinAddress as string);
         
@@ -987,7 +1009,7 @@ export default function PostList({
     };
     
     fetchUserBalances();
-  }, [address, posts]);
+  }, [address, internalPosts]);
 
   // Trading functions removed - now handled by direct links to Zora.co in the UI
 
@@ -1872,7 +1894,7 @@ export default function PostList({
     );
   };
 
-  if (isLoading && posts.length === 0) {
+  if (isLoading && internalPosts.length === 0) {
     return (
       <div className="animate-pulse space-y-4">
         {[...Array(5)].map((_, i) => (
@@ -1895,7 +1917,7 @@ export default function PostList({
     );
   }
 
-  if (posts.length === 0 && !isLoading) {
+  if (internalPosts.length === 0 && !isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm text-center">
         <div className="text-4xl mb-4">📭</div>
@@ -1942,7 +1964,7 @@ export default function PostList({
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse group-hover:animate-bounce"></div>
               </div>
             </button>
-          ) : posts.length > 0 ? (
+          ) : internalPosts.length > 0 ? (
             <div className="text-center p-4">
               <div className="text-gray-500 dark:text-gray-400 text-sm mb-2">🎉 You've reached the end!</div>
               <div className="text-gray-400 dark:text-gray-500 text-xs">All posts have been loaded</div>
@@ -1952,7 +1974,7 @@ export default function PostList({
       )}
 
       {/* Informacja o limicie wyświetlania */}
-      {!disableInfiniteScroll && displayLimit >= MAX_DISPLAY_LIMIT && posts.length > MAX_DISPLAY_LIMIT && (
+      {!disableInfiniteScroll && displayLimit >= MAX_DISPLAY_LIMIT && internalPosts.length > MAX_DISPLAY_LIMIT && (
         <div className="text-center p-4">
           <div className="text-yellow-500 dark:text-yellow-400 text-sm mb-2">📊 Display limit reached</div>
           <div className="text-gray-400 dark:text-gray-500 text-xs">

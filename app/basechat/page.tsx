@@ -74,7 +74,6 @@ import { Address as ViemAddress, Hex } from 'viem';
 import CreatePostBaseCamp from './components/BaseCampPosts/CreatePostBaseCamp';
 import ClaimPortalBanner from './components/BaseCampPosts/ClaimPortalBanner';
 import MockFeed from './prelogin/MockFeed';
-import { ContractEventListener } from './PinnedJobs';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -2571,11 +2570,8 @@ export default function BaseChat() {
   return (
     <FarcasterFrameProvider>
       {/* Contract Event Listener - listens for PinCreated events and refreshes feed */}
-      <ContractEventListener 
-        onPinCreated={refreshPosts} 
-        onPinConfirmed={handlePinConfirmed}
-      />
       
+    
       <BanPage>
         <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
         <div className="min-h-screen relative">

@@ -432,46 +432,37 @@ export const createPost = async (post: {
   txHash?: string; // Keep this as it now represents the Zora creation tx hash
   zoraCoinAddress?: string; // <-- ADDED
   network?: 'base' | 'basecamp'; // Add network parameter to identify the source network
-}): Promise<string> => {
+}): Promise<string> => { // Zmieniamy typ zwracany na Promise<string>
   try {
-    const userRef = doc(db, 'users', post.author);
-    const postsRef = collection(db, 'posts');
+    const postsCollection = collection(db, 'posts');
     
-    // Utwórz nowy dokument posta
-    const docRef = await addDoc(postsRef, {
+    // Użyj `addDoc` aby Firebase sam wygenerował ID
+    const newPostRef = await addDoc(postsCollection, {
       ...post,
-      timestamp: serverTimestamp(), // Użyj serverTimestamp dla Firebase
+      timestamp: serverTimestamp(), // Użyj serverTimestamp dla spójności
       likes: 0,
       likedBy: [],
-      comments: []
-    });
-
-    // Zaktualizuj statystyki użytkownika (liczbę postów)
-    await runTransaction(db, async (transaction) => {
-      const userDoc = await transaction.get(userRef);
-      if (!userDoc.exists()) {
-        // Jeśli użytkownik nie istnieje, utwórz go
-        transaction.set(userRef, { 
-          address: post.author,
-          postsCount: 1, 
-          likesReceived: 0,
-          joinedAt: serverTimestamp(),
-          lastActive: serverTimestamp()
-        });
-      } else {
-        // Jeśli użytkownik istnieje, zaktualizuj liczbę postów
-        transaction.update(userRef, { 
-          postsCount: increment(1),
-          lastActive: serverTimestamp()
-        });
-      }
+      comments: [],
+      isPinned: false, // Domyślnie post nie jest przypięty
+      // Upewnij się, że opcjonalne pola mają wartość null, jeśli nie są podane
+      image: post.image || null,
+      video: post.video || null,
+      tags: post.tags || [],
+      mentions: post.mentions || [],
+      visibility: post.visibility || 'public',
+      txHash: post.txHash || null,
+      zoraCoinAddress: post.zoraCoinAddress || null,
+      network: post.network || 'base'
     });
     
-    console.log("Post created with ID: ", docRef.id);
-    return docRef.id;
+    console.log(`✅ Post created with ID: ${newPostRef.id}`);
+
+    // Zwróć ID nowego posta
+    return newPostRef.id;
+
   } catch (error) {
-    console.error("Error creating post: ", error);
-    throw error;
+    console.error('❌ Error creating post:', error);
+    throw new Error('Failed to create post in Firebase');
   }
 };
 

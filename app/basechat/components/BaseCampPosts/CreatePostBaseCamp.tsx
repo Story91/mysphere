@@ -112,8 +112,8 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
       const tags = Array.from(new Set((content.match(/#(\w+)/g) || []).map(tag => tag.slice(1))));
       const mentions = Array.from(new Set((content.match(/@(\w+)/g) || []).map(mention => mention.slice(1))));
       
-      // Save post to Firebase with network:basecamp
-      await createPost({
+      // Save post to Firebase and get the new post's ID
+      const newPostId = await createPost({
         author: address,
         content: content,
         timestamp: Date.now(),
@@ -122,10 +122,30 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
         visibility: 'public',
         txHash: txHash,
         network: 'basecamp', // Mark as a BaseCamp network post
-        image: imageUrl, // Use uploaded URL instead of base64
-        video: videoUrl  // Use uploaded URL instead of base64
+        image: imageUrl,
+        video: videoUrl
       });
       
+      console.log(`🎉 New post created with Firebase ID: ${newPostId}`);
+
+      // Dispatch a global event with the new post data
+      const newPostData = {
+        id: newPostId,
+        author: address,
+        content: content,
+        timestamp: Date.now(),
+        tags: tags,
+        mentions: mentions,
+        visibility: 'public',
+        txHash: txHash,
+        network: 'basecamp',
+        image: imageUrl,
+        video: videoUrl,
+        likes: 0,
+        comments: []
+      };
+      document.dispatchEvent(new CustomEvent('post-created', { detail: newPostData }));
+
       // Reset UI
       setContent('');
       setPostPreviewImage(null);

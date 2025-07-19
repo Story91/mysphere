@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { Crown, Clock, DollarSign, Zap } from 'lucide-react';
-import { PaidPinButton, PinTimer, getAllDurations, formatTimeLeft } from '../index';
+import PaidPinButton from '../components/PaidPinButton';
+import PinTimer from '../components/PinTimer';
+import { getAllDurations, formatTimeLeft } from '../utils/pinPricing';
 import { PinDuration } from '../../../utils/firebase';
 
 export default function PaidPinDemo() {
@@ -97,7 +99,7 @@ export default function PaidPinDemo() {
               authorAddress={address || '0x0000000000000000000000000000000000000000'} // Use current user's address for demo
               isPinned={demoPost.isPinned}
               isPaidPin={demoPost.isPaidPin}
-              onPinSuccess={(txHash, duration) => {
+              onPinSuccess={(txHash: string, duration: PinDuration) => {
                 console.log('Demo pin success:', { txHash, duration });
                 alert(`Demo: Post would be pinned for ${duration} with tx: ${txHash.slice(0, 10)}...`);
               }}
