@@ -31,7 +31,7 @@ export default function PaidPinModal({
   authorAddress,
   onPinSuccess
 }: PaidPinModalProps) {
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
   const { data: balance } = useBalance({ address });
   
   const [selectedDuration, setSelectedDuration] = useState<PinDuration>('HOURS_24');
@@ -60,14 +60,15 @@ export default function PaidPinModal({
   }, [isConfirming, isConfirmed, contractError, hash]);
   
   const handleFirebasePinning = async () => {
-    if (!hash || !address) return;
+    if (!hash || !address || !chain) return;
     
     const success = await createPaidPin(
       postId,
       address,
       selectedDuration,
       hash,
-      selectedPrice.ethAmount
+      selectedPrice.ethAmount,
+      chain.id
     );
 
     if (success) {
@@ -127,11 +128,19 @@ export default function PaidPinModal({
   const selectedPrice = calculateTotalCost(selectedDuration, currentEthPrice);
   const expirationTime = calculateExpirationTime(selectedDuration);
   
-  // Sprawdź czy użytkownik ma wystarczająco ETH
+  const isCorrectNetwork = chain?.id === PAID_PIN_CONTRACT_CONFIG.chainId;
   const hasEnoughBalance = balance && parseFloat(balance.formatted) >= parseFloat(selectedPrice.ethAmount);
-  
-  // Sprawdź czy użytkownik może pinować (tylko swój post)
   const canPin = address && address.toLowerCase() === authorAddress.toLowerCase();
+  
+  const getButtonState = () => {
+    if (!isCorrectNetwork) return { text: 'Wrong Network', disabled: true };
+    if (isProcessing) return { text: 'Processing...', disabled: true };
+    if (!canPin) return { text: 'Not Your Post', disabled: true };
+    if (!hasEnoughBalance) return { text: 'Insufficient Balance', disabled: true };
+    return { text: 'Pay & Pin', disabled: false };
+  };
+  
+  const buttonState = getButtonState();
 
   useEffect(() => {
     // Reset form when modal opens
@@ -318,13 +327,25 @@ export default function PaidPinModal({
           <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={handlePayAndPin}
-            disabled={!canPin || !hasEnoughBalance || isProcessing || isPending || isConfirming}
-            className="w-full px-6 py-3.5 text-base font-bold text-white rounded-xl transition-all transform hover:scale-105 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            disabled={buttonState.disabled}
+            className={`w-full py-3 mt-4 font-bold text-white rounded-lg transition-all 
+              ${buttonState.disabled 
+                ? 'bg-gray-600 cursor-not-allowed' 
+                : 'bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105'}`
+            }
           >
-            {isProcessing || isPending || isConfirming
-              ? 'Processing...'
-              : `⚡ Pay ${selectedPrice.ethAmount} ETH & Pin`}
+            {buttonState.text}
           </button>
+
+          <p className="text-center text-gray-500 mt-2 text-xs">
+            Pinning is only available on Base Mainnet.
+          </p>
+          
+          {!isCorrectNetwork && (
+            <p className="text-center text-red-500 mt-2 text-sm">
+              Please switch to Base Mainnet to pin posts.
+            </p>
+          )}
           </div>
 
           {/* Help text */}

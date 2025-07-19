@@ -4130,64 +4130,57 @@ export const createPaidPin = async (
   userAddress: string, 
   duration: PinDuration,
   txHash: string,
-  amountPaid: string
+  amountPaid: string,
+  chainId: number // łańcuch z którego przyszła transakcja
 ): Promise<boolean> => {
   try {
-    // Check if pin already exists (prevent duplicates)
-    const existingPinQuery = query(
-      collection(db, 'paidPins'),
-      where('txHash', '==', txHash) // Użyj txHash jako unikalnego identyfikatora
-    );
-    const existingPins = await getDocs(existingPinQuery);
-    
-    if (!existingPins.empty) {
-      console.log(`ℹ️ Pin already processed for tx: ${txHash}`);
-      return false; // Not an error, just already exists
-    }
-
-    const expiresAt = calculatePinExpirationTime(duration);
-    const now = Date.now();
-    
-    // NEW: Check if post document exists before doing anything
-    const postRef = doc(db, 'posts', postId);
-    const postDoc = await getDoc(postRef);
-    if (!postDoc.exists()) {
-      console.error(`❌ Post with ID ${postId} does not exist. Cannot create a pin.`);
+    // 🔥 KLUCZOWA WALIDACJA - akceptuj tylko z Base Mainnet
+    if (chainId !== 8453) { // 8453 to chainId dla Base Mainnet
+      console.error(`❌ Pin rejected: Invalid chainId ${chainId}. Only Base Mainnet (8453) is allowed.`);
+      // Można dodatkowo zapisać log o próbie oszustwa
       return false;
     }
 
-    // 1. Dodaj rekord do kolekcji paidPins dla tracking
-    const paidPinData = {
+    const postRef = doc(db, 'posts', postId);
+    const pinRef = doc(collection(db, 'paidPins'));
+
+    const expirationTime = calculatePinExpirationTime(duration);
+    const now = Date.now();
+
+    const pinData = {
+      id: pinRef.id,
       postId,
-      owner: userAddress,
+      owner: userAddress.toLowerCase(),
       duration,
-      expiresAt,
       paidAmount: amountPaid,
       txHash,
       isActive: true,
       createdAt: now,
-      network: 'base'
+      expiresAt: expirationTime,
+      chainId: chainId // Zapisz chainId dla audytu
     };
 
-    await addDoc(collection(db, 'paidPins'), paidPinData);
-    console.log(`✅ Created document in 'paidPins' for postId: ${postId}`);
-
-    // 2. Zaktualizuj post z paid pin informacjami
-    await updateDoc(postRef, {
+    const postUpdateData = {
       isPinned: true,
       isPaidPin: true,
-      pinnedAt: serverTimestamp(),
-      pinExpiresAt: expiresAt,
+      pinExpiresAt: expirationTime,
+      pinnedAt: now,
       pinDuration: duration,
-      pinOwner: userAddress,
-      pinAmountPaid: amountPaid,
+      pinOwner: userAddress.toLowerCase(),
       pinTxHash: txHash
-    });
+    };
 
-    console.log(`✅ Updated document in 'posts' successfully: ${postId} is now pinned.`);
+    const batch = writeBatch(db);
+    batch.set(pinRef, pinData);
+    batch.update(postRef, postUpdateData);
+
+    await batch.commit();
+
+    console.log(`✅ Post ${postId} successfully pinned by ${userAddress} for ${duration}. TX: ${txHash}`);
     return true;
+
   } catch (error) {
-    console.error(`❌ Error in createPaidPin for postId ${postId}:`, error);
+    console.error(`Error in createPaidPin for postId ${postId}:`, error);
     return false;
   }
 };
