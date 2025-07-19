@@ -24,8 +24,10 @@ export async function GET(request: NextRequest) {
       transport: http()
     });
 
-    // Get events from last 5 minutes
-    const fromBlock = await client.getBlockNumber() - BigInt(50); // ~5 minutes ago
+    // Zwiększamy okno do ~15 minut (150 bloków), aby mieć większy bufor bezpieczeństwa
+    const currentBlock = await client.getBlockNumber();
+    const fromBlock = currentBlock - BigInt(150); 
+    console.log(`🔍 Scanning for PinCreated events from block ${fromBlock} to ${currentBlock}`);
 
     const pinCreatedEvents = await client.getLogs({
       address: '0x163bd9Ec5267491963163dE70D0B64f9400a20AD' as `0x${string}`,
@@ -33,6 +35,12 @@ export async function GET(request: NextRequest) {
       fromBlock,
       toBlock: 'latest'
     });
+
+    if (pinCreatedEvents.length === 0) {
+      console.log('✅ No new PinCreated events found in the given block range.');
+    } else {
+      console.log(`🔥 Found ${pinCreatedEvents.length} new PinCreated events to process.`);
+    }
 
     let syncedCount = 0;
     const errors: string[] = [];

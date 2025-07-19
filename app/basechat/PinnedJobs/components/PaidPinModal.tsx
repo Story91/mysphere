@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAccount, useBalance } from 'wagmi';
-import { parseEther, formatEther } from 'viem';
+import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { X, Clock, DollarSign, Zap, Crown } from 'lucide-react';
 import { getAllDurations, calculateTotalCost, formatTimeLeft, calculateExpirationTime } from '../utils/pinPricing';
@@ -11,7 +12,7 @@ import { createPaidPin, canPinPost, PinDuration } from '../../../utils/firebase'
 
 // Smart Contract Integration
 import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI, ContractPinDuration } from '../config/contractConfig';
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+
 
 interface PaidPinModalProps {
   isOpen: boolean;
@@ -35,14 +36,81 @@ export default function PaidPinModal({
   
   const [selectedDuration, setSelectedDuration] = useState<PinDuration>('HOURS_24');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentEthPrice, setCurrentEthPrice] = useState(2500); // Mock ETH price, można podłączyć do API
-  const [txHash, setTxHash] = useState<string | null>(null);
+  const [currentEthPrice, setCurrentEthPrice] = useState(2500); // Mock
   
-  // Smart Contract Integration
-  const { writeContract, isPending: isContractPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash: txHash as `0x${string}`,
+  const { data: hash, writeContract, isPending, error: contractError } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ 
+    hash, 
   });
+
+  useEffect(() => {
+    if (isConfirming) {
+      toast.loading('Processing transaction... Please wait.', { id: hash });
+    }
+    if (isConfirmed) {
+      toast.success('Transaction successful! Pinning post...', { id: hash });
+      // The actual pin creation logic will now be triggered here
+      handleFirebasePinning();
+    }
+    if (contractError) {
+      toast.error(contractError.message || 'Transaction failed.', { id: hash });
+      setIsProcessing(false);
+    }
+  }, [isConfirming, isConfirmed, contractError, hash]);
+  
+  const handleFirebasePinning = async () => {
+    if (!hash || !address) return;
+    
+    const success = await createPaidPin(
+      postId,
+      address,
+      selectedDuration,
+      hash,
+      selectedPrice.ethAmount
+    );
+
+    if (success) {
+      toast.success('Post pinned successfully!', { id: hash });
+      if (onPinSuccess) {
+        onPinSuccess(hash, selectedDuration);
+      }
+    } else {
+      toast.error('Failed to save pin data to Firebase.', { id: hash });
+    }
+    setIsProcessing(false);
+    onClose();
+  };
+
+  const handlePayAndPin = async () => {
+    if (!address || !canPin || !hasEnoughBalance || isProcessing) return;
+    
+    try {
+      setIsProcessing(true);
+      
+      const canPostBePinned = await canPinPost(postId);
+      if (!canPostBePinned) {
+        toast.error('This post is already pinned or cannot be pinned');
+        setIsProcessing(false);
+        return;
+      }
+      
+      console.log("🚀 Calling smart contract...");
+      writeContract({
+        address: PAID_PIN_CONTRACT_CONFIG.address as `0x${string}`,
+        abi: PAID_PIN_CONTRACT_ABI,
+        functionName: 'pinPost',
+        args: [postId, getContractDuration(selectedDuration)],
+        value: parseEther(selectedPrice.ethAmount)
+      });
+      // Logic continues in the useEffect hook watching for transaction status
+      
+    } catch (error) {
+      console.error('Error initiating pin transaction:', error);
+      toast.error('Failed to start transaction. Please try again.');
+      setIsProcessing(false);
+    }
+  };
   
   // Map internal duration to contract enum
   const getContractDuration = (duration: PinDuration): number => {
@@ -83,90 +151,6 @@ export default function PaidPinModal({
       document.body.style.overflow = 'auto';
     };
   }, [isOpen]);
-
-  const handlePayAndPin = async () => {
-    if (!address || !canPin || !hasEnoughBalance) return;
-    
-    try {
-      setIsProcessing(true);
-      
-      // 1. Sprawdź czy post może być przypięty
-      const canPostBePinned = await canPinPost(postId);
-      if (!canPostBePinned) {
-        toast.error('This post is already pinned or cannot be pinned');
-        return;
-      }
-      
-      // 2. Smart Contract Integration - PIN POST ON BLOCKCHAIN
-      let realTxHash: string;
-      
-      // Check if contract address is set (not placeholder)
-      if (PAID_PIN_CONTRACT_CONFIG.address === "YOUR_CONTRACT_ADDRESS") {
-        console.log("🚧 Using mock transaction - contract not deployed yet");
-        // Fallback to mock for testing
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Mock successful transaction
-        const realTxHash = '0xmock_' + Math.random().toString(16).substr(2, 60);
-        
-        // For mock, we manually call createPaidPin since there's no real contract event
-        const success = await createPaidPin(
-          postId,
-          address,
-          selectedDuration,
-          realTxHash,
-          selectedPrice.ethAmount
-        );
-        
-        if (success) {
-          toast.success('Post pinned successfully! (Mock mode)');
-          if (onPinSuccess) {
-            onPinSuccess(realTxHash, selectedDuration);
-          }
-        } else {
-          toast.error('Failed to save pin data.');
-        }
-        
-        onClose();
-      } else {
-        console.log("🚀 Using real smart contract:", PAID_PIN_CONTRACT_CONFIG.address);
-        
-        // Real smart contract transaction
-        const result = await writeContract({
-          address: PAID_PIN_CONTRACT_CONFIG.address as `0x${string}`,
-          abi: PAID_PIN_CONTRACT_ABI,
-          functionName: 'pinPost',
-          args: [postId, getContractDuration(selectedDuration)],
-          value: parseEther(selectedPrice.ethAmount)
-        });
-        
-        console.log("📜 Transaction sent, waiting for confirmation...");
-        
-        // Enhanced user feedback with countdown expectation
-        toast.success("💰 Transaction sent! Your post will be pinned in 1-5 minutes after blockchain confirmation.", {
-          duration: 8000,
-          icon: '⏳',
-        });
-        
-        setTimeout(() => {
-          toast("🕐 Meanwhile, your post will show a 'pending pin' status with countdown timer.", {
-            duration: 6000,
-            icon: '⏱️',
-          });
-        }, 2000); // Show second toast after 2 seconds
-        
-        // ❌ REMOVED: No longer pin immediately in Firebase
-        // ✅ Contract event listener will handle pinning after confirmation
-        
-        onClose(); // Close modal after sending transaction
-      }
-    } catch (error) {
-      console.error('Error pinning post:', error);
-      toast.error('Failed to pin post. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -331,31 +315,17 @@ export default function PaidPinModal({
           )}
 
           {/* Action Button */}
+          <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={handlePayAndPin}
-            disabled={!canPin || !hasEnoughBalance || isProcessing}
-            className={`w-full mt-4 sm:mt-6 py-2.5 sm:py-3 px-4 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium transition-all ${
-              !canPin || !hasEnoughBalance || isProcessing
-                ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]'
-            }`}
+            disabled={!canPin || !hasEnoughBalance || isProcessing || isPending || isConfirming}
+            className="w-full px-6 py-3.5 text-base font-bold text-white rounded-xl transition-all transform hover:scale-105 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
-            {isProcessing ? (
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Processing...</span>
-              </div>
-            ) : !canPin ? (
-              "You can only pin your own posts"
-            ) : !hasEnoughBalance ? (
-              "Insufficient balance"
-            ) : (
-              <div className="flex items-center justify-center space-x-2">
-                <Zap className="w-4 h-4" />
-                <span>Pay {selectedPrice.ethAmount} ETH & Pin</span>
-              </div>
-            )}
+            {isProcessing || isPending || isConfirming
+              ? 'Processing...'
+              : `⚡ Pay ${selectedPrice.ethAmount} ETH & Pin`}
           </button>
+          </div>
 
           {/* Help text */}
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3">

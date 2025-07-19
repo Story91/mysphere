@@ -1743,11 +1743,8 @@ export default function PostList({
             postId={post.id}
             postContent={post.content}
             authorAddress={post.author}
-            isPinned={post.isPinned}
-            isPaidPin={post.isPaidPin}
+            isPinned={!!post.isPinned}
             onPinSuccess={(txHash: string, duration: PinDuration) => {
-              console.log('Pin transaction sent:', { postId: post.id, txHash, duration });
-              // Set post to pending state with countdown
               if (onPinPending) {
                 onPinPending(post.id, txHash, duration);
               }

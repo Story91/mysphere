@@ -577,6 +577,10 @@ export const fetchPosts = async ({
             ? postData.pinnedAt.toMillis() 
             : (postData.pinnedAt || undefined),
           pinnedBy: postData.pinnedBy || undefined,
+          isPaidPin: postData.isPaidPin || false,
+          paidPinExpiresAt: postData.paidPinExpiresAt instanceof Timestamp 
+            ? postData.paidPinExpiresAt.toMillis() 
+            : (postData.paidPinExpiresAt || undefined),
         };
         
         // Dodatkowe filtrowanie po stronie klienta dla wyszukiwania (jeśli potrzebne)
@@ -2709,6 +2713,11 @@ export const getGlobalStats = async () => {
 interface ExtendedPost extends Post {
   pollId?: string;
   lastEdited?: any;
+  isPinned?: boolean;
+  pinnedAt?: any;
+  pinnedBy?: string;
+  isPaidPin?: boolean;
+  paidPinExpiresAt?: any;
 }
 
 // Funkcja do usuwania postów wg. filtru
@@ -3464,60 +3473,120 @@ export const isUserAdmin = (userAddress: string): boolean => {
 
 // Funkcja do pobierania TYLKO przypiętych postów
 export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
+  const now = Timestamp.now();
+  
   try {
-    const postsCollection = collection(db, 'posts');
-    
-    // Zapytanie tylko o przypięte posty
-    const pinnedQuery = query(
-      postsCollection,
-      where('isPinned', '==', true)
+    // 1. Fetch Admin-pinned posts
+    const adminPinnedQuery = query(
+      collection(db, 'posts'),
+      where('isPinned', '==', true),
+      firestoreOrderBy('pinnedAt', 'desc')
     );
     
-    const pinnedSnapshot = await getDocs(pinnedQuery);
-    
-    const pinnedPosts: ExtendedPost[] = [];
-    
-    for (const postDoc of pinnedSnapshot.docs) {
-      const postData = postDoc.data();
-      
-      const post: ExtendedPost = {
-        id: postDoc.id,
-        author: postData.author,
-        content: postData.content,
-        timestamp: postData.timestamp instanceof Timestamp 
-          ? postData.timestamp.toMillis() 
-          : (postData.timestamp || Date.now()),
-        likes: postData.likes || 0,
-        likedBy: postData.likedBy || [],
-        comments: postData.comments || [],
-        tags: postData.tags || [],
-        mentions: postData.mentions || [],
-        image: postData.image || null,
-        video: postData.video || null,
-        txHash: postData.txHash || null,
-        lastEdited: postData.lastEdited || null,
-        zoraCoinAddress: postData.zoraCoinAddress || null,
-        network: postData.network || 'base',
-        isPinned: true,
-        pinnedAt: postData.pinnedAt instanceof Timestamp 
-          ? postData.pinnedAt.toMillis() 
-          : (postData.pinnedAt || Date.now()),
-        pinnedBy: postData.pinnedBy || undefined,
-      };
-      
-      pinnedPosts.push(post);
+    // 2. Fetch Active Paid-pinned posts
+    const paidPinsQuery = query(
+      collection(db, 'paidPins'),
+      where('isActive', '==', true),
+      where('expiresAt', '>', now),
+      firestoreOrderBy('expiresAt', 'desc')
+    );
+
+    const [adminPinnedSnapshot, paidPinsSnapshot] = await Promise.all([
+      getDocs(adminPinnedQuery),
+      getDocs(paidPinsQuery)
+    ]);
+
+    const postIds = new Set<string>();
+    const paidPostDetails: { [postId: string]: any } = {};
+
+    // Process paid pins to get their post IDs and details
+    if (!paidPinsSnapshot.empty) {
+      for (const pinDoc of paidPinsSnapshot.docs) {
+        const pinData = pinDoc.data();
+        if (pinData.postId) {
+          postIds.add(pinData.postId);
+          paidPostDetails[pinData.postId] = { 
+            paidPinExpiresAt: pinData.expiresAt,
+            isPaidPin: true
+          };
+        }
+      }
     }
     
-    // Sortuj po czasie przypięcia po stronie klienta
-    pinnedPosts.sort((a, b) => {
-      const aPinnedAt = a.pinnedAt || 0;
-      const bPinnedAt = b.pinnedAt || 0;
-      return bPinnedAt - aPinnedAt;
+    // Process admin pins, adding only unique post IDs
+    if (!adminPinnedSnapshot.empty) {
+      adminPinnedSnapshot.docs.forEach(doc => {
+        postIds.add(doc.id);
+      });
+    }
+
+    if (postIds.size === 0) {
+      return [];
+    }
+    
+    // Efficiently fetch all post documents in chunks
+    const postDocs: QueryDocumentSnapshot[] = [];
+    const postIdsArray = Array.from(postIds);
+
+    for (let i = 0; i < postIdsArray.length; i += 30) {
+      const chunk = postIdsArray.slice(i, i + 30);
+      if (chunk.length > 0) {
+        const postsQuery = query(collection(db, 'posts'), where('__name__', 'in', chunk));
+        const chunkSnap = await getDocs(postsQuery);
+        postDocs.push(...chunkSnap.docs);
+      }
+    }
+
+    // Map fetched documents to ExtendedPost objects
+    const postsMap = new Map<string, ExtendedPost>();
+    postDocs.forEach(doc => {
+      if (doc.exists()) {
+        const postData = doc.data();
+        const post = { id: doc.id, ...postData } as ExtendedPost;
+        
+        // Add paid pin details if available
+        if (paidPostDetails[doc.id]) {
+          post.isPaidPin = true;
+          post.paidPinExpiresAt = paidPostDetails[doc.id].paidPinExpiresAt;
+        }
+
+        // Ensure isPinned is correctly set for admin pins
+        if (postData.isPinned) {
+            post.isPinned = true;
+        }
+
+        postsMap.set(doc.id, post);
+      }
     });
     
-    return pinnedPosts;
+    // Create final list and filter out any undefined posts
+    const allPinnedPosts = postIdsArray
+        .map(id => postsMap.get(id))
+        .filter((p): p is ExtendedPost => p !== undefined);
+
+    // Advanced sorting: Admin pins first, then paid pins by expiration
+    allPinnedPosts.sort((a, b) => {
+        const aIsAdminPinned = a.isPinned && !a.isPaidPin;
+        const bIsAdminPinned = b.isPinned && !b.isPaidPin;
+
+        if (aIsAdminPinned && !bIsAdminPinned) return -1;
+        if (!aIsAdminPinned && bIsAdminPinned) return 1;
+
+        if (aIsAdminPinned && bIsAdminPinned) {
+            const timeA = a.pinnedAt?.toMillis ? a.pinnedAt.toMillis() : (a.pinnedAt || 0);
+            const timeB = b.pinnedAt?.toMillis ? b.pinnedAt.toMillis() : (b.pinnedAt || 0);
+            return timeB - timeA;
+        }
+
+        const expireA = a.paidPinExpiresAt?.toMillis ? a.paidPinExpiresAt.toMillis() : (a.paidPinExpiresAt || 0);
+        const expireB = b.paidPinExpiresAt?.toMillis ? b.paidPinExpiresAt.toMillis() : (b.paidPinExpiresAt || 0);
+        return expireB - expireA;
+    });
+
+    return allPinnedPosts;
+
   } catch (error) {
-    console.error('❌ fetchPinnedPosts: Błąd podczas pobierania przypiętych postów:', error);
+    console.error("❌ Error fetching pinned posts:", error);
     return [];
   }
 };
