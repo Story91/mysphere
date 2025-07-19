@@ -163,7 +163,8 @@ async function processEventLog(log: any) {
       owner,
       mappedDuration,
       log.transactionHash,
-      (Number(amount) / 1e18).toString()
+      (Number(amount) / 1e18).toString(),
+      8453 // Base Mainnet chainId
     );
 
     if (!success) {

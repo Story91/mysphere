@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
           const amountEth = (Number(amount) / 1e18).toString();
 
           // Try to create pin (will fail if already exists)
-          const success = await createPaidPin(postId, owner, mappedDuration, txHash, amountEth);
+          const success = await createPaidPin(postId, owner, mappedDuration, txHash, amountEth, 8453);
           
           if (success) {
             syncedCount++;

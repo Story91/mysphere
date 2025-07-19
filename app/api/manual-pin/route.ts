@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔧 Manual pin creation for post ${postId}, tx: ${txHash}`);
 
-    const success = await createPaidPin(postId, userAddress, duration, txHash, amountPaid);
+    const success = await createPaidPin(postId, userAddress, duration, txHash, amountPaid, 8453);
 
     if (success) {
       return NextResponse.json({
@@ -100,7 +100,8 @@ export async function GET(request: NextRequest) {
           pin.owner,
           pin.duration as any,
           pin.txHash,
-          pin.amountEth
+          pin.amountEth,
+          8453
         );
 
         if (success) {
