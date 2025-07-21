@@ -347,11 +347,13 @@ export const deletePost = async (postId: string, authorAddress: string) => {
     // Prepare batch for atomic operations
     const batch = writeBatch(db);
 
-    // Odejmij lajki od autora (tylko gdy usuwamy własny post)
+    // Odejmij lajki i postsCount od autora (tylko gdy usuwamy własny post)
     if (isAuthor) {
       const authorRef = doc(db, 'users', authorAddress);
       batch.update(authorRef, {
         likesReceived: increment(-(postData.likes || 0)),
+        postsCount: increment(-1),
+        'stats.posts': increment(-1),
         lastActive: serverTimestamp()
       });
     }
@@ -456,6 +458,20 @@ export const createPost = async (post: {
     });
     
     console.log(`✅ Post created with ID: ${newPostRef.id}`);
+
+    // 📊 AKTUALIZUJ STATYSTYKI AUTORA: Zwiększ liczbę postów
+    try {
+      const authorRef = doc(db, 'users', post.author);
+      await updateDoc(authorRef, {
+        postsCount: increment(1),
+        'stats.posts': increment(1),
+        lastActive: serverTimestamp()
+      });
+      console.log(`📊 Updated postsCount for author: ${post.author}`);
+    } catch (authorUpdateError) {
+      console.error('❌ Error updating author postsCount:', authorUpdateError);
+      // Nie rzucamy błędu - post został utworzony, tylko statystyki się nie zaktualizowały
+    }
 
     // Zwróć ID nowego posta
     return newPostRef.id;
@@ -4441,6 +4457,119 @@ export const cleanupExpiredPaidPins = async (): Promise<{
     return {
       expiredCount: 0,
       errors: [`Cleanup failed: ${error}`]
+    };
+  }
+};
+
+// 🔧 NAPRAWKA: Funkcja do naprawy statystyk użytkowników
+export const fixUserPostStats = async (userAddress: string): Promise<{ before: any, after: any }> => {
+  try {
+    console.log(`🔧 Naprawiam statystyki dla użytkownika: ${userAddress}`);
+    
+    // Pobierz obecne dane użytkownika
+    const userRef = doc(db, 'users', userAddress);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      throw new Error('User not found');
+    }
+    
+    const userData = userDoc.data();
+    const currentStats = {
+      postsCount: userData.postsCount || 0,
+      likesReceived: userData.likesReceived || 0,
+      statsComments: userData.stats?.comments || 0
+    };
+    
+    // Policz rzeczywiste posty użytkownika
+    const postsRef = collection(db, 'posts');
+    const userPostsQuery = query(postsRef, where('author', '==', userAddress));
+    const postsSnapshot = await getDocs(userPostsQuery);
+    
+    let totalLikes = 0;
+    postsSnapshot.forEach((doc) => {
+      const postData = doc.data();
+      totalLikes += postData.likes || 0;
+    });
+    
+    const realStats = {
+      postsCount: postsSnapshot.size,
+      likesReceived: totalLikes,
+      // Komentarze zostają bez zmian - są aktualizowane poprawnie
+      statsComments: currentStats.statsComments
+    };
+    
+    // Zaktualizuj tylko jeśli są różnice
+    if (currentStats.postsCount !== realStats.postsCount || 
+        currentStats.likesReceived !== realStats.likesReceived) {
+      
+      await updateDoc(userRef, {
+        postsCount: realStats.postsCount,
+        likesReceived: realStats.likesReceived,
+        'stats.posts': realStats.postsCount,
+        'stats.likes': realStats.likesReceived,
+        lastUpdated: serverTimestamp()
+      });
+      
+      console.log(`✅ Naprawiono statystyki dla ${userAddress}:`, {
+        postsCount: `${currentStats.postsCount} → ${realStats.postsCount}`,
+        likesReceived: `${currentStats.likesReceived} → ${realStats.likesReceived}`
+      });
+    } else {
+      console.log(`✅ Statystyki ${userAddress} są już poprawne`);
+    }
+    
+    return {
+      before: currentStats,
+      after: realStats
+    };
+    
+  } catch (error) {
+    console.error(`❌ Error fixing stats for ${userAddress}:`, error);
+    throw error;
+  }
+};
+
+// 🔧 ADMIN ONLY: Napraw statystyki dla wszystkich użytkowników (DROGIE!)
+export const fixAllUserStats = async (): Promise<{ success: boolean, fixed: number, errors: string[] }> => {
+  try {
+    console.log('🔧 ADMIN: Rozpoczynam naprawę statystyk wszystkich użytkowników...');
+    
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    let fixedCount = 0;
+    const errors: string[] = [];
+    
+    for (const userDoc of usersSnapshot.docs) {
+      try {
+        const result = await fixUserPostStats(userDoc.id);
+        if (result.before.postsCount !== result.after.postsCount || 
+            result.before.likesReceived !== result.after.likesReceived) {
+          fixedCount++;
+        }
+      } catch (error) {
+        const errorMsg = `${userDoc.id}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        errors.push(errorMsg);
+        console.error(`❌ Error fixing ${userDoc.id}:`, error);
+      }
+    }
+    
+    console.log(`✅ ADMIN: Naprawa zakończona. Naprawiono: ${fixedCount} użytkowników`);
+    if (errors.length > 0) {
+      console.warn(`⚠️ Błędy dla ${errors.length} użytkowników:`, errors);
+    }
+    
+    return {
+      success: true,
+      fixed: fixedCount,
+      errors
+    };
+    
+  } catch (error) {
+    console.error('❌ ADMIN: Error during mass stats fix:', error);
+    return {
+      success: false,
+      fixed: 0,
+      errors: [error instanceof Error ? error.message : 'Unknown error']
     };
   }
 };

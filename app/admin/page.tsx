@@ -11,7 +11,7 @@ import Statistics from './components/Statistics';
 import PaidPinsManagement from './components/PaidPinsManagement';
 import { refreshTop50UsersOnly } from '../utils/firebase';
 import AdminQuotes from './quotes/page';
-import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache } from '../utils/firebase';
+import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache, fixAllUserStats, fixUserPostStats } from '../utils/firebase';
 
 // Usuwam stałą ADMIN_ADDRESS, bo importujemy ją z firebase.ts
 const ADMIN_BASENAME = "story91.base.eth";
@@ -489,6 +489,127 @@ export default function AdminPanel() {
         >
           Global Stats
         </button>
+      </div>
+
+      {/* Sekcja naprawy statystyk użytkowników */}
+      <div className="mb-6 p-4 bg-yellow-900/30 rounded-xl border border-yellow-500/20">
+        <h2 className="text-xl font-semibold mb-2 text-yellow-300">🔧 Naprawa Statystyk Użytkowników</h2>
+        <div className="mb-4">
+          <p className="text-gray-400">
+            Napraw nieprawidłowe liczby postów i lajków dla użytkowników (bug został już naprawiony)
+          </p>
+          <p className="text-yellow-400 text-sm mt-1">
+            ⚠️ Drogie - sprawdza wszystkich użytkowników. Użyj tylko gdy potrzeba
+          </p>
+        </div>
+        
+        <div className="flex gap-4">
+          <button
+            onClick={async () => {
+              try {
+                setIsRefreshing(true);
+                const result = await fixAllUserStats();
+                setRefreshStatus({
+                  success: result.success,
+                  updatedUsers: result.fixed,
+                  message: `Naprawiono ${result.fixed} użytkowników. Błędy: ${result.errors.length}`,
+                  errors: result.errors
+                });
+              } catch (error) {
+                console.error('Błąd podczas naprawy statystyk:', error);
+                setRefreshStatus({ 
+                  success: false, 
+                  error: error instanceof Error ? error.message : 'Nieznany błąd' 
+                });
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
+            disabled={isRefreshing}
+            className={`px-4 py-2 rounded-lg ${
+              isRefreshing 
+                ? 'bg-gray-500 cursor-not-allowed' 
+                : 'bg-yellow-600 hover:bg-yellow-700'
+            } text-white transition-all`}
+          >
+            {isRefreshing ? '🔧 Naprawiam...' : '🔧 Napraw Wszystkich'}
+          </button>
+          
+          <input
+            type="text"
+            placeholder="0x... (adres użytkownika)"
+            className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm"
+            id="singleUserFix"
+          />
+          <button
+            onClick={async () => {
+              const input = document.getElementById('singleUserFix') as HTMLInputElement;
+              const userAddress = input?.value?.trim();
+              if (!userAddress) {
+                alert('Wpisz adres użytkownika');
+                return;
+              }
+              
+              try {
+                setIsRefreshing(true);
+                const result = await fixUserPostStats(userAddress);
+                setRefreshStatus({
+                  success: true,
+                  updatedUsers: result.before.postsCount !== result.after.postsCount ? 1 : 0,
+                  message: `${userAddress}: Posts ${result.before.postsCount}→${result.after.postsCount}, Likes ${result.before.likesReceived}→${result.after.likesReceived}`
+                });
+                input.value = '';
+              } catch (error) {
+                console.error('Błąd podczas naprawy użytkownika:', error);
+                setRefreshStatus({ 
+                  success: false, 
+                  error: error instanceof Error ? error.message : 'Nieznany błąd' 
+                });
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
+            disabled={isRefreshing}
+            className={`px-3 py-2 rounded-lg ${
+              isRefreshing 
+                ? 'bg-gray-500 cursor-not-allowed' 
+                : 'bg-blue-600 hover:bg-blue-700'
+            } text-white transition-all text-sm`}
+          >
+            {isRefreshing ? '🔧' : '🔧 Jeden'}
+          </button>
+        </div>
+        
+        {refreshStatus && (
+          <div className="mt-4 p-3 bg-black/30 rounded-lg">
+            {refreshStatus.success ? (
+              <>
+                <p className="text-sm text-gray-400">
+                  {refreshStatus.message}
+                </p>
+                {refreshStatus.errors && refreshStatus.errors.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="text-sm text-yellow-400 cursor-pointer">
+                      Pokaż błędy ({refreshStatus.errors.length})
+                    </summary>
+                    <div className="mt-2 text-xs text-red-400 max-h-40 overflow-y-auto">
+                      {refreshStatus.errors.map((error: string, i: number) => (
+                        <div key={i}>{error}</div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+                <p className="text-sm text-green-500">
+                  Status: Zakończono pomyślnie
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-red-500">
+                Błąd: {refreshStatus.error}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sekcja odświeżania postów */}
