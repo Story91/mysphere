@@ -330,10 +330,10 @@ export default function BaseChat() {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [trendingTags, setTrendingTags] = useState<{tag: string, count: number}[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
-  const [totalUsers, setTotalUsers] = useState(112704);
-  const [totalLikes, setTotalLikes] = useState(14563);
-  const [totalPosts, setTotalPosts] = useState(142291);
-  const [totalComments, setTotalComments] = useState(7079);
+     const [totalUsers, setTotalUsers] = useState(118829);
+   const [totalLikes, setTotalLikes] = useState(15531);
+   const [totalPosts, setTotalPosts] = useState(162317);
+   const [totalComments, setTotalComments] = useState(8006);
   const [expandedUsersList, setExpandedUsersList] = useState(false);
   const [expandedTagsList, setExpandedTagsList] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -629,14 +629,14 @@ export default function BaseChat() {
         } else {
           // 💰 Pobierz z Firebase tylko gdy brak cache'a lub wygasł
           console.log(`🔥 Refresh fetching fresh posts from Firebase for: ${cacheKey}`);
-          const { posts: refreshedPosts } = await fetchPosts({ 
+        const { posts: refreshedPosts } = await fetchPosts({ 
             userId: address,
             ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
-          });
+        });
           
           // 💾 Zapisz do cache'a dla przyszłych użyć
           setCachedPosts(cacheKey, refreshedPosts);
-          setPosts(refreshedPosts);
+        setPosts(refreshedPosts);
         }
       }
     } catch (error) {
@@ -1060,7 +1060,7 @@ export default function BaseChat() {
 
       // 🗑️ Wyczyść cache bo mamy nowy post
       clearPostsCache();
-      
+
       // Refresh posts list from Firebase to get the real ID
       const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
@@ -1367,10 +1367,10 @@ export default function BaseChat() {
     try {
       // ✅ ULTRA-CHEAP: Statyczne dane zamiast Firebase (oszczędność $15,000+/dzień!)
       const stats = {
-        userCount: 112704,
-        postsCount: 142291,
-        likesCount: 14563,
-        commentsCount: 7079,
+        userCount: 118829,
+        postsCount: 162317,
+        likesCount: 15531,
+        commentsCount: 8006,
         transactionsCount: 40818
       };
       
@@ -1393,10 +1393,10 @@ export default function BaseChat() {
     } catch (error) {
       console.error('Error fetching BaseChat global stats:', error);
       // Fallback values
-      setTotalUsers(112704);
-      setTotalLikes(14563);
-      setTotalPosts(142291);
-      setTotalComments(7079);
+      setTotalUsers(118829);
+      setTotalLikes(15531);
+      setTotalPosts(162317);
+      setTotalComments(8006);
     }
   };
 
@@ -1561,27 +1561,27 @@ export default function BaseChat() {
 
     // Sprawdź czy można zmienić zdjęcie (tylko dla zwykłych użytkowników)
     if (!isAdmin) {
-      const userRef = doc(db, 'users', address);
-      const userDoc = await getDoc(userRef);
-      const userData = userDoc.data();
+          const userRef = doc(db, 'users', address);
+          const userDoc = await getDoc(userRef);
+    const userData = userDoc.data();
+    
+    if (userData?.lastImageUpdate) {
+      const lastUpdate = userData.lastImageUpdate.toDate();
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
       
-      if (userData?.lastImageUpdate) {
-        const lastUpdate = userData.lastImageUpdate.toDate();
-        const oneMonthAgo = new Date();
-        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      if (lastUpdate > oneMonthAgo) {
+        const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const now = new Date();
+        const diff = timeToWait.getTime() - now.getTime();
         
-        if (lastUpdate > oneMonthAgo) {
-          const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
-          const now = new Date();
-          const diff = timeToWait.getTime() - now.getTime();
-          
-          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-          const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-          
-          setModalMessage(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
-          setModalType('warning');
-          setShowModal(true);
-          return;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        
+        setModalMessage(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
+        setModalType('warning');
+        setShowModal(true);
+        return;
         }
       }
     }
@@ -2721,25 +2721,25 @@ export default function BaseChat() {
 
                                         // Sprawdź ograniczenia czasowe tylko dla zwykłych użytkowników
                                         if (!isAdmin) {
-                                          const userRef = doc(db, 'users', address);
-                                          const userDoc = await getDoc(userRef);
-                                          const userData = userDoc.data();
+                                        const userRef = doc(db, 'users', address);
+                                        const userDoc = await getDoc(userRef);
+                                        const userData = userDoc.data();
 
-                                          if (userData?.lastImageUpdate) {
-                                            const lastUpdate = userData.lastImageUpdate.toDate();
-                                            const oneMonthAgo = new Date();
-                                            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                                        if (userData?.lastImageUpdate) {
+                                          const lastUpdate = userData.lastImageUpdate.toDate();
+                                          const oneMonthAgo = new Date();
+                                          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                                          
+                                          if (lastUpdate > oneMonthAgo) {
+                                            const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
+                                            const now = new Date();
+                                            const diff = timeToWait.getTime() - now.getTime();
                                             
-                                            if (lastUpdate > oneMonthAgo) {
-                                              const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
-                                              const now = new Date();
-                                              const diff = timeToWait.getTime() - now.getTime();
-                                              
-                                              const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                                              const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                              
-                                              alert(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
-                                              return;
+                                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                            
+                                            alert(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
+                                            return;
                                             }
                                           }
                                         }
@@ -3234,7 +3234,7 @@ export default function BaseChat() {
                       </svg>
                       My Profile
                     </button>
-                    <button
+                      <button
                       onClick={() => {
                         setShowMyFeed(!showMyFeed);
                         // Przeładuj posty gdy przełączamy tryb
@@ -3261,13 +3261,13 @@ export default function BaseChat() {
                           ? 'bg-blue-500 text-white' 
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                       } flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors`}
-                    >
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
+                        </svg>
                       {showMyFeed ? 'All Posts' : 'My Feed'}
-                    </button>
-                   </div>
+                      </button>
+                          </div>
                  </div>
               </div>
 
@@ -3531,11 +3531,11 @@ export default function BaseChat() {
 
                       {/* Pinned Posts Section - ukryj w trybie My Feed */}
                       {!showMyFeed && (
-                        <PinnedPosts
-                          displayUserName={displayUserName}
-                          userNames={userNames}
+                      <PinnedPosts
+                        displayUserName={displayUserName}
+                        userNames={userNames}
                           onUserNamesUpdate={handleUserNamesUpdate}
-                        />
+                      />
                       )}
 
                       {/* Tutaj zastępuję kod wyświetlający posty komponentem PostList */}
@@ -3560,7 +3560,7 @@ export default function BaseChat() {
                               ) : (
                                 <div>
                                   <MockFeed />
-                                </div>
+                    </div>
                   )}
                 </>
               )}

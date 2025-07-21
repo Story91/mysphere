@@ -39,11 +39,11 @@ const CAMP_NFT_CONTRACT = '0x1eD74B27f846C699A90926daD057A7f6FD22C126';
 
 // Static MySphere data
 const STATIC_MYSPHERE_DATA = {
-  totalUsers: 93306,
+  totalUsers: 113061,
   socialMediaConnections: {
-    twitter: 35866,
-    spotify: 1919,
-    tiktok: 2845
+    twitter: 42377,
+    spotify: 2063,
+    tiktok: 3031
   },
   fullyConnectedUsers: 13,
   averageConnectionsPerUser: 0.6,
@@ -93,10 +93,10 @@ const STATIC_MYSPHERE_DATA = {
     },
     {
       date: "2025-07-05",
-      users: 93306,
-      twitter: 35866,
-      spotify: 1919,
-      tiktok: 2845
+      users: 113061,
+      twitter: 42377,
+      spotify: 2063,
+      tiktok: 3031
     }
   ]
 };

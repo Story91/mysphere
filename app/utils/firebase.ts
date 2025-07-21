@@ -743,8 +743,12 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
         postsCount: data.postsCount || 0, // 💡 Użyj zapisanej wartości zamiast liczenia na nowo
         likesReceived: data.likesReceived || 0,
         address: address,
-        joinedAt: data.joinedAt,
-        lastActive: data.lastActive,
+        joinedAt: data.joinedAt instanceof Timestamp 
+          ? data.joinedAt.toMillis() 
+          : (data.joinedAt || Date.now()),
+        lastActive: data.lastActive instanceof Timestamp 
+          ? data.lastActive.toMillis() 
+          : (data.lastActive || Date.now()),
         bio: data.bio,
         socialLinks: loadSocialLinks ? data.socialLinks || {
           twitter: '',
@@ -759,22 +763,62 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
       };
     }
     
-    // Default profile for new users
+    // 🆕 PRZYWRÓCENIE ORYGINALNEJ FUNKCJONALNOŚCI: Automatyczne tworzenie konta w Firebase
+    // Kiedy użytkownik po raz pierwszy łączy portfel, od razu tworzymy mu dokument w bazie
+    console.log(`🆕 Tworzę nowe konto użytkownika dla ${address}`);
+    
+    const newUserProfile = {
+      walletAddress: address,
+      name: `${address.slice(0, 6)}...${address.slice(-4)}`,
+      joinedAt: serverTimestamp(),
+      lastActive: serverTimestamp(),
+      postsCount: 0,
+      likesReceived: 0,
+      stats: {
+        posts: 0,
+        likes: 0,
+        comments: 0
+      },
+      socialLinks: {
+        twitter: '',
+        farcaster: '',
+        discord: ''
+      },
+      // Dodaj podstawowe punkty BaseChatPoints
+      baseChatPoints: {
+        activityBonus: 0,
+        likePoints: 0,
+        postPoints: 0,
+        baseNameBonus: 0,
+        totalPoints: 0
+      }
+    };
+    
+    // Zapisz nowy profil do Firebase
+    await setDoc(userRef, newUserProfile);
+    console.log(`✅ Utworzono nowe konto użytkownika: ${address}`);
+    
+    // 🎉 UWAGA: Base Name i bonus 1000 punktów będą dodane automatycznie 
+    // przez useEffect w basechat/page.tsx gdy baseName się załaduje
+    
+    // Zwróć profil w formacie zgodnym z interfejsem UserProfile
+    // UWAGA: Zwracamy dane z właśnie utworzonego profilu w Firebase
     return {
       id: address,
       name: `${address.slice(0, 6)}...${address.slice(-4)}`,
       address: address,
-      postsCount: 0, // 💡 Nowy użytkownik = 0 postów
+      postsCount: 0,
       likesReceived: 0,
-      joinedAt: Date.now(),
+      joinedAt: Date.now(), // Użyj current timestamp jako reprezentację serverTimestamp
       lastActive: Date.now(),
+      bio: undefined, // Nowi użytkownicy nie mają bio
       socialLinks: loadSocialLinks ? {
         twitter: '',
         farcaster: '',
         discord: ''
       } : undefined,
       stats: {
-        posts: 0, // 💡 Nowy użytkownik = 0 postów
+        posts: 0,
         likes: 0,
         comments: 0
       }
@@ -796,19 +840,8 @@ export const getUserName = async (walletAddress: string): Promise<string> => {
       return userData.name || `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
     }
     
-    // Jeśli użytkownik nie istnieje, utwórz podstawowy profil
-    await setDoc(userRef, {
-      walletAddress,
-      name: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
-      joinedAt: serverTimestamp(),
-      lastActive: serverTimestamp(),
-      stats: {
-        posts: 0,
-        likes: 0,
-        comments: 0
-      }
-    });
-    
+    // 🔄 ZMIANA: Nie tworzymy już konta tutaj, bo to robi fetchUserProfile
+    // Zwracamy tylko domyślną nazwę dla users których profil jeszcze nie został załadowany
     return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
   } catch (error) {
     console.error('Error getting user name:', error);
