@@ -2649,6 +2649,145 @@ export const getGlobalStatsRealTime = async () => {
   }
 };
 
+// 🚀 ULTRA-OPTIMIZED: Inkrementalne pobieranie statystyk (TYLKO nowe dane!)
+export const getGlobalStatsIncremental = async (forceFullRefresh: boolean = false): Promise<any> => {
+  try {
+    const cacheKey = 'adminGlobalStatsCache';
+    const timestampKey = 'adminGlobalStatsTimestamp';
+    
+    // Pobierz cache i timestamp ostatniego pobrania
+    const cachedData = localStorage.getItem(cacheKey);
+    const lastFetchTime = localStorage.getItem(timestampKey);
+    
+    let existingStats = null;
+    let lastUpdateTimestamp = null;
+    
+    if (cachedData && lastFetchTime && !forceFullRefresh) {
+      existingStats = JSON.parse(cachedData);
+      lastUpdateTimestamp = new Date(lastFetchTime);
+      console.log(`📋 ADMIN: Found cached data from ${lastUpdateTimestamp.toLocaleString()}`);
+    }
+    
+    if (!existingStats || forceFullRefresh) {
+      console.log('🔄 ADMIN: Performing FULL stats fetch (first time or forced refresh)...');
+      
+      // Pełne pobranie danych
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const postsSnapshot = await getDocs(collection(db, 'posts'));
+      
+      let totalLikes = 0;
+      let totalComments = 0;
+      
+      for (const doc of postsSnapshot.docs) {
+        const postData = doc.data();
+        if (postData.likes) {
+          totalLikes += postData.likes;
+        }
+        
+        if (postData.comments && Array.isArray(postData.comments)) {
+          totalComments += postData.comments.length;
+        } else if (postData.commentsCount) {
+          totalComments += postData.commentsCount;
+        }
+      }
+      
+      const fullStats = {
+        userCount: usersSnapshot.size,
+        postsCount: postsSnapshot.size,
+        likesCount: totalLikes,
+        commentsCount: totalComments,
+        transactionsCount: Math.floor((postsSnapshot.size + totalComments) * 1.1),
+        lastUpdated: new Date().toISOString(),
+        dataSource: 'firebase-full-fetch',
+        adminAccess: true
+      };
+      
+      // Zapisz do cache
+      localStorage.setItem(cacheKey, JSON.stringify(fullStats));
+      localStorage.setItem(timestampKey, fullStats.lastUpdated);
+      
+      console.log(`✅ ADMIN: Full fetch completed - ${fullStats.userCount} users, ${fullStats.postsCount} posts`);
+      console.log(`💰 Cost: ~$${((fullStats.userCount + fullStats.postsCount) * 0.00006).toFixed(2)} for full fetch`);
+      
+      return fullStats;
+    }
+    
+    // ⚡ INCREMENTAL UPDATE: Pobierz tylko nowe dane od ostatniego update
+    console.log(`⚡ ADMIN: Performing INCREMENTAL update since ${lastUpdateTimestamp?.toLocaleString()}`);
+    
+    // Pobierz nowych użytkowników (joinedAt > lastUpdateTimestamp)
+    const newUsersQuery = query(
+      collection(db, 'users'),
+      where('joinedAt', '>', lastUpdateTimestamp),
+      firestoreOrderBy('joinedAt', 'desc')
+    );
+    const newUsersSnapshot = await getDocs(newUsersQuery);
+    
+    // Pobierz nowe posty (timestamp > lastUpdateTimestamp)  
+    const newPostsQuery = query(
+      collection(db, 'posts'),
+      where('timestamp', '>', lastUpdateTimestamp),
+      firestoreOrderBy('timestamp', 'desc')
+    );
+    const newPostsSnapshot = await getDocs(newPostsQuery);
+    
+    // Oblicz nowe like'i i komentarze z nowych postów
+    let newLikes = 0;
+    let newComments = 0;
+    
+    for (const doc of newPostsSnapshot.docs) {
+      const postData = doc.data();
+      if (postData.likes) {
+        newLikes += postData.likes;
+      }
+      
+      if (postData.comments && Array.isArray(postData.comments)) {
+        newComments += postData.comments.length;
+      } else if (postData.commentsCount) {
+        newComments += postData.commentsCount;
+      }
+    }
+    
+    // Połącz stare dane z nowymi
+    const incrementalStats = {
+      userCount: existingStats.userCount + newUsersSnapshot.size,
+      postsCount: existingStats.postsCount + newPostsSnapshot.size,
+      likesCount: existingStats.likesCount + newLikes,
+      commentsCount: existingStats.commentsCount + newComments,
+      transactionsCount: Math.floor((existingStats.postsCount + newPostsSnapshot.size + existingStats.commentsCount + newComments) * 1.1),
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'firebase-incremental',
+      adminAccess: true,
+      deltaInfo: {
+        newUsers: newUsersSnapshot.size,
+        newPosts: newPostsSnapshot.size,
+        newLikes: newLikes,
+        newComments: newComments,
+        incrementalSince: lastUpdateTimestamp?.toISOString()
+      }
+    };
+    
+    // Zapisz zaktualizowane dane do cache
+    localStorage.setItem(cacheKey, JSON.stringify(incrementalStats));
+    localStorage.setItem(timestampKey, incrementalStats.lastUpdated);
+    
+    const totalReads = newUsersSnapshot.size + newPostsSnapshot.size;
+    console.log(`⚡ ADMIN: Incremental update completed:`);
+    console.log(`  📊 New data: +${newUsersSnapshot.size} users, +${newPostsSnapshot.size} posts`);
+    console.log(`  📈 Current totals: ${incrementalStats.userCount} users, ${incrementalStats.postsCount} posts`);
+    console.log(`  💰 Cost: ~$${(totalReads * 0.00006).toFixed(4)} (${totalReads} reads vs thousands with full fetch)`);
+    console.log(`  🎯 Savings: ~${((existingStats.userCount + existingStats.postsCount - totalReads) * 0.00006).toFixed(2)}$ per refresh`);
+    
+    return incrementalStats;
+    
+  } catch (error) {
+    console.error('❌ ADMIN Error in incremental stats fetch:', error);
+    // Fallback to full fetch on error
+    console.log('🔄 Falling back to full fetch due to error...');
+    return await getGlobalStatsIncremental(true);
+  }
+};
+
 // Funkcja do pobierania globalnych statystyk dla strony głównej
 // ⚠️ OPTIMIZED - Global stats with 12h cache per user for accurate data
 export const getGlobalStats = async () => {

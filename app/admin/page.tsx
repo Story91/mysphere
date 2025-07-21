@@ -11,7 +11,7 @@ import Statistics from './components/Statistics';
 import PaidPinsManagement from './components/PaidPinsManagement';
 import { refreshTop50UsersOnly } from '../utils/firebase';
 import AdminQuotes from './quotes/page';
-import { getGlobalStats, getGlobalStatsRealTime, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache } from '../utils/firebase';
+import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache } from '../utils/firebase';
 
 // Usuwam stałą ADMIN_ADDRESS, bo importujemy ją z firebase.ts
 const ADMIN_BASENAME = "story91.base.eth";
@@ -66,19 +66,49 @@ export default function AdminPanel() {
     checkAdminStatus();
   }, [address, isConnected]);
 
-  // 🔐 ADMIN: Automatyczne ładowanie danych przy wejściu na Global Stats
+  // ⚡ OPTIMIZED: Smart auto-loading przy wejściu na Global Stats (tylko jeśli brak danych)
   useEffect(() => {
     if (activeTab === 'globalstats' && address && isAdmin && !loadingGlobalStats && !realStatsLoading) {
-      console.log('🔐 ADMIN: Auto-fetching data on Global Stats tab...');
+      console.log('⚡ ADMIN: Smart auto-loading on Global Stats tab...');
       
-      // Fetch BaseChat statistics (prawdziwe Firebase data)
+      // 🎯 BaseChat: Sprawdź cache, a potem ewentualnie smart refresh
       if (!globalStats) {
-        handleFetchRealTimeStats();
+        // Sprawdź czy są dane w localStorage cache
+        const cachedData = localStorage.getItem('adminGlobalStatsCache');
+        if (cachedData) {
+          console.log('📋 Found cached BaseChat data - loading from localStorage...');
+          try {
+            const parsedData = JSON.parse(cachedData);
+            setGlobalStats(parsedData);
+            setLastGlobalStatsUpdate(new Date().toLocaleString());
+            
+            // Animuj cached data (bez incremental flag)
+            if (parsedData) {
+              animateStatValue(parsedData.userCount, 'users', false);
+              animateStatValue(parsedData.postsCount, 'posts', false);
+              animateStatValue(parsedData.likesCount, 'likes', false);
+              animateStatValue(parsedData.commentsCount, 'comments', false);
+              animateStatValue(parsedData.transactionsCount, 'transactions', false);
+            }
+          } catch (error) {
+            console.error('Error parsing cached data:', error);
+            console.log('📊 Cache invalid - performing smart refresh...');
+            handleFetchRealTimeStats(false);
+          }
+        } else {
+          console.log('📊 No cache found - performing smart refresh...');
+          handleFetchRealTimeStats(false); // false = smart incremental refresh
+        }
+      } else {
+        console.log('📊 BaseChat data already loaded - skipping refresh');
       }
       
-      // Fetch MySphere statistics (statyczne dane z API)
+      // 🌐 MySphere: Ładuj tylko jeśli brak danych
       if (!realStatsData) {
+        console.log('🌐 No MySphere data found - fetching...');
         fetchMySphereStats();
+      } else {
+        console.log('🌐 MySphere data already loaded - skipping refresh');
       }
     }
   }, [activeTab, address, isAdmin]);
@@ -159,12 +189,50 @@ export default function AdminPanel() {
     }
   };
 
-  // 🔐 ADMIN: Pobierz prawdziwe dane Firebase (bez cache!)
-  const handleFetchRealTimeStats = async () => {
+  // ⚡ OPTIMIZED: Inkrementalne pobieranie (tylko nowe dane!)
+  const handleFetchRealTimeStats = async (forceFullRefresh: boolean = false) => {
     setLoadingGlobalStats(true);
     
     try {
-      console.log('🔐 Admin fetching REAL-TIME Firebase stats (no cache)...');
+      console.log(`🔐 Admin fetching ${forceFullRefresh ? 'FULL' : 'INCREMENTAL'} Firebase stats...`);
+      const stats = await getGlobalStatsIncremental(forceFullRefresh);
+      setGlobalStats(stats);
+      setLastGlobalStatsUpdate(new Date().toLocaleString());
+      
+      // 🎯 Animate stats counters (z informacją o typie update)
+      if (stats) {
+        const isIncremental = stats.dataSource === 'firebase-incremental';
+        animateStatValue(stats.userCount, 'users', isIncremental);
+        animateStatValue(stats.postsCount, 'posts', isIncremental);
+        animateStatValue(stats.likesCount, 'likes', isIncremental);
+        animateStatValue(stats.commentsCount, 'comments', isIncremental);
+        animateStatValue(stats.transactionsCount, 'transactions', isIncremental);
+      }
+      
+      console.log(`✅ ${stats.dataSource} Firebase stats loaded:`, stats);
+      if (stats.deltaInfo) {
+        console.log(`📊 Delta: +${stats.deltaInfo.newUsers} users, +${stats.deltaInfo.newPosts} posts`);
+        
+        // 🎉 Pokaż toast notification dla incremental update
+        if (stats.dataSource === 'firebase-incremental' && (stats.deltaInfo.newUsers > 0 || stats.deltaInfo.newPosts > 0)) {
+          // Opcjonalnie: możemy dodać toast notification że dane zostały zaktualizowane
+          console.log(`🔔 Smart Update: +${stats.deltaInfo.newUsers} users, +${stats.deltaInfo.newPosts} posts added`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching optimized Firebase stats:', error);
+      setGlobalStats(null);
+    } finally {
+      setLoadingGlobalStats(false);
+    }
+  };
+
+  // 🔄 LEGACY: Stary system (pełne pobieranie - użyj tylko w nagłych przypadkach)
+  const handleFetchLegacyStats = async () => {
+    setLoadingGlobalStats(true);
+    
+    try {
+      console.log('🔐 Admin fetching LEGACY FULL Firebase stats (expensive!)...');
       const stats = await getGlobalStatsRealTime();
       setGlobalStats(stats);
       setLastGlobalStatsUpdate(new Date().toLocaleString());
@@ -178,10 +246,10 @@ export default function AdminPanel() {
         animateStatValue(stats.transactionsCount, 'transactions');
       }
       
-      console.log(`✅ REAL-TIME Firebase stats loaded:`, stats);
+      console.log(`✅ LEGACY Firebase stats loaded:`, stats);
       console.log(`💰 Cost: ~$${((stats.userCount + stats.postsCount) * 0.00006).toFixed(2)} for this request`);
     } catch (error) {
-      console.error('❌ Error fetching real-time Firebase stats:', error);
+      console.error('❌ Error fetching legacy Firebase stats:', error);
       setGlobalStats(null);
     } finally {
       setLoadingGlobalStats(false);
@@ -216,16 +284,18 @@ export default function AdminPanel() {
     }, 1000);
   };
 
-  // 📊 Animate stats counter
-  const animateStatValue = (newValue: number, statType: string) => {
+  // 📊 Animate stats counter (zoptymalizowane dla Smart Refresh)
+  const animateStatValue = (newValue: number, statType: string, isIncremental: boolean = false) => {
     const oldValue = animatedStats[statType] || 0;
     if (oldValue !== newValue) {
       triggerUpdate(statType);
       
-      // Animate from old to new value
+      // 🎯 Smart Refresh: Krótsza, subtelniejsza animacja dla małych przyrostów
+      const difference = Math.abs(newValue - oldValue);
+      const duration = isIncremental && difference < 100 ? 600 : 1000; // Szybsza animacja dla małych zmian
+      const steps = isIncremental && difference < 100 ? 20 : 30;
+      
       let current = oldValue;
-      const duration = 1000; // 1 second
-      const steps = 30;
       const increment = (newValue - oldValue) / steps;
       
       const interval = setInterval(() => {
@@ -539,11 +609,21 @@ export default function AdminPanel() {
           <div className="bg-white/10 rounded-lg p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-white">Current Stats</h3>
-              {lastGlobalStatsUpdate && (
-                <div className="text-sm text-blue-300">
-                  Last updated: {lastGlobalStatsUpdate}
-                </div>
-              )}
+              <div className="flex items-center space-x-3">
+                {globalStats?.dataSource && (
+                  <div className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
+                    {globalStats.dataSource === 'firebase-incremental' ? '⚡ Incremental' :
+                     globalStats.dataSource === 'firebase-full-fetch' ? '🔄 Full Fetch' :
+                     globalStats.dataSource === 'firebase-realtime' ? '💥 Legacy' :
+                     '📋 Cached'}
+                  </div>
+                )}
+                {lastGlobalStatsUpdate && (
+                  <div className="text-sm text-blue-300">
+                    Last updated: {lastGlobalStatsUpdate}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex gap-4 mb-6 flex-wrap">
@@ -580,11 +660,9 @@ export default function AdminPanel() {
 
               <button
                 onClick={() => {
-                  setRealStatsData(null);
-                  setGlobalStats(null);
-                  setAnimatedStats({});
-                  // Refresh both BaseChat statistics and MySphere statistics
-                  handleFetchRealTimeStats();
+                  // ⚡ SMART REFRESH: Zachowaj obecne dane, tylko je zaktualizuj
+                  // NIE resetuj globalStats ani animatedStats - pozwól na płynną aktualizację
+                  handleFetchRealTimeStats(false);
                   fetchMySphereStats();
                 }}
                 disabled={realStatsLoading}
@@ -594,26 +672,119 @@ export default function AdminPanel() {
                     : 'bg-blue-600 hover:bg-blue-700'
                 } text-white`}
               >
-                {realStatsLoading ? '⏳ Loading...' : '🔄 Refresh Data'}
+                {realStatsLoading ? '⏳ Loading...' : '⚡ Smart Refresh'}
+              </button>
+              
+              <button
+                onClick={() => {
+                  // 🔄 FULL REFRESH: Resetuj wszystko i załaduj od nowa
+                  setRealStatsData(null);
+                  setGlobalStats(null);
+                  setAnimatedStats({});
+                  handleFetchRealTimeStats(true);
+                  fetchMySphereStats();
+                }}
+                disabled={realStatsLoading}
+                className={`px-3 py-2 rounded-lg font-medium transition-all ${
+                  realStatsLoading 
+                    ? 'bg-gray-500 cursor-not-allowed' 
+                    : 'bg-orange-600 hover:bg-orange-700'
+                } text-white text-sm`}
+              >
+                {realStatsLoading ? '⏳' : '🔄 Full'}
+              </button>
+              
+              <button
+                onClick={() => {
+                  // 💥 LEGACY: Resetuj wszystko i użyj starej, drogiej metody
+                  setRealStatsData(null);
+                  setGlobalStats(null);
+                  setAnimatedStats({});
+                  handleFetchLegacyStats();
+                  fetchMySphereStats();
+                }}
+                disabled={realStatsLoading}
+                className={`px-3 py-2 rounded-lg font-medium transition-all ${
+                  realStatsLoading 
+                    ? 'bg-gray-500 cursor-not-allowed' 
+                    : 'bg-red-600 hover:bg-red-700'
+                } text-white text-sm`}
+              >
+                {realStatsLoading ? '⏳' : '💥 Legacy'}
+              </button>
+              
+              <button
+                onClick={() => {
+                  // 🗑️ Wyczyść cache i resetuj stan
+                  localStorage.removeItem('adminGlobalStatsCache');
+                  localStorage.removeItem('adminGlobalStatsTimestamp');
+                  setGlobalStats(null);
+                  setAnimatedStats({});
+                  console.log('🗑️ Admin cache cleared');
+                }}
+                className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all text-sm"
+              >
+                🗑️ Clear Cache
               </button>
             </div>
 
-            {/* Data Source Indicator */}
+            {/* Data Source Indicator & Optimization Status */}
             {(globalStats || realStatsData) && (
-              <div className="mb-6 p-3 rounded-lg text-sm bg-cyan-500/20 border border-cyan-500/50 text-cyan-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <span className="text-cyan-400 mr-2">⚡</span>
-                    <span className="font-medium">Auto-loaded Firebase data (direct calls)</span>
-                    <span className="ml-2 text-cyan-300">(2x faster, no API overhead)</span>
-                  </div>
-                  {realStatsData && (
-                    <div className="text-xs text-cyan-300">
-                      MySphere: {realStatsData.mySphere?.totalUsers || 'N/A'} users • 
-                      Updated: {new Date().toLocaleTimeString()}
+              <div className="mb-6 space-y-3">
+                {/* Current Data Source */}
+                <div className="p-3 rounded-lg text-sm bg-cyan-500/20 border border-cyan-500/50 text-cyan-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span className="text-cyan-400 mr-2">
+                        {globalStats?.dataSource === 'firebase-incremental' ? '⚡' : 
+                         globalStats?.dataSource === 'firebase-full-fetch' ? '🔄' : 
+                         '📊'}
+                      </span>
+                      <span className="font-medium">
+                        {globalStats?.dataSource === 'firebase-incremental' ? 'Incremental update (OPTIMIZED)' :
+                         globalStats?.dataSource === 'firebase-full-fetch' ? 'Full refresh (first time)' :
+                         globalStats?.dataSource === 'firebase-realtime' ? 'Legacy full fetch (EXPENSIVE)' :
+                         'Auto-loaded Firebase data'}
+                      </span>
+                      <span className="ml-2 text-cyan-300">(direct calls, no API overhead)</span>
                     </div>
-                  )}
+                    {realStatsData && (
+                      <div className="text-xs text-cyan-300">
+                        MySphere: {realStatsData.mySphere?.totalUsers || 'N/A'} users • 
+                        Updated: {new Date().toLocaleTimeString()}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* Optimization Details */}
+                {globalStats?.deltaInfo && (
+                  <div className="p-3 rounded-lg text-sm bg-green-500/20 border border-green-500/50 text-green-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <span className="text-green-400">🎯</span>
+                        <div>
+                          <span className="font-medium">Delta Update: </span>
+                          <span>+{globalStats.deltaInfo.newUsers} users, +{globalStats.deltaInfo.newPosts} posts since {new Date(globalStats.deltaInfo.incrementalSince).toLocaleTimeString()}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-green-300">
+                        Reads saved: ~{((globalStats.userCount + globalStats.postsCount - (globalStats.deltaInfo.newUsers + globalStats.deltaInfo.newPosts)) * 0.00006).toFixed(2)}$
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Legacy Warning */}
+                {globalStats?.dataSource === 'firebase-realtime' && (
+                  <div className="p-3 rounded-lg text-sm bg-red-500/20 border border-red-500/50 text-red-200">
+                    <div className="flex items-center">
+                      <span className="text-red-400 mr-2">⚠️</span>
+                      <span className="font-medium">Legacy Mode Active - This method scans ALL documents and is expensive!</span>
+                      <span className="ml-2 text-red-300">Cost: ~$${((globalStats.userCount + globalStats.postsCount) * 0.00006).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
