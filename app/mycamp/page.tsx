@@ -33,6 +33,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import Script from 'next/script';
+import SpotifyDashboard from './components/SpotifyDashboard'; // 🎵 Import needed even when hidden
 // Removed API imports - these should only be used in backend
 
 const CAMP_NFT_CONTRACT = '0x1eD74B27f846C699A90926daD057A7f6FD22C126';
@@ -108,6 +109,11 @@ export default function MyCampPage() {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const [walletStats, setWalletStats] = useState<any>(null);
+  
+  // 🎵 Spotify Features Configuration
+  // Set to true to enable Spotify functionality in MyCamp
+  // When enabled: Shows Spotify tab, allows music analytics, social features
+  const SPOTIFY_FEATURES_ENABLED = false;
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [socialDropdownOpen, setSocialDropdownOpen] = useState(false);
@@ -429,6 +435,13 @@ export default function MyCampPage() {
     }
   };
 
+  // Ensure activeTab is not 'spotify' when Spotify features are disabled
+  useEffect(() => {
+    if (!SPOTIFY_FEATURES_ENABLED && activeTab === 'spotify') {
+      setActiveTab('home');
+    }
+  }, [activeTab]);
+
   // Debug social data
   useEffect(() => {
     console.log('🔍 Camp Network Status:', {
@@ -443,7 +456,8 @@ export default function MyCampPage() {
       hasTwitter: (socialsData as any)?.twitter,
       hasSpotify: (socialsData as any)?.spotify,
       hasTiktok: (socialsData as any)?.tiktok,
-      connectedSocialsCount
+      connectedSocialsCount,
+      spotifyFeaturesEnabled: SPOTIFY_FEATURES_ENABLED
     });
   }, [authenticated, loading, address, socialsData, socialsError, socialsLoading, CLIENT_ID, API_KEY, connectedSocialsCount]);
 
@@ -754,7 +768,7 @@ export default function MyCampPage() {
         >
 
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 ${SPOTIFY_FEATURES_ENABLED ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
             {/* Home Button */}
             <motion.button
               initial={{ opacity: 0, y: 20 }}
@@ -920,6 +934,51 @@ export default function MyCampPage() {
                 />
               )}
             </motion.button>
+
+            {/* Spotify Button - Hidden if SPOTIFY_FEATURES_ENABLED is false */}
+            {SPOTIFY_FEATURES_ENABLED && (
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.55, duration: 0.5 }}
+                whileHover={{ 
+                  scale: 1.05, 
+                  y: -5,
+                  boxShadow: "0 20px 40px rgba(34, 197, 94, 0.4)"
+                }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setActiveTab('spotify')}
+                className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
+                  activeTab === 'spotify'
+                    ? 'bg-gradient-to-br from-green-500/80 to-emerald-500/80 text-white shadow-2xl shadow-green-500/25 border border-green-400/50'
+                    : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-green-400/40'
+                }`}
+              >
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-emerald-400/20"
+                  initial={{ opacity: 0 }}
+                  whileHover={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                />
+                <div className="relative z-10">
+                  <motion.div 
+                    className="text-center"
+                    whileHover={{ scale: 1.1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">MUSIC</div>
+                    <div className="text-xs opacity-80 uppercase tracking-widest">Spotify</div>
+                  </motion.div>
+                </div>
+                {activeTab === 'spotify' && (
+                  <motion.div
+                    layoutId="activeGlow"
+                    className="absolute inset-0 bg-gradient-to-br from-green-500/30 to-emerald-500/30 rounded-2xl"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+              </motion.button>
+            )}
 
             {/* Social Media Dropdown Button */}
             <motion.div
@@ -2051,11 +2110,26 @@ export default function MyCampPage() {
           </motion.div>
         )}
 
-
-
-
-
-
+        {/* Spotify Tab Content - Hidden if SPOTIFY_FEATURES_ENABLED is false */}
+        {SPOTIFY_FEATURES_ENABLED && activeTab === 'spotify' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="bg-black/30 backdrop-blur-sm border border-green-500/20 rounded-2xl p-4 sm:p-6 mb-8"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-green-300 flex items-center gap-2">
+                🎵 Spotify Analytics & Data
+                <span className="text-sm bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                  Enhanced with Origin SDK
+                </span>
+              </h3>
+            </div>
+            
+            <SpotifyDashboard />
+          </motion.div>
+        )}
 
         {/* Camp Modal for Authentication */}
         <CampModal injectButton={false} />

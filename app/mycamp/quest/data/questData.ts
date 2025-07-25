@@ -225,6 +225,66 @@ export const SEVEN_DAY_JOURNEY: QuestDay[] = [
         }
       },
       {
+        id: 'day2_spotify_diversity',
+        title: 'Musical Explorer',
+        description: 'Achieve a listening diversity score of 50% or higher',
+        shortDescription: 'Reach 50% music diversity',
+        type: 'achievement',
+        category: 'social',
+        difficulty: 'medium',
+        day: 2,
+        xpReward: 1000,
+        tokenReward: 200,
+        estimatedTime: '15 min',
+        icon: '🎯',
+        gradient: 'from-green-500 to-blue-500',
+        status: 'locked',
+        unlockConditions: [{ dayRequired: 1 }],
+        requirements: [{
+          id: 'listening_diversity',
+          type: 'complete_profile',
+          target: 50,
+          current: 0,
+          description: 'Achieve 50% listening diversity on Spotify'
+        }],
+        progress: {
+          completed: false,
+          percentage: 0,
+          currentStep: 0,
+          totalSteps: 1
+        }
+      },
+      {
+        id: 'day2_music_social',
+        title: 'Rhythm Connector',
+        description: 'Find and connect with users who share similar music taste',
+        shortDescription: 'Connect with similar music lovers',
+        type: 'social_connect',
+        category: 'social',
+        difficulty: 'medium',
+        day: 2,
+        xpReward: 1200,
+        tokenReward: 250,
+        estimatedTime: '10 min',
+        icon: '🤝',
+        gradient: 'from-purple-500 to-pink-500',
+        status: 'locked',
+        unlockConditions: [{ dayRequired: 1 }],
+        requirements: [{
+          id: 'music_connections',
+          type: 'social_connect',
+          target: 1,
+          current: 0,
+          description: 'Connect with a user with similar music taste'
+        }],
+        progress: {
+          completed: false,
+          percentage: 0,
+          currentStep: 0,
+          totalSteps: 1
+        }
+      },
+      {
         id: 'day2_tiktok_connect',
         title: 'Viral Vortex',
         description: 'Enter the fast-paced dimension of viral content',
