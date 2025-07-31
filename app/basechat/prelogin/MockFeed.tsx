@@ -2,6 +2,9 @@
 
 import React from 'react';
 import MockPost from './MockPost';
+import { SignInWithBaseButton } from '@base-org/account-ui/react';
+import { createBaseAccountSDK } from '@base-org/account';
+import { useAccount, useConnect } from 'wagmi';
 
 const mockPostsData = [
   {
@@ -62,6 +65,53 @@ const mockPostsData = [
 ];
 
 const MockFeed = () => {
+  const { connect, connectors } = useConnect();
+
+  const handleSignInWithBase = async () => {
+    try {
+      console.log('🔵 Sign In With Base clicked in MockFeed');
+      
+      // Find Coinbase Wallet connector (which supports Base Account)
+      const coinbaseConnector = connectors.find(connector => 
+        connector.name === 'Coinbase Wallet' || connector.id === 'coinbaseWallet'
+      );
+      
+      if (coinbaseConnector) {
+        console.log('✅ Found Coinbase Wallet connector, connecting...');
+        await connect({ connector: coinbaseConnector });
+      } else {
+        console.log('❌ Coinbase Wallet connector not found');
+        // Fallback to Base Account SDK (automatically connects to Base network)
+        const sdk = createBaseAccountSDK({
+          appName: 'BaseBook',
+          appLogo: '/favicon_io (1)/android-chrome-192x1921.png'
+        });
+        
+        const provider = sdk.getProvider();
+        
+        const result = await provider.request({
+          method: 'wallet_connect',
+          params: [{
+            version: '1',
+            capabilities: {
+              signInWithEthereum: { 
+                nonce: window.crypto?.randomUUID?.()?.replace(/-/g, '') || Math.random().toString(36).substring(7),
+                chainId: '0x2105' // Base Mainnet - 8453
+              }
+            }
+          }]
+        });
+        
+        if (result?.accounts?.[0]) {
+          console.log('✅ Base Account connected:', result.accounts[0].address);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Sign In With Base error:', error);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-gradient-to-br from-black via-gray-900 to-blue-900 rounded-lg text-center text-white p-4">
@@ -78,7 +128,15 @@ const MockFeed = () => {
             />
           </div>
         </div>
-        <p className="text-sm text-gray-300">Connect your wallet to join the conversation and see the live feed.</p>
+        <p className="text-sm text-gray-300 mb-4">Connect your wallet to join the conversation and see the live feed.</p>
+        
+        {/* Sign In With Base Button */}
+        <div className="flex justify-center">
+          <SignInWithBaseButton 
+            colorScheme="dark"
+            onClick={handleSignInWithBase}
+          />
+        </div>
       </div>
       
       {mockPostsData.map((post, index) => (

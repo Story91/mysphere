@@ -7,6 +7,7 @@ export const PIN_PRICES: Record<PinDuration, PinPrice> = {
     duration: 'HOUR_1',
     priceETH: '0.0005',
     priceUSD: 1.25,
+    priceUSDC: 0.625, // 50% ceny ETH w USD  
     label: '1 Hour',
     description: 'Quick visibility boost'
   },
@@ -14,6 +15,7 @@ export const PIN_PRICES: Record<PinDuration, PinPrice> = {
     duration: 'HOURS_6', 
     priceETH: '0.002',
     priceUSD: 5.0,
+    priceUSDC: 2.50, // 50% ceny ETH w USD
     label: '6 Hours',
     description: 'Half-day promotion'
   },
@@ -21,6 +23,7 @@ export const PIN_PRICES: Record<PinDuration, PinPrice> = {
     duration: 'HOURS_24',
     priceETH: '0.005', 
     priceUSD: 12.5,
+    priceUSDC: 6.25, // 50% ceny ETH w USD
     label: '24 Hours',
     description: 'Full day featured'
   },
@@ -28,6 +31,7 @@ export const PIN_PRICES: Record<PinDuration, PinPrice> = {
     duration: 'DAYS_7',
     priceETH: '0.02',
     priceUSD: 50.0,
+    priceUSDC: 25.0, // 50% ceny ETH w USD
     label: '7 Days', 
     description: 'Week-long premium'
   }
@@ -79,14 +83,17 @@ export const getPriceForDuration = (duration: PinDuration): PinPrice => {
 export const calculateTotalCost = (duration: PinDuration, ethPrice?: number): {
   ethAmount: string;
   usdAmount: number;
+  usdcAmount: number;
 } => {
   const price = getPriceForDuration(duration);
   const ethAmount = price.priceETH;
   const usdAmount = ethPrice ? parseFloat(ethAmount) * ethPrice : price.priceUSD;
+  const usdcAmount = price.priceUSDC;
   
   return {
     ethAmount,
-    usdAmount
+    usdAmount,
+    usdcAmount
   };
 };
 

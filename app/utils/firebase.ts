@@ -436,17 +436,13 @@ export const createPost = async (post: {
   network?: 'base' | 'basecamp'; // Add network parameter to identify the source network
 }): Promise<string> => { // Zmieniamy typ zwracany na Promise<string>
   try {
-    const postsCollection = collection(db, 'posts');
-    
-    // Użyj `addDoc` aby Firebase sam wygenerował ID
-    const newPostRef = await addDoc(postsCollection, {
+    const postData = {
       ...post,
-      timestamp: serverTimestamp(), // Użyj serverTimestamp dla spójności
+      timestamp: serverTimestamp(),
       likes: 0,
       likedBy: [],
       comments: [],
-      isPinned: false, // Domyślnie post nie jest przypięty
-      // Upewnij się, że opcjonalne pola mają wartość null, jeśli nie są podane
+      isPinned: false,
       image: post.image || null,
       video: post.video || null,
       tags: post.tags || [],
@@ -455,24 +451,43 @@ export const createPost = async (post: {
       txHash: post.txHash || null,
       zoraCoinAddress: post.zoraCoinAddress || null,
       network: post.network || 'base'
-    });
-    
-    console.log(`✅ Post created with ID: ${newPostRef.id}`);
+    };
 
-    // 📊 AKTUALIZUJ STATYSTYKI AUTORA: Zwiększ liczbę postów
-    try {
-      const authorRef = doc(db, 'users', post.author);
-      await updateDoc(authorRef, {
-        postsCount: increment(1),
-        'stats.posts': increment(1),
-        lastActive: serverTimestamp()
-      });
-      console.log(`📊 Updated postsCount for author: ${post.author}`);
-    } catch (authorUpdateError) {
-      console.error('❌ Error updating author postsCount:', authorUpdateError);
-      // Nie rzucamy błędu - post został utworzony, tylko statystyki się nie zaktualizowały
+    // Użyj batcha do operacji atomowych
+    const batch = writeBatch(db);
+
+    // 1. Dodaj post do głównej kolekcji `posts`
+    const postsCollection = collection(db, 'posts');
+    const newPostRef = doc(postsCollection); // Wygeneruj ID posta z góry
+    batch.set(newPostRef, postData);
+
+    // 2. Sprawdź, czy autor ma BaseName
+    const usernameRef = doc(db, 'usernames', post.author);
+    const usernameDoc = await getDoc(usernameRef);
+    const hasBaseName = usernameDoc.exists() && usernameDoc.data().isBaseName === true;
+
+    // 3. Jeśli autor ma BaseName, dodaj kopię posta do `baseNameFeed`
+    if (hasBaseName) {
+      console.log(`👤 Użytkownik ${post.author} ma BaseName. Dodaję post do baseNameFeed.`);
+      const baseNameFeedCollection = collection(db, 'baseNameFeed');
+      // Użyj tego samego ID dla posta w obu kolekcjach
+      const baseNameFeedPostRef = doc(baseNameFeedCollection, newPostRef.id);
+      batch.set(baseNameFeedPostRef, postData);
     }
 
+    // 4. Zaktualizuj statystyki autora (postsCount)
+    const authorRef = doc(db, 'users', post.author);
+    batch.update(authorRef, {
+      postsCount: increment(1),
+      'stats.posts': increment(1),
+      lastActive: serverTimestamp()
+    });
+
+    // 5. Wykonaj wszystkie operacje w batchu
+    await batch.commit();
+    
+    console.log(`✅ Post created with ID: ${newPostRef.id}`);
+    
     // Zwróć ID nowego posta
     return newPostRef.id;
 
@@ -628,6 +643,81 @@ export const fetchPosts = async ({
     
   } catch (error) {
     console.error('Error fetching posts:', error);
+    throw error;
+  }
+};
+
+// Funkcja do pobierania postów z dedykowanego feedu BaseName
+export const fetchBaseNameFeedPosts = async ({ 
+  limit = 15,
+  startAfter = null,
+  orderBy = 'newest'
+}: {
+  limit?: number;
+  startAfter?: QueryDocumentSnapshot | null;
+  orderBy?: 'newest' | 'oldest';
+} = {}): Promise<FetchPostsResult> => {
+  try {
+    const postsCollection = collection(db, 'baseNameFeed'); // 🎯 CZYTA Z NOWEJ KOLEKCJI
+    const queryConstraints = [];
+    
+    // Sortowanie postów
+    if (orderBy === 'newest') {
+      queryConstraints.push(firestoreOrderBy('timestamp', 'desc'));
+    } else {
+      queryConstraints.push(firestoreOrderBy('timestamp', 'asc'));
+    }
+    
+    // Ograniczenie liczby postów
+    queryConstraints.push(firestoreLimit(limit));
+    
+    // Paginacja
+    if (startAfter) {
+      queryConstraints.push(firestoreStartAfter(startAfter));
+    }
+    
+    const postsQuery = query(postsCollection, ...queryConstraints);
+    const postsSnapshot = await getDocs(postsQuery);
+    
+    const posts: ExtendedPost[] = postsSnapshot.docs.map(doc => {
+      const postData = doc.data();
+      return {
+        id: doc.id,
+        author: postData.author,
+        content: postData.content,
+        timestamp: postData.timestamp instanceof Timestamp 
+          ? postData.timestamp.toMillis() 
+          : (postData.timestamp || Date.now()),
+        likes: postData.likes || 0,
+        likedBy: postData.likedBy || [],
+        comments: postData.comments || [],
+        tags: postData.tags || [],
+        mentions: postData.mentions || [],
+        image: postData.image || null,
+        video: postData.video || null,
+        txHash: postData.txHash || null,
+        lastEdited: postData.lastEdited || null,
+        zoraCoinAddress: postData.zoraCoinAddress || null,
+        network: postData.network || 'base',
+        isPinned: postData.isPinned || false,
+        pinnedAt: postData.pinnedAt instanceof Timestamp 
+          ? postData.pinnedAt.toMillis() 
+          : (postData.pinnedAt || undefined),
+        pinnedBy: postData.pinnedBy || undefined,
+        isPaidPin: postData.isPaidPin || false,
+        paidPinExpiresAt: postData.paidPinExpiresAt instanceof Timestamp 
+          ? postData.paidPinExpiresAt.toMillis() 
+          : (postData.paidPinExpiresAt || undefined),
+      };
+    });
+
+    const lastVisible = postsSnapshot.docs.length > 0 
+      ? postsSnapshot.docs[postsSnapshot.docs.length - 1] 
+      : null;
+
+    return { posts, lastVisible };
+  } catch (error) {
+    console.error('Error fetching BaseName feed posts:', error);
     throw error;
   }
 };
@@ -3344,6 +3434,8 @@ export const getMySphereRecentUsers = async (limit: number = 10) => {
   }
 };
 
+
+
 // Usuń wszystkie dane MySphere (funkcja czyszcząca dla testów)
 export const clearMySphereData = async (): Promise<{success: boolean, deletedRecords: number}> => {
   try {
@@ -4571,5 +4663,117 @@ export const fixAllUserStats = async (): Promise<{ success: boolean, fixed: numb
       fixed: 0,
       errors: [error instanceof Error ? error.message : 'Unknown error']
     };
+  }
+};
+
+// Funkcja migracyjna do kopiowania historycznych postów od użytkowników z BaseName
+export const migrateHistoricalBaseNamePosts = async (): Promise<{
+  success: boolean;
+  processedPosts: number;
+  migratedPosts: number;
+  error?: string;
+}> => {
+  try {
+    console.log('🔄 Rozpoczynam migrację historycznych postów dla użytkowników z BaseName...');
+    
+    // 1. Pobierz listę wszystkich użytkowników z BaseName
+    const usernamesRef = collection(db, 'usernames');
+    const baseNameQuery = query(usernamesRef, where('isBaseName', '==', true));
+    const baseNameSnapshot = await getDocs(baseNameQuery);
+    
+    const baseNameUsers = baseNameSnapshot.docs.map(doc => doc.id);
+    console.log(`📊 Znaleziono ${baseNameUsers.length} użytkowników z BaseName`);
+    
+    if (baseNameUsers.length === 0) {
+      return {
+        success: true,
+        processedPosts: 0,
+        migratedPosts: 0,
+        error: 'Brak użytkowników z BaseName do migracji'
+      };
+    }
+    
+    // 2. Pobierz posty od użytkowników z BaseName (w batch'ach po 10 użytkowników)
+    let totalProcessed = 0;
+    let totalMigrated = 0;
+    const batch = writeBatch(db);
+    let batchCount = 0;
+    const maxBatchSize = 500; // Firestore limit
+    
+    for (let i = 0; i < baseNameUsers.length; i += 10) {
+      const userChunk = baseNameUsers.slice(i, i + 10);
+      
+      // Pobierz posty dla tej grupy użytkowników
+      const postsRef = collection(db, 'posts');
+      const postsQuery = query(postsRef, where('author', 'in', userChunk));
+      const postsSnapshot = await getDocs(postsQuery);
+      
+      // Przetwórz każdy post
+      for (const postDoc of postsSnapshot.docs) {
+        totalProcessed++;
+        
+        // Sprawdź czy post już istnieje w baseNameFeed
+        const baseNameFeedRef = doc(db, 'baseNameFeed', postDoc.id);
+        const existingPost = await getDoc(baseNameFeedRef);
+        
+        if (!existingPost.exists()) {
+          // Dodaj post do batch'a do skopiowania
+          batch.set(baseNameFeedRef, postDoc.data());
+          totalMigrated++;
+          batchCount++;
+          
+          // Wykonaj batch jeśli osiągnęliśmy limit
+          if (batchCount >= maxBatchSize) {
+            await batch.commit();
+            console.log(`✅ Batch wykonany: ${batchCount} postów skopiowanych`);
+            // Rozpocznij nowy batch
+            const newBatch = writeBatch(db);
+            Object.assign(batch, newBatch);
+            batchCount = 0;
+          }
+        }
+      }
+      
+      console.log(`📊 Przetworzono ${i + userChunk.length}/${baseNameUsers.length} użytkowników`);
+    }
+    
+    // Wykonaj ostatni batch jeśli zawiera jakieś operacje
+    if (batchCount > 0) {
+      await batch.commit();
+      console.log(`✅ Ostatni batch wykonany: ${batchCount} postów skopiowanych`);
+    }
+    
+    console.log(`🎉 Migracja zakończona:
+    - Przetworzono postów: ${totalProcessed}
+    - Zmigrowano nowych postów: ${totalMigrated}
+    - Użytkowników z BaseName: ${baseNameUsers.length}`);
+    
+    return {
+      success: true,
+      processedPosts: totalProcessed,
+      migratedPosts: totalMigrated
+    };
+    
+  } catch (error) {
+    console.error('❌ Błąd podczas migracji:', error);
+    return {
+      success: false,
+      processedPosts: 0,
+      migratedPosts: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas migracji'
+    };
+  }
+};
+
+// Funkcja do pobierania liczby użytkowników z BaseName
+export const getUsersWithBasenameCount = async (): Promise<number> => {
+  try {
+    const usernamesRef = collection(db, 'usernames');
+    const baseNameQuery = query(usernamesRef, where('isBaseName', '==', true));
+    const baseNameSnapshot = await getDocs(baseNameQuery);
+    return baseNameSnapshot.size;
+  } catch (error) {
+    console.error("Błąd podczas pobierania liczby użytkowników z BaseName:", error);
+    return 0;
   }
 };

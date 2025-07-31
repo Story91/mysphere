@@ -2,16 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useAccount, useBalance } from 'wagmi';
+import { useAccount, useBalance, useSwitchChain } from 'wagmi';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { X, Clock, DollarSign, Zap, Crown } from 'lucide-react';
 import { getAllDurations, calculateTotalCost, formatTimeLeft, calculateExpirationTime } from '../utils/pinPricing';
 import { createPaidPin, canPinPost, PinDuration } from '../../../utils/firebase';
+// Base Pay imports
+import { pay, getPaymentStatus } from '@base-org/account';
+import { BasePayButton } from '@base-org/account-ui/react';
 
 // Smart Contract Integration
 import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI, ContractPinDuration } from '../config/contractConfig';
+
+// MySphere wallet address for Base Pay payments
+const MYSPHERE_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd';
 
 
 interface PaidPinModalProps {
@@ -33,6 +39,7 @@ export default function PaidPinModal({
 }: PaidPinModalProps) {
   const { address, chain } = useAccount();
   const { data: balance } = useBalance({ address });
+  const { switchChain } = useSwitchChain();
   
   const [selectedDuration, setSelectedDuration] = useState<PinDuration>('HOURS_24');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -83,11 +90,36 @@ export default function PaidPinModal({
     onClose();
   };
 
+  // Function to ensure we're on Base network before transaction
+  const ensureBaseNetwork = async () => {
+    const BASE_CHAIN_ID = 8453;
+    if (chain?.id !== BASE_CHAIN_ID) {
+      try {
+        console.log('🔄 Switching to Base network...');
+        await switchChain({ chainId: BASE_CHAIN_ID });
+        console.log('✅ Switched to Base network');
+        return true;
+      } catch (error) {
+        console.error('❌ Failed to switch to Base network:', error);
+        toast.error('Please switch to Base network manually');
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handlePayAndPin = async () => {
     if (!address || !canPin || !hasEnoughBalance || isProcessing) return;
     
     try {
       setIsProcessing(true);
+      
+      // Ensure we're on Base network first
+      const switched = await ensureBaseNetwork();
+      if (!switched) {
+        setIsProcessing(false);
+        return;
+      }
       
       const canPostBePinned = await canPinPost(postId);
       if (!canPostBePinned) {
@@ -220,6 +252,8 @@ export default function PaidPinModal({
             </div>
           </div>
 
+
+
           {/* Duration Selection */}
           <div className="p-3 sm:p-6">
                       <h4 className="text-sm sm:text-md font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">
@@ -323,8 +357,9 @@ export default function PaidPinModal({
             </div>
           )}
 
-          {/* Action Button */}
+          {/* Action Buttons */}
           <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+          {/* ETH Payment Button */}
           <button
             onClick={handlePayAndPin}
             disabled={buttonState.disabled}
@@ -337,7 +372,90 @@ export default function PaidPinModal({
             {buttonState.text}
           </button>
 
-          <p className="text-center text-gray-500 mt-2 text-xs">
+          {/* Base Pay Button - 50% cheaper alternative */}
+          <div className="mt-4">
+            <div className="text-center mb-2">
+              <span className="text-xs text-gray-600 dark:text-gray-400">Or pay with Base Pay </span>
+              <span className="text-xs text-green-600 dark:text-green-400 font-semibold">(50% cheaper - ${selectedPrice.usdcAmount.toFixed(2)} USDC!)</span>
+            </div>
+            <BasePayButton
+              colorScheme="light"
+              onClick={async () => {
+                try {
+                  // Ensure we're on Base network first
+                  const switched = await ensureBaseNetwork();
+                  if (!switched) {
+                    return;
+                  }
+                  
+                  setIsProcessing(true);
+                  
+                  const canPostBePinned = await canPinPost(postId);
+                  if (!canPostBePinned) {
+                    toast.error('This post is already pinned or cannot be pinned');
+                    setIsProcessing(false);
+                    return;
+                  }
+                  
+                  const { id } = await pay({
+                    amount: selectedPrice.usdcAmount.toString(),
+                    to: MYSPHERE_ADDRESS,
+                    testnet: chain?.id !== 8453
+                  });
+                  
+                  // Poll for transaction status
+                  const pollStatus = async () => {
+                    try {
+                      const { status } = await getPaymentStatus({ 
+                        id,
+                        testnet: chain?.id !== 8453
+                      });
+                      
+                      if (status === 'completed') {
+                        // Zapisz do Firebase tak samo jak ETH pin
+                        const success = await createPaidPin(
+                          postId,
+                          address,
+                          selectedDuration,
+                          id, // Base Pay transaction ID
+                          selectedPrice.usdcAmount.toString(),
+                          chain?.id || 8453
+                        );
+
+                        if (success) {
+                          toast.success(`Post pinned for $${selectedPrice.usdcAmount.toFixed(2)} USDC via Base Pay! 🎉`);
+                          if (onPinSuccess) {
+                            onPinSuccess(id, selectedDuration);
+                          }
+                          onClose();
+                        } else {
+                          toast.error('Failed to create pin record');
+                        }
+                        setIsProcessing(false);
+                      } else if (status === 'failed') {
+                        throw new Error('Payment failed');
+                      } else {
+                        setTimeout(pollStatus, 2000);
+                      }
+                    } catch (error) {
+                      console.error('Error checking payment status:', error);
+                      toast.error('Failed to verify payment status');
+                      setIsProcessing(false);
+                    }
+                  };
+                  
+                  setTimeout(pollStatus, 1000);
+                  
+                } catch (error) {
+                  console.error('Base Pay error:', error);
+                  toast.error(`Base Pay failed: ${error.message || 'Unknown error'}`);
+                  setIsProcessing(false);
+                }
+              }}
+            />
+          </div>
+
+          <p className="text-center text-gray-500 mt-4 text-xs">
             Pinning is only available on Base Mainnet.
           </p>
           

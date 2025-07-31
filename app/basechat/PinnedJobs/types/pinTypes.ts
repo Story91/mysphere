@@ -7,6 +7,7 @@ export interface PinPrice {
   duration: PinDuration;
   priceETH: string;
   priceUSD: number;
+  priceUSDC: number; // Base Pay USDC price (50% of ETH price)
   label: string;
   description: string;
 }

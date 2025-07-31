@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useAccount, useChainId, useBalance } from 'wagmi';
+import { useAccount, useChainId, useBalance, useSwitchChain } from 'wagmi';
 import { 
   Transaction,
   TransactionButton,
@@ -14,6 +14,9 @@ import { parseEther, parseUnits, formatEther, formatUnits, encodeFunctionData } 
 import { toast } from 'react-hot-toast';
 import { base } from 'wagmi/chains';
 import { saveTip } from '../../utils/firebase';
+// Base Pay imports
+import { pay, getPaymentStatus } from '@base-org/account';
+import { BasePayButton } from '@base-org/account-ui/react';
 
 // USDC contract address on Base Mainnet (official) - Updated Jan 2024
 const USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
@@ -48,6 +51,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
   
   // Mobile debugging - DISABLED
   // useEffect(() => {
@@ -112,6 +116,23 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
 
   // Check if on correct network
   const isCorrectNetwork = chainId === base.id;
+
+  // Function to ensure we're on Base network before transaction
+  const ensureBaseNetwork = useCallback(async () => {
+    if (chainId !== base.id) {
+      try {
+        console.log('🔄 Switching to Base network...');
+        await switchChain({ chainId: base.id });
+        console.log('✅ Switched to Base network');
+        return true;
+      } catch (error) {
+        console.error('❌ Failed to switch to Base network:', error);
+        toast.error('Please switch to Base network manually');
+        return false;
+      }
+    }
+    return true;
+  }, [chainId, switchChain]);
 
   const handleTransactionStatus = useCallback(async (status: any) => {
     // console.log('🔄 Transaction status:', status); // Debug log
@@ -193,23 +214,12 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   }, [address, recipientAddress, tipAmount, selectedToken, postId]);
 
   const getCalls = useCallback(() => {
-    // console.log('📱 Mobile Debug - getCalls:', {
-    //   isConnected,
-    //   address,
-    //   recipientAddress,
-    //   tipAmount,
-    //   selectedToken,
-    //   chainId
-    // });
-    
     if (!isConnected || !address || !recipientAddress || !tipAmount) {
-      // console.log('❌ Mobile Debug - Missing required params for transaction');
       return [];
     }
 
     const amount = parseFloat(tipAmount);
     if (amount <= 0) {
-      // console.log('❌ Mobile Debug - Invalid amount:', amount);
       return [];
     }
 
@@ -219,7 +229,6 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         to: recipientAddress as `0x${string}`,
         value: parseEther(tipAmount)
       };
-      // console.log('📱 Mobile Debug - ETH transfer call:', call);
       return [call];
     } else {
       // USDC transfer (ERC20)
@@ -234,7 +243,6 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         to: USDC_ADDRESS as `0x${string}`,
         data
       };
-      // console.log('📱 Mobile Debug - USDC transfer call:', call);
       return [call];
     }
   }, [address, recipientAddress, tipAmount, selectedToken, isConnected, chainId]);
@@ -477,47 +485,135 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 
                 {transactionSuccess && (
                   <div className="mb-4 p-3 bg-green-500/20 backdrop-blur-sm border border-green-400/50 rounded-xl text-green-300 text-sm text-center">
-                                         <div className="flex items-center justify-center space-x-2">
-                       <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                       </svg>
-                       <div className="text-center">
-                         <div>Tip sent successfully! 🎉</div>
-                         <div className="text-xs opacity-80 mt-1">Closing in 2 seconds...</div>
-                       </div>
-                     </div>
+                    <div className="flex items-center justify-center space-x-2">
+                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <div className="text-center">
+                        <div>Tip sent successfully! 🎉</div>
+                        <div className="text-xs opacity-80 mt-1">Closing in 2 seconds...</div>
+                      </div>
+                    </div>
                   </div>
                 )}
                 
-                <Transaction
-                  chainId={base.id}
-                  calls={getCalls()}
-                  onStatus={handleTransactionStatus}
-                  onError={(error) => {
-                    console.error('📱 Mobile Debug - Transaction error:', error);
-                    toast.dismiss(); // Clear loading toasts
-                    toast.error(`Transaction failed: ${error.message || 'Unknown error'}`);
-                    setIsTransacting(false);
-                    setTransactionSuccess(false);
-                  }}
-                >
-                  <TransactionButton
-                    text={
-                      hasInsufficientBalance()
-                        ? `Insufficient ${selectedToken}`
-                        : isTransacting
-                        ? 'Processing...'
-                        : `Tip ${tipAmount} ${selectedToken}`
-                    }
-                    disabled={
-                      !isCorrectNetwork ||
-                      hasInsufficientBalance() ||
-                      parseFloat(tipAmount) <= 0 ||
-                      isTransacting
-                    }
-                    className="w-full px-6 py-4 text-base font-medium rounded-xl touch-manipulation"
-                  />
-                </Transaction>
+                {/* Traditional wallet payments */}
+                {!isCorrectNetwork ? (
+                  <button
+                    onClick={async () => {
+                      const switched = await ensureBaseNetwork();
+                      if (switched) {
+                        toast.success('Switched to Base network! Now you can send tips.');
+                      }
+                    }}
+                    className="w-full px-6 py-4 text-base font-medium rounded-xl touch-manipulation mb-3 bg-orange-500 hover:bg-orange-600 text-white"
+                  >
+                    Switch to Base Network
+                  </button>
+                ) : (
+                  <Transaction
+                    chainId={base.id}
+                    calls={getCalls()}
+                    onStatus={handleTransactionStatus}
+                    onError={(error) => {
+                      console.error('Transaction error:', error);
+                      toast.dismiss();
+                      toast.error(`Transaction failed: ${error.message || 'Unknown error'}`);
+                      setIsTransacting(false);
+                      setTransactionSuccess(false);
+                    }}
+                  >
+                    <TransactionButton
+                      text={
+                        hasInsufficientBalance()
+                          ? `Insufficient ${selectedToken}`
+                          : isTransacting
+                          ? 'Processing...'
+                          : `Tip ${tipAmount} ${selectedToken}`
+                      }
+                      disabled={
+                        hasInsufficientBalance() ||
+                        parseFloat(tipAmount) <= 0 ||
+                        isTransacting
+                      }
+                      className="w-full px-6 py-4 text-base font-medium rounded-xl touch-manipulation mb-3"
+                    />
+                  </Transaction>
+                )}
+                
+                {/* Base Pay Button - tylko dla USDC */}
+                {selectedToken === 'USDC' && (
+                  <div className="text-center">
+                    <div className="text-xs text-blue-300 mb-2">Or pay with Base Pay:</div>
+                    <BasePayButton
+                      colorScheme="dark"
+                      onClick={async () => {
+                        try {
+                          // Ensure we're on Base network first
+                          const switched = await ensureBaseNetwork();
+                          if (!switched) {
+                            return;
+                          }
+                          
+                          setIsTransacting(true);
+                          
+                          const { id } = await pay({
+                            amount: tipAmount,
+                            to: recipientAddress,
+                            testnet: chainId !== base.id
+                          });
+                          
+                          // Poll for transaction status
+                          const pollStatus = async () => {
+                            try {
+                              const { status } = await getPaymentStatus({ 
+                                id,
+                                testnet: chainId !== base.id
+                              });
+                              
+                              if (status === 'completed') {
+                                // Zapisz do Firebase jako USDC tip (Base Pay używa USDC)
+                                await saveTip({
+                                  senderAddress: address!,
+                                  recipientAddress,
+                                  amount: tipAmount,
+                                  token: 'USDC', // Base Pay używa USDC
+                                  postId,
+                                  txHash: id, // Base Pay transaction ID
+                                  network: 'base'
+                                });
+                                
+                                toast.success('Tip sent via Base Pay! 🎉');
+                                setTransactionSuccess(true);
+                                setIsTransacting(false);
+                                
+                                setTimeout(() => {
+                                  setIsOpen(false);
+                                  setTransactionSuccess(false);
+                                }, 2000);
+                              } else if (status === 'failed') {
+                                throw new Error('Payment failed');
+                              } else {
+                                setTimeout(pollStatus, 2000);
+                              }
+                            } catch (error) {
+                              console.error('Error checking payment status:', error);
+                              toast.error('Failed to verify payment status');
+                              setIsTransacting(false);
+                            }
+                          };
+                          
+                          setTimeout(pollStatus, 1000);
+                          
+                        } catch (error) {
+                          console.error('Base Pay error:', error);
+                          toast.error(`Base Pay failed: ${error.message || 'Unknown error'}`);
+                          setIsTransacting(false);
+                        }
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

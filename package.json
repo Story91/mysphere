@@ -19,6 +19,8 @@
     "db:indexes": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts"
   },
   "dependencies": {
+    "@base-org/account": "^1.1.1",
+    "@base-org/account-ui": "^1.0.1",
     "@campnetwork/origin": "^0.0.9",
     "@chainlink/contracts": "0.8.0",
     "@coinbase/onchainkit": "^0.37.8",

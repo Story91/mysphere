@@ -21,6 +21,9 @@ import {
   Identity,
   EthBalance,
 } from '@coinbase/onchainkit/identity';
+// Import Base Pay components - commented out because SignInWithBaseButton is now in MockFeed
+// import { SignInWithBaseButton } from '@base-org/account-ui/react';
+// import { createBaseAccountSDK } from '@base-org/account';
 import { useAccount } from 'wagmi';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
@@ -77,6 +80,80 @@ export default function Navigation() {
       setIsAdmin(false);
     }
   }, [address]);
+
+  // Override OnchainKit modal "Sign up" text to "Sign In With Base"
+  useEffect(() => {
+    const replaceSignUpText = () => {
+      // Find all text nodes containing "Sign up"
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      let node;
+      const nodesToUpdate = [];
+      
+      while (node = walker.nextNode()) {
+        if (node.textContent && node.textContent.trim() === 'Sign up') {
+          nodesToUpdate.push(node);
+        }
+      }
+
+      nodesToUpdate.forEach(node => {
+        console.log('🔄 Replacing "Sign up" with "Sign In With Base"');
+        node.textContent = 'Sign In With Base';
+      });
+
+      // Also check elements that might contain "Sign up"
+      const elements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, button, span, div');
+      elements.forEach(element => {
+        if (element.textContent && element.textContent.trim() === 'Sign up') {
+          console.log('🔄 Replacing element "Sign up" with "Sign In With Base"');
+          element.textContent = 'Sign In With Base';
+        }
+      });
+    };
+
+    // Run immediately
+    replaceSignUpText();
+
+    // Watch for DOM changes (when modal opens)
+    const observer = new MutationObserver((mutations) => {
+      let shouldCheck = false;
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          // Check if any added node contains modal content
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as Element;
+              if (
+                element.querySelector('[data-testid*="connect"]') ||
+                element.querySelector('[role="dialog"]') ||
+                element.textContent?.includes('Sign up')
+              ) {
+                shouldCheck = true;
+              }
+            }
+          });
+        }
+      });
+      
+      if (shouldCheck) {
+        // Delay to let modal render completely
+        setTimeout(replaceSignUpText, 100);
+        setTimeout(replaceSignUpText, 500); // Second check for slow renders
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const navLinks: (NavLink | NavLinkWithDropdown)[] = [
     { href: '/basechat', label: 'MySphere' },
@@ -326,6 +403,12 @@ export default function Navigation() {
           </div>
           <div className="flex items-center space-x-2">
             <NetworkSwitcher />
+            {/* Sign in with Base Button - ukryty, bo jest w MockFeed 
+            <SignInWithBaseButton 
+              colorScheme="light"
+              onClick={handleSignInWithBase}
+            />
+            */}
             <Wallet>
               <ConnectWallet className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2">
                 <ConnectWalletText>Log In</ConnectWalletText>

@@ -669,3 +669,15 @@ appkit-button::part(button):hover {
     opacity: 1;
   }
 }
+
+/* OnchainKit Modal Styling - Custom appearance */
+[data-testid="ockConnectWallet_Container"] {
+  /* Custom styling for connect wallet modal */
+}
+
+/* Hide Sign up text with more specific selectors */
+div[role="dialog"] h1,
+div[role="dialog"] h2, 
+div[role="dialog"] h3 {
+  /* Let JavaScript handle text replacement */
+}

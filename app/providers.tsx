@@ -61,7 +61,9 @@ const wagmiConfig = createConfig({
     coinbaseWallet({
       appName: 'MySphere',
       appLogoUrl: '/android-chrome-192x192.png',
-      darkMode: true
+      // Force Base network for smart wallet
+      preference: 'smartWalletOnly',
+      version: '4'
     }),
     walletConnect({ 
       projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '',
@@ -90,8 +92,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <FarcasterFrameProvider>
               <OnchainKitProvider
                 apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-                // We're using baseSepolia as default now for testing
-                chain={baseSepolia}
+                // Changed to base mainnet to fix chain mismatch error
+                chain={base}
                 config={{
                   appearance: {
                     name: 'MySphere',

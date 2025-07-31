@@ -11,7 +11,7 @@ import Statistics from './components/Statistics';
 import PaidPinsManagement from './components/PaidPinsManagement';
 import { refreshTop50UsersOnly } from '../utils/firebase';
 import AdminQuotes from './quotes/page';
-import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache, fixAllUserStats, fixUserPostStats } from '../utils/firebase';
+import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache, fixAllUserStats, fixUserPostStats, getUsersWithBasenameCount, migrateHistoricalBaseNamePosts } from '../utils/firebase';
 
 // Usuwam stałą ADMIN_ADDRESS, bo importujemy ją z firebase.ts
 const ADMIN_BASENAME = "story91.base.eth";
@@ -29,6 +29,10 @@ export default function AdminPanel() {
   const [realStatsData, setRealStatsData] = useState<any>(null);
   const [realStatsLoading, setRealStatsLoading] = useState(false);
   const [lastGlobalStatsUpdate, setLastGlobalStatsUpdate] = useState<string | null>(null);
+  const [basenameUserCount, setBasenameUserCount] = useState<number | null>(null);
+  const [loadingBasenameCount, setLoadingBasenameCount] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState<any>(null);
+  const [isMigrating, setIsMigrating] = useState(false);
   
   // 🎯 Animation states for stats counter
   const [updateTrigger, setUpdateTrigger] = useState<{[key: string]: boolean}>({});
@@ -253,6 +257,43 @@ export default function AdminPanel() {
       setGlobalStats(null);
     } finally {
       setLoadingGlobalStats(false);
+    }
+  };
+
+  const handleFetchBasenameCount = async () => {
+    setLoadingBasenameCount(true);
+    try {
+      const count = await getUsersWithBasenameCount();
+      setBasenameUserCount(count);
+    } catch (error) {
+      console.error("Error fetching basename user count:", error);
+      setBasenameUserCount(null);
+    } finally {
+      setLoadingBasenameCount(false);
+    }
+  };
+
+  const handleMigrateBaseNamePosts = async () => {
+    if (!confirm('Czy chcesz uruchomić migrację historycznych postów dla użytkowników z BaseName?\n\nTo może potrwać kilka minut i będzie kosztować dodatkowe odczyty z Firebase.')) {
+      return;
+    }
+
+    setIsMigrating(true);
+    setMigrationStatus(null);
+    
+    try {
+      const result = await migrateHistoricalBaseNamePosts();
+      setMigrationStatus(result);
+    } catch (error) {
+      console.error("Error during migration:", error);
+      setMigrationStatus({
+        success: false,
+        processedPosts: 0,
+        migratedPosts: 0,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -720,6 +761,88 @@ export default function AdminPanel() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Nowa sekcja do pobierania liczby użytkowników z BaseName */}
+      <div className="mb-6 p-4 bg-black/50 rounded-xl border border-[#0052FF]/20">
+        <h2 className="text-xl font-semibold mb-2">BaseName Feed Management</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Kolumna 1: Liczba użytkowników */}
+          <div>
+            <h3 className="text-lg font-medium mb-2">Liczba użytkowników z BaseName</h3>
+            <p className="text-gray-400 text-sm mb-3">
+              Pobierz aktualną liczbę użytkowników, którzy mają zarejestrowaną nazwę .base.eth.
+            </p>
+            <button
+              onClick={handleFetchBasenameCount}
+              disabled={loadingBasenameCount}
+              className={`px-4 py-2 rounded-lg ${
+                loadingBasenameCount
+                  ? 'bg-gray-500 cursor-not-allowed'
+                  : 'bg-[#0052FF] hover:bg-[#0052FF]/90'
+              } text-white transition-all mb-3`}
+            >
+              {loadingBasenameCount ? 'Pobieranie...' : 'Pobierz liczbę'}
+            </button>
+
+            {basenameUserCount !== null && (
+              <div className="p-3 bg-black/30 rounded-lg">
+                <p className="text-2xl font-bold text-white">
+                  {basenameUserCount.toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-400">
+                  Użytkowników z BaseName
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Kolumna 2: Migracja postów */}
+          <div>
+            <h3 className="text-lg font-medium mb-2">Migracja historycznych postów</h3>
+            <p className="text-gray-400 text-sm mb-3">
+              Skopiuj wszystkie istniejące posty od użytkowników z BaseName do dedykowanego feedu.
+            </p>
+            <button
+              onClick={handleMigrateBaseNamePosts}
+              disabled={isMigrating}
+              className={`px-4 py-2 rounded-lg ${
+                isMigrating
+                  ? 'bg-gray-500 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700'
+              } text-white transition-all mb-3`}
+            >
+              {isMigrating ? 'Migracja w toku...' : 'Uruchom migrację'}
+            </button>
+
+            {migrationStatus && (
+              <div className={`p-3 rounded-lg ${
+                migrationStatus.success 
+                  ? 'bg-green-900/30 border border-green-600/30' 
+                  : 'bg-red-900/30 border border-red-600/30'
+              }`}>
+                {migrationStatus.success ? (
+                  <div className="text-green-400">
+                    <p className="font-bold">✅ Migracja zakończona!</p>
+                    <p className="text-sm">Przetworzono: {migrationStatus.processedPosts} postów</p>
+                    <p className="text-sm">Zmigrowano: {migrationStatus.migratedPosts} nowych postów</p>
+                  </div>
+                ) : (
+                  <div className="text-red-400">
+                    <p className="font-bold">❌ Błąd migracji</p>
+                    <p className="text-sm">{migrationStatus.error}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700/30">
+          <p className="text-green-700 dark:text-green-400 text-sm">
+            ✅ Feed BaseName jest teraz dostępny w aplikacji! Użytkownicy mogą klikać zakładkę "BaseName" aby zobaczyć posty tylko od użytkowników z .base.eth.
+          </p>
+        </div>
       </div>
 
       {/* Global Statistics */}

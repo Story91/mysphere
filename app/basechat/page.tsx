@@ -13,6 +13,7 @@ import {
   toggleLike,
   toggleCommentLike,
   fetchPosts,
+  fetchBaseNameFeedPosts, // Import nowej funkcji
   fetchUserProfile,
   deletePost,
   db,
@@ -330,10 +331,10 @@ export default function BaseChat() {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [trendingTags, setTrendingTags] = useState<{tag: string, count: number}[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
-         const [totalUsers, setTotalUsers] = useState(135191);
-    const [totalLikes, setTotalLikes] = useState(15921);
-    const [totalPosts, setTotalPosts] = useState(179636);
-    const [totalComments, setTotalComments] = useState(8427);
+         const [totalUsers, setTotalUsers] = useState(154262);
+    const [totalLikes, setTotalLikes] = useState(16999);
+    const [totalPosts, setTotalPosts] = useState(206996);
+    const [totalComments, setTotalComments] = useState(9203);
   const [expandedUsersList, setExpandedUsersList] = useState(false);
   const [expandedTagsList, setExpandedTagsList] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -366,6 +367,7 @@ export default function BaseChat() {
     const [showPostImagePreview, setShowPostImagePreview] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [showMyFeed, setShowMyFeed] = useState(false);
+  const [activeFeed, setActiveFeed] = useState<'forYou' | 'following' | 'baseName'>('forYou'); // Dodajemy 'baseName'
   
   // Hook do sprawdzania BaseName
   const { data: baseName, isLoading: isBaseNameLoading } = useName({ 
@@ -554,27 +556,27 @@ export default function BaseChat() {
         try {
           setIsLoadingPosts(true);
           
-          // 🎯 Unikalna kombinacja dla cache'a (adres + tryb)
-          const cacheKey = showMyFeed ? `my_feed_${address}` : `all_posts_${address}`;
+          const cacheKey = `${activeFeed}_${address}`;
           
-          // 🚀 Sprawdź cache najpierw
           const cachedPosts = getCachedPosts(cacheKey);
           if (cachedPosts) {
             setPosts(cachedPosts);
             setIsLoadingPosts(false);
-            return; // Użyj cache'a, nie pobieraj z Firebase!
+            return;
+          }
+
+          let fetchedResult;
+          if (activeFeed === 'baseName') {
+            fetchedResult = await fetchBaseNameFeedPosts({});
+          } else {
+            fetchedResult = await fetchPosts({ 
+              userId: address,
+              ...(activeFeed === 'following' ? { authorFilter: address } : {})
+            });
           }
           
-          // 💰 Pobierz z Firebase tylko gdy brak cache'a lub wygasł
-          console.log(`🔥 Fetching fresh posts from Firebase for: ${cacheKey}`);
-          const { posts: fetchedPosts } = await fetchPosts({ 
-            userId: address,
-            ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
-          });
-          
-          // 💾 Zapisz do cache'a dla przyszłych użyć
-          setCachedPosts(cacheKey, fetchedPosts);
-          setPosts(fetchedPosts);
+          setCachedPosts(cacheKey, fetchedResult.posts);
+          setPosts(fetchedResult.posts);
           
         } catch (error) {
           console.error('Error fetching posts:', error);
@@ -584,7 +586,7 @@ export default function BaseChat() {
       };
       loadPosts();
     }
-      }, [isConnected, address, showMyFeed]); // Dodano showMyFeed do dependencies
+  }, [isConnected, address, activeFeed]);
 
 
 
@@ -619,7 +621,7 @@ export default function BaseChat() {
         // Większość wywołań będzie używać optimistic update (newPosts)
         
         // 🎯 Unikalna kombinacja dla cache'a (adres + tryb)
-        const cacheKey = showMyFeed ? `my_feed_${address}` : `all_posts_${address}`;
+        const cacheKey = `${activeFeed}_${address}`;
         
         // 🚀 Sprawdź cache najpierw
         const cachedPosts = getCachedPosts(cacheKey);
@@ -631,7 +633,7 @@ export default function BaseChat() {
           console.log(`🔥 Refresh fetching fresh posts from Firebase for: ${cacheKey}`);
         const { posts: refreshedPosts } = await fetchPosts({ 
             userId: address,
-            ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
+            ...(activeFeed === 'following' ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
         });
           
           // 💾 Zapisz do cache'a dla przyszłych użyć
@@ -644,7 +646,7 @@ export default function BaseChat() {
     } finally {
       setIsLoadingPosts(false);
     }
-  }, [address, showMyFeed]); // Dodano showMyFeed do dependencies
+  }, [address, activeFeed]); // Dodano showMyFeed do dependencies
 
   // Dodaj stan dla przechowywania hash transakcji i flagi blokującej wielokrotne tworzenie postów
   const [storedTxHash, setStoredTxHash] = useState<string | null>(null);
@@ -1367,10 +1369,10 @@ export default function BaseChat() {
     try {
       // ✅ ULTRA-CHEAP: Statyczne dane zamiast Firebase (oszczędność $15,000+/dzień!)
       const stats = {
-        userCount: 135191,
-        postsCount: 179636,
-        likesCount: 15921,
-        commentsCount: 8427,
+        userCount: 154262,
+        postsCount: 206996,
+        likesCount: 16999,
+        commentsCount: 9203,
         transactionsCount: 40818
       };
       
@@ -1393,10 +1395,10 @@ export default function BaseChat() {
     } catch (error) {
       console.error('Error fetching BaseChat global stats:', error);
       // Fallback values
-      setTotalUsers(135191);
-      setTotalLikes(15921);
-      setTotalPosts(179636);
-      setTotalComments(8427);
+      setTotalUsers(154262);
+      setTotalLikes(16999);
+      setTotalPosts(206996);
+      setTotalComments(9203);
     }
   };
 
