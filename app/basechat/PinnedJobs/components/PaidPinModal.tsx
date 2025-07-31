@@ -397,25 +397,31 @@ export default function PaidPinModal({
                     return;
                   }
                   
-                  const { id } = await pay({
+                  const paymentResult = await pay({
                     amount: selectedPrice.usdcAmount.toString(),
                     to: MYSPHERE_ADDRESS,
-                    testnet: chain?.id !== 8453
+                    testnet: false
                   });
+                  
+                  // Bezpieczne wydobycie ID z różnych możliwych struktur PaymentResult
+                  const id = (paymentResult as any)?.id || 
+                            (paymentResult as any)?.paymentId || 
+                            (paymentResult as any)?.transactionId || 
+                            paymentResult;
                   
                   // Poll for transaction status
                   const pollStatus = async () => {
                     try {
                       const { status } = await getPaymentStatus({ 
                         id,
-                        testnet: chain?.id !== 8453
+                        testnet: false
                       });
                       
                       if (status === 'completed') {
                         // Zapisz do Firebase tak samo jak ETH pin
                         const success = await createPaidPin(
                           postId,
-                          address,
+                          address!,
                           selectedDuration,
                           id, // Base Pay transaction ID
                           selectedPrice.usdcAmount.toString(),
@@ -448,7 +454,8 @@ export default function PaidPinModal({
                   
                 } catch (error) {
                   console.error('Base Pay error:', error);
-                  toast.error(`Base Pay failed: ${error.message || 'Unknown error'}`);
+                  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                  toast.error(`Base Pay failed: ${errorMessage}`);
                   setIsProcessing(false);
                 }
               }}

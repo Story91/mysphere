@@ -557,18 +557,24 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                           
                           setIsTransacting(true);
                           
-                          const { id } = await pay({
+                          const paymentResult = await pay({
                             amount: tipAmount,
                             to: recipientAddress,
-                            testnet: chainId !== base.id
+                            testnet: false
                           });
+                          
+                          // Bezpieczne wydobycie ID z różnych możliwych struktur PaymentResult
+                          const id = (paymentResult as any)?.id || 
+                                    (paymentResult as any)?.paymentId || 
+                                    (paymentResult as any)?.transactionId || 
+                                    paymentResult;
                           
                           // Poll for transaction status
                           const pollStatus = async () => {
                             try {
                               const { status } = await getPaymentStatus({ 
                                 id,
-                                testnet: chainId !== base.id
+                                testnet: false
                               });
                               
                               if (status === 'completed') {
@@ -607,7 +613,8 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                           
                         } catch (error) {
                           console.error('Base Pay error:', error);
-                          toast.error(`Base Pay failed: ${error.message || 'Unknown error'}`);
+                          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                          toast.error(`Base Pay failed: ${errorMessage}`);
                           setIsTransacting(false);
                         }
                       }}

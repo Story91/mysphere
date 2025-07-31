@@ -83,8 +83,7 @@ const MockFeed = () => {
         console.log('❌ Coinbase Wallet connector not found');
         // Fallback to Base Account SDK (automatically connects to Base network)
         const sdk = createBaseAccountSDK({
-          appName: 'BaseBook',
-          appLogo: '/favicon_io (1)/android-chrome-192x1921.png'
+          appName: 'BaseBook'
         });
         
         const provider = sdk.getProvider();
@@ -102,8 +101,8 @@ const MockFeed = () => {
           }]
         });
         
-        if (result?.accounts?.[0]) {
-          console.log('✅ Base Account connected:', result.accounts[0].address);
+        if ((result as any)?.accounts?.[0]) {
+          console.log('✅ Base Account connected:', (result as any).accounts[0].address);
         }
       }
       
