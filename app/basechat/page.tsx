@@ -41,6 +41,7 @@ import {
   unpinPost,
   isUserAdmin
 } from '../utils/firebase';
+import { useSocial } from './friendsystem/hooks';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
 import { Post, Comment, UserProfile, Stats } from '../types';
 import { calculateRanking, UserRank, RANK_DESCRIPTIONS, BADGES } from '../utils/ranking';
@@ -48,11 +49,17 @@ import { collection, getDocs, addDoc } from 'firebase/firestore';
 import CoinGeckoMarqueeWidget from '../components/CryptoWidget/CoinGeckoMarqueeWidget';
 import Script from 'next/script';
 import { put } from '@vercel/blob';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
 import { useBanStatus } from '../hooks/useBanStatus';
 import LinkPreview from './components/LinkPreview';
 import BuilderProfile from './components/BuilderProfile';
+import FollowingView from './friendsystem/FollowingView';
+import FriendsView from './friendsystem/FriendsView';
+import DiscoverView from './friendsystem/DiscoverView';
+
+import NotificationsView from './friendsystem/NotificationsView';
 
 import FrameSDK from '@farcaster/frame-sdk'
 import farcasterFrame from '@farcaster/frame-wagmi-connector'
@@ -257,7 +264,7 @@ const clearPostsCache = () => {
 export default function BaseChat() {
   const [isMounted, setIsMounted] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
-  const [activeMainPanel, setActiveMainPanel] = useState('feed');
+  const [activeMainPanel, setActiveMainPanel] = useState<'feed' | 'builders' | 'following' | 'friends' | 'discover' | 'notifications'>('feed');
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [selectedBuilderProfile, setSelectedBuilderProfile] = useState<{
     address: string;
@@ -383,10 +390,23 @@ export default function BaseChat() {
 
   // Dodaj nowy stan dla tooltipa
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
+
+  // Social features hook (Hook funkcji społecznościowych)
+  const socialFeatures = useSocial(address || null);
+
+  // URL params for navigation (Parametry URL do nawigacji)
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const urlView = searchParams.get('view');
   const [userStats, setUserStats] = useState<{[key: string]: Stats & { totalPoints: number }}>({});
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
 
   const chainId = useChainId();
+
+  // Function to clear URL params (Funkcja do czyszczenia parametrów URL)
+  const clearViewParams = () => {
+    router.replace('/basechat', { scroll: false });
+  };
 
   // Funkcja do pobierania statystyk użytkownika
   const fetchUserStats = async (userAddress: string) => {
@@ -587,6 +607,13 @@ export default function BaseChat() {
       loadPosts();
     }
   }, [isConnected, address, activeFeed]);
+
+  // Handle URL params for navigation (Obsługa parametrów URL do nawigacji)
+  useEffect(() => {
+    if (urlView === 'notifications') {
+      setActiveMainPanel('notifications');
+    }
+  }, [urlView]);
 
 
 
@@ -3208,14 +3235,18 @@ export default function BaseChat() {
               <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4">
                 <div className="flex flex-col gap-3">
                   {/* Main filters row */}
-                  <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <div className="flex items-center gap-1 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-6 lg:gap-2 scrollbar-hide">
                     <button
                       onClick={() => {
                         setSelectedTag('');
                         setSelectedAuthor('');
                         setActiveMainPanel('feed');
+                        clearViewParams();
                       }}
-                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${activeMainPanel === 'feed' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+                      className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+                        activeMainPanel === 'feed' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                      } flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors`}
                     >
                       All Posts
                     </button>
@@ -3223,22 +3254,24 @@ export default function BaseChat() {
                       onClick={() => {
                         if (address) {
                           handleViewBuilderProfile(address);
+                          clearViewParams();
                         } else {
                           toast.error('Connect your wallet to view builder profiles');
                         }
                       }}
-                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${
+                      className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
                         activeMainPanel === 'builders' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                      } flex items-center justify-center`}
+                      } flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors`}
                     >
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
                       My Profile
                     </button>
-                      <button
+                    <button
                       onClick={() => {
                         setShowMyFeed(!showMyFeed);
+                        clearViewParams();
                         // Przeładuj posty gdy przełączamy tryb
                         if (isConnected && address) {
                           const loadPosts = async () => {
@@ -3258,7 +3291,7 @@ export default function BaseChat() {
                           loadPosts();
                         }
                       }}
-                      className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${
+                      className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
                         showMyFeed 
                           ? 'bg-blue-500 text-white' 
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
@@ -3268,43 +3301,120 @@ export default function BaseChat() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                       {showMyFeed ? 'All Posts' : 'My Feed'}
-                      </button>
+                    </button>
+
+                                            {/* 🆕 NEW SOCIAL BUTTONS - Updated with gradients and modern icons */}
+                    {address && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setActiveMainPanel('following');
+                            clearViewParams();
+                          }}
+                          className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+                            activeMainPanel === 'following' 
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                          } flex items-center justify-center hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 hover:text-white transition-all duration-200`}
+                        >
+                          <div className="w-4 h-4 mr-1 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 flex items-center justify-center">
+                            <svg className="w-2.5 h-2.5" fill="white" viewBox="0 0 24 24">
+                              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                            </svg>
                           </div>
+                          Follows
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setActiveMainPanel('friends');
+                            clearViewParams();
+                          }}
+                          className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+                            activeMainPanel === 'friends' 
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg' 
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                          } flex items-center justify-center hover:bg-gradient-to-r hover:from-emerald-600 hover:to-teal-600 hover:text-white transition-all duration-200`}
+                        >
+                          <div className="w-4 h-4 mr-1 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 flex items-center justify-center">
+                            <svg className="w-2.5 h-2.5" fill="white" viewBox="0 0 24 24">
+                              <path d="M16 4c0-1.11.89-2 2-2s2 .89 2 2-.89 2-2 2-2-.89-2-2zM4 18v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1H4zM12 12c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zM12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/>
+                            </svg>
+                          </div>
+                          Friends
+                          {socialFeatures.friendsStats && socialFeatures.friendsStats.pendingRequests > 0 && (
+                            <span className="ml-1 text-xs bg-red-500 text-white px-1 rounded-full">
+                              {socialFeatures.friendsStats.pendingRequests}
+                            </span>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setActiveMainPanel('discover');
+                            clearViewParams();
+                          }}
+                          className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+                            activeMainPanel === 'discover' 
+                              ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg' 
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                          } flex items-center justify-center hover:bg-gradient-to-r hover:from-orange-600 hover:to-red-600 hover:text-white transition-all duration-200`}
+                        >
+                          <div className="w-4 h-4 mr-1 rounded-full bg-gradient-to-r from-orange-400 to-red-400 flex items-center justify-center">
+                            <svg className="w-2.5 h-2.5" fill="white" viewBox="0 0 24 24">
+                              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                            </svg>
+                          </div>
+                          Discover
+                        </button>
+                      </>
+                    )}
+                    </div>
+                    
+                    {/* Mobile scroll indicator (Wskaźnik przewijania na mobile) */}
+                    <div className="flex lg:hidden justify-center mt-2 space-x-1">
+                      <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                      <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                    </div>
+                  </div>
                  </div>
               </div>
 
               {/* Network Filter tabs */}
-              <div className="flex items-center gap-2 mt-2">
-                <button
-                  onClick={() => setActivePostingNetwork('base')}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'base' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
-                >
-                  <img 
-                    src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png"
-                    alt="Base"
-                    className="w-4 h-4 mr-1.5 bg-white rounded-full p-0.5"
-                  />
-                  Base Post
-                </button>
-                <button
-                  onClick={() => setActivePostingNetwork('basecamp')}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'basecamp' ? 'bg-orange-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
-                >
-                  <svg 
-                    className="w-4 h-4 mr-1.5"
-                    viewBox="0 0 600 600"
-                    xmlns="http://www.w3.org/2000/svg"
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4 border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActivePostingNetwork('base')}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'base' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
                   >
-                    <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
-                    <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
-                    <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
-                    <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
-                  </svg>
-                  Camp Network Post
-                </button>
+                    <img 
+                      src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png"
+                      alt="Base"
+                      className="w-4 h-4 mr-1.5 bg-white rounded-full p-0.5"
+                    />
+                    Base Post
+                  </button>
+                  <button
+                    onClick={() => setActivePostingNetwork('basecamp')}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'basecamp' ? 'bg-orange-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
+                  >
+                    <svg 
+                      className="w-4 h-4 mr-1.5"
+                      viewBox="0 0 600 600"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
+                      <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
+                      <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
+                      <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
+                    </svg>
+                    Camp Network Post
+                  </button>
+                </div>
               </div>
 
-              {/* Dodaj warunek wyświetlania panelu Builders lub feed */}
+              {/* Main content switcher based on activeMainPanel (Przełącznik głównej zawartości) */}
               {activeMainPanel === 'builders' ? (
                 <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden border border-blue-100 dark:border-blue-900">
                   {/* Builder Profile Content */}
@@ -3331,6 +3441,38 @@ export default function BaseChat() {
                       <p className="text-gray-500 dark:text-gray-400">Loading builder profile...</p>
                     </div>
                   )}
+                </div>
+              ) : activeMainPanel === 'following' ? (
+                /* 👥 FOLLOWING VIEW (Widok obserwowanych) */
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                  <FollowingView 
+                    currentUserAddress={address || ''}
+                    onUserClick={handleViewBuilderProfile}
+                  />
+                </div>
+              ) : activeMainPanel === 'friends' ? (
+                /* 🤝 FRIENDS VIEW (Widok znajomych) */
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                  <FriendsView 
+                    currentUserAddress={address || ''}
+                    onUserClick={handleViewBuilderProfile}
+                  />
+                </div>
+              ) : activeMainPanel === 'discover' ? (
+                /* 🔍 DISCOVER VIEW (Widok odkrywania) */
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                  <DiscoverView 
+                    currentUserAddress={address || ''}
+                    onUserClick={handleViewBuilderProfile}
+                  />
+                </div>
+              ) : activeMainPanel === 'notifications' ? (
+                /* 🔔 NOTIFICATIONS VIEW (Widok powiadomień) */
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                  <NotificationsView 
+                    currentUserAddress={address || ''}
+                    onUserClick={handleViewBuilderProfile}
+                  />
                 </div>
               ) : (
                 <>
@@ -3597,8 +3739,6 @@ export default function BaseChat() {
                   </div>
                 </div>
               </div>
-
-              {/* ✅ USUNIĘTO: BaseChat Points - przeniesiono do BuilderProfile po kliknięciu */}
 
 
 

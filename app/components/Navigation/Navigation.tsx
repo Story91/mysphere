@@ -28,6 +28,7 @@ import { useAccount } from 'wagmi';
 import { useEffect, useState } from 'react';
 import { ReactNode } from 'react';
 import { NetworkSwitcher } from '../NetworkSwitcher';
+import { NotificationsBell } from './NotificationsBell';
 
 // Stały adres administratora
 const ADMIN_ADDRESS = "0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd";
@@ -72,6 +73,12 @@ export default function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  // Handler for notifications bell click (Obsługa kliknięcia w dzwoneczek powiadomień)
+  const handleNotificationsClick = () => {
+    // Navigate to BaseChat with notifications view (Przejdź do BaseChat z widokiem powiadomień)
+    router.push('/basechat?view=notifications');
+  };
   
   useEffect(() => {
     if (address) {
@@ -403,6 +410,7 @@ export default function Navigation() {
           </div>
           <div className="flex items-center space-x-2">
             <NetworkSwitcher />
+            <NotificationsBell onNotificationsClick={handleNotificationsClick} />
             {/* Sign in with Base Button - ukryty, bo jest w MockFeed 
             <SignInWithBaseButton 
               colorScheme="light"

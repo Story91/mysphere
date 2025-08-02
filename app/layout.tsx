@@ -5,6 +5,7 @@ import '@coinbase/onchainkit/styles.css';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from "@vercel/speed-insights/react"
+import { Toaster } from 'react-hot-toast';
 import { Providers } from './providers';
 import Navigation from './components/Navigation/Navigation';
 import { ThemeProvider } from './context/ThemeContext';
@@ -82,6 +83,40 @@ export default function RootLayout({
                   {children}
                 </main>
               </ClientOnly>
+              
+              {/* Toast Notifications */}
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: '#1f2937',
+                    color: '#f9fafb',
+                    border: '1px solid #374151',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                  },
+                  success: {
+                    style: {
+                      background: '#10b981',
+                      color: '#ffffff',
+                    },
+                  },
+                  error: {
+                    style: {
+                      background: '#ef4444',
+                      color: '#ffffff',
+                    },
+                  },
+                  loading: {
+                    style: {
+                      background: '#3b82f6',
+                      color: '#ffffff',
+                    },
+                  },
+                }}
+              />
+              
               <Analytics />
               <SpeedInsights />
             </Providers>

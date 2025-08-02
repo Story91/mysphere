@@ -9,6 +9,8 @@ import TipButton from './TipButton';
 import TipStats from './TipStats';
 import RecentTips from './RecentTips';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
+import { useSocial } from '../friendsystem/hooks';
+import { sendFriendRequest as sendFriendRequestDirect } from '../friendsystem/friends_system';
 
 // Talent Protocol API types
 interface TalentScore {
@@ -240,12 +242,177 @@ export default function BuilderProfile({
   const [talentScore, setTalentScore] = useState<TalentScore | null>(null);
   const [talentProfile, setTalentProfile] = useState<TalentProfile | null>(null);
   const [loadingTalentData, setLoadingTalentData] = useState(false);
+
+  // 🚀 SOCIAL FEATURES: Hook i stany  
+  // Get stats for the profile we're viewing (userAddress)
+  const { 
+    followStats, 
+    friendsStats
+  } = useSocial(userAddress || null);
+  
+  // Get actions for the current logged-in user
+  const {
+    followUser, 
+    unfollowUser, 
+    checkIfFollowing
+  } = useSocial(currentUserAddress || null);
+  
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [checkingFollowStatus, setCheckingFollowStatus] = useState(true);
   
   // Zresetuj stan edycji bio kiedy zmienia się profil
   useEffect(() => {
     setNewBio(profile.bio || '');
     setIsEditingBio(false);
   }, [profile]);
+
+  // 🚀 SOCIAL FEATURES: Sprawdź follow status
+  useEffect(() => {
+    if (!currentUserAddress || currentUserAddress === userAddress) {
+      setCheckingFollowStatus(false);
+      return;
+    }
+
+    const checkFollowStatusAsync = async () => {
+      setCheckingFollowStatus(true);
+      try {
+        const isCurrentlyFollowing = await checkIfFollowing(userAddress);
+        setIsFollowing(isCurrentlyFollowing);
+      } catch (error) {
+        console.error('Error checking follow status:', error);
+        setIsFollowing(false);
+      } finally {
+        setCheckingFollowStatus(false);
+      }
+    };
+
+    checkFollowStatusAsync();
+  }, [currentUserAddress, userAddress, checkIfFollowing]);
+
+  // 🚀 FOLLOW/UNFOLLOW HANDLERS
+  const handleFollowUser = async () => {
+    if (!currentUserAddress || followLoading) return;
+    
+    setFollowLoading(true);
+    try {
+      const success = await followUser(userAddress);
+      if (success) {
+        setIsFollowing(true);
+        toast.success('👥 User followed successfully!', {
+          duration: 3000,
+          position: 'top-right',
+        });
+      } else {
+        toast.error('❌ Failed to follow user', {
+          duration: 3000,
+          position: 'top-right',
+        });
+      }
+    } catch (error) {
+      console.error('Error following user:', error);
+      toast.error('❌ Failed to follow user', {
+        duration: 3000,
+        position: 'top-right',
+      });
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const handleUnfollowUser = async () => {
+    if (!currentUserAddress || followLoading) return;
+    
+    setFollowLoading(true);
+    try {
+      const success = await unfollowUser(userAddress);
+      if (success) {
+        setIsFollowing(false);
+        toast.success('👋 User unfollowed successfully!', {
+          duration: 3000,
+          position: 'top-right',
+        });
+      } else {
+        toast.error('❌ Failed to unfollow user', {
+          duration: 3000,
+          position: 'top-right',
+        });
+      }
+    } catch (error) {
+      console.error('Error unfollowing user:', error);
+      toast.error('❌ Failed to unfollow user', {
+        duration: 3000,
+        position: 'top-right',
+      });
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const handleSendFriendRequest = async () => {
+    if (!currentUserAddress) {
+      toast.error('Please connect your wallet first!');
+      return;
+    }
+    
+    // Check if trying to send request to yourself
+    if (currentUserAddress === userAddress) {
+      toast.error('🚫 Cannot send friend request to yourself!', {
+        duration: 3000,
+        position: 'top-right',
+      });
+      return;
+    }
+    
+    // Show loading toast
+    const loadingToast = toast.loading('Sending friend request...', {
+      position: 'top-right',
+    });
+    
+    try {
+      const result = await sendFriendRequestDirect(currentUserAddress!, userAddress, 'Hello! Let\'s be friends! 🤝');
+      
+      toast.dismiss(loadingToast);
+      
+      if (result.success) {
+        toast.success('🤝 Friend request sent successfully!', {
+          duration: 4000,
+          position: 'top-right',
+          style: {
+            background: '#10B981',
+            color: '#fff',
+          },
+        });
+      } else {
+        // Different toasts for different errors
+        if (result.error === 'Already friends') {
+          toast('👥 You are already friends!', {
+            duration: 3000,
+            position: 'top-right',
+            icon: '👥',
+          });
+        } else if (result.error === 'Friend request already sent') {
+          toast('⏳ Friend request already sent!', {
+            duration: 3000,
+            position: 'top-right',
+            icon: '⏳',
+          });
+        } else {
+          toast.error(`❌ ${result.error || 'Failed to send friend request'}`, {
+            duration: 4000,
+            position: 'top-right',
+          });
+        }
+      }
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error('Error sending friend request:', error);
+      toast.error('❌ Network error! Please try again.', {
+        duration: 4000,
+        position: 'top-right',
+      });
+    }
+  };
 
   // Fetch Talent Protocol data
   useEffect(() => {
@@ -432,33 +599,117 @@ export default function BuilderProfile({
                     </span>
                   </div>
                 )}
-                <div className="flex items-center space-x-2 mt-1">
-                  <button
-                    onClick={copyAddressToClipboard}
-                    className="flex items-center text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md w-fit"
-                  >
-                    <span className="mr-1.5 font-mono">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                  
-                  {/* Tip Button - Don't show for own profile */}
-                  {currentUserAddress !== userAddress && (
-                    <div className="bg-gray-100 dark:bg-gray-800 rounded-md">
-                      <TipButton
-                        recipientAddress={userAddress}
-                        postId={`profile-${userAddress}`}
-                        className="text-gray-500 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-400 p-1"
-                      />
+                <div className="flex flex-col space-y-3 mt-1">
+                  {/* First row: Address and stats */}
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={copyAddressToClipboard}
+                      className="flex items-center text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md w-fit"
+                    >
+                      <span className="mr-1.5 font-mono">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                    
+                    {/* Tip Stats - Show received tips for this user */}
+                    <TipStats
+                      userAddress={userAddress}
+                      className="ml-2"
+                    />
+                  </div>
+
+                  {/* 🚀 SOCIAL STATS (Statystyki społecznościowe) */}
+                  {(followStats || friendsStats) && (
+                    <div className="flex items-center space-x-4 text-xs">
+                      {followStats && (
+                        <>
+                          <div className="flex items-center space-x-1 bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded-full">
+                            <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <span className="text-purple-600 font-medium">{followStats.followers}</span>
+                            <span className="text-purple-500">followers</span>
+                          </div>
+                          <div className="flex items-center space-x-1 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-full">
+                            <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <span className="text-blue-600 font-medium">{followStats.following}</span>
+                            <span className="text-blue-500">following</span>
+                          </div>
+                        </>
+                      )}
+                      {friendsStats && (
+                        <div className="flex items-center space-x-1 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full">
+                          <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                          </svg>
+                          <span className="text-green-600 font-medium">{friendsStats.totalFriends}</span>
+                          <span className="text-green-500">friends</span>
+                        </div>
+                      )}
                     </div>
                   )}
-                  
-                  {/* Tip Stats - Show received tips for this user */}
-                  <TipStats
-                    userAddress={userAddress}
-                    className="ml-2"
-                  />
+
+                  {/* Third row: Action buttons (Trzeci rząd: Przyciski akcji) */}
+                  {currentUserAddress !== userAddress && (
+                    <div className="flex items-center space-x-2">
+                      {/* Follow Button (Przycisk obserwowania) */}
+                      {!checkingFollowStatus && (
+                        <button
+                          onClick={isFollowing ? handleUnfollowUser : handleFollowUser}
+                          disabled={followLoading}
+                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                            isFollowing
+                              ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'
+                              : 'bg-purple-500 text-white hover:bg-purple-600'
+                          } ${followLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {followLoading ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                              <span>Loading...</span>
+                            </>
+                          ) : isFollowing ? (
+                            <>
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                              </svg>
+                              <span>Following</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                              <span>Follow</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {/* Friend Request Button (Przycisk zaproszenia do znajomych) */}
+                      <button
+                        onClick={handleSendFriendRequest}
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500 text-white hover:bg-green-600 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                        <span>Add Friend</span>
+                      </button>
+
+                      {/* Tip Button */}
+                      <div className="bg-gray-100 dark:bg-gray-800 rounded-md">
+                        <TipButton
+                          recipientAddress={userAddress}
+                          postId={`profile-${userAddress}`}
+                          className="text-gray-500 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-400 p-1"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

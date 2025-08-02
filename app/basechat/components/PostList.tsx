@@ -21,6 +21,9 @@ import { getCachedCoin } from '../../utils/zoraSdk';
 import { parseEther, parseUnits, formatEther, formatUnits } from 'viem'; // Import viem utils
 import { Address as ViemAddress } from 'viem';
 
+// Import social features
+import { useSocial } from '../friendsystem/hooks';
+
 // Import icons
 import { Users, Coins, ShoppingCart, Tag, ExternalLink, X, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
 
@@ -218,6 +221,11 @@ export default function PostList({
   
   // ❌ Usunięto loadMoreTriggerRef - nie potrzebny bez infinite scroll
   const { address, isConnected } = useAccount();
+
+  // 🚀 SOCIAL FEATURES: Hook i stany (MOVED AFTER useAccount)
+  const { followUser, unfollowUser, checkIfFollowing } = useSocial(address || null);
+  const [followingStatus, setFollowingStatus] = useState<{[address: string]: boolean}>({});
+  const [followLoading, setFollowLoading] = useState<{[address: string]: boolean}>({});
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const networkChainId = useChainId();
@@ -657,6 +665,75 @@ export default function PostList({
       }
     }
   };
+
+  // 🚀 FOLLOW/UNFOLLOW HANDLERS (Obsługa obserwowania/przestawania obserwowania)
+  const handleFollowUser = async (targetUserAddress: string) => {
+    if (!address || targetUserAddress === address) return;
+    
+    setFollowLoading(prev => ({ ...prev, [targetUserAddress]: true }));
+    
+    try {
+      const success = await followUser(targetUserAddress);
+      if (success) {
+        setFollowingStatus(prev => ({ ...prev, [targetUserAddress]: true }));
+        toast.success('User followed successfully! (Użytkownik obserwowany!)');
+      } else {
+        toast.error('Failed to follow user (Nie udało się obserwować użytkownika)');
+      }
+    } catch (error) {
+      console.error('Error following user:', error);
+      toast.error('Failed to follow user (Nie udało się obserwować użytkownika)');
+    } finally {
+      setFollowLoading(prev => ({ ...prev, [targetUserAddress]: false }));
+    }
+  };
+
+  const handleUnfollowUser = async (targetUserAddress: string) => {
+    if (!address || targetUserAddress === address) return;
+    
+    setFollowLoading(prev => ({ ...prev, [targetUserAddress]: true }));
+    
+    try {
+      const success = await unfollowUser(targetUserAddress);
+      if (success) {
+        setFollowingStatus(prev => ({ ...prev, [targetUserAddress]: false }));
+        toast.success('User unfollowed successfully! (Przestałeś obserwować użytkownika!)');
+      } else {
+        toast.error('Failed to unfollow user (Nie udało się przestać obserwować użytkownika)');
+      }
+    } catch (error) {
+      console.error('Error unfollowing user:', error);
+      toast.error('Failed to unfollow user (Nie udało się przestać obserwować użytkownika)');
+    } finally {
+      setFollowLoading(prev => ({ ...prev, [targetUserAddress]: false }));
+    }
+  };
+
+  // Check follow status when posts change (Sprawdź status obserwowania gdy posty się zmieniają)
+  useEffect(() => {
+    if (!address || !posts || posts.length === 0) return;
+
+    const checkFollowStatus = async () => {
+      const authorAddresses = [...new Set(posts.map(post => post.author))];
+      const followStatuses: {[address: string]: boolean} = {};
+      
+      for (const authorAddress of authorAddresses) {
+        if (authorAddress !== address) { // Don't check for self
+          try {
+            const isFollowing = await checkIfFollowing(authorAddress);
+            followStatuses[authorAddress] = isFollowing;
+          } catch (error) {
+            console.error('Error checking follow status:', error);
+            followStatuses[authorAddress] = false;
+          }
+        }
+      }
+      
+      setFollowingStatus(followStatuses);
+    };
+
+    checkFollowStatus();
+  }, [posts, address, checkIfFollowing]);
 
   const handleAddReply = async (postId: string, commentId: string, txHash?: string) => {
     if (!address || !replyContent.trim()) return;
@@ -1740,6 +1817,47 @@ export default function PostList({
             <span className="text-xs">{commentCount}</span>
           </button>
 
+          {/* FOLLOW BUTTON - Show only if not author and user is connected */}
+          {address && post.author !== address && (
+            <button
+              onClick={() => {
+                const isCurrentlyFollowing = followingStatus[post.author];
+                if (isCurrentlyFollowing) {
+                  handleUnfollowUser(post.author);
+                } else {
+                  handleFollowUser(post.author);
+                }
+              }}
+              disabled={followLoading[post.author]}
+              className={`flex items-center space-x-1 transition-colors text-xs px-2 py-1 rounded-full ${
+                followingStatus[post.author]
+                  ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'
+                  : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300'
+              } ${followLoading[post.author] ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {followLoading[post.author] ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Loading...</span>
+                </>
+              ) : followingStatus[post.author] ? (
+                <>
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <span>Following</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span>Follow</span>
+                </>
+              )}
+            </button>
+          )}
+
           {/* 💰 Paid Pin Button - Show for non-pinned posts */}
           <PaidPinButton
             postId={post.id}
@@ -1774,11 +1892,13 @@ export default function PostList({
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center space-x-1 text-gray-900 dark:text-gray-200 hover:text-blue-500"
+              title="View Transaction"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span className="text-xs">Transaction</span>
+              {/* Tekst tylko na desktop */}
+              <span className="hidden md:inline text-xs">Transaction</span>
             </a>
           )}
 
