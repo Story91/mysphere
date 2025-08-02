@@ -54,6 +54,7 @@ export interface ProfileCardProps {
     farcaster?: string;
     discord?: string;
   };
+
   onContactClick?: () => void;
 }
 
@@ -457,6 +458,8 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
                     </span>
                   )}
                 </div>
+
+
 
                 <div className="pc-user-info">
                   <div className="pc-user-details">
