@@ -55,20 +55,20 @@ export default function TipStats({ userAddress, postId, className = '' }: TipSta
       <div className={`flex items-center space-x-2 ${className}`}>
         <div className="flex items-center space-x-1 bg-green-100 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full px-3 py-1">
           <span className="text-xs">💰</span>
-          <span className="text-xs font-medium text-green-700 dark:text-green-300">
-            {userStats.ethReceived > 0 && (
-              <span>{userStats.ethReceived.toFixed(4)} ETH</span>
-            )}
-            {userStats.ethReceived > 0 && userStats.usdcReceived > 0 && (
-              <span className="mx-1">+</span>
-            )}
-            {userStats.usdcReceived > 0 && (
-              <span>${userStats.usdcReceived.toFixed(2)} USDC</span>
-            )}
-          </span>
-          <span className="text-xs text-green-600 dark:text-green-400">
-            ({userStats.tipCount} tips)
-          </span>
+                     <div className="flex items-center space-x-1 text-xs font-medium text-green-700 dark:text-green-300">
+             {userStats.ethReceived > 0 && (
+               <span className="flex items-center">
+                 <span className="text-blue-500">⟠</span>
+                 <span className="ml-0.5">{userStats.ethReceived.toFixed(4)}</span>
+               </span>
+             )}
+             {userStats.usdcReceived > 0 && (
+               <span className="flex items-center">
+                 <span className="text-green-500">$</span>
+                 <span className="ml-0.5">{userStats.usdcReceived.toFixed(2)}</span>
+               </span>
+             )}
+           </div>
         </div>
       </div>
     );
@@ -78,22 +78,22 @@ export default function TipStats({ userAddress, postId, className = '' }: TipSta
   if (postId && postStats && postStats.tipCount > 0) {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
-        <div className="flex items-center space-x-1 bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-full px-2 py-1">
+        <div className="flex items-center space-x-1 bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/40 dark:to-cyan-900/40 border border-blue-300 dark:border-blue-600 rounded-full px-2 py-1">
           <span className="text-xs">🎯</span>
-          <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
-            {postStats.ethTips > 0 && (
-              <span>{postStats.ethTips.toFixed(4)} ETH</span>
-            )}
-            {postStats.ethTips > 0 && postStats.usdcTips > 0 && (
-              <span className="mx-1">+</span>
-            )}
-            {postStats.usdcTips > 0 && (
-              <span>${postStats.usdcTips.toFixed(2)} USDC</span>
-            )}
-          </span>
-          <span className="text-xs text-yellow-600 dark:text-yellow-400">
-            ({postStats.uniqueTippers} tippers)
-          </span>
+                     <div className="flex items-center space-x-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+             {postStats.ethTips > 0 && (
+               <span className="flex items-center">
+                 <span className="text-blue-500">⟠</span>
+                 <span className="ml-0.5">{postStats.ethTips.toFixed(4)}</span>
+               </span>
+             )}
+             {postStats.usdcTips > 0 && (
+               <span className="flex items-center">
+                 <span className="text-green-500">$</span>
+                 <span className="ml-0.5">{postStats.usdcTips.toFixed(2)}</span>
+               </span>
+             )}
+           </div>
         </div>
       </div>
     );
