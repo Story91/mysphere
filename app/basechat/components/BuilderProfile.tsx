@@ -6,8 +6,8 @@ import { toast } from 'react-hot-toast';
 // ✅ USUNIĘTO: UserRank i RANK_DESCRIPTIONS - nie używane już
 import { Avatar } from '@coinbase/onchainkit/identity';
 import TipButton from './TipButton';
-import TipStats from './TipStats';
 import RecentTips from './RecentTips';
+import { getUserTipStats, TipStats as TipStatsType } from '../../utils/firebase';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 import { useSocial } from '../friendsystem/hooks';
 import { sendFriendRequest as sendFriendRequestDirect } from '../friendsystem/friends_system';
@@ -263,6 +263,10 @@ export default function BuilderProfile({
   // BaseChatPoints section state
   const [isBaseChatPointsExpanded, setIsBaseChatPointsExpanded] = useState(false);
   
+  // Tip Stats state
+  const [tipStats, setTipStats] = useState<TipStatsType | null>(null);
+  const [loadingTipStats, setLoadingTipStats] = useState(false);
+  
   // Talent Protocol state
   const [talentScore, setTalentScore] = useState<TalentScore | null>(null);
   const [talentProfile, setTalentProfile] = useState<TalentProfile | null>(null);
@@ -472,6 +476,25 @@ export default function BuilderProfile({
     }
   };
 
+  // Fetch Tip Stats data
+  useEffect(() => {
+    const fetchTipStatsData = async () => {
+      if (!userAddress) return;
+      
+      setLoadingTipStats(true);
+      try {
+        const stats = await getUserTipStats(userAddress);
+        setTipStats(stats);
+      } catch (error) {
+        console.error('Error fetching tip stats:', error);
+      } finally {
+        setLoadingTipStats(false);
+      }
+    };
+
+    fetchTipStatsData();
+  }, [userAddress]);
+
   // Fetch Talent Protocol data
   useEffect(() => {
     const fetchTalentData = async () => {
@@ -597,33 +620,57 @@ export default function BuilderProfile({
       
       {/* User Info Section */}
       <div className="p-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-6 p-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl">
-          {/* Niebieska poświata */}
-          <div className="absolute -top-6 -right-6 w-32 h-32 bg-blue-300/20 rounded-full filter blur-2xl"></div>
-          <div className="absolute -bottom-6 -left-6 w-24 h-24 bg-blue-400/15 rounded-full filter blur-xl"></div>
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent"></div>
+        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 mb-6 p-8 lg:p-12 relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-slate-50/80 to-blue-50/60 border border-white/60 backdrop-blur-2xl shadow-2xl">
+          {/* Premium białe i niebieskie efekty świetlne */}
+          <div className="absolute -top-8 -right-8 w-40 h-40 bg-gradient-to-br from-blue-200/30 to-indigo-300/20 rounded-full filter blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-gradient-to-tr from-white/40 to-blue-100/30 rounded-full filter blur-2xl"></div>
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent"></div>
           
-          {/* Efekt szkła */}
-          <div className="absolute inset-0 bg-white/30 backdrop-blur-sm"></div>
+          {/* Efekt premium szkła z białymi refleksami */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-blue-50/30 backdrop-blur-xl"></div>
+          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent"></div>
           
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-6 w-full">
-          <div className="flex flex-col items-center">
-            <div className="w-24 h-24 rounded-full overflow-hidden mr-0 md:mr-4 flex-shrink-0 ring-4 ring-white dark:ring-gray-800 shadow-lg relative">
-              {profile.avatar ? (
-                <img 
-                  src={profile.avatar} 
-                  alt="Profile" 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Avatar address={convertAddress(profile.address)} className="w-24 h-24" />
-              )}
-              {/* Subtelny efekt ramki z gradientem */}
-              <div className="absolute inset-0 rounded-full border border-white/20 bg-gradient-to-br from-transparent via-blue-100/10 to-blue-200/20 opacity-50"></div>
+          {/* MySphere Logo with Verified Badge - Top Right */}
+          <div className="absolute top-6 right-6 flex items-center space-x-2 bg-gradient-to-r from-white/80 to-blue-50/60 backdrop-blur-sm border border-blue-200/50 rounded-full px-3 py-2 shadow-lg">
+            <img 
+              src="/favicon_io (1)/android-chrome-192x1921.png" 
+              alt="MySphere" 
+              className="w-5 h-5 object-contain"
+            />
+            <div className="flex items-center space-x-1">
+              <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span className="text-xs font-medium text-blue-700">Verified</span>
+            </div>
+          </div>
+          
+          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 w-full">
+          <div className="flex flex-col items-center lg:items-start">
+            <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden flex-shrink-0 relative group">
+              {/* Premium ramka z białym gradientem */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white via-blue-100 to-blue-200 p-1 shadow-2xl">
+                <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                  {profile.avatar ? (
+                    <img 
+                      src={profile.avatar} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    />
+                  ) : (
+                    <Avatar address={convertAddress(profile.address)} className="w-full h-full" />
+                  )}
+                </div>
+              </div>
+              
+              {/* Premium efekty świetlne */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 via-transparent to-blue-300/20 opacity-70"></div>
+              <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-blue-200/20 to-transparent filter blur-lg opacity-60 group-hover:opacity-80 transition-opacity duration-300"></div>
             </div>
             
             {/* Linki społecznościowe pod avatarem */}
-            <div className="mt-3 w-full">
+            <div className="mt-4 lg:mt-6 w-full lg:w-auto">
               <ProfileSocials 
                 address={convertAddress(profile.address)}
                 initialLinks={profile.socialLinks}
@@ -638,19 +685,22 @@ export default function BuilderProfile({
             </div>
           </div>
 
-          <div className="flex-1">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
-              <div className="flex flex-col">
-                <div className={`text-2xl font-semibold ${
+          <div className="flex-1 w-full lg:max-w-none">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-4 lg:mb-6">
+              <div className="flex flex-col lg:flex-1">
+                <div className={`text-2xl lg:text-3xl font-semibold mb-2 lg:mb-3 ${
                   isVitalik 
                     ? "bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-transparent bg-clip-text"
                     : "bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text"
                 }`}>
                   {profile.name.endsWith('.base.eth') ? (
-                    <>
-                      <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text">{profile.name}</span>
-                      <span className="ml-1.5 text-sm bg-blue-100 dark:bg-blue-900 text-blue-500 px-1.5 py-0.5 rounded-md">BaseName</span>
-                    </>
+                    <div className="flex items-center">
+                      <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-transparent bg-clip-text font-medium">{profile.name}</span>
+                      <div className="inline-flex items-center ml-3 px-3 py-1.5 rounded-full bg-gradient-to-r from-white/80 to-blue-50/60 backdrop-blur-sm border border-blue-200/50 shadow-lg">
+                        <div className="w-2.5 h-2.5 bg-blue-600 rounded-full mr-2"></div>
+                        <span className="text-blue-700 text-sm font-medium">basename</span>
+                      </div>
+                    </div>
                   ) : profile.name.endsWith('.sphere') ? (
                     <>
                       <span className="text-gray-900 dark:text-white">{profile.name.replace('.sphere', '')}</span>
@@ -685,54 +735,109 @@ export default function BuilderProfile({
                     </span>
                   </div>
                 )}
-                <div className="flex flex-col space-y-3 mt-1">
+                <div className="flex flex-col space-y-4 lg:space-y-5 mt-2 lg:mt-4">
                   {/* First row: Address and stats */}
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3 lg:space-x-4">
                     <button
                       onClick={copyAddressToClipboard}
-                      className="flex items-center text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md w-fit"
+                      className="flex items-center text-xs text-slate-600 hover:text-blue-600 bg-gradient-to-r from-white to-blue-50 hover:from-blue-50 hover:to-blue-100 px-3 py-1.5 rounded-lg border border-blue-200/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 w-fit"
                     >
-                      <span className="mr-1.5 font-mono">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
+                      <span className="mr-2 font-mono text-slate-700">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     </button>
                     
-                    {/* Tip Stats - Show received tips for this user */}
-                    <TipStats
-                      userAddress={userAddress}
-                      className="ml-2"
-                    />
+                    {/* Creator Earnings - Golden display with proper icons */}
+                    {(tipStats && tipStats.tipCount > 0) ? (
+                      <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-4 py-2.5 shadow-md backdrop-blur-sm hover:scale-105 hover:shadow-lg transition-all duration-300 relative">
+                        {/* Golden glow effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-yellow-100/30 to-amber-200/30 rounded-xl opacity-50"></div>
+                        
+                        <div className="relative flex items-center space-x-3">
+                          {/* Clean stats display */}
+                          <div className="flex flex-col">
+                            <div className="flex items-center space-x-1 mb-1">
+                              <img 
+                                src="/favicon_io (1)/android-chrome-192x1921.png" 
+                                alt="MySphere" 
+                                className="w-3 h-3 object-contain"
+                              />
+                              <span className="text-xs font-semibold text-amber-700">Creator Earnings</span>
+                              <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse"></div>
+                            </div>
+                            
+                            {/* ETH, USDC and CAMP values with proper icons */}
+                            <div className="flex items-center space-x-3">
+                              {tipStats.ethReceived > 0 && (
+                                <div className="flex items-center space-x-1">
+                                  <div className="flex items-center -space-x-0.5">
+                                    <img src="/brand-kit/base/logo/in-product/Base_Network_Logo.svg" alt="Base" className="w-3 h-3 z-10" />
+                                    <img src="/icons/eth.svg" alt="ETH" className="w-3.5 h-3.5" />
+                                  </div>
+                                  <span className="text-xs font-medium text-amber-700">
+                                    {tipStats.ethReceived.toFixed(4)}
+                                  </span>
+                                </div>
+                              )}
+                              {tipStats.usdcReceived > 0 && (
+                                <div className="flex items-center space-x-1">
+                                  <img src="/icons/usdc.svg" alt="USDC" className="w-3.5 h-3.5" />
+                                  <span className="text-xs font-medium text-amber-700">
+                                    {tipStats.usdcReceived.toFixed(2)}
+                                  </span>
+                                </div>
+                              )}
+                              {/* Future CAMP token support */}
+                              <div className="flex items-center space-x-1 opacity-40">
+                                <img src="/Camp.png" alt="CAMP" className="w-3.5 h-3.5" />
+                                <span className="text-xs font-medium text-amber-700">
+                                  0.00
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : loadingTipStats ? (
+                      <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-4 py-2.5 shadow-md backdrop-blur-sm">
+                        <div className="flex items-center space-x-2">
+                          <div className="animate-pulse bg-amber-200 rounded px-2 py-1 text-xs">
+                            Loading earnings...
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* 🚀 SOCIAL STATS (Statystyki społecznościowe) */}
                   {(followStats || friendsStats) && (
-                    <div className="flex items-center space-x-4 text-xs">
+                    <div className="flex items-center flex-wrap gap-3 lg:gap-4 text-xs">
                       {followStats && (
                         <>
-                          <div className="flex items-center space-x-1 bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded-full">
-                            <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="flex items-center space-x-1 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
+                            <svg className="w-3 h-3 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <span className="text-purple-600 font-medium">{followStats.followers}</span>
-                            <span className="text-purple-500">followers</span>
+                            <span className="text-purple-800 font-semibold">{followStats.followers}</span>
+                            <span className="text-purple-700 text-xs font-medium">followers</span>
                           </div>
-                          <div className="flex items-center space-x-1 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-full">
-                            <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="flex items-center space-x-1 bg-gradient-to-r from-blue-50 to-cyan-100 border border-cyan-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
+                            <svg className="w-3 h-3 text-cyan-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <span className="text-blue-600 font-medium">{followStats.following}</span>
-                            <span className="text-blue-500">following</span>
+                            <span className="text-cyan-800 font-semibold">{followStats.following}</span>
+                            <span className="text-cyan-700 text-xs font-medium">following</span>
                           </div>
                         </>
                       )}
                       {friendsStats && (
-                        <div className="flex items-center space-x-1 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full">
-                          <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex items-center space-x-1 bg-gradient-to-r from-green-50 to-emerald-100 border border-green-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
+                          <svg className="w-3 h-3 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                           </svg>
-                          <span className="text-green-600 font-medium">{friendsStats.totalFriends}</span>
-                          <span className="text-green-500">friends</span>
+                          <span className="text-green-800 font-semibold">{friendsStats.totalFriends}</span>
+                          <span className="text-green-700 text-xs font-medium">friends</span>
                         </div>
                       )}
                     </div>
@@ -740,16 +845,16 @@ export default function BuilderProfile({
 
                   {/* Third row: Action buttons (Trzeci rząd: Przyciski akcji) */}
                   {currentUserAddress !== userAddress && (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center flex-wrap gap-3 lg:gap-4">
                       {/* Follow Button (Przycisk obserwowania) */}
                       {!checkingFollowStatus && (
                         <button
                           onClick={isFollowing ? handleUnfollowUser : handleFollowUser}
                           disabled={followLoading}
-                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 shadow-sm backdrop-blur-sm border hover:scale-105 ${
                             isFollowing
-                              ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'
-                              : 'bg-purple-500 text-white hover:bg-purple-600'
+                              ? 'bg-gradient-to-r from-white to-indigo-50 border-indigo-200/50 text-indigo-700 hover:from-indigo-50 hover:to-indigo-100'
+                              : 'bg-gradient-to-r from-indigo-500 to-blue-600 border-indigo-400/50 text-white hover:from-indigo-600 hover:to-blue-700 shadow-lg'
                           } ${followLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {followLoading ? (
@@ -778,7 +883,7 @@ export default function BuilderProfile({
                       {/* Friend Request Button (Przycisk zaproszenia do znajomych) */}
                       <button
                         onClick={handleSendFriendRequest}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-medium bg-green-500 text-white hover:bg-green-600 transition-colors"
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-r from-emerald-500 to-green-600 border border-emerald-400/50 text-white hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-sm backdrop-blur-sm hover:scale-105 shadow-lg"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
@@ -787,11 +892,11 @@ export default function BuilderProfile({
                       </button>
 
                       {/* Tip Button */}
-                      <div className="bg-gray-100 dark:bg-gray-800 rounded-md">
+                      <div className="bg-gradient-to-r from-white to-yellow-50 border border-yellow-200/50 rounded-lg shadow-sm backdrop-blur-sm hover:scale-105 transition-all duration-300">
                         <TipButton
                           recipientAddress={userAddress}
                           postId={`profile-${userAddress}`}
-                          className="text-gray-500 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-400 p-1"
+                          className="text-yellow-600 hover:text-yellow-700 p-2 transition-colors"
                         />
                       </div>
                     </div>
