@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
 import { defineChain } from 'viem';
 import { baseCampChain } from './contracts/BaseCampPostContract';
+import { lineaChain } from './basechat/Linea/config/LineaNetworkConfig';
 import { CampProvider } from '@campnetwork/origin/react';
 
 type ThemeMode = 'auto' | 'light' | 'dark';
@@ -42,6 +43,7 @@ const queryClient = new QueryClient();
  * 1. Base Sepolia (baseSepolia) - Primary network for the app (for testing)
  * 2. Base Mainnet (base) - Will be used in production
  * 3. BaseCamp (baseCampChain) - Secondary network for specific functionality
+ * 4. Linea (lineaChain) - Ethereum Layer 2 for scalable posting
  * 
  * When using transactions for BaseCamp, ensure you explicitly specify 
  * the chain in both simulateContract and writeContract calls.
@@ -49,11 +51,12 @@ const queryClient = new QueryClient();
  * for an example implementation.
  */
 const wagmiConfig = createConfig({
-  chains: [base, baseSepolia, baseCampChain],
+  chains: [base, baseSepolia, baseCampChain, lineaChain],
   transports: {
     [base.id]: http('https://mainnet.base.org'),
     [baseSepolia.id]: http(),
     [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
+    [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
   },
   connectors: [
     farcasterFrame(),

@@ -3,3 +3,4 @@
 /* eslint-disable */
 import type * as spheresCoreSol from "./spheres-core.sol";
 export type { spheresCoreSol };
+export type { LineaPostContract } from "./LineaPostContract";

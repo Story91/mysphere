@@ -7,7 +7,7 @@ require("dotenv").config();
 
 const config = {
   solidity: {
-    version: "0.8.19",
+    version: "0.8.20",
     settings: {
       optimizer: {
         enabled: true,
@@ -37,13 +37,22 @@ const config = {
       url: process.env.BASE_GOERLI_RPC_URL || "https://goerli.base.org",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 84531
+    },
+    linea: {
+      url: process.env.LINEA_RPC_URL || "https://linea-rpc.publicnode.com",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 59144,
+      gasPrice: "auto",
+      gas: "auto",
+      timeout: 120000
     }
   },
   etherscan: {
     apiKey: {
       "base-sepolia": process.env.BASESCAN_API_KEY || "",
       base: process.env.BASESCAN_API_KEY || "",
-      "base-goerli": process.env.BASESCAN_API_KEY || ""
+      "base-goerli": process.env.BASESCAN_API_KEY || "",
+      linea: "HSHV72NNW6KVQA88YB5BFSZHTVPFWC2GJU"
     },
     customChains: [
       {
@@ -68,6 +77,14 @@ const config = {
         urls: {
           apiURL: "https://api-goerli.basescan.org/api",
           browserURL: "https://goerli.basescan.org"
+        }
+      },
+      {
+        network: "linea",
+        chainId: 59144,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api?chainid=59144",
+          browserURL: "https://lineascan.build"
         }
       }
     ]

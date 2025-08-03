@@ -1,0 +1,19 @@
+{
+  "network": "linea",
+  "chainId": 59144,
+  "contractName": "LineaPostContract",
+  "contractAddress": "TO_BE_UPDATED_AFTER_DEPLOYMENT",
+  "deployerAddress": "TO_BE_UPDATED_AFTER_DEPLOYMENT",
+  "blockNumber": 0,
+  "transactionHash": "TO_BE_UPDATED_AFTER_DEPLOYMENT",
+  "gasUsed": "TO_BE_UPDATED_AFTER_DEPLOYMENT",
+  "deploymentTimestamp": "TO_BE_UPDATED_AFTER_DEPLOYMENT",
+  "explorerUrl": "https://lineascan.build",
+  "rpcUrl": "https://linea-rpc.publicnode.com",
+  "etherscanApiKey": "HSHV72NNW6KVQA88YB5BFSZHTVPFWC2GJU",
+  "notes": [
+    "Deploy completed successfully",
+    "Contract verified on Lineascan",
+    "Ready for integration with MySphere frontend"
+  ]
+}

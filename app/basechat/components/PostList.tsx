@@ -1535,6 +1535,18 @@ export default function PostList({
                 </div>
               )}
               
+              {/* Linea network badge */}
+              {post.network === 'linea' && (
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-cyan-50/30 dark:bg-cyan-900/20 shadow-sm">
+                  <img 
+                    src="/Logomark Blue BG.svg"
+                    alt="Linea"
+                    className="w-4 h-4 drop-shadow-md"
+                  />
+                  <span className="ml-1 text-xs bg-gradient-to-r from-cyan-600 to-blue-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Linea</span>
+                </div>
+              )}
+              
               {/* Zora logo and badge */}
               {post.zoraCoinAddress && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">

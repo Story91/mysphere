@@ -54,6 +54,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IERC165__factory>;
     getContractFactory(
+      name: "LineaPostContract",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.LineaPostContract__factory>;
+    getContractFactory(
       name: "HybridCommunityPlatform",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.HybridCommunityPlatform__factory>;
@@ -109,6 +113,11 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.IERC165>;
     getContractAt(
+      name: "LineaPostContract",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.LineaPostContract>;
+    getContractAt(
       name: "HybridCommunityPlatform",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
@@ -155,6 +164,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IERC165>;
     deployContract(
+      name: "LineaPostContract",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.LineaPostContract>;
+    deployContract(
       name: "HybridCommunityPlatform",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.HybridCommunityPlatform>;
@@ -209,6 +222,11 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IERC165>;
+    deployContract(
+      name: "LineaPostContract",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.LineaPostContract>;
     deployContract(
       name: "HybridCommunityPlatform",
       args: any[],

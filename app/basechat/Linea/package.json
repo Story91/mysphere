@@ -1,0 +1,16 @@
+{
+  "name": "linea-integration",
+  "version": "1.0.0",
+  "description": "Linea Network integration for MySphere",
+  "scripts": {
+    "deploy-linea": "npx hardhat run scripts/deploy-linea.ts --network linea --config hardhat-linea.config.ts",
+    "verify-linea": "npx hardhat verify --network linea",
+    "compile-linea": "npx hardhat compile --config hardhat-linea.config.ts",
+    "test-linea": "npx hardhat test --config hardhat-linea.config.ts"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.0",
+    "hardhat": "^2.19.0",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0"
+  }
+}

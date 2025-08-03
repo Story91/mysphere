@@ -84,6 +84,7 @@ import { createCoin, getCoinCreateFromLogs } from '@zoralabs/coins-sdk';
 import { Address as ViemAddress, Hex } from 'viem';
 import CreatePostBaseCamp from './components/BaseCampPosts/CreatePostBaseCamp';
 import ClaimPortalBanner from './components/BaseCampPosts/ClaimPortalBanner';
+import CreatePostLinea from './Linea/components/CreatePostLinea';
 import MockFeed from './prelogin/MockFeed';
 
 // Add global type declaration for CoinGecko widget
@@ -3439,6 +3440,17 @@ export default function BaseChat() {
                     </svg>
                     Camp Network Post
                   </button>
+                  <button
+                    onClick={() => setActivePostingNetwork('linea')}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'linea' ? 'bg-black text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
+                  >
+                    <img 
+                      src="/Logomark Blue BG.svg" 
+                      alt="Linea" 
+                      className="w-4 h-4 mr-1.5"
+                    />
+                    Linea Post
+                  </button>
                 </div>
               </div>
               )}
@@ -3697,6 +3709,16 @@ export default function BaseChat() {
                               />
                               <ClaimPortalBanner />
                             </div>
+                          )}
+
+                          {/* Add Linea post form conditionally */}
+                          {activePostingNetwork === 'linea' && (
+                            <CreatePostLinea 
+                              onPostCreated={refreshPosts} 
+                              setShowAIModal={setShowAIModal}
+                              aiGeneratedContent={aiGeneratedContentForCamp}
+                              onAiContentUsed={() => setAiGeneratedContentForCamp('')}
+                            />
                           )}
                         </div>
                       ) : (

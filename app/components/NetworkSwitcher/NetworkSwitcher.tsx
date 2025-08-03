@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useAccount, useSwitchChain, useChainId } from 'wagmi';
 import { base, baseSepolia } from 'viem/chains';
 import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
+import { lineaChain } from '@/app/basechat/Linea/config/LineaNetworkConfig';
 
 // Definicja sieci z polskimi komentarzami
 // Definition of networks with Polish comments
@@ -29,6 +30,13 @@ const networks = [
     shortName: 'CAMP',
     iconUrl: '/Camp.png', // Ikona dla sieci Camp
     color: '#FF6B35',
+  },
+  {
+    id: lineaChain.id,
+    name: 'Linea',
+    shortName: 'LINEA',
+    iconUrl: '/Logomark Blue BG.svg', // Ikona dla sieci Linea
+    color: '#000000',
   },
 ];
 

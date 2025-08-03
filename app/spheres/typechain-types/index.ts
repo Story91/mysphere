@@ -26,5 +26,7 @@ export type { ERC165 } from "./@openzeppelin/contracts/utils/introspection/ERC16
 export { ERC165__factory } from "./factories/@openzeppelin/contracts/utils/introspection/ERC165__factory";
 export type { IERC165 } from "./@openzeppelin/contracts/utils/introspection/IERC165";
 export { IERC165__factory } from "./factories/@openzeppelin/contracts/utils/introspection/IERC165__factory";
+export type { LineaPostContract } from "./app/spheres/contracts/LineaPostContract";
+export { LineaPostContract__factory } from "./factories/app/spheres/contracts/LineaPostContract__factory";
 export type { HybridCommunityPlatform } from "./app/spheres/contracts/spheres-core.sol/HybridCommunityPlatform";
 export { HybridCommunityPlatform__factory } from "./factories/app/spheres/contracts/spheres-core.sol/HybridCommunityPlatform__factory";

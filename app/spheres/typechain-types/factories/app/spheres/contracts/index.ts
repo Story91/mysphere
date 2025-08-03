@@ -2,3 +2,4 @@
 /* tslint:disable */
 /* eslint-disable */
 export * as spheresCoreSol from "./spheres-core.sol";
+export { LineaPostContract__factory } from "./LineaPostContract__factory";
