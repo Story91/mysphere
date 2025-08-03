@@ -434,6 +434,24 @@ export const createPost = async (post: {
   txHash?: string; // Keep this as it now represents the Zora creation tx hash
   zoraCoinAddress?: string; // <-- ADDED
   network?: 'base' | 'basecamp'; // Add network parameter to identify the source network
+  musicTrack?: { // 🎵 Dodaj obsługę załączników muzycznych
+    id: string;
+    name: string;
+    artists: Array<{
+      name: string;
+      external_urls?: { spotify: string; };
+    }>;
+    album: {
+      name: string;
+      images?: Array<{ url: string; height: number; width: number; }>;
+      external_urls?: { spotify: string; };
+      release_date?: string;
+    };
+    duration_ms: number;
+    popularity?: number;
+    preview_url?: string;
+    external_urls?: { spotify: string; };
+  };
 }): Promise<string> => { // Zmieniamy typ zwracany na Promise<string>
   try {
     const postData = {
@@ -450,7 +468,8 @@ export const createPost = async (post: {
       visibility: post.visibility || 'public',
       txHash: post.txHash || null,
       zoraCoinAddress: post.zoraCoinAddress || null,
-      network: post.network || 'base'
+      network: post.network || 'base',
+      musicTrack: post.musicTrack || null // 🎵 Dodaj pole musicTrack
     };
 
     // Użyj batcha do operacji atomowych
@@ -594,6 +613,7 @@ export const fetchPosts = async ({
           lastEdited: postData.lastEdited || null,
           zoraCoinAddress: postData.zoraCoinAddress || null,
           network: postData.network || 'base', // Include network property and default to 'base' for backward compatibility
+          musicTrack: postData.musicTrack || null, // 🎵 Pobierz dane muzyki z Firebase
           isPinned: postData.isPinned || false,
           pinnedAt: postData.pinnedAt instanceof Timestamp 
             ? postData.pinnedAt.toMillis() 
@@ -699,6 +719,7 @@ export const fetchBaseNameFeedPosts = async ({
         lastEdited: postData.lastEdited || null,
         zoraCoinAddress: postData.zoraCoinAddress || null,
         network: postData.network || 'base',
+        musicTrack: postData.musicTrack || null, // 🎵 Pobierz dane muzyki z Firebase
         isPinned: postData.isPinned || false,
         pinnedAt: postData.pinnedAt instanceof Timestamp 
           ? postData.pinnedAt.toMillis() 

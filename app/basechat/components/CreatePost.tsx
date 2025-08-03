@@ -4,10 +4,14 @@ import { useState, useRef, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import BanRestriction from '../../admin/components/BanRestriction';
 import TransactionButton from '../../components/TransactionButton';
+import MusicSelector from './MusicSelector';
+import SpotifyTrackCard from './SpotifyTrackCard';
 
 export default function CreatePost() {
   const [content, setContent] = useState('');
   const [showOptions, setShowOptions] = useState(false);
+  const [selectedMusic, setSelectedMusic] = useState<any>(null);
+  const [showMusicSelector, setShowMusicSelector] = useState(false);
   const { address } = useAccount();
   const optionsRef = useRef<HTMLDivElement>(null);
 
@@ -29,7 +33,7 @@ export default function CreatePost() {
     if (!content.trim()) return;
     
     try {
-      console.log('Creating standard post...');
+      console.log('Creating standard post...', { hasMusic: !!selectedMusic });
       const response = await fetch('/api/posts/create', {
         method: 'POST',
         headers: {
@@ -37,6 +41,7 @@ export default function CreatePost() {
         },
         body: JSON.stringify({
           content,
+          musicTrack: selectedMusic, // Dodaj dane muzyki
         }),
       });
 
@@ -48,6 +53,7 @@ export default function CreatePost() {
 
       console.log('Post created successfully!');
       setContent('');
+      setSelectedMusic(null); // Wyczyść wybraną muzykę
       setShowOptions(false);
     } catch (error) {
       console.error('Error creating post:', error);
@@ -67,7 +73,17 @@ export default function CreatePost() {
   const handleTransactionSuccess = (txHash: string) => {
     console.log('Transaction successful with hash:', txHash);
     setContent('');
+    setSelectedMusic(null); // Wyczyść wybraną muzykę
     setShowOptions(false);
+  };
+
+  const handleSelectMusic = (track: any) => {
+    setSelectedMusic(track);
+    console.log('🎵 Selected music track:', track.name, 'by', track.artists.map((a: any) => a.name).join(', '));
+  };
+
+  const handleRemoveMusic = () => {
+    setSelectedMusic(null);
   };
 
   if (!address) {
@@ -93,8 +109,46 @@ export default function CreatePost() {
             className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             rows={3}
           />
-          
-          <div className="mt-2 flex justify-end">
+
+          {/* Selected Music Preview */}
+          {selectedMusic && (
+            <div className="mt-3 border border-green-300 dark:border-green-600 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-green-800 dark:text-green-300">
+                  🎵 Attached Track
+                </h4>
+                <button
+                  onClick={handleRemoveMusic}
+                  className="text-red-500 hover:text-red-700 text-sm"
+                  title="Remove track"
+                >
+                  ✕
+                </button>
+              </div>
+              <SpotifyTrackCard
+                trackData={{ track: selectedMusic }}
+                isCompact={true}
+                showAudioPlayer={false}
+              />
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="mt-3 flex items-center justify-between">
+            {/* Music Button */}
+            <button
+              type="button"
+              onClick={() => setShowMusicSelector(true)}
+              className="px-3 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center"
+              title="Add track from Spotify"
+            >
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 6L12 10l-3.5-2v4L12 14l3.5-2V8z"/>
+              </svg>
+              {selectedMusic ? 'Change Track' : 'Add Track'}
+            </button>
+            
+            <div className="flex justify-end">
             <div ref={optionsRef} className="relative">
               <button
                 type="button"
@@ -154,7 +208,15 @@ export default function CreatePost() {
               )}
             </div>
           </div>
+          </div> {/* Zamknij Action Buttons container */}
         </div>
+
+        {/* Music Selector Modal */}
+        <MusicSelector
+          isOpen={showMusicSelector}
+          onClose={() => setShowMusicSelector(false)}
+          onSelectTrack={handleSelectMusic}
+        />
       </div>
     </BanRestriction>
   );

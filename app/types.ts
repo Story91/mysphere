@@ -29,6 +29,36 @@ export interface Post {
   pinOwner?: string;
   pinAmountPaid?: string;
   pinTxHash?: string;
+  // 🎵 Music attachment field
+  musicTrack?: {
+    id: string;           // Spotify track ID
+    name: string;         // Nazwa utworu
+    artists: Array<{      // Artyści
+      name: string;
+      external_urls?: {
+        spotify: string;
+      };
+    }>;
+    album: {              // Album
+      name: string;
+      images?: Array<{
+        url: string;
+        height: number;
+        width: number;
+      }>;
+      external_urls?: {
+        spotify: string;
+      };
+      release_date?: string;
+      release_date_precision?: string;
+    };
+    duration_ms: number;  // Długość utworu
+    popularity?: number;  // Popularność (0-100)
+    preview_url?: string; // URL do podglądu (30 sek)
+    external_urls?: {     // Link do Spotify
+      spotify: string;
+    };
+  };
 }
 
 export interface Comment {

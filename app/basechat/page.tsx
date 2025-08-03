@@ -76,6 +76,8 @@ import PostList, { ExtendedPost } from './components/PostList';
 import ProfileCard from './components/ProfileCard';
 import PinnedPosts from './components/PinnedPosts';
 import { HomeIcon, UserIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
+import MusicSelector from './components/MusicSelector';
+import SpotifyTrackCard from './components/SpotifyTrackCard';
 // Import Zora SDK functions
 import { createCoin, getCoinCreateFromLogs } from '@zoralabs/coins-sdk';
 // Import Viem types
@@ -305,6 +307,9 @@ export default function BaseChat() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [posts, setPosts] = useState<ExtendedPost[]>([]);
   const [newPost, setNewPost] = useState('');
+  // 🎵 Stany dla funkcjonalności muzyki
+  const [selectedMusic, setSelectedMusic] = useState<any>(null);
+  const [showMusicSelector, setShowMusicSelector] = useState(false);
   
   // Pending Pin state management
   const [pendingPins, setPendingPins] = useState<{[postId: string]: {
@@ -776,7 +781,8 @@ export default function BaseChat() {
         comments: [],
         txHash: txHash,
         network: 'base' as 'base' | 'basecamp',
-        isPinned: false
+        isPinned: false,
+        musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór do optimistic update
       };
 
       // Dodaj post na górę listy NATYCHMIAST
@@ -793,7 +799,8 @@ export default function BaseChat() {
         mentions: mentions,
         visibility: 'public',
         txHash: txHash, // Zapisz hash transakcji onchain
-        network: 'base' // Identify as a Base network post
+        network: 'base', // Identify as a Base network post
+        musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór
       }).then((realPostId) => {
         // Zaktualizuj tempPost z prawdziwym ID z Firebase
         setPosts(currentPosts => 
@@ -813,6 +820,7 @@ export default function BaseChat() {
       setNewPost('');
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
+      setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę
       
       // ✅ OPTYMALIZACJA: Usunięto refreshPosts() - oszczędność 15 Firebase reads po każdym poście!
       
@@ -849,6 +857,16 @@ export default function BaseChat() {
     } finally {
       setIsCreatingPost(false);
     }
+  };
+
+  // 🎵 Funkcje obsługi muzyki
+  const handleSelectMusic = (track: any) => {
+    setSelectedMusic(track);
+    console.log('🎵 Selected music track:', track.name, 'by', track.artists.map((a: any) => a.name).join(', '));
+  };
+
+  const handleRemoveMusic = () => {
+    setSelectedMusic(null);
   };
 
   // Modyfikacja handleCreatePost, aby odświeżał posty po dodaniu nowego posta
@@ -1081,7 +1099,8 @@ export default function BaseChat() {
           mentions: mentions,
           visibility: visibilityValue,
           zoraCoinAddress: zoraCoinAddress,
-          txHash: result.hash
+          txHash: result.hash,
+          musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór
       });
       console.log("Post saved to Firebase.");
 
@@ -1100,6 +1119,7 @@ export default function BaseChat() {
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
       setUploadProgress(0);
+      setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę
 
       // Show success message
       toast.dismiss(toastId);
@@ -1159,7 +1179,8 @@ export default function BaseChat() {
             tags: tags,
             mentions: mentions,
             visibility: 'public',
-            network: 'base' // Identify as a Base network post without token
+            network: 'base', // Identify as a Base network post without token
+            musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór do fallback post
           });
           
           // Update UI
@@ -1167,6 +1188,7 @@ export default function BaseChat() {
           setNewPost('');
           setPostPreviewImage(null);
           setPostPreviewVideo(null);
+          setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę w fallback
           
           // Refresh posts
           await refreshPosts();
@@ -3548,6 +3570,29 @@ export default function BaseChat() {
                             </div>
                           )}
 
+                          {/* 🎵 Selected Music Preview */}
+                          {selectedMusic && (
+                            <div className="mb-4 border border-green-300 dark:border-green-600 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-medium text-green-800 dark:text-green-300">
+                                  🎵 Attached Track
+                                </h4>
+                                <button
+                                  onClick={handleRemoveMusic}
+                                  className="text-red-500 hover:text-red-700 text-sm"
+                                  title="Remove track"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              <SpotifyTrackCard
+                                trackData={{ track: selectedMusic }}
+                                isCompact={true}
+                                showAudioPlayer={false}
+                              />
+                            </div>
+                          )}
+
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2 sm:space-x-4">
                               <button 
@@ -3570,6 +3615,17 @@ export default function BaseChat() {
                                 </svg>
                                 <span className="hidden xs:inline">Generate AI Post</span>
                                 <span className="inline xs:hidden">AI</span>
+                              </button>
+
+                              <button
+                                onClick={() => setShowMusicSelector(true)}
+                                className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400 text-xs sm:text-sm bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+                                title="Add track from Spotify"
+                              >
+                                <span className="text-lg">🎵</span>
+                                <span className="hidden sm:inline font-medium text-green-600 dark:text-green-400">
+                                  {selectedMusic ? 'Change Track' : 'Music'}
+                                </span>
                               </button>
                             </div>
                             
@@ -3617,6 +3673,13 @@ export default function BaseChat() {
                             accept="image/*,video/*"
                             onChange={handlePostFileSelect}
                             className="hidden"
+                          />
+
+                          {/* 🎵 Music Selector Modal */}
+                          <MusicSelector
+                            isOpen={showMusicSelector}
+                            onClose={() => setShowMusicSelector(false)}
+                            onSelectTrack={handleSelectMusic}
                           />
                             </>
                           )}

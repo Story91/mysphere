@@ -14,6 +14,7 @@ import CommentTransactionButtonBaseCamp from './BaseCampPosts/CommentTransaction
 import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
 import TipButton from './TipButton';
 import TipStats from './TipStats';
+import SpotifyTrackCard from './SpotifyTrackCard';
 
 // Import Zora SDK functions and types
 import { getProfileBalances } from '@zoralabs/coins-sdk';
@@ -226,6 +227,26 @@ export default function PostList({
   const { followUser, unfollowUser, checkIfFollowing } = useSocial(address || null);
   const [followingStatus, setFollowingStatus] = useState<{[address: string]: boolean}>({});
   const [followLoading, setFollowLoading] = useState<{[address: string]: boolean}>({});
+  
+  // 🎵 Audio Player state for music previews
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [currentTrackUrl, setCurrentTrackUrl] = useState<string | null>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.5);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+
+  // 🎵 Cleanup audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (currentAudio) {
+        currentAudio.pause();
+        setCurrentAudio(null);
+        setIsPlayingAudio(false);
+      }
+    };
+  }, [currentAudio]);
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const networkChainId = useChainId();
@@ -435,6 +456,61 @@ export default function PostList({
         await onRefreshPosts();
       }
     }
+  };
+
+  // 🎵 Audio Player Functions
+  const playTrack = (previewUrl: string) => {
+    if (!previewUrl) return;
+    
+    // If same track, just toggle play/pause
+    if (currentTrackUrl === previewUrl && currentAudio) {
+      if (currentAudio.paused) {
+        console.log('🎵 Resuming track');
+        currentAudio.play();
+        setIsPlayingAudio(true);
+      } else {
+        console.log('⏸️ Pausing track');
+        currentAudio.pause();
+        setIsPlayingAudio(false);
+      }
+      return;
+    }
+
+    // Stop current track if playing (only for different tracks)
+    if (currentAudio) {
+      currentAudio.pause();
+      setIsPlayingAudio(false);
+    }
+
+    // Create new audio for different track
+    setIsLoadingAudio(true);
+    setCurrentTrackUrl(previewUrl);
+    
+    const audio = new Audio(previewUrl);
+    audio.volume = volume;
+    
+    audio.addEventListener('loadedmetadata', () => {
+      setDuration(audio.duration);
+      setIsLoadingAudio(false);
+    });
+    
+    audio.addEventListener('timeupdate', () => {
+      setCurrentTime(audio.currentTime);
+    });
+    
+    audio.addEventListener('ended', () => {
+      setIsPlayingAudio(false);
+      setCurrentTime(0);
+    });
+    
+    audio.addEventListener('error', () => {
+      setIsLoadingAudio(false);
+      console.error('Failed to load audio');
+    });
+
+    setCurrentAudio(audio);
+    audio.play();
+    setIsPlayingAudio(true);
   };
 
   const handleAddComment = async (postId: string, txHash: string) => {
@@ -1553,6 +1629,22 @@ export default function PostList({
             {post.video && (
               <video src={post.video} controls className="max-h-96 w-full rounded-lg" />
             )}
+          </div>
+        )}
+
+        {/* 🎵 Music Track - wyświetlaj kafelek muzyczny jeśli post ma załączony utwór */}
+        {post.musicTrack && (
+          <div className="my-3">
+            <SpotifyTrackCard
+              trackData={{ track: post.musicTrack as any }}
+              isCompact={false}
+              showAudioPlayer={true}
+              onPlayTrack={playTrack}
+              isPlaying={isPlayingAudio && currentTrackUrl === post.musicTrack.preview_url}
+              isLoading={isLoadingAudio && currentTrackUrl === post.musicTrack.preview_url}
+              currentTime={currentTrackUrl === post.musicTrack.preview_url ? currentTime : 0}
+              duration={currentTrackUrl === post.musicTrack.preview_url ? duration : 0}
+            />
           </div>
         )}
 
