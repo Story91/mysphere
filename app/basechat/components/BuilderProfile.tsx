@@ -669,8 +669,19 @@ export default function BuilderProfile({
               <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-blue-200/20 to-transparent filter blur-lg opacity-60 group-hover:opacity-80 transition-opacity duration-300"></div>
             </div>
             
-            {/* Linki społecznościowe pod avatarem */}
-            <div className="mt-4 lg:mt-6 w-full lg:w-auto">
+            {/* Skrócony adres portfela pod avatarem */}
+            <div className="mt-4 lg:mt-6 w-full lg:w-auto flex flex-col items-center lg:items-start space-y-3">
+              <button
+                onClick={copyAddressToClipboard}
+                className="flex items-center text-xs text-slate-600 hover:text-blue-600 bg-gradient-to-r from-white to-blue-50 hover:from-blue-50 hover:to-blue-100 px-3 py-1.5 rounded-lg border border-blue-200/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 w-fit"
+              >
+                <span className="mr-2 font-mono text-slate-700">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+              
+              {/* Linki społecznościowe */}
               <ProfileSocials 
                 address={convertAddress(profile.address)}
                 initialLinks={profile.socialLinks}
@@ -735,85 +746,74 @@ export default function BuilderProfile({
                     </span>
                   </div>
                 )}
+                {/* Separator gradientowy */}
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent my-4"></div>
+                
                 <div className="flex flex-col space-y-4 lg:space-y-5 mt-2 lg:mt-4">
-                  {/* First row: Address and stats */}
-                  <div className="flex items-center space-x-3 lg:space-x-4">
-                    <button
-                      onClick={copyAddressToClipboard}
-                      className="flex items-center text-xs text-slate-600 hover:text-blue-600 bg-gradient-to-r from-white to-blue-50 hover:from-blue-50 hover:to-blue-100 px-3 py-1.5 rounded-lg border border-blue-200/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 w-fit"
-                    >
-                      <span className="mr-2 font-mono text-slate-700">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </button>
-                    
-                    {/* Creator Earnings - Golden display with proper icons */}
-                    {(tipStats && tipStats.tipCount > 0) ? (
-                      <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-4 py-2.5 shadow-md backdrop-blur-sm hover:scale-105 hover:shadow-lg transition-all duration-300 relative">
-                        {/* Golden glow effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-yellow-100/30 to-amber-200/30 rounded-xl opacity-50"></div>
-                        
-                        <div className="relative flex items-center space-x-3">
-                          {/* Clean stats display */}
-                          <div className="flex flex-col">
-                            <div className="flex items-center space-x-1 mb-1">
-                              <img 
-                                src="/favicon_io (1)/android-chrome-192x1921.png" 
-                                alt="MySphere" 
-                                className="w-3 h-3 object-contain"
-                              />
-                              <span className="text-xs font-semibold text-amber-700">Creator Earnings</span>
-                              <div className="w-1 h-1 bg-amber-400 rounded-full animate-pulse"></div>
-                            </div>
-                            
-                            {/* ETH, USDC and CAMP values with proper icons */}
-                            <div className="flex items-center space-x-3">
-                              {tipStats.ethReceived > 0 && (
-                                <div className="flex items-center space-x-1">
-                                  <div className="flex items-center -space-x-0.5">
-                                    <img src="/brand-kit/base/logo/in-product/Base_Network_Logo.svg" alt="Base" className="w-3 h-3 z-10" />
-                                    <img src="/icons/eth.svg" alt="ETH" className="w-3.5 h-3.5" />
-                                  </div>
-                                  <span className="text-xs font-medium text-amber-700">
-                                    {tipStats.ethReceived.toFixed(4)}
-                                  </span>
-                                </div>
-                              )}
-                              {tipStats.usdcReceived > 0 && (
-                                <div className="flex items-center space-x-1">
-                                  <img src="/icons/usdc.svg" alt="USDC" className="w-3.5 h-3.5" />
-                                  <span className="text-xs font-medium text-amber-700">
-                                    {tipStats.usdcReceived.toFixed(2)}
-                                  </span>
-                                </div>
-                              )}
-                              {/* Future CAMP token support */}
-                              <div className="flex items-center space-x-1 opacity-40">
-                                <img src="/Camp.png" alt="CAMP" className="w-3.5 h-3.5" />
-                                <span className="text-xs font-medium text-amber-700">
-                                  0.00
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : loadingTipStats ? (
-                      <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-4 py-2.5 shadow-md backdrop-blur-sm">
+                  {/* Creator Earnings - Rozciągnięty na całą szerokość */}
+                  {(tipStats && tipStats.tipCount > 0) ? (
+                    <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-6 py-4 shadow-md backdrop-blur-sm hover:scale-[1.02] hover:shadow-lg transition-all duration-300 relative w-full">
+                      {/* Golden glow effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-100/30 to-amber-200/30 rounded-xl opacity-50"></div>
+                      
+                      <div className="relative flex items-center justify-between">
+                        {/* Left side - Title and icon */}
                         <div className="flex items-center space-x-2">
-                          <div className="animate-pulse bg-amber-200 rounded px-2 py-1 text-xs">
-                            Loading earnings...
+                          <img 
+                            src="/favicon_io (1)/android-chrome-192x1921.png" 
+                            alt="MySphere" 
+                            className="w-4 h-4 object-contain"
+                          />
+                          <span className="text-sm font-bold text-amber-700">Creator Earnings</span>
+                        </div>
+                        
+                        {/* Right side - ETH, USDC and CAMP values with proper icons */}
+                        <div className="flex items-center space-x-4">
+                          {tipStats.ethReceived > 0 && (
+                            <div className="flex items-center space-x-2.5">
+                              <div className="flex items-center -space-x-0.5">
+                                <img src="/brand-kit/base/logo/in-product/Base_Network_Logo.svg" alt="Base" className="w-4 h-4 z-10" />
+                                <img src="/icons/eth.svg" alt="ETH" className="w-4 h-4" />
+                              </div>
+                              <span className="text-sm font-semibold text-amber-700">
+                                {tipStats.ethReceived.toFixed(4)}
+                              </span>
+                            </div>
+                          )}
+                          {tipStats.usdcReceived > 0 && (
+                            <div className="flex items-center space-x-1.5">
+                              <img src="/icons/usdc.svg" alt="USDC" className="w-4 h-4" />
+                              <span className="text-sm font-semibold text-amber-700">
+                                {tipStats.usdcReceived.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                          {/* CAMP token support - ODBLOKOWANY */}
+                          <div className="flex items-center space-x-1.5">
+                            <img src="/Camp.png" alt="CAMP" className="w-4 h-4" />
+                            <span className="text-sm font-semibold text-amber-700">
+                              0.00
+                            </span>
                           </div>
                         </div>
                       </div>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : loadingTipStats ? (
+                    <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-6 py-4 shadow-md backdrop-blur-sm w-full">
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="animate-pulse bg-amber-200 rounded px-3 py-2 text-sm">
+                          Loading earnings...
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
 
-                  {/* 🚀 SOCIAL STATS (Statystyki społecznościowe) */}
+                  {/* Separator gradientowy przed social stats */}
                   {(followStats || friendsStats) && (
-                    <div className="flex items-center flex-wrap gap-3 lg:gap-4 text-xs">
-                      {followStats && (
+                    <>
+                      <div className="w-full h-px bg-gradient-to-r from-transparent via-purple-300/60 to-transparent my-3"></div>
+                      <div className="flex items-center flex-wrap gap-3 lg:gap-4 text-xs">
+                        {followStats && (
                         <>
                           <div className="flex items-center space-x-1 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
                             <svg className="w-3 h-3 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -830,22 +830,25 @@ export default function BuilderProfile({
                             <span className="text-cyan-700 text-xs font-medium">following</span>
                           </div>
                         </>
-                      )}
-                      {friendsStats && (
-                        <div className="flex items-center space-x-1 bg-gradient-to-r from-green-50 to-emerald-100 border border-green-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
-                          <svg className="w-3 h-3 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                          </svg>
-                          <span className="text-green-800 font-semibold">{friendsStats.totalFriends}</span>
-                          <span className="text-green-700 text-xs font-medium">friends</span>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                        {friendsStats && (
+                          <div className="flex items-center space-x-1 bg-gradient-to-r from-green-50 to-emerald-100 border border-green-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
+                            <svg className="w-3 h-3 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                            </svg>
+                            <span className="text-green-800 font-semibold">{friendsStats.totalFriends}</span>
+                            <span className="text-green-700 text-xs font-medium">friends</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
 
-                  {/* Third row: Action buttons (Trzeci rząd: Przyciski akcji) */}
+                  {/* Separator gradientowy przed action buttons */}
                   {currentUserAddress !== userAddress && (
-                    <div className="flex items-center flex-wrap gap-3 lg:gap-4">
+                    <>
+                      <div className="w-full h-px bg-gradient-to-r from-transparent via-indigo-300/60 to-transparent my-3"></div>
+                      <div className="flex items-center flex-wrap gap-3 lg:gap-4">
                       {/* Follow Button (Przycisk obserwowania) */}
                       {!checkingFollowStatus && (
                         <button
@@ -899,7 +902,8 @@ export default function BuilderProfile({
                           className="text-yellow-600 hover:text-yellow-700 p-2 transition-colors"
                         />
                       </div>
-                    </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
