@@ -127,10 +127,10 @@ export default function SpotifyTrackCard({
                 <button
                   onClick={() => onPlayTrack?.(track.preview_url!)}
                   disabled={isLoading && currentTrackUrl === track.preview_url}
-                  className={`absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded transition-opacity duration-200 disabled:opacity-50 ${
+                  className={`absolute inset-0 flex items-center justify-center rounded transition-opacity duration-200 disabled:opacity-50 ${
                     isPlaying && currentTrackUrl === track.preview_url 
-                      ? 'opacity-100' 
-                      : 'opacity-0 group-hover:opacity-100'
+                      ? 'bg-black/30 opacity-100' 
+                      : 'bg-black/50 backdrop-blur-sm opacity-0 group-hover:opacity-100'
                   }`}
                   title={isPlaying && currentTrackUrl === track.preview_url ? 'Pause' : 'Play 30s preview'}
                 >
@@ -146,6 +146,18 @@ export default function SpotifyTrackCard({
                     </svg>
                   )}
                 </button>
+              )}
+              
+              {/* No Preview Indicator */}
+              {!track?.preview_url && showAudioPlayer && (
+                <div 
+                  className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded transition-opacity duration-200 opacity-0 group-hover:opacity-100"
+                  title="No preview available for this track"
+                >
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                </div>
               )}
             </div>
           )}
