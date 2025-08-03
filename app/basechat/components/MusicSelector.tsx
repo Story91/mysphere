@@ -227,14 +227,27 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                     spotifyData.profile.playedTracks.slice(0, 20).map((trackData, index) => (
                       <div
                         key={`recent-${index}`}
-                        onClick={() => handleSelectTrack(trackData)}
-                        className="cursor-pointer hover:scale-[1.01] transition-transform"
+                        className="relative hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
                       >
                         <SpotifyTrackCard
                           trackData={trackData}
                           isCompact={true}
                           showAudioPlayer={false}
+                          disableLinks={true}
                         />
+                        {/* ➕ Add Track Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectTrack(trackData);
+                          }}
+                          className="absolute top-3 right-3 w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 border-2 border-white/20 z-10"
+                          title="Add track to post"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
                       </div>
                     ))
                   ) : (
@@ -252,14 +265,27 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                     spotifyData.profile.savedTracks.slice(0, 20).map((trackData, index) => (
                       <div
                         key={`saved-${index}`}
-                        onClick={() => handleSelectTrack(trackData)}
-                        className="cursor-pointer hover:scale-[1.01] transition-transform"
+                        className="relative hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
                       >
                         <SpotifyTrackCard
                           trackData={trackData}
                           isCompact={true}
                           showAudioPlayer={false}
+                          disableLinks={true}
                         />
+                        {/* ➕ Add Track Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectTrack(trackData);
+                          }}
+                          className="absolute top-3 right-3 w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 border-2 border-white/20 z-10"
+                          title="Add track to post"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
                       </div>
                     ))
                   ) : (

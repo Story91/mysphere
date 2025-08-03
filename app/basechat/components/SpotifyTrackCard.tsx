@@ -39,6 +39,7 @@ interface SpotifyTrackCardProps {
   trackData: SpotifyTrackData;
   isCompact?: boolean; // Wersja kompaktowa dla postów
   showAudioPlayer?: boolean; // Czy pokazywać odtwarzacz
+  disableLinks?: boolean; // Wyłącz linki do Spotify (tryb selekcji)
   currentTrackUrl?: string;
   isPlaying?: boolean;
   isLoading?: boolean;
@@ -61,6 +62,7 @@ export default function SpotifyTrackCard({
   trackData,
   isCompact = false,
   showAudioPlayer = true,
+  disableLinks = false,
   currentTrackUrl,
   isPlaying = false,
   isLoading = false,
@@ -98,19 +100,27 @@ export default function SpotifyTrackCard({
           {/* Album Cover */}
           {track?.album?.images && track.album.images[0] && (
             <div className="relative group">
-              <a
-                href={track?.album?.external_urls?.spotify || '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block hover:opacity-80 transition-opacity"
-                title={`View album: ${track?.album?.name}`}
-              >
+              {disableLinks ? (
                 <img
                   src={track.album.images[0].url}
                   alt={track.album.name}
-                  className={`${isCompact ? 'w-10 h-10' : 'w-12 h-12'} rounded cursor-pointer hover:shadow-lg transition-all duration-200`}
+                  className={`${isCompact ? 'w-10 h-10' : 'w-12 h-12'} rounded transition-all duration-200`}
                 />
-              </a>
+              ) : (
+                <a
+                  href={track?.album?.external_urls?.spotify || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block hover:opacity-80 transition-opacity"
+                  title={`View album: ${track?.album?.name}`}
+                >
+                  <img
+                    src={track.album.images[0].url}
+                    alt={track.album.name}
+                    className={`${isCompact ? 'w-10 h-10' : 'w-12 h-12'} rounded cursor-pointer hover:shadow-lg transition-all duration-200`}
+                  />
+                </a>
+              )}
               
               {/* Preview Play Button */}
               {track?.preview_url && showAudioPlayer && (
