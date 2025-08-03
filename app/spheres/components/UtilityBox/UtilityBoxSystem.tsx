@@ -415,7 +415,7 @@ export default function UtilityBoxSystem() {
         <div className="min-h-screen bg-gradient-to-b from-blue-900 via-purple-900 to-indigo-900 p-6">
             {/* Real Contract Event Listener */}
             <PrizeEventListener 
-                userAddress={address}
+          
                 onPrizeDetected={handlePrizeDetected}
                 onTransactionProcessed={(txHash) => console.log('Transaction processed:', txHash)}
             />

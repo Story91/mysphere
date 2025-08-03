@@ -62,7 +62,7 @@ const formatNumberWithSuffix = (value: number | string): string => {
 
 export interface ExtendedPost extends Post {
   pollId?: string;
-  network?: 'base' | 'basecamp';
+  network?: 'base' | 'basecamp' | 'linea';
   // 🚀 Paid Pin fields
   isPaidPin?: boolean;
   pinExpiresAt?: number;

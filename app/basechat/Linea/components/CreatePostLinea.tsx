@@ -213,7 +213,6 @@ export default function CreatePostLinea({
 
   return (
     <BanRestriction 
-      userAddress={address}
       fallback={
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 border border-blue-200">
           <div className="text-red-500 dark:text-red-400 text-center">
