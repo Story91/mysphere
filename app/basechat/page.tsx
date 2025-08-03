@@ -70,7 +70,7 @@ import TransactionButton from '../components/TransactionButton';
 import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
 import YapsMetrics from '../yapscan/components/YapsMetrics';
-import TwitterProfileSection from './components/TwitterProfileSection';
+
 
 import PostList, { ExtendedPost } from './components/PostList';
 import ProfileCard from './components/ProfileCard';
@@ -2678,10 +2678,7 @@ export default function BaseChat() {
                         </div>
                       )}
 
-                      {/* Twitter Profile Section */}
-                      {address && (
-                        <TwitterProfileSection userAddress={address} />
-                      )}
+
 
                       {/* Modern Edit Profile Panel */}
                       {isEditingProfile && address && (
