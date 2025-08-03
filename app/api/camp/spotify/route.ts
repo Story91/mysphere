@@ -98,11 +98,25 @@ export async function GET(request: NextRequest) {
         console.warn('❌ fetchSavedPlaylistsById failed:', err);
         return { data: [], isError: true, message: 'Failed to fetch saved playlists' };
       }),
-      // TODO: Find correct method name for top artists/genres API
-      Promise.resolve({ 
-        data: { names: [], genres: [] }, 
-        isError: false, 
-        message: 'Top artists/genres temporarily disabled - waiting for correct API method name' 
+      // Direct HTTP call to /top endpoint since SDK method name is unclear
+      fetch(`https://wv2h4to5qa.execute-api.us-east-2.amazonaws.com/dev/spotify/top?spotifyId=${spotifyId}&time_range=long_term`, {
+        headers: {
+          'x-api-key': apiKey,
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log('✅ Direct /top API call success:', { 
+          isError: data.isError, 
+          hasNames: !!data.data?.names?.length,
+          hasGenres: !!data.data?.genres?.length 
+        });
+        return data;
+      })
+      .catch((err: any) => {
+        console.warn('❌ Direct /top API call failed:', err);
+        return { data: { names: [], genres: [] }, isError: true, message: 'Failed to fetch top artists and genres' };
       })
     ]);
 

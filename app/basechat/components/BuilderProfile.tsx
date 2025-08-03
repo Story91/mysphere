@@ -1724,7 +1724,27 @@ export default function BuilderProfile({
                               <h5 className="text-green-300 text-sm font-medium mb-3">Recently Played</h5>
                               <div className="space-y-2">
                                 {(spotifyUserData.profile?.playedTracks || []).slice(0, 3).map((item, index) => (
-                                  <div key={index} className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors">
+                                  <div 
+                                    key={index} 
+                                    className="relative overflow-hidden rounded-lg p-3 hover:scale-[1.02] hover:shadow-2xl hover:shadow-black/30 origin-left transition-all duration-300"
+                                    style={{
+                                      backgroundImage: item?.track?.album?.images?.[0]?.url 
+                                        ? `url(${item.track.album.images[0].url})` 
+                                        : undefined,
+                                      backgroundSize: 'cover',
+                                      backgroundPosition: 'center',
+                                      backgroundRepeat: 'no-repeat'
+                                    }}
+                                  >
+                                    {/* Blurred Background Overlay */}
+                                    <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
+                                      item?.track?.album?.images?.[0]?.url 
+                                        ? 'bg-black/40' 
+                                        : 'bg-gradient-to-br from-green-900/30 to-emerald-800/30'
+                                    }`}></div>
+                                    
+                                    {/* Content Container */}
+                                    <div className="relative z-10">
                                     <div className="flex items-center space-x-3">
                                       {item?.track?.album?.images && item.track.album.images[0] && (
                                         <div className="relative group">
@@ -1903,6 +1923,7 @@ export default function BuilderProfile({
                                         )}
                                       </div>
                                     </div>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -1915,7 +1936,27 @@ export default function BuilderProfile({
                               <h5 className="text-green-300 text-sm font-medium mb-3">Saved Tracks</h5>
                               <div className="space-y-2">
                                 {(spotifyUserData.profile?.savedTracks || []).slice(0, 3).map((item, index) => (
-                                  <div key={index} className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors">
+                                  <div 
+                                    key={index} 
+                                    className="relative overflow-hidden rounded-lg p-3 hover:scale-[1.02] hover:shadow-2xl hover:shadow-black/30 origin-left transition-all duration-300"
+                                    style={{
+                                      backgroundImage: item?.track?.album?.images?.[0]?.url 
+                                        ? `url(${item.track.album.images[0].url})` 
+                                        : undefined,
+                                      backgroundSize: 'cover',
+                                      backgroundPosition: 'center',
+                                      backgroundRepeat: 'no-repeat'
+                                    }}
+                                  >
+                                    {/* Blurred Background Overlay */}
+                                    <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
+                                      item?.track?.album?.images?.[0]?.url 
+                                        ? 'bg-black/40' 
+                                        : 'bg-gradient-to-br from-green-900/30 to-emerald-800/30'
+                                    }`}></div>
+                                    
+                                    {/* Content Container */}
+                                    <div className="relative z-10">
                                     <div className="flex items-center space-x-3">
                                       {item?.track?.album?.images && item.track.album.images[0] && (
                                         <div className="relative group">
@@ -2093,6 +2134,7 @@ export default function BuilderProfile({
                                           </div>
                                         )}
                                       </div>
+                                    </div>
                                     </div>
                                   </div>
                                 ))}
