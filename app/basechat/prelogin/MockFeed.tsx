@@ -117,13 +117,9 @@ const MockFeed = () => {
         <div className="flex justify-center mb-2 overflow-hidden">
           <div className="relative w-[250px] h-[100px] overflow-hidden">
             <img 
-              src="/frame-v2.png" 
+              src="/elo2.png" 
               alt="MySphere Logo" 
               className="w-full h-full object-contain"
-              style={{
-                filter: 'brightness(1.1) contrast(1.1)',
-                mixBlendMode: 'lighten'
-              }}
             />
           </div>
         </div>

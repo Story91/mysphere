@@ -3256,7 +3256,8 @@ export default function BaseChat() {
             <div className={`flex-1 p-4 overflow-y-auto ${
               activeMobilePanel === 'main' ? 'block w-full' : 'hidden lg:block'
             }`}>
-              {/* Post switcher and network selection */}
+              {/* Post switcher and network selection - only for logged in users */}
+              {isConnected && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4">
                 <div className="flex flex-col gap-3">
                   {/* Main filters row */}
@@ -3405,8 +3406,10 @@ export default function BaseChat() {
                   </div>
                  </div>
               </div>
+              )}
 
-              {/* Network Filter tabs */}
+              {/* Network Filter tabs - only for logged in users */}
+              {isConnected && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-2">
                   <button
@@ -3438,6 +3441,7 @@ export default function BaseChat() {
                   </button>
                 </div>
               </div>
+              )}
 
               {/* Main content switcher based on activeMainPanel (Przełącznik głównej zawartości) */}
               {activeMainPanel === 'builders' ? (
