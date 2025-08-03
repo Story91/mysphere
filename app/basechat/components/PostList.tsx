@@ -1640,10 +1640,24 @@ export default function PostList({
               isCompact={false}
               showAudioPlayer={true}
               onPlayTrack={playTrack}
+              currentTrackUrl={currentTrackUrl || undefined}
               isPlaying={isPlayingAudio && currentTrackUrl === post.musicTrack.preview_url}
               isLoading={isLoadingAudio && currentTrackUrl === post.musicTrack.preview_url}
               currentTime={currentTrackUrl === post.musicTrack.preview_url ? currentTime : 0}
               duration={currentTrackUrl === post.musicTrack.preview_url ? duration : 0}
+              volume={volume}
+              onVolumeChange={(newVolume) => {
+                setVolume(newVolume);
+                if (currentAudio) {
+                  currentAudio.volume = newVolume;
+                }
+              }}
+              onSeekTime={(time) => {
+                if (currentAudio) {
+                  currentAudio.currentTime = time;
+                  setCurrentTime(time);
+                }
+              }}
             />
           </div>
         )}
@@ -2012,11 +2026,10 @@ export default function PostList({
           )}
 
           {(canEdit || (canDelete && post.author === address)) && (
-            <div className="relative group ml-auto">
-              <button className="hover:text-gray-700 dark:hover:text-gray-300">
+            <div className="relative ml-auto">
+              <button className="hover:text-gray-700 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 group">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
-              </button>
-              <div className="absolute right-0 bottom-full mb-1 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 border border-gray-100 dark:border-gray-600">
+                <div className="absolute right-0 bottom-full mb-1 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 border border-gray-100 dark:border-gray-600 pointer-events-none group-hover:pointer-events-auto">
                 {canEdit && (
                   <button
                     onClick={() => { setEditingPost(post.id); setEditedContent(post.content); }}
@@ -2046,7 +2059,8 @@ export default function PostList({
                     Delete
                   </button>
                 )}
-              </div>
+                </div>
+              </button>
             </div>
           )}
         </div>
