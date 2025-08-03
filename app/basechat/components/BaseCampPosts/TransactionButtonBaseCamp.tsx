@@ -36,7 +36,34 @@ export default function TransactionButtonBaseCamp({
   const contractAddress = getBaseCampContractAddress();
 
   const handleSendTransaction = useCallback(async () => {
-    if (!isConnected || !address || !content.trim() || disabled || isTransacting) {
+    if (!isConnected || !address || disabled || isTransacting) {
+      return;
+    }
+
+    // If not on BaseCamp network, only switch network (don't post)
+    if (!isBaseCampNetwork) {
+      if (!content.trim()) {
+        toast.error('Please write some content first');
+        return;
+      }
+      
+      try {
+        setIsTransacting(true);
+        toast.loading('Switching to Camp Network...');
+        await switchChain({ chainId: BASECAMP_CHAIN_ID });
+        toast.success('Switched to Camp Network! Now you can post.');
+        setIsTransacting(false);
+        return; // Exit here - just switch, don't post
+      } catch (switchError) {
+        console.error('Failed to switch network:', switchError);
+        toast.error('Please switch to Camp Network manually');
+        setIsTransacting(false);
+        return;
+      }
+    }
+
+    // Only post if we're on BaseCamp network AND have content
+    if (!content.trim()) {
       return;
     }
 
@@ -48,19 +75,6 @@ export default function TransactionButtonBaseCamp({
     try {
       setIsTransacting(true);
       toast.loading('Preparing transaction...');
-
-      // If not on BaseCamp network, try to switch
-      if (!isBaseCampNetwork) {
-        try {
-          await switchChain({ chainId: BASECAMP_CHAIN_ID });
-          toast.success('Switched to Camp Network network');
-        } catch (switchError) {
-          console.error('Failed to switch network:', switchError);
-          toast.error('Please switch to Camp Network network manually');
-          setIsTransacting(false);
-          return;
-        }
-      }
 
       // Ensure the contract address has the correct format
       const formattedAddress = contractAddress.startsWith('0x') 
@@ -171,7 +185,7 @@ export default function TransactionButtonBaseCamp({
           : 'bg-yellow-500 text-white hover:bg-yellow-600'
       } ${disabled || isTransacting ? 'opacity-50 cursor-not-allowed' : ''}`}
       onClick={handleSendTransaction}
-      disabled={disabled || isTransacting || !content.trim()}
+      disabled={disabled || isTransacting || (!isBaseCampNetwork && !content.trim())}
     >
       {isTransacting ? (
         <>
@@ -194,7 +208,7 @@ export default function TransactionButtonBaseCamp({
             <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
             <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
           </svg>
-          {isBaseCampNetwork ? 'Post to Camp Network' : 'Switch to Camp Network & Post'}
+          {isBaseCampNetwork ? 'Post to Camp Network' : 'Switch To Camp'}
         </>
       )}
     </button>

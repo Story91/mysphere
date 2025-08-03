@@ -8,6 +8,8 @@ import { createPost } from '../../../utils/firebase';
 import { put } from '@vercel/blob';
 import { toast } from 'react-hot-toast';
 import { Avatar } from '@coinbase/onchainkit/identity';
+import MusicSelector from '../MusicSelector';
+import SpotifyTrackCard from '../SpotifyTrackCard';
 
 interface CreatePostBaseCampProps {
   onPostCreated?: () => Promise<void>;
@@ -21,6 +23,8 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
   const [isSaving, setIsSaving] = useState(false);
   const [postPreviewImage, setPostPreviewImage] = useState<string | null>(null);
   const [postPreviewVideo, setPostPreviewVideo] = useState<string | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState<any>(null);
+  const [showMusicSelector, setShowMusicSelector] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { address } = useAccount();
@@ -65,6 +69,16 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
     reader.readAsDataURL(file);
   };
 
+  // Handle Spotify music selection
+  const handleSelectMusic = (track: any) => {
+    setSelectedMusic(track);
+    console.log('🎵 Selected music track for Camp:', track.name, 'by', track.artists.map((a: any) => a.name).join(', '));
+  };
+
+  const handleRemoveMusic = () => {
+    setSelectedMusic(null);
+  };
+
   // Handle the transaction success from the blockchain
   const handleTransactionSuccess = async (txHash: string) => {
     if (!address) return;
@@ -87,6 +101,7 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
 
         const isVideo = postPreviewVideo !== null;
         const fileExtension = isVideo ? (blob.type.split('/')[1] || 'mp4') : (blob.type.split('/')[1] || 'jpg');
+        
         const fileName = `basecamp-post-media-${Date.now()}.${fileExtension}`;
 
         const formData = new FormData();
@@ -123,7 +138,8 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
         txHash: txHash,
         network: 'basecamp', // Mark as a BaseCamp network post
         image: imageUrl,
-        video: videoUrl
+        video: videoUrl,
+        musicTrack: selectedMusic // Add Spotify track data
       });
       
       console.log(`🎉 New post created with Firebase ID: ${newPostId}`);
@@ -141,6 +157,7 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
         network: 'basecamp',
         image: imageUrl,
         video: videoUrl,
+        musicTrack: selectedMusic,
         likes: 0,
         comments: []
       };
@@ -150,6 +167,7 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
       setContent('');
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
+      setSelectedMusic(null);
       toast.success('Post saved successfully to Camp Network!', { id: toastId });
       
       // Call the parent's refresh function if provided
@@ -193,7 +211,7 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="What would you like to post on Camp Network?"
+                              placeholder="What's up .campers? Drop your current Spotify vibe and share what's on your mind with the camp!"
               className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
               rows={3}
             />
@@ -239,29 +257,61 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
             )}
           </div>
         )}
+
+        {/* Selected Music Preview */}
+        {selectedMusic && (
+          <div className="mb-4 border border-green-300 dark:border-green-600 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-green-800 dark:text-green-300">
+                🎵 Attached Track
+              </h4>
+              <button
+                onClick={handleRemoveMusic}
+                className="text-red-500 hover:text-red-700 text-sm"
+                title="Remove track"
+              >
+                ✕
+              </button>
+            </div>
+            <SpotifyTrackCard
+              trackData={{ track: selectedMusic }}
+              isCompact={true}
+              showAudioPlayer={false}
+            />
+          </div>
+        )}
         
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
+              className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 text-xs sm:text-sm bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+              title="Add photo or video"
             >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <span className="text-lg">📷</span>
+              <span className="hidden sm:inline font-medium text-blue-600 dark:text-blue-400">Photo</span>
+            </button>
+
+            <button 
+              onClick={() => setShowMusicSelector(true)}
+              className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400 text-xs sm:text-sm bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+              title="Add track from Spotify"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
               </svg>
-              <span className="hidden xs:inline">Add photo/video</span>
-              <span className="inline xs:hidden">Photo</span>
+              <span className="hidden sm:inline font-medium text-green-600 dark:text-green-400">
+                {selectedMusic ? 'Change Track' : 'Spotify'}
+              </span>
             </button>
 
             <button
               onClick={handleShowAIModal}
-              className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
+              className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 text-xs sm:text-sm bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+              title="Generate AI post"
             >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="hidden xs:inline">Generate AI Post</span>
-              <span className="inline xs:hidden">AI</span>
+              <span className="text-lg">🤖</span>
+              <span className="hidden sm:inline font-medium text-purple-600 dark:text-purple-400">AI</span>
             </button>
           </div>
           
@@ -281,6 +331,13 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
           accept="image/*,video/*"
           onChange={handlePostFileSelect}
           className="hidden"
+        />
+
+        {/* Music Selector Modal */}
+        <MusicSelector
+          isOpen={showMusicSelector}
+          onClose={() => setShowMusicSelector(false)}
+          onSelectTrack={handleSelectMusic}
         />
       </div>
     </BanRestriction>
