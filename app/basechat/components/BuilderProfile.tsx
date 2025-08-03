@@ -51,6 +51,108 @@ interface TwitterTweet {
   isReTweet: boolean;
 }
 
+// Spotify/Camp Network API types
+interface SpotifyUser {
+  id: string;
+  display_name: string;
+  external_urls: {
+    spotify: string;
+  };
+  href: string;
+  images: Array<{
+    url: string;
+    height: number;
+    width: number;
+  }>;
+  type: string;
+  uri: string;
+  followers: number;
+  lastSynced: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SpotifyTrack {
+  track: {
+    id: string;
+    name: string;
+    artists: Array<{
+      name: string;
+      external_urls?: {
+        spotify: string;
+      };
+    }>;
+    album: {
+      name: string;
+      images?: Array<{
+        url: string;
+        height: number;
+        width: number;
+      }>;
+      external_urls?: {
+        spotify: string;
+      };
+    };
+    duration_ms: number;
+    popularity: number;
+    preview_url?: string;
+    external_urls?: {
+      spotify: string;
+    };
+  };
+  played_at?: string;
+  added_at?: string;
+}
+
+interface SpotifyAlbum {
+  albumId: string;
+  albumName: string;
+  albumTotalTracks: number;
+  albumPopularity: string;
+  albumImages: Array<{
+    url: string;
+    height: number;
+    width: number;
+  }>;
+  albumType: string;
+  albumReleaseDate: string;
+  added_at: string;
+}
+
+interface SpotifyPlaylist {
+  playlistId: string;
+  playlistName: string;
+  playlistDescription: string;
+  playlistImages: Array<{
+    url: string;
+    height: number;
+    width: number;
+  }>;
+  playlistFollowers: number;
+  playlistCollaborative: boolean;
+  added_at: string;
+}
+
+interface SpotifyUserData {
+  user: SpotifyUser;
+  profile: {
+    savedTracks: SpotifyTrack[];
+    playedTracks: SpotifyTrack[];
+    savedAlbums: SpotifyAlbum[];
+    savedPlaylists: SpotifyPlaylist[];
+  };
+  analytics: {
+    totalSavedTracks: number;
+    totalPlayedTracks: number;
+    totalSavedAlbums: number;
+    totalSavedPlaylists: number;
+    listeningDiversity: number;
+  };
+  dataSource?: string;
+  usingMockData?: boolean;
+  hasContent?: boolean;
+}
+
 // Funkcja pomocnicza do konwersji adresu do formatu Ethereum
 const toEthereumAddress = (address: string): `0x${string}` => {
   // Upewnij się, że adres ma prefiks 0x
@@ -278,6 +380,11 @@ export default function BuilderProfile({
   const [loadingTwitterData, setLoadingTwitterData] = useState(false);
   const [isTwitterSectionExpanded, setIsTwitterSectionExpanded] = useState(false);
 
+  // Spotify/Camp Network state
+  const [spotifyUserData, setSpotifyUserData] = useState<SpotifyUserData | null>(null);
+  const [loadingSpotifyData, setLoadingSpotifyData] = useState(false);
+  const [isSpotifySectionExpanded, setIsSpotifySectionExpanded] = useState(false);
+
   // 🚀 SOCIAL FEATURES: Hook i stany  
   // Get stats for the profile we're viewing (userAddress)
   const { 
@@ -476,6 +583,78 @@ export default function BuilderProfile({
     }
   };
 
+  // Fetch Spotify data from Camp Network with localStorage caching
+  const fetchSpotifyData = async (address: string) => {
+    if (!address) return null;
+    
+    // Try to load from localStorage first
+    const cacheKey = `spotify_data_${address}`;
+    const cacheTimestampKey = `spotify_data_${address}_timestamp`;
+    const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes cache
+    
+    try {
+      const cachedData = localStorage.getItem(cacheKey);
+      const cachedTimestamp = localStorage.getItem(cacheTimestampKey);
+      
+      if (cachedData && cachedTimestamp) {
+        const age = Date.now() - parseInt(cachedTimestamp);
+        if (age < CACHE_DURATION) {
+          console.log(`🎵 Spotify data loaded from cache (${Math.round(age/1000)}s old)`);
+          return JSON.parse(cachedData);
+        } else {
+          // Cache expired, remove old data
+          localStorage.removeItem(cacheKey);
+          localStorage.removeItem(cacheTimestampKey);
+          console.log(`🎵 Spotify cache expired (${Math.round(age/1000)}s old) - fetching fresh data`);
+        }
+      }
+    } catch (error) {
+      console.warn('Error reading Spotify cache:', error);
+    }
+    
+    try {
+      // Fetch comprehensive Spotify data using Camp Network API
+      const response = await fetch(`/api/camp/spotify?address=${encodeURIComponent(address)}&type=full`);
+      
+      if (!response.ok) {
+        console.warn(`Spotify API returned ${response.status} for address ${address}`);
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success || data.error) {
+        console.warn('Spotify API error:', data.message || data.error);
+        return null;
+      }
+
+      // Save to localStorage for caching
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(data.data));
+        localStorage.setItem(cacheTimestampKey, Date.now().toString());
+        console.log('🎵 Spotify data cached successfully');
+      } catch (cacheError) {
+        console.warn('Failed to cache Spotify data:', cacheError);
+      }
+      
+      return data.data;
+    } catch (error) {
+      console.error('Error fetching Spotify data:', error);
+      return null;
+    }
+  };
+
+  // Clear Spotify cache function (for debugging or manual refresh)
+  const clearSpotifyCache = (address: string) => {
+    try {
+      localStorage.removeItem(`spotify_data_${address}`);
+      localStorage.removeItem(`spotify_data_${address}_timestamp`);
+      console.log('🎵 Spotify cache cleared for address:', address);
+    } catch (error) {
+      console.warn('Error clearing Spotify cache:', error);
+    }
+  };
+
   // Fetch Tip Stats data
   useEffect(() => {
     const fetchTipStatsData = async () => {
@@ -545,6 +724,31 @@ export default function BuilderProfile({
     };
 
     fetchTwitterDataEffect();
+  }, [userAddress]);
+
+  // Fetch Spotify data
+  useEffect(() => {
+    const fetchSpotifyDataEffect = async () => {
+      if (!userAddress) return;
+      
+      setLoadingSpotifyData(true);
+      try {
+        const spotifyData = await fetchSpotifyData(userAddress);
+        
+        if (spotifyData) {
+          setSpotifyUserData(spotifyData);
+        } else {
+          setSpotifyUserData(null);
+        }
+      } catch (error) {
+        console.error('Error fetching Spotify data:', error);
+        setSpotifyUserData(null);
+      } finally {
+        setLoadingSpotifyData(false);
+      }
+    };
+
+    fetchSpotifyDataEffect();
   }, [userAddress]);
 
   // Funkcja do zapisywania nowego bio
@@ -1148,6 +1352,307 @@ export default function BuilderProfile({
                 <div className="text-center py-6">
                   <div className="text-gray-400 text-sm">
                     No Twitter data available for this wallet address
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Spotify Profile Section */}
+        {(spotifyUserData || loadingSpotifyData) && (
+          <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-900 via-emerald-800 to-green-900 border border-green-700/50 backdrop-blur-xl shadow-2xl">
+            {/* Spotify green poświata */}
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-green-400/30 rounded-full filter blur-2xl animate-pulse"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-emerald-400/20 rounded-full filter blur-xl"></div>
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-green-400/50 to-transparent"></div>
+            
+            {/* Efekt szkła */}
+            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
+            
+            <div className="relative z-10 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-green-400/20 to-emerald-500/20 backdrop-blur-sm border border-green-400/30 mr-4 shadow-lg">
+                    <svg className="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-light text-xl text-white">Spotify Profile</h3>
+                    <p className="text-sm text-green-400/80">Music Activity</p>
+                  </div>
+                </div>
+                
+                {spotifyUserData?.dataSource === 'spotify' && (
+                  <div className="flex items-center bg-green-400/10 backdrop-blur-sm border border-green-400/30 px-3 py-1.5 rounded-full">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span className="text-xs text-green-400 font-medium">Connected</span>
+                  </div>
+                )}
+              </div>
+              
+              {loadingSpotifyData ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-green-400/30 border-t-green-400"></div>
+                  <span className="ml-4 text-green-400/80">Loading Spotify data...</span>
+                </div>
+              ) : spotifyUserData ? (
+                <div>
+                  {/* Spotify User Info */}
+                  <div className="flex items-start space-x-4 mb-6">
+                    {spotifyUserData.user.images && spotifyUserData.user.images[0] && (
+                      <img
+                        src={spotifyUserData.user.images[0].url}
+                        alt={`${spotifyUserData.user.display_name} avatar`}
+                        className="w-16 h-16 rounded-full border-2 border-green-400/30"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <h4 className="text-lg font-medium text-white truncate">{spotifyUserData.user.display_name}</h4>
+                        {spotifyUserData.user.external_urls?.spotify && (
+                          <a
+                            href={spotifyUserData.user.external_urls.spotify}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-green-400 hover:text-green-300 text-sm font-mono bg-green-400/10 px-2 py-1 rounded transition-all duration-300 hover:scale-105 hover:bg-green-400/20 flex items-center"
+                            title="Open Spotify Profile"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
+                            </svg>
+                            Open Profile
+                          </a>
+                        )}
+                      </div>
+                      {!spotifyUserData.hasContent && (
+                        <div className="flex items-center text-blue-400 text-xs mb-3 bg-blue-400/10 px-2 py-1 rounded">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          Spotify connected • Start saving tracks to see activity
+                        </div>
+                      )}
+                      <div className="flex items-center text-gray-400 text-sm mb-3">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        {(spotifyUserData.user.followers || 0).toLocaleString()} followers
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Spotify Analytics Stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
+                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.totalSavedTracks || 0}</div>
+                      <div className="text-gray-300 text-xs">Saved Tracks</div>
+                    </div>
+                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
+                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.totalSavedAlbums || 0}</div>
+                      <div className="text-gray-300 text-xs">Albums</div>
+                    </div>
+                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
+                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.totalSavedPlaylists || 0}</div>
+                      <div className="text-gray-300 text-xs">Playlists</div>
+                    </div>
+                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
+                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.listeningDiversity || 0}%</div>
+                      <div className="text-gray-300 text-xs">Diversity</div>
+                    </div>
+                  </div>
+
+                  {/* Expandable Music Content */}
+                  {(spotifyUserData.profile?.savedTracks?.length > 0 || spotifyUserData.profile?.playedTracks?.length > 0) && (
+                    <>
+                      <button
+                        onClick={() => setIsSpotifySectionExpanded(!isSpotifySectionExpanded)}
+                        className="w-full flex items-center justify-center text-green-400 hover:text-green-300 transition-colors duration-300 border-t border-green-700/30 pt-4"
+                      >
+                        <span className="text-sm font-medium mr-2">
+                          {isSpotifySectionExpanded ? 'Hide Music Details' : `Show Recent Music (${Math.max(spotifyUserData.profile?.savedTracks?.length || 0, spotifyUserData.profile?.playedTracks?.length || 0)})`}
+                        </span>
+                        {isSpotifySectionExpanded ? (
+                          <ChevronUpIcon className="w-4 h-4" />
+                        ) : (
+                          <ChevronDownIcon className="w-4 h-4" />
+                        )}
+                      </button>
+
+                      {/* Recent Music */}
+                      {isSpotifySectionExpanded && (
+                        <div className="mt-4 space-y-4 max-h-96 overflow-y-auto">
+                          {/* Recently Played Tracks */}
+                          {spotifyUserData.profile?.playedTracks?.length > 0 && (
+                            <div>
+                              <h5 className="text-green-300 text-sm font-medium mb-3">Recently Played</h5>
+                              <div className="space-y-2">
+                                {(spotifyUserData.profile?.playedTracks || []).slice(0, 3).map((item, index) => (
+                                  <div key={index} className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors">
+                                    <div className="flex items-center space-x-3">
+                                      {item?.track?.album?.images && item.track.album.images[0] && (
+                                        <a
+                                          href={item?.track?.album?.external_urls?.spotify || '#'}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="block hover:opacity-80 transition-opacity"
+                                          title={`View album: ${item?.track?.album?.name}`}
+                                        >
+                                          <img
+                                            src={item.track.album.images[0].url}
+                                            alt={item.track.album.name}
+                                            className="w-10 h-10 rounded cursor-pointer hover:shadow-lg transition-shadow"
+                                          />
+                                        </a>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        {item?.track?.external_urls?.spotify ? (
+                                          <a
+                                            href={item.track.external_urls.spotify}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-white hover:text-green-300 text-sm font-medium truncate block transition-colors"
+                                            title={`Play on Spotify: ${item?.track?.name}`}
+                                          >
+                                            🎵 {item?.track?.name || 'Unknown Track'}
+                                          </a>
+                                        ) : (
+                                          <p className="text-white text-sm font-medium truncate">{item?.track?.name || 'Unknown Track'}</p>
+                                        )}
+                                        <div className="text-gray-300 text-xs truncate">
+                                          {item?.track?.artists?.map((artist, idx) => (
+                                            <span key={idx}>
+                                              {artist?.external_urls?.spotify ? (
+                                                <a
+                                                  href={artist.external_urls.spotify}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="hover:text-green-300 transition-colors"
+                                                  title={`View artist: ${artist?.name}`}
+                                                >
+                                                  {artist?.name}
+                                                </a>
+                                              ) : (
+                                                artist?.name
+                                              )}
+                                              {idx < (item?.track?.artists?.length || 0) - 1 && ', '}
+                                            </span>
+                                          )) || 'Unknown Artist'} • 
+                                          {item?.track?.album?.external_urls?.spotify ? (
+                                            <a
+                                              href={item.track.album.external_urls.spotify}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="hover:text-green-300 transition-colors ml-1"
+                                              title={`View album: ${item?.track?.album?.name}`}
+                                            >
+                                              {item?.track?.album?.name || 'Unknown Album'}
+                                            </a>
+                                          ) : (
+                                            <span className="ml-1">{item?.track?.album?.name || 'Unknown Album'}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Saved Tracks */}
+                          {spotifyUserData.profile?.savedTracks?.length > 0 && (
+                            <div>
+                              <h5 className="text-green-300 text-sm font-medium mb-3">Saved Tracks</h5>
+                              <div className="space-y-2">
+                                {(spotifyUserData.profile?.savedTracks || []).slice(0, 3).map((item, index) => (
+                                  <div key={index} className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors">
+                                    <div className="flex items-center space-x-3">
+                                      {item?.track?.album?.images && item.track.album.images[0] && (
+                                        <a
+                                          href={item?.track?.album?.external_urls?.spotify || '#'}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="block hover:opacity-80 transition-opacity"
+                                          title={`View album: ${item?.track?.album?.name}`}
+                                        >
+                                          <img
+                                            src={item.track.album.images[0].url}
+                                            alt={item.track.album.name}
+                                            className="w-10 h-10 rounded cursor-pointer hover:shadow-lg transition-shadow"
+                                          />
+                                        </a>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        {item?.track?.external_urls?.spotify ? (
+                                          <a
+                                            href={item.track.external_urls.spotify}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-white hover:text-green-300 text-sm font-medium truncate block transition-colors"
+                                            title={`Play on Spotify: ${item?.track?.name}`}
+                                          >
+                                            🎵 {item?.track?.name || 'Unknown Track'}
+                                          </a>
+                                        ) : (
+                                          <p className="text-white text-sm font-medium truncate">{item?.track?.name || 'Unknown Track'}</p>
+                                        )}
+                                        <div className="text-gray-300 text-xs truncate">
+                                          {item?.track?.artists?.map((artist, idx) => (
+                                            <span key={idx}>
+                                              {artist?.external_urls?.spotify ? (
+                                                <a
+                                                  href={artist.external_urls.spotify}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="hover:text-green-300 transition-colors"
+                                                  title={`View artist: ${artist?.name}`}
+                                                >
+                                                  {artist?.name}
+                                                </a>
+                                              ) : (
+                                                artist?.name
+                                              )}
+                                              {idx < (item?.track?.artists?.length || 0) - 1 && ', '}
+                                            </span>
+                                          )) || 'Unknown Artist'} • 
+                                          {item?.track?.album?.external_urls?.spotify ? (
+                                            <a
+                                              href={item.track.album.external_urls.spotify}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="hover:text-green-300 transition-colors ml-1"
+                                              title={`View album: ${item?.track?.album?.name}`}
+                                            >
+                                              {item?.track?.album?.name || 'Unknown Album'}
+                                            </a>
+                                          ) : (
+                                            <span className="ml-1">{item?.track?.album?.name || 'Unknown Album'}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <div className="text-gray-400 text-sm">
+                    No Spotify data available for this wallet address
                   </div>
                 </div>
               )}

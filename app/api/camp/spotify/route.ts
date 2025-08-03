@@ -134,22 +134,22 @@ export async function GET(request: NextRequest) {
     const hasRealData = profile.savedTracks.length > 0 || profile.playedTracks.length > 0 || 
                        profile.savedAlbums.length > 0 || profile.savedPlaylists.length > 0;
 
-    if (!hasRealData) {
-      console.log('⚠️ No real Spotify data available - Origin SDK may not have access to private data');
-      console.log('🎭 Adding mock data for demonstration purposes');
-      
-      // Add mock data to demonstrate functionality
-      profile.savedTracks = generateMockSavedTracks();
-      profile.playedTracks = generateMockPlayedTracks();
-      profile.savedAlbums = generateMockSavedAlbums();
-      profile.savedPlaylists = generateMockSavedPlaylists();
-      
-      console.log('✅ Mock data added:', {
-        savedTracks: profile.savedTracks.length,
-        playedTracks: profile.playedTracks.length,
-        savedAlbums: profile.savedAlbums.length,
-        savedPlaylists: profile.savedPlaylists.length
+    // Check if we have a valid Spotify connection (user exists)
+    const hasSpotifyConnection = userData.data.spotifyUser && userData.data.spotifyUser.id;
+
+    if (!hasSpotifyConnection) {
+      console.log('❌ No Spotify connection found');
+      return NextResponse.json({
+        success: false,
+        message: 'No Spotify account connected for this wallet address',
+        data: null
       });
+    }
+
+    // If user is connected but has no data, that's OK - don't add mock data
+    if (!hasRealData) {
+      console.log('✅ Spotify connected but user has no saved content - this is normal');
+      console.log('📭 Empty profile data (user may not have saved any content yet)');
     } else {
       console.log('✅ Using real Spotify data from Origin SDK');
     }
@@ -169,9 +169,10 @@ export async function GET(request: NextRequest) {
       analytics
     };
 
-    // Add metadata about data source
-    (response as any).dataSource = hasRealData ? 'spotify' : 'mock';
-    (response as any).usingMockData = !hasRealData;
+    // Add metadata about data source - always real data if user is connected
+    (response as any).dataSource = hasSpotifyConnection ? 'spotify' : 'none';
+    (response as any).usingMockData = false;
+    (response as any).hasContent = hasRealData;
 
     // Return analytics only if requested
     if (dataType === 'analytics') {
@@ -217,160 +218,4 @@ function calculateListeningDiversity(profile: any): number {
   return Math.round(collectionScore + volumeScore);
 }
 
-// Mock data generators for demo purposes when real data is not available
-function generateMockSavedTracks(): any[] {
-  return [
-    {
-      track: {
-        id: 'mock1',
-        name: 'Bohemian Rhapsody',
-        artists: [{ name: 'Queen' }],
-        album: { name: 'A Night at the Opera' },
-        duration_ms: 355000,
-        popularity: 85
-      },
-      added_at: '2024-01-15T10:30:00Z'
-    },
-    {
-      track: {
-        id: 'mock2',
-        name: 'Stairway to Heaven',
-        artists: [{ name: 'Led Zeppelin' }],
-        album: { name: 'Led Zeppelin IV' },
-        duration_ms: 482000,
-        popularity: 82
-      },
-      added_at: '2024-01-10T15:20:00Z'
-    },
-    {
-      track: {
-        id: 'mock3',
-        name: 'Hotel California',
-        artists: [{ name: 'Eagles' }],
-        album: { name: 'Hotel California' },
-        duration_ms: 391000,
-        popularity: 80
-      },
-      added_at: '2024-01-05T09:45:00Z'
-    }
-  ];
-}
-
-function generateMockPlayedTracks(): any[] {
-  return [
-    {
-      track: {
-        id: 'played1',
-        name: 'Billie Jean',
-        artists: [{ name: 'Michael Jackson' }],
-        album: { name: 'Thriller' },
-        duration_ms: 294000,
-        popularity: 88
-      },
-      played_at: '2024-01-20T14:30:00Z'
-    },
-    {
-      track: {
-        id: 'played2',
-        name: 'Sweet Child O Mine',
-        artists: [{ name: 'Guns N Roses' }],
-        album: { name: 'Appetite for Destruction' },
-        duration_ms: 356000,
-        popularity: 84
-      },
-      played_at: '2024-01-20T13:15:00Z'
-    },
-    {
-      track: {
-        id: 'played3',
-        name: 'Imagine',
-        artists: [{ name: 'John Lennon' }],
-        album: { name: 'Imagine' },
-        duration_ms: 183000,
-        popularity: 86
-      },
-      played_at: '2024-01-20T12:00:00Z'
-    },
-    {
-      track: {
-        id: 'played4',
-        name: 'Purple Haze',
-        artists: [{ name: 'Jimi Hendrix' }],
-        album: { name: 'Are You Experienced' },
-        duration_ms: 167000,
-        popularity: 79
-      },
-      played_at: '2024-01-20T11:30:00Z'
-    }
-  ];
-}
-
-function generateMockSavedAlbums(): any[] {
-  return [
-    {
-      albumId: 'album1',
-      albumName: 'Abbey Road',
-      albumTotalTracks: 17,
-      albumPopularity: 85,
-      albumImages: [
-        { url: 'https://via.placeholder.com/640x640', height: 640, width: 640 }
-      ],
-      albumType: 'album',
-      albumReleaseDate: '1969-09-26',
-      added_at: '2024-01-12T10:00:00Z'
-    },
-    {
-      albumId: 'album2',
-      albumName: 'Dark Side of the Moon',
-      albumTotalTracks: 10,
-      albumPopularity: 88,
-      albumImages: [
-        { url: 'https://via.placeholder.com/640x640', height: 640, width: 640 }
-      ],
-      albumType: 'album',
-      albumReleaseDate: '1973-03-01',
-      added_at: '2024-01-08T16:30:00Z'
-    },
-    {
-      albumId: 'album3',
-      albumName: 'Rumours',
-      albumTotalTracks: 11,
-      albumPopularity: 83,
-      albumImages: [
-        { url: 'https://via.placeholder.com/640x640', height: 640, width: 640 }
-      ],
-      albumType: 'album',
-      albumReleaseDate: '1977-02-04',
-      added_at: '2024-01-03T14:15:00Z'
-    }
-  ];
-}
-
-function generateMockSavedPlaylists(): any[] {
-  return [
-    {
-      playlistId: 'playlist1',
-      playlistName: 'Rock Classics',
-      playlistDescription: 'The best rock songs of all time',
-      playlistImages: [
-        { url: 'https://via.placeholder.com/640x640', height: 640, width: 640 }
-      ],
-      playlistCollaborative: false,
-      playlistFollowers: 1524,
-      playlistType: 'playlist',
-      added_at: '2024-01-01T00:00:00Z'
-    },
-    {
-      playlistId: 'playlist2',
-      playlistName: 'Chill Vibes',
-      playlistDescription: 'Relaxing music for any mood',
-      playlistImages: [
-        { url: 'https://via.placeholder.com/640x640', height: 640, width: 640 }
-      ],
-      playlistCollaborative: false,
-      playlistFollowers: 892,
-      playlistType: 'playlist',
-      added_at: '2023-12-15T12:00:00Z'
-    }
-  ];
-} 
+ 
