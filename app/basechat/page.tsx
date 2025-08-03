@@ -3597,24 +3597,20 @@ export default function BaseChat() {
                             <div className="flex items-center space-x-2 sm:space-x-4">
                               <button 
                                 onClick={() => document.getElementById('fileInput')?.click()}
-                                className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
+                                className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 text-xs sm:text-sm bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                title="Add photo or video"
                               >
-                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span className="hidden xs:inline">Add photo/video</span>
-                                <span className="inline xs:hidden">Photo</span>
+                                <span className="text-lg">📷</span>
+                                <span className="hidden sm:inline font-medium text-blue-600 dark:text-blue-400">Photo</span>
                               </button>
 
                               <button
                                 onClick={() => setShowAIModal(true)}
-                                className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm"
+                                className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 text-xs sm:text-sm bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+                                title="Generate AI post"
                               >
-                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                                <span className="hidden xs:inline">Generate AI Post</span>
-                                <span className="inline xs:hidden">AI</span>
+                                <span className="text-lg">🤖</span>
+                                <span className="hidden sm:inline font-medium text-purple-600 dark:text-purple-400">AI</span>
                               </button>
 
                               <button
