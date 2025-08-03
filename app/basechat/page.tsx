@@ -3438,7 +3438,7 @@ export default function BaseChat() {
                       <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
                       <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
                     </svg>
-                    Camp Network Post
+                    Camp Post
                   </button>
                   <button
                     onClick={() => setActivePostingNetwork('linea')}

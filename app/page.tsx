@@ -25,6 +25,10 @@ import { FaCheckCircle, FaExternalLinkAlt } from 'react-icons/fa';
 // Import Camp Network config
 import { baseCampChain, BASECAMP_POST_CONTRACT_ABI } from './contracts/BaseCampPostContract';
 
+// Import Linea Network config
+import { lineaChain } from './basechat/Linea/config/LineaNetworkConfig';
+import { LINEA_POST_CONTRACT_ABI, LINEA_CONTRACT_ADDRESS } from './basechat/Linea/contracts/LineaPostContract';
+
 const themes = [
   { id: 'base', name: 'Base', gradient: 'from-[#0052FF] via-[#1E4DD8] to-[#4C8FFF]' },
   { id: 'cyberpunk', name: 'Cyberpunk', gradient: 'from-[#FF00FF] via-[#FF00CC] to-[#FF0099]' },
@@ -133,6 +137,9 @@ const tailwindConfig = {
 // Camp Network contracts addresses
 const CAMP_POST_CONTRACT = "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E" as `0x${string}`;
 const PORTAL_NFT_CONTRACT = "0x1eD74B27f846C699A90926daD057A7f6FD22C126" as `0x${string}`;
+
+// Linea Network contracts addresses
+const LINEA_POST_CONTRACT = LINEA_CONTRACT_ADDRESS as `0x${string}`;
 
 // PORTAL NFT ABI (simplified - only for reading totalClaimed)
 const PORTAL_NFT_ABI = [
@@ -371,6 +378,14 @@ export default function HomePage() {
     chainId: baseCampChain.id,
   });
 
+  // LIVE DATA z Linea Network blockchain  
+  const { data: lineaPostsData } = useContractRead({
+    address: LINEA_POST_CONTRACT,
+    abi: LINEA_POST_CONTRACT_ABI,
+    functionName: 'totalPosts',
+    chainId: lineaChain.id,
+  });
+
   // LIVE DATA z Base Network blockchain
   const { data: basePostsData } = useContractRead({
     address: BASE_POST_CONTRACT,
@@ -414,6 +429,11 @@ export default function HomePage() {
     const nftTransactions = portalClaimedData ? Number(portalClaimedData) : 0;
     return postTransactions + nftTransactions;
   }, [campPostsData, portalClaimedData]);
+
+  // Oblicz łączną liczbę transakcji Linea Network na żywo
+  const lineaTransactionsCount = useMemo(() => {
+    return lineaPostsData ? Number(lineaPostsData) : 0;
+  }, [lineaPostsData]);
 
   // Oblicz łączną liczbę transakcji Base Network na żywo
   const baseTransactionsCount = useMemo(() => {
@@ -823,7 +843,7 @@ export default function HomePage() {
           <p className="font-['Coinbase_Display'] text-gray-100 text-base md:text-xl text-center mt-2 mb-4 px-4 filter drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
             Build, grow, and <span className="text-[#0052FF] font-semibold">own</span> your digital sphere
           </p>
-          <p className="font-['Share_Tech_Mono'] text-xs md:text-sm text-[#0052FF] text-center mb-4">[BETA 2.9.1]</p>
+          <p className="font-['Share_Tech_Mono'] text-xs md:text-sm text-[#0052FF] text-center mb-4">[MySphere v2.0]</p>
           <div className="h-0.5 w-32 mx-auto bg-gradient-to-r from-transparent via-[#0052FF] to-transparent mt-6 mb-6"></div>
         </div>
 
@@ -1417,6 +1437,60 @@ export default function HomePage() {
                 </div>
               </div>
             </a>
+          </div>
+        </section>
+
+        {/* Linea Network contracts section */}
+        <section className="max-w-6xl mx-auto px-4 mb-16">
+          <h3 className="text-lg font-semibold text-gray-300 mb-4 text-center">
+            <span className="text-cyan-400">Linea Network</span> Smart Contracts
+            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/30">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse mr-1"></span>
+              <span className="text-cyan-300 text-xs font-bold">LIVE</span>
+            </span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <a href="https://lineascan.build/address/0x9fb36660849d85cee6609f6020af3336ab7541f5" target="_blank" rel="noopener noreferrer" 
+               className="bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-cyan-600/10 backdrop-blur-md rounded-xl p-4 border border-cyan-800/50 hover:border-cyan-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(34,211,238,0.3)] group">
+              <div className="flex items-center">
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <div className="text-cyan-400 mr-2">
+                      <FaCheckCircle className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-sm font-medium text-cyan-400">Linea Post Contract</h3>
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({lineaPostsData ? Number(lineaPostsData) : 0} posts)
+                    </span>
+                  </div>
+                  <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x9fb36660849d85cee6609f6020af3336ab7541f5</p>
+                </div>
+                <div className="text-gray-500 group-hover:text-cyan-400 transition-colors">
+                  <FaExternalLinkAlt className="w-3 h-3" />
+                </div>
+              </div>
+            </a>
+            
+            <div className="bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-cyan-600/10 backdrop-blur-md rounded-xl p-4 border border-cyan-800/50">
+              <div className="flex items-center">
+                <img 
+                  src="/Logomark Blue BG.svg" 
+                  alt="Linea" 
+                  className="w-8 h-8 mr-3"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <h3 className="text-sm font-medium text-cyan-400">Network Stats</h3>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Total Transactions: <span className="text-cyan-300 font-semibold">{lineaTransactionsCount.toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="text-cyan-400">
+                  <MdOutlineStackedLineChart className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
