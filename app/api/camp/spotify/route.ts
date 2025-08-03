@@ -14,6 +14,8 @@ interface SpotifyUserData {
     playedTracks: any[];
     savedAlbums: any[];
     savedPlaylists: any[];
+    topArtists: string[];
+    topGenres: string[];
   };
   analytics: {
     totalSavedTracks: number;
@@ -77,23 +79,30 @@ export async function GET(request: NextRequest) {
       savedTracks,
       playedTracks,
       savedAlbums,
-      savedPlaylists
+      savedPlaylists,
+      topArtistsAndGenres
     ] = await Promise.allSettled([
-      spotifyAPI.fetchSavedTracksById(spotifyId).catch(err => {
+      spotifyAPI.fetchSavedTracksById(spotifyId).catch((err: any) => {
         console.warn('❌ fetchSavedTracksById failed:', err);
         return { data: [], isError: true, message: 'Failed to fetch saved tracks' };
       }),
-      spotifyAPI.fetchPlayedTracksById(spotifyId).catch(err => {
+      spotifyAPI.fetchPlayedTracksById(spotifyId).catch((err: any) => {
         console.warn('❌ fetchPlayedTracksById failed:', err);
         return { data: [], isError: true, message: 'Failed to fetch played tracks' };
       }),
-      spotifyAPI.fetchSavedAlbumsById(spotifyId).catch(err => {
+      spotifyAPI.fetchSavedAlbumsById(spotifyId).catch((err: any) => {
         console.warn('❌ fetchSavedAlbumsById failed:', err);
         return { data: [], isError: true, message: 'Failed to fetch saved albums' };
       }),
-      spotifyAPI.fetchSavedPlaylistsById(spotifyId).catch(err => {
+      spotifyAPI.fetchSavedPlaylistsById(spotifyId).catch((err: any) => {
         console.warn('❌ fetchSavedPlaylistsById failed:', err);
         return { data: [], isError: true, message: 'Failed to fetch saved playlists' };
+      }),
+      // TODO: Find correct method name for top artists/genres API
+      Promise.resolve({ 
+        data: { names: [], genres: [] }, 
+        isError: false, 
+        message: 'Top artists/genres temporarily disabled - waiting for correct API method name' 
       })
     ]);
 
@@ -116,23 +125,54 @@ export async function GET(request: NextRequest) {
       return [];
     };
 
+    // Extract top artists and genres data
+    const extractTopData = (result: any, name: string) => {
+      if (result.status === 'fulfilled') {
+        const response = result.value as SpotifyAPIResponse;
+        console.log(`✅ ${name} success:`, {
+          isError: response.isError,
+          dataType: typeof response.data,
+          hasNames: !!response.data?.names,
+          hasGenres: !!response.data?.genres,
+          message: response.message
+        });
+        
+        if (!response.isError && response.data) {
+          return {
+            topArtists: response.data.names || [],
+            topGenres: response.data.genres || []
+          };
+        }
+      } else {
+        console.warn(`❌ ${name} failed:`, result.reason);
+      }
+      return { topArtists: [], topGenres: [] };
+    };
+
+    const topData = extractTopData(topArtistsAndGenres, 'topArtistsAndGenres');
+    
     const profile = {
       savedTracks: extractData(savedTracks, 'savedTracks'),
       playedTracks: extractData(playedTracks, 'playedTracks'),
       savedAlbums: extractData(savedAlbums, 'savedAlbums'),
-      savedPlaylists: extractData(savedPlaylists, 'savedPlaylists')
+      savedPlaylists: extractData(savedPlaylists, 'savedPlaylists'),
+      topArtists: topData.topArtists,
+      topGenres: topData.topGenres
     };
 
     console.log('📊 Profile data summary:', {
       savedTracks: profile.savedTracks.length,
       playedTracks: profile.playedTracks.length,
       savedAlbums: profile.savedAlbums.length,
-      savedPlaylists: profile.savedPlaylists.length
+      savedPlaylists: profile.savedPlaylists.length,
+      topArtists: profile.topArtists.length,
+      topGenres: profile.topGenres.length
     });
 
     // Check if we have meaningful data (not just empty arrays)
     const hasRealData = profile.savedTracks.length > 0 || profile.playedTracks.length > 0 || 
-                       profile.savedAlbums.length > 0 || profile.savedPlaylists.length > 0;
+                       profile.savedAlbums.length > 0 || profile.savedPlaylists.length > 0 ||
+                       profile.topArtists.length > 0 || profile.topGenres.length > 0;
 
     // Check if we have a valid Spotify connection (user exists)
     const hasSpotifyConnection = userData.data.spotifyUser && userData.data.spotifyUser.id;

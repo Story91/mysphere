@@ -92,6 +92,8 @@ interface SpotifyTrack {
       external_urls?: {
         spotify: string;
       };
+      release_date?: string;
+      release_date_precision?: string;
     };
     duration_ms: number;
     popularity: number;
@@ -140,6 +142,8 @@ interface SpotifyUserData {
     playedTracks: SpotifyTrack[];
     savedAlbums: SpotifyAlbum[];
     savedPlaylists: SpotifyPlaylist[];
+    topArtists: string[];
+    topGenres: string[];
   };
   analytics: {
     totalSavedTracks: number;
@@ -385,6 +389,15 @@ export default function BuilderProfile({
   const [loadingSpotifyData, setLoadingSpotifyData] = useState(false);
   const [isSpotifySectionExpanded, setIsSpotifySectionExpanded] = useState(false);
 
+  // Audio Player state
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [currentTrackUrl, setCurrentTrackUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.5);
+  const [isLoading, setIsLoading] = useState(false);
+
   // 🚀 SOCIAL FEATURES: Hook i stany  
   // Get stats for the profile we're viewing (userAddress)
   const { 
@@ -628,6 +641,16 @@ export default function BuilderProfile({
         return null;
       }
 
+      // 🐛 DEBUG: Check what data we're getting
+      console.log('🎵 Spotify API Response:', {
+        hasUser: !!data.data?.user,
+        hasProfile: !!data.data?.profile,
+        playedTracksCount: data.data?.profile?.playedTracks?.length || 0,
+        savedTracksCount: data.data?.profile?.savedTracks?.length || 0,
+        dataSource: data.data?.dataSource,
+        usingMockData: data.data?.usingMockData
+      });
+
       // Save to localStorage for caching
       try {
         localStorage.setItem(cacheKey, JSON.stringify(data.data));
@@ -654,6 +677,122 @@ export default function BuilderProfile({
       console.warn('Error clearing Spotify cache:', error);
     }
   };
+
+  // Refresh Spotify data
+  const refreshSpotifyData = async () => {
+    if (!userAddress) return;
+    clearSpotifyCache(userAddress);
+    setLoadingSpotifyData(true);
+    try {
+      const freshData = await fetchSpotifyData(userAddress);
+      setSpotifyUserData(freshData);
+    } catch (error) {
+      console.error('Error refreshing Spotify data:', error);
+    } finally {
+      setLoadingSpotifyData(false);
+    }
+  };
+
+  // Audio Player Functions
+  const playTrack = (previewUrl: string) => {
+    if (!previewUrl) return;
+    
+    // If same track, just toggle play/pause
+    if (currentTrackUrl === previewUrl && currentAudio) {
+      if (currentAudio.paused) {
+        console.log('🎵 Resuming track');
+        currentAudio.play();
+        setIsPlaying(true);
+      } else {
+        console.log('⏸️ Pausing track');
+        currentAudio.pause();
+        setIsPlaying(false);
+      }
+      return;
+    }
+
+    // Stop current track if playing (only for different tracks)
+    if (currentAudio) {
+      currentAudio.pause();
+      setIsPlaying(false);
+    }
+
+    // Create new audio for different track
+    setIsLoading(true);
+    setCurrentTrackUrl(previewUrl);
+    
+    const audio = new Audio(previewUrl);
+    audio.volume = volume;
+    
+    audio.addEventListener('loadedmetadata', () => {
+      setDuration(audio.duration);
+      setIsLoading(false);
+    });
+    
+    audio.addEventListener('timeupdate', () => {
+      setCurrentTime(audio.currentTime);
+    });
+    
+    audio.addEventListener('ended', () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    });
+    
+    audio.addEventListener('error', () => {
+      setIsLoading(false);
+      console.error('Failed to load audio');
+    });
+
+    setCurrentAudio(audio);
+    audio.play();
+    setIsPlaying(true);
+  };
+
+  const pauseTrack = () => {
+    if (currentAudio) {
+      currentAudio.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const stopTrack = () => {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      setIsPlaying(false);
+      setCurrentTime(0);
+    }
+  };
+
+  const setTrackVolume = (newVolume: number) => {
+    setVolume(newVolume);
+    if (currentAudio) {
+      currentAudio.volume = newVolume;
+    }
+  };
+
+  const seekToTime = (time: number) => {
+    if (currentAudio) {
+      currentAudio.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Cleanup audio on component unmount
+  useEffect(() => {
+    return () => {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = '';
+      }
+    };
+  }, [currentAudio]);
 
   // Fetch Tip Stats data
   useEffect(() => {
@@ -1384,14 +1523,33 @@ export default function BuilderProfile({
                   </div>
                 </div>
                 
-                {spotifyUserData?.dataSource === 'spotify' && (
-                  <div className="flex items-center bg-green-400/10 backdrop-blur-sm border border-green-400/30 px-3 py-1.5 rounded-full">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                <div className="flex items-center gap-2">
+                  {spotifyUserData?.dataSource === 'spotify' && (
+                    <div className="flex items-center bg-green-400/10 backdrop-blur-sm border border-green-400/30 px-3 py-1.5 rounded-full">
+                      <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <span className="text-xs text-green-400 font-medium">Connected</span>
+                    </div>
+                  )}
+                  
+                  {/* Refresh Button */}
+                  <button
+                    onClick={refreshSpotifyData}
+                    disabled={loadingSpotifyData}
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-green-400/10 backdrop-blur-sm border border-green-400/30 hover:bg-green-400/20 hover:border-green-400/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
+                    title="Refresh Spotify Data"
+                  >
+                    <svg 
+                      className={`w-4 h-4 text-green-400 group-hover:text-green-300 transition-transform duration-200 ${loadingSpotifyData ? 'animate-spin' : 'group-hover:rotate-180'}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <span className="text-xs text-green-400 font-medium">Connected</span>
-                  </div>
-                )}
+                  </button>
+                </div>
               </div>
               
               {loadingSpotifyData ? (
@@ -1469,6 +1627,77 @@ export default function BuilderProfile({
                     </div>
                   </div>
 
+                  {/* Music Matching Profile */}
+                  {(spotifyUserData.profile?.topGenres?.length > 0 || spotifyUserData.profile?.topArtists?.length > 0) && (
+                    <div className="mt-4 p-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
+                      <div className="flex items-center mb-3">
+                        <svg className="w-5 h-5 text-green-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.58L19 8l-9 9z"/>
+                        </svg>
+                        <h4 className="text-green-300 text-sm font-medium">Music Matching Profile</h4>
+                        <span className="ml-2 text-xs text-gray-400">• User compatibility data</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Top Genres */}
+                        {spotifyUserData.profile.topGenres.length > 0 && (
+                          <div className="bg-white/5 rounded-lg p-3">
+                            <div className="flex items-center mb-2">
+                              <svg className="w-4 h-4 text-green-400 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                              </svg>
+                              <span className="text-green-300 text-xs font-medium">Top Genres</span>
+                              <span className="ml-1 text-xs text-gray-400">({spotifyUserData.profile.topGenres.length})</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {spotifyUserData.profile.topGenres.slice(0, 6).map((genre, index) => (
+                                <span 
+                                  key={index}
+                                  className="px-2 py-1 bg-green-400/10 text-green-300 text-xs rounded-full border border-green-400/20"
+                                >
+                                  {genre}
+                                </span>
+                              ))}
+                              {spotifyUserData.profile.topGenres.length > 6 && (
+                                <span className="px-2 py-1 bg-green-400/5 text-green-400 text-xs rounded-full border border-green-400/10">
+                                  +{spotifyUserData.profile.topGenres.length - 6} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Top Artists */}
+                        {spotifyUserData.profile.topArtists.length > 0 && (
+                          <div className="bg-white/5 rounded-lg p-3">
+                            <div className="flex items-center mb-2">
+                              <svg className="w-4 h-4 text-green-400 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                              </svg>
+                              <span className="text-green-300 text-xs font-medium">Top Artists</span>
+                              <span className="ml-1 text-xs text-gray-400">({spotifyUserData.profile.topArtists.length})</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {spotifyUserData.profile.topArtists.slice(0, 4).map((artist, index) => (
+                                <span 
+                                  key={index}
+                                  className="px-2 py-1 bg-green-400/10 text-green-300 text-xs rounded-full border border-green-400/20"
+                                >
+                                  {artist}
+                                </span>
+                              ))}
+                              {spotifyUserData.profile.topArtists.length > 4 && (
+                                <span className="px-2 py-1 bg-green-400/5 text-green-400 text-xs rounded-full border border-green-400/10">
+                                  +{spotifyUserData.profile.topArtists.length - 4} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Expandable Music Content */}
                   {(spotifyUserData.profile?.savedTracks?.length > 0 || spotifyUserData.profile?.playedTracks?.length > 0) && (
                     <>
@@ -1498,19 +1727,47 @@ export default function BuilderProfile({
                                   <div key={index} className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors">
                                     <div className="flex items-center space-x-3">
                                       {item?.track?.album?.images && item.track.album.images[0] && (
-                                        <a
-                                          href={item?.track?.album?.external_urls?.spotify || '#'}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="block hover:opacity-80 transition-opacity"
-                                          title={`View album: ${item?.track?.album?.name}`}
-                                        >
-                                          <img
-                                            src={item.track.album.images[0].url}
-                                            alt={item.track.album.name}
-                                            className="w-10 h-10 rounded cursor-pointer hover:shadow-lg transition-shadow"
-                                          />
-                                        </a>
+                                        <div className="relative group">
+                                          <a
+                                            href={item?.track?.album?.external_urls?.spotify || '#'}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block hover:opacity-80 transition-opacity"
+                                            title={`View album: ${item?.track?.album?.name}`}
+                                          >
+                                            <img
+                                              src={item.track.album.images[0].url}
+                                              alt={item.track.album.name}
+                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-lg transition-all duration-200"
+                                            />
+                                          </a>
+                                          
+                                          {/* Preview Overlay */}
+                                          {item?.track?.preview_url && (
+                                            <button
+                                              onClick={() => playTrack(item.track.preview_url!)}
+                                              disabled={isLoading && currentTrackUrl === item.track.preview_url}
+                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded transition-opacity duration-200 disabled:opacity-50 ${
+                                                isPlaying && currentTrackUrl === item.track.preview_url 
+                                                  ? 'opacity-100' 
+                                                  : 'opacity-0 group-hover:opacity-100'
+                                              }`}
+                                              title={isPlaying && currentTrackUrl === item.track.preview_url ? 'Pause' : 'Play 30s preview'}
+                                            >
+                                              {isLoading && currentTrackUrl === item.track.preview_url ? (
+                                                <div className="animate-spin w-4 h-4 border border-white border-t-transparent rounded-full"></div>
+                                              ) : isPlaying && currentTrackUrl === item.track.preview_url ? (
+                                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                                                </svg>
+                                              ) : (
+                                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                  <path d="M8 5v14l11-7z"/>
+                                                </svg>
+                                              )}
+                                            </button>
+                                          )}
+                                        </div>
                                       )}
                                       <div className="flex-1 min-w-0">
                                         {item?.track?.external_urls?.spotify ? (
@@ -1559,6 +1816,91 @@ export default function BuilderProfile({
                                             <span className="ml-1">{item?.track?.album?.name || 'Unknown Album'}</span>
                                           )}
                                         </div>
+                                        
+                                        {/* Additional Matching Data */}
+                                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                          {/* Track Popularity */}
+                                          {item?.track?.popularity !== undefined && (
+                                            <div className="flex items-center gap-1 px-2 py-1 bg-yellow-400/10 rounded border border-yellow-400/20">
+                                              <svg className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                              </svg>
+                                              <span className="text-yellow-400">
+                                                {item.track.popularity}/100 
+                                                <span className="text-gray-400 ml-1">
+                                                  {item.track.popularity >= 70 ? 'Mainstream' : item.track.popularity >= 40 ? 'Popular' : 'Niche'}
+                                                </span>
+                                              </span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Release Year/Era */}
+                                          {item?.track?.album?.release_date && (
+                                            <div className="flex items-center gap-1 px-2 py-1 bg-blue-400/10 rounded border border-blue-400/20">
+                                              <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M9 11H7v6h2v-6zm4 0h-2v6h2v-6zm4 0h-2v6h2v-6zm2.5 0h-2v6h2v-6zm3-9H3v2h2v16h14V4h2V2z"/>
+                                              </svg>
+                                              <span className="text-blue-400">
+                                                {new Date(item.track.album.release_date).getFullYear()}
+                                                <span className="text-gray-400 ml-1">
+                                                  {(() => {
+                                                    const year = new Date(item.track.album.release_date).getFullYear();
+                                                    const currentYear = new Date().getFullYear();
+                                                    if (year >= currentYear - 2) return 'Recent';
+                                                    if (year >= 2010) return '2010s+';
+                                                    if (year >= 2000) return '2000s';
+                                                    if (year >= 1990) return '90s';
+                                                    return 'Classic';
+                                                  })()}
+                                                </span>
+                                              </span>
+                                            </div>
+                                          )}
+
+                                        </div>
+                                        
+                                        {/* Compact Audio Player - tylko gdy track się odtwarza */}
+                                        {item?.track?.preview_url && currentTrackUrl === item.track.preview_url && duration > 0 && (
+                                          <div className="mt-2 flex items-center gap-2">
+                                            {/* Mini Progress Bar */}
+                                            <div className="flex-1 flex items-center gap-2">
+                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(currentTime)}</span>
+                                              <div 
+                                                className="flex-1 h-0.5 bg-green-400/20 rounded-full cursor-pointer"
+                                                onClick={(e) => {
+                                                  const rect = e.currentTarget.getBoundingClientRect();
+                                                  const percent = (e.clientX - rect.left) / rect.width;
+                                                  seekToTime(percent * duration);
+                                                }}
+                                              >
+                                                <div 
+                                                  className="h-full bg-green-400 rounded-full transition-all"
+                                                  style={{ width: `${(currentTime / duration) * 100}%` }}
+                                                ></div>
+                                              </div>
+                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(duration)}</span>
+                                            </div>
+                                            
+                                            {/* Mini Volume */}
+                                            <div className="flex items-center gap-1">
+                                              <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+                                              </svg>
+                                              <input
+                                                type="range"
+                                                min="0"
+                                                max="1"
+                                                step="0.01"
+                                                value={volume}
+                                                onChange={(e) => setTrackVolume(parseFloat(e.target.value))}
+                                                className="w-8 h-0.5 bg-green-400/20 rounded-full appearance-none cursor-pointer"
+                                                style={{
+                                                  background: `linear-gradient(to right, #4ade80 0%, #4ade80 ${volume * 100}%, rgba(74, 222, 128, 0.2) ${volume * 100}%, rgba(74, 222, 128, 0.2) 100%)`
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -1576,19 +1918,47 @@ export default function BuilderProfile({
                                   <div key={index} className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10 hover:bg-white/10 transition-colors">
                                     <div className="flex items-center space-x-3">
                                       {item?.track?.album?.images && item.track.album.images[0] && (
-                                        <a
-                                          href={item?.track?.album?.external_urls?.spotify || '#'}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="block hover:opacity-80 transition-opacity"
-                                          title={`View album: ${item?.track?.album?.name}`}
-                                        >
-                                          <img
-                                            src={item.track.album.images[0].url}
-                                            alt={item.track.album.name}
-                                            className="w-10 h-10 rounded cursor-pointer hover:shadow-lg transition-shadow"
-                                          />
-                                        </a>
+                                        <div className="relative group">
+                                          <a
+                                            href={item?.track?.album?.external_urls?.spotify || '#'}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block hover:opacity-80 transition-opacity"
+                                            title={`View album: ${item?.track?.album?.name}`}
+                                          >
+                                            <img
+                                              src={item.track.album.images[0].url}
+                                              alt={item.track.album.name}
+                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-lg transition-all duration-200"
+                                            />
+                                          </a>
+                                          
+                                          {/* Preview Overlay */}
+                                          {item?.track?.preview_url && (
+                                            <button
+                                              onClick={() => playTrack(item.track.preview_url!)}
+                                              disabled={isLoading && currentTrackUrl === item.track.preview_url}
+                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded transition-opacity duration-200 disabled:opacity-50 ${
+                                                isPlaying && currentTrackUrl === item.track.preview_url 
+                                                  ? 'opacity-100' 
+                                                  : 'opacity-0 group-hover:opacity-100'
+                                              }`}
+                                              title={isPlaying && currentTrackUrl === item.track.preview_url ? 'Pause' : 'Play 30s preview'}
+                                            >
+                                              {isLoading && currentTrackUrl === item.track.preview_url ? (
+                                                <div className="animate-spin w-4 h-4 border border-white border-t-transparent rounded-full"></div>
+                                              ) : isPlaying && currentTrackUrl === item.track.preview_url ? (
+                                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                                                </svg>
+                                              ) : (
+                                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                  <path d="M8 5v14l11-7z"/>
+                                                </svg>
+                                              )}
+                                            </button>
+                                          )}
+                                        </div>
                                       )}
                                       <div className="flex-1 min-w-0">
                                         {item?.track?.external_urls?.spotify ? (
@@ -1637,6 +2007,91 @@ export default function BuilderProfile({
                                             <span className="ml-1">{item?.track?.album?.name || 'Unknown Album'}</span>
                                           )}
                                         </div>
+                                        
+                                        {/* Additional Matching Data */}
+                                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                          {/* Track Popularity */}
+                                          {item?.track?.popularity !== undefined && (
+                                            <div className="flex items-center gap-1 px-2 py-1 bg-yellow-400/10 rounded border border-yellow-400/20">
+                                              <svg className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                              </svg>
+                                              <span className="text-yellow-400">
+                                                {item.track.popularity}/100 
+                                                <span className="text-gray-400 ml-1">
+                                                  {item.track.popularity >= 70 ? 'Mainstream' : item.track.popularity >= 40 ? 'Popular' : 'Niche'}
+                                                </span>
+                                              </span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Release Year/Era */}
+                                          {item?.track?.album?.release_date && (
+                                            <div className="flex items-center gap-1 px-2 py-1 bg-blue-400/10 rounded border border-blue-400/20">
+                                              <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M9 11H7v6h2v-6zm4 0h-2v6h2v-6zm4 0h-2v6h2v-6zm2.5 0h-2v6h2v-6zm3-9H3v2h2v16h14V4h2V2z"/>
+                                              </svg>
+                                              <span className="text-blue-400">
+                                                {new Date(item.track.album.release_date).getFullYear()}
+                                                <span className="text-gray-400 ml-1">
+                                                  {(() => {
+                                                    const year = new Date(item.track.album.release_date).getFullYear();
+                                                    const currentYear = new Date().getFullYear();
+                                                    if (year >= currentYear - 2) return 'Recent';
+                                                    if (year >= 2010) return '2010s+';
+                                                    if (year >= 2000) return '2000s';
+                                                    if (year >= 1990) return '90s';
+                                                    return 'Classic';
+                                                  })()}
+                                                </span>
+                                              </span>
+                                            </div>
+                                          )}
+
+                                        </div>
+                                        
+                                        {/* Compact Audio Player - tylko gdy track się odtwarza */}
+                                        {item?.track?.preview_url && currentTrackUrl === item.track.preview_url && duration > 0 && (
+                                          <div className="mt-2 flex items-center gap-2">
+                                            {/* Mini Progress Bar */}
+                                            <div className="flex-1 flex items-center gap-2">
+                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(currentTime)}</span>
+                                              <div 
+                                                className="flex-1 h-0.5 bg-green-400/20 rounded-full cursor-pointer"
+                                                onClick={(e) => {
+                                                  const rect = e.currentTarget.getBoundingClientRect();
+                                                  const percent = (e.clientX - rect.left) / rect.width;
+                                                  seekToTime(percent * duration);
+                                                }}
+                                              >
+                                                <div 
+                                                  className="h-full bg-green-400 rounded-full transition-all"
+                                                  style={{ width: `${(currentTime / duration) * 100}%` }}
+                                                ></div>
+                                              </div>
+                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(duration)}</span>
+                                            </div>
+                                            
+                                            {/* Mini Volume */}
+                                            <div className="flex items-center gap-1">
+                                              <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+                                              </svg>
+                                              <input
+                                                type="range"
+                                                min="0"
+                                                max="1"
+                                                step="0.01"
+                                                value={volume}
+                                                onChange={(e) => setTrackVolume(parseFloat(e.target.value))}
+                                                className="w-8 h-0.5 bg-green-400/20 rounded-full appearance-none cursor-pointer"
+                                                style={{
+                                                  background: `linear-gradient(to right, #4ade80 0%, #4ade80 ${volume * 100}%, rgba(74, 222, 128, 0.2) ${volume * 100}%, rgba(74, 222, 128, 0.2) 100%)`
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
