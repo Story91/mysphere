@@ -53,6 +53,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
 import { useBanStatus } from '../hooks/useBanStatus';
+import ReferralLeaderboard from '../utils/referrals/components/ReferralLeaderboard';
 import LinkPreview from './components/LinkPreview';
 import BuilderProfile from './components/BuilderProfile';
 import FollowingView from './friendsystem/FollowingView';
@@ -405,10 +406,27 @@ export default function BaseChat() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlView = searchParams.get('view');
+  const welcomeParam = searchParams.get('welcome');
   const [userStats, setUserStats] = useState<{[key: string]: Stats & { totalPoints: number }}>({});
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+  const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
 
   const chainId = useChainId();
+  
+  // Obsługa komunikatu powitalnego dla użytkowników z linku referalowego
+  useEffect(() => {
+    if (welcomeParam === 'true' && address) {
+      setShowWelcomeMessage(true);
+      // Usuń parametr z URL po wyświetleniu
+      setTimeout(() => {
+        router.replace('/basechat', { scroll: false });
+      }, 100);
+      // Ukryj komunikat po 5 sekundach
+      setTimeout(() => {
+        setShowWelcomeMessage(false);
+      }, 5000);
+    }
+  }, [welcomeParam, address, router]);
 
   // Function to clear URL params (Funkcja do czyszczenia parametrów URL)
   const clearViewParams = () => {
@@ -2627,6 +2645,27 @@ export default function BaseChat() {
     
       <BanPage>
         <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
+        
+        {/* Komunikat powitalny dla użytkowników z linku referalowego */}
+        {showWelcomeMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-2xl"
+          >
+            <div className="flex items-center space-x-3">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="font-semibold text-lg">Welcome to BaseChat! 🎉</p>
+                <p className="text-sm opacity-90">You have been successfully registered through a referral link</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+        
         <div className="min-h-screen relative">
           {/* Prosty gradient w tle zamiast skomplikowanych efektów */}
           <div className="fixed inset-0 bg-[#050B20] z-0">
@@ -3154,6 +3193,11 @@ export default function BaseChat() {
                           </div>
                         </a>
                       </div>
+
+                      {/* Referral Leaderboard */}
+                      <div className="mb-4">
+                        <ReferralLeaderboard />
+                      </div>
                   </div>
                 ) : (
                   <div className="space-y-4 pointer-events-none">
@@ -3175,6 +3219,11 @@ export default function BaseChat() {
                           className="w-full max-w-sm"
                         />
                       </div>
+                    </div>
+
+                    {/* Referral Leaderboard */}
+                    <div className="mb-4">
+                      <ReferralLeaderboard />
                     </div>
 
                     {/* YapYap Integration */}

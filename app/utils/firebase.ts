@@ -507,6 +507,21 @@ export const createPost = async (post: {
     
     console.log(`✅ Post created with ID: ${newPostRef.id}`);
     
+    // 6. Check if this is user's first post and award referral bonus
+    const userPostsQuery = query(
+      collection(db, 'posts'),
+      where('author', '==', post.author)
+    );
+    const userPostsSnapshot = await getDocs(userPostsQuery);
+    
+    // If this is user's first post (only the one just created)
+    if (userPostsSnapshot.size === 1) {
+      // Dynamic import to avoid circular dependencies
+      const { awardFirstPostBonus } = await import('./referrals/referralService');
+      await awardFirstPostBonus(post.author);
+      console.log(`🎁 Checked first post bonus for ${post.author}`);
+    }
+    
     // Zwróć ID nowego posta
     return newPostRef.id;
 

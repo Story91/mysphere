@@ -11,6 +11,8 @@ import { getUserTipStats, TipStats as TipStatsType } from '../../utils/firebase'
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 import { useSocial } from '../friendsystem/hooks';
 import { sendFriendRequest as sendFriendRequestDirect } from '../friendsystem/friends_system';
+import ReferralDashboard from '../../utils/referrals/components/ReferralDashboard';
+import { initializeReferralStats } from '../../utils/referrals';
 
 // Talent Protocol API types
 interface TalentScore {
@@ -397,6 +399,10 @@ export default function BuilderProfile({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.5);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Referral System state
+  const [showReferralDashboard, setShowReferralDashboard] = useState(false);
+  const [referralStatsInitialized, setReferralStatsInitialized] = useState(false);
 
   // 🚀 SOCIAL FEATURES: Hook i stany  
   // Get stats for the profile we're viewing (userAddress)
@@ -421,6 +427,24 @@ export default function BuilderProfile({
     setNewBio(profile.bio || '');
     setIsEditingBio(false);
   }, [profile]);
+  
+  // Initialize referral stats
+  useEffect(() => {
+    const initReferralStats = async () => {
+      if (currentUserAddress && !referralStatsInitialized) {
+        try {
+          console.log('🔄 Initializing referral stats for:', currentUserAddress);
+          const stats = await initializeReferralStats(currentUserAddress);
+          setReferralStatsInitialized(true);
+          console.log('✅ Referral stats initialized:', stats);
+        } catch (error) {
+          console.error('Error initializing referral stats:', error);
+        }
+      }
+    };
+    
+    initReferralStats();
+  }, [currentUserAddress, referralStatsInitialized]);
 
   // 🚀 SOCIAL FEATURES: Sprawdź follow status
   useEffect(() => {
@@ -1186,6 +1210,25 @@ export default function BuilderProfile({
                       </div>
                     </>
                   )}
+                  
+                  {/* Referral System Button - only for own profile */}
+                  {currentUserAddress === userAddress && (
+                    <>
+                      <div className="w-full h-px bg-gradient-to-r from-transparent via-green-300/60 to-transparent my-3"></div>
+                      <button
+                        onClick={() => setShowReferralDashboard(!showReferralDashboard)}
+                        className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M4.5 12a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z" />
+                        </svg>
+                        <span>Referral System</span>
+                        <svg className={`w-4 h-4 transition-transform ${showReferralDashboard ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
 
                   {/* Separator gradientowy przed action buttons */}
                   {currentUserAddress !== userAddress && (
@@ -1254,6 +1297,16 @@ export default function BuilderProfile({
                     </div>
           </div>
         </div>
+        
+        {/* Referral Dashboard - displayed after clicking the button */}
+        {showReferralDashboard && currentUserAddress === userAddress && (
+          <div className="mb-6">
+            <ReferralDashboard 
+              userAddress={userAddress} 
+              isOwnProfile={true}
+            />
+          </div>
+        )}
           
         {/* Talent Protocol Builder Score */}
         {(talentScore || talentProfile || loadingTalentData) && (
@@ -2383,7 +2436,6 @@ export default function BuilderProfile({
             </div>
           )}
         </div>
-        
 
         
 
