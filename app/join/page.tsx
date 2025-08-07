@@ -96,11 +96,11 @@ function JoinContent() {
               router.push('/basechat?welcome=true');
             }, 3000);
           } else {
-            setError('Nie udało się zarejestrować. Możliwe, że już korzystałeś z innego linku referalowego.');
+            setError('Registration failed. You may have already used another referral link before.');
           }
         } catch (err) {
-          console.error('Błąd podczas rejestracji:', err);
-          setError('Wystąpił błąd podczas rejestracji');
+          console.error('Registration error:', err);
+          setError('An error occurred during registration');
         } finally {
           setIsProcessing(false);
         }
@@ -120,11 +120,11 @@ function JoinContent() {
           className="text-center mb-12"
         >
           <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-            Join BaseChat! 🚀
+            Join MySphere! 🚀
           </h1>
           {referrerName && (
-            <p className="text-xl text-gray-600 dark:text-gray-300">
-              You were invited by <span className="font-semibold text-blue-600 dark:text-blue-400">{referrerName}</span>
+            <p className="text-xl text-gray-800 dark:text-gray-200 font-medium">
+              You were invited by <span className="font-bold text-blue-600 dark:text-blue-400">{referrerName}</span>
             </p>
           )}
         </motion.div>
@@ -140,8 +140,8 @@ function JoinContent() {
             <div className="bg-blue-100 dark:bg-blue-900 rounded-full w-12 h-12 flex items-center justify-center mb-4">
               <FiGift className="text-blue-600 dark:text-blue-400 text-xl" />
             </div>
-            <h3 className="font-semibold text-lg mb-2">Welcome Bonus</h3>
-            <p className="text-gray-600 dark:text-gray-400">
+            <h3 className="font-semibold text-lg mb-2 text-gray-900 dark:text-white">Welcome Bonus</h3>
+            <p className="text-gray-700 dark:text-gray-300">
               Get extra points for joining through a referral link
             </p>
           </div>
@@ -150,8 +150,8 @@ function JoinContent() {
             <div className="bg-purple-100 dark:bg-purple-900 rounded-full w-12 h-12 flex items-center justify-center mb-4">
               <FiUsers className="text-purple-600 dark:text-purple-400 text-xl" />
             </div>
-            <h3 className="font-semibold text-lg mb-2">Community</h3>
-            <p className="text-gray-600 dark:text-gray-400">
+            <h3 className="font-semibold text-lg mb-2 text-gray-900 dark:text-white">Community</h3>
+            <p className="text-gray-700 dark:text-gray-300">
               Join an active community of builders on Base
             </p>
           </div>
@@ -160,8 +160,8 @@ function JoinContent() {
             <div className="bg-green-100 dark:bg-green-900 rounded-full w-12 h-12 flex items-center justify-center mb-4">
               <FiTrendingUp className="text-green-600 dark:text-green-400 text-xl" />
             </div>
-            <h3 className="font-semibold text-lg mb-2">Growth</h3>
-            <p className="text-gray-600 dark:text-gray-400">
+            <h3 className="font-semibold text-lg mb-2 text-gray-900 dark:text-white">Growth</h3>
+            <p className="text-gray-700 dark:text-gray-300">
               Earn points, badges and grow your position in the community
             </p>
           </div>
@@ -176,9 +176,9 @@ function JoinContent() {
         >
           {!isConnected ? (
             <div className="text-center">
-              <h2 className="text-2xl font-semibold mb-4">Connect your wallet to continue</h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Connect your wallet to join BaseChat and receive your welcome bonus
+              <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">Connect your wallet to continue</h2>
+              <p className="text-gray-700 dark:text-gray-300 mb-6 font-medium">
+                Connect your wallet to join MySphere and receive your welcome bonus
               </p>
               <div className="flex justify-center">
                 <ConnectWallet />
@@ -196,8 +196,8 @@ function JoinContent() {
               <h2 className="text-2xl font-semibold mb-4 text-green-600 dark:text-green-400">
                 Registration successful!
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Welcome to BaseChat! You will be redirected shortly...
+              <p className="text-gray-700 dark:text-gray-300 mb-4 font-medium">
+                Welcome to MySphere! You will be redirected shortly...
               </p>
               <div className="flex justify-center items-center gap-2 text-blue-600 dark:text-blue-400">
                 <span>Redirecting to app</span>
@@ -220,18 +220,23 @@ function JoinContent() {
               <h2 className="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">
                 Oops! Something went wrong
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
-              <button
-                onClick={() => router.push('/basechat')}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Go to BaseChat
-              </button>
+              <p className="text-gray-700 dark:text-gray-300 mb-4 font-medium">{error}</p>
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Don't worry! You can still join MySphere and participate in the community.
+                </p>
+                <button
+                  onClick={() => router.push('/basechat')}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Continue to MySphere
+                </button>
+              </div>
             </div>
           ) : (
             <div className="text-center">
-              <h2 className="text-xl font-semibold mb-2">Preparing registration...</h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Preparing registration...</h2>
+              <p className="text-gray-700 dark:text-gray-300">
                 Checking your status...
               </p>
             </div>
@@ -243,7 +248,7 @@ function JoinContent() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          className="mt-12 text-center text-sm text-gray-500 dark:text-gray-400"
+          className="mt-12 text-center text-sm text-gray-600 dark:text-gray-400"
         >
           <p>
             By joining through a referral link, you accept our{' '}
