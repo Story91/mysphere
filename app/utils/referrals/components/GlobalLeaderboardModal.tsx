@@ -58,6 +58,7 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
         leaderboardQuery = query(
           collection(db, 'referralStats'),
           orderBy('successfulReferrals', 'desc'),
+          orderBy('totalRewards', 'desc'),
           limit(ITEMS_PER_PAGE)
         );
       } else if (lastDoc) {
@@ -65,6 +66,7 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
         leaderboardQuery = query(
           collection(db, 'referralStats'),
           orderBy('successfulReferrals', 'desc'),
+          orderBy('totalRewards', 'desc'),
           startAfter(lastDoc),
           limit(ITEMS_PER_PAGE)
         );

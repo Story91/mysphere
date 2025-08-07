@@ -39,6 +39,7 @@ export default function ReferralLeaderboard() {
       const statsQuery = query(
         collection(db, 'referralStats'),
         orderBy('successfulReferrals', 'desc'),
+        orderBy('totalRewards', 'desc'),
         limit(5)
       );
       
