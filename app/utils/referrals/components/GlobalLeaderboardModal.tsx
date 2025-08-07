@@ -58,7 +58,6 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
         leaderboardQuery = query(
           collection(db, 'referralStats'),
           orderBy('successfulReferrals', 'desc'),
-          orderBy('totalRewards', 'desc'),
           limit(ITEMS_PER_PAGE)
         );
       } else if (lastDoc) {
@@ -66,7 +65,6 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
         leaderboardQuery = query(
           collection(db, 'referralStats'),
           orderBy('successfulReferrals', 'desc'),
-          orderBy('totalRewards', 'desc'),
           startAfter(lastDoc),
           limit(ITEMS_PER_PAGE)
         );
@@ -80,7 +78,6 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
       
       snapshot.docs.forEach((doc, index) => {
         const data = doc.data();
-        const globalRank = reset ? index + 1 : leaderboard.length + index + 1;
         
         entries.push({
           userId: data.userId,
@@ -88,8 +85,21 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
           totalReferrals: data.totalReferrals || 0,
           successfulReferrals: data.successfulReferrals || 0,
           totalRewards: data.totalRewards || 0,
-          rank: globalRank
+          rank: 0 // Will be assigned after sorting
         });
+      });
+      
+      // Sort by successfulReferrals first, then by totalRewards
+      entries.sort((a, b) => {
+        if (b.successfulReferrals !== a.successfulReferrals) {
+          return b.successfulReferrals - a.successfulReferrals;
+        }
+        return b.totalRewards - a.totalRewards;
+      });
+      
+      // Assign ranks
+      entries.forEach((entry, index) => {
+        entry.rank = (reset ? 0 : leaderboard.length) + index + 1;
       });
       
       if (reset) {

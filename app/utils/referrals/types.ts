@@ -19,6 +19,7 @@ export interface Referral {
 
 export interface ReferralStats {
   userId: string;
+  userName?: string;            // Display name (basename, .sphere, .camper, etc.)
   totalReferrals: number;       // Łączna liczba referali
   successfulReferrals: number;  // Liczba aktywnych referali
   pendingReferrals: number;     // Oczekujące na aktywację

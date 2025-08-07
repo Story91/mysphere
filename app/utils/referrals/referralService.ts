@@ -22,6 +22,26 @@ import {
   DEFAULT_REFERRAL_CONFIG 
 } from './types';
 
+// Pobieranie nazwy użytkownika (basename, .sphere, .camper lub skrócony adres)
+const getUserDisplayName = async (address: string): Promise<string> => {
+  try {
+    // 1. Sprawdź profil użytkownika w Firebase (.sphere, .camper, custom name)
+    const userDoc = await getDoc(doc(db, 'users', address));
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      if (userData.name) {
+        return userData.name;
+      }
+    }
+    
+    // 2. Fallback - skrócony adres
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  } catch (error) {
+    console.error('Error getting user display name:', error);
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }
+};
+
 // Generowanie unikalnego kodu referalowego
 export const generateReferralCode = (address: string): string => {
   // Używamy pierwszych 6 i ostatnich 4 znaki adresu + losowy suffix
@@ -50,13 +70,16 @@ export const initializeReferralStats = async (userId: string): Promise<ReferralS
     // Create new stats
     const referralCode = generateReferralCode(userId);
     const referralLink = generateReferralLink(referralCode);
+    const userName = await getUserDisplayName(userId);
     
     console.log(`📊 Creating referral stats for ${userId}:`);
     console.log(`   - Code: ${referralCode}`);
     console.log(`   - Link: ${referralLink}`);
+    console.log(`   - Name: ${userName}`);
     
     const newStats: ReferralStats = {
       userId,
+      userName,
       totalReferrals: 0,
       successfulReferrals: 0,
       pendingReferrals: 0,
@@ -220,9 +243,11 @@ export const activateReferral = async (
       completedAt: serverTimestamp()
     });
     
-    // Zaktualizuj statystyki referera
+    // Zaktualizuj statystyki referera (z aktualną nazwą)
     const statsRef = doc(db, 'referralStats', referralData.referrerId);
+    const userName = await getUserDisplayName(referralData.referrerId);
     await updateDoc(statsRef, {
+      userName,
       successfulReferrals: increment(1),
       pendingReferrals: increment(-1),
       lastUpdated: serverTimestamp()

@@ -39,7 +39,6 @@ export default function ReferralLeaderboard() {
       const statsQuery = query(
         collection(db, 'referralStats'),
         orderBy('successfulReferrals', 'desc'),
-        orderBy('totalRewards', 'desc'),
         limit(5)
       );
       
@@ -54,8 +53,21 @@ export default function ReferralLeaderboard() {
           totalReferrals: data.totalReferrals || 0,
           successfulReferrals: data.successfulReferrals || 0,
           totalRewards: data.totalRewards || 0,
-          rank: index + 1
+          rank: 0 // Will be assigned after sorting
         });
+      });
+      
+      // Sort by successfulReferrals first, then by totalRewards
+      entries.sort((a, b) => {
+        if (b.successfulReferrals !== a.successfulReferrals) {
+          return b.successfulReferrals - a.successfulReferrals;
+        }
+        return b.totalRewards - a.totalRewards;
+      });
+      
+      // Assign ranks
+      entries.forEach((entry, index) => {
+        entry.rank = index + 1;
       });
       
       setLeaderboard(entries);
