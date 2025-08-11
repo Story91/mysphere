@@ -346,10 +346,10 @@ export default function BaseChat() {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [trendingTags, setTrendingTags] = useState<{tag: string, count: number}[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
-         const [totalUsers, setTotalUsers] = useState(154262);
-    const [totalLikes, setTotalLikes] = useState(16999);
-    const [totalPosts, setTotalPosts] = useState(206996);
-    const [totalComments, setTotalComments] = useState(9203);
+         const [totalUsers, setTotalUsers] = useState(170403);
+    const [totalLikes, setTotalLikes] = useState(18420);
+    const [totalPosts, setTotalPosts] = useState(231306);
+    const [totalComments, setTotalComments] = useState(10551);
   const [expandedUsersList, setExpandedUsersList] = useState(false);
   const [expandedTagsList, setExpandedTagsList] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -1438,10 +1438,10 @@ export default function BaseChat() {
     try {
       // ✅ ULTRA-CHEAP: Statyczne dane zamiast Firebase (oszczędność $15,000+/dzień!)
       const stats = {
-        userCount: 154262,
-        postsCount: 206996,
-        likesCount: 16999,
-        commentsCount: 9203,
+        userCount: 170403,
+        postsCount: 231306,
+        likesCount: 18420,
+        commentsCount: 10551,
         transactionsCount: 40818
       };
       
@@ -1464,10 +1464,10 @@ export default function BaseChat() {
     } catch (error) {
       console.error('Error fetching BaseChat global stats:', error);
       // Fallback values
-      setTotalUsers(154262);
-      setTotalLikes(16999);
-      setTotalPosts(206996);
-      setTotalComments(9203);
+      setTotalUsers(170403);
+      setTotalLikes(18420);
+      setTotalPosts(231306);
+      setTotalComments(10551);
     }
   };
 
