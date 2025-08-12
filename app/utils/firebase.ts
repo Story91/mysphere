@@ -26,6 +26,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth, TwitterAuthProvider } from 'firebase/auth';
 import { UserProfile, Post, Comment } from '../types';
+import { DEFAULT_REFERRAL_CONFIG } from './referrals/types';
 
 // Stała z adresem admina
 export const ADMIN_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd'.toLowerCase();
@@ -2266,10 +2267,13 @@ export const refreshTop50UsersOnly = async () => {
       userStats[post.author].likes += actualLikes;
     }
     
-    // Aktualizuj statystyki użytkowników
+    // Aktualizuj statystyki użytkowników (uwzględnij BaseName i referral)
     for (const [userId, stats] of Object.entries(userStats)) {
       const userRef = doc(db, 'users', userId);
       const baseNameBonus = stats.hasBaseName ? 1000 : 0;
+      // Pobierz referralPoints z bieżących danych użytkownika (jeśli istnieją)
+      const userDoc = await getDoc(userRef);
+      const existingReferralPoints = userDoc.exists() ? Number(userDoc.data().baseChatPoints?.referralPoints || 0) : 0;
       
       batch.update(userRef, {
         postsCount: stats.posts,
@@ -2279,7 +2283,14 @@ export const refreshTop50UsersOnly = async () => {
         'stats.likes': stats.likes,
         'stats.hasBaseName': stats.hasBaseName,
         'stats.baseNameBonus': baseNameBonus,
-        'stats.points': Math.round((stats.posts * 5 + stats.likes) * 1.25 + baseNameBonus)
+        'stats.points': Math.round((stats.posts * 5 + stats.likes) * 1.25 + baseNameBonus + existingReferralPoints),
+        'baseChatPoints.postPoints': stats.posts * 5,
+        'baseChatPoints.likePoints': stats.likes,
+        'baseChatPoints.activityBonus': Math.round(((stats.posts * 5) + stats.likes) * 0.25),
+        'baseChatPoints.baseNameBonus': baseNameBonus,
+        'baseChatPoints.referralPoints': existingReferralPoints,
+        'baseChatPoints.totalPoints': Math.round(((stats.posts * 5) + stats.likes) * 1.25 + baseNameBonus + existingReferralPoints),
+        'baseChatPoints.lastUpdated': serverTimestamp()
       });
     }
     
@@ -3561,9 +3572,10 @@ export const getTopActiveUsers = async (limit: number = 50) => {
       
       const fallbackSnap = await getDocs(fallbackQuery);
       
-      // Połącz wyniki
-      const allUsers = [...topUsersSnap.docs, ...fallbackSnap.docs];
-      return allUsers;
+      // Połącz wyniki, ale uniknij duplikatów
+      const ids = new Set(topUsersSnap.docs.map(d => d.id));
+      const merged = [...topUsersSnap.docs, ...fallbackSnap.docs.filter(d => !ids.has(d.id))];
+      return merged;
     }
     
     return topUsersSnap.docs;
@@ -3606,7 +3618,7 @@ export const refreshUserRankings = async (): Promise<{
           const data = docSnapshot.data();
           processedUsers++;
           
-          // Oblicz punkty
+          // Oblicz punkty (uwzględnij BaseName i referral)
           const stats = {
             posts: data.postsCount || 0,
             likes: data.likesReceived || 0
@@ -3615,7 +3627,16 @@ export const refreshUserRankings = async (): Promise<{
           const likePoints = stats.likes;
           const basePoints = postPoints + likePoints;
           const activityBonus = Math.round(basePoints * 0.25);
-          const totalPoints = basePoints + activityBonus;
+
+          // BaseName bonus: preferuj zapisany w baseChatPoints, inaczej heurystyka po nazwie
+          const hasBaseName = (data.baseChatPoints?.baseNameBonus ? data.baseChatPoints.baseNameBonus > 0 : false) 
+            || (typeof data.name === 'string' && data.name.endsWith('.base.eth'));
+          const baseNameBonus = hasBaseName ? (Number(data.baseChatPoints?.baseNameBonus) || 1000) : 0;
+
+          // Referral points: weź zapisane wartości (rekomendowane po rebuildReferralAggregates)
+          const referralPoints = Number(data.baseChatPoints?.referralPoints || 0);
+
+          const totalPoints = basePoints + activityBonus + baseNameBonus + referralPoints;
           
           // Aktualizuj tylko jeśli punkty się zmieniły
           const currentPoints = data.baseChatPoints?.totalPoints || 0;
@@ -3625,6 +3646,8 @@ export const refreshUserRankings = async (): Promise<{
               'baseChatPoints.postPoints': postPoints,
               'baseChatPoints.likePoints': likePoints,
               'baseChatPoints.activityBonus': activityBonus,
+              'baseChatPoints.baseNameBonus': baseNameBonus,
+              'baseChatPoints.referralPoints': referralPoints,
               'baseChatPoints.totalPoints': totalPoints,
               'baseChatPoints.lastUpdated': serverTimestamp()
             });
@@ -3686,27 +3709,37 @@ export const getCachedActiveUsers = async (limit: number = 50, forceRefresh: boo
     const users = userDocs.map(docSnapshot => {
       const data = docSnapshot.data();
       const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
-      
+
+      // Oblicz punktację w sposób odporny na nadpisania pól
       let totalPoints = 0;
       if (data.baseChatPoints && typeof data.baseChatPoints === 'object') {
-        totalPoints = data.baseChatPoints.totalPoints || 0;
+        const postPoints = Number(data.baseChatPoints.postPoints || 0);
+        const likePoints = Number(data.baseChatPoints.likePoints || 0);
+        const activityBonus = Number(data.baseChatPoints.activityBonus || 0);
+        const baseNameBonus = Number(data.baseChatPoints.baseNameBonus || 0);
+        const referralPoints = Number(data.baseChatPoints.referralPoints || 0);
+        const computedTotal = postPoints + likePoints + activityBonus + baseNameBonus + referralPoints;
+        const storedTotal = Number(data.baseChatPoints.totalPoints || 0);
+        // Weź większą z wartości, aby nie tracić bonusów przy ewentualnym nadpisaniu
+        totalPoints = Math.max(storedTotal, computedTotal);
       } else {
-        const stats = {
-          posts: data.postsCount || 0,
-          likes: data.likesReceived || 0
-        };
-        const postPoints = stats.posts * 5;
-        const likePoints = stats.likes;
+        const posts = Number(data.postsCount || 0);
+        const likes = Number(data.likesReceived || 0);
+        const postPoints = posts * 5;
+        const likePoints = likes;
         const basePoints = postPoints + likePoints;
         const activityBonus = Math.round(basePoints * 0.25);
-        totalPoints = basePoints + activityBonus;
+        // Fallback: dodaj bonus BaseName, jeśli da się to wywnioskować z nazwy
+        const isBaseNameFallback = (typeof data.name === 'string' && data.name.endsWith('.base.eth')) || Boolean(data.baseName);
+        const baseNameBonus = isBaseNameFallback ? 1000 : 0;
+        totalPoints = basePoints + activityBonus + baseNameBonus;
       }
-      
+
       const userName = data.name || (data.baseName ? `${data.baseName}.base.eth` : docSnapshot.id.slice(0, 6) + '...' + docSnapshot.id.slice(-4));
-      
+
       return {
         address: docSnapshot.id,
-        points: userName === 'vitalik.eth' ? 5000 : totalPoints,
+        points: totalPoints,
         stats: {
           posts: data.postsCount || 0,
           likes: data.likesReceived || 0
@@ -3718,11 +3751,7 @@ export const getCachedActiveUsers = async (limit: number = 50, forceRefresh: boo
     });
     
     // Sortuj po punktach
-    const sortedUsers = users.sort((a, b) => {
-      if (a.name === 'vitalik.eth') return -1;
-      if (b.name === 'vitalik.eth') return 1;
-      return b.points - a.points;
-    });
+    const sortedUsers = users.sort((a, b) => b.points - a.points);
     
     // Aktualizuj cache
     cachedActiveUsers = sortedUsers;
@@ -4704,6 +4733,239 @@ export const fixAllUserStats = async (): Promise<{ success: boolean, fixed: numb
       fixed: 0,
       errors: [error instanceof Error ? error.message : 'Unknown error']
     };
+  }
+};
+
+// 🔧 ADMIN: Rebuild referral aggregates and sync to users.baseChatPoints
+export const rebuildReferralAggregates = async (): Promise<{ success: boolean; updatedUsers: number; errors: string[] }> => {
+  try {
+    console.log('🔧 ADMIN: Rebuilding referral aggregates from referralRewards...');
+    const errors: string[] = [];
+    let updatedUsers = 0;
+
+    // 1) Pobierz wszystkie nagrody referral
+    const rewardsSnap = await getDocs(collection(db, 'referralRewards'));
+
+    // 2) Zgrupuj sumy per userId
+    const sumsByUser: Record<string, number> = {};
+    rewardsSnap.docs.forEach((docSnap) => {
+      const data = docSnap.data() as any;
+      const userId = data.userId;
+      // Sanity clamp: amount must be within expected reward ranges
+      let amount = Number(data.amount || 0);
+      if (!Number.isFinite(amount)) amount = 0;
+      if (amount < 0) amount = 0;
+      // Twarde limity bezpieczeństwa per typ nagrody
+      switch (data.type) {
+        case 'signup':
+          amount = Math.min(amount, DEFAULT_REFERRAL_CONFIG.rewardPerReferral);
+          break;
+        case 'first_post':
+          amount = Math.min(amount, DEFAULT_REFERRAL_CONFIG.firstPostBonus);
+          break;
+        case 'milestone':
+          // Milestony znane: 5/10/25/50
+          amount = Math.min(amount, Math.max(
+            DEFAULT_REFERRAL_CONFIG.milestoneRewards.fifty,
+            DEFAULT_REFERRAL_CONFIG.milestoneRewards.twentyFive,
+            DEFAULT_REFERRAL_CONFIG.milestoneRewards.ten,
+            DEFAULT_REFERRAL_CONFIG.milestoneRewards.five
+          ));
+          break;
+        default:
+          // 'special' lub nieznane: z clampem defensywnym
+          amount = Math.min(amount, 5000);
+      }
+      if (!userId) return;
+      sumsByUser[userId] = (sumsByUser[userId] || 0) + amount;
+    });
+
+    // 3) Zaktualizuj referralStats.totalRewards oraz users.baseChatPoints.referralPoints/totalPoints
+    const batchSize = 500;
+    let ops = 0;
+    let batch = writeBatch(db);
+
+    const commitBatch = async () => {
+      if (ops > 0) {
+        await batch.commit();
+        batch = writeBatch(db);
+        ops = 0;
+      }
+    };
+
+    for (const [userId, sum] of Object.entries(sumsByUser)) {
+      try {
+        // referralStats
+        const statsRef = doc(db, 'referralStats', userId);
+        batch.set(statsRef, { totalRewards: sum, lastUpdated: serverTimestamp() }, { merge: true });
+        ops++;
+
+        // users.baseChatPoints
+        const userRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userRef);
+        const userData = userDoc.exists() ? (userDoc.data() as any) : {};
+        const bcp = userData.baseChatPoints || {};
+        const postPoints = Number(bcp.postPoints || 0);
+        const likePoints = Number(bcp.likePoints || 0);
+        const activityBonus = Number(bcp.activityBonus || 0);
+        const baseNameBonus = Number(bcp.baseNameBonus || (typeof userData.name === 'string' && userData.name.endsWith('.base.eth') ? 1000 : 0));
+        const referralPoints = Number(sum || 0);
+        const totalPoints = postPoints + likePoints + activityBonus + baseNameBonus + referralPoints;
+
+        batch.set(userRef, {
+          baseChatPoints: {
+            postPoints,
+            likePoints,
+            activityBonus,
+            baseNameBonus,
+            referralPoints,
+            totalPoints,
+            lastUpdated: serverTimestamp()
+          }
+        }, { merge: true });
+        ops++;
+
+        updatedUsers++;
+        if (ops >= batchSize - 2) {
+          await commitBatch();
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`Referral aggregate update failed for ${userId}:`, msg);
+        errors.push(`${userId}: ${msg}`);
+      }
+    }
+
+    await commitBatch();
+    console.log(`✅ ADMIN: Referral aggregates rebuilt for ${updatedUsers} users`);
+    return { success: true, updatedUsers, errors };
+  } catch (error) {
+    console.error('❌ ADMIN: rebuildReferralAggregates failed:', error);
+    return { success: false, updatedUsers: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] };
+  }
+};
+
+// 🔧 ADMIN: STRICT recompute referral points from referrals collection (ignores referralRewards)
+export const recomputeReferralPointsStrict = async (): Promise<{
+  success: boolean;
+  updatedUsers: number;
+  processedReferrals: number;
+  errors: string[];
+}> => {
+  try {
+    console.log('🔧 ADMIN: STRICT recompute of referral points (from referrals)...');
+    const errors: string[] = [];
+
+    // 1) Zbierz dane z referrals: completed count i firstPostBonusAwarded per referrer
+    const referralsSnap = await getDocs(collection(db, 'referrals'));
+    const byReferrer: Record<string, { completed: number; firstPostBonuses: number }> = {};
+    let processed = 0;
+
+    referralsSnap.docs.forEach((docSnap) => {
+      const r = docSnap.data() as any;
+      const referrerId = r.referrerId;
+      if (!referrerId) return;
+      if (!byReferrer[referrerId]) byReferrer[referrerId] = { completed: 0, firstPostBonuses: 0 };
+      if (r.status === 'completed') byReferrer[referrerId].completed++;
+      if (r.firstPostBonusAwarded === true) byReferrer[referrerId].firstPostBonuses++;
+      processed++;
+    });
+
+    // 2) Przelicz strict points wg konfiguracji i zaktualizuj referralStats oraz users.baseChatPoints
+    const batchSize = 500;
+    let ops = 0;
+    let batch = writeBatch(db);
+    let updatedUsers = 0;
+
+    const commitBatch = async () => {
+      if (ops > 0) {
+        await batch.commit();
+        batch = writeBatch(db);
+        ops = 0;
+      }
+    };
+
+    for (const [userId, agg] of Object.entries(byReferrer)) {
+      try {
+        const completed = agg.completed || 0;
+        // ZGODNIE Z DEFINICJĄ: successful oznacza, że polecony zrobił pierwszy post
+        const firstPosts = completed;
+
+        // Milestone rewards by thresholds
+        let milestoneTotal = 0;
+        if (completed >= 5) milestoneTotal += DEFAULT_REFERRAL_CONFIG.milestoneRewards.five;
+        if (completed >= 10) milestoneTotal += DEFAULT_REFERRAL_CONFIG.milestoneRewards.ten;
+        if (completed >= 25) milestoneTotal += DEFAULT_REFERRAL_CONFIG.milestoneRewards.twentyFive;
+        if (completed >= 50) milestoneTotal += DEFAULT_REFERRAL_CONFIG.milestoneRewards.fifty;
+
+        const signupTotal = completed * DEFAULT_REFERRAL_CONFIG.rewardPerReferral;
+        const firstPostTotal = Math.min(firstPosts, completed) * DEFAULT_REFERRAL_CONFIG.firstPostBonus;
+        const strictReferralPoints = signupTotal + firstPostTotal + milestoneTotal;
+
+        // Update referralStats
+        const statsRef = doc(db, 'referralStats', userId);
+        batch.set(
+          statsRef,
+          {
+            totalRewards: strictReferralPoints,
+            successfulReferrals: completed,
+            lastUpdated: serverTimestamp(),
+            milestones: {
+              five: completed >= 5,
+              ten: completed >= 10,
+              twentyFive: completed >= 25,
+              fifty: completed >= 50,
+            },
+          },
+          { merge: true }
+        );
+        ops++;
+
+        // Update users.baseChatPoints
+        const userRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userRef);
+        const userData = userDoc.exists() ? (userDoc.data() as any) : {};
+        const bcp = userData.baseChatPoints || {};
+        const postPoints = Number(bcp.postPoints || 0);
+        const likePoints = Number(bcp.likePoints || 0);
+        const activityBonus = Number(bcp.activityBonus || 0);
+        const baseNameBonus = Number(bcp.baseNameBonus || (typeof userData.name === 'string' && userData.name.endsWith('.base.eth') ? 1000 : 0));
+        const totalPoints = postPoints + likePoints + activityBonus + baseNameBonus + strictReferralPoints;
+
+        batch.set(
+          userRef,
+          {
+            baseChatPoints: {
+              postPoints,
+              likePoints,
+              activityBonus,
+              baseNameBonus,
+              referralPoints: strictReferralPoints,
+              totalPoints,
+              lastUpdated: serverTimestamp(),
+            },
+          },
+          { merge: true }
+        );
+        ops++;
+
+        updatedUsers++;
+        if (ops >= batchSize - 2) {
+          await commitBatch();
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`STRICT recompute failed for ${userId}:`, msg);
+        errors.push(`${userId}: ${msg}`);
+      }
+    }
+
+    await commitBatch();
+    console.log(`✅ ADMIN: STRICT referral points recomputed for ${updatedUsers} users`);
+    return { success: true, updatedUsers, processedReferrals: processed, errors };
+  } catch (error) {
+    console.error('❌ ADMIN: recomputeReferralPointsStrict failed:', error);
+    return { success: false, updatedUsers: 0, processedReferrals: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] };
   }
 };
 

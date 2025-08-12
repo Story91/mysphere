@@ -11,7 +11,7 @@ import Statistics from './components/Statistics';
 import PaidPinsManagement from './components/PaidPinsManagement';
 import { refreshTop50UsersOnly } from '../utils/firebase';
 import AdminQuotes from './quotes/page';
-import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache, fixAllUserStats, fixUserPostStats, getUsersWithBasenameCount, migrateHistoricalBaseNamePosts } from '../utils/firebase';
+import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache, fixAllUserStats, fixUserPostStats, getUsersWithBasenameCount, migrateHistoricalBaseNamePosts, rebuildReferralAggregates, recomputeReferralPointsStrict, clearPaginatedActiveUsersCache } from '../utils/firebase';
 
 // Usuwam stałą ADMIN_ADDRESS, bo importujemy ją z firebase.ts
 const ADMIN_BASENAME = "story91.base.eth";
@@ -556,6 +556,12 @@ export default function AdminPanel() {
                   message: `Naprawiono ${result.fixed} użytkowników. Błędy: ${result.errors.length}`,
                   errors: result.errors
                 });
+                // Po zakończeniu: dodatkowo przebuduj agregaty referral i zsynchronizuj punkty
+                const agg = await rebuildReferralAggregates();
+                setRefreshStatus((prev: any) => ({
+                  ...prev,
+                  referralFix: `Referral sync: ${agg.updatedUsers} users, errors: ${agg.errors.length}`
+                }));
               } catch (error) {
                 console.error('Błąd podczas naprawy statystyk:', error);
                 setRefreshStatus({ 
@@ -574,6 +580,33 @@ export default function AdminPanel() {
             } text-white transition-all`}
           >
             {isRefreshing ? '🔧 Naprawiam...' : '🔧 Napraw Wszystkich'}
+          </button>
+
+          <button
+            onClick={async () => {
+              try {
+                setIsRefreshing(true);
+                const result = await recomputeReferralPointsStrict();
+                setRefreshStatus({
+                  success: result.success,
+                  message: `STRICT Referral: users ${result.updatedUsers}, processed referrals ${result.processedReferrals}, errors ${result.errors.length}`,
+                  errors: result.errors
+                });
+              } catch (error) {
+                console.error('Błąd STRICT referral recompute:', error);
+                setRefreshStatus({ success: false, error: error instanceof Error ? error.message : 'Nieznany błąd' });
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
+            disabled={isRefreshing}
+            className={`px-4 py-2 rounded-lg ${
+              isRefreshing 
+                ? 'bg-gray-500 cursor-not-allowed' 
+                : 'bg-purple-600 hover:bg-purple-700'
+            } text-white transition-all`}
+          >
+            {isRefreshing ? 'Recompute...' : 'Napraw Referral (STRICT)'}
           </button>
           
           <input
@@ -700,6 +733,36 @@ export default function AdminPanel() {
             )}
           </div>
         )}
+
+        {/* Hard refresh ranking/cache */}
+        <div className="mt-4 flex gap-3">
+          <button
+            onClick={async () => {
+              try {
+                setIsRefreshing(true);
+                // Wyczyść cache paginowanych użytkowników po stronie serwera
+                clearPaginatedActiveUsersCache();
+                // Wyczyść cache po stronie przeglądarki (Most Active)
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('activeUsers');
+                  localStorage.removeItem('activeUsersPage');
+                  localStorage.removeItem('userNames');
+                  localStorage.removeItem('usersCacheTime');
+                }
+                setRefreshStatus({ success: true, message: 'Hard refresh: caches cleared. Open page and click Refresh in Most Active.' });
+              } catch (error) {
+                console.error('Hard refresh error:', error);
+                setRefreshStatus({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
+            disabled={isRefreshing}
+            className={`px-4 py-2 rounded-lg ${isRefreshing ? 'bg-gray-500 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600'} text-white transition-all`}
+          >
+            {isRefreshing ? 'Clearing...' : 'Hard Refresh Ranking'}
+          </button>
+        </div>
       </div>
 
       {/* Nowa sekcja przeliczania lajków */}

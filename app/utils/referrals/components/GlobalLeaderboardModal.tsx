@@ -97,15 +97,24 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
         return b.totalRewards - a.totalRewards;
       });
       
+      // Safety clamp of points for UI (defensive until backend rebuild completes)
+      const rewardPerReferral = 100; // sync with DEFAULT_REFERRAL_CONFIG
+      const firstPostBonus = 50;
+      const maxMilestone = 5000; // highest milestone
+      const safeEntries = entries.map((e) => {
+        const theoreticalMax = (e.successfulReferrals * (rewardPerReferral + firstPostBonus)) + maxMilestone;
+        return { ...e, totalRewards: Math.min(e.totalRewards, theoreticalMax) };
+      });
+
       // Assign ranks
-      entries.forEach((entry, index) => {
+      safeEntries.forEach((entry, index) => {
         entry.rank = (reset ? 0 : leaderboard.length) + index + 1;
       });
       
       if (reset) {
-        setLeaderboard(entries);
+        setLeaderboard(safeEntries);
       } else {
-        setLeaderboard(prev => [...prev, ...entries]);
+        setLeaderboard(prev => [...prev, ...safeEntries]);
       }
       
       setHasMore(snapshot.docs.length === ITEMS_PER_PAGE);

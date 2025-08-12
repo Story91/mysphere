@@ -2003,15 +2003,23 @@ export default function BaseChat() {
       const postPoints = userProfile.postCount * 5;
       const likePoints = userProfile.likesReceived;
       const activityBonus = Math.round((postPoints + likePoints) * 0.25);
-      const totalBaseChatPoints = Math.round((postPoints + likePoints) * 1.25);
+      // Nie nadpisuj bonusów – odczytaj istniejące i dolicz do total
+      const userRef = doc(db, 'users', address);
+      const userSnap = await getDoc(userRef);
+      const existing = userSnap.exists() ? (userSnap.data() as any) : {};
+      const existingBCP = existing.baseChatPoints || {};
+      const baseNameBonus = Number(existingBCP.baseNameBonus || 0);
+      const referralPoints = Number(existingBCP.referralPoints || 0);
+      const totalBaseChatPoints = Math.round((postPoints + likePoints) * 1.25 + baseNameBonus + referralPoints);
 
       // Zapisz punkty w Firebase
-      const userRef = doc(db, 'users', address);
       await updateDoc(userRef, {
         baseChatPoints: {
           postPoints,
           likePoints,
           activityBonus,
+          baseNameBonus,
+          referralPoints,
           totalPoints: totalBaseChatPoints,
           lastUpdated: serverTimestamp()
         }

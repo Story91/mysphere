@@ -65,12 +65,21 @@ export default function ReferralLeaderboard() {
         return b.totalRewards - a.totalRewards;
       });
       
+      // Safety clamp: points cannot exceed logical max based on referrals (defensive UI)
+      const rewardPerReferral = 100; // sync with DEFAULT_REFERRAL_CONFIG
+      const firstPostBonus = 50;
+      const maxMilestone = 5000; // highest milestone
+      const safeEntries = entries.map((e) => {
+        const theoreticalMax = (e.successfulReferrals * (rewardPerReferral + firstPostBonus)) + maxMilestone;
+        return { ...e, totalRewards: Math.min(e.totalRewards, theoreticalMax) };
+      });
+
       // Assign ranks
-      entries.forEach((entry, index) => {
+      safeEntries.forEach((entry, index) => {
         entry.rank = index + 1;
       });
       
-      setLeaderboard(entries);
+      setLeaderboard(safeEntries);
     } catch (error) {
       console.error('Error loading leaderboard:', error);
     } finally {
