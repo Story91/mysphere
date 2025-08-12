@@ -4969,6 +4969,116 @@ export const recomputeReferralPointsStrict = async (): Promise<{
   }
 };
 
+// STRICT: Recompute referral points for single user and sync stats
+export const recomputeUserReferralPointsStrict = async (userId: string): Promise<{
+  success: boolean;
+  successful: number;
+  firstPosts: number;
+  referralPoints: number;
+}> => {
+  try {
+    // Zlicz referrals danego użytkownika
+    const q = query(collection(db, 'referrals'), where('referrerId', '==', userId));
+    const snap = await getDocs(q);
+    let successful = 0;
+    let firstPosts = 0;
+    snap.docs.forEach((d) => {
+      const r = d.data() as any;
+      if (r.status === 'completed') successful++;
+      if (r.firstPostBonusAwarded === true) firstPosts++;
+    });
+
+    // Milestony
+    let milestoneTotal = 0;
+    if (successful >= 5) milestoneTotal += DEFAULT_REFERRAL_CONFIG.milestoneRewards.five;
+    if (successful >= 10) milestoneTotal += DEFAULT_REFERRAL_CONFIG.milestoneRewards.ten;
+    if (successful >= 25) milestoneTotal += DEFAULT_REFERRAL_CONFIG.milestoneRewards.twentyFive;
+    if (successful >= 50) milestoneTotal += DEFAULT_REFERRAL_CONFIG.milestoneRewards.fifty;
+
+    // Zgodnie z definicją: successful oznacza pierwszy post
+    const signupTotal = successful * DEFAULT_REFERRAL_CONFIG.rewardPerReferral;
+    const firstPostTotal = successful * DEFAULT_REFERRAL_CONFIG.firstPostBonus;
+    const total = signupTotal + firstPostTotal + milestoneTotal;
+
+    // Zapis do referralStats
+    const statsRef = doc(db, 'referralStats', userId);
+    await setDoc(
+      statsRef,
+      {
+        userId,
+        successfulReferrals: successful,
+        totalReferrals: snap.size,
+        totalRewards: total,
+        lastUpdated: serverTimestamp(),
+        milestones: {
+          five: successful >= 5,
+          ten: successful >= 10,
+          twentyFive: successful >= 25,
+          fifty: successful >= 50,
+        },
+      },
+      { merge: true }
+    );
+
+    return { success: true, successful, firstPosts: successful, referralPoints: total };
+  } catch (e) {
+    console.error('recomputeUserReferralPointsStrict error:', e);
+    return { success: false, successful: 0, firstPosts: 0, referralPoints: 0 };
+  }
+};
+
+// STRICT: Fully recompute ranking points for a single user (posts/likes already stored)
+export const fixUserRankingStrict = async (userAddress: string): Promise<{
+  success: boolean;
+  before?: any;
+  after?: any;
+}> => {
+  try {
+    const userRef = doc(db, 'users', userAddress);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) throw new Error('User not found');
+
+    const data = userSnap.data() as any;
+    const postsCount = Number(data.postsCount || 0);
+    const likesReceived = Number(data.likesReceived || 0);
+    const postPoints = postsCount * 5;
+    const likePoints = likesReceived;
+    const activityBonus = Math.round((postPoints + likePoints) * 0.25);
+    const baseNameBonus = (typeof data.name === 'string' && data.name.endsWith('.base.eth'))
+      ? 1000
+      : Number(data.baseChatPoints?.baseNameBonus || 0);
+
+    // STRICT referral recompute for this user
+    const referral = await recomputeUserReferralPointsStrict(userAddress);
+    const referralPoints = referral.referralPoints;
+    const totalPoints = postPoints + likePoints + activityBonus + baseNameBonus + referralPoints;
+
+    const before = {
+      baseChatPoints: data.baseChatPoints || null,
+      postsCount,
+      likesReceived,
+    };
+
+    await updateDoc(userRef, {
+      baseChatPoints: {
+        postPoints,
+        likePoints,
+        activityBonus,
+        baseNameBonus,
+        referralPoints,
+        totalPoints,
+        lastUpdated: serverTimestamp(),
+      },
+    });
+
+    const after = { postPoints, likePoints, activityBonus, baseNameBonus, referralPoints, totalPoints };
+    return { success: true, before, after };
+  } catch (e) {
+    console.error('fixUserRankingStrict error:', e);
+    return { success: false };
+  }
+};
+
 // Funkcja migracyjna do kopiowania historycznych postów od użytkowników z BaseName
 export const migrateHistoricalBaseNamePosts = async (): Promise<{
   success: boolean;

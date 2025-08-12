@@ -11,7 +11,7 @@ import Statistics from './components/Statistics';
 import PaidPinsManagement from './components/PaidPinsManagement';
 import { refreshTop50UsersOnly } from '../utils/firebase';
 import AdminQuotes from './quotes/page';
-import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache, fixAllUserStats, fixUserPostStats, getUsersWithBasenameCount, migrateHistoricalBaseNamePosts, rebuildReferralAggregates, recomputeReferralPointsStrict, clearPaginatedActiveUsersCache } from '../utils/firebase';
+import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache, fixAllUserStats, fixUserPostStats, getUsersWithBasenameCount, migrateHistoricalBaseNamePosts, rebuildReferralAggregates, recomputeReferralPointsStrict, clearPaginatedActiveUsersCache, fixUserRankingStrict } from '../utils/firebase';
 
 // Usuwam stałą ADMIN_ADDRESS, bo importujemy ją z firebase.ts
 const ADMIN_BASENAME = "story91.base.eth";
@@ -626,11 +626,10 @@ export default function AdminPanel() {
               
               try {
                 setIsRefreshing(true);
-                const result = await fixUserPostStats(userAddress);
+                const result = await fixUserRankingStrict(userAddress);
                 setRefreshStatus({
-                  success: true,
-                  updatedUsers: result.before.postsCount !== result.after.postsCount ? 1 : 0,
-                  message: `${userAddress}: Posts ${result.before.postsCount}→${result.after.postsCount}, Likes ${result.before.likesReceived}→${result.after.likesReceived}`
+                  success: result.success,
+                  message: result.success ? `${userAddress}: totalPoints ${result.before?.baseChatPoints?.totalPoints || 0}→${result.after?.totalPoints}` : 'Fix failed'
                 });
                 input.value = '';
               } catch (error) {
