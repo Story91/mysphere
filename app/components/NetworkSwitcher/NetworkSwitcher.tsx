@@ -50,13 +50,14 @@ const lineaEntry = {
 
 // Kolejność: Base, Camp Testnet, Camp Mainnet (z kłódką gdy wyłączone), Linea
 const networks = [baseEntry, campTestnetEntry, campMainnetEntry, lineaEntry] as const;
+type Network = (typeof networks)[number];
 
 export function NetworkSwitcher() {
   const { switchChain } = useSwitchChain();
   const chainId = useChainId();
   const { isConnected } = useAccount();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeNetwork, setActiveNetwork] = useState(networks[0]);
+  const [activeNetwork, setActiveNetwork] = useState<Network>(networks[0]);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

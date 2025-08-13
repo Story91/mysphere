@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import Script from 'next/script';
 import SpotifyDashboard from './components/SpotifyDashboard'; // 🎵 Import needed even when hidden
+import MyIpSection from './components/MyIpSection';
 // Removed API imports - these should only be used in backend
 
 const CAMP_NFT_CONTRACT = '0x1eD74B27f846C699A90926daD057A7f6FD22C126';
@@ -591,12 +592,7 @@ export default function MyCampPage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden relative">
-      {/* PL: Camp Mainnet (private) komunikat – przygotowane, ale wyłączone */}
-      <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50">
-        <div className="px-3 py-1.5 rounded-lg bg-orange-500/90 text-white text-xs sm:text-sm shadow border border-orange-300/50">
-          Camp Mainnet (private) – wkrótce. Transakcje wymagają gazu CAMP lub sponsora.
-        </div>
-      </div>
+      {/* Camp Mainnet banner removed on request */}
       <Script
         async
         src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
@@ -2113,6 +2109,9 @@ export default function MyCampPage() {
                 </div>
               </div>
             )}
+
+            {/* My IP NFTs (Origin IpNFTs auto-detected from Blockscout) */}
+            <MyIpSection />
           </motion.div>
         )}
 
