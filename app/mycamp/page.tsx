@@ -591,6 +591,12 @@ export default function MyCampPage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden relative">
+      {/* PL: Camp Mainnet (private) komunikat – przygotowane, ale wyłączone */}
+      <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50">
+        <div className="px-3 py-1.5 rounded-lg bg-orange-500/90 text-white text-xs sm:text-sm shadow border border-orange-300/50">
+          Camp Mainnet (private) – wkrótce. Transakcje wymagają gazu CAMP lub sponsora.
+        </div>
+      </div>
       <Script
         async
         src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"

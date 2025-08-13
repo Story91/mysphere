@@ -191,6 +191,7 @@ export default function Navigation() {
       dropdownItems: [
         { href: '/ai-agent', label: 'Spherian' },
         { href: '#', label: 'Spheres', isDisabled: true },
+        { href: '#', label: 'Camp Mainnet (private)', isDisabled: true },
       ],
     },
     { href: '/Docs', label: 'Docs' },

@@ -1,6 +1,6 @@
 'use client';
 
-import { base, baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { OnchainKitProvider } from '@coinbase/onchainkit';
 import { createContext, useContext, useState } from 'react';
 import { createConfig, http } from 'wagmi';
@@ -11,6 +11,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
 import { defineChain } from 'viem';
 import { baseCampChain } from './contracts/BaseCampPostContract';
+import { campMainnetChain } from './contracts/CampMainnet';
+import { ENABLE_CAMP_MAINNET, CAMP_MAINNET } from '@/config/camp';
 import { lineaChain } from './basechat/Linea/config/LineaNetworkConfig';
 import { CampProvider } from '@campnetwork/origin/react';
 
@@ -37,48 +39,57 @@ export function useTheme() {
 const queryClient = new QueryClient();
 
 /**
- * Wagmi Configuration
- * 
- * We define our configuration with multiple chains:
- * 1. Base Sepolia (baseSepolia) - Primary network for the app (for testing)
- * 2. Base Mainnet (base) - Will be used in production
- * 3. BaseCamp (baseCampChain) - Secondary network for specific functionality
- * 4. Linea (lineaChain) - Ethereum Layer 2 for scalable posting
- * 
- * When using transactions for BaseCamp, ensure you explicitly specify 
- * the chain in both simulateContract and writeContract calls.
- * See BaseBook/app/basechat/components/BaseCampPosts/TransactionButtonBaseCamp.tsx
- * for an example implementation.
+ * Wagmi Configuration (bez Base Sepolia)
+ * PL: Przygotowane dwie gałęzie konfiguracji, aby uniknąć błędu typów dla 484
  */
-const wagmiConfig = createConfig({
-  chains: [base, baseSepolia, baseCampChain, lineaChain],
-  transports: {
-    [base.id]: http('https://mainnet.base.org'),
-    [baseSepolia.id]: http(),
-    [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
-    [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
-  },
-  connectors: [
-    farcasterFrame(),
-    injected(),
-    coinbaseWallet({
-      appName: 'MySphere',
-      appLogoUrl: '/android-chrome-192x192.png',
-      // Force Base network for smart wallet
-      preference: 'smartWalletOnly',
-      version: '4'
-    }),
-    walletConnect({ 
-      projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '',
-      metadata: {
-        name: 'MySphere',
-        description: 'The onchain social Dapp on Base. Build, grow, and own your digital Sphere.',
-        url: 'https://mysphere.fun',
-        icons: ['https://mysphere.fun/android-chrome-192x192.png']
-      }
+const CHAINS_BASE = [base, baseCampChain, lineaChain] as const;
+const TRANSPORTS_BASE = {
+  [base.id]: http('https://mainnet.base.org'),
+  [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
+  [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
+} as const;
+
+const CHAINS_WITH_CAMP_MAINNET = [
+  ...CHAINS_BASE,
+  campMainnetChain,
+] as const;
+const TRANSPORTS_WITH_CAMP_MAINNET = {
+  ...TRANSPORTS_BASE,
+  [campMainnetChain.id]: http(CAMP_MAINNET.RPC_HTTP),
+} as const;
+
+const COMMON_CONNECTORS = [
+  farcasterFrame(),
+  injected(),
+  coinbaseWallet({
+    appName: 'MySphere',
+    appLogoUrl: '/android-chrome-192x192.png',
+    // Force Base network for smart wallet
+    preference: 'smartWalletOnly',
+    version: '4'
+  }),
+  walletConnect({ 
+    projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '',
+    metadata: {
+      name: 'MySphere',
+      description: 'The onchain social Dapp on Base. Build, grow, and own your digital Sphere.',
+      url: 'https://mysphere.fun',
+      icons: ['https://mysphere.fun/android-chrome-192x192.png']
+    }
+  })
+] as const;
+
+const wagmiConfig = ENABLE_CAMP_MAINNET
+  ? createConfig({
+      chains: CHAINS_WITH_CAMP_MAINNET,
+      transports: TRANSPORTS_WITH_CAMP_MAINNET,
+      connectors: COMMON_CONNECTORS as unknown as any,
     })
-  ]
-});
+  : createConfig({
+      chains: CHAINS_BASE,
+      transports: TRANSPORTS_BASE,
+      connectors: COMMON_CONNECTORS as unknown as any,
+    });
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>('auto');

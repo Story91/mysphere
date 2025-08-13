@@ -3,42 +3,53 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useAccount, useSwitchChain, useChainId } from 'wagmi';
-import { base, baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
+import { campMainnetChain } from '@/app/contracts/CampMainnet';
+import { ENABLE_CAMP_MAINNET } from '@/config/camp';
 import { lineaChain } from '@/app/basechat/Linea/config/LineaNetworkConfig';
 
 // Definicja sieci z polskimi komentarzami
 // Definition of networks with Polish comments
-const networks = [
-  {
-    id: base.id,
-    name: 'Base',
-    shortName: 'BASE',
-    iconUrl: '/brand-kit/base/logo/symbol/Base_Symbol_Blue.svg', // Ikona dla sieci Base
-    color: '#0052FF',
-  },
-  {
-    id: baseSepolia.id,
-    name: 'Base Sepolia',
-    shortName: 'SEPOLIA',
-    iconUrl: '/brand-kit/base/logo/symbol/Base_Symbol_White.svg', // Ikona dla sieci Base Sepolia
-    color: '#00A3FF',
-  },
-  {
-    id: baseCampChain.id,
-    name: 'Camp Testnet',
-    shortName: 'CAMP',
-    iconUrl: '/Camp.png', // Ikona dla sieci Camp
-    color: '#FF6B35',
-  },
-  {
-    id: lineaChain.id,
-    name: 'Linea',
-    shortName: 'LINEA',
-    iconUrl: '/Logomark Blue BG.svg', // Ikona dla sieci Linea
-    color: '#000000',
-  },
-];
+const baseEntry = {
+  id: base.id,
+  name: 'Base',
+  shortName: 'BASE',
+  iconUrl: '/brand-kit/base/logo/symbol/Base_Symbol_Blue.svg', // Ikona dla sieci Base
+  color: '#0052FF',
+  bgWhite: false,
+} as const;
+
+const campMainnetEntry = {
+  id: campMainnetChain.id,
+  name: 'Camp Mainnet',
+  shortName: 'CAMP-M',
+  iconUrl: '/Camp.png',
+  color: '#FF6B35',
+  disabled: !ENABLE_CAMP_MAINNET,
+  bgWhite: true, // Białe tło pod logo, żeby było czytelne
+} as const;
+
+const campTestnetEntry = {
+  id: baseCampChain.id,
+  name: 'Camp Testnet',
+  shortName: 'CAMP',
+  iconUrl: '/Camp.png', // Ikona dla sieci Camp
+  color: '#FF6B35',
+  bgWhite: true, // Białe tło pod logo
+} as const;
+
+const lineaEntry = {
+  id: lineaChain.id,
+  name: 'Linea',
+  shortName: 'LINEA',
+  iconUrl: '/Logomark Blue BG.svg', // Ikona dla sieci Linea
+  color: '#000000',
+  bgWhite: false,
+} as const;
+
+// Kolejność: Base, Camp Testnet, Camp Mainnet (z kłódką gdy wyłączone), Linea
+const networks = [baseEntry, campTestnetEntry, campMainnetEntry, lineaEntry] as const;
 
 export function NetworkSwitcher() {
   const { switchChain } = useSwitchChain();
@@ -96,7 +107,9 @@ export function NetworkSwitcher() {
         className="flex items-center gap-2 px-3 py-2 bg-black/20 hover:bg-black/30 rounded-xl border border-[#0052FF]/20 hover:border-[#0052FF]/50 transition-all duration-200 backdrop-blur-xl"
         aria-label="Przełącz sieć"
       >
-        <div className="w-5 h-5 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
+        <div className={`w-5 h-5 rounded-full overflow-hidden ${
+          (activeNetwork as any).bgWhite ? 'bg-white' : 'bg-white/10'
+        } flex items-center justify-center`}>
           <Image
             src={activeNetwork.iconUrl}
             alt={`Logo ${activeNetwork.name}`}
@@ -125,15 +138,18 @@ export function NetworkSwitcher() {
             {networks.map((network) => (
               <button
                 key={network.id}
-                onClick={() => handleNetworkSwitch(network.id)}
+                onClick={() => !('disabled' in network && network.disabled) && handleNetworkSwitch(network.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg transition-all duration-200 ${
                   network.id === chainId 
                     ? 'bg-[#0052FF]/20 text-white' 
                     : 'text-gray-300 hover:bg-white/5 hover:text-white'
                 }`}
-                disabled={network.id === chainId}
+                disabled={network.id === chainId || ('disabled' in network && network.disabled)}
+                title={('disabled' in network && network.disabled) ? 'Locked' : undefined}
               >
-                <div className="w-6 h-6 rounded-full overflow-hidden bg-white/10 flex items-center justify-center flex-shrink-0">
+                <div className={`w-6 h-6 rounded-full overflow-hidden ${
+                  (network as any).bgWhite ? 'bg-white' : 'bg-white/10'
+                } flex items-center justify-center flex-shrink-0`}>
                   <Image
                     src={network.iconUrl}
                     alt={`Logo ${network.name}`}
@@ -147,7 +163,18 @@ export function NetworkSwitcher() {
                     {network.name}
                   </div>
                 </div>
-                {network.id === chainId && (
+                {/* Kłódka dla zablokowanych */}
+                {('disabled' in network && network.disabled) ? (
+                  <svg
+                    className="w-3.5 h-3.5 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M7 10V8C7 5.79086 8.79086 4 11 4C13.2091 4 15 5.79086 15 8V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <rect x="5" y="10" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                ) : network.id === chainId && (
                   <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
                 )}
               </button>
