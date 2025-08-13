@@ -53,6 +53,7 @@ export async function fetchIpNftsFor(address: string) {
       let tokenUri = '';
       let metadata: any = null;
       let image = '';
+      let mediaType: 'image' | 'video' | 'audio' | 'text' | 'unknown' = 'unknown';
       try {
         tokenUri = (await client.readContract({
           address: o.contractAddress as `0x${string}`,
@@ -66,6 +67,16 @@ export async function fetchIpNftsFor(address: string) {
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null);
           if (metadata?.image) image = ipfsToHttp(metadata.image);
+          // prosta detekcja typu medium na podstawie metadata
+          const animUrl = metadata?.animation_url || metadata?.animationUrl;
+          const mime = (metadata?.properties?.mimeType || metadata?.mimeType || '').toString().toLowerCase();
+          const ext = (animUrl || image || '').split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
+          const isVideo = mime.startsWith('video/') || ['mp4','webm','mov','m4v'].includes(ext || '');
+          const isAudio = mime.startsWith('audio/') || ['mp3','wav','ogg','m4a','flac'].includes(ext || '');
+          if (isVideo) mediaType = 'video';
+          else if (isAudio) mediaType = 'audio';
+          else if (image) mediaType = 'image';
+          else if (metadata?.text || metadata?.content || typeof metadata?.description === 'string') mediaType = 'text';
         }
       } catch {}
       return {
@@ -74,6 +85,7 @@ export async function fetchIpNftsFor(address: string) {
         tokenUri,
         metadata,
         image,
+        type: mediaType,
       };
     })
   );
