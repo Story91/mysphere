@@ -35,6 +35,8 @@ import {
 import Script from 'next/script';
 import SpotifyDashboard from './components/SpotifyDashboard'; // 🎵 Import needed even when hidden
 import MyIpSection from './components/MyIpSection';
+import NftCreator from './components/NftCreator';
+import { ToastProvider } from './components/Toast';
 // Removed API imports - these should only be used in backend
 
 const CAMP_NFT_CONTRACT = '0x1eD74B27f846C699A90926daD057A7f6FD22C126';
@@ -591,7 +593,8 @@ export default function MyCampPage() {
   }, [socialDropdownOpen, buttonRef]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden relative">
+    <ToastProvider>
+      <div className="min-h-screen overflow-x-hidden relative">
       {/* Camp Mainnet banner removed on request */}
       <Script
         async
@@ -639,110 +642,15 @@ export default function MyCampPage() {
           transition={{ duration: 1, ease: "easeOut" }}
           className={`text-center ${isMobile ? 'mb-8' : 'mb-16'} relative`}
         >
-          {/* Multi-layer Glow Effect Background */}
-          <div className="absolute inset-0 -z-10">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
-              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${
-                isMobile ? 'w-[300px] h-24' : 'w-[500px] h-40'
-              } bg-gradient-to-r from-orange-500/30 via-yellow-500/40 to-red-500/30 blur-3xl rounded-full`}
-            />
-            <motion.div
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 2, ease: "easeOut", delay: 0.3 }}
-              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${
-                isMobile ? 'w-48 h-20' : 'w-96 h-32'
-              } bg-gradient-to-r from-pink-500/20 via-orange-500/30 to-yellow-500/20 blur-2xl rounded-full`}
-            />
+          {/* Simple connect panel header */}
+          <div className="bg-black/40 border border-white/10 rounded-2xl mx-auto max-w-xl p-4">
+            <div className="text-orange-200 text-sm mb-2">Connect to Camp Network</div>
+            <div className="flex justify-center">
+              <CampModal />
+            </div>
           </div>
           
-          {/* Enhanced Main Title with Different Font */}
-          <motion.h1
-            initial={{ opacity: 0, scale: 0.3, rotateX: -15 }}
-            animate={{ opacity: 1, scale: 1, rotateX: 0 }}
-            transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
-            className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black relative tracking-wider"
-            style={{ fontFamily: 'Impact, "Arial Black", sans-serif' }}
-          >
-            {/* Multi-layer Text with Enhanced Gradient */}
-            <span className="relative inline-block">
-              {/* Shadow Layer */}
-              <span className="absolute inset-0 bg-gradient-to-r from-orange-900 via-red-800 to-orange-900 bg-clip-text text-transparent blur-sm translate-x-2 translate-y-2">
-                MyCamp
-              </span>
-              {/* Main Text with Animated Gradient */}
-              <span className="relative bg-gradient-to-r from-orange-200 via-yellow-300 via-orange-100 via-yellow-400 to-orange-200 bg-clip-text text-transparent bg-[length:300%_100%] animate-gradient-x drop-shadow-[0_0_30px_rgba(249,115,22,0.8)]">
-                MyCamp
-              </span>
-              {/* Highlight Layer */}
-              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent bg-clip-text text-transparent bg-[length:200%_100%] animate-pulse">
-                MyCamp
-              </span>
-            </span>
-            
-            {/* Enhanced Animated Underline */}
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: "100%", opacity: 1 }}
-              transition={{ duration: 2, delay: 1.2, ease: "easeOut" }}
-              className={`absolute ${
-                isMobile ? '-bottom-3' : '-bottom-6'
-              } left-1/2 -translate-x-1/2 ${
-                isMobile ? 'h-1' : 'h-2'
-              } bg-gradient-to-r from-transparent via-orange-400 via-yellow-400 via-orange-400 to-transparent rounded-full shadow-[0_0_20px_rgba(249,115,22,0.8)]`}
-            />
-            
-            {/* Secondary Underline */}
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: "80%", opacity: 0.6 }}
-              transition={{ duration: 1.5, delay: 1.8, ease: "easeOut" }}
-              className={`absolute ${
-                isMobile ? '-bottom-2' : '-bottom-3'
-              } left-1/2 -translate-x-1/2 ${
-                isMobile ? 'h-0.5' : 'h-1'
-              } bg-gradient-to-r from-transparent via-yellow-300 to-transparent rounded-full`}
-            />
-          </motion.h1>
-
-          {/* Enhanced Floating Camp Icon */}
-          <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.5 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 1.2, delay: 0.8, ease: "easeOut" }}
-            className={`${isMobile ? 'mt-8' : 'mt-12'} inline-block`}
-          >
-            <motion.div
-              animate={{ 
-                y: [0, isMobile ? -8 : -15, 0],
-                rotate: [0, 8, -8, 0],
-                scale: [1, 1.1, 1]
-              }}
-              transition={{ 
-                duration: 5,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              className={`${
-                isMobile ? 'text-4xl' : 'text-7xl'
-              } filter drop-shadow-[0_0_30px_rgba(249,115,22,0.9)] hover:drop-shadow-[0_0_40px_rgba(249,115,22,1)] transition-all duration-300`}
-            >
-              🏕️
-            </motion.div>
-          </motion.div>
-
-          {/* MyOrigin Button - using original CampModal component */}
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.8, delay: 1.2, ease: "easeOut" }}
-            className="mt-8 flex justify-center"
-          >
-            <CampModal />
-          </motion.div>
+          {/* MyOrigin dedicated row below (kept for spacing consistency) */}
 
           {/* Enhanced Particles Effect */}
           <div className="absolute inset-0 -z-20">
@@ -781,7 +689,7 @@ export default function MyCampPage() {
         >
 
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
             {/* Home Button */}
             <motion.button
               initial={{ opacity: 0, y: 20 }}
@@ -864,6 +772,49 @@ export default function MyCampPage() {
                   layoutId="activeGlow"
                   className="absolute inset-0 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/30 rounded-2xl"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </motion.button>
+
+            {/* IP Creator Button (subpage within MyCamp) */}
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.5, duration: 0.5 }}
+              whileHover={{ 
+                scale: 1.05, 
+                y: -5,
+                boxShadow: "0 20px 40px rgba(236, 72, 153, 0.35)"
+              }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setActiveTab('creator')}
+              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
+                activeTab === 'creator'
+                  ? 'bg-gradient-to-br from-pink-500/80 to-fuchsia-500/80 text-white shadow-2xl shadow-pink-500/25 border border-pink-400/50'
+                  : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-pink-400/40'
+              }`}
+            >
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-pink-400/20 to-fuchsia-400/20"
+                initial={{ opacity: 0 }}
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+              <div className="relative z-10">
+                <motion.div 
+                  className="text-center"
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">IP CREATOR</div>
+                  <div className="text-xs opacity-80 uppercase tracking-widest">Create</div>
+                </motion.div>
+              </div>
+              {activeTab === 'creator' && (
+                <motion.div
+                  layoutId="activeGlow"
+                  className="absolute inset-0 bg-gradient-to-br from-pink-500/30 to-fuchsia-500/30 rounded-2xl"
+                  transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
                 />
               )}
             </motion.button>
@@ -1804,28 +1755,45 @@ export default function MyCampPage() {
 
         {/* My IP Tab Content */}
         {activeTab === 'nfts' && (
+          <>
+            
+            {/* Existing IP NFTs */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="bg-black/30 backdrop-blur-sm border border-purple-500/20 rounded-2xl p-4 sm:p-6 mb-8"
+            >
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-200 mb-4 sm:mb-6 flex items-center gap-2">
+                🎯 My IP NFTs
+                <span className="text-sm bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">
+                  Origin SDK
+                </span>
+              </h3>
+              
+              {!isConnected ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🔌</div>
+                  <p className="text-purple-200 text-lg">Connect your wallet to view IP NFTs</p>
+                  <p className="text-purple-200/70 text-sm mt-2">Your Origin IpNFTs from BaseCamp test</p>
+                </div>
+              ) : (
+                <MyIpSection />
+              )}
+            </motion.div>
+          </>
+        )}
+
+        {/* IP Creator Subpage */}
+        {activeTab === 'creator' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="bg-black/30 backdrop-blur-sm border border-purple-500/20 rounded-2xl p-4 sm:p-6 mb-8"
+            className="bg-black/30 backdrop-blur-sm border border-pink-500/20 rounded-2xl p-4 sm:p-6 mb-8"
           >
-            <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-200 mb-4 sm:mb-6 flex items-center gap-2">
-              🎯 My IP NFTs
-              <span className="text-sm bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">
-                Origin SDK
-              </span>
-            </h3>
-            
-            {!isConnected ? (
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">🔌</div>
-                <p className="text-purple-200 text-lg">Connect your wallet to view IP NFTs</p>
-                <p className="text-purple-200/70 text-sm mt-2">Your Origin IpNFTs from BaseCamp test</p>
-              </div>
-            ) : (
-              <MyIpSection />
-            )}
+            {/* Title removed as requested */}
+            <NftCreator />
           </motion.div>
         )}
 
@@ -2003,5 +1971,6 @@ export default function MyCampPage() {
         document.body
       )}
     </div>
+    </ToastProvider>
   );
 }

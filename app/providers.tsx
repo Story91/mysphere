@@ -79,7 +79,7 @@ const COMMON_CONNECTORS = [
   })
 ] as const;
 
-const wagmiConfig = ENABLE_CAMP_MAINNET
+export const wagmiConfig = ENABLE_CAMP_MAINNET
   ? createConfig({
       chains: CHAINS_WITH_CAMP_MAINNET,
       transports: TRANSPORTS_WITH_CAMP_MAINNET,

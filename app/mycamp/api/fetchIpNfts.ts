@@ -29,8 +29,13 @@ export async function fetchIpNftsFor(address: string) {
   const json = await res.json();
   const result = (json?.result || []) as NftTx[];
 
+  // IP NFT contract address from Origin SDK
+  const IP_NFT_CONTRACT = '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E';
+  
   const ipNftTransfers = result.filter((tx) =>
-    (tx.tokenSymbol || '').toUpperCase() === 'IP' || (tx.tokenName || '').toLowerCase().includes('ipnft')
+    tx.contractAddress.toLowerCase() === IP_NFT_CONTRACT.toLowerCase() ||
+    (tx.tokenSymbol || '').toUpperCase() === 'IP' || 
+    (tx.tokenName || '').toLowerCase().includes('ipnft')
   );
 
   const lastByKey = new Map<string, NftTx>();
@@ -73,18 +78,29 @@ export async function fetchIpNftsFor(address: string) {
           const ext = (animUrl || image || '').split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
           const isVideo = mime.startsWith('video/') || ['mp4','webm','mov','m4v'].includes(ext || '');
           const isAudio = mime.startsWith('audio/') || ['mp3','wav','ogg','m4a','flac'].includes(ext || '');
+          const isText  = mime.startsWith('text/')  || ['txt','md','rtf','csv','json'].includes(ext || '');
           if (isVideo) mediaType = 'video';
           else if (isAudio) mediaType = 'audio';
+          else if (isText) mediaType = 'text';
           else if (image) mediaType = 'image';
-          else if (metadata?.text || metadata?.content || typeof metadata?.description === 'string') mediaType = 'text';
+          else if (metadata?.text || metadata?.content) mediaType = 'text';
         }
       } catch {}
+      // Ensure consistent contract address format for IP NFT
+      const contractAddress = o.contractAddress.toLowerCase() === IP_NFT_CONTRACT.toLowerCase() 
+        ? IP_NFT_CONTRACT 
+        : o.contractAddress;
+        
+      const mediaUrl = (metadata?.animation_url || metadata?.animationUrl || image) ? ipfsToHttp(metadata?.animation_url || metadata?.animationUrl || image) : '';
+      const mimeOut = (metadata?.properties?.mimeType || metadata?.mimeType || '').toString();
       return {
-        contract: o.contractAddress,
+        contract: contractAddress,
         tokenId: o.tokenID,
         tokenUri,
         metadata,
         image,
+        mediaUrl,
+        mime: mimeOut,
         type: mediaType,
       };
     })

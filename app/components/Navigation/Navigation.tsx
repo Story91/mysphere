@@ -166,7 +166,10 @@ export default function Navigation() {
     { href: '/basechat', label: 'MySphere' },
     { 
       href: '/mycamp', 
-      label: '🏕️ MyCamp', 
+      label: 'MyCamp',
+      icon: (
+        <Image src="/Camp.png" alt="Camp" width={14} height={14} className="mr-2 inline" />
+      ),
       isHighlighted: true 
     },
     { href: '/profile', label: 'Identity' },

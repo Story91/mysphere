@@ -129,6 +129,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Display font for NFT titles */
+@font-face {
+  font-family: 'ClashDisplay';
+  src: url('/fonts/ClashDisplay-Semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;
