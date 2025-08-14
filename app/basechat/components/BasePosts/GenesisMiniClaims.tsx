@@ -29,7 +29,7 @@ export default function GenesisMiniClaims() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
-        className="mt-4"
+        className="mt-4 mb-4"
       >
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-medium text-black">Claim your Sphere Genesis NFTs</div>
