@@ -35,39 +35,33 @@ export default function GenesisMiniClaims() {
           <div className="text-sm font-medium text-black">Claim your Sphere Genesis NFTs</div>
           <button
             onClick={handleDismiss}
-            className="text-xs text-gray-500 hover:text-gray-700"
+            className="px-2 py-0.5 text-[11px] font-semibold text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100"
             aria-label="Dismiss"
           >
             Dismiss
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {GENESIS_CONTRACTS.map(({ address, label }) => (
-            <div key={address} className="relative group">
-              <div className="absolute -inset-[1px] rounded-xl bg-white opacity-50 group-hover:opacity-70 blur-[1px] transition-all" />
-              <NFTMintCard 
-                contractAddress={address}
-                className="relative rounded-xl overflow-hidden border border-gray-200 bg-white"
-              >
-                {/* Small preview */}
-                <div className="grid grid-cols-[72px,1fr] items-center gap-3 p-3">
-                  <div className="rounded-lg overflow-hidden border border-[#0052FF]/30">
-                    <NFTMedia className="w-[72px] h-[72px] object-cover" />
-                  </div>
-                  <div className="min-w-0">
-                    <NFTCollectionTitle className="text-sm font-semibold text-black truncate" />
-                    <div className="mt-0.5 text-[11px] text-gray-600">{label}</div>
-                    <div className="mt-1 text-xs text-gray-800">
-                      <NFTAssetCost className="!text-xs !text-gray-900" />
-                    </div>
-                    <div className="mt-1">
-                      <NFTMintButton className="!px-3 !py-1.5 !text-xs !rounded-lg !bg-[#0052FF] !text-white" />
-                    </div>
-                  </div>
-                </div>
-              </NFTMintCard>
-            </div>
+            <NFTMintCard 
+              key={address}
+              contractAddress={address}
+              className="bg-white border border-gray-200 rounded-xl p-2 flex flex-col items-center text-center"
+            >
+              {/* Name above preview */}
+              <NFTCollectionTitle className="text-xs font-semibold text-black mb-1 truncate max-w-[110px]" />
+              {/* Square preview only; disable interactions */}
+              <div className="rounded-lg overflow-hidden border border-gray-200">
+                <NFTMedia square className="w-[84px] h-[84px] object-cover pointer-events-none select-none" />
+              </div>
+              {/* Price - one centered compact line */}
+              <div className="mt-1 w-full flex justify-center">
+                <NFTAssetCost className="!text-[9px] !text-gray-900 !whitespace-nowrap !tracking-tighter text-center" />
+              </div>
+              {/* Small Mint button under */}
+              <NFTMintButton className="!mt-1.5 !px-2.5 !py-1 !text-[11px] !rounded-md !bg-[#0052FF] !text-white !w-auto" />
+            </NFTMintCard>
           ))}
         </div>
       </motion.div>

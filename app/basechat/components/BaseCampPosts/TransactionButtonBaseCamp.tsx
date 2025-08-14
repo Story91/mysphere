@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useAccount, useChainId, useSwitchChain, useWalletClient, usePublicClient } from 'wagmi';
 import { toast } from 'react-hot-toast';
 import { BASECAMP_CHAIN_ID, BASECAMP_POST_CONTRACT_ABI, getBaseCampContractAddress, baseCampChain } from '../../../contracts/BaseCampPostContract';
+import Image from 'next/image';
 
 interface TransactionButtonBaseCampProps {
   content: string;
@@ -197,17 +198,8 @@ export default function TransactionButtonBaseCamp({
         </>
       ) : (
         <>
-          {/* Camp logo - Orange flame symbol in a C shape */}
-          <svg 
-            className="w-5 h-5 mr-1.5"
-            viewBox="0 0 600 600"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
-            <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
-            <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
-            <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
-          </svg>
+          {/* Real Camp logo (same as Navigation) */}
+          <Image src="/Camp.png" alt="Camp" width={16} height={16} className="mr-1.5 inline" />
           {isBaseCampNetwork ? 'Post to Camp Network' : 'Switch To Camp'}
         </>
       )}
