@@ -20,10 +20,7 @@ const CreateListingModal = dynamic(() => import('./components/CreateListingModal
   ssr: false
 });
 
-const DashboardView = dynamic(() => import('./components/DashboardView'), {
-  ssr: false,
-  loading: () => <div className="text-center py-12">Loading dashboard...</div>
-});
+import DashboardView from './components/DashboardView';
 
 const ActivityFeed = dynamic(() => import('./components/ActivityFeed'), {
   ssr: false,
@@ -40,14 +37,21 @@ export default function MarketplacePage() {
   const [showCreateAuction, setShowCreateAuction] = useState<any>(null);
   const [prefillTokenId, setPrefillTokenId] = useState<string | null>(null);
   
-  // Check for list parameter in URL
+  // Check for list and auction parameters in URL
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const listTokenId = urlParams.get('list');
+      const auctionId = urlParams.get('auction');
+      
       if (listTokenId) {
         setPrefillTokenId(listTokenId);
         setShowCreateModal(true);
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (auctionId) {
+        // Switch to explore view to show the specific auction
+        setActiveView('explore');
         // Clean URL
         window.history.replaceState({}, '', window.location.pathname);
       }

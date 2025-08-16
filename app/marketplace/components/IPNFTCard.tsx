@@ -149,6 +149,20 @@ export default function IPNFTCard({
 
 
 
+            {/* Auction badge (top left) */}
+            {nft.isAuctioned && (
+              <div className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded bg-red-500 text-white border border-red-600 font-bold">
+                🔥 AUCTION
+              </div>
+            )}
+            
+            {/* Listed badge (top left, below auction if present) */}
+            {nft.isListed && (
+              <div className={`absolute ${nft.isAuctioned ? 'top-8 left-2' : 'top-2 left-2'} text-[10px] px-2 py-0.5 rounded bg-orange-500 text-white border border-orange-600 font-bold`}>
+                🏷️ LISTED
+              </div>
+            )}
+
             {/* Contract badge (top right) - only if different from default */}
             {nft.contract && nft.contract.toLowerCase() !== '0xf90733b9ecda3b49c250b2c3e3e42c96fc93324e'.toLowerCase() && (
               <div className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 rounded bg-purple-500/80 text-white border border-purple-400/40">
@@ -280,8 +294,15 @@ export default function IPNFTCard({
             </>
           )}
           
+          {/* Auction status for owned NFTs */}
+          {isOwner && nft.isAuctioned && (
+            <div className="flex-1 py-1 px-2 bg-red-500/20 text-red-100 text-[10px] font-semibold rounded border border-red-500/40 text-center">
+              🔥 Your Auction
+            </div>
+          )}
+          
           {/* Regular listing buttons - only show if not an auction */}
-          {nft.saleType !== 'auction' && isOwner && !nft.isListed && onList && (
+          {nft.saleType !== 'auction' && !nft.isAuctioned && isOwner && !nft.isListed && onList && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -293,7 +314,7 @@ export default function IPNFTCard({
             </button>
           )}
           
-          {isOwner && nft.isListed && (
+          {isOwner && nft.isListed && !nft.isAuctioned && (
             <div className="flex-1 py-1 px-2 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded border border-green-500/40 text-center">
               🏷️ Listed
             </div>

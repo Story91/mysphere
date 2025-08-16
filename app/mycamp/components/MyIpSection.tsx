@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { createPublicClient, http } from 'viem';
+import Link from 'next/link';
 import { fetchIpNftsFor } from '../api/fetchIpNfts';
 import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../../marketplace/config/simpleMarketplace';
@@ -16,8 +17,9 @@ export default function MyIpSection() {
   const [pageSize, setPageSize] = useState(6); // 6 on mobile, 8 on desktop
   const [preview, setPreview] = useState<any | null>(null);
   const [listedTokens, setListedTokens] = useState<Set<string>>(new Set());
+  const [auctionedTokens, setAuctionedTokens] = useState<Map<string, any>>(new Map());
 
-  // Check which tokens are listed on marketplace
+  // Check which tokens are listed on marketplace and in auctions
   const checkListedTokens = async (nfts: any[]) => {
     try {
       const client = createPublicClient({
@@ -34,7 +36,7 @@ export default function MyIpSection() {
 
       const listed = new Set<string>();
       
-      // Manually check each listing (since getActiveListings was removed)
+      // Check each listing
       for (let i = 1n; i <= listingCount; i++) {
         try {
           const listing = await client.readContract({
@@ -45,7 +47,6 @@ export default function MyIpSection() {
           }) as any;
           
           // listing[2] is tokenId, listing[1] is nftContract, listing[6] is isActive
-          // Check if this token is listed (regardless of who listed it)
           if (listing[6] && listing[1]?.toLowerCase() === '0xf90733b9ecda3b49c250b2c3e3e42c96fc93324e'.toLowerCase()) {
             listed.add(listing[2].toString());
           }
@@ -53,8 +54,50 @@ export default function MyIpSection() {
       }
       
       setListedTokens(listed);
+
+      // Check auctions
+      const auctionCount = await client.readContract({
+        address: MARKETPLACE_ADDRESS as `0x${string}`,
+        abi: MARKETPLACE_ABI,
+        functionName: 'auctionCount',
+      }) as bigint;
+
+      const auctioned = new Map<string, any>();
+      
+      // Check each auction
+      for (let i = 1n; i <= auctionCount; i++) {
+        try {
+          const auction = await client.readContract({
+            address: MARKETPLACE_ADDRESS as `0x${string}`,
+            abi: MARKETPLACE_ABI,
+            functionName: 'auctions',
+            args: [i],
+          }) as any;
+          
+          // auction[0] = seller, auction[1] = nftContract, auction[2] = tokenId, 
+          // auction[3] = minPrice, auction[4] = reservePrice, auction[5] = endTime,
+          // auction[6] = highestBidder, auction[7] = highestBid, auction[8] = bidIncrement, auction[9] = active
+          const active = Boolean(auction[9]);
+          const endTime = Number(auction[5]);
+          const isEnded = endTime <= Math.floor(Date.now() / 1000);
+          
+          if (active && !isEnded && auction[1]?.toLowerCase() === '0xf90733b9ecda3b49c250b2c3e3e42c96fc93324e'.toLowerCase()) {
+            auctioned.set(auction[2].toString(), {
+              auctionId: i,
+              minPrice: auction[3],
+              reservePrice: auction[4],
+              endTime: auction[5],
+              highestBid: auction[7],
+              highestBidder: auction[6],
+              seller: auction[0]
+            });
+          }
+        } catch {}
+      }
+      
+      setAuctionedTokens(auctioned);
     } catch (error) {
-      console.error('Error checking listed tokens:', error);
+      console.error('Error checking listed tokens and auctions:', error);
     }
   };
 
@@ -126,7 +169,6 @@ export default function MyIpSection() {
 
   return (
     <div className="mt-6">
-      <h4 className="text-base sm:text-lg font-semibold text-orange-200">My IP NFTs</h4>
       {loading && <div className="opacity-70 text-sm mt-2">Loading…</div>}
       <div className="flex items-center gap-2 mt-2">
         {(['all','image','video','audio','text'] as const).map(t => (
@@ -165,13 +207,26 @@ export default function MyIpSection() {
                     </div>
                   )}
                   
+                  {/* Auction badge */}
+                  {auctionedTokens.has(nft.tokenId) && (
+                    <div className={`absolute ${listedTokens.has(nft.tokenId) ? 'top-8 left-2' : 'top-2 left-2'} text-[10px] px-2 py-0.5 rounded bg-red-500 text-white border border-red-600 font-bold`}>
+                      🔥 ON AUCTION
+                    </div>
+                  )}
+                  
                   {/* Price badge (native) */}
                   {(() => {
                     const attrs = (nft?.metadata?.attributes || []) as Array<{trait_type?: string; value?: string}>;
                     const native = attrs.find(a => a.trait_type === 'Price (native)')?.value;
                     if (!native) return null;
+                    const hasListed = listedTokens.has(nft.tokenId);
+                    const hasAuction = auctionedTokens.has(nft.tokenId);
+                    let topOffset = 'top-2 left-2';
+                    if (hasListed && hasAuction) topOffset = 'top-14 left-2';
+                    else if (hasListed || hasAuction) topOffset = 'top-8 left-2';
+                    
                     return (
-                      <div className={`absolute ${listedTokens.has(nft.tokenId) ? 'top-8 left-2' : 'top-2 left-2'} text-[10px] px-2 py-0.5 rounded bg-black/70 text-white border border-white/10`}>
+                      <div className={`absolute ${topOffset} text-[10px] px-2 py-0.5 rounded bg-black/70 text-white border border-white/10`}>
                         {native} $CAMP
                       </div>
                     );
@@ -210,19 +265,29 @@ export default function MyIpSection() {
               className="block text-[10px] text-black/70 hover:text-black underline px-2 pb-1"
             >View on Explorer</a>
             
-            {/* List NFT Button */}
-            <div className="px-2 pb-2">
-              {listedTokens.has(nft.tokenId) ? (
+            {/* Action Buttons */}
+            <div className="px-2 pb-2 space-y-1">
+              {auctionedTokens.has(nft.tokenId) ? (
+                // Token is on auction - show Bid button
+                <Link
+                  href={`/marketplace?auction=${auctionedTokens.get(nft.tokenId)?.auctionId}`}
+                  className="block py-1 px-2 bg-red-500 text-white text-[10px] font-semibold rounded text-center hover:bg-red-600 transition-colors"
+                >
+                  🔥 Bid on Auction
+                </Link>
+              ) : listedTokens.has(nft.tokenId) ? (
+                // Token is listed - show Already Listed
                 <div className="py-1 px-2 bg-gray-300 text-gray-600 text-[10px] font-semibold rounded text-center cursor-not-allowed">
                   Already Listed
                 </div>
               ) : (
-                <a
+                // Token is not listed or auctioned - show List button
+                <Link
                   href={`/marketplace?list=${nft.tokenId}`}
                   className="block py-1 px-2 bg-orange-500 text-white text-[10px] font-semibold rounded text-center hover:bg-orange-600 transition-colors"
                 >
                   List on Marketplace
-                </a>
+                </Link>
               )}
             </div>
           </div>

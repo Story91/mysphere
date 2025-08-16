@@ -35,6 +35,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
   const { isLoading: isConfirming, isSuccess, isError: isTxError, error: txError } = useWaitForTransactionReceipt({ hash: txHash });
   const { isLoading: isSavingTerms, isSuccess: saveTermsSuccess, isError: saveTermsError, error: saveTermsErrorObj } = useWaitForTransactionReceipt({ hash: updateTermsHash });
   const [myNfts, setMyNfts] = useState<any[]>([]);
+  const [loadingNfts, setLoadingNfts] = useState(true);
 
   // ERC721 minimal ABI for checks/approve
   const ERC721_ABI = [
@@ -57,7 +58,12 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      if (!address) return;
+      if (!address) {
+        setLoadingNfts(false);
+        return;
+      }
+      
+      setLoadingNfts(true);
       try {
         const items = await fetchIpNftsFor(address);
         
@@ -94,8 +100,16 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
         // Filter out NFTs that are in auction
         const availableItems = items.filter(item => !auctionedTokenIds.has(item.tokenId));
         
-        if (!ignore) setMyNfts(availableItems);
-      } catch {}
+        if (!ignore) {
+          setMyNfts(availableItems);
+          setLoadingNfts(false);
+        }
+      } catch (error) {
+        console.error('Error loading NFTs:', error);
+        if (!ignore) {
+          setLoadingNfts(false);
+        }
+      }
     };
     load();
     return () => { ignore = true; };
@@ -347,7 +361,16 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
           </button>
         </div>
 
+        {/* Loading state */}
+        {loadingNfts && (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+            <span className="ml-3 text-gray-400">Loading your NFTs...</span>
+          </div>
+        )}
+
         {/* Form */}
+        {!loadingNfts && (
         <div className="space-y-6">
           {/* Select NFT */}
           <div>
@@ -649,6 +672,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
             </button>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

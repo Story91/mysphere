@@ -74,6 +74,7 @@ export default function MarketplaceGrid({
           }) as bigint;
 
           const listedTokens = new Set<string>();
+          const auctionedTokens = new Map<string, any>();
           
           // Manually check each listing (since getActiveListings was removed)
           for (let i = 1n; i <= listingCount; i++) {
@@ -92,10 +93,42 @@ export default function MarketplaceGrid({
             } catch {}
           }
           
-          // Mark user's NFTs with correct listing status
+          // Check auctions
+          const auctionCount = await client.readContract({
+            address: MARKETPLACE_ADDRESS as `0x${string}`,
+            abi: MARKETPLACE_ABI,
+            functionName: 'auctionCount',
+          }) as bigint;
+          
+          for (let i = 1n; i <= auctionCount; i++) {
+            try {
+              const auction = await client.readContract({
+                address: MARKETPLACE_ADDRESS as `0x${string}`,
+                abi: MARKETPLACE_ABI,
+                functionName: 'auctions',
+                args: [i],
+              }) as any;
+              
+              // auction[9] is active, auction[1] is nftContract, auction[2] is tokenId, auction[0] is seller
+              if (auction[9] && auction[1]?.toLowerCase() === '0xf90733b9ecda3b49c250b2c3e3e42c96fc93324e'.toLowerCase() && auction[0]?.toLowerCase() === address.toLowerCase()) {
+                auctionedTokens.set(auction[2].toString(), {
+                  auctionId: i.toString(),
+                  minPrice: auction[3],
+                  reservePrice: auction[4],
+                  endTime: auction[5],
+                  highestBid: auction[7],
+                  seller: auction[0]
+                });
+              }
+            } catch {}
+          }
+          
+          // Mark user's NFTs with correct listing and auction status
           const userNFTsFormatted = userNFTs.map((nft: any) => ({
             ...nft,
             isListed: listedTokens.has(nft.tokenId),
+            isAuctioned: auctionedTokens.has(nft.tokenId),
+            auctionData: auctionedTokens.get(nft.tokenId),
             price: nft.metadata?.attributes?.find((a: any) => a.trait_type === 'Price (native)')?.value || '0.1',
             seller: address
           }));
