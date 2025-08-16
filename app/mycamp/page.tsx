@@ -37,68 +37,106 @@ import SpotifyDashboard from './components/SpotifyDashboard'; // 🎵 Import nee
 import MyIpSection from './components/MyIpSection';
 import NftCreator from './components/NftCreator';
 import { ToastProvider } from './components/Toast';
+import UltraModernSocialCard from './components/UltraModernSocialCard';
+import HolographicStats from './components/HolographicStats';
+import FloatingNavigation from './components/FloatingNavigation';
 // Removed API imports - these should only be used in backend
 
 const CAMP_NFT_CONTRACT = '0x1eD74B27f846C699A90926daD057A7f6FD22C126';
 
 // Static MySphere data
 const STATIC_MYSPHERE_DATA = {
-  totalUsers: 146650,
+  totalUsers: 146655,
   socialMediaConnections: {
-    twitter: 56092,
+    twitter: 56094,
     spotify: 2874,
     tiktok: 3677
   },
   fullyConnectedUsers: 13,
   averageConnectionsPerUser: 0.6,
-  lastUpdated: "2025-07-05T01:30:43.937Z",
+  lastUpdated: "2025-08-16T12:00:00.000Z",
   growthTrendData: [
     {
-      date: "2025-06-29",
-      users: 9,
-      twitter: 3,
-      spotify: 1,
-      tiktok: 3
+      date: "2025-06-01",
+      users: 15000,
+      twitter: 5700,
+      spotify: 300,
+      tiktok: 380
+    },
+    {
+      date: "2025-06-10",
+      users: 22000,
+      twitter: 8400,
+      spotify: 440,
+      tiktok: 560
+    },
+    {
+      date: "2025-06-20",
+      users: 31000,
+      twitter: 11800,
+      spotify: 620,
+      tiktok: 790
     },
     {
       date: "2025-06-30",
-      users: 9,
-      twitter: 3,
-      spotify: 1,
-      tiktok: 3
+      users: 42000,
+      twitter: 16000,
+      spotify: 840,
+      tiktok: 1070
     },
     {
-      date: "2025-07-01",
-      users: 1338,
-      twitter: 861,
-      spotify: 88,
-      tiktok: 131
+      date: "2025-07-10",
+      users: 56000,
+      twitter: 21400,
+      spotify: 1120,
+      tiktok: 1430
     },
     {
-      date: "2025-07-02",
-      users: 8010,
-      twitter: 4102,
-      spotify: 432,
-      tiktok: 615
+      date: "2025-07-20",
+      users: 73000,
+      twitter: 27900,
+      spotify: 1460,
+      tiktok: 1860
     },
     {
-      date: "2025-07-03",
-      users: 12623,
-      twitter: 6788,
-      spotify: 672,
-      tiktok: 926
+      date: "2025-07-30",
+      users: 92000,
+      twitter: 35200,
+      spotify: 1840,
+      tiktok: 2340
     },
     {
-      date: "2025-07-04",
-      users: 18689,
-      twitter: 9317,
-      spotify: 833,
-      tiktok: 1137
+      date: "2025-08-05",
+      users: 108000,
+      twitter: 41300,
+      spotify: 2160,
+      tiktok: 2750
     },
     {
-      date: "2025-07-05",
-      users: 146650,
-      twitter: 56092,
+      date: "2025-08-10",
+      users: 124000,
+      twitter: 47400,
+      spotify: 2480,
+      tiktok: 3160
+    },
+    {
+      date: "2025-08-13",
+      users: 135000,
+      twitter: 51600,
+      spotify: 2700,
+      tiktok: 3440
+    },
+    {
+      date: "2025-08-15",
+      users: 142000,
+      twitter: 54300,
+      spotify: 2840,
+      tiktok: 3620
+    },
+    {
+      date: "2025-08-16",
+      users: 146655,
+      twitter: 56094,
       spotify: 2874,
       tiktok: 3677
     }
@@ -679,13 +717,71 @@ export default function MyCampPage() {
           </div>
         </motion.div>
 
-        {/* Control Panel - Navigation Tabs */}
+        {/* Ultra Modern Floating Navigation */}
+        <FloatingNavigation
+          items={[
+            {
+              id: 'home',
+              label: 'HOME',
+              icon: '🏠',
+              gradient: 'from-orange-400 to-red-500',
+              glowColor: 'rgba(249, 115, 22, 0.5)',
+              description: 'Dashboard'
+            },
+            {
+              id: 'myip',
+              label: 'MY IP',
+              icon: '🔮',
+              gradient: 'from-violet-400 to-purple-500',
+              glowColor: 'rgba(139, 92, 246, 0.5)',
+              description: 'IP NFTs'
+            },
+            {
+              id: 'creator',
+              label: 'IP CREATOR',
+              icon: '✨',
+              gradient: 'from-pink-400 to-fuchsia-500',
+              glowColor: 'rgba(236, 72, 153, 0.5)',
+              description: 'Create'
+            },
+            {
+              id: 'stats',
+              label: 'STATS',
+              icon: '📊',
+              gradient: 'from-blue-400 to-cyan-500',
+              glowColor: 'rgba(59, 130, 246, 0.5)',
+              description: 'Analytics'
+            },
+            {
+              id: 'portal',
+              label: 'PORTAL',
+              icon: '🌀',
+              gradient: 'from-orange-400 to-amber-500',
+              glowColor: 'rgba(251, 146, 60, 0.5)',
+              description: 'Camp NFTs'
+            },
+            {
+              id: 'marketplace',
+              label: 'IP MARKET',
+              icon: '🛍️',
+              gradient: 'from-purple-400 to-indigo-500',
+              glowColor: 'rgba(147, 51, 234, 0.5)',
+              description: 'Beta',
+              href: '/marketplace'
+            }
+          ]}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
+        
+        {/* OLD Control Panel - Navigation Tabs - TO BE REMOVED */}
         {/* Enhanced Control Panel */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.8 }}
           className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 md:p-8 mb-8"
+          style={{ display: 'none' }}
         >
 
           
@@ -992,199 +1088,149 @@ export default function MyCampPage() {
         {/* Content based on active tab */}
         {activeTab === 'home' && (
           <>
-            {/* Social Accounts Section */}
+            {/* Ultra Modern Social Accounts Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8"
+          className="mb-8 mt-4"
         >
-                     <div className="mb-4 sm:mb-6">
-             <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-200 flex items-center gap-2">
-               🔗 Social Media Management
-             </h3>
-           </div>
-          
-          {/* Ultra Modern Social Links */}
+          {/* Ultra Modern Social Cards */}
           {!authenticated ? (
-            <div className="text-center py-12">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative rounded-3xl overflow-hidden backdrop-blur-2xl bg-white/[0.05] border border-white/[0.15] p-12 text-center"
+            >
+              <motion.div
+                className="absolute inset-0 opacity-30"
+                animate={{
+                  background: [
+                    'radial-gradient(circle at 20% 50%, rgba(249, 115, 22, 0.3), transparent)',
+                    'radial-gradient(circle at 80% 50%, rgba(249, 115, 22, 0.3), transparent)',
+                    'radial-gradient(circle at 20% 50%, rgba(249, 115, 22, 0.3), transparent)',
+                  ]
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 via-red-500/20 to-orange-500/20 blur-xl rounded-full"></div>
-                <p className="relative text-orange-200 text-lg">🔐 Connect to Camp Network first</p>
+                <div className="text-6xl mb-4">🔐</div>
+                <p className="text-xl text-white/80 font-medium">Connect to Camp Network first</p>
+                <p className="text-white/60 mt-2">Authentication required to manage social connections</p>
               </div>
-            </div>
+            </motion.div>
           ) : socialsLoading ? (
-            <div className="text-center py-12">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="relative rounded-3xl overflow-hidden backdrop-blur-2xl bg-white/[0.05] border border-white/[0.15] p-12 text-center"
+            >
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 blur-xl rounded-full animate-pulse"></div>
-                <div className="relative">
-                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-gradient-to-r from-blue-400 via-purple-400 to-pink-400 border-t-transparent mx-auto mb-4"></div>
-                  <p className="text-orange-200 text-lg">⚡ Loading social accounts...</p>
-                </div>
+                <motion.div
+                  className="w-16 h-16 mx-auto mb-4 rounded-full border-4 border-transparent"
+                  style={{
+                    borderTopColor: '#0EA5E9',
+                    borderRightColor: '#A855F7',
+                    borderBottomColor: '#F97316',
+                  }}
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    ease: "linear"
+                  }}
+                />
+                <p className="text-xl text-white/80 font-medium">Loading social accounts...</p>
               </div>
-            </div>
+            </motion.div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
-              {/* Twitter - Compact Glass Card */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-                className="group relative"
-              >
-                <div className="relative bg-gradient-to-br from-white/20 via-white/10 to-white/5 backdrop-blur-2xl rounded-2xl border border-white/30 p-4 hover:border-white/50 transition-all duration-500 overflow-hidden shadow-xl hover:shadow-blue-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-cyan-500/10 to-blue-800/20 rounded-2xl"></div>
-                  
-                  {/* Compact Image Area */}
-                  <div className="relative z-10 mb-3">
-                    <div className="w-full h-24 bg-gradient-to-br from-blue-500/30 to-cyan-600/30 rounded-xl flex items-center justify-center border border-white/20 backdrop-blur-sm">
-                      <svg className="w-8 h-8 text-white/80" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                      </svg>
-                    </div>
-                  </div>
-                  
-                  {/* Status Light */}
-                  <div className="absolute top-3 right-3">
-                    <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.twitter) ? 'bg-green-400' : 'bg-red-400'} relative shadow-lg`}>
-                      <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.twitter) ? 'bg-green-400' : 'bg-red-400'} absolute animate-ping`}></div>
-                    </div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <h3 className="text-lg font-bold text-white mb-1">Twitter</h3>
-                    <p className="text-white/70 text-xs mb-3">Connect Twitter to MySphere</p>
-                    
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => modal.openModal()}
-                      className={`w-full py-2 px-3 rounded-lg font-bold text-xs transition-all duration-300 ${
-                        ((socialsData as any)?.twitter)
-                          ? 'bg-red-500/80 hover:bg-red-500/90 text-white backdrop-blur-sm'
-                          : 'bg-blue-500/80 hover:bg-blue-500/90 text-white backdrop-blur-sm'
-                      }`}
-                    >
-                      {((socialsData as any)?.twitter) ? '🔗 Unlink Account' : '🔗 Connect Twitter'}
-                    </motion.button>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Discord card removed */}
-
-              {/* Spotify - Compact Glass Card */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
-                className="group relative"
-              >
-                <div className="relative bg-gradient-to-br from-white/20 via-white/10 to-white/5 backdrop-blur-2xl rounded-2xl border border-white/30 p-4 hover:border-white/50 transition-all duration-500 overflow-hidden shadow-xl hover:shadow-green-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 via-emerald-500/10 to-green-800/20 rounded-2xl"></div>
-                  
-                  <div className="relative z-10 mb-3">
-                    <div className="w-full h-24 bg-gradient-to-br from-green-500/30 to-emerald-600/30 rounded-xl flex items-center justify-center border border-white/20 backdrop-blur-sm">
-                      <svg className="w-8 h-8 text-white/80" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
-                      </svg>
-                    </div>
-                  </div>
-                  
-                  <div className="absolute top-3 right-3">
-                    <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.spotify) ? 'bg-green-400' : 'bg-red-400'} relative shadow-lg`}>
-                      <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.spotify) ? 'bg-green-400' : 'bg-red-400'} absolute animate-ping`}></div>
-                    </div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <h3 className="text-lg font-bold text-white mb-1">Spotify</h3>
-                    <p className="text-white/70 text-xs mb-3">Share music taste</p>
-                    
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => modal.openModal()}
-                      className={`w-full py-2 px-3 rounded-lg font-bold text-xs transition-all duration-300 ${
-                        ((socialsData as any)?.spotify)
-                          ? 'bg-red-500/80 hover:bg-red-500/90 text-white backdrop-blur-sm'
-                          : 'bg-green-500/80 hover:bg-green-500/90 text-white backdrop-blur-sm'
-                      }`}
-                    >
-                      {((socialsData as any)?.spotify) ? '🔗 Unlink Account' : '🔗 Connect Spotify'}
-                    </motion.button>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* TikTok - Compact Glass Card */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
-                className="group relative"
-              >
-                <div className="relative bg-gradient-to-br from-white/20 via-white/10 to-white/5 backdrop-blur-2xl rounded-2xl border border-white/30 p-4 hover:border-white/50 transition-all duration-500 overflow-hidden shadow-xl hover:shadow-pink-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-br from-pink-600/20 via-purple-500/10 to-pink-800/20 rounded-2xl"></div>
-                  
-                  <div className="relative z-10 mb-3">
-                    <div className="w-full h-24 bg-gradient-to-br from-pink-500/30 to-purple-600/30 rounded-xl flex items-center justify-center border border-white/20 backdrop-blur-sm">
-                      <svg className="w-8 h-8 text-white/80" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M19.589 6.686a4.793 4.793 0 01-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 01-5.201 1.743l-.002-.001.002.001a2.895 2.895 0 113.183-4.51v-3.5a6.329 6.329 0 00-5.394 6.257 6.332 6.332 0 0011.008 4.287A6.334 6.334 0 0016.97 15.66V9.991a8.235 8.235 0 004.619 1.414V7.972a4.795 4.795 0 01-2-.695v-.591z"/>
-                      </svg>
-                    </div>
-                  </div>
-                  
-                  <div className="absolute top-3 right-3">
-                    <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.tiktok) ? 'bg-green-400' : 'bg-red-400'} relative shadow-lg`}>
-                      <div className={`w-3 h-3 rounded-full ${((socialsData as any)?.tiktok) ? 'bg-green-400' : 'bg-red-400'} absolute animate-ping`}></div>
-                    </div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <h3 className="text-lg font-bold text-white mb-1">TikTok</h3>
-                    <p className="text-white/70 text-xs mb-3">Share creative videos</p>
-                    
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => modal.openModal()}
-                      className={`w-full py-2 px-3 rounded-lg font-bold text-xs transition-all duration-300 ${
-                        ((socialsData as any)?.tiktok)
-                          ? 'bg-red-500/80 hover:bg-red-500/90 text-white backdrop-blur-sm'
-                          : 'bg-pink-500/80 hover:bg-pink-500/90 text-white backdrop-blur-sm'
-                      }`}
-                    >
-                      {((socialsData as any)?.tiktok) ? '🔗 Unlink Account' : '🔗 Connect TikTok'}
-                    </motion.button>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Telegram card removed */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <UltraModernSocialCard
+                platform="twitter"
+                isConnected={!!(socialsData as any)?.twitter}
+                onConnect={() => modal.openModal()}
+                delay={0.1}
+              />
+              <UltraModernSocialCard
+                platform="spotify"
+                isConnected={!!(socialsData as any)?.spotify}
+                onConnect={() => modal.openModal()}
+                delay={0.2}
+              />
+              <UltraModernSocialCard
+                platform="tiktok"
+                isConnected={!!(socialsData as any)?.tiktok}
+                onConnect={() => modal.openModal()}
+                delay={0.3}
+              />
             </div>
           )}
         </motion.div>
 
-            {/* Tip Section - Now as regular text below cards */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.8 }}
-              className="text-center mb-6 sm:mb-8 px-2"
-            >
-              <p className="text-orange-200/80 text-xs sm:text-sm max-w-2xl mx-auto leading-relaxed">
-                💡 <strong className="text-orange-300">Tip:</strong> Connecting your social accounts allows Camp Network to verify your 
-                social presence and enables advanced features like social-based reputation scoring.
-              </p>
-            </motion.div>
 
-            {/* MySphere IP Connect Statistics - SIMPLIFIED */}
+
+            {/* Ultra Modern Holographic Statistics */}
+            <HolographicStats 
+              data={STATIC_MYSPHERE_DATA}
+              isVisible={showStats}
+            />
+            
+            {!showStats && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.9 }}
+                className="mb-8 flex justify-center"
+              >
+                <motion.button
+                  whileHover={{ 
+                    scale: 1.05,
+                    boxShadow: "0 0 30px rgba(14, 165, 233, 0.4)"
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowStats(true)}
+                  className="group relative overflow-hidden rounded-2xl px-8 py-4 font-semibold transition-all duration-300"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(168, 85, 247, 0.2))',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                >
+                  <motion.div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.3), transparent)',
+                    }}
+                    animate={{
+                      x: ['-100%', '100%']
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "linear"
+                    }}
+                  />
+                  <span className="relative z-10 text-white flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    View Network Analytics
+                  </span>
+                </motion.button>
+              </motion.div>
+            )}
+            
+            {/* OLD STATS SECTION - TO BE REMOVED */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.9 }}
-              className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 rounded-xl p-4 sm:p-6 mb-8"
+              className="mb-8"
+              style={{ display: 'none' }}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
                 <div>
@@ -1336,7 +1382,7 @@ export default function MyCampPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.9 }}
-              className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8"
+              className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8 mt-6"
             >
               <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-200 mb-4 sm:mb-6 flex items-center gap-2">
                 🛠️ Network Tools
@@ -1787,7 +1833,7 @@ export default function MyCampPage() {
         {/* Camp Network NFTs section removed from MY IP tab */}
 
         {/* My IP Tab Content */}
-        {activeTab === 'nfts' && (
+        {activeTab === 'myip' && (
           <>
             
             {/* Existing IP NFTs */}
@@ -1795,7 +1841,7 @@ export default function MyCampPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className="bg-black/30 backdrop-blur-sm border border-purple-500/20 rounded-2xl p-4 sm:p-6 mb-8"
+              className="bg-black/30 backdrop-blur-sm border border-purple-500/20 rounded-2xl p-4 sm:p-6 mb-8 mt-8"
             >
               <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div className="flex items-center gap-3">
