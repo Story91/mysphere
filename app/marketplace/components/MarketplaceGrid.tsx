@@ -221,7 +221,13 @@ export default function MarketplaceGrid({
             let tokenUri = '';
             let metadata: any = null;
             let image = '';
+            let mediaUrl = '';
+            let mime = '';
             let mediaType: 'image' | 'video' | 'audio' | 'text' | 'unknown' = 'unknown';
+            
+            // Helper function to convert IPFS URLs
+            const ipfsToHttp = (url: string) => url?.startsWith('ipfs://') ? url.replace('ipfs://', 'https://ipfs.io/ipfs/') : url;
+            
             try {
               tokenUri = (await client.readContract({
                 address: l[1] as `0x${string}`, // nftContract jest na pozycji 1
@@ -229,11 +235,24 @@ export default function MarketplaceGrid({
                 functionName: 'tokenURI',
                 args: [l[2]], // tokenId jest na pozycji 2
               })) as string;
-              const metaUrl = tokenUri?.startsWith('ipfs://') ? tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/') : tokenUri;
+              const metaUrl = ipfsToHttp(tokenUri);
               if (metaUrl) {
                 metadata = await fetch(metaUrl, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
-                if (metadata?.image) image = (metadata.image as string).replace('ipfs://', 'https://ipfs.io/ipfs/');
-                mediaType = image ? 'image' : 'unknown';
+                if (metadata?.image) image = ipfsToHttp(metadata.image);
+                
+                // Proper media type detection like in fetchIpNfts.ts
+                const animUrl = metadata?.animation_url || metadata?.animationUrl;
+                mediaUrl = (animUrl || image) ? ipfsToHttp(animUrl || image) : '';
+                mime = (metadata?.properties?.mimeType || metadata?.mimeType || '').toString();
+                const ext = (animUrl || image || '').split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
+                const isVideo = mime.toLowerCase().startsWith('video/') || ['mp4','webm','mov','m4v'].includes(ext || '');
+                const isAudio = mime.toLowerCase().startsWith('audio/') || ['mp3','wav','ogg','m4a','flac'].includes(ext || '');
+                const isText  = mime.toLowerCase().startsWith('text/')  || ['txt','md','rtf','csv','json'].includes(ext || '');
+                if (isVideo) mediaType = 'video';
+                else if (isAudio) mediaType = 'audio';
+                else if (isText) mediaType = 'text';
+                else if (image) mediaType = 'image';
+                else if (metadata?.text || metadata?.content) mediaType = 'text';
               }
             } catch {}
             // Try to read access terms
@@ -263,6 +282,8 @@ export default function MarketplaceGrid({
               hasAccessTerms: !!terms && Number((terms as any).price || 0) > 0 && Number((terms as any).duration || 0) > 0,
               metadata,
               image,
+              mediaUrl,
+              mime,
               tokenUri,
               type: mediaType,
             });
@@ -281,6 +302,13 @@ export default function MarketplaceGrid({
                 // Fetch NFT metadata for auction
                 let metadata = null;
                 let image = '';
+                let mediaUrl = '';
+                let mime = '';
+                let mediaType: 'image' | 'video' | 'audio' | 'text' | 'unknown' = 'unknown';
+                
+                // Helper function to convert IPFS URLs
+                const ipfsToHttp = (url: string) => url?.startsWith('ipfs://') ? url.replace('ipfs://', 'https://ipfs.io/ipfs/') : url;
+                
                 try {
                   const nftContract = (a as any).nftContract ?? a[1];
                   const tokenId = (a as any).tokenId ?? a[2];
@@ -302,13 +330,25 @@ export default function MarketplaceGrid({
                   }) as string;
                   
                   if (tokenUri) {
-                    const metaUrl = tokenUri.startsWith('ipfs://') 
-                      ? tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/') 
-                      : tokenUri;
+                    const metaUrl = ipfsToHttp(tokenUri);
                     const metaResponse = await fetch(metaUrl);
                     if (metaResponse.ok) {
                       metadata = await metaResponse.json();
-                      image = metadata?.image?.replace('ipfs://', 'https://ipfs.io/ipfs/') || '';
+                      image = ipfsToHttp(metadata?.image || '');
+                      
+                      // Proper media type detection like in fetchIpNfts.ts
+                      const animUrl = metadata?.animation_url || metadata?.animationUrl;
+                      mediaUrl = (animUrl || image) ? ipfsToHttp(animUrl || image) : '';
+                      mime = (metadata?.properties?.mimeType || metadata?.mimeType || '').toString();
+                      const ext = (animUrl || image || '').split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
+                      const isVideo = mime.toLowerCase().startsWith('video/') || ['mp4','webm','mov','m4v'].includes(ext || '');
+                      const isAudio = mime.toLowerCase().startsWith('audio/') || ['mp3','wav','ogg','m4a','flac'].includes(ext || '');
+                      const isText  = mime.toLowerCase().startsWith('text/')  || ['txt','md','rtf','csv','json'].includes(ext || '');
+                      if (isVideo) mediaType = 'video';
+                      else if (isAudio) mediaType = 'audio';
+                      else if (isText) mediaType = 'text';
+                      else if (image) mediaType = 'image';
+                      else if (metadata?.text || metadata?.content) mediaType = 'text';
                     }
                   }
                 } catch {}
@@ -329,8 +369,10 @@ export default function MarketplaceGrid({
                   saleType: 'auction',
                   metadata,
                   image,
+                  mediaUrl,
+                  mime,
                   tokenUri: '',
-                  type: metadata?.properties?.type || 'image',
+                  type: mediaType,
                 });
               } catch {}
             }
