@@ -137,6 +137,7 @@ const tailwindConfig = {
 // Camp Network contracts addresses
 const CAMP_POST_CONTRACT = "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E" as `0x${string}`;
 const PORTAL_NFT_CONTRACT = "0x1eD74B27f846C699A90926daD057A7f6FD22C126" as `0x${string}`;
+const IP_MARKET_V3_CONTRACT = "0xF528f920d0ce1D1EA230B0ec10F0F64B8F43cbac" as `0x${string}`;
 
 // Linea Network contracts addresses
 const LINEA_POST_CONTRACT = LINEA_CONTRACT_ADDRESS as `0x${string}`;
@@ -378,6 +379,13 @@ export default function HomePage() {
     chainId: baseCampChain.id,
   });
 
+  const { data: ipMarketV3Data } = useContractRead({
+    address: IP_MARKET_V3_CONTRACT,
+    abi: BASECAMP_POST_CONTRACT_ABI,
+    functionName: 'totalPosts',
+    chainId: baseCampChain.id,
+  });
+
   // LIVE DATA z Linea Network blockchain  
   const { data: lineaPostsData } = useContractRead({
     address: LINEA_POST_CONTRACT,
@@ -427,8 +435,9 @@ export default function HomePage() {
   const campTransactionsCount = useMemo(() => {
     const postTransactions = campPostsData ? Number(campPostsData) : 0;
     const nftTransactions = portalClaimedData ? Number(portalClaimedData) : 0;
-    return postTransactions + nftTransactions;
-  }, [campPostsData, portalClaimedData]);
+    const ipMarketTransactions = ipMarketV3Data ? Number(ipMarketV3Data) : 0;
+    return postTransactions + nftTransactions + ipMarketTransactions;
+  }, [campPostsData, portalClaimedData, ipMarketV3Data]);
 
   // Oblicz łączną liczbę transakcji Linea Network na żywo
   const lineaTransactionsCount = useMemo(() => {
@@ -636,7 +645,7 @@ export default function HomePage() {
     const fetchTotalEthBalance = async () => {
       try {
         // Definiujemy bazową, historyczną wartość przychodów, która będzie stała
-        const historicalBaseRevenue = 0.2562;
+        const historicalBaseRevenue = 0.3312; // 0.2562 + 0.075 (wypłacone z portfela)
 
         const contract1Balance = await fetchEthBalance("0x6e1811a5401dfc30e8f3e2dd9de0bbe156f97ac7");
         const contract2Balance = await fetchEthBalance("0x9c44802843a670732383f62b2f3304f92ec1702b");
@@ -647,7 +656,7 @@ export default function HomePage() {
         setEthRevenue(totalBalance);
       } catch (error) {
         console.error("Błąd podczas pobierania łącznego salda ETH:", error);
-        setEthRevenue(0.2562); // Wartość domyślna w przypadku błędu to nasza historyczna baza
+        setEthRevenue(0.3312); // Wartość domyślna w przypadku błędu to nasza historyczna baza
       }
     };
     
@@ -852,37 +861,34 @@ export default function HomePage() {
           <div
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 auto-rows-fr mb-28 w-full"
           >
-            {/* BaseChat Card - FEATURED */}
+            {/* BaseChat Card */}
             <div className="group">
               <Link href="/basechat" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
                 <div 
-                  className="h-full bg-gradient-to-br from-[#0052FF]/50 via-[#1E4DD8]/45 to-[#4C8FFF]/50 backdrop-blur-2xl rounded-xl overflow-hidden border-2 border-[#0052FF]/80 hover:border-[#4C8FFF]/90 transition-colors duration-300 p-6 relative shadow-[0_8px_32px_rgba(0,82,255,0.15)]"
+                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
                   onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
                 >
-                  {/* Glass effect overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-xl"></div>
-                  
-                  {/* Enhanced LIVE badge */}
-                  <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-[#0052FF]/40 border-2 border-[#0052FF]/60 backdrop-blur-sm">
-                      <span className="w-3 h-3 rounded-full bg-[#0052FF] mr-2"></span>
-                      <span className="text-blue-100 text-sm font-bold">LIVE</span>
-                    </span>
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-[#0052FF]/10 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                   </div>
                   
                   {/* Content */}
                   <div className="relative z-10">
-                    <div className="flex items-center justify-start mb-4">
-                      <Image
-                        src="/elo2.png"
-                        alt="SPHERE"
-                        width={48}
-                        height={48}
-                        className="object-contain w-[48px] h-auto"
-                        style={{ width: 'auto', height: 'auto', maxHeight: '48px' }}
-                      />
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center">
+                        <Image
+                          src="/elo2.png"
+                          alt="SPHERE"
+                          width={32}
+                          height={32}
+                          className="object-contain w-8 h-8 mr-3"
+                          style={{ width: 'auto', height: 'auto', maxHeight: '32px' }}
+                        />
+                        <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">MySphere</h2>
+                      </div>
                     </div>
-                    <p className="text-blue-50/95 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed text-left">
+                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
                       Connect with other .base.eth owners, share updates, create daily posts about base and earn sphere points!
                     </p>
                   </div>
@@ -890,30 +896,34 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Camp Network Integration Card - FEATURED */}
+            {/* MyCamp Integration Card */}
             <div className="group">
               <Link href="/mycamp" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
                 <div 
-                  className="h-full bg-gradient-to-br from-orange-400/50 via-orange-500/45 to-orange-600/50 backdrop-blur-2xl rounded-xl overflow-hidden border-2 border-orange-400/80 hover:border-orange-300/90 transition-colors duration-300 p-6 relative shadow-[0_8px_32px_rgba(249,115,22,0.15)]"
+                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-orange-500/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
                   onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
                 >
-                  {/* Glass effect overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-xl"></div>
-                  
-                  {/* Enhanced NEW badge */}
-                  <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-orange-500/40 border-2 border-orange-400/60 backdrop-blur-sm">
-                      <span className="w-3 h-3 rounded-full bg-orange-400 mr-2"></span>
-                      <span className="text-orange-100 text-sm font-bold">HOT</span>
-                    </span>
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-orange-500/10 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                   </div>
                   
                   {/* Content */}
                   <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title text-orange-100">Camp Network</h2>
+                    <div className="flex items-center justify-start mb-3">
+                      <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mr-3 shadow-lg">
+                        <Image
+                          src="/Camp.png"
+                          alt="Camp Network"
+                          width={20}
+                          height={20}
+                          className="object-contain w-5 h-5"
+                          style={{ width: 'auto', height: 'auto', maxHeight: '20px' }}
+                        />
+                      </div>
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-orange-500">MyCamp</h2>
                     </div>
-                    <p className="text-orange-50/95 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
+                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
                       Explore the new Camp Network integration! Connect your social accounts, manage your onchain identity, and access exclusive features.
                     </p>
                   </div>
@@ -921,33 +931,25 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Sphere Genesis NFT Card - FEATURED */}
+            {/* IP NFT Market v3 Card */}
             <div className="group">
-              <Link href="/nft" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
+              <Link href="/marketplace" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
                 <div 
-                  className="h-full bg-gradient-to-br from-green-400/50 via-green-500/45 to-green-600/50 backdrop-blur-2xl rounded-xl overflow-hidden border-2 border-green-400/80 hover:border-green-300/90 transition-colors duration-300 p-6 relative shadow-[0_8px_32px_rgba(34,197,94,0.15)]"
+                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-purple-500/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
                   onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
                 >
-                  {/* Glass effect overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-xl"></div>
-                  
-                  {/* Enhanced NFT badge */}
-                  <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-green-500/40 border-2 border-green-400/60 backdrop-blur-sm">
-                      <span className="w-3 h-3 rounded-full bg-green-400 mr-2"></span>
-                      <span className="text-green-100 text-sm font-bold">NFT</span>
-                    </span>
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-purple-500/10 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
                   </div>
                   
                   {/* Content */}
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title text-green-100">
-                        Sphere Genesis
-                      </h2>
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-purple-500">IP NFT Market v3</h2>
                     </div>
-                    <p className="text-green-50/95 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                      Get your exclusive Sphere Genesis NFT collection. Early supporters receive special benefits and access to premium features.
+                    <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
+                      Explore the IP NFT marketplace on Camp Network. Trade intellectual property NFTs in our beta version with exclusive features.
                     </p>
                   </div>
                 </div>
@@ -979,11 +981,11 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Buy&Swap Card - Changed to Docs */}
+            {/* Sphere Genesis NFT Card */}
             <div className="group">
-              <Link href="/Docs" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
+              <Link href="/nft" className={`block h-full ${isAppleDevice ? 'apple-performance' : ''}`}>
                 <div 
-                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-[#0052FF]/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
+                  className="h-full bg-black/50 backdrop-blur-xl rounded-xl overflow-hidden border border-gray-800 hover:border-green-500/50 transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl p-6 relative"
                   onTouchStart={() => {}} // Eliminacja 300ms opóźnienia na urządzeniach mobilnych
                 >
                   {/* Hover overlay */}
@@ -994,10 +996,10 @@ export default function HomePage() {
                   {/* Content */}
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-[#0052FF]">Docs</h2>
+                      <h2 className="text-2xl font-['Share_Tech_Mono'] grid-title group-hover:text-green-500">Sphere Genesis</h2>
                     </div>
                     <p className="text-gray-400 text-base md:text-lg font-['Coinbase_Display'] leading-relaxed">
-                      Learn everything about MySphere platform features, how it works, and how to get the most out of your social experience.
+                      Get your exclusive Sphere Genesis NFT collection. Early supporters receive special benefits and access to premium features.
                     </p>
                   </div>
                 </div>
@@ -1395,7 +1397,7 @@ export default function HomePage() {
               <span className="text-orange-300 text-xs font-bold">NEW INTEGRATION</span>
             </span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <a href="https://basecamp.cloud.blockscout.com/address/0x177Af844a3c7A1749dE97656a5d84b6373Fc350E" target="_blank" rel="noopener noreferrer" 
                className="bg-gradient-to-br from-orange-500/10 via-blue-500/10 to-orange-600/10 backdrop-blur-md rounded-xl p-4 border border-orange-800/50 hover:border-orange-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(249,115,22,0.3)] group">
               <div className="flex items-center">
@@ -1433,6 +1435,27 @@ export default function HomePage() {
                   <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x1eD74B27f846C699A90926daD057A7f6FD22C126</p>
                 </div>
                 <div className="text-gray-500 group-hover:text-blue-400 transition-colors">
+                  <FaExternalLinkAlt className="w-3 h-3" />
+                </div>
+              </div>
+            </a>
+            
+            <a href="https://basecamp.cloud.blockscout.com/address/0xF528f920d0ce1D1EA230B0ec10F0F64B8F43cbac" target="_blank" rel="noopener noreferrer"
+               className="bg-gradient-to-br from-orange-500/10 via-purple-500/10 to-orange-600/10 backdrop-blur-md rounded-xl p-4 border border-orange-800/50 hover:border-purple-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(147,51,234,0.3)] group">
+              <div className="flex items-center">
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <div className="text-purple-400 mr-2">
+                      <FaCheckCircle className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-sm font-medium text-purple-400">IP Market v3</h3>
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({ipMarketV3Data ? Number(ipMarketV3Data) : 0} transactions)
+                    </span>
+                  </div>
+                  <p className="text-gray-400 text-sm font-mono mt-1 truncate">0xF528f920d0ce1D1EA230B0ec10F0F64B8F43cbac</p>
+                </div>
+                <div className="text-gray-500 group-hover:text-purple-400 transition-colors">
                   <FaExternalLinkAlt className="w-3 h-3" />
                 </div>
               </div>
