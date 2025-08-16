@@ -19,6 +19,17 @@ export default function MyIpSection() {
   const [listedTokens, setListedTokens] = useState<Set<string>>(new Set());
   const [auctionedTokens, setAuctionedTokens] = useState<Map<string, any>>(new Map());
 
+  // Listen for filter changes from parent component
+  useEffect(() => {
+    const handleFilterChange = (event: CustomEvent) => {
+      setFilter(event.detail.filter);
+      setPage(1);
+    };
+    
+    window.addEventListener('filterChange', handleFilterChange as EventListener);
+    return () => window.removeEventListener('filterChange', handleFilterChange as EventListener);
+  }, []);
+
   // Check which tokens are listed on marketplace and in auctions
   const checkListedTokens = async (nfts: any[]) => {
     try {
@@ -170,15 +181,6 @@ export default function MyIpSection() {
   return (
     <div className="mt-6">
       {loading && <div className="opacity-70 text-sm mt-2">Loading…</div>}
-      <div className="flex items-center gap-2 mt-2">
-        {(['all','image','video','audio','text'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => { setFilter(t); setPage(1); }}
-            className={`px-3 py-1 text-xs rounded-lg border ${filter===t ? 'bg-white/10 text-white border-white/30' : 'text-white/70 border-white/10 hover:border-white/20'}`}
-          >{t.toUpperCase()}</button>
-        ))}
-      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-3">
         {pageItems.map((nft) => (
           <div key={`${nft.contract}-${nft.tokenId}`} title={nft?.metadata?.name || `IpNFT #${nft.tokenId}`}

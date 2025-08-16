@@ -953,36 +953,37 @@ export default function MyCampPage() {
             </motion.button>
 
             {/* IP Market V3 Button */}
-            <motion.button
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.65, duration: 0.5 }}
-              whileHover={{ 
-                scale: 1.05, 
-                y: -5,
-                boxShadow: "0 20px 40px rgba(147, 51, 234, 0.4)"
-              }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => window.open('/marketplace', '_blank')}
-              className="group relative overflow-hidden rounded-2xl p-2 sm:p-4 transition-all duration-500 bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-purple-400/40"
-            >
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-indigo-400/20"
-                initial={{ opacity: 0 }}
-                whileHover={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              />
-              <div className="relative z-10">
-                <motion.div 
-                  className="text-center"
-                  whileHover={{ scale: 1.1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="text-sm sm:text-lg md:text-xl mb-1 sm:mb-2 font-black tracking-wider">IP MARKET V3</div>
-                  <div className="text-[10px] sm:text-xs opacity-80 uppercase tracking-widest">Beta</div>
-                </motion.div>
-              </div>
-            </motion.button>
+            <Link href="/marketplace" className="block h-full">
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.65, duration: 0.5 }}
+                whileHover={{ 
+                  scale: 1.05, 
+                  y: -5,
+                  boxShadow: "0 20px 40px rgba(147, 51, 234, 0.4)"
+                }}
+                whileTap={{ scale: 0.95 }}
+                className="group relative overflow-hidden rounded-2xl p-2 sm:p-4 transition-all duration-500 bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-purple-400/40 w-full h-full"
+              >
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-indigo-400/20"
+                  initial={{ opacity: 0 }}
+                  whileHover={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                />
+                <div className="relative z-10">
+                  <motion.div 
+                    className="text-center"
+                    whileHover={{ scale: 1.1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="text-sm sm:text-lg md:text-xl mb-1 sm:mb-2 font-black tracking-wider">IP MARKET V3</div>
+                    <div className="text-[10px] sm:text-xs opacity-80 uppercase tracking-widest">Beta</div>
+                  </motion.div>
+                </div>
+              </motion.button>
+            </Link>
 
             {/* Social Media Dropdown Button - REMOVED */}
           </div>
@@ -1796,13 +1797,19 @@ export default function MyCampPage() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="bg-black/30 backdrop-blur-sm border border-purple-500/20 rounded-2xl p-4 sm:p-6 mb-8"
             >
-              <div className="flex justify-between items-start mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-200 flex items-center gap-2">
-                  🎯 My IP NFTs
-                  <span className="text-sm bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">
-                    Origin SDK
-                  </span>
-                </h3>
+              <div className="flex justify-between items-center mb-4 sm:mb-6">
+                <div className="flex items-center gap-3">
+                  {(['all','image','video','audio','text'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => {
+                        const event = new CustomEvent('filterChange', { detail: { filter: t } });
+                        window.dispatchEvent(event);
+                      }}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all text-white/70 border-white/10 hover:border-white/20 hover:bg-white/5`}
+                    >{t.toUpperCase()}</button>
+                  ))}
+                </div>
                 <Link
                   href="/marketplace"
                   className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-2 px-4 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2"
