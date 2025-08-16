@@ -951,26 +951,27 @@ export default function DashboardView() {
         <p className="text-gray-400">Manage your listings, offers, and earnings</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-8 border-b border-gray-700">
+      {/* Tabs - Mobile Responsive */}
+      <div className="flex flex-wrap gap-1 sm:gap-2 mb-8 border-b border-gray-700 overflow-x-auto">
         {[
-          { id: 'listings', label: 'My Listings', icon: '📋' },
-          { id: 'offers', label: 'Offers Received', icon: '💰' },
-          { id: 'earnings', label: 'Earnings', icon: '💵' },
-          { id: 'access', label: 'My Access', icon: '🔑' },
-          { id: 'auctions', label: 'Auctions', icon: '🔨' },
+          { id: 'listings', label: 'My Listings', icon: '📋', shortLabel: 'Listings' },
+          { id: 'offers', label: 'Offers Received', icon: '💰', shortLabel: 'Offers' },
+          { id: 'earnings', label: 'Earnings', icon: '💵', shortLabel: 'Earnings' },
+          { id: 'access', label: 'My Access', icon: '🔑', shortLabel: 'Access' },
+          { id: 'auctions', label: 'Auctions', icon: '🔨', shortLabel: 'Auctions' },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`px-6 py-3 font-medium transition-all ${
+            className={`px-3 sm:px-6 py-2 sm:py-3 font-medium transition-all text-sm sm:text-base whitespace-nowrap ${
               activeTab === tab.id
                 ? 'text-white border-b-2 border-orange-500'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            <span className="mr-2">{tab.icon}</span>
-            {tab.label}
+            <span className="mr-1 sm:mr-2">{tab.icon}</span>
+            <span className="hidden sm:inline">{tab.label}</span>
+            <span className="sm:hidden">{tab.shortLabel}</span>
           </button>
         ))}
       </div>
@@ -1021,8 +1022,8 @@ export default function DashboardView() {
               ) : (
                 <div className="grid gap-4">
                   {myOffers.map((offer, index) => (
-                    <div key={`${offer.listingId}-${offer.offerIndex}`} className="bg-black/40 border border-gray-700 rounded-xl p-6">
-                      <div className="flex justify-between items-center">
+                    <div key={`${offer.listingId}-${offer.offerIndex}`} className="bg-black/40 border border-gray-700 rounded-xl p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                         <div>
                           <h4 className="text-white font-semibold mb-2">
                             Offer for Listing #{offer.listingId}
@@ -1037,7 +1038,7 @@ export default function DashboardView() {
                             Duration: <span className="text-white">{Number(offer.duration) / 86400} days</span>
                           </p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 justify-end sm:justify-start">
                           <button
                             onClick={() => handleAcceptOffer(offer.listingId, offer.offerIndex)}
                             disabled={isAccepting}
@@ -1058,10 +1059,10 @@ export default function DashboardView() {
           {activeTab === 'earnings' && (
             <div>
               <h3 className="text-xl font-bold text-white mb-6">My Earnings</h3>
-              <div className="bg-gradient-to-br from-orange-600/20 to-amber-600/20 border border-orange-500/30 rounded-xl p-8">
+              <div className="bg-gradient-to-br from-orange-600/20 to-amber-600/20 border border-orange-500/30 rounded-xl p-4 sm:p-8">
                 <div className="text-center">
                   <p className="text-gray-300 mb-2">Available to Withdraw</p>
-                  <p className="text-5xl font-bold text-orange-400 mb-8">
+                  <p className="text-3xl sm:text-5xl font-bold text-orange-400 mb-4 sm:mb-8">
                     {userEarnings ? formatEther(userEarnings) : '0'} CAMP
                   </p>
                   <button
@@ -1096,7 +1097,7 @@ export default function DashboardView() {
               {myAuctions.filter(a => a.active).length === 0 ? (
                 <div className="bg-black/40 border border-gray-700 rounded-xl p-12 text-center text-gray-400">You have no auctions</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {myAuctions.filter(a => a.active).map(a => (
                     <AuctionCardWithPreview
                       key={a.auctionId}
@@ -1154,7 +1155,7 @@ export default function DashboardView() {
                   <p className="text-gray-500 text-sm mt-2">Browse the marketplace to find NFTs with temporary access available.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {myAccess.map((access) => (
                     <AccessCard key={access.tokenId.toString()} access={access} onRenew={() => {
                       setShowRenewAccess({
@@ -1242,7 +1243,7 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
         )}
         
         {/* Time left badge */}
-        <div className={`absolute top-2 right-2 px-3 py-1 rounded-full text-xs font-semibold ${
+        <div className={`absolute top-2 right-2 px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
           timeLeft === 'Expired' ? 'bg-red-500/80' : 'bg-green-500/80'
         } text-white backdrop-blur`}>
           {timeLeft === 'Expired' ? '⏱️ Expired' : `⏱️ ${timeLeft}`}
@@ -1250,7 +1251,7 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
               </div>
 
       {/* Card Content */}
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         <h4 className="text-white font-semibold text-lg mb-1">
           {access.metadata?.name || `Token #${access.tokenId}`}
         </h4>
@@ -1398,7 +1399,7 @@ function AuctionCardWithPreview({
       </div>
       
       {/* Card Content */}
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         <h4 className="text-white font-semibold text-lg mb-1">
           {nftData?.name || `Token #${auction.tokenId}`}
         </h4>
@@ -1410,7 +1411,7 @@ function AuctionCardWithPreview({
           </span>
           <button
             onClick={handleCopyTokenId}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-gray-400 hover:text-white transition-colors text-sm"
             title="Copy full token ID"
           >
             {copied ? '✓' : '📋'}
@@ -1463,6 +1464,7 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
   const [nftData, setNftData] = useState<{ image?: string; name?: string; type?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [terms, setTerms] = useState<{ price: bigint; duration: bigint } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const fetchNFTData = async () => {
@@ -1511,10 +1513,10 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
   }, [listing.tokenId, listing.nftContract]);
 
   return (
-    <div className="bg-black/40 border border-gray-700 rounded-xl p-6">
-      <div className="flex gap-4">
+    <div className="bg-black/40 border border-gray-700 rounded-xl p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row gap-4">
         {/* NFT Preview */}
-        <div className="w-20 h-20 rounded-lg overflow-hidden border border-gray-600 flex-shrink-0">
+        <div className="w-full sm:w-20 h-40 sm:h-20 rounded-lg overflow-hidden border border-gray-600 flex-shrink-0">
           {loading ? (
             <div className="w-full h-full bg-gray-800 animate-pulse flex items-center justify-center">
               <div className="text-xs text-gray-500">⏳</div>
@@ -1537,14 +1539,31 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
         </div>
 
         {/* Listing Info */}
-        <div className="flex-1">
-          <h4 className="text-white font-semibold text-lg mb-2">
+        <div className="flex-1 min-w-0">
+          <h4 className="text-white font-semibold text-base sm:text-lg mb-2 truncate">
             {nftData?.name || `Listing #${listing.listingId}`}
           </h4>
           <div className="space-y-1 text-sm">
-            <p className="text-gray-400">
-              Token ID: <span className="text-white">{listing.tokenId?.toString()}</span>
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-gray-400">
+                Token ID: <span className="text-white">
+                  {listing.tokenId?.toString().length > 20 
+                    ? `${listing.tokenId.toString().slice(0, 8)}...${listing.tokenId.toString().slice(-6)}`
+                    : listing.tokenId?.toString()}
+                </span>
+              </p>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(listing.tokenId?.toString() || '');
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="text-gray-400 hover:text-white transition-colors text-xs"
+                title="Copy full token ID"
+              >
+                {copied ? '✓' : '📋'}
+              </button>
+            </div>
             <p className="text-gray-400">
               Price: <span className="text-orange-400 font-bold">{listing.price ? formatEther(listing.price) : '0'} CAMP</span>
             </p>
@@ -1653,11 +1672,11 @@ function BidCardWithNFTPreview({
   }, [auction]);
 
   return (
-    <div className={`bg-black/40 border rounded-xl p-4 flex items-center gap-4 ${
+    <div className={`bg-black/40 border rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 ${
       isWinning ? 'border-green-500 ring-2 ring-green-500/20' : 'border-gray-700'
     }`}>
       {/* NFT Image */}
-      <div className="w-16 h-16 bg-black/60 rounded-lg overflow-hidden flex-shrink-0">
+      <div className="w-full sm:w-16 h-32 sm:h-16 bg-black/60 rounded-lg overflow-hidden flex-shrink-0">
         {loading ? (
           <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
             Loading...

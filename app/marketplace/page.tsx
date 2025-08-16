@@ -148,7 +148,7 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black">
-      {/* Compact Hero Section - Single Line */}
+      {/* Compact Hero Section - Mobile Responsive */}
       <div className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-gradient-to-r from-orange-600/10 via-purple-600/10 to-blue-600/10 blur-3xl" />
         
@@ -156,16 +156,16 @@ export default function MarketplacePage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between"
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <span className="relative inline-flex items-center justify-center">
-                <span className="relative w-8 h-8 rounded-full bg-white ring-2 ring-orange-400/50 shadow-lg flex items-center justify-center">
-                  <img src="/Camp.png" alt="CAMP" className="w-6 h-6" />
+                <span className="relative w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white ring-2 ring-orange-400/50 shadow-lg flex items-center justify-center">
+                  <img src="/Camp.png" alt="CAMP" className="w-4 h-4 sm:w-6 sm:h-6" />
                 </span>
               </span>
               <h1
-                className="text-xl lg:text-2xl font-bold flex items-center gap-2"
+                className="text-base sm:text-xl lg:text-2xl font-bold flex items-center gap-2"
                 style={{ fontFamily: 'Space Grotesk, ClashDisplay, Inter, ui-sans-serif, system-ui' }}
               >
                 <span className="bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent">
@@ -177,18 +177,18 @@ export default function MarketplacePage() {
               </span>
             </div>
             
-            {/* Stats - Right Side */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-black/50 rounded-lg border border-orange-500/20">
-                <span className="text-sm font-bold text-orange-400">{Number(stats.listed || 0)}</span>
+            {/* Stats - Mobile Responsive */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 rounded-lg border border-orange-500/20">
+                <span className="text-xs sm:text-sm font-bold text-orange-400">{Number(stats.listed || 0)}</span>
                 <span className="text-xs text-gray-500">Listed</span>
               </div>
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-black/50 rounded-lg border border-purple-500/20">
-                <span className="text-sm font-bold text-purple-400">{Number(stats.creators || 0).toLocaleString()}</span>
+              <div className="flex sm:hidden md:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 rounded-lg border border-purple-500/20">
+                <span className="text-xs sm:text-sm font-bold text-purple-400">{Number(stats.creators || 0).toLocaleString()}</span>
                 <span className="text-xs text-gray-500">Creators</span>
               </div>
-              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-black/50 rounded-lg border border-blue-500/20">
-                <span className="text-sm font-bold text-blue-400">{stats.volumeCamp.toFixed(2)}</span>
+              <div className="flex sm:hidden lg:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 rounded-lg border border-blue-500/20">
+                <span className="text-xs sm:text-sm font-bold text-blue-400">{stats.volumeCamp.toFixed(2)}</span>
                 <span className="text-xs text-gray-500">CAMP</span>
               </div>
             </div>
@@ -198,12 +198,13 @@ export default function MarketplacePage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-6">
-        {/* Navigation */}
-        <div className="flex items-center justify-between mb-6">
-            <div className="flex gap-2">
+        {/* Navigation - Mobile Responsive */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+            {/* Main Navigation - Grid on mobile, flex on desktop */}
+            <div className="grid grid-cols-2 sm:flex gap-2">
               <button
                 onClick={() => setActiveView('explore')}
-                className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
                   activeView === 'explore'
                     ? 'bg-orange-500 text-white'
                     : 'bg-black/50 text-gray-400 hover:text-white border border-gray-800'
@@ -213,7 +214,7 @@ export default function MarketplacePage() {
               </button>
               <button
                 onClick={() => setActiveView('live')}
-                className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
                   activeView === 'live'
                     ? 'bg-orange-500 text-white'
                     : 'bg-black/50 text-gray-400 hover:text-white border border-gray-800'
@@ -224,7 +225,7 @@ export default function MarketplacePage() {
               {isConnected && (
                 <button
                   onClick={() => setActiveView('my-ip')}
-                  className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                  className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
                     activeView === 'my-ip'
                       ? 'bg-orange-500 text-white'
                       : 'bg-black/50 text-gray-400 hover:text-white border border-gray-800'
@@ -235,34 +236,35 @@ export default function MarketplacePage() {
               )}
               <button
                 onClick={() => setActiveView('activity')}
-                className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
                   activeView === 'activity'
                     ? 'bg-orange-500 text-white'
                     : 'bg-black/50 text-gray-400 hover:text-white border border-gray-800'
                 }`}
               >
-                🕒 Last Activity
+                🕒 Activity
               </button>
             </div>
 
-            <div className="flex gap-2">
+            {/* Action Buttons - Mobile responsive */}
+            <div className="flex flex-col sm:flex-row gap-2">
               {isConnected && (
                 <>
                   <button
                     onClick={() => { setPrefillTokenId(null); setShowCreateModal(true); }}
-                    className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all"
+                    className="px-4 sm:px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all text-sm sm:text-base"
                   >
                     + List NFT
                   </button>
                   <button
                     onClick={() => setShowCreateAuction({})}
-                    className="px-6 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-lg hover:from-orange-600 hover:to-amber-600 transition-all"
+                    className="px-4 sm:px-6 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-lg hover:from-orange-600 hover:to-amber-600 transition-all text-sm sm:text-base"
                   >
-                    🎯 Create Auction
+                    🎯 Auction
                   </button>
                   <button
                     onClick={() => setActiveView('dashboard')}
-                    className="px-6 py-2 bg-gradient-to-r from-gray-700 to-gray-800 text-white font-bold rounded-lg hover:from-gray-600 hover:to-gray-700 transition-all"
+                    className="px-4 sm:px-6 py-2 bg-gradient-to-r from-gray-700 to-gray-800 text-white font-bold rounded-lg hover:from-gray-600 hover:to-gray-700 transition-all text-sm sm:text-base"
                   >
                     📊 Dashboard
                   </button>
