@@ -77,6 +77,7 @@ export default function MarketplaceGrid({
           const auctionedTokens = new Map<string, any>();
           
           // Manually check each listing (since getActiveListings was removed)
+          const listedTokenPrices = new Map<string, string>();
           for (let i = 1n; i <= listingCount; i++) {
             try {
               const listing = await client.readContract({
@@ -86,9 +87,12 @@ export default function MarketplaceGrid({
                 args: [i],
               }) as any;
               
-              // listing[2] is tokenId, listing[1] is nftContract, listing[6] is isActive
+              // listing[2] is tokenId, listing[1] is nftContract, listing[6] is isActive, listing[3] is price
               if (listing[6] && listing[1]?.toLowerCase() === '0xf90733b9ecda3b49c250b2c3e3e42c96fc93324e'.toLowerCase()) {
-                listedTokens.add(listing[2].toString());
+                const tokenId = listing[2].toString();
+                const price = (Number(listing[3]) / 1e18).toString(); // Convert from wei to CAMP
+                listedTokens.add(tokenId);
+                listedTokenPrices.set(tokenId, price);
               }
             } catch {}
           }
@@ -124,14 +128,21 @@ export default function MarketplaceGrid({
           }
           
           // Mark user's NFTs with correct listing and auction status
-          const userNFTsFormatted = userNFTs.map((nft: any) => ({
-            ...nft,
-            isListed: listedTokens.has(nft.tokenId),
-            isAuctioned: auctionedTokens.has(nft.tokenId),
-            auctionData: auctionedTokens.get(nft.tokenId),
-            price: nft.metadata?.attributes?.find((a: any) => a.trait_type === 'Price (native)')?.value || '0.1',
-            seller: address
-          }));
+          const userNFTsFormatted = userNFTs.map((nft: any) => {
+            const isListed = listedTokens.has(nft.tokenId);
+            const isAuctioned = auctionedTokens.has(nft.tokenId);
+            const marketplacePrice = listedTokenPrices.get(nft.tokenId);
+            const nativePrice = nft.metadata?.attributes?.find((a: any) => a.trait_type === 'Price (native)')?.value || '0.1';
+            
+            return {
+              ...nft,
+              isListed,
+              isAuctioned,
+              auctionData: auctionedTokens.get(nft.tokenId),
+              price: isListed ? marketplacePrice : nativePrice, // Use marketplace price if listed, otherwise native price
+              seller: address
+            };
+          });
           
           nfts = userNFTsFormatted;
         } catch (error) {
