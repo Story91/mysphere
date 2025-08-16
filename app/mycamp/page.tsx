@@ -689,7 +689,7 @@ export default function MyCampPage() {
         >
 
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
             {/* Home Button */}
             <motion.button
               initial={{ opacity: 0, y: 20 }}
@@ -702,7 +702,7 @@ export default function MyCampPage() {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setActiveTab('home')}
-              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
+              className={`group relative overflow-hidden rounded-2xl p-2 sm:p-4 transition-all duration-500 ${
                 activeTab === 'home'
                   ? 'bg-gradient-to-br from-orange-500/80 to-red-500/80 text-white shadow-2xl shadow-orange-500/25 border border-orange-400/50'
                   : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-orange-400/40'
@@ -720,8 +720,8 @@ export default function MyCampPage() {
                   whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">HOME</div>
-                  <div className="text-xs opacity-80 uppercase tracking-widest">Dashboard</div>
+                  <div className="text-sm sm:text-lg md:text-xl mb-1 sm:mb-2 font-black tracking-wider">HOME</div>
+                  <div className="text-[10px] sm:text-xs opacity-80 uppercase tracking-widest">Dashboard</div>
                 </motion.div>
               </div>
               {activeTab === 'home' && (
@@ -745,7 +745,7 @@ export default function MyCampPage() {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setActiveTab('nfts')}
-              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
+              className={`group relative overflow-hidden rounded-2xl p-2 sm:p-4 transition-all duration-500 ${
                 activeTab === 'nfts'
                   ? 'bg-gradient-to-br from-purple-500/80 to-fuchsia-500/80 text-white shadow-2xl shadow-purple-500/25 border border-purple-400/50'
                   : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-purple-400/40'
@@ -763,8 +763,8 @@ export default function MyCampPage() {
                   whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">MY IP</div>
-                  <div className="text-xs opacity-80 uppercase tracking-widest">IpNFTs</div>
+                  <div className="text-sm sm:text-lg md:text-xl mb-1 sm:mb-2 font-black tracking-wider">MY IP</div>
+                  <div className="text-[10px] sm:text-xs opacity-80 uppercase tracking-widest">IpNFTs</div>
                 </motion.div>
               </div>
               {activeTab === 'nfts' && (
@@ -788,7 +788,7 @@ export default function MyCampPage() {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setActiveTab('creator')}
-              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
+              className={`group relative overflow-hidden rounded-2xl p-2 sm:p-4 transition-all duration-500 ${
                 activeTab === 'creator'
                   ? 'bg-gradient-to-br from-pink-500/80 to-fuchsia-500/80 text-white shadow-2xl shadow-pink-500/25 border border-pink-400/50'
                   : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-pink-400/40'
@@ -806,8 +806,8 @@ export default function MyCampPage() {
                   whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">IP CREATOR</div>
-                  <div className="text-xs opacity-80 uppercase tracking-widest">Create</div>
+                  <div className="text-sm sm:text-lg md:text-xl mb-1 sm:mb-2 font-black tracking-wider">IP CREATOR</div>
+                  <div className="text-[10px] sm:text-xs opacity-80 uppercase tracking-widest">Create</div>
                 </motion.div>
               </div>
               {activeTab === 'creator' && (
@@ -831,7 +831,7 @@ export default function MyCampPage() {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setActiveTab('stats')}
-              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
+              className={`group relative overflow-hidden rounded-2xl p-2 sm:p-4 transition-all duration-500 ${
                 activeTab === 'stats'
                   ? 'bg-gradient-to-br from-blue-500/80 to-cyan-500/80 text-white shadow-2xl shadow-blue-500/25 border border-blue-400/50'
                   : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-blue-400/40'
@@ -849,8 +849,8 @@ export default function MyCampPage() {
                   whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">STATS</div>
-                  <div className="text-xs opacity-80 uppercase tracking-widest">Analytics</div>
+                  <div className="text-sm sm:text-lg md:text-xl mb-1 sm:mb-2 font-black tracking-wider">STATS</div>
+                  <div className="text-[10px] sm:text-xs opacity-80 uppercase tracking-widest">Analytics</div>
                 </motion.div>
               </div>
               {activeTab === 'stats' && (
@@ -921,7 +921,7 @@ export default function MyCampPage() {
               }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setActiveTab('portal')}
-              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 transition-all duration-500 ${
+              className={`group relative overflow-hidden rounded-2xl p-2 sm:p-4 transition-all duration-500 ${
                 activeTab === 'portal'
                   ? 'bg-gradient-to-br from-orange-500/80 to-amber-500/80 text-white shadow-2xl shadow-orange-500/25 border border-orange-400/50'
                   : 'bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-orange-400/40'
@@ -939,8 +939,8 @@ export default function MyCampPage() {
                   whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="text-xl sm:text-2xl md:text-3xl mb-2 sm:mb-3 font-black tracking-wider">PORTAL</div>
-                  <div className="text-xs opacity-80 uppercase tracking-widest">Camp NFTs</div>
+                  <div className="text-sm sm:text-lg md:text-xl mb-1 sm:mb-2 font-black tracking-wider">PORTAL</div>
+                  <div className="text-[10px] sm:text-xs opacity-80 uppercase tracking-widest">Camp NFTs</div>
                 </motion.div>
               </div>
               {activeTab === 'portal' && (
@@ -950,6 +950,38 @@ export default function MyCampPage() {
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
+            </motion.button>
+
+            {/* IP Market V3 Button */}
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.65, duration: 0.5 }}
+              whileHover={{ 
+                scale: 1.05, 
+                y: -5,
+                boxShadow: "0 20px 40px rgba(147, 51, 234, 0.4)"
+              }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => window.open('/marketplace', '_blank')}
+              className="group relative overflow-hidden rounded-2xl p-2 sm:p-4 transition-all duration-500 bg-black/40 hover:bg-black/60 text-orange-200 hover:text-orange-100 border border-orange-500/20 hover:border-purple-400/40"
+            >
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-indigo-400/20"
+                initial={{ opacity: 0 }}
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+              <div className="relative z-10">
+                <motion.div 
+                  className="text-center"
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="text-sm sm:text-lg md:text-xl mb-1 sm:mb-2 font-black tracking-wider">IP MARKET V3</div>
+                  <div className="text-[10px] sm:text-xs opacity-80 uppercase tracking-widest">Beta</div>
+                </motion.div>
+              </div>
             </motion.button>
 
             {/* Social Media Dropdown Button - REMOVED */}
