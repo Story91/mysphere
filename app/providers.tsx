@@ -5,6 +5,7 @@ import { OnchainKitProvider } from '@coinbase/onchainkit';
 import { createContext, useContext, useState } from 'react';
 import { createConfig, http } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
+import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors';
 import { farcasterFrame } from '@farcaster/frame-wagmi-connector';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -99,6 +100,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeContext.Provider value={{ mode, setMode, style, setStyle }}>
       <QueryClientProvider client={queryClient}>
         <WagmiConfig config={wagmiConfig}>
+          <RainbowKitProvider>
           <CampProvider 
             clientId={process.env.NEXT_PUBLIC_CAMP_CLIENT_ID!}
             redirectUri={typeof window !== 'undefined' ? `${window.location.origin}/mycamp` : ''}
@@ -127,6 +129,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
               </OnchainKitProvider>
             </FarcasterFrameProvider>
           </CampProvider>
+          </RainbowKitProvider>
         </WagmiConfig>
       </QueryClientProvider>
     </ThemeContext.Provider>

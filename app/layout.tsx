@@ -2,6 +2,7 @@
 
 import Script from 'next/script';
 import '@coinbase/onchainkit/styles.css';
+import '@rainbow-me/rainbowkit/styles.css';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from "@vercel/speed-insights/react"

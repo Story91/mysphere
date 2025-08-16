@@ -185,7 +185,8 @@ export default function Navigation() {
       label: 'NFT',
       dropdownItems: [
         { href: '/nft', label: 'SphereGenesis' },
-        { href: '/quotes', label: 'Quotes on Base' }
+        { href: '/quotes', label: 'Quotes on Base' },
+        { href: '/marketplace', label: 'IP NFT Marketplace', isHighlighted: true }
       ]
     },
     {

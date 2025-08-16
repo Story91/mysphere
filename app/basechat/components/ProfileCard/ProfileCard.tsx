@@ -501,9 +501,9 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
                     type="button"
                     aria-label={`Contact ${name || "user"}`}
                   >
-                    <svg className="pc-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <circle cx="12" cy="12" r="3"/>
-                      <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/>
+                    <svg className="pc-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5l4 4L7 21l-4 1 1-4 12.5-14.5z" />
                     </svg>
                   </button>
                 </div>

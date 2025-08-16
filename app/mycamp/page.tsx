@@ -1764,12 +1764,21 @@ export default function MyCampPage() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="bg-black/30 backdrop-blur-sm border border-purple-500/20 rounded-2xl p-4 sm:p-6 mb-8"
             >
-              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-200 mb-4 sm:mb-6 flex items-center gap-2">
-                🎯 My IP NFTs
-                <span className="text-sm bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">
-                  Origin SDK
-                </span>
-              </h3>
+              <div className="flex justify-between items-start mb-4 sm:mb-6">
+                <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-200 flex items-center gap-2">
+                  🎯 My IP NFTs
+                  <span className="text-sm bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">
+                    Origin SDK
+                  </span>
+                </h3>
+                <Link
+                  href="/marketplace"
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-2 px-4 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2"
+                >
+                  <span>🛒</span>
+                  <span>Marketplace</span>
+                </Link>
+              </div>
               
               {!isConnected ? (
                 <div className="text-center py-12">

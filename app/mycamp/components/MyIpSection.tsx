@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
+import { createPublicClient, http } from 'viem';
 import { fetchIpNftsFor } from '../api/fetchIpNfts';
+import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
+import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../../marketplace/config/simpleMarketplace';
 
 export default function MyIpSection() {
   const { address } = useAccount();
@@ -12,14 +15,77 @@ export default function MyIpSection() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(6); // 6 on mobile, 8 on desktop
   const [preview, setPreview] = useState<any | null>(null);
+  const [listedTokens, setListedTokens] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
+  // Check which tokens are listed on marketplace
+  const checkListedTokens = async (nfts: any[]) => {
+    try {
+      const client = createPublicClient({
+        chain: baseCampChain,
+        transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
+      });
+      
+      // Get listing count first
+      const listingCount = await client.readContract({
+        address: MARKETPLACE_ADDRESS as `0x${string}`,
+        abi: MARKETPLACE_ABI,
+        functionName: 'getListingCount',
+      }) as bigint;
+
+      const listed = new Set<string>();
+      
+      // Manually check each listing (since getActiveListings was removed)
+      for (let i = 1n; i <= listingCount; i++) {
+        try {
+          const listing = await client.readContract({
+            address: MARKETPLACE_ADDRESS as `0x${string}`,
+            abi: MARKETPLACE_ABI,
+            functionName: 'listings',
+            args: [i],
+          }) as any;
+          
+          // listing[2] is tokenId, listing[1] is nftContract, listing[6] is isActive
+          // Check if this token is listed (regardless of who listed it)
+          if (listing[6] && listing[1]?.toLowerCase() === '0xf90733b9ecda3b49c250b2c3e3e42c96fc93324e'.toLowerCase()) {
+            listed.add(listing[2].toString());
+          }
+        } catch {}
+      }
+      
+      setListedTokens(listed);
+    } catch (error) {
+      console.error('Error checking listed tokens:', error);
+    }
+  };
+
+  const refreshData = async () => {
     if (!address) return;
     setLoading(true);
-    fetchIpNftsFor(address)
-      .then(setItems)
-      .finally(() => setLoading(false));
+    try {
+      const nfts = await fetchIpNftsFor(address);
+      setItems(nfts);
+      await checkListedTokens(nfts);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
   }, [address]);
+
+  // Listen for marketplace events to refresh data
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'marketplace-listing-created') {
+        console.log('🔄 Marketplace listing created - refreshing MyIP data');
+        setTimeout(() => refreshData(), 2000); // Small delay for blockchain propagation
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Responsive page size: 6 on mobile, 8 on desktop (lg and up)
   useEffect(() => {
@@ -92,13 +158,20 @@ export default function MyIpSection() {
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900" style={{ filter: 'blur(10px)' }} />
                 )}
+                  {/* Listed badge */}
+                  {listedTokens.has(nft.tokenId) && (
+                    <div className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded bg-orange-500 text-white border border-orange-600 font-bold">
+                      🏷️ LISTED
+                    </div>
+                  )}
+                  
                   {/* Price badge (native) */}
                   {(() => {
                     const attrs = (nft?.metadata?.attributes || []) as Array<{trait_type?: string; value?: string}>;
                     const native = attrs.find(a => a.trait_type === 'Price (native)')?.value;
                     if (!native) return null;
                     return (
-                      <div className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded bg-black/70 text-white border border-white/10">
+                      <div className={`absolute ${listedTokens.has(nft.tokenId) ? 'top-8 left-2' : 'top-2 left-2'} text-[10px] px-2 py-0.5 rounded bg-black/70 text-white border border-white/10`}>
                         {native} $CAMP
                       </div>
                     );
@@ -134,8 +207,24 @@ export default function MyIpSection() {
               href={`https://basecamp.cloud.blockscout.com/token/${nft.contract}/instance/${nft.tokenId}`}
               target="_blank"
               rel="noreferrer"
-              className="block text-[10px] text-black/70 hover:text-black underline px-2 pb-2"
+              className="block text-[10px] text-black/70 hover:text-black underline px-2 pb-1"
             >View on Explorer</a>
+            
+            {/* List NFT Button */}
+            <div className="px-2 pb-2">
+              {listedTokens.has(nft.tokenId) ? (
+                <div className="py-1 px-2 bg-gray-300 text-gray-600 text-[10px] font-semibold rounded text-center cursor-not-allowed">
+                  Already Listed
+                </div>
+              ) : (
+                <a
+                  href={`/marketplace?list=${nft.tokenId}`}
+                  className="block py-1 px-2 bg-orange-500 text-white text-[10px] font-semibold rounded text-center hover:bg-orange-600 transition-colors"
+                >
+                  List on Marketplace
+                </a>
+              )}
+            </div>
           </div>
         ))}
       </div>
