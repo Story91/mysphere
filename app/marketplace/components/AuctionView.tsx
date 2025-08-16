@@ -529,12 +529,25 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                     <div className="space-y-2">
                       {selectedAuction.highestBid > 0n && (
                         <>
-                          <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3 text-center">
-                            <div className="text-green-400 font-semibold">Auction Won!</div>
-                            <div className="text-white text-sm mt-1">
-                              Winner: {selectedAuction.highestBidder.slice(0, 8)}...{selectedAuction.highestBidder.slice(-6)}
+                          {/* Check if reserve price is met */}
+                          {selectedAuction.highestBid >= selectedAuction.reservePrice ? (
+                            <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3 text-center">
+                              <div className="text-green-400 font-semibold">Auction Won!</div>
+                              <div className="text-white text-sm mt-1">
+                                Winner: {selectedAuction.highestBidder.slice(0, 8)}...{selectedAuction.highestBidder.slice(-6)}
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="bg-orange-500/20 border border-orange-500/40 rounded-lg p-3 text-center">
+                              <div className="text-orange-400 font-semibold">Reserve Price Not Met</div>
+                              <div className="text-white text-sm mt-1">
+                                Highest bid: {formatEther(selectedAuction.highestBid)} CAMP
+                              </div>
+                              <div className="text-gray-300 text-xs mt-1">
+                                Required: {formatEther(selectedAuction.reservePrice)} CAMP
+                              </div>
+                            </div>
+                          )}
                           
                           {/* Warning if seller needs to act */}
                           {selectedAuction.seller.toLowerCase() === address?.toLowerCase() && (
@@ -550,9 +563,16 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                             selectedAuction.highestBidder.toLowerCase() === address?.toLowerCase()) && (
                             <button
                               onClick={() => handleFinalizeAuction(selectedAuction.auctionId)}
-                              className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all text-lg"
+                              className={`w-full py-3 text-white font-bold rounded-lg transition-all text-lg ${
+                                selectedAuction.highestBid >= selectedAuction.reservePrice
+                                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
+                                  : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600'
+                              }`}
                             >
-                              Finalize & Transfer NFT
+                              {selectedAuction.highestBid >= selectedAuction.reservePrice
+                                ? 'Finalize & Transfer NFT'
+                                : 'Finalize & Return Funds'
+                              }
                             </button>
                           )}
                         </>

@@ -1078,6 +1078,26 @@ export default function DashboardView() {
                 </div>
               </div>
 
+              {/* Pending Returns Section - always show */}
+              <div className="mt-6 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-4 sm:p-6">
+                <div className="text-center">
+                  <p className="text-gray-300 mb-2">Auction Refunds Available</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-blue-400 mb-4">
+                    {myPendingReturns ? formatEther(myPendingReturns) : '0'} CAMP
+                  </p>
+                  <button
+                    onClick={handleWithdrawPendingReturns}
+                    disabled={!myPendingReturns || myPendingReturns === 0n || isWithdrawingPending}
+                    className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                  >
+                    {isWithdrawingPending ? 'Processing...' : 'Withdraw Refunds'}
+                  </button>
+                  <p className="text-gray-500 text-xs mt-3">
+                    Refunds from unsuccessful auctions or overbids
+                  </p>
+                </div>
+              </div>
+
 
             </div>
           )}
@@ -1441,9 +1461,19 @@ function AuctionCardWithPreview({
           <button 
             onClick={onFinalize} 
             disabled={isFinalizing} 
-            className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+            className={`flex-1 px-3 py-2 text-white rounded-lg disabled:opacity-50 transition-colors ${
+              auction.highestBid >= auction.reservePrice
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-orange-600 hover:bg-orange-700'
+            }`}
+            title={auction.highestBid < auction.reservePrice ? 
+              `Reserve price (${formatEther(auction.reservePrice)} CAMP) not met. Will return funds to bidder.` : 
+              'Reserve price met. Will transfer NFT to winner.'
+            }
           >
-            {isFinalizing ? 'Processing...' : 'Finalize'}
+            {isFinalizing ? 'Processing...' : (
+              auction.highestBid >= auction.reservePrice ? 'Finalize' : 'Return Funds'
+            )}
           </button>
           <button 
             onClick={onCancel} 
