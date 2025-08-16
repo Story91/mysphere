@@ -570,6 +570,7 @@ export default function MarketplaceGrid({
             onAccess={handleAccess}
             onBid={handleBid}
             showOfferAlways={mode === 'live'}
+            mode={mode}
           />
         ))}
       </div>

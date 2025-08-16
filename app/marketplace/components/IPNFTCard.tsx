@@ -12,6 +12,7 @@ interface IPNFTCardProps {
   onAccess?: (nft: any) => void;
   onBid?: (nft: any) => void;
   showOfferAlways?: boolean;
+  mode?: 'explore' | 'my' | 'live';
 }
 
 export default function IPNFTCard({ 
@@ -22,7 +23,8 @@ export default function IPNFTCard({
   onOffer,
   onAccess,
   onBid,
-  showOfferAlways = false 
+  showOfferAlways = false,
+  mode = 'explore'
 }: IPNFTCardProps) {
   const { address } = useAccount();
   const [imageError, setImageError] = useState(false);
@@ -156,8 +158,8 @@ export default function IPNFTCard({
               </div>
             )}
             
-            {/* Listed badge (top left, below auction if present) */}
-            {nft.isListed && (
+            {/* Listed badge (top left, below auction if present) - only in 'my' mode */}
+            {nft.isListed && mode === 'my' && (
               <div className={`absolute ${nft.isAuctioned ? 'top-8 left-2' : 'top-2 left-2'} text-[10px] px-2 py-0.5 rounded bg-orange-500 text-white border border-orange-600 font-bold`}>
                 🏷️ LISTED
               </div>
