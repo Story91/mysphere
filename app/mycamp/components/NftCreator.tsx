@@ -53,11 +53,24 @@ export default function NftCreator() {
   
   // Common states
   const [isMinting, setIsMinting] = useState(false);
-  // License controls (aligned with MyOrigin basic fields)
-  const [licensePriceWei, setLicensePriceWei] = useState<string>('0');
+  // License controls - price in CAMP tokens
+  const [licensePriceCamp, setLicensePriceCamp] = useState<string>('0');
   // AI Name/Description (for generated image)
   const [aiName, setAiName] = useState<string>('');
   const [aiDescription, setAiDescription] = useState<string>('');
+
+  // Function to get skeleton dimensions based on aspect ratio
+  const getSkeletonDimensions = (ratio: string) => {
+    const baseWidth = 320; // Base width for skeleton (max-w-md is ~384px)
+    switch (ratio) {
+      case '1:1': return { width: baseWidth, height: baseWidth };
+      case '4:3': return { width: baseWidth, height: Math.round(baseWidth * 3/4) };
+      case '3:4': return { width: Math.round(baseWidth * 3/4), height: baseWidth };
+      case '16:9': return { width: baseWidth, height: Math.round(baseWidth * 9/16) };
+      case '9:16': return { width: Math.round(baseWidth * 9/16), height: baseWidth };
+      default: return { width: baseWidth, height: baseWidth };
+    }
+  };
 
   const generateImage = async () => {
     if (!prompt.trim()) return;
@@ -162,14 +175,9 @@ export default function NftCreator() {
       const ipfsBlob = await ipfsResponse.blob();
       const ipfsFile = new File([ipfsBlob], file.name, { type: 'image/png' });
 
-      // Parse price (wei) from input (allow commas/spaces)
-      const sanitizedWei = (licensePriceWei || '0').toString().replace(/[^0-9]/g, '');
-      let priceWei: bigint = 0n;
-      try {
-        priceWei = sanitizedWei ? BigInt(sanitizedWei) : 0n;
-      } catch {
-        throw new Error('Invalid wei amount');
-      }
+      // Convert CAMP to wei (1 CAMP = 10^18 wei)
+      const campAmount = parseFloat(licensePriceCamp || '0');
+      const priceWei: bigint = BigInt(Math.floor(campAmount * 1e18));
 
       // Define license terms for Origin SDK
       const license = {
@@ -192,8 +200,8 @@ export default function NftCreator() {
           { trait_type: "Aspect Ratio", value: generatedImage.metadata?.aspectRatio || aspectRatio },
           { trait_type: "Model", value: generatedImage.metadata?.modelId || 'fal-ai/fast-sdxl' },
           // Price (optional duplication for UI)
-          { trait_type: "Price (wei)", value: sanitizedWei || '0' },
-          { trait_type: "Price (native)", value: formatEther(priceWei) },
+          { trait_type: "Price (CAMP)", value: licensePriceCamp || '0' },
+          { trait_type: "Price (wei)", value: priceWei.toString() },
         ],
       } as any;
 
@@ -310,6 +318,8 @@ export default function NftCreator() {
           >
             {/* Fal Image Generator (fast-sdxl) */}
             <FalImageGenerator
+              aspectRatio={aspectRatio}
+              onAspectRatioChange={setAspectRatio}
               onGenerated={(dataUri, metadata) => {
                 setGeneratedImage({ data: dataUri, metadata });
                 const meta: any = metadata || {};
@@ -335,7 +345,14 @@ export default function NftCreator() {
                     className="w-full max-w-md mx-auto rounded-lg border border-purple-500/30"
                   />
                 ) : (
-                  <div className="w-full max-w-md mx-auto h-64 rounded-lg border border-purple-500/30 bg-purple-500/10 animate-pulse" />
+                  <div 
+                    className="mx-auto rounded-lg border border-purple-500/30 bg-purple-500/10 animate-pulse"
+                    style={{
+                      width: `${getSkeletonDimensions(aspectRatio).width}px`,
+                      height: `${getSkeletonDimensions(aspectRatio).height}px`,
+                      maxWidth: '100%'
+                    }}
+                  />
                 )}
                 <div className="text-sm text-purple-300">
                   <p><strong>Style:</strong> {generatedImage?.metadata?.style || imageStyle}</p>
@@ -366,19 +383,21 @@ export default function NftCreator() {
                   </div>
                 </div>
 
-                {/* License Controls - Only Price */}
+                {/* License Controls - Price in CAMP */}
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label className="block text-purple-200 text-sm font-medium mb-1">Price in wei</label>
+                    <label className="block text-purple-200 text-sm font-medium mb-1">Price in CAMP</label>
                     <input
                       type="number"
                       min={0}
-                      value={licensePriceWei}
-                      onChange={(e) => setLicensePriceWei(e.target.value)}
+                      step="0.01"
+                      value={licensePriceCamp}
+                      onChange={(e) => setLicensePriceCamp(e.target.value)}
+                      placeholder="0.00"
                       className="w-full p-2 bg-black/40 border border-purple-500/30 rounded-lg text-white"
                     />
                     <div className="text-xs text-purple-300 mt-1">
-                      ≈ {(() => { try { return formatEther(BigInt((licensePriceWei||'0').toString().replace(/[^0-9]/g,''))); } catch { return '0'; } })()} CAMP
+                      ≈ {BigInt(Math.floor(parseFloat(licensePriceCamp || '0') * 1e18)).toString()} wei
                     </div>
                   </div>
                 </div>
@@ -547,17 +566,22 @@ export default function NftCreator() {
                     />
                   </div>
 
-                  {/* License Controls - Only Price */}
+                  {/* License Controls - Price in CAMP */}
                   <div className="grid grid-cols-1 gap-3">
                     <div>
-                      <label className="block text-purple-200 text-sm font-medium mb-1">Price in wei</label>
+                      <label className="block text-purple-200 text-sm font-medium mb-1">Price in CAMP</label>
                       <input
                         type="number"
                         min={0}
-                        value={licensePriceWei}
-                        onChange={(e) => setLicensePriceWei(e.target.value)}
+                        step="0.01"
+                        value={licensePriceCamp}
+                        onChange={(e) => setLicensePriceCamp(e.target.value)}
+                        placeholder="0.00"
                         className="w-full p-2 bg-black/40 border border-purple-500/30 rounded-lg text-white"
                       />
+                      <div className="text-xs text-purple-300 mt-1">
+                        ≈ {BigInt(Math.floor(parseFloat(licensePriceCamp || '0') * 1e18)).toString()} wei
+                      </div>
                     </div>
                   </div>
                 </div>
