@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fal } from '@ai-sdk/fal';
-import { experimental_generateImage as generateImage } from 'ai';
 
 export const runtime = 'edge';
 
@@ -48,39 +46,37 @@ export async function POST(request: NextRequest) {
           negative_prompt: 'pixelated, blurry, low-quality, distorted, watermark, text, signature, frame, border',
         };
 
-    // Generate image using Fal
-    const { image, providerMetadata } = await generateImage({
-      model: fal.image(modelId),
-      prompt: enhancedPrompt,
-      providerOptions: { fal: falOptions as any },
+    // Direct Fal API call instead of AI SDK (compatibility fix)
+    const falApiKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
+    
+    // TypeScript fix: ensure no providerMetadata usage
+    
+    const falPayload = isSDXL 
+      ? {
+          prompt: enhancedPrompt,
+          image_size: falOptions.image_size,
+          format: 'png'
+        }
+      : {
+          prompt: enhancedPrompt,
+          ...falOptions
+        };
+
+    const falResponse = await fetch(`https://fal.run/${modelId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Key ${falApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(falPayload),
     });
 
-    // Prefer hosted URL from Fal metadata if provided (mniej awaryjne)
-    const falImageUrl = (providerMetadata as any)?.fal?.images?.[0]?.url as string | undefined;
-
-    // Handle various image result shapes from AI SDK / Fal
-    const anyImage: any = image as any;
-    let resolvedImage: string | undefined = falImageUrl
-      || (typeof anyImage?.url === 'string' ? anyImage.url : undefined)
-      || (typeof anyImage?.base64 === 'string' ? `data:image/png;base64,${anyImage.base64}` : undefined);
-
-    if (!resolvedImage) {
-      // Last-resort: try to convert Uint8Array → base64 without Buffer (Edge safe)
-      let bytes: Uint8Array | undefined;
-      if (image instanceof Uint8Array) {
-        bytes = image;
-      } else if (typeof image === 'object' && image !== null && 'bytes' in image) {
-        bytes = (image as any).bytes as Uint8Array;
-      }
-      if (bytes) {
-        let binary = '';
-        const chunkSize = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)) as unknown as number[]);
-        }
-        resolvedImage = `data:image/png;base64,${btoa(binary)}`;
-      }
+    if (!falResponse.ok) {
+      throw new Error(`Fal API error: ${falResponse.status} ${falResponse.statusText}`);
     }
+
+    const falResult = await falResponse.json();
+    const resolvedImage = falResult.images?.[0]?.url || falResult.image?.url;
 
     return NextResponse.json({
       success: true,
@@ -91,7 +87,7 @@ export async function POST(request: NextRequest) {
         aspectRatio,
         style,
         modelId,
-        revisedPrompt: providerMetadata?.fal ? String(providerMetadata.fal) : undefined,
+        revisedPrompt: falResult.revised_prompt || undefined,
       },
     });
 
