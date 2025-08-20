@@ -31,6 +31,9 @@ export default function MarketplaceGrid({
   const [filter, setFilter] = useState<'all' | 'image' | 'video' | 'audio' | 'text'>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
+  const [totalListingsCount, setTotalListingsCount] = useState(0);
+  const [cachedListings, setCachedListings] = useState<Map<string, any>>(new Map());
+  const [activeListingIds, setActiveListingIds] = useState<bigint[]>([]);
   const [preview, setPreview] = useState<any | null>(null);
   const [showListModal, setShowListModal] = useState(false);
   const [selectedNFT, setSelectedNFT] = useState<any>(null);
@@ -48,6 +51,38 @@ export default function MarketplaceGrid({
     sortBy: 'recent',
     saleType: 'all' as 'all' | 'buy' | 'auctions' | 'access',
   });
+
+  // Cache helpers for explore mode
+  const getCacheKey = () => `marketplace-listings-cache-v2`;
+  const getListingCache = () => {
+    if (typeof window === 'undefined') return { listings: new Map(), activeIds: [], activeAuctionIds: [], timestamp: 0 };
+    try {
+      const cached = sessionStorage.getItem(getCacheKey());
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return {
+          listings: new Map(parsed.listings || []),
+          activeIds: (parsed.activeIds || []).map((id: string) => BigInt(id)),
+          activeAuctionIds: (parsed.activeAuctionIds || []).map((id: string) => BigInt(id)),
+          timestamp: parsed.timestamp || 0
+        };
+      }
+    } catch {}
+    return { listings: new Map(), activeIds: [], activeAuctionIds: [], timestamp: 0 };
+  };
+
+  const saveListingCache = (listings: Map<string, any>, activeIds: bigint[], activeAuctionIds: bigint[] = []) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const cacheData = {
+        listings: Array.from(listings.entries()),
+        activeIds: activeIds.map(id => id.toString()),
+        activeAuctionIds: activeAuctionIds.map(id => id.toString()),
+        timestamp: Date.now()
+      };
+      sessionStorage.setItem(getCacheKey(), JSON.stringify(cacheData));
+    } catch {}
+  };
 
   // Fetch NFTs depending on mode
   useEffect(() => {
@@ -168,7 +203,7 @@ export default function MarketplaceGrid({
           console.error('Failed to fetch recent IP NFTs:', error);
         }
       } else {
-        // Explore: aktywne listingi z marketplace
+        // Explore: aktywne listingi z marketplace z cache i paginacją
         try {
           const client = createPublicClient({
             chain: baseCampChain,
@@ -176,31 +211,89 @@ export default function MarketplaceGrid({
           });
           console.log('🔍 Fetching active listings from marketplace:', MARKETPLACE_ADDRESS);
           
-          // Get listing count first
-          const listingCount = await client.readContract({
-            address: MARKETPLACE_ADDRESS as `0x${string}`,
-            abi: MARKETPLACE_ABI,
-            functionName: 'getListingCount',
-          }) as bigint;
+          // Sprawdź cache
+          const cache = getListingCache();
+          const CACHE_DURATION = 15 * 60 * 1000; // 15 minut
+          const isCacheValid = cache.timestamp && (Date.now() - cache.timestamp) < CACHE_DURATION;
           
-          // Collect active listing IDs manually
-          const listingIds: bigint[] = [];
-          for (let i = 1n; i <= listingCount && listingIds.length < 50; i++) {
+          let allActiveIds: bigint[] = [];
+          let allActiveAuctionIds: bigint[] = [];
+          let listingsCache = new Map(cache.listings);
+          
+          if (isCacheValid && cache.activeIds.length > 0) {
+            console.log('📋 Using cached active listing IDs:', cache.activeIds.length, 'auctions:', cache.activeAuctionIds?.length || 0);
+            allActiveIds = cache.activeIds;
+            allActiveAuctionIds = cache.activeAuctionIds || [];
+            setActiveListingIds(allActiveIds);
+            setTotalListingsCount(allActiveIds.length + allActiveAuctionIds.length);
+          } else {
+            console.log('🔄 Cache expired or empty, scanning for active listings...');
+            // Get total listing count first
+            const listingCount = await client.readContract({
+              address: MARKETPLACE_ADDRESS as `0x${string}`,
+              abi: MARKETPLACE_ABI,
+              functionName: 'getListingCount',
+            }) as bigint;
+            
+            // Scan wszystkie listingi aby znaleźć aktywne
+            for (let i = 1n; i <= listingCount; i++) {
+              try {
+                const listing = await client.readContract({
+                  address: MARKETPLACE_ADDRESS as `0x${string}`,
+                  abi: MARKETPLACE_ABI,
+                  functionName: 'listings',
+                  args: [i],
+                }) as any;
+                
+                // listing[6] is isActive
+                if (listing[6]) {
+                  allActiveIds.push(i);
+                }
+              } catch {}
+            }
+            
+            // Skanuj także aukcje
             try {
-              const listing = await client.readContract({
+              const auctionCount = await client.readContract({
                 address: MARKETPLACE_ADDRESS as `0x${string}`,
                 abi: MARKETPLACE_ABI,
-                functionName: 'listings',
-                args: [i],
-              }) as any;
+                functionName: 'auctionCount',
+              }) as bigint;
               
-              // listing[6] is isActive
-              if (listing[6]) {
-                listingIds.push(i);
+              for (let i = 1n; i <= auctionCount; i++) {
+                try {
+                  const auction = await client.readContract({
+                    address: MARKETPLACE_ADDRESS as `0x${string}`,
+                    abi: MARKETPLACE_ABI,
+                    functionName: 'auctions',
+                    args: [i],
+                  }) as any;
+                  
+                  if (Boolean(auction[9])) { // auction[9] is active
+                    allActiveAuctionIds.push(i);
+                  }
+                } catch {}
               }
             } catch {}
+            
+            setActiveListingIds(allActiveIds);
+            setTotalListingsCount(allActiveIds.length + allActiveAuctionIds.length);
+            console.log(`📋 Found ${allActiveIds.length} active listings, ${allActiveAuctionIds.length} active auctions`);
           }
-          console.log('📋 Active listing IDs:', listingIds);
+          
+          // Pobierz elementy dla aktualnej strony (listingi + aukcje)
+          const startIndex = (page - 1) * pageSize;
+          const endIndex = startIndex + pageSize;
+          const allItems = [...allActiveIds, ...allActiveAuctionIds];
+          const pageItemIds = allItems.slice(startIndex, endIndex);
+          
+          // Rozdiel na listingi i aukcje
+          const pageListingIds = pageItemIds.filter(id => allActiveIds.includes(id));
+          const pageAuctionIds = pageItemIds.filter(id => allActiveAuctionIds.includes(id));
+          
+          console.log(`📋 Page ${page}: showing ${pageListingIds.length} listings + ${pageAuctionIds.length} auctions (${pageItemIds.length} total)`);
+          
+          setCachedListings(listingsCache);
 
           const ERC721_ABI = [
             {
@@ -213,7 +306,16 @@ export default function MarketplaceGrid({
           ] as const;
 
           const items: any[] = [];
-          for (const id of listingIds) {
+          for (const id of pageListingIds) {
+            const cacheKey = `listing-${id}`;
+            
+            // Sprawdź czy mamy listing w cache
+            if (listingsCache.has(cacheKey)) {
+              console.log(`💾 Using cached listing ${id}`);
+              items.push(listingsCache.get(cacheKey));
+              continue;
+            }
+            
             console.log(`🔸 Fetching listing ${id}...`);
             const l = await client.readContract({
               address: MARKETPLACE_ADDRESS as `0x${string}`,
@@ -277,7 +379,7 @@ export default function MarketplaceGrid({
               });
             } catch {}
 
-            items.push({
+            const listingItem = {
               listingId: id.toString(),
               contract: l[1], // nftContract na pozycji 1
               tokenId: l[2].toString(), // tokenId na pozycji 2
@@ -297,97 +399,125 @@ export default function MarketplaceGrid({
               mime,
               tokenUri,
               type: mediaType,
-            });
+            };
+            
+            // Cache this listing
+            listingsCache.set(cacheKey, listingItem);
+            items.push(listingItem);
           }
+          
           console.log('✅ Final processed listings:', items);
-          // Append active auctions
-          try {
-            const total = await client.readContract({ address: MARKETPLACE_ADDRESS as `0x${string}`, abi: MARKETPLACE_ABI, functionName: 'auctionCount' }) as bigint;
-            for (let i = 1n; i <= total; i++) {
-              try {
-                const a = await client.readContract({ address: MARKETPLACE_ADDRESS as `0x${string}`, abi: MARKETPLACE_ABI, functionName: 'auctions', args: [i] }) as any;
-                const active = Boolean((a as any).active ?? a[9]); // Index 9 is 'active'
-                if (!active) continue;
-                const endTime = Number((a as any).endTime ?? a[5]); // Index 5 is 'endTime'
-                
-                // Fetch NFT metadata for auction
-                let metadata = null;
-                let image = '';
-                let mediaUrl = '';
-                let mime = '';
-                let mediaType: 'image' | 'video' | 'audio' | 'text' | 'unknown' = 'unknown';
-                
-                // Helper function to convert IPFS URLs
-                const ipfsToHttp = (url: string) => url?.startsWith('ipfs://') ? url.replace('ipfs://', 'https://ipfs.io/ipfs/') : url;
-                
-                try {
-                  const nftContract = (a as any).nftContract ?? a[1];
-                  const tokenId = (a as any).tokenId ?? a[2];
-                  const contractAddress = (!nftContract || nftContract === '0x0000000000000000000000000000000000000000') 
-                    ? '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E' // DEFAULT_IP_NFT_CONTRACT
-                    : nftContract;
-                  
-                  const ERC721_ABI = [
-                    { name: 'tokenURI', type: 'function', stateMutability: 'view', 
-                      inputs: [{ name: 'tokenId', type: 'uint256' }], 
-                      outputs: [{ type: 'string' }] }
-                  ] as const;
-                  
-                  const tokenUri = await client.readContract({
-                    address: contractAddress as `0x${string}`,
-                    abi: ERC721_ABI,
-                    functionName: 'tokenURI',
-                    args: [BigInt(tokenId)]
-                  }) as string;
-                  
-                  if (tokenUri) {
-                    const metaUrl = ipfsToHttp(tokenUri);
-                    const metaResponse = await fetch(metaUrl);
-                    if (metaResponse.ok) {
-                      metadata = await metaResponse.json();
-                      image = ipfsToHttp(metadata?.image || '');
-                      
-                      // Proper media type detection like in fetchIpNfts.ts
-                      const animUrl = metadata?.animation_url || metadata?.animationUrl;
-                      mediaUrl = (animUrl || image) ? ipfsToHttp(animUrl || image) : '';
-                      mime = (metadata?.properties?.mimeType || metadata?.mimeType || '').toString();
-                      const ext = (animUrl || image || '').split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
-                      const isVideo = mime.toLowerCase().startsWith('video/') || ['mp4','webm','mov','m4v'].includes(ext || '');
-                      const isAudio = mime.toLowerCase().startsWith('audio/') || ['mp3','wav','ogg','m4a','flac'].includes(ext || '');
-                      const isText  = mime.toLowerCase().startsWith('text/')  || ['txt','md','rtf','csv','json'].includes(ext || '');
-                      if (isVideo) mediaType = 'video';
-                      else if (isAudio) mediaType = 'audio';
-                      else if (isText) mediaType = 'text';
-                      else if (image) mediaType = 'image';
-                      else if (metadata?.text || metadata?.content) mediaType = 'text';
-                    }
-                  }
-                } catch {}
-                
-                // Fix price formatting - use formatEther properly
-                const minPrice = (a as any).minPrice ?? a[3];
-                const highestBid = (a as any).highestBid ?? a[7]; // Index 7 is highestBid, not 6!
-                
-                items.push({
-                  auctionId: i.toString(),
-                  contract: (a as any).nftContract ?? a[1],
-                  tokenId: ((a as any).tokenId ?? a[2]).toString(),
-                  minPrice: String(Number(minPrice) / 1e18),
-                  highestBid: String(Number(highestBid) / 1e18),
-                  seller: (a as any).seller ?? a[0],
-                  endTime,
-                  isListed: false,
-                  saleType: 'auction',
-                  metadata,
-                  image,
-                  mediaUrl,
-                  mime,
-                  tokenUri: '',
-                  type: mediaType,
-                });
-              } catch {}
+          
+          // Process auctions for this page
+          for (const auctionId of pageAuctionIds) {
+            const auctionCacheKey = `auction-${auctionId}`;
+            
+            // Sprawdź czy mamy aukcję w cache
+            if (listingsCache.has(auctionCacheKey)) {
+              console.log(`💾 Using cached auction ${auctionId}`);
+              items.push(listingsCache.get(auctionCacheKey));
+              continue;
             }
-          } catch {}
+            
+            console.log(`🔸 Fetching auction ${auctionId}...`);
+            try {
+              const a = await client.readContract({ 
+                address: MARKETPLACE_ADDRESS as `0x${string}`, 
+                abi: MARKETPLACE_ABI, 
+                functionName: 'auctions', 
+                args: [auctionId] 
+              }) as any;
+              
+              const endTime = Number((a as any).endTime ?? a[5]); // Index 5 is 'endTime'
+              
+              // Fetch NFT metadata for auction
+              let metadata = null;
+              let image = '';
+              let mediaUrl = '';
+              let mime = '';
+              let mediaType: 'image' | 'video' | 'audio' | 'text' | 'unknown' = 'unknown';
+              
+              // Helper function to convert IPFS URLs
+              const ipfsToHttp = (url: string) => url?.startsWith('ipfs://') ? url.replace('ipfs://', 'https://ipfs.io/ipfs/') : url;
+              
+              try {
+                const nftContract = (a as any).nftContract ?? a[1];
+                const tokenId = (a as any).tokenId ?? a[2];
+                const contractAddress = (!nftContract || nftContract === '0x0000000000000000000000000000000000000000') 
+                  ? '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E' // DEFAULT_IP_NFT_CONTRACT
+                  : nftContract;
+                
+                const ERC721_ABI = [
+                  { name: 'tokenURI', type: 'function', stateMutability: 'view', 
+                    inputs: [{ name: 'tokenId', type: 'uint256' }], 
+                    outputs: [{ type: 'string' }] }
+                ] as const;
+                
+                const tokenUri = await client.readContract({
+                  address: contractAddress as `0x${string}`,
+                  abi: ERC721_ABI,
+                  functionName: 'tokenURI',
+                  args: [BigInt(tokenId)]
+                }) as string;
+                
+                if (tokenUri) {
+                  const metaUrl = ipfsToHttp(tokenUri);
+                  const metaResponse = await fetch(metaUrl);
+                  if (metaResponse.ok) {
+                    metadata = await metaResponse.json();
+                    image = ipfsToHttp(metadata?.image || '');
+                    
+                    // Proper media type detection like in fetchIpNfts.ts
+                    const animUrl = metadata?.animation_url || metadata?.animationUrl;
+                    mediaUrl = (animUrl || image) ? ipfsToHttp(animUrl || image) : '';
+                    mime = (metadata?.properties?.mimeType || metadata?.mimeType || '').toString();
+                    const ext = (animUrl || image || '').split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
+                    const isVideo = mime.toLowerCase().startsWith('video/') || ['mp4','webm','mov','m4v'].includes(ext || '');
+                    const isAudio = mime.toLowerCase().startsWith('audio/') || ['mp3','wav','ogg','m4a','flac'].includes(ext || '');
+                    const isText  = mime.toLowerCase().startsWith('text/')  || ['txt','md','rtf','csv','json'].includes(ext || '');
+                    if (isVideo) mediaType = 'video';
+                    else if (isAudio) mediaType = 'audio';
+                    else if (isText) mediaType = 'text';
+                    else if (image) mediaType = 'image';
+                    else if (metadata?.text || metadata?.content) mediaType = 'text';
+                  }
+                }
+              } catch {}
+              
+              // Fix price formatting - use formatEther properly
+              const minPrice = (a as any).minPrice ?? a[3];
+              const highestBid = (a as any).highestBid ?? a[7]; // Index 7 is highestBid, not 6!
+              
+              const auctionItem = {
+                auctionId: auctionId.toString(),
+                contract: (a as any).nftContract ?? a[1],
+                tokenId: ((a as any).tokenId ?? a[2]).toString(),
+                minPrice: String(Number(minPrice) / 1e18),
+                highestBid: String(Number(highestBid) / 1e18),
+                seller: (a as any).seller ?? a[0],
+                endTime,
+                isListed: false,
+                saleType: 'auction',
+                metadata,
+                image,
+                mediaUrl,
+                mime,
+                tokenUri: '',
+                type: mediaType,
+              };
+              
+              // Cache this auction
+              listingsCache.set(auctionCacheKey, auctionItem);
+              items.push(auctionItem);
+            } catch (error) {
+              console.error(`Failed to fetch auction ${auctionId}:`, error);
+            }
+          }
+          
+          // Save updated cache
+          setCachedListings(listingsCache);
+          saveListingCache(listingsCache, allActiveIds, allActiveAuctionIds);
+          
           nfts = items;
         } catch (err) {
           console.error('❌ Failed to load marketplace listings:', err);
@@ -399,7 +529,28 @@ export default function MarketplaceGrid({
     };
     
     loadNFTs();
-  }, [address, mode]);
+  }, [address, mode, page]); // Dodane page do dependencies aby przeładowywało przy zmianie strony
+
+  // Reset page to 1 when mode changes (separate useEffect)
+  useEffect(() => {
+    setPage(1);
+  }, [mode]);
+
+  // Invalidate cache when marketplace listing is created
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'marketplace-listing-created' && mode === 'explore') {
+        console.log('🔄 Marketplace listing created - invalidating cache');
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem(getCacheKey());
+        }
+        setPage(1); // Reset to first page and reload
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [mode]);
 
   // Listen for marketplace events to refresh data (for 'my' mode)
   useEffect(() => {
@@ -516,8 +667,13 @@ export default function MarketplaceGrid({
     }
     
     setFilteredNFTs(filtered);
-    setPage(1); // Reset to first page when filters change
+    // Note: Not resetting page here to allow pagination in explore mode
   }, [allNFTs, filters]);
+
+  // Reset page only when filters change (not when allNFTs change)
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   // Responsive page size
   useEffect(() => {
@@ -530,8 +686,13 @@ export default function MarketplaceGrid({
     return () => mq.removeEventListener?.('change', apply);
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(filteredNFTs.length / pageSize));
-  const pageItems = filteredNFTs.slice((page - 1) * pageSize, page * pageSize);
+  // Dla explore mode używamy totalListingsCount, dla innych mode'ów normalną paginację
+  const totalPages = mode === 'explore' 
+    ? Math.max(1, Math.ceil(totalListingsCount / pageSize))
+    : Math.max(1, Math.ceil(filteredNFTs.length / pageSize));
+  const pageItems = mode === 'explore' 
+    ? filteredNFTs // W explore mode już mamy odpowiednie NFT z RPC
+    : filteredNFTs.slice((page - 1) * pageSize, page * pageSize);
 
   const handleList = (nft: any) => {
     setSelectedNFT(nft);
@@ -606,7 +767,7 @@ export default function MarketplaceGrid({
           IP NFT Marketplace
         </h2>
         <div className="text-sm text-orange-200/70">
-          {filteredNFTs.length} items • {filteredNFTs.filter(n => n.isListed).length} listed
+          {mode === 'explore' ? totalListingsCount : filteredNFTs.length} items • {filteredNFTs.filter(n => n.isListed).length} listed
         </div>
       </div>
       
