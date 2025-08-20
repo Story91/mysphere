@@ -34,6 +34,7 @@ export default function MarketplaceGrid({
   const [totalListingsCount, setTotalListingsCount] = useState(0);
   const [cachedListings, setCachedListings] = useState<Map<string, any>>(new Map());
   const [activeListingIds, setActiveListingIds] = useState<bigint[]>([]);
+  const [prefetchedPages, setPrefetchedPages] = useState<Map<number, any[]>>(new Map());
   const [preview, setPreview] = useState<any | null>(null);
   const [showListModal, setShowListModal] = useState(false);
   const [selectedNFT, setSelectedNFT] = useState<any>(null);
@@ -82,6 +83,178 @@ export default function MarketplaceGrid({
       };
       sessionStorage.setItem(getCacheKey(), JSON.stringify(cacheData));
     } catch {}
+  };
+
+  // Rate limiting for prefetch
+  const [lastPrefetchTime, setLastPrefetchTime] = useState(0);
+  const PREFETCH_COOLDOWN = 5000; // 5 seconds between prefetch operations
+
+  // Prefetch function for background loading
+  const prefetchPage = async (pageToFetch: number) => {
+    const now = Date.now();
+    
+    if (
+      mode !== 'explore' || 
+      prefetchedPages.has(pageToFetch) || 
+      !activeListingIds.length ||
+      (now - lastPrefetchTime) < PREFETCH_COOLDOWN
+    ) {
+      console.log(`⏸️ Skipping prefetch for page ${pageToFetch} (cooldown or already cached)`);
+      return;
+    }
+
+    setLastPrefetchTime(now);
+    console.log(`🔮 Prefetching page ${pageToFetch} in background...`);
+
+    try {
+      const client = createPublicClient({
+        chain: baseCampChain,
+        transport: http(baseCampChain.rpcUrls.default.http[0]),
+      });
+
+      const cache = getListingCache();
+      let allActiveAuctionIds: bigint[] = cache.activeAuctionIds || [];
+      let allActiveListingIds: bigint[] = cache.activeIds || activeListingIds;
+      let listingsCache = new Map(cache.listings);
+
+      // Calculate items for the page (use same logic as normal loading)
+      const startIndex = (pageToFetch - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const allItems = [...allActiveListingIds, ...allActiveAuctionIds];
+      const pageItemIds = allItems.slice(startIndex, endIndex);
+      
+      const pageListingIds = pageItemIds.filter(id => allActiveListingIds.includes(id));
+      const pageAuctionIds = pageItemIds.filter(id => allActiveAuctionIds.includes(id));
+
+      const items: any[] = [];
+
+      // Process listings for this page (limit concurrent fetches)
+      const maxConcurrentFetches = 3; // Limit to 3 concurrent RPC calls
+      let fetchCount = 0;
+      
+      for (const id of pageListingIds) {
+        const cacheKey = `listing-${id}`;
+        
+        if (listingsCache.has(cacheKey)) {
+          items.push(listingsCache.get(cacheKey));
+          continue;
+        }
+
+        // Skip if we've reached the limit for this prefetch batch
+        if (fetchCount >= maxConcurrentFetches) {
+          console.log(`⏸️ Prefetch limit reached (${maxConcurrentFetches}), stopping early`);
+          break;
+        }
+
+        fetchCount++;
+        
+        // If not in cache, fetch it
+        try {
+          const l = await client.readContract({
+            address: MARKETPLACE_ADDRESS as `0x${string}`,
+            abi: MARKETPLACE_ABI,
+            functionName: 'listings',
+            args: [id],
+          }) as any;
+
+          const isActive = l[6];
+          if (!isActive) continue;
+
+          let tokenUri = '';
+          let metadata: any = null;
+          let image = '';
+          let mediaUrl = '';
+          let mime = '';
+          let mediaType: 'image' | 'video' | 'audio' | 'text' | 'unknown' = 'unknown';
+          
+          const ipfsToHttp = (url: string) => url?.startsWith('ipfs://') ? url.replace('ipfs://', 'https://ipfs.io/ipfs/') : url;
+          
+          try {
+            const ERC721_ABI = [{ name: 'tokenURI', type: 'function', stateMutability: 'view', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ type: 'string' }] }] as const;
+            
+            tokenUri = (await client.readContract({
+              address: l[1] as `0x${string}`,
+              abi: ERC721_ABI,
+              functionName: 'tokenURI',
+              args: [l[2]],
+            })) as string;
+            
+            const metaUrl = ipfsToHttp(tokenUri);
+            if (metaUrl) {
+              metadata = await fetch(metaUrl, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+              if (metadata?.image) image = ipfsToHttp(metadata.image);
+              
+              const animUrl = metadata?.animation_url || metadata?.animationUrl;
+              mediaUrl = (animUrl || image) ? ipfsToHttp(animUrl || image) : '';
+              mime = (metadata?.properties?.mimeType || metadata?.mimeType || '').toString();
+              const ext = (animUrl || image || '').split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
+              const isVideo = mime.toLowerCase().startsWith('video/') || ['mp4','webm','mov','m4v'].includes(ext || '');
+              const isAudio = mime.toLowerCase().startsWith('audio/') || ['mp3','wav','ogg','m4a','flac'].includes(ext || '');
+              const isText  = mime.toLowerCase().startsWith('text/')  || ['txt','md','rtf','csv','json'].includes(ext || '');
+              if (isVideo) mediaType = 'video';
+              else if (isAudio) mediaType = 'audio';
+              else if (isText) mediaType = 'text';
+              else if (image) mediaType = 'image';
+              else if (metadata?.text || metadata?.content) mediaType = 'text';
+            }
+          } catch {}
+
+          let terms: any = null;
+          try {
+            terms = await client.readContract({
+              address: MARKETPLACE_ADDRESS as `0x${string}`,
+              abi: MARKETPLACE_ABI,
+              functionName: 'getTerms',
+              args: [l[2] as bigint],
+            });
+          } catch {}
+
+          const listingItem = {
+            listingId: id.toString(),
+            contract: l[1],
+            tokenId: l[2].toString(),
+            price: (Number(l[3]) / 1e18).toString(),
+            seller: l[0],
+            isListed: true,
+            saleType: 'buy',
+            license: {
+              commercialUse: Boolean(l[8]),
+              derivativeWorks: Boolean(l[9]),
+              durationDays: Number(l[10]) || 0,
+            },
+            hasAccessTerms: !!terms && Number((terms as any).price || 0) > 0 && Number((terms as any).duration || 0) > 0,
+            metadata,
+            image,
+            mediaUrl,
+            mime,
+            tokenUri,
+            type: mediaType,
+          };
+          
+          listingsCache.set(cacheKey, listingItem);
+          items.push(listingItem);
+        } catch {}
+      }
+
+      // Process auctions for this page (simplified)
+      for (const auctionId of pageAuctionIds) {
+        const auctionCacheKey = `auction-${auctionId}`;
+        
+        if (listingsCache.has(auctionCacheKey)) {
+          items.push(listingsCache.get(auctionCacheKey));
+        }
+        // Note: For prefetch, we only use cached auctions to avoid too many RPC calls
+      }
+
+      // Save prefetched page and update cache
+      setPrefetchedPages(prev => new Map(prev.set(pageToFetch, items)));
+      setCachedListings(listingsCache);
+      saveListingCache(listingsCache, allActiveListingIds, allActiveAuctionIds);
+      
+      console.log(`✅ Prefetched page ${pageToFetch}: ${items.length} items`);
+    } catch (error) {
+      console.error(`❌ Failed to prefetch page ${pageToFetch}:`, error);
+    }
   };
 
   // Fetch NFTs depending on mode
@@ -204,6 +377,14 @@ export default function MarketplaceGrid({
         }
       } else {
         // Explore: aktywne listingi z marketplace z cache i paginacją
+        
+        // Check if we have prefetched this page
+        if (prefetchedPages.has(page)) {
+          console.log(`🚀 Using prefetched page ${page}`);
+          nfts = prefetchedPages.get(page) || [];
+          // Don't return here - let it continue to setAllNFTs below
+        } else {
+        
         try {
           const client = createPublicClient({
             chain: baseCampChain,
@@ -522,6 +703,7 @@ export default function MarketplaceGrid({
         } catch (err) {
           console.error('❌ Failed to load marketplace listings:', err);
         }
+        } // End of else block for non-prefetched pages
       }
       
       setAllNFTs(nfts);
@@ -674,6 +856,28 @@ export default function MarketplaceGrid({
   useEffect(() => {
     setPage(1);
   }, [filters]);
+
+  // Prefetch next page when current page loads (only for explore mode) - THROTTLED
+  useEffect(() => {
+    if (mode !== 'explore' || loading || activeListingIds.length === 0) {
+      return;
+    }
+
+    const totalPages = Math.ceil((totalListingsCount || activeListingIds.length) / pageSize);
+    
+    // Only prefetch once per page change, with throttling
+    const timeoutId = setTimeout(() => {
+      const nextPage = page + 1;
+      
+      // Prefetch only next page to avoid RPC overload
+      if (nextPage <= totalPages && !prefetchedPages.has(nextPage)) {
+        console.log(`🔮 Triggering prefetch for page ${nextPage}`);
+        prefetchPage(nextPage);
+      }
+    }, 2000); // Increased delay to avoid rate limiting
+
+    return () => clearTimeout(timeoutId);
+  }, [mode, page]); // Minimal dependencies to avoid loops
 
   // Responsive page size
   useEffect(() => {
