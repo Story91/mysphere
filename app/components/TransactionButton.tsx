@@ -1,23 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useAccount, useChainId } from 'wagmi';
-import { 
-  Transaction,
-  TransactionButton as OnchainKitTransactionButton,
-  TransactionSponsor,
-  TransactionStatus,
-  TransactionStatusAction,
-  TransactionStatusLabel,
-  TransactionToast,
-  TransactionToastIcon,
-  TransactionToastLabel,
-  TransactionToastAction
-} from '@coinbase/onchainkit/transaction';
-import { toast } from 'react-hot-toast';
-import { getContractAddress, prepareCreatePostCall } from '../contracts/PostContract';
-import { getContractAddress2, prepareCreatePostCall2 } from '../contracts/PostContract2';
+import { useAccount, useChainId, useSwitchChain, useWalletClient, usePublicClient } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
+import { toast } from 'react-hot-toast';
+import { getContractAddress2 } from '../contracts/PostContract2';
 
 interface TransactionButtonProps {
   content: string;
@@ -27,8 +14,8 @@ interface TransactionButtonProps {
   onPostAdded?: () => Promise<void>;
 }
 
-export default function TransactionButtonWrapper({ 
-  content, 
+export default function TransactionButton({
+  content,
   onTransactionSuccess,
   disabled = false,
   autoPost = true,
@@ -36,6 +23,9 @@ export default function TransactionButtonWrapper({
 }: TransactionButtonProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+  const { switchChain } = useSwitchChain();
   const [isTransacting, setIsTransacting] = useState(false);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [transactionSuccess, setTransactionSuccess] = useState(false);
@@ -44,10 +34,10 @@ export default function TransactionButtonWrapper({
   const requestDeniedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const successTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Pobierz adres kontraktu w zależności od sieci
+  // Get contract address based on current chain
   const contractAddress = getContractAddress2(chainId);
 
-  // Sprawdź, czy jesteśmy na odpowiedniej sieci
+  // Check if we're on the right network
   useEffect(() => {
     if (isConnected) {
       if (chainId !== base.id && chainId !== baseSepolia.id) {
@@ -58,20 +48,18 @@ export default function TransactionButtonWrapper({
     }
   }, [chainId, isConnected]);
 
-  // Efekt dla automatycznego ukrywania komunikatu "Request denied"
+  // Auto-hide "Request denied" message after 5 seconds
   useEffect(() => {
     if (requestDenied) {
-      // Wyczyść poprzedni timer, jeśli istnieje
       if (requestDeniedTimerRef.current) {
         clearTimeout(requestDeniedTimerRef.current);
       }
-      
-      // Ustaw nowy timer na 5 sekund
+
       requestDeniedTimerRef.current = setTimeout(() => {
         setRequestDenied(false);
       }, 5000);
     }
-    
+
     return () => {
       if (requestDeniedTimerRef.current) {
         clearTimeout(requestDeniedTimerRef.current);
@@ -79,21 +67,19 @@ export default function TransactionButtonWrapper({
     };
   }, [requestDenied]);
 
-  // Efekt dla automatycznego ukrywania komunikatu o sukcesie
+  // Auto-hide success message after 6 seconds
   useEffect(() => {
     if (transactionSuccess) {
-      // Wyczyść poprzedni timer, jeśli istnieje
       if (successTimerRef.current) {
         clearTimeout(successTimerRef.current);
       }
-      
-      // Ustaw nowy timer na 6 sekund (zamiast 3)
+
       successTimerRef.current = setTimeout(() => {
         setTransactionSuccess(false);
         setTransactionHash(null);
       }, 6000);
     }
-    
+
     return () => {
       if (successTimerRef.current) {
         clearTimeout(successTimerRef.current);
@@ -101,96 +87,129 @@ export default function TransactionButtonWrapper({
     };
   }, [transactionSuccess]);
 
-  // Obsługa statusu transakcji
-  const handleTransactionStatus = useCallback((status: any) => {
-    // Loguj tylko istotne statusy (nie loguj 'init')
-    if (status.statusName !== 'init') {
-      console.log('Transaction status:', status);
+  // Function to handle sending transaction via wagmi
+  const handleSendTransaction = useCallback(async () => {
+    if (!isConnected || !address || !content.trim() || disabled || isTransacting) {
+      return;
     }
-    
-    if (status.statusName === 'success') {
-      // W przypadku sukcesu, pobierz hash transakcji z danych statusu
-      const txHash = status.statusData?.transactionReceipts?.[0]?.transactionHash;
-      
-      if (txHash) {
-        toast.success('Transaction confirmed on blockchain!');
-        console.log('✅ Transaction confirmed:', status.statusData);
-        console.log('✅ Transaction hash:', txHash);
-        
-        // Zapisz hash transakcji i ustaw flagę sukcesu
-        setTransactionHash(txHash);
-        setTransactionSuccess(true);
-        
-        // Wywołaj callback z hashem transakcji
-        if (autoPost) {
-          toast.success('Automatically saving post to database...');
-          onTransactionSuccess(txHash);
-          if (onPostAdded) {
-            onPostAdded().catch(error => {
-              console.error('Error in onPostAdded callback:', error);
-            });
-          }
-        } else {
-          toast.success('Transaction confirmed! Click "Post" to save your post to the database.');
-          onTransactionSuccess(txHash);
+
+    if (!walletClient || !publicClient) {
+      toast.error('Wallet not connected properly');
+      return;
+    }
+
+    try {
+      setIsTransacting(true);
+      toast.loading('Preparing post transaction...');
+
+      // If on wrong network, try to switch
+      if (chainId !== base.id && chainId !== baseSepolia.id) {
+        try {
+          await switchChain({ chainId: base.id });
+          toast.success('Switched to Base network');
+        } catch (switchError) {
+          console.error('Failed to switch network:', switchError);
+          toast.error('Please switch to Base network manually');
+          setIsTransacting(false);
+          setRequestDenied(true);
+          return;
         }
       }
-      
-      // Resetuj stan
-      setIsTransacting(false);
-    } else if (status.statusName === 'error') {
-      // Sprawdź, czy błąd dotyczy odrzucenia transakcji przez użytkownika
-      const errorMessage = status.statusData?.message || 'Unknown error';
+
+      // Check if contract address is available
+      if (!contractAddress) {
+        throw new Error('Contract address is undefined');
+      }
+
+      // Ensure the contract address has the correct format
+      const formattedAddress = contractAddress.startsWith('0x')
+        ? contractAddress as `0x${string}`
+        : `0x${contractAddress}` as `0x${string}`;
+
+      // Prepare a basic contract write for PostContract2
+      const { request } = await publicClient.simulateContract({
+        address: formattedAddress,
+        // PostContract2 ABI simplified for the createPost function
+        abi: [{
+          name: 'createPost',
+          type: 'function',
+          stateMutability: 'nonpayable',
+          inputs: [{ name: 'content', type: 'string' }],
+          outputs: []
+        }],
+        functionName: 'createPost',
+        args: [`post:${content}`],
+        account: address,
+      });
+
+      // Send transaction using wallet client
+      const hash = await walletClient.writeContract(request);
+
+      toast.success('Post transaction sent!');
+      console.log('Post transaction hash:', hash);
+
+      // Set transaction hash and call success handler
+      setTransactionHash(hash);
+        setTransactionSuccess(true);
+
+        if (autoPost) {
+          toast.success('Automatically saving post to database...');
+        onTransactionSuccess(hash);
+          if (onPostAdded) {
+          await onPostAdded();
+          }
+        } else {
+        toast.success('Post transaction confirmed! Click to save your post.');
+        onTransactionSuccess(hash);
+        }
+
+    } catch (error) {
+      console.error('Post transaction error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
       if (errorMessage.includes('rejected') || errorMessage.includes('denied') || errorMessage.includes('cancelled')) {
         setRequestDenied(true);
       }
-      
-      toast.error(`Transaction error: ${errorMessage}`);
-      console.error('Transaction error:', status.statusData);
+
+      toast.error(`Post transaction failed: ${errorMessage}`);
+    } finally {
       setIsTransacting(false);
-    } else if (status.statusName === 'transactionPending') {
-      toast.loading('Transaction pending...');
-      setIsTransacting(true);
-    } else if (status.statusName === 'buildingTransaction') {
-      console.log('Building transaction...');
     }
-  }, [onTransactionSuccess, autoPost, onPostAdded]);
+  }, [
+    isConnected,
+    address,
+    content,
+    disabled,
+    isTransacting,
+    chainId,
+    switchChain,
+    contractAddress,
+    walletClient,
+    publicClient,
+    onTransactionSuccess,
+    onPostAdded,
+    autoPost
+  ]);
 
-  // Przygotowanie wywołania kontraktu
-  const getCalls = useCallback(() => {
-    if (!contractAddress) {
-      return undefined;
-    }
-    
-    // Użyj funkcji z PostContract2.ts do przygotowania danych dla wywołania kontraktu
-    return prepareCreatePostCall2(contractAddress, content);
-  }, [contractAddress, content]);
-
-  // Funkcja do otwierania transakcji w eksploratorze bloków
+  // Function to open transaction in explorer
   const openTransactionInExplorer = () => {
     if (transactionHash) {
-      const baseUrl = chainId === base.id 
-        ? 'https://basescan.org/tx/' 
+      const baseUrl = chainId === base.id
+        ? 'https://basescan.org/tx/'
         : 'https://sepolia.basescan.org/tx/';
       window.open(`${baseUrl}${transactionHash}`, '_blank');
     }
   };
 
-  // Get contract calls before rendering
-  const contractCalls = getCalls();
-  const hasValidCalls = contractCalls !== undefined && Array.isArray(contractCalls) && contractCalls.length > 0;
-
   return (
     <div className="relative">
       {!transactionSuccess ? (
-        hasValidCalls ? (
-        <Transaction
-          chainId={chainId}
-            calls={contractCalls}
-          onStatus={handleTransactionStatus}
+        contractAddress ? (
+        <button
+          onClick={handleSendTransaction}
+          disabled={disabled || !content.trim() || isTransacting || !!networkError}
+          className="px-3 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-[#0052FF] to-[#2D74FF] text-white rounded-lg hover:from-[#0047E1] hover:to-[#2D6AE6] disabled:opacity-50 disabled:cursor-not-allowed border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3)] transition-all duration-300 font-medium relative overflow-hidden text-xs sm:text-sm"
         >
-          <OnchainKitTransactionButton 
-            text={
               <span className="flex items-center justify-center">
                 {isTransacting ? (
                   <>
@@ -203,9 +222,9 @@ export default function TransactionButtonWrapper({
                   </>
                 ) : (
                   <>
-                    <img 
-                      src="/brand-kit/base/logo/symbol/Base_Symbol_White.png" 
-                      alt="Base Logo" 
+                    <img
+                      src="/brand-kit/base/logo/symbol/Base_Symbol_White.png"
+                      alt="Base Logo"
                       className="w-4 h-4 mr-1.5"
                     />
                     <span className="hidden xs:inline">Post Onchain</span>
@@ -213,24 +232,10 @@ export default function TransactionButtonWrapper({
                   </>
                 )}
               </span>
-            }
-            className="px-3 py-1.5 sm:px-5 sm:py-2 h-[32px] bg-gradient-to-r from-[#0052FF] to-[#2D74FF] text-white rounded-lg hover:from-[#0047E1] hover:to-[#2D6AE6] disabled:opacity-50 disabled:cursor-not-allowed border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3),0_0_20px_rgba(0,82,255,0.2),0_0_30px_rgba(0,82,255,0.1)] transition-all duration-300 font-medium relative overflow-hidden text-sm"
-            disabled={disabled || !content.trim() || isTransacting || !!networkError}
-          />
-          <TransactionSponsor />
-          <TransactionStatus>
-            <TransactionStatusLabel />
-            <TransactionStatusAction />
-          </TransactionStatus>
-          <TransactionToast>
-            <TransactionToastIcon />
-            <TransactionToastLabel />
-            <TransactionToastAction />
-          </TransactionToast>
-        </Transaction>
+        </button>
         ) : (
           <button
-            className="px-3 py-1.5 sm:px-5 sm:py-2 h-[32px] bg-gray-500 text-white rounded-lg border border-gray-400 opacity-70 cursor-not-allowed text-sm"
+            className="px-3 py-2 sm:px-4 sm:py-2 bg-gray-500 text-white rounded-lg border border-gray-400 opacity-70 cursor-not-allowed text-xs sm:text-sm"
             disabled={true}
           >
             <span className="flex items-center justify-center">
@@ -239,20 +244,18 @@ export default function TransactionButtonWrapper({
           </button>
         )
       ) : (
-        <div className="flex flex-col">
-          <button
-            onClick={openTransactionInExplorer}
-            className="px-5 py-2.5 bg-gradient-to-r from-[#0052FF] to-[#2D74FF] text-white rounded-lg hover:from-[#0047E1] hover:to-[#2D6AE6] border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3),0_0_20px_rgba(0,82,255,0.2),0_0_30px_rgba(0,82,255,0.1)] transition-all duration-300 font-medium relative overflow-hidden"
-          >
-            <span className="flex items-center justify-center">
-              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              View transaction
-            </span>
-          </button>
-          <div className="text-center text-xs text-green-500 mt-1">Successful</div>
-        </div>
+        <button
+          onClick={openTransactionInExplorer}
+          className="px-3 py-2 sm:px-4 sm:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-xs sm:text-sm"
+        >
+          <span className="flex items-center justify-center">
+            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="hidden xs:inline">Saved</span>
+            <span className="inline xs:hidden">Saved</span>
+          </span>
+        </button>
       )}
       
       {/* Komunikat o odrzuceniu żądania */}
