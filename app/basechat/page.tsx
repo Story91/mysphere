@@ -371,8 +371,8 @@ export default function BaseChat() {
   const [selectedTag, setSelectedTag] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [selectedAuthor, setSelectedAuthor] = useState('');
-  const [dailyPostCount, setDailyPostCount] = useState(0);
-  const [showDailyPostOverlay, setShowDailyPostOverlay] = useState(false);
+
+
   const [isAppleDevice, setIsAppleDevice] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -738,13 +738,7 @@ export default function BaseChat() {
       // Sprawdzenie czy użytkownik jest adminem
       const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
 
-      // Sprawdzenie limitu postów dziennie (tylko dla zwykłych użytkowników)
-      if (!isAdmin && dailyPostCount >= 5) {
-        toast.error('You have reached the daily limit of 5 posts.');
-        setIsCreatingPost(false);
-        toast.dismiss(toastId);
-        return;
-      }
+
 
       let imageUrl: string | null = null;
       let videoUrl: string | null = null;
@@ -845,7 +839,6 @@ export default function BaseChat() {
       // ✅ OPTYMALIZACJA: Usunięto refreshPosts() - oszczędność 15 Firebase reads po każdym poście!
       
       // 5. Increment daily count
-      setDailyPostCount(prev => prev + 1);
       await updateDoc(doc(db, 'users', address), {
         [`dailyPosts.${today}`]: increment(1)
       });
@@ -918,12 +911,7 @@ export default function BaseChat() {
       const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
 
       // Sprawdzenie limitu postów dziennie (tylko dla zwykłych użytkowników)
-      if (!isAdmin && dailyPostCount >= 5) {
-        toast.error('You have reached the daily limit of 5 posts.');
-        setIsCreatingPost(false); // Resetuj flagę
-        toast.dismiss(toastId);
-        return;
-      }
+
       // Optimistically update count, handle potential failure later if needed
       // setDailyPostCount(prev => prev + 1); // Moved after successful creation
 
@@ -1125,7 +1113,6 @@ export default function BaseChat() {
       console.log("Post saved to Firebase.");
 
       // Successfully created, now increment daily count
-      setDailyPostCount(prev => prev + 1);
 
       // 🗑️ Wyczyść cache bo mamy nowy post
       clearPostsCache();
@@ -1145,11 +1132,7 @@ export default function BaseChat() {
       toast.dismiss(toastId);
       toast.success('Post created successfully as a Zora token!');
 
-      // Show daily post overlay with delay
-      setTimeout(() => {
-        setShowDailyPostOverlay(true);
-        setTimeout(() => setShowDailyPostOverlay(false), 3000);
-      }, 1000); // Shorter delay now
+
 
     } catch (error: any) {
       console.error('Error creating Zora coin post:', error);
@@ -1214,7 +1197,6 @@ export default function BaseChat() {
           await refreshPosts();
           
           // Increment daily count
-          setDailyPostCount(prev => prev + 1);
           
         } catch (fallbackError) {
           console.error('Fallback post creation also failed:', fallbackError);
@@ -2350,39 +2332,7 @@ export default function BaseChat() {
     </div>
   )};
 
-  useEffect(() => {
-    const fetchDailyPostCount = async () => {
-      if (!isConnected || !address) return;
-      try {
-        const postsRef = collection(db, 'posts');
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const q = query(postsRef, where('author', '==', address), where('timestamp', '>=', Timestamp.fromDate(today)));
-        const postsSnap = await getDocs(q);
-        setDailyPostCount(postsSnap.size);
-      } catch (error) {
-        console.error('Error fetching daily post count:', error);
-      }
-    };
-    fetchDailyPostCount();
-  }, [address, isConnected]);
 
-  // Funkcja do ręcznego odświeżania licznika dziennych postów
-  const resetDailyPostCount = async () => {
-    if (!isConnected || !address) return;
-    try {
-      const postsRef = collection(db, 'posts');
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const q = query(postsRef, where('author', '==', address), where('timestamp', '>=', Timestamp.fromDate(today)));
-      const postsSnap = await getDocs(q);
-      setDailyPostCount(postsSnap.size);
-      toast.success('Post limit refreshed!');
-    } catch (error) {
-      console.error('Error refreshing daily post count:', error);
-      toast.error('Failed to refresh post limit');
-    }
-  };
 
   const handleGenerateAIPost = async () => {
     if (!aiPrompt.trim() || !address || isGeneratingAI) return;
@@ -4059,22 +4009,7 @@ export default function BaseChat() {
         {/* ... rest of the content ... */}
       </div>
       <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
-          {showDailyPostOverlay && (
-            <div className="fixed bottom-20 left-0 right-0 flex items-center justify-center z-40 pointer-events-auto">
-              <div className="px-4 py-2 bg-black bg-opacity-80 text-white rounded-lg flex items-center gap-2 shadow-lg">
-                <span>{dailyPostCount}/5 posts today</span>
-                <button 
-                  onClick={resetDailyPostCount}
-                  className="ml-2 p-1 bg-[#0052FF] rounded-md text-xs flex items-center hover:bg-[#0047E1] transition-colors"
-                >
-                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
-              </div>
-            </div>
-          )}
+
 
       {/* Mobile footer */}
       <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-t border-[#0052FF]/20 z-40">
