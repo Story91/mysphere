@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import OpenAI from 'openai';
+import { OpenAI } from 'openai';
 
 export type PostingNetwork = 'base' | 'basecamp' | 'linea';
 
@@ -58,7 +58,7 @@ export function useAIGenerator(): UseAIGeneratorReturn {
 
       // Initialize OpenAI client with the new API key
       const client = new OpenAI({
-        apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY_POST || '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',
+        apiKey: process.env.OPENAI_API_KEY_POST || 'YOUR_OPENAI_API_KEY_HERE',
         dangerouslyAllowBrowser: true
       });
 
