@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { OpenAI } from 'openai';
 
 export type PostingNetwork = 'base' | 'basecamp' | 'linea';
 
@@ -56,29 +55,27 @@ export function useAIGenerator(): UseAIGeneratorReturn {
       setIsGeneratingAI(true);
       const toastId = toast.loading("Generating AI post...");
 
-      // Initialize OpenAI client with the new API key
-      const client = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY_POST || 'YOUR_OPENAI_API_KEY_HERE',
-        dangerouslyAllowBrowser: true
-      });
-
       try {
-        const response = await client.responses.create({
-          model: "gpt-5-nano",
-          tools: [
-            {
-              type: "web_search_preview",
-              search_context_size: "low"
-            }
-          ],
-          instructions: getSystemMessage(activeNetwork),
-          input: aiPrompt
+        // Call our API route instead of direct OpenAI client
+        const response = await fetch('/api/ai-generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: aiPrompt,
+            network: activeNetwork
+          })
         });
 
-        console.log('Received OpenAI response:', response);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to generate AI content');
+        }
 
-        // Get the generated content from response.output_text
-        const generatedPost = response.output_text || 'No content generated';
+        const data = await response.json();
+        const generatedPost = data.content;
+
         console.log('Post generated:', generatedPost);
 
         // Set content based on network with AI flag
@@ -105,9 +102,9 @@ export function useAIGenerator(): UseAIGeneratorReturn {
         toast.success('AI post generated successfully with web search!', { id: toastId });
 
       } catch (apiError: unknown) {
-        console.error('OpenAI API Error:', apiError);
+        console.error('AI Generation Error:', apiError);
         const errorMessage = apiError instanceof Error ? apiError.message : 'Unknown API error';
-        toast.error(`OpenAI API Error: ${errorMessage}`, { id: toastId });
+        toast.error(`AI Generation Error: ${errorMessage}`, { id: toastId });
       }
 
     } catch (error: unknown) {
