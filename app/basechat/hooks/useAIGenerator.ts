@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import OpenAI from 'openai';
 
 export type PostingNetwork = 'base' | 'basecamp' | 'linea';
 
@@ -16,9 +17,9 @@ interface UseAIGeneratorReturn {
   isGeneratingAI: boolean;
 
   // Generated content for each network
-  aiGeneratedContentForBase: string;
-  aiGeneratedContentForCamp: string;
-  aiGeneratedContentForLinea: string;
+  aiGeneratedContentForBase: { content: string; isAIGenerated: boolean } | string;
+  aiGeneratedContentForCamp: { content: string; isAIGenerated: boolean } | string;
+  aiGeneratedContentForLinea: { content: string; isAIGenerated: boolean } | string;
 
   // Functions
   generateAIPost: (activeNetwork: PostingNetwork) => Promise<void>;
@@ -30,19 +31,21 @@ export function useAIGenerator(): UseAIGeneratorReturn {
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [aiGeneratedContentForBase, setAiGeneratedContentForBase] = useState<string>('');
-  const [aiGeneratedContentForCamp, setAiGeneratedContentForCamp] = useState<string>('');
-  const [aiGeneratedContentForLinea, setAiGeneratedContentForLinea] = useState<string>('');
+  const [aiGeneratedContentForBase, setAiGeneratedContentForBase] = useState<{ content: string; isAIGenerated: boolean } | string>('');
+  const [aiGeneratedContentForCamp, setAiGeneratedContentForCamp] = useState<{ content: string; isAIGenerated: boolean } | string>('');
+  const [aiGeneratedContentForLinea, setAiGeneratedContentForLinea] = useState<{ content: string; isAIGenerated: boolean } | string>('');
 
   const getSystemMessage = (network: PostingNetwork): string => {
+    const baseInstruction = "You are a social media content creator who generates viral, engaging posts that drive interaction and community engagement. Write in a conversational, authentic tone that resonates with crypto/blockchain enthusiasts. Use trending formats, emojis strategically, and include calls-to-action. Keep posts concise but impactful.";
+
     switch (network) {
       case 'basecamp':
-        return "You are an assistant who generates engaging social media posts related to the Camp Network ecosystem. Your posts should be informative, but also friendly and encouraging interaction. Focus on community building, innovation, and the unique features of Camp Network.";
+        return `${baseInstruction} Focus on Camp Network's community building aspects, gaming features, and innovative ecosystem developments. Make it sound exciting and community-focused.`;
       case 'linea':
-        return "You are an assistant who generates engaging social media posts related to the Linea blockchain ecosystem. Your posts should be informative, but also friendly and encouraging interaction. Focus on Layer 2 scaling, Ethereum compatibility, and the unique features of Linea.";
+        return `${baseInstruction} Focus on Linea's Layer 2 scaling solutions, fast transactions, low fees, and Ethereum compatibility. Highlight speed and efficiency benefits.`;
       case 'base':
       default:
-        return "You are an assistant who generates engaging social media posts related to the Base blockchain ecosystem. Your posts should be informative, but also friendly and encouraging interaction.";
+        return `${baseInstruction} Focus on Base blockchain's developer-friendly ecosystem, Coinbase integration, and growing dApp ecosystem. Emphasize accessibility and mainstream adoption.`;
     }
   };
 
@@ -53,80 +56,58 @@ export function useAIGenerator(): UseAIGeneratorReturn {
       setIsGeneratingAI(true);
       const toastId = toast.loading("Generating AI post...");
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+      // Initialize OpenAI client with the new API key
+      const client = new OpenAI({
+        apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY_POST || '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',
+        dangerouslyAllowBrowser: true
+      });
 
       try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
-            'HTTP-Referer': 'https://basebook.vercel.app',
-            'X-Title': 'BaseBook',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: "deepseek/deepseek-r1:free",
-            messages: [
-              {
-                role: "system",
-                content: getSystemMessage(activeNetwork)
-              },
-              {
-                role: "user",
-                content: aiPrompt
-              }
-            ],
-            temperature: 1,
-            top_p: 1,
-            repetition_penalty: 1
-          }),
-          signal: controller.signal
+        const response = await client.responses.create({
+          model: "gpt-5-nano",
+          tools: [
+            {
+              type: "web_search_preview",
+              search_context_size: "low"
+            }
+          ],
+          instructions: getSystemMessage(activeNetwork),
+          input: aiPrompt
         });
 
-        clearTimeout(timeoutId);
-        console.log('Received API response, status:', response.status);
+        console.log('Received OpenAI response:', response);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('API Error:', errorData);
-          throw new Error(errorData.error || `Error while generating post (${response.status})`);
-        }
-
-        const data = await response.json();
-        console.log('Received data:', data);
-
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-          console.error('Invalid response structure:', data);
-          throw new Error('Invalid API response');
-        }
-
-        const generatedPost = data.choices[0].message.content;
+        // Get the generated content from response.output_text
+        const generatedPost = response.output_text || 'No content generated';
         console.log('Post generated:', generatedPost);
 
-        // Set content based on network
+        // Set content based on network with AI flag
+        const aiGeneratedPost = {
+          content: generatedPost,
+          isAIGenerated: true
+        };
+
         switch (activeNetwork) {
           case 'basecamp':
-            setAiGeneratedContentForCamp(generatedPost);
+            setAiGeneratedContentForCamp(aiGeneratedPost);
             break;
           case 'linea':
-            setAiGeneratedContentForLinea(generatedPost);
+            setAiGeneratedContentForLinea(aiGeneratedPost);
             break;
           case 'base':
           default:
-            setAiGeneratedContentForBase(generatedPost);
+            setAiGeneratedContentForBase(aiGeneratedPost);
             break;
         }
 
         setShowAIModal(false);
         setAiPrompt('');
-        toast.success('AI post generated successfully!', { id: toastId });
+        toast.success('AI post generated successfully with web search!', { id: toastId });
 
-      } catch (fetchError: unknown) {
-        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          throw new Error('Request timeout exceeded');
-        }
-        throw fetchError;
+      } catch (apiError: unknown) {
+        console.error('OpenAI API Error:', apiError);
+        const errorMessage = apiError instanceof Error ? apiError.message : 'Unknown API error';
+        toast.error(`OpenAI API Error: ${errorMessage}`, { id: toastId });
       }
 
     } catch (error: unknown) {
@@ -154,15 +135,25 @@ export function useAIGenerator(): UseAIGeneratorReturn {
   };
 
   const getGeneratedContent = (network: PostingNetwork): string => {
+    let content;
     switch (network) {
       case 'basecamp':
-        return aiGeneratedContentForCamp;
+        content = aiGeneratedContentForCamp;
+        break;
       case 'linea':
-        return aiGeneratedContentForLinea;
+        content = aiGeneratedContentForLinea;
+        break;
       case 'base':
       default:
-        return aiGeneratedContentForBase;
+        content = aiGeneratedContentForBase;
+        break;
     }
+
+    // Handle both old string format and new object format
+    if (typeof content === 'string') {
+      return content;
+    }
+    return content?.content || '';
   };
 
   return {

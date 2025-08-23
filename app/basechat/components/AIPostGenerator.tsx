@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { PostingNetwork } from '../hooks/useAIGenerator';
+import { Badge } from '../../../components/ui/badge';
 
 interface AIPostGeneratorProps {
   isOpen: boolean;
@@ -26,24 +27,24 @@ export default function AIPostGenerator({
   const getNetworkTitle = (network: PostingNetwork): string => {
     switch (network) {
       case 'basecamp':
-        return 'Camp AI Generator';
+        return 'Camp';
       case 'linea':
-        return 'Linea AI Generator';
+        return 'Linea';
       case 'base':
       default:
-        return 'Base AI Generator';
+        return 'Base';
     }
   };
 
   const getNetworkDescription = (network: PostingNetwork): string => {
     switch (network) {
       case 'basecamp':
-        return 'Let AI help you create engaging Camp Network content';
+        return 'Let AI help you create engaging Camp Network content with real-time web search';
       case 'linea':
-        return 'Let AI help you create engaging Linea blockchain content';
+        return 'Let AI help you create engaging Linea blockchain content with real-time web search';
       case 'base':
       default:
-        return 'Let AI help you create engaging Base blockchain content';
+        return 'Let AI help you create engaging Base blockchain content with real-time web search';
     }
   };
 
@@ -113,16 +114,88 @@ export default function AIPostGenerator({
           >
             <div className="flex flex-col items-center mb-6 relative">
               <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 ${
-                activeNetwork === 'basecamp' ? 'bg-gradient-to-r from-transparent via-orange-500 to-transparent' : 'bg-gradient-to-r from-transparent via-blue-500 to-transparent'
+                activeNetwork === 'basecamp'
+                  ? 'bg-gradient-to-r from-transparent via-orange-500 to-transparent'
+                  : activeNetwork === 'linea'
+                  ? 'bg-gradient-to-r from-transparent via-cyan-400 to-transparent'
+                  : 'bg-gradient-to-r from-transparent via-blue-500 to-transparent'
               }`}></div>
 
-              <h3 className={`text-xl font-medium text-transparent bg-clip-text ${networkStyles.titleGradient} mt-4`}>
-                {getNetworkTitle(activeNetwork)}
-              </h3>
+              <div className="flex items-center justify-center mt-6">
+                <div className="relative">
+                  {/* Glowing background ring */}
+                  <div className={`absolute inset-0 w-20 h-20 rounded-full blur-xl opacity-30 ${
+                    activeNetwork === 'base'
+                      ? 'bg-blue-500'
+                      : activeNetwork === 'basecamp'
+                      ? 'bg-orange-500'
+                      : 'bg-cyan-500'
+                  }`}></div>
 
-              <div className="text-sm text-gray-400 mt-2 text-center">
-                {getNetworkDescription(activeNetwork)}
+                  {/* Main container with border */}
+                  <div className={`relative flex items-center gap-4 p-4 rounded-2xl border-2 backdrop-blur-sm ${
+                    activeNetwork === 'base'
+                      ? 'bg-white/10 border-blue-300/30 shadow-[0_0_20px_rgba(59,130,246,0.3)]'
+                      : activeNetwork === 'basecamp'
+                      ? 'bg-black/10 border-orange-300/30 shadow-[0_0_20px_rgba(249,115,22,0.3)]'
+                      : 'bg-black/10 border-cyan-300/30 shadow-[0_0_20px_rgba(34,211,238,0.3)]'
+                  }`}>
+
+                    {/* Logo with circular frame */}
+                    <div className={`relative flex items-center justify-center w-12 h-12 rounded-full border-2 ${
+                      activeNetwork === 'base'
+                        ? 'bg-white border-blue-300 shadow-lg'
+                        : activeNetwork === 'basecamp'
+                        ? 'bg-white border-orange-300 shadow-lg'
+                        : 'bg-white border-cyan-300 shadow-lg'
+                    }`}>
+                      <div className="absolute inset-0 rounded-full blur-sm opacity-50"></div>
+                      {activeNetwork === 'base' && (
+                        <img
+                          src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png"
+                          alt="Base"
+                          className="w-8 h-8 relative z-10 drop-shadow-md"
+                        />
+                      )}
+                      {activeNetwork === 'basecamp' && (
+                        <img
+                          src="/Camp.png"
+                          alt="Camp"
+                          className="w-full h-full rounded-full relative z-10 drop-shadow-md object-cover"
+                        />
+                      )}
+                      {activeNetwork === 'linea' && (
+                        <img
+                          src="/Logomark Blue BG.svg"
+                          alt="Linea"
+                          className="w-full h-full rounded-full relative z-10 drop-shadow-md object-cover"
+                        />
+                      )}
+                    </div>
+
+                    {/* Separator line */}
+                    <div className={`w-px h-8 ${
+                      activeNetwork === 'base'
+                        ? 'bg-blue-300/50'
+                        : activeNetwork === 'basecamp'
+                        ? 'bg-orange-300/50'
+                        : 'bg-cyan-300/50'
+                    }`}></div>
+
+                    {/* Badges with enhanced styling */}
+                    <div className="flex flex-col gap-1">
+                      <Badge variant="secondary" className="text-xs px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-lg hover:scale-105 transition-transform">
+                        OpenAI GPT-5
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs px-3 py-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 shadow-lg hover:scale-105 transition-transform">
+                        Web Search
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+
 
               <button
                 onClick={onClose}
@@ -218,17 +291,32 @@ export default function AIPostGenerator({
                     ? 'text-cyan-300'
                     : 'text-white/80'
                 }`}>
-                  Due to high demand, generation may take about a minute.
-                  <br />
-                  <span className={`${networkStyles.textColor} font-medium`}>
-                    We're creating the perfect {
-                      activeNetwork === 'basecamp'
+                  <div className="font-mono text-sm bg-black/20 p-2 rounded border border-green-400/20">
+                    <span className={`${networkStyles.textColor} animate-pulse`}>
+                      &gt; [HACK]
+                    </span>
+                    <span className={`${networkStyles.textColor} ml-2`}>
+                      Bypassing AI firewalls...
+                    </span>
+                    <br />
+                    <span className={`${networkStyles.textColor} text-green-400`}>
+                      GPT-5 + WebSearch
+                    </span>
+                    <span className={`${networkStyles.textColor} ml-2 flex items-center space-x-0.5`}>
+                      <span className="animate-ping inline-block text-red-400">.</span>
+                      <span className="animate-pulse inline-block text-yellow-400">.</span>
+                      <span className="animate-bounce inline-block text-green-400">.</span>
+                    </span>
+                    <br />
+                    <span className={`${networkStyles.textColor} text-xs opacity-75 mt-1 block`}>
+                      {activeNetwork === 'basecamp'
                         ? 'Camp Network'
                         : activeNetwork === 'linea'
                         ? 'Linea blockchain'
                         : 'Base blockchain'
-                    } post for you! ✨
-                  </span>
+                      } • Quantum encryption active • Neural processing...
+                    </span>
+                  </div>
                 </p>
               </div>
             )}
