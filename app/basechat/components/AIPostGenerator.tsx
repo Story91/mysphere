@@ -292,29 +292,8 @@ export default function AIPostGenerator({
                     : 'text-white/80'
                 }`}>
                   <div className="font-mono text-sm bg-black/20 p-2 rounded border border-green-400/20">
-                    <span className={`${networkStyles.textColor} animate-pulse`}>
-                      &gt; [HACK]
-                    </span>
-                    <span className={`${networkStyles.textColor} ml-2`}>
-                      Bypassing AI firewalls...
-                    </span>
-                    <br />
-                    <span className={`${networkStyles.textColor} text-green-400`}>
-                      GPT-5 + WebSearch
-                    </span>
-                    <span className={`${networkStyles.textColor} ml-2 flex items-center space-x-0.5`}>
-                      <span className="animate-ping inline-block text-red-400">.</span>
-                      <span className="animate-pulse inline-block text-yellow-400">.</span>
-                      <span className="animate-bounce inline-block text-green-400">.</span>
-                    </span>
-                    <br />
-                    <span className={`${networkStyles.textColor} text-xs opacity-75 mt-1 block`}>
-                      {activeNetwork === 'basecamp'
-                        ? 'Camp Network'
-                        : activeNetwork === 'linea'
-                        ? 'Linea blockchain'
-                        : 'Base blockchain'
-                      } • Quantum encryption active • Neural processing...
+                    <span className={`${networkStyles.textColor}`}>
+                      HACK GPT-5 + WebSearch Content Creator
                     </span>
                   </div>
                 </p>
