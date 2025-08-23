@@ -26,7 +26,7 @@
     "@base-org/account-ui": "^1.0.1",
     "@campnetwork/origin": "^0.0.9",
     "@chainlink/contracts": "0.8.0",
-    "@coinbase/agentkit": "^0.9.0",
+    "@coinbase/agentkit": "^0.10.0",
     "@coinbase/agentkit-langchain": "^0.3.0",
     "@coinbase/agentkit-vercel-ai-sdk": "^0.1.0",
     "@coinbase/onchainkit": "^0.37.8",
