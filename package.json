@@ -100,7 +100,8 @@
     "tsparticles-slim": "^2.12.0",
     "viem": "^2.27.3",
     "wagmi": "^2.14.13",
-    "zod": "^3.25.7"
+    "zod": "^3.25.7",
+    "openai": "^4.69.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",

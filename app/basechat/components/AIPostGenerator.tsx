@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { PostingNetwork } from '../hooks/useAIGenerator';
-import { Badge } from '../../../components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 
 interface AIPostGeneratorProps {
   isOpen: boolean;
