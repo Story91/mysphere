@@ -185,7 +185,7 @@ export default function AIPostGenerator({
                     {/* Badges with enhanced styling */}
                     <div className="flex flex-col gap-1">
                       <Badge variant="secondary" className="text-xs px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-lg hover:scale-105 transition-transform">
-                        OpenAI GPT-5 + WebSearch
+                        OpenAI GPT-5-nano 
                       </Badge>
                       <Badge variant="secondary" className="text-xs px-3 py-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 shadow-lg hover:scale-105 transition-transform">
                         Web Search
