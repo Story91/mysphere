@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast';
 import { Avatar } from '@coinbase/onchainkit/identity';
 import MusicSelector from '../../components/MusicSelector';
 import SpotifyTrackCard from '../../components/SpotifyTrackCard';
+import AIButton from '../../components/AIButton';
 
 interface CreatePostLineaProps {
   onPostCreated?: () => Promise<void>;
@@ -339,15 +340,10 @@ export default function CreatePostLinea({
             </button>
 
             {setShowAIModal && (
-              <button
+              <AIButton
                 onClick={handleShowAIModal}
-                className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 text-xs sm:text-sm bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
-                title="Generate AI post"
                 disabled={isSaving}
-              >
-                <span className="text-lg">🤖</span>
-                <span className="hidden sm:inline font-medium text-purple-600 dark:text-purple-400">AI</span>
-              </button>
+              />
             )}
           </div>
           

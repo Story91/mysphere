@@ -71,6 +71,9 @@ import TransactionButton from '../components/TransactionButton';
 import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
 import YapsMetrics from '../yapscan/components/YapsMetrics';
+import { useAIGenerator } from './hooks/useAIGenerator';
+import AIPostGenerator from './components/AIPostGenerator';
+import AIButton from './components/AIButton';
 
 
 import PostList, { ExtendedPost } from './components/PostList';
@@ -297,11 +300,17 @@ export default function BaseChat() {
   // Network filter state - renamed to activePostingNetwork to reflect its new purpose
   const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea'>('base');
   
-  // Stany dla generowania AI
-  const [showAIModal, setShowAIModal] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [aiGeneratedContentForCamp, setAiGeneratedContentForCamp] = useState<string>('');
+  // AI Generator Hook
+  const aiGenerator = useAIGenerator();
+
+  // Update newPost when AI generates content for Base network
+  useEffect(() => {
+    const baseContent = aiGenerator.getGeneratedContent('base');
+    if (baseContent && activePostingNetwork === 'base') {
+      setNewPost(baseContent);
+      aiGenerator.clearGeneratedContent('base');
+    }
+  }, [aiGenerator.getGeneratedContent('base'), activePostingNetwork, aiGenerator]);
   
   // Globalne deklaracje stanów modalu przeniesione na początek funkcji
   const [modalMessage, setModalMessage] = useState('');
@@ -2334,89 +2343,15 @@ export default function BaseChat() {
 
 
 
-  const handleGenerateAIPost = async () => {
-    if (!aiPrompt.trim() || !address || isGeneratingAI) return;
-    
-    try {
-      setIsGeneratingAI(true);
-      console.log('Starting AI post generation...');
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+  // Helper function to check if network supports AI
+  const isAINetwork = (network: string): network is 'base' | 'basecamp' | 'linea' => {
+    return ['base', 'basecamp', 'linea'].includes(network);
+  };
 
-      try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
-            'HTTP-Referer': 'https://basebook.vercel.app',
-            'X-Title': 'BaseBook',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: "deepseek/deepseek-r1:free",
-            messages: [
-              {
-                role: "system",
-                content: activePostingNetwork === 'basecamp' 
-                  ? "You are an assistant who generates engaging social media posts related to the Camp Network ecosystem. Your posts should be informative, but also friendly and encouraging interaction. Focus on community building, innovation, and the unique features of Camp Network."
-                  : "You are an assistant who generates engaging social media posts related to the Base blockchain ecosystem. Your posts should be informative, but also friendly and encouraging interaction."
-              },
-              {
-                role: "user",
-                content: aiPrompt
-              }
-            ],
-            temperature: 1,
-            top_p: 1,
-            repetition_penalty: 1
-          }),
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-        console.log('Received API response, status:', response.status);
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('API Error:', errorData);
-          throw new Error(errorData.error || `Error while generating post (${response.status})`);
-        }
-
-        const data = await response.json();
-        console.log('Received data:', data);
-
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-          console.error('Invalid response structure:', data);
-          throw new Error('Invalid API response');
-        }
-
-        const generatedPost = data.choices[0].message.content;
-        console.log('Post generated:', generatedPost);
-
-        // Check which network is active and set appropriate content
-        if (activePostingNetwork === 'basecamp') {
-          setAiGeneratedContentForCamp(generatedPost);
-        } else {
-          setNewPost(generatedPost);
-        }
-        
-        setShowAIModal(false);
-        setAiPrompt('');
-        
-      } catch (fetchError: unknown) {
-        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          throw new Error('Request timeout exceeded');
-        }
-        throw fetchError;
-      }
-
-    } catch (error: unknown) {
-      console.error('Error generating AI post:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`An error occurred while generating the post: ${errorMessage}`);
-    } finally {
-      setIsGeneratingAI(false);
+  // AI Generation Handler
+  const handleAIGenerate = () => {
+    if (isAINetwork(activePostingNetwork)) {
+      aiGenerator.generateAIPost(activePostingNetwork);
     }
   };
 
@@ -3626,14 +3561,9 @@ export default function BaseChat() {
                                 <span className="hidden sm:inline font-medium text-blue-600 dark:text-blue-400">Photo</span>
                               </button>
 
-                              <button
-                                onClick={() => setShowAIModal(true)}
-                                className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 text-xs sm:text-sm bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
-                                title="Generate AI post"
-                              >
-                                <span className="text-lg">🤖</span>
-                                <span className="hidden sm:inline font-medium text-purple-600 dark:text-purple-400">AI</span>
-                              </button>
+                              <AIButton
+                                onClick={() => aiGenerator.setShowAIModal(true)}
+                              />
 
                               <button
                                 onClick={() => setShowMusicSelector(true)}
@@ -3707,11 +3637,11 @@ export default function BaseChat() {
                           {/* Add BaseCamp post form conditionally */}
                           {activePostingNetwork === 'basecamp' && (
                             <div>
-                              <CreatePostBaseCamp 
-                                onPostCreated={refreshPosts} 
-                                setShowAIModal={setShowAIModal}
-                                aiGeneratedContent={aiGeneratedContentForCamp}
-                                onAiContentUsed={() => setAiGeneratedContentForCamp('')}
+                              <CreatePostBaseCamp
+                                onPostCreated={refreshPosts}
+                                setShowAIModal={aiGenerator.setShowAIModal}
+                                aiGeneratedContent={aiGenerator.getGeneratedContent('basecamp')}
+                                onAiContentUsed={() => aiGenerator.clearGeneratedContent('basecamp')}
                               />
                               <ClaimPortalBanner />
                             </div>
@@ -3719,11 +3649,11 @@ export default function BaseChat() {
 
                           {/* Add Linea post form conditionally */}
                           {activePostingNetwork === 'linea' && (
-                            <CreatePostLinea 
-                              onPostCreated={refreshPosts} 
-                              setShowAIModal={setShowAIModal}
-                              aiGeneratedContent={aiGeneratedContentForCamp}
-                              onAiContentUsed={() => setAiGeneratedContentForCamp('')}
+                            <CreatePostLinea
+                              onPostCreated={refreshPosts}
+                              setShowAIModal={aiGenerator.setShowAIModal}
+                              aiGeneratedContent={aiGenerator.getGeneratedContent('linea')}
+                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('linea')}
                             />
                           )}
                         </div>
@@ -4068,133 +3998,18 @@ export default function BaseChat() {
       {/* Padding for mobile footer */}
       <div className="h-20 lg:h-0" />
 
-      {/* Modal do generowania postów AI */}
-      <AnimatePresence>
-        {showAIModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-            onClick={() => setShowAIModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.5, opacity: 0 }}
-              className={`${
-                activePostingNetwork === 'basecamp' 
-                  ? 'bg-gradient-to-br from-black/90 to-orange-900/90 border-orange-500/30 shadow-[0_0_30px_rgba(249,115,22,0.3)]'
-                  : 'bg-gradient-to-br from-gray-900/90 to-gray-800/90 border-white/10 shadow-[0_0_30px_rgba(59,130,246,0.2)]'
-              } backdrop-blur-xl rounded-2xl p-6 max-w-md w-full mx-4 border`}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex flex-col items-center mb-6 relative">
-                <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 ${
-                  activePostingNetwork === 'basecamp'
-                    ? 'bg-gradient-to-r from-transparent via-orange-500 to-transparent'
-                    : 'bg-gradient-to-r from-transparent via-blue-500 to-transparent'
-                }`}></div>
-                
-                <h3 className={`text-xl font-medium text-transparent bg-clip-text ${
-                  activePostingNetwork === 'basecamp'
-                    ? 'bg-gradient-to-r from-orange-400 to-yellow-400'
-                    : 'bg-gradient-to-r from-blue-400 to-purple-400'
-                } mt-4`}>
-                  {activePostingNetwork === 'basecamp' ? 'Camp AI Generator' : 'AI Post Generator'}
-                </h3>
-                
-                <div className="text-sm text-gray-400 mt-2 text-center">
-                  {activePostingNetwork === 'basecamp' 
-                    ? 'Let AI help you create engaging Camp Network content'
-                    : 'Let AI help you create engaging content'
-                  }
-                </div>
-
-                <button
-                  onClick={() => setShowAIModal(false)}
-                  className="absolute top-0 right-0 text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="relative">
-                <textarea
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder={
-                    activePostingNetwork === 'basecamp'
-                      ? "I'm your personal Camp Network agent. How can I assist you with creating engaging content for the Camp community today?"
-                      : "I'm your personal Base network agent. How can I assist you with creating engaging content today?"
-                  }
-                  className={`w-full px-4 py-3 ${
-                    activePostingNetwork === 'basecamp'
-                      ? 'bg-gradient-to-r from-black/50 to-orange-900/50 border-orange-500/20 focus:ring-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.1)]'
-                      : 'bg-gradient-to-r from-gray-800/50 to-gray-900/50 border-white/10 focus:ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
-                  } backdrop-blur-md border rounded-xl text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 resize-none`}
-                  rows={4}
-                  maxLength={500}
-                />
-                <div className="absolute bottom-3 right-3 text-xs text-gray-500">
-                  {aiPrompt.length}/500
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center mt-4">
-                <button
-                  onClick={() => setShowAIModal(false)}
-                  className="px-4 py-2 text-sm text-gray-400 hover:text-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleGenerateAIPost}
-                  disabled={isGeneratingAI || !aiPrompt.trim()}
-                  className={`flex items-center gap-2 px-6 py-2 ${
-                    activePostingNetwork === 'basecamp'
-                      ? 'bg-gradient-to-r from-orange-500/30 to-yellow-500/30 hover:shadow-[0_0_20px_rgba(249,115,22,0.5)] border-orange-500/20'
-                      : 'bg-gradient-to-r from-blue-500/30 to-purple-500/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] border-white/20'
-                  } backdrop-blur-md rounded-xl text-white font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed border`}
-                >
-                  {isGeneratingAI ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      <span>Generating...</span>
-                    </>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      Generate
-                    </span>
-                  )}
-                </button>
-              </div>
-              {isGeneratingAI && (
-                <div className={`mt-4 p-4 rounded-xl ${
-                  activePostingNetwork === 'basecamp'
-                    ? 'bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border-orange-500/20'
-                    : 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-white/10'
-                } backdrop-blur-md border shadow-lg`}>
-                  <p className="text-sm text-white/80 text-center">
-                    Due to high demand, generation may take about a minute.
-                    <br />
-                    <span className={`${
-                      activePostingNetwork === 'basecamp' ? 'text-orange-400' : 'text-blue-400'
-                    } font-medium`}>
-                      We're creating the perfect {activePostingNetwork === 'basecamp' ? 'Camp Network' : ''} post for you! ✨
-                    </span>
-                  </p>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* AI Post Generator Modal */}
+      {isAINetwork(activePostingNetwork) && (
+        <AIPostGenerator
+          isOpen={aiGenerator.showAIModal}
+          onClose={() => aiGenerator.setShowAIModal(false)}
+          activeNetwork={activePostingNetwork}
+          aiPrompt={aiGenerator.aiPrompt}
+          setAiPrompt={aiGenerator.setAiPrompt}
+          isGeneratingAI={aiGenerator.isGeneratingAI}
+          onGenerate={handleAIGenerate}
+        />
+      )}
     </BanPage>
   </FarcasterFrameProvider>
   );
