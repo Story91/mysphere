@@ -22,21 +22,12 @@ const baseEntry = {
 
 const campMainnetEntry = {
   id: campMainnetChain.id,
-  name: 'Camp Mainnet',
-  shortName: 'CAMP-M',
+  name: 'Camp',
+  shortName: 'CAMP',
   iconUrl: '/Camp.png',
   color: '#FF6B35',
   disabled: !ENABLE_CAMP_MAINNET,
   bgWhite: true, // Białe tło pod logo, żeby było czytelne
-} as const;
-
-const campTestnetEntry = {
-  id: baseCampChain.id,
-  name: 'Camp Testnet',
-  shortName: 'CAMP',
-  iconUrl: '/Camp.png', // Ikona dla sieci Camp
-  color: '#FF6B35',
-  bgWhite: true, // Białe tło pod logo
 } as const;
 
 const lineaEntry = {
@@ -48,8 +39,8 @@ const lineaEntry = {
   bgWhite: false,
 } as const;
 
-// Kolejność: Base, Camp Testnet, Camp Mainnet (z kłódką gdy wyłączone), Linea
-const networks = [baseEntry, campTestnetEntry, campMainnetEntry, lineaEntry] as const;
+// Kolejność: Base, Camp Mainnet, Linea
+const networks = [baseEntry, campMainnetEntry, lineaEntry] as const;
 type Network = (typeof networks)[number];
 
 export function NetworkSwitcher() {

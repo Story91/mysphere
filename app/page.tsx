@@ -135,8 +135,8 @@ const tailwindConfig = {
 }
 
 // Camp Network contracts addresses
-const CAMP_POST_CONTRACT = "0x177Af844a3c7A1749dE97656a5d84b6373Fc350E" as `0x${string}`;
-const PORTAL_NFT_CONTRACT = "0x1eD74B27f846C699A90926daD057A7f6FD22C126" as `0x${string}`;
+const CAMP_POST_CONTRACT = "0x71bE438ee579de33EBf353579A413439Db042CA5" as `0x${string}`;
+const PORTAL_NFT_CONTRACT = "0x57CC99c9E1942a34a0cfF7FCC27c227455f14587" as `0x${string}`;
 const IP_MARKET_V3_CONTRACT = "0xF528f920d0ce1D1EA230B0ec10F0F64B8F43cbac" as `0x${string}`;
 
 // Linea Network contracts addresses
@@ -1398,7 +1398,7 @@ export default function HomePage() {
             </span>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a href="https://basecamp.cloud.blockscout.com/address/0x177Af844a3c7A1749dE97656a5d84b6373Fc350E" target="_blank" rel="noopener noreferrer" 
+                            <a href="https://camp.cloud.blockscout.com/address/0x71bE438ee579de33EBf353579A413439Db042CA5" target="_blank" rel="noopener noreferrer" 
                className="bg-gradient-to-br from-orange-500/10 via-blue-500/10 to-orange-600/10 backdrop-blur-md rounded-xl p-4 border border-orange-800/50 hover:border-orange-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(249,115,22,0.3)] group">
               <div className="flex items-center">
                 <div className="flex-1">
@@ -1411,7 +1411,7 @@ export default function HomePage() {
                       ({campPostsData ? Number(campPostsData) : 0} posts)
                     </span>
                   </div>
-                  <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x177Af844a3c7A1749dE97656a5d84b6373Fc350E</p>
+                  <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x71bE438ee579de33EBf353579A413439Db042CA5</p>
                 </div>
                 <div className="text-gray-500 group-hover:text-orange-400 transition-colors">
                   <FaExternalLinkAlt className="w-3 h-3" />
@@ -1419,7 +1419,7 @@ export default function HomePage() {
               </div>
             </a>
             
-            <a href="https://basecamp.cloud.blockscout.com/token/0x1eD74B27f846C699A90926daD057A7f6FD22C126" target="_blank" rel="noopener noreferrer"
+            <a href="https://basecamp.cloud.blockscout.com/token/0x57CC99c9E1942a34a0cfF7FCC27c227455f14587" target="_blank" rel="noopener noreferrer"
                className="bg-gradient-to-br from-orange-500/10 via-blue-500/10 to-orange-600/10 backdrop-blur-md rounded-xl p-4 border border-orange-800/50 hover:border-blue-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] group">
               <div className="flex items-center">
                 <div className="flex-1">
@@ -1432,7 +1432,7 @@ export default function HomePage() {
                       ({portalClaimedData ? Number(portalClaimedData) : 0} claimed)
                     </span>
                   </div>
-                  <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x1eD74B27f846C699A90926daD057A7f6FD22C126</p>
+                  <p className="text-gray-400 text-sm font-mono mt-1 truncate">0x57CC99c9E1942a34a0cfF7FCC27c227455f14587</p>
                 </div>
                 <div className="text-gray-500 group-hover:text-blue-400 transition-colors">
                   <FaExternalLinkAlt className="w-3 h-3" />

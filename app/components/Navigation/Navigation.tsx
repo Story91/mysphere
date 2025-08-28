@@ -189,15 +189,14 @@ export default function Navigation() {
         { href: '/marketplace', label: 'IP NFT Marketplace', isHighlighted: true }
       ]
     },
-    {
-      label: 'Mini-Apps',
-      isHighlighted: true,
-      dropdownItems: [
-        { href: '/ai-agent', label: 'Spherian' },
-        { href: '#', label: 'Spheres', isDisabled: true },
-        { href: '#', label: 'Camp Mainnet (private)', isDisabled: true },
-      ],
-    },
+            {
+          label: 'Mini-Apps',
+          isHighlighted: true,
+          dropdownItems: [
+            { href: '/ai-agent', label: 'Spherian' },
+            { href: '#', label: 'Spheres', isDisabled: true },
+          ],
+        },
     { href: '/Docs', label: 'Docs' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ];

@@ -1,7 +1,7 @@
 // Globalna konfiguracja Camp Mainnet (bez .env)
-// PL: Centralny przełącznik i stałe sieci – trzymamy wyłączone domyślnie
+// PL: Centralny przełącznik i stałe sieci – włączone dla mainnet
 
-export const ENABLE_CAMP_MAINNET = false as const;
+export const ENABLE_CAMP_MAINNET = true as const;
 
 export const CAMP_MAINNET = {
   CHAIN_ID: 484,

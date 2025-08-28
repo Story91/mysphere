@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import { baseCampChain } from '../../../contracts/BaseCampPostContract';
 import { AnimatePresence, motion } from 'framer-motion';
 
-const PORTAL_NFT_ADDRESS = "0x1eD74B27f846C699A90926daD057A7f6FD22C126";
+const PORTAL_NFT_ADDRESS = "0x57CC99c9E1942a34a0cfF7FCC27c227455f14587";
 const PORTAL_NFT_ABI = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"uint256","name":"balance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"},{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"ERC1155InsufficientBalance","type":"error"},{"inputs":[{"internalType":"address","name":"approver","type":"address"}],"name":"ERC1155InvalidApprover","type":"error"},{"inputs":[{"internalType":"uint256","name":"idsLength","type":"uint256"},{"internalType":"uint256","name":"valuesLength","type":"uint256"}],"name":"ERC1155InvalidArrayLength","type":"error"},{"inputs":[{"internalType":"address","name":"operator","type":"address"}],"name":"ERC1155InvalidOperator","type":"error"},{"inputs":[{"internalType":"address","name":"receiver","type":"address"}],"name":"ERC1155InvalidReceiver","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"}],"name":"ERC1155InvalidSender","type":"error"},{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"address","name":"owner","type":"address"}],"name":"ERC1155MissingApprovalForAll","type":"error"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":false,"internalType":"bool","name":"approved","type":"bool"}],"name":"ApprovalForAll","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256[]","name":"ids","type":"uint256[]"},{"indexed":false,"internalType":"uint256[]","name":"values","type":"uint256[]"}],"name":"TransferBatch","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"TransferSingle","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"value","type":"string"},{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"}],"name":"URI","type":"event"},{"inputs":[],"name":"TOKEN_ID","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"uint256","name":"id","type":"uint256"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint256[]","name":"ids","type":"uint256[]"}],"name":"balanceOfBatch","outputs":[{"internalType":"uint256[]","name":"","type":"uint256[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"claim","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"address","name":"operator","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256[]","name":"ids","type":"uint256[]"},{"internalType":"uint256[]","name":"values","type":"uint256[]"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"safeBatchTransferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"id","type":"uint256"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"safeTransferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"newuri","type":"string"}],"name":"setURI","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalClaimed","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"uri","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"}];
 
 // Interface for NFT metadata
@@ -26,7 +26,8 @@ const fixedNFTMetadata: NFTMetadata = {
   "attributes": [
     {"trait_type":"Collection","value":"MySphere X"},
     {"trait_type":"Edition","value":"Limited"},
-    {"trait_type":"Network","value":"Camp"}
+    {"trait_type":"Network","value":"Camp"},
+    {"trait_type":"Floor Price","value":"10 $CAMP"}
   ]
 };
 
@@ -99,7 +100,7 @@ const ClaimPortalBanner = () => {
 
     try {
       setIsLoading(true);
-      toast.loading('Preparing to claim NFT...');
+      toast.loading('Preparing to purchase NFT...');
 
       // If not on BaseCamp network, try to switch
       if (!isBaseCampNetwork) {
@@ -135,7 +136,7 @@ const ClaimPortalBanner = () => {
         chain: baseCampChain,
       });
       
-      toast.success('Claim transaction sent!');
+      toast.success('Purchase transaction sent!');
       console.log('Transaction hash:', txHash);
       
       // Set as claimed and store transaction hash
@@ -146,8 +147,8 @@ const ClaimPortalBanner = () => {
       setShowPreviewModal(false);
       
     } catch (error) {
-      console.error('Claim transaction error:', error);
-      toast.error('Failed to claim NFT: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('Purchase transaction error:', error);
+      toast.error('Failed to purchase NFT: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsLoading(false);
     }
@@ -214,7 +215,7 @@ const ClaimPortalBanner = () => {
                   : "bg-orange-600 hover:bg-orange-500"
               } text-white rounded-lg font-medium transition-colors`}
             >
-              {isLoading ? "Claiming..." : "Confirm Claim"}
+              {isLoading ? "Processing..." : "Confirm Purchase"}
             </button>
           </div>
         </div>
@@ -232,10 +233,10 @@ const ClaimPortalBanner = () => {
         <div className="flex flex-col sm:flex-row items-center justify-between">
           <div className="mb-4 sm:mb-0 text-center sm:text-left">
             <h3 className="text-lg font-bold mb-1">
-              Claim your PORTAL NFT for free on Camp Network
+              Get your PORTAL NFT on Camp Network Mainnet
             </h3>
             <p className="text-sm text-orange-100">
-              Join the MySphere X CampNetwork community with this exclusive NFT
+              Post for free, get exclusive PORTAL NFT for 10 $CAMP
             </p>
             <div className="w-full mt-2">
               <div className="flex justify-between text-xs text-white mb-1">
@@ -272,7 +273,7 @@ const ClaimPortalBanner = () => {
                     : "bg-white hover:bg-orange-100"
                 } text-orange-800 rounded text-sm font-medium transition duration-200`}
               >
-                {isLoading ? "Claiming..." : "Claim Free NFT"}
+                {isLoading ? "Processing..." : "10 $CAMP"}
               </button>
             )}
             

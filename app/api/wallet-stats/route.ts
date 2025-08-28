@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const BASECAMP_API_URL = 'https://basecamp.cloud.blockscout.com/api/v2';
-const CAMP_NFT_CONTRACT = '0x1eD74B27f846C699A90926daD057A7f6FD22C126';
+const CAMP_NFT_CONTRACT = '0x57CC99c9E1942a34a0cfF7FCC27c227455f14587';
 
 interface WalletStats {
   transactions: number;

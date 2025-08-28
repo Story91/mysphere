@@ -11,16 +11,16 @@ const config = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 50
+        runs: 200
       },
       viaIR: true
     }
   },
   paths: {
-    sources: "./app/spheres/contracts",
-    tests: "./app/spheres/test",
-    cache: "./app/spheres/cache",
-    artifacts: "./app/spheres/artifacts"
+    sources: "./camp-contract",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts"
   },
   networks: {
     "base-sepolia": {
@@ -45,6 +45,19 @@ const config = {
       gasPrice: "auto",
       gas: "auto",
       timeout: 120000
+    },
+    "camp-mainnet": {
+      url: process.env.CAMP_MAINNET_RPC_URL || "https://rpc.camp.raas.gelato.cloud",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 484
+    },
+    "camp": {
+      url: process.env.CAMP_RPC_URL || "https://rpc.camp.raas.gelato.cloud",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 484,
+      gasPrice: "auto",
+      gas: "auto",
+      timeout: 120000
     }
   },
   etherscan: {
@@ -52,7 +65,8 @@ const config = {
       "base-sepolia": process.env.BASESCAN_API_KEY || "",
       base: process.env.BASESCAN_API_KEY || "",
       "base-goerli": process.env.BASESCAN_API_KEY || "",
-      linea: "HSHV72NNW6KVQA88YB5BFSZHTVPFWC2GJU"
+      linea: "HSHV72NNW6KVQA88YB5BFSZHTVPFWC2GJU",
+      "camp": "empty"
     },
     customChains: [
       {
@@ -86,16 +100,27 @@ const config = {
           apiURL: "https://api.etherscan.io/v2/api?chainid=59144",
           browserURL: "https://lineascan.build"
         }
+      },
+      {
+        network: "camp",
+        chainId: 484,
+        urls: {
+          apiURL: "https://camp.cloud.blockscout.com/api",
+          browserURL: "https://camp.cloud.blockscout.com"
+        }
       }
     ]
   },
   typechain: {
-    outDir: "app/spheres/typechain-types",
+    outDir: "typechain-types",
     target: "ethers-v6"
   },
   gasReporter: {
     enabled: true,
     currency: "USD"
+  },
+  sourcify: {
+    enabled: true
   }
 };
 
