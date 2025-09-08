@@ -193,8 +193,10 @@ export default function Navigation() {
           label: 'Mini-Apps',
           isHighlighted: true,
           dropdownItems: [
-            { href: '/ai-agent', label: 'Spherian' },
-            { href: '#', label: 'Spheres', isDisabled: true },
+            { href: 'https://farcaster.xyz/miniapps/EKw40VoEc1vi/swipe', label: 'SWIPE', isExternal: true },
+            { href: 'https://farcaster.xyz/?launchFrameUrl=https%3A%2F%2Fstreme.fun%2Ftoken%2F0x35231bb71689687fd127f991ddf3a071a432350f', label: '$BOOST', isExternal: true },
+            { href: 'https://farcaster.xyz/miniapps/wLwL313HxiaE/mysphere', label: 'MySphere', isExternal: true },
+            { href: '/ai-agent', label: 'Spherian', isDisabled: true },
           ],
         },
     { href: '/Docs', label: 'Docs' },
@@ -320,22 +322,6 @@ export default function Navigation() {
                               <span className="font-['Coinbase_Display']">
                                 {item.label}
                               </span>
-                              {item.isExternal && (
-                                <svg
-                                  className="w-3 h-3 ml-1"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14M14 4H20M20 4V10M20 4L10 14"
-                                    stroke="#0052FF"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              )}
                             </Link>
                           ),
                         )}
