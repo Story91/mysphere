@@ -90,7 +90,6 @@ import CreatePostBaseCamp from './components/BaseCampPosts/CreatePostBaseCamp';
 import ClaimPortalBanner from './components/BaseCampPosts/ClaimPortalBanner';
 import CreatePostLinea from './Linea/components/CreatePostLinea';
 import MockFeed from './prelogin/MockFeed';
-import GenesisMiniClaims from './components/BasePosts/GenesisMiniClaims';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -3524,8 +3523,6 @@ export default function BaseChat() {
                             </div>
                           )}
 
-                          {/* MySphere Genesis mini-claims (Base) */}
-                          <GenesisMiniClaims />
 
                           {/* 🎵 Selected Music Preview */}
                           {selectedMusic && (
