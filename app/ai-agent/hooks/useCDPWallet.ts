@@ -222,7 +222,7 @@ export const useCDPWallet = (config?: {
           address: eoaAccount.address,
           transaction: {
             to,
-            value: value.toString(),
+            value,
             data: data || '0x',
           },
           network: networkId === 'base-mainnet' ? 'base' : 'base-sepolia',
