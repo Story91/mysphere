@@ -24,6 +24,9 @@ import { useZeroDevSmartWallet } from './hooks/useZeroDevSmartWallet';
 import { formatEther, parseEther } from "viem";
 import { Copy, ExternalLink, RefreshCw, Bot, Wallet, Zap } from "lucide-react";
 import AutonomousWalletDemo from "../components/AutonomousWalletDemo";
+import { CDPWalletManager } from './components/CDPWalletManager';
+import { SpendPermissionsManager } from './components/SpendPermissionsManager';
+import { useCDPWallet } from './hooks/useCDPWalletClient';
 
 type ActivePanel = 'profile' | 'spherian' | 'portfolio';
 
@@ -88,6 +91,11 @@ const ProfilePanelInner = ({
   const { address: userAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
   const [activeSection, setActiveSection] = useState<MenuKey>(null);
+  
+  // CDP Wallet
+  const cdpWallet = useCDPWallet({
+    networkId: process.env.NEXT_PUBLIC_NETWORK_ID || 'base-sepolia'
+  });
 
   // Privy Embedded Wallet
   const {
@@ -349,8 +357,25 @@ const ProfilePanelInner = ({
 
             <Separator className="bg-gray-200" />
 
+            {/* CDP Wallet Section */}
+            <div className="mt-6">
+              <CDPWalletManager 
+                networkId={process.env.NEXT_PUBLIC_NETWORK_ID || 'base-sepolia'}
+                onWalletCreated={(address, type) => {
+                  console.log(`CDP ${type} wallet created:`, address);
+                }}
+              />
+            </div>
+
+            {/* Spend Permissions Section */}
+            {cdpWallet.smartAccount.isConnected && cdpWallet.smartAccount.supportsSpendPermissions && (
+              <div className="mt-6">
+                <SpendPermissionsManager cdpWallet={cdpWallet} />
+              </div>
+            )}
+
             {/* Smart Wallet Section */}
-            <div className="space-y-3">
+            <div className="space-y-3 mt-6">
               <div className="flex items-center gap-2 mb-2">
                 <Zap className="h-4 w-4 text-purple-600" />
                 <span className="text-sm font-medium text-gray-900">Smart Wallet (ZeroDev)</span>
@@ -1245,6 +1270,11 @@ export default function Home() {
     sendTransaction
   } = useZeroDevSmartWallet();
 
+  // CDP wallet integration
+  const cdpWallet = useCDPWallet({
+    networkId: process.env.NEXT_PUBLIC_NETWORK_ID || 'base-sepolia'
+  });
+
   // Ref for the messages container
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Ref for the input field
@@ -1315,7 +1345,7 @@ export default function Home() {
       sendTransaction
     };
     
-    await sendMessage(message, userAddress, embeddedWallet, smartWalletHook);
+    await sendMessage(message, userAddress, embeddedWallet, smartWalletHook, cdpWallet);
   };
 
   return (

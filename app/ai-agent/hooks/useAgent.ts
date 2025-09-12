@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useAccount } from "wagmi";
 import { AgentRequest, AgentResponse } from "../types/api";
 import { useZeroDevSmartWallet } from "./useZeroDevSmartWallet";
+import { useCDPWallet } from "./useCDPWallet";
+import { CDPWalletActionProvider } from "../providers/CDPWalletActionProvider";
 
 /**
  * Fixes common URL issues in agent responses and converts transaction hashes to clickable links
@@ -180,7 +182,8 @@ async function messageAgent(
   userMessage: string, 
   userAddress?: string, 
   embeddedWallet?: { id: string; address: string },
-  smartWalletHook?: any
+  smartWalletHook?: any,
+  cdpWallet?: any
 ): Promise<string | null> {
   try {
     // Require wallet connection and embedded wallet
@@ -195,7 +198,37 @@ async function messageAgent(
     // FIRST: Check if user message contains wallet commands (direct execution)
     let walletResult = '';
     let directWalletCommand = null;
-    if (smartWalletHook && smartWalletHook.isConnected) {
+    
+    // Try CDP wallet first if available (preferred for spend permissions)
+    if (cdpWallet && (cdpWallet.eoaWallet.isConnected || cdpWallet.smartAccount.isConnected)) {
+      console.log('🔍 CDP wallet available:', {
+        eoaConnected: cdpWallet.eoaWallet.isConnected,
+        smartAccountConnected: cdpWallet.smartAccount.isConnected,
+        address: cdpWallet.smartAccount.address || cdpWallet.eoaWallet.address,
+        supportsSpendPermissions: cdpWallet.smartAccount.supportsSpendPermissions
+      });
+      
+      directWalletCommand = parseWalletCommand(userMessage);
+      if (directWalletCommand) {
+        console.log('🤖 CDP wallet command detected:', directWalletCommand);
+        try {
+          const cdpActionProvider = new CDPWalletActionProvider(cdpWallet);
+          const result = await cdpActionProvider.processAgentRequest(userMessage);
+          
+          if (result.success) {
+            walletResult = `✅ **CDP Wallet Transaction:**\n\n${result.message}${result.txHash ? `\n\nTransaction: ${result.txHash}` : ''}`;
+          } else {
+            walletResult = `❌ **CDP Wallet error:**\n\n${result.message || 'Unknown error'}`;
+          }
+          console.log('✅ CDP wallet command executed:', walletResult);
+        } catch (error) {
+          console.error('❌ CDP wallet command failed:', error);
+          walletResult = `❌ **CDP Wallet error:**\n\n${error instanceof Error ? error.message : 'Unknown error'}`;
+        }
+      }
+    }
+    // Fall back to smart wallet if CDP wallet not available
+    else if (smartWalletHook && smartWalletHook.isConnected) {
       console.log('🔍 Smart wallet hook available:', {
         isConnected: smartWalletHook.isConnected,
         address: smartWalletHook.address,
@@ -228,10 +261,11 @@ async function messageAgent(
         }
       }
     } else {
-      console.log('⚠️ Smart wallet hook not available or not connected:', {
-        hasHook: !!smartWalletHook,
-        isConnected: smartWalletHook?.isConnected,
-        address: smartWalletHook?.address
+      console.log('⚠️ No wallet available or connected:', {
+        hasCDP: !!cdpWallet,
+        cdpConnected: cdpWallet?.eoaWallet.isConnected || cdpWallet?.smartAccount.isConnected,
+        hasSmartWallet: !!smartWalletHook,
+        smartWalletConnected: smartWalletHook?.isConnected
       });
     }
 
@@ -317,12 +351,14 @@ export function useAgent() {
    * @param {string} userAddress - The user's wallet address.
    * @param {object} embeddedWallet - The Privy embedded wallet info.
    * @param {object} smartWallet - The smart wallet instance for autonomous operations.
+   * @param {object} cdpWallet - The CDP wallet instance for spend permissions.
    */
   const sendMessage = async (
     input: string, 
     userAddress?: string, 
     embeddedWallet?: { id: string; address: string },
-    smartWalletHook?: any
+    smartWalletHook?: any,
+    cdpWallet?: any
   ) => {
     if (!input.trim()) return;
 
@@ -341,8 +377,8 @@ export function useAgent() {
     setMessages(prev => [...prev, { text: input, sender: "user" }]);
     setIsThinking(true);
 
-    // Use Privy embedded wallet for agent + smart wallet for autonomous operations
-    const responseMessage = await messageAgent(input, userAddress, embeddedWallet, smartWalletHook);
+    // Use Privy embedded wallet for agent + smart wallet for autonomous operations + CDP wallet for spend permissions
+    const responseMessage = await messageAgent(input, userAddress, embeddedWallet, smartWalletHook, cdpWallet);
 
     if (responseMessage) {
       // WORKAROUND: Fix common URL issues in agent responses (e.g., base.scan.com -> basescan.org)
