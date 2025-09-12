@@ -173,7 +173,7 @@ const ProfilePanelInner = ({
       </div>
 
       {/* Content Section - Bottom 2/3 */}
-      <div className="flex-1 bg-white border border-gray-200 rounded-lg p-4 relative">
+      <div className="flex-1 bg-white border border-gray-200 rounded-lg p-4 relative overflow-y-auto">
         {activeSection && (
           <Button onClick={() => setActiveSection(null)} size="sm" className="absolute top-3 right-3 h-7 px-2 text-xs bg-gray-900 text-white hover:bg-gray-800">
             ← Back
@@ -350,6 +350,14 @@ const ProfilePanelInner = ({
                         : "Transakcje wymagają Twojego zatwierdzenia w popup"
                       }
                     </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={privyLogout}
+                      className="mt-2 w-full h-6 text-xs"
+                    >
+                      🚪 Logout
+                    </Button>
                   </div>
                 </div>
               )}
@@ -687,10 +695,21 @@ const TARGET_WALLET = "0xfF3183b774bc99b730CA6216E08370cB156c3C26";
     },
   ];
 
-  const PortfolioPanel = () => {
+  const PortfolioPanel = ({ 
+    activeWalletType, 
+    setActiveWalletType 
+  }: { 
+    activeWalletType: 'main' | 'cdp';
+    setActiveWalletType: (type: 'main' | 'cdp') => void;
+  }) => {
     const { address: userAddress } = useAccount();
     const { data: walletClient } = useWalletClient();
-    const { embeddedWallet, isLoading: isPrivyLoading, isAuthenticated: isPrivyAuthenticated, login: privyLogin } = usePrivyEmbedded();
+    
+    // Use CDP wallet instead of Privy for portfolio
+    const cdpWallet = useCDPWallet({
+      networkId: process.env.NEXT_PUBLIC_NETWORK_ID || 'base-sepolia'
+    });
+    
     const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
     const [walletTokens, setWalletTokens] = useState<ExtendedTokenInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -698,9 +717,9 @@ const TARGET_WALLET = "0xfF3183b774bc99b730CA6216E08370cB156c3C26";
     const [totalValue, setTotalValue] = useState("$0.00");
     const [dataFetched, setDataFetched] = useState(false);
     
-    // Use embedded wallet address for portfolio data
-    const portfolioWallet = embeddedWallet?.address;
-    const displayWallet = embeddedWallet?.address;
+    // Use CDP wallet address for portfolio data, fallback to user address
+    const portfolioWallet = cdpWallet.smartAccount.isConnected ? cdpWallet.smartAccount.address : userAddress;
+    const displayWallet = portfolioWallet;
 
     // No need for manual wallet creation - Privy handles it automatically
 
@@ -842,13 +861,13 @@ const TARGET_WALLET = "0xfF3183b774bc99b730CA6216E08370cB156c3C26";
         return;
       }
       
-      // Only fetch data when we have embedded wallet
-      if (embeddedWallet && (!dataFetched || portfolioWallet)) {
-        fetchTokenBalances(embeddedWallet.address);
-        fetchWalletTokens(embeddedWallet.address);
+      // Only fetch data when we have CDP wallet or user wallet
+      if (portfolioWallet && (!dataFetched || portfolioWallet)) {
+        fetchTokenBalances(portfolioWallet);
+        fetchWalletTokens(portfolioWallet);
         setDataFetched(true);
       }
-    }, [userAddress, embeddedWallet, portfolioWallet, dataFetched, fetchTokenBalances, fetchWalletTokens]);
+    }, [userAddress, portfolioWallet, dataFetched, fetchTokenBalances, fetchWalletTokens]);
 
     // Transform token data for the DataTable
     const tokenData = isLoading 
@@ -960,16 +979,16 @@ const TARGET_WALLET = "0xfF3183b774bc99b730CA6216E08370cB156c3C26";
           ) : (
             /* Wallet Connected - Show Portfolio */
             <>
-              {/* Embedded Wallet Address */}
+              {/* Wallet Address */}
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold text-gray-900">
-                  {embeddedWallet ? 'Embedded Wallet Address' : 'Wallet Address'}
+                  {cdpWallet.smartAccount.isConnected ? 'CDP Smart Wallet Address' : 'Wallet Address'}
                 </h4>
                 {displayWallet ? (
                   <div className="flex items-center space-x-2">
                     <Badge 
                       variant="outline" 
-                      className={`font-mono text-xs ${embeddedWallet ? 'bg-green-50 border-green-300 text-green-700' : ''}`}
+                      className={`font-mono text-xs ${cdpWallet.smartAccount.isConnected ? 'bg-green-50 border-green-300 text-green-700' : ''}`}
                     >
                       {displayWallet.slice(0, 6)}...{displayWallet.slice(-4)}
                     </Badge>
@@ -989,30 +1008,162 @@ const TARGET_WALLET = "0xfF3183b774bc99b730CA6216E08370cB156c3C26";
                     >
                       🔍
                     </Button>
-                    {embeddedWallet && (
-                      <Badge variant="outline" className="text-xs bg-blue-50 border-blue-300 text-blue-700">
-                        🔐 Privy
+                    {cdpWallet.smartAccount.isConnected && (
+                      <Badge variant="outline" className="text-xs bg-purple-50 border-purple-300 text-purple-700">
+                        🏦 CDP
                       </Badge>
                     )}
                   </div>
                 ) : (
-                  /* No Embedded Wallet Yet */
+                  /* No Wallet Connected */
                   <div className="flex items-center space-x-2">
                     <Badge variant="outline" className="font-mono text-xs bg-yellow-50 border-yellow-300 text-yellow-700">
-                      No Embedded Wallet
+                      No Wallet Connected
                     </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={privyLogin}
-                      disabled={isPrivyLoading}
-                      className="h-6 px-2 text-xs"
-                    >
-                      {isPrivyLoading ? '⏳ Loading...' : '🔐 Login with Privy'}
-                    </Button>
+                    <span className="text-xs text-gray-500">Create CDP wallet below</span>
                   </div>
                 )}
               </div>
+
+          <Separator className="bg-gray-200" />
+
+          {/* Agent Wallet Selection */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-gray-900">Agent Wallet</h4>
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-sm text-black mb-3 font-medium">
+                Choose which wallet the AI agent should use for transactions:
+              </p>
+              <div className="flex space-x-2">
+                <Button
+                  variant={activeWalletType === 'main' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveWalletType('main')}
+                  className="flex-1 h-8 text-xs"
+                >
+                  🔗 Main Wallet
+                </Button>
+                <Button
+                  variant={activeWalletType === 'cdp' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveWalletType('cdp')}
+                  className="flex-1 h-8 text-xs"
+                  disabled={!cdpWallet.smartAccount.isConnected}
+                >
+                  🏦 CDP Wallet
+                </Button>
+              </div>
+              <p className="text-xs text-black mt-2 font-medium">
+                {activeWalletType === 'main' 
+                  ? `✅ Using main wallet: ${userAddress?.slice(0, 8)}...${userAddress?.slice(-6)}`
+                  : cdpWallet.smartAccount.isConnected 
+                    ? `✅ Using CDP wallet: ${cdpWallet.smartAccount.address?.slice(0, 8)}...${cdpWallet.smartAccount.address?.slice(-6)}`
+                    : '❌ CDP wallet not connected'
+                }
+              </p>
+            </div>
+          </div>
+
+          <Separator className="bg-gray-200" />
+
+          {/* CDP Wallet Creation */}
+          {!cdpWallet.smartAccount.isConnected && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-gray-900">CDP Smart Wallet</h4>
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="text-sm text-black mb-3 font-medium">
+                  Create a CDP smart wallet to use with the AI agent. This wallet will be used for autonomous transactions.
+                </p>
+                <Button
+                  onClick={() => cdpWallet.createSmartAccount(true)} // Enable spend permissions
+                  disabled={cdpWallet.isLoading}
+                  className="w-full h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  {cdpWallet.isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                      Creating CDP Wallet...
+                    </>
+                  ) : (
+                    <>
+                      🏦 Create CDP Smart Wallet
+                    </>
+                  )}
+                </Button>
+                {cdpWallet.error && (
+                  <p className="text-xs text-red-600 mt-2">Error: {cdpWallet.error}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* CDP Wallet Management */}
+          {cdpWallet.smartAccount.isConnected && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-gray-900">CDP Smart Wallet</h4>
+              <div className="space-y-2">
+                <div className="p-2 bg-purple-50 rounded border border-purple-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-black">Smart Wallet Address</span>
+                    <Badge variant="outline" className="text-xs bg-purple-100 border-purple-300 text-purple-700">
+                      🏦 CDP
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-black font-mono">
+                    {cdpWallet.smartAccount.address?.slice(0, 8)}...{cdpWallet.smartAccount.address?.slice(-6)}
+                  </p>
+                </div>
+                
+                <div className="p-2 bg-green-50 rounded border border-green-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-black">Status</span>
+                  </div>
+                  <p className="text-xs text-black">✅ Connected</p>
+                </div>
+                
+                {cdpWallet.smartAccount.supportsSpendPermissions && (
+                  <div className="p-2 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-black">Spend Permissions</span>
+                    <Badge variant="outline" className="text-xs bg-blue-100 border-blue-300 text-blue-700">
+                      {cdpWallet.spendPermissions.length} active
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-black">✅ Enabled</p>
+                  </div>
+                )}
+                
+                <div className="p-2 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-black">AI Agent Integration</span>
+                    <Badge variant="outline" className="text-xs bg-blue-100 border-blue-300 text-blue-700">
+                      🤖 Ready
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-black">Agent can now use this wallet for transactions</p>
+                </div>
+                
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => cdpWallet.listSpendPermissions()}
+                    className="flex-1 h-7 text-xs"
+                  >
+                    📋 View Permissions
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => cdpWallet.disconnect()}
+                    className="flex-1 h-7 text-xs"
+                  >
+                    🚪 Disconnect
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <Separator className="bg-gray-200" />
 
@@ -1258,6 +1409,7 @@ export default function Home() {
   const { messages, sendMessage, isThinking } = useAgent();
   const [activePanel, setActivePanel] = useState<ActivePanel>('spherian');
   const [isAutonomousMode, setIsAutonomousMode] = useState(false);
+  const [activeWalletType, setActiveWalletType] = useState<'main' | 'cdp'>('main');
 
   // Smart wallet integration
   const {
@@ -1329,23 +1481,47 @@ export default function Home() {
       alert('Please connect your wallet first');
       return;
     }
-    if (!embeddedWallet) {
-      alert('Please create an embedded wallet first');
+    
+    // Check if selected wallet is available
+    if (activeWalletType === 'cdp' && !cdpWallet.smartAccount.isConnected) {
+      alert('Please create a CDP smart wallet first or switch to main wallet');
       return;
     }
     
     const message = input;
     setInput("");
     
-    // Pass smart wallet hook to agent for autonomous operations
-    const smartWalletHook = {
-      isConnected: isSmartWalletConnected,
-      address: smartWallet?.address || embeddedWallet.address,
-      getBalance,
-      sendTransaction
-    };
+    // Choose wallet based on active selection
+    let walletForAgent;
+    let smartWalletHook;
     
-    await sendMessage(message, userAddress, embeddedWallet, smartWalletHook, cdpWallet);
+    if (activeWalletType === 'cdp' && cdpWallet.smartAccount.isConnected) {
+      // Use CDP wallet
+      walletForAgent = {
+        id: cdpWallet.smartAccount.address || 'cdp-wallet',
+        address: cdpWallet.smartAccount.address || ''
+      };
+      smartWalletHook = {
+        isConnected: true,
+        address: cdpWallet.smartAccount.address,
+        getBalance: () => Promise.resolve(BigInt(0)), // CDP wallet balance
+        sendTransaction: () => Promise.resolve('cdp-tx-hash') // CDP transaction
+      };
+    } else {
+      // Use main wallet (RainbowKit)
+      walletForAgent = {
+        id: userAddress || 'main-wallet',
+        address: userAddress || ''
+      };
+      smartWalletHook = {
+        isConnected: isSmartWalletConnected,
+        address: smartWallet?.address || userAddress,
+        getBalance,
+        sendTransaction
+      };
+    }
+    
+    await sendMessage(message, userAddress, walletForAgent, smartWalletHook, cdpWallet, activeWalletType);
   };
 
   return (
@@ -1374,7 +1550,10 @@ export default function Home() {
           scrollToBottom={scrollToBottom}
           inputRef={inputRef}
         />}
-        {activePanel === 'portfolio' && <PortfolioPanel />}
+        {activePanel === 'portfolio' && <PortfolioPanel 
+          activeWalletType={activeWalletType}
+          setActiveWalletType={setActiveWalletType}
+        />}
       </div>
     </div>
 
@@ -1414,7 +1593,10 @@ export default function Home() {
           />
         </div>
         <div className="col-span-1 h-full overflow-hidden">
-          <PortfolioPanel />
+          <PortfolioPanel 
+            activeWalletType={activeWalletType}
+            setActiveWalletType={setActiveWalletType}
+          />
         </div>
       </div>
     </div>

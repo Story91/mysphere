@@ -1,6 +1,6 @@
 import { usePrivy } from '@privy-io/react-auth';
 import { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
+import * as ethers from 'ethers';
 
 export interface PrivyEmbeddedWallet {
   id: string;

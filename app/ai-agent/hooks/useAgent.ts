@@ -183,7 +183,8 @@ async function messageAgent(
   userAddress?: string, 
   embeddedWallet?: { id: string; address: string },
   smartWalletHook?: any,
-  cdpWallet?: any
+  cdpWallet?: any,
+  activeWalletType?: 'main' | 'cdp'
 ): Promise<string | null> {
   try {
     // Require wallet connection and embedded wallet
@@ -272,16 +273,23 @@ async function messageAgent(
     // SECOND: Get agent response (if no direct wallet command or as additional context)
     let agentResponse = '';
     if (!directWalletCommand || directWalletCommand.command === 'checkBalance') {
-      // Use Privy embedded wallet system
-      console.log('🤖 Using Privy embedded wallet for:', userAddress, 'wallet:', embeddedWallet.address);
-      const response = await fetch("/api/ai-agent/chat", {
+      // Determine which wallet to use based on activeWalletType
+      let walletType: 'main' | 'cdp' = 'main';
+      let walletAddress = embeddedWallet.address;
+      
+      if (activeWalletType === 'cdp' && cdpWallet?.smartAccount?.isConnected) {
+        walletType = 'cdp';
+        walletAddress = cdpWallet.smartAccount.address;
+      }
+      
+      console.log('🤖 Using selected wallet for:', userAddress, 'wallet:', walletAddress, 'type:', walletType);
+      const response = await fetch("/api/ai-agent/agent-with-wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          userAddress,
-          message: userMessage,
-          embeddedWalletId: embeddedWallet.id,
-          embeddedWalletAddress: embeddedWallet.address
+          userMessage: userMessage,
+          walletType: walletType,
+          walletAddress: walletAddress
         }),
       });
 
@@ -358,7 +366,8 @@ export function useAgent() {
     userAddress?: string, 
     embeddedWallet?: { id: string; address: string },
     smartWalletHook?: any,
-    cdpWallet?: any
+    cdpWallet?: any,
+    activeWalletType?: 'main' | 'cdp'
   ) => {
     if (!input.trim()) return;
 
@@ -378,7 +387,7 @@ export function useAgent() {
     setIsThinking(true);
 
     // Use Privy embedded wallet for agent + smart wallet for autonomous operations + CDP wallet for spend permissions
-    const responseMessage = await messageAgent(input, userAddress, embeddedWallet, smartWalletHook, cdpWallet);
+    const responseMessage = await messageAgent(input, userAddress, embeddedWallet, smartWalletHook, cdpWallet, activeWalletType);
 
     if (responseMessage) {
       // WORKAROUND: Fix common URL issues in agent responses (e.g., base.scan.com -> basescan.org)
