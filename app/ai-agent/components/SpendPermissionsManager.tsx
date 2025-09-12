@@ -34,7 +34,13 @@ export const SpendPermissionsManager: React.FC<SpendPermissionsManagerProps> = (
   cdpWallet,
 }) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<Partial<CreateSpendPermissionParams>>({
+  // Form data uses string types for easier input handling
+  const [formData, setFormData] = useState<{
+    spender: string;
+    token: string;
+    allowance: string;
+    period: string;
+  }>({
     spender: '',
     token: TOKEN_OPTIONS[0].value,
     allowance: '',
@@ -42,7 +48,7 @@ export const SpendPermissionsManager: React.FC<SpendPermissionsManagerProps> = (
   });
 
   // Validate spender address
-  const isValidSpender = formData.spender && isAddress(formData.spender as `0x${string}`);
+  const isValidSpender = formData.spender && isAddress(formData.spender);
   const isValidAllowance = formData.allowance && !isNaN(parseFloat(formData.allowance));
 
   // Handle create permission
