@@ -1,25 +1,7 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "npm ci --prefer-offline --no-audit --no-fund",
-  "rewrites": [
-    {
-      "source": "/flashblock/:path*",
-      "destination": "https://base-is-10x-faster.vercel.app/:path*"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/cleanup-expired-pins",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/sync-recent-events",
-      "schedule": "*/2 * * * *"
-    }
-  ],
-  "functions": {
-    "app/api/cleanup-expired-pins/route.ts": {
-      "maxDuration": 60
-    }
+  "installCommand": "npm ci",
+  "env": {
+    "VERCEL_FORCE_NO_BUILD_CACHE": "1"
   }
-} 
+}
