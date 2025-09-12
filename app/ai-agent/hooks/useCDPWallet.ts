@@ -223,7 +223,7 @@ export const useCDPWallet = (config?: {
           transaction: {
             to,
             value,
-            data: data || '0x',
+            data: (data || '0x') as `0x${string}`,
           },
           network: networkId === 'base-mainnet' ? 'base' : 'base-sepolia',
         });
