@@ -1,56 +1,40 @@
-# Dependencies
-node_modules
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Ignore deployment scripts
+app/basechat/Linea/scripts/
+scripts/
 
-# Build artifacts
-.next
-out
-dist
-build
+# Ignore test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
 
-# Development files
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Ignore configuration files
+hardhat.config.ts
+hardhat.tsconfig.json
 
-# IDE files
-.vscode
-.idea
-*.swp
-*.swo
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Cache
-.cache
-.parcel-cache
-
-# Hardhat
-artifacts
-cache
-typechain-types
-
-# Test files
-test
-tests
-__tests__
-*.test.js
-*.test.ts
-*.spec.js
-*.spec.ts
-
-# Documentation
-README.md
-docs
+# Ignore documentation
+docs/
 *.md
 
-# Scripts
-scripts
+# Ignore contract artifacts
+app/spheres/artifacts/
+app/spheres/cache/
+app/spheres/typechain-types/
+artifacts/
+cache/
+typechain-types/
+
+# Ignore development files
+.env.local
+.env.development
+
+# Ignore git files
+.git/
+.gitignore
+
+# Ignore camp contracts
+camp-contract/
+
+# Ignore specific scripts
+scripts/deploy*.js
+scripts/deploy*.ts
