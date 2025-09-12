@@ -1,4 +1,4 @@
-import { usePrivy, useSessionSigners } from '@privy-io/react-auth';
+import { usePrivy } from '@privy-io/react-auth';
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 
@@ -20,7 +20,8 @@ export function usePrivyEmbedded() {
     ready
   } = usePrivy();
   
-  const { addSessionSigners } = useSessionSigners();
+  // Note: useSessionSigners is no longer available in the latest version
+  // const { addSessionSigners } = useSessionSigners();
 
   const [embeddedWallet, setEmbeddedWallet] = useState<PrivyEmbeddedWallet | null>(null);
   const [isLoading, setIsLoading] = useState(false);

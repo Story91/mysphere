@@ -21,7 +21,7 @@ export function useZeroDevSmartWallet() {
   const [error, setError] = useState<string | null>(null);
 
   // Find embedded wallet from Privy
-  const embeddedWallet = wallets.find(wallet => wallet.walletClientType === 'privy');
+  const embeddedWallet = wallets.find((wallet: any) => wallet.walletClientType === 'privy');
 
   // Initialize basic smart wallet
   const initializeSmartWallet = useCallback(async () => {

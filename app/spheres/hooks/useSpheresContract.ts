@@ -8,11 +8,11 @@ import { toast } from 'react-hot-toast';
 // Contract configuration
 export const CONTRACT_ADDRESS = "0xdE9f006A063eeE1f0dDb15A8198E573B36aCc070" as Address;
 
-// Import ABI from artifacts
-import HybridCommunityPlatformArtifacts from '../artifacts/app/spheres/contracts/spheres-core.sol/HybridCommunityPlatform.json';
+// Import ABI from artifacts - DISABLED (contract not in use)
+// import HybridCommunityPlatformArtifacts from '../../../artifacts/app/spheres/contracts/spheres-core.sol/HybridCommunityPlatform.json';
 
-// Complete ABI for HybridCommunityPlatform
-export const CONTRACT_ABI = HybridCommunityPlatformArtifacts.abi as Abi;
+// Complete ABI for HybridCommunityPlatform - using empty ABI since contract is not in use
+export const CONTRACT_ABI = [] as Abi;
 
 // Simplified enums
 export enum CommunityStatus {
