@@ -16,7 +16,6 @@ import {
   createWalletClient,
 } from "viem";
 import { Network, NETWORK_ID_TO_CHAIN_ID, NETWORK_ID_TO_VIEM_CHAIN } from "../network";
-import { EvmWalletProvider } from "./evmWalletProvider";
 
 /**
  * Configuration options for CustomEmbeddedWalletProvider
@@ -53,15 +52,13 @@ export interface CustomEmbeddedWalletProviderConfig {
  * - Maintains user control over their funds
  * - No server-side wallet creation or management
  */
-export class CustomEmbeddedWalletProvider extends EvmWalletProvider {
+export class CustomEmbeddedWalletProvider {
   #userWalletAddress: Address;
   #userWalletClient: WalletClient;
   #network: Network;
   #publicClient: PublicClient;
 
   private constructor(config: CustomEmbeddedWalletProviderConfig) {
-    super();
-    
     this.#userWalletAddress = config.userWalletAddress;
     this.#userWalletClient = config.userWalletClient;
     
@@ -134,7 +131,11 @@ export class CustomEmbeddedWalletProvider extends EvmWalletProvider {
   public async signTransaction(transaction: TransactionRequest): Promise<Hex> {
     try {
       // Use the user's wallet client to sign the transaction
-      const signedTx = await this.#userWalletClient.signTransaction(transaction);
+      const signedTx = await this.#userWalletClient.signTransaction({
+        ...transaction,
+        account: this.#userWalletClient.account || this.#userWalletAddress,
+        chain: NETWORK_ID_TO_VIEM_CHAIN[this.#network.networkId]
+      } as any);
       return signedTx;
     } catch (error) {
       throw new Error(`Failed to sign transaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -150,7 +151,11 @@ export class CustomEmbeddedWalletProvider extends EvmWalletProvider {
   public async sendTransaction(transaction: TransactionRequest): Promise<Hex> {
     try {
       // Use the user's wallet client to send the transaction
-      const hash = await this.#userWalletClient.sendTransaction(transaction);
+      const hash = await this.#userWalletClient.sendTransaction({
+        ...transaction,
+        account: this.#userWalletClient.account || this.#userWalletAddress,
+        chain: NETWORK_ID_TO_VIEM_CHAIN[this.#network.networkId]
+      } as any);
       return hash;
     } catch (error) {
       throw new Error(`Failed to send transaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -166,7 +171,10 @@ export class CustomEmbeddedWalletProvider extends EvmWalletProvider {
   public async signMessage(message: string): Promise<Hex> {
     try {
       // Use the user's wallet client to sign the message
-      const signature = await this.#userWalletClient.signMessage({ message });
+      const signature = await this.#userWalletClient.signMessage({ 
+        message,
+        account: this.#userWalletClient.account || this.#userWalletAddress
+      });
       return signature;
     } catch (error) {
       throw new Error(`Failed to sign message: ${error instanceof Error ? error.message : 'Unknown error'}`);
