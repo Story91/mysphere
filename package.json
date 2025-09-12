@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "next build --no-lint",
+    "build": "NODE_OPTIONS='--max-old-space-size=4096' next build --no-lint",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "contracts:compile": "hardhat compile",
@@ -25,7 +25,7 @@
     "@base-org/account": "^1.1.1",
     "@base-org/account-ui": "^1.0.1",
     "@campnetwork/origin": "^0.0.9",
-    "@coinbase/agentkit": "^0.10.0",
+    "@coinbase/agentkit": "^0.10.1",
     "@coinbase/agentkit-langchain": "^0.3.0",
     "@coinbase/agentkit-vercel-ai-sdk": "^0.1.0",
     "@coinbase/cdp-sdk": "^1.36.0",

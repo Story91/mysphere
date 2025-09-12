@@ -3,9 +3,35 @@ const nextConfig = {
     experimental: {
       serverComponentsExternalPackages: ['mongodb'],
     },
+    // Memory optimization settings
+    swcMinify: true,
+    compress: true,
+    poweredByHeader: false,
+    generateEtags: false,
     // Silence warnings
     // https://github.com/WalletConnect/walletconnect-monorepo/issues/1908
     webpack: (config, { isServer }) => {
+      // Memory optimization
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            default: {
+              minChunks: 2,
+              priority: -20,
+              reuseExistingChunk: true,
+            },
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              priority: -10,
+              chunks: 'all',
+            },
+          },
+        },
+      };
+
       // From .mjs
       config.externals.push('pino-pretty', 'lokijs', 'encoding');
 

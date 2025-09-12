@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci --prefer-offline --no-audit --no-fund",
   "rewrites": [
     {
       "source": "/flashblock/:path*",
