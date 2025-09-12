@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// import { Label } from '@/components/ui/label';
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -141,7 +141,7 @@ export const SpendPermissionsManager: React.FC<SpendPermissionsManagerProps> = (
 
               <div className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="spender">Spender Address</Label>
+                  <label htmlFor="spender" className="text-sm font-medium">Spender Address</label>
                   <Input
                     id="spender"
                     placeholder="0x..."
@@ -154,26 +154,23 @@ export const SpendPermissionsManager: React.FC<SpendPermissionsManagerProps> = (
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="token">Token</Label>
-                  <Select
+                  <label htmlFor="token" className="text-sm font-medium">Token</label>
+                  <select
+                    id="token"
                     value={formData.token}
-                    onValueChange={(value) => setFormData({ ...formData, token: value })}
+                    onChange={(e) => setFormData({ ...formData, token: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md"
                   >
-                    <SelectTrigger id="token">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TOKEN_OPTIONS.map((token) => (
-                        <SelectItem key={token.value} value={token.value}>
-                          {token.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {TOKEN_OPTIONS.map((token) => (
+                      <option key={token.value} value={token.value}>
+                        {token.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="allowance">Allowance Amount</Label>
+                  <label htmlFor="allowance" className="text-sm font-medium">Allowance Amount</label>
                   <div className="flex space-x-2">
                     <Input
                       id="allowance"
@@ -190,22 +187,19 @@ export const SpendPermissionsManager: React.FC<SpendPermissionsManagerProps> = (
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="period">Reset Period</Label>
-                  <Select
+                  <label htmlFor="period" className="text-sm font-medium">Reset Period</label>
+                  <select
+                    id="period"
                     value={formData.period}
-                    onValueChange={(value) => setFormData({ ...formData, period: value })}
+                    onChange={(e) => setFormData({ ...formData, period: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md"
                   >
-                    <SelectTrigger id="period">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PERIOD_OPTIONS.map((period) => (
-                        <SelectItem key={period.value} value={period.value}>
-                          {period.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {PERIOD_OPTIONS.map((period) => (
+                      <option key={period.value} value={period.value}>
+                        {period.label}
+                      </option>
+                    ))}
+                  </select>
                   <p className="text-sm text-gray-500">
                     The allowance will reset after this period
                   </p>
