@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "rm -rf node_modules package-lock.json && npm install && next build --no-lint",
+    "build": "next build --no-lint",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "contracts:compile": "hardhat compile",
