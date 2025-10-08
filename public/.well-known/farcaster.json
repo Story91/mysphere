@@ -1,14 +1,14 @@
 {
   "accountAssociation": {
-    "header": "eyJmaWQiOjM0MDY3OCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweEYxNDU5ZEIwOTI2OTg5RThkRjQyYkQ0MWQ3N0Q4MzIxMzRGYzc4Q2UifQ",
+    "header": "eyJmaWQiOjM0MDY3OCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDk0MGY2Njg5ZDJFNTMxZTI5MkQwOWU0YjZjNmY1RTc1NUE5NDhEMDAifQ",
     "payload": "eyJkb21haW4iOiJteXNwaGVyZS5mdW4ifQ",
-    "signature": "MHg3ODQxODM3NGM1OTI3MmVjNDc5ZjUyNWMzODY0YTY5ZjVhMjUyZWYzZGZkMmM4ZDlkMTdkMGI1ZTQ0NDlhZmMwNWJmNDdkOTM1MWFjM2UxYzU5MTQ0ZGJmMjM0YjQyMzUwMGM4NDg2OTViZWM0OGRhN2NjZDk0YjdhZGI1YzM4YTFi"
+    "signature": "MHhmNDRhOWRiNWE2NmQ2NWUxYTRkNGRiOWI5YTc0NmVmZThjYzk4YzJjZTFiNjhhYzcwMjI1MjZiZWYxODUwZmVlMjUzNTg3NWE3YmEzZjYzODJiZmRhNjU5ZTg2MTI4N2RiYjM2MzVlYWQyZWZhODBlOGU2MmZmMDUyNGQxYmRhMzFi"
   },
   "miniapp": {
     "version": "1",
     "name": "MySphere",
-    "subtitle": "Build, grow, and own your digital Sphere",
-    "description": "MySphere is a revolutionary Web3 social platform on Base that combines traditional social media with blockchain technology. Create, tokenize, and monetize your content as NFTs while building your onchain reputation. Join the community of builders and creators shaping the future of social media.",
+    "subtitle": "Build and own your Sphere",
+    "description": "Web3 social platform on Base. Create, tokenize, and monetize content as NFTs while building your onchain reputation. Join builders shaping social media.",
     "screenshotUrls": [
       "https://mysphere.fun/frame-v2.png",
       "https://mysphere.fun/SphereWhite.png"
@@ -19,11 +19,11 @@
     "homeUrl": "https://mysphere.fun",
     "webhookUrl": "https://mysphere.fun/api/webhook",
     "primaryCategory": "social",
-    "tags": ["web3", "nft", "base", "social", "onchain", "creator"],
+    "tags": ["web3", "base", "social", "onchain", "creator"],
     "heroImageUrl": "https://mysphere.fun/frame-v2.png",
-    "tagline": "The onchain social Dapp on Base",
-    "ogTitle": "MySphere - Web3 Social Platform on Base",
-    "ogDescription": "Build, grow, and own your digital Sphere. Create and monetize content as NFTs on the Base blockchain.",
+    "tagline": "Onchain social on Base",
+    "ogTitle": "MySphere - Social on Base",
+    "ogDescription": "Build, grow, and own your digital Sphere. Create and monetize content on Base.",
     "ogImageUrl": "https://mysphere.fun/frame-v2.png"
   },
   "baseBuilder": {

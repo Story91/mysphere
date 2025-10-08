@@ -9,8 +9,8 @@ export const minikitConfig = {
   miniapp: {
     version: "1",
     name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "MySphere",
-    subtitle: process.env.NEXT_PUBLIC_APP_SUBTITLE || "Build, grow, and own your digital Sphere",
-    description: process.env.NEXT_PUBLIC_APP_DESCRIPTION || "MySphere is a revolutionary Web3 social platform on Base that combines traditional social media with blockchain technology. Create, tokenize, and monetize your content as NFTs while building your onchain reputation.",
+    subtitle: process.env.NEXT_PUBLIC_APP_SUBTITLE || "Build and own your Sphere",
+    description: process.env.NEXT_PUBLIC_APP_DESCRIPTION || "Web3 social platform on Base. Create, tokenize, and monetize content as NFTs while building your onchain reputation. Join builders shaping social media.",
     screenshotUrls: process.env.NEXT_PUBLIC_APP_SCREENSHOTS 
       ? process.env.NEXT_PUBLIC_APP_SCREENSHOTS.split(',').map(url => url.trim())
       : [`${ROOT_URL}/frame-v2.png`, `${ROOT_URL}/SphereWhite.png`],
@@ -22,11 +22,11 @@ export const minikitConfig = {
     primaryCategory: process.env.NEXT_PUBLIC_APP_PRIMARY_CATEGORY || "social",
     tags: process.env.NEXT_PUBLIC_APP_TAGS 
       ? process.env.NEXT_PUBLIC_APP_TAGS.split(',').map(tag => tag.trim())
-      : ["web3", "nft", "base", "social", "onchain", "creator"],
+      : ["web3", "base", "social", "onchain", "creator"],
     heroImageUrl: process.env.NEXT_PUBLIC_APP_HERO_IMAGE || `${ROOT_URL}/frame-v2.png`,
-    tagline: process.env.NEXT_PUBLIC_APP_TAGLINE || "The onchain social Dapp on Base",
-    ogTitle: process.env.NEXT_PUBLIC_APP_OG_TITLE || "MySphere - Web3 Social Platform on Base",
-    ogDescription: process.env.NEXT_PUBLIC_APP_OG_DESCRIPTION || "Build, grow, and own your digital Sphere. Create and monetize content as NFTs on the Base blockchain.",
+    tagline: process.env.NEXT_PUBLIC_APP_TAGLINE || "Onchain social on Base",
+    ogTitle: process.env.NEXT_PUBLIC_APP_OG_TITLE || "MySphere - Social on Base",
+    ogDescription: process.env.NEXT_PUBLIC_APP_OG_DESCRIPTION || "Build and own your digital Sphere. Create and monetize content on Base.",
     ogImageUrl: process.env.NEXT_PUBLIC_APP_OG_IMAGE || `${ROOT_URL}/frame-v2.png`,
   },
   baseBuilder: {
