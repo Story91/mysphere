@@ -4,16 +4,27 @@
     "payload": "eyJkb21haW4iOiJteXNwaGVyZS5mdW4ifQ",
     "signature": "MHg3ODQxODM3NGM1OTI3MmVjNDc5ZjUyNWMzODY0YTY5ZjVhMjUyZWYzZGZkMmM4ZDlkMTdkMGI1ZTQ0NDlhZmMwNWJmNDdkOTM1MWFjM2UxYzU5MTQ0ZGJmMjM0YjQyMzUwMGM4NDg2OTViZWM0OGRhN2NjZDk0YjdhZGI1YzM4YTFi"
   },
-  "frame": {
+  "miniapp": {
     "version": "1",
     "name": "MySphere",
+    "subtitle": "Build, grow, and own your digital Sphere",
+    "description": "MySphere is a revolutionary Web3 social platform on Base that combines traditional social media with blockchain technology. Create, tokenize, and monetize your content as NFTs while building your onchain reputation. Join the community of builders and creators shaping the future of social media.",
+    "screenshotUrls": [
+      "https://mysphere.fun/frame-v2.png",
+      "https://mysphere.fun/SphereWhite.png"
+    ],
     "iconUrl": "https://mysphere.fun/android-chrome-512x512.png",
-    "homeUrl": "https://mysphere.fun",
-    "imageUrl": "https://mysphere.fun/SphereWhite.png",
-    "buttonTitle": "Open MySphere",
     "splashImageUrl": "https://mysphere.fun/SphereWhite.png",
-    "splashBackgroundColor": "#FFFFFF",
-    "webhookUrl": "https://mysphere.fun/api/webhook"
+    "splashBackgroundColor": "#050B20",
+    "homeUrl": "https://mysphere.fun",
+    "webhookUrl": "https://mysphere.fun/api/webhook",
+    "primaryCategory": "social",
+    "tags": ["web3", "nft", "base", "social", "onchain", "creator"],
+    "heroImageUrl": "https://mysphere.fun/frame-v2.png",
+    "tagline": "The onchain social Dapp on Base",
+    "ogTitle": "MySphere - Web3 Social Platform on Base",
+    "ogDescription": "Build, grow, and own your digital Sphere. Create and monetize content as NFTs on the Base blockchain.",
+    "ogImageUrl": "https://mysphere.fun/frame-v2.png"
   },
   "baseBuilder": {
     "allowedAddresses": ["0x5B9Db509BdA743DE9FF52C8049EFa92FEdD29126"]

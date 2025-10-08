@@ -16,6 +16,7 @@ import { campMainnetChain } from './contracts/CampMainnet';
 import { ENABLE_CAMP_MAINNET, CAMP_MAINNET } from '@/config/camp';
 import { lineaChain } from './basechat/Linea/config/LineaNetworkConfig';
 import { CampProvider } from '@campnetwork/origin/react';
+import { PrivyProvider } from '@privy-io/react-auth';
 
 type ThemeMode = 'auto' | 'light' | 'dark';
 type ThemeStyle = 'default' | 'base' | 'cyberpunk' | 'hacker';
@@ -106,27 +107,43 @@ export function Providers({ children }: { children: React.ReactNode }) {
             redirectUri={typeof window !== 'undefined' ? `${window.location.origin}/mycamp` : ''}
           >
             <FarcasterFrameProvider>
-              <OnchainKitProvider
-                apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-                // Changed to base mainnet to fix chain mismatch error
-                chain={base}
+              <PrivyProvider
+                appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
                 config={{
+                  loginMethods: ['email', 'wallet', 'google', 'twitter'],
                   appearance: {
-                    name: 'MySphere',
-                    logo: '/android-chrome-192x192.png',
-                    mode: 'dark',
-                    theme: 'base',
+                    theme: 'dark',
+                    accentColor: '#0052FF',
+                    showWalletLoginFirst: false,
                   },
-                  wallet: {
-                    display: 'modal',
-                    termsUrl: 'https://mysphere.fun/docs',
-                    privacyUrl: 'https://basebook.xyz/docs',
-                  }
+                  defaultChain: base,
+                  supportedChains: [base],
+                  // embeddedWallets: {
+                  //   createOnLogin: 'users-without-wallets',
+                  // },
                 }}
-                projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
               >
-                {children}
-              </OnchainKitProvider>
+                <OnchainKitProvider
+                  apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+                  chain={base}
+                  config={{
+                    appearance: {
+                      name: 'MySphere',
+                      logo: '/android-chrome-192x192.png',
+                      mode: 'auto',
+                      theme: 'base',
+                    },
+                    wallet: {
+                      display: 'modal',
+                      termsUrl: 'https://mysphere.fun/docs',
+                      privacyUrl: 'https://mysphere.fun/docs',
+                    }
+                  }}
+                  projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
+                >
+                  {children}
+                </OnchainKitProvider>
+              </PrivyProvider>
             </FarcasterFrameProvider>
           </CampProvider>
           </RainbowKitProvider>
