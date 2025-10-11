@@ -15,8 +15,8 @@ export const minikitConfig = {
       ? process.env.NEXT_PUBLIC_APP_SCREENSHOTS.split(',').map(url => url.trim())
       : [`${ROOT_URL}/frame-v2.png`, `${ROOT_URL}/SphereWhite.png`],
     iconUrl: process.env.NEXT_PUBLIC_APP_ICON || `${ROOT_URL}/android-chrome-512x512.png`,
-    splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE || `${ROOT_URL}/SphereWhite.png`,
-    splashBackgroundColor: process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR || "#050B20",
+    splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE || `${ROOT_URL}/SPLASH.gif`,
+    splashBackgroundColor: process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR || "#FFFFFF",
     homeUrl: ROOT_URL,
     webhookUrl: `${ROOT_URL}/api/webhook`,
     primaryCategory: process.env.NEXT_PUBLIC_APP_PRIMARY_CATEGORY || "social",

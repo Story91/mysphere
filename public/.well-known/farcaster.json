@@ -7,21 +7,21 @@
   "miniapp": {
     "version": "1",
     "name": "MySphere",
-    "subtitle": "Build and own your Sphere",
-    "description": "Web3 social platform on Base where creators build reputation and monetize content while shaping the future of social media",
+    "subtitle": "Build, grow and own your Sphere",
+    "description": "Build, grow, and own your digital Sphere.",
     "screenshotUrls": [
       "https://mysphere.fun/frame-v2.png",
       "https://mysphere.fun/SphereWhite.png"
     ],
     "iconUrl": "https://mysphere.fun/android-chrome-512x512.png",
-    "splashImageUrl": "https://mysphere.fun/SphereWhite.png",
-    "splashBackgroundColor": "#050B20",
+    "splashImageUrl": "https://mysphere.fun/SPLASH.gif",
+    "splashBackgroundColor": "#FFFFFF",
     "homeUrl": "https://mysphere.fun",
     "webhookUrl": "https://mysphere.fun/api/webhook",
     "primaryCategory": "social",
     "tags": ["web3", "base", "social", "onchain", "creator"],
     "heroImageUrl": "https://mysphere.fun/frame-v2.png",
-    "tagline": "Onchain social on Base",
+    "tagline": "Create and monetize content on Base",
     "ogTitle": "MySphere - Social on Base",
     "ogDescription": "Build, grow, and own your digital Sphere. Create and monetize content on Base.",
     "ogImageUrl": "https://mysphere.fun/frame-v2.png"
