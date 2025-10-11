@@ -10,7 +10,7 @@ export const minikitConfig = {
     version: "1",
     name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "MySphere",
     subtitle: process.env.NEXT_PUBLIC_APP_SUBTITLE || "Build and own your Sphere",
-    description: process.env.NEXT_PUBLIC_APP_DESCRIPTION || "Web3 social platform on Base where creators build reputation and monetize content while shaping the future of social media",
+    description: process.env.NEXT_PUBLIC_APP_DESCRIPTION || "Build, grow, and own your digital Sphere.",
     screenshotUrls: process.env.NEXT_PUBLIC_APP_SCREENSHOTS 
       ? process.env.NEXT_PUBLIC_APP_SCREENSHOTS.split(',').map(url => url.trim())
       : [`${ROOT_URL}/frame-v2.png`, `${ROOT_URL}/SphereWhite.png`],

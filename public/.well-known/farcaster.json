@@ -7,7 +7,7 @@
   "miniapp": {
     "version": "1",
     "name": "MySphere",
-    "subtitle": "Build, grow and own your Sphere",
+    "subtitle": "Build, grow, own your Sphere",
     "description": "Build, grow, and own your digital Sphere.",
     "screenshotUrls": [
       "https://mysphere.fun/frame-v2.png",
@@ -21,7 +21,7 @@
     "primaryCategory": "social",
     "tags": ["web3", "base", "social", "onchain", "creator"],
     "heroImageUrl": "https://mysphere.fun/frame-v2.png",
-    "tagline": "Create and monetize content on Base",
+    "tagline": "Create and get rewarded",
     "ogTitle": "MySphere - Social on Base",
     "ogDescription": "Build, grow, and own your digital Sphere. Create and monetize content on Base.",
     "ogImageUrl": "https://mysphere.fun/frame-v2.png"
