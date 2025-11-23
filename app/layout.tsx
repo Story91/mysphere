@@ -40,16 +40,16 @@ export default function RootLayout({
         {/* Farcaster Frame - zaktualizowany format z launch_frame */}
         <meta name="fc:frame" content='{
           "version": "next",
-          "imageUrl": "https://mysphere.fun/frame-v2.png",
+          "imageUrl": "https://mysphere.fun/SphereWhite.png",
           "aspectRatio": "3:2",
           "button": {
-            "title": "Launch MySphere",
+            "title": "Tip Creators",
             "action": {
               "type": "launch_frame",
               "name": "MySphere",
               "url": "https://mysphere.fun",
-              "splashImageUrl": "https://mysphere.fun/frame-v2.png",
-              "splashBackgroundColor": "#050B20"
+              "splashImageUrl": "https://mysphere.fun/SPLASH.gif",
+              "splashBackgroundColor": "#FFFFFF"
             }
           }
         }' />
