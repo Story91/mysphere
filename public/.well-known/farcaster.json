@@ -20,11 +20,11 @@
     "webhookUrl": "https://mysphere.fun/api/webhook",
     "primaryCategory": "social",
     "tags": ["web3", "base", "social", "onchain", "creator"],
-    "heroImageUrl": "https://mysphere.fun/frame-v2.png",
+    "heroImageUrl": "https://mysphere.fun/SphereWhite.png",
     "tagline": "Create and get rewarded",
     "ogTitle": "MySphere - Social on Base",
     "ogDescription": "Build, grow, and own your digital Sphere. Create and monetize content on Base.",
-    "ogImageUrl": "https://mysphere.fun/frame-v2.png"
+    "ogImageUrl": "https://mysphere.fun/SphereWhite.png"
   },
   "baseBuilder": {
     "allowedAddresses": ["0x5B9Db509BdA743DE9FF52C8049EFa92FEdD29126"]
