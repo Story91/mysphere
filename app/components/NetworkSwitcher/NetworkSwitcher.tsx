@@ -18,7 +18,7 @@ const baseEntry = {
   id: base.id,
   name: 'Base',
   shortName: 'BASE',
-  iconUrl: '/brand-kit/base/logo/symbol/Base_Symbol_Blue.svg', // Ikona dla sieci Base
+  iconUrl: '/logotypy/Base_basemark_blue.png', // Ikona dla sieci Base
   color: '#0052FF',
   bgWhite: false,
 } as const;
@@ -130,20 +130,34 @@ export function NetworkSwitcher() {
         className="flex items-center gap-2 px-3 py-2 bg-black/20 hover:bg-black/30 rounded-xl border border-[#0052FF]/20 hover:border-[#0052FF]/50 transition-all duration-200 backdrop-blur-xl"
         aria-label="Przełącz sieć"
       >
-        <div className={`w-5 h-5 rounded-full overflow-hidden ${
-          (activeNetwork as any).bgWhite ? 'bg-white' : (activeNetwork as any).bgBlack ? 'bg-black' : 'bg-white/10'
-        } flex items-center justify-center`}>
-          <Image
-            src={activeNetwork.iconUrl}
-            alt={`Logo ${activeNetwork.name}`}
-            width={16}
-            height={16}
-            className="object-contain"
-          />
-        </div>
-        <span className="hidden sm:block text-white text-sm font-['Coinbase_Display'] font-medium">
-          {activeNetwork.shortName}
-        </span>
+        {activeNetwork.id === base.id ? (
+          <div className="w-5 h-5 bg-white rounded p-0.5 flex items-center justify-center">
+            <Image
+              src="/logotypy/Base_square_blue.png"
+              alt={`Logo ${activeNetwork.name}`}
+              width={16}
+              height={16}
+              className="object-contain"
+            />
+          </div>
+        ) : (
+          <>
+            <div className={`w-5 h-5 rounded-full overflow-hidden ${
+              (activeNetwork as any).bgWhite ? 'bg-white' : (activeNetwork as any).bgBlack ? 'bg-black' : 'bg-white/10'
+            } flex items-center justify-center`}>
+              <Image
+                src={activeNetwork.iconUrl}
+                alt={`Logo ${activeNetwork.name}`}
+                width={16}
+                height={16}
+                className="object-contain"
+              />
+            </div>
+            <span className="hidden sm:block text-white text-sm font-['Coinbase_Display'] font-medium">
+              {activeNetwork.shortName}
+            </span>
+          </>
+        )}
         <svg 
           className={`w-3 h-3 text-gray-300 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           fill="none" 
@@ -170,22 +184,36 @@ export function NetworkSwitcher() {
                 disabled={network.id === chainId || ('disabled' in network && network.disabled)}
                 title={('disabled' in network && network.disabled) ? 'Locked' : undefined}
               >
-                <div className={`w-6 h-6 rounded-full overflow-hidden ${
-                  (network as any).bgWhite ? 'bg-white' : (network as any).bgBlack ? 'bg-black' : 'bg-white/10'
-                } flex items-center justify-center flex-shrink-0`}>
-                  <Image
-                    src={network.iconUrl}
-                    alt={`Logo ${network.name}`}
-                    width={20}
-                    height={20}
-                    className="object-contain"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-['Coinbase_Display'] font-medium text-sm truncate">
-                    {network.name}
+                {network.id === base.id ? (
+                  <div className="bg-white rounded-lg p-1.5 flex items-center justify-center flex-shrink-0">
+                    <Image
+                      src={network.iconUrl}
+                      alt={`Logo ${network.name}`}
+                      width={50}
+                      height={20}
+                      className="object-contain h-5"
+                    />
                   </div>
-                </div>
+                ) : (
+                  <div className={`w-6 h-6 rounded-full overflow-hidden ${
+                    (network as any).bgWhite ? 'bg-white' : (network as any).bgBlack ? 'bg-black' : 'bg-white/10'
+                  } flex items-center justify-center flex-shrink-0`}>
+                    <Image
+                      src={network.iconUrl}
+                      alt={`Logo ${network.name}`}
+                      width={20}
+                      height={20}
+                      className="object-contain"
+                    />
+                  </div>
+                )}
+                {network.id !== base.id && (
+                  <div className="flex-1 min-w-0">
+                    <div className="font-['Coinbase_Display'] font-medium text-sm truncate">
+                      {network.name}
+                    </div>
+                  </div>
+                )}
                 {/* Kłódka dla zablokowanych */}
                 {('disabled' in network && network.disabled) ? (
                   <svg

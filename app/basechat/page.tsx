@@ -3360,12 +3360,12 @@ export default function BaseChat() {
                 <div className="flex items-center justify-center gap-2 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-6 lg:gap-2 scrollbar-hide">
                   <button
                     onClick={() => setActivePostingNetwork('base')}
-                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'base' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
+                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'base' ? 'bg-white text-gray-900 border border-black' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
                   >
                     <img 
-                      src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png"
+                      src="/logotypy/Base_square_blue.png"
                       alt="Base"
-                      className="w-5 h-5 bg-white rounded-full p-0.5"
+                      className="w-5 h-5"
                     />
                     <span className="hidden sm:inline">Base</span>
                   </button>

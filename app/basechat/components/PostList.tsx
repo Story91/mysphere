@@ -1529,11 +1529,10 @@ export default function PostList({
               {post.network === 'base' && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
                   <img 
-                    src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png"
+                    src="/logotypy/Base_lockup_2color.png"
                     alt="Base"
-                    className="w-4 h-4 drop-shadow-md"
+                    className="h-3 drop-shadow-md"
                   />
-                  <span className="ml-1 text-xs bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Base</span>
                 </div>
               )}
               
@@ -1552,24 +1551,36 @@ export default function PostList({
               {/* Celo network badge */}
               {post.network === 'celo' && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
-                  <div className="w-4 h-4 bg-green-500 rounded-full drop-shadow-md"></div>
-                  <span className="ml-1 text-xs bg-gradient-to-r from-green-600 to-emerald-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Celo</span>
+                  <img 
+                    src="/logotypy/ENL3ZjX9OnprxVs5u8A81khADqA.webp"
+                    alt="Celo"
+                    className="h-5 drop-shadow-md"
+                  />
                 </div>
               )}
 
               {/* Ethereum network badge */}
               {post.network === 'ethereum' && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
-                  <div className="w-4 h-4 bg-blue-500 rounded-full drop-shadow-md"></div>
-                  <span className="ml-1 text-xs bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Ethereum</span>
+                  <img 
+                    src="/ethlogo.png"
+                    alt="Ethereum"
+                    className="w-4 h-4 drop-shadow-md"
+                  />
+                  <span className="ml-1 text-xs bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text font-bold drop-shadow-sm">ETH</span>
                 </div>
               )}
 
               {/* World Chain network badge */}
               {post.network === 'worldchain' && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
-                  <div className="w-4 h-4 bg-purple-500 rounded-full drop-shadow-md"></div>
-                  <span className="ml-1 text-xs bg-gradient-to-r from-purple-600 to-pink-500 text-transparent bg-clip-text font-bold drop-shadow-sm">World Chain</span>
+                  <div className="bg-white rounded-full p-0.5 flex items-center justify-center drop-shadow-md">
+                    <img 
+                      src="/logotypy/logo.svg"
+                      alt="World Chain"
+                      className="h-3 drop-shadow-md"
+                    />
+                  </div>
                 </div>
               )}
 
