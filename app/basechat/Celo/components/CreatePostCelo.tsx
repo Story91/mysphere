@@ -325,7 +325,7 @@ export default function CreatePostCelo({
           <TransactionButtonCelo
             content={content}
             onTransactionSuccess={handleTransactionSuccess}
-            disabled={!content.trim() || isSaving}
+            disabled={isSaving}
             autoPost={true}
             onPostAdded={onPostCreated}
           />

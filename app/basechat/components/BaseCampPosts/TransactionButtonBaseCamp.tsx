@@ -43,14 +43,8 @@ export default function TransactionButtonBaseCamp({
 
     // If not on BaseCamp network, only switch network (don't post)
     if (!isBaseCampNetwork) {
-      if (!content.trim()) {
-        toast.error('Please write some content first');
-        return;
-      }
-      
       try {
         setIsTransacting(true);
-        toast.loading('Switching to Camp Network...');
         await switchChain({ chainId: BASECAMP_CHAIN_ID });
         toast.success('Switched to Camp Network! Now you can post.');
         setIsTransacting(false);
@@ -148,7 +142,7 @@ export default function TransactionButtonBaseCamp({
   const openTransactionInExplorer = useCallback(() => {
     if (transactionHash) {
       setIsViewingExplorer(true);
-      window.open(`https://basecamp.cloud.blockscout.com/tx/${transactionHash}`, '_blank');
+              window.open(`https://camp.cloud.blockscout.com/tx/${transactionHash}`, '_blank');
       
       // Reset after a delay so users can make another post
       setTimeout(() => {
@@ -186,7 +180,7 @@ export default function TransactionButtonBaseCamp({
           : 'bg-yellow-500 text-white hover:bg-yellow-600'
       } ${disabled || isTransacting ? 'opacity-50 cursor-not-allowed' : ''}`}
       onClick={handleSendTransaction}
-      disabled={disabled || isTransacting || (!isBaseCampNetwork && !content.trim())}
+      disabled={disabled || isTransacting}
     >
       {isTransacting ? (
         <>

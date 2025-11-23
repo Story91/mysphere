@@ -49,14 +49,8 @@ export default function TransactionButtonLinea({
 
     // If not on Linea network, only switch network (don't post)
     if (!isLineaNetwork) {
-      if (!content.trim()) {
-        toast.error('Please write some content first');
-        return;
-      }
-      
       try {
         setIsTransacting(true);
-        toast.loading('Switching to Linea Network...');
         await switchChain({ chainId: LINEA_CHAIN_ID });
         toast.success('Switched to Linea Network! Now you can post.');
         setIsTransacting(false);
@@ -197,7 +191,7 @@ export default function TransactionButtonLinea({
           : 'bg-gray-700 text-white hover:bg-gray-600'
       } ${disabled || isTransacting ? 'opacity-50 cursor-not-allowed' : ''}`}
       onClick={handleSendTransaction}
-      disabled={disabled || isTransacting || (!isLineaNetwork && !content.trim())}
+      disabled={disabled || isTransacting}
     >
       {isTransacting ? (
         <>

@@ -45,14 +45,8 @@ export default function TransactionButtonCelo({
     }
 
     if (!isCeloNetwork) {
-      if (!content.trim()) {
-        toast.error('Please write some content first');
-        return;
-      }
-      
       try {
         setIsTransacting(true);
-        toast.loading('Switching to Celo Network...');
         await switchChain({ chainId: CELO_CHAIN_ID });
         toast.success('Switched to Celo Network! Now you can post.');
         setIsTransacting(false);
@@ -182,7 +176,7 @@ export default function TransactionButtonCelo({
           : 'bg-gray-700 text-white hover:bg-gray-600'
       } ${disabled || isTransacting ? 'opacity-50 cursor-not-allowed' : ''}`}
       onClick={handleSendTransaction}
-      disabled={disabled || isTransacting || (!isCeloNetwork && !content.trim())}
+      disabled={disabled || isTransacting}
     >
       {isTransacting ? (
         <>

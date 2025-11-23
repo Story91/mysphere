@@ -3645,7 +3645,7 @@ export default function BaseChat() {
                               <TransactionButton 
                                 content={newPost}
                                 onTransactionSuccess={handleTransactionSuccess}
-                                disabled={!newPost.trim() || isCreatingPost}
+                                disabled={isCreatingPost}
                                 autoPost={true}
                               />
                             </div>

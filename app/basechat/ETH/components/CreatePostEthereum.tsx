@@ -326,7 +326,7 @@ export default function CreatePostEthereum({
             <TransactionButtonEthereum
               content={content}
               onTransactionSuccess={handleTransactionSuccess}
-              disabled={!content.trim() || isSaving}
+              disabled={isSaving}
               autoPost={true}
               onPostAdded={onPostCreated}
             />

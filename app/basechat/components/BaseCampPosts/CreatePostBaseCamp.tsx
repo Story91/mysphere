@@ -315,7 +315,7 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
             <TransactionButtonBaseCamp
               content={content}
               onTransactionSuccess={handleTransactionSuccess}
-              disabled={!content.trim() || isSaving}
+              disabled={isSaving}
               autoPost={true}
               onPostAdded={onPostCreated} // Pass through to TransactionButton
             />

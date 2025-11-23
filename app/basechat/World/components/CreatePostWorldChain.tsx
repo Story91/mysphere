@@ -326,7 +326,7 @@ export default function CreatePostWorldChain({
             <TransactionButtonWorldChain
               content={content}
               onTransactionSuccess={handleTransactionSuccess}
-              disabled={!content.trim() || isSaving}
+              disabled={isSaving}
               autoPost={true}
               onPostAdded={onPostCreated}
             />

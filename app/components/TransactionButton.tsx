@@ -27,7 +27,6 @@ export default function TransactionButton({
   const publicClient = usePublicClient();
   const { switchChain } = useSwitchChain();
   const [isTransacting, setIsTransacting] = useState(false);
-  const [networkError, setNetworkError] = useState<string | null>(null);
   const [transactionSuccess, setTransactionSuccess] = useState(false);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [requestDenied, setRequestDenied] = useState(false);
@@ -37,16 +36,8 @@ export default function TransactionButton({
   // Get contract address based on current chain
   const contractAddress = getContractAddress2(chainId);
 
-  // Check if we're on the right network
-  useEffect(() => {
-    if (isConnected) {
-      if (chainId !== base.id && chainId !== baseSepolia.id) {
-        setNetworkError(`Please switch to Base Mainnet or Base Sepolia. Current network: Chain ID ${chainId}`);
-      } else {
-        setNetworkError(null);
-      }
-    }
-  }, [chainId, isConnected]);
+  // Check if we're on Base network
+  const isBaseNetwork = chainId === base.id || chainId === baseSepolia.id;
 
   // Auto-hide "Request denied" message after 5 seconds
   useEffect(() => {
@@ -89,7 +80,28 @@ export default function TransactionButton({
 
   // Function to handle sending transaction via wagmi
   const handleSendTransaction = useCallback(async () => {
-    if (!isConnected || !address || !content.trim() || disabled || isTransacting) {
+    if (!isConnected || !address || disabled || isTransacting) {
+      return;
+    }
+
+    // If not on Base network, only switch network (don't post)
+    if (!isBaseNetwork) {
+      try {
+        setIsTransacting(true);
+        await switchChain({ chainId: base.id });
+        toast.success('Switched to Base Network! Now you can post.');
+        setIsTransacting(false);
+        return; // Exit here - just switch, don't post
+      } catch (switchError) {
+        console.error('Failed to switch network:', switchError);
+        toast.error('Please switch to Base Network manually');
+        setIsTransacting(false);
+        return;
+      }
+    }
+
+    // Only post if we're on Base network AND have content
+    if (!content.trim()) {
       return;
     }
 
@@ -101,20 +113,6 @@ export default function TransactionButton({
     try {
       setIsTransacting(true);
       toast.loading('Preparing post transaction...');
-
-      // If on wrong network, try to switch
-      if (chainId !== base.id && chainId !== baseSepolia.id) {
-        try {
-          await switchChain({ chainId: base.id });
-          toast.success('Switched to Base network');
-        } catch (switchError) {
-          console.error('Failed to switch network:', switchError);
-          toast.error('Please switch to Base network manually');
-          setIsTransacting(false);
-          setRequestDenied(true);
-          return;
-        }
-      }
 
       // Check if contract address is available
       if (!contractAddress) {
@@ -182,6 +180,7 @@ export default function TransactionButton({
     disabled,
     isTransacting,
     chainId,
+    isBaseNetwork,
     switchChain,
     contractAddress,
     walletClient,
@@ -204,23 +203,28 @@ export default function TransactionButton({
   return (
     <div className="relative">
       {!transactionSuccess ? (
-        contractAddress ? (
         <button
           onClick={handleSendTransaction}
-          disabled={disabled || !content.trim() || isTransacting || !!networkError}
-          className="px-3 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-[#0052FF] to-[#2D74FF] text-white rounded-lg hover:from-[#0047E1] hover:to-[#2D6AE6] disabled:opacity-50 disabled:cursor-not-allowed border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3)] transition-all duration-300 font-medium relative overflow-hidden text-xs sm:text-sm"
+          disabled={disabled || isTransacting || (isBaseNetwork && !content.trim())}
+          className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-white transition-all duration-300 font-medium relative overflow-hidden text-xs sm:text-sm ${
+            isBaseNetwork 
+              ? 'bg-gradient-to-r from-[#0052FF] to-[#2D74FF] hover:from-[#0047E1] hover:to-[#2D6AE6] border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3)]' 
+              : 'bg-gray-700 hover:bg-gray-600'
+          } ${disabled || isTransacting ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-              <span className="flex items-center justify-center">
-                {isTransacting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span className="hidden xs:inline">Processing...</span>
-                    <span className="inline xs:hidden">...</span>
-                  </>
-                ) : (
+          <span className="flex items-center justify-center">
+            {isTransacting ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="hidden xs:inline">Processing...</span>
+                <span className="inline xs:hidden">...</span>
+              </>
+            ) : (
+              <>
+                {isBaseNetwork ? (
                   <>
                     <img
                       src="/brand-kit/base/logo/symbol/Base_Symbol_White.png"
@@ -230,19 +234,20 @@ export default function TransactionButton({
                     <span className="hidden xs:inline">Post Onchain</span>
                     <span className="inline xs:hidden">Post</span>
                   </>
+                ) : (
+                  <>
+                    <img
+                      src="/logotypy/Base_square_blue.png"
+                      alt="Base"
+                      className="w-4 h-4 mr-1.5"
+                    />
+                    <span>Switch To Base</span>
+                  </>
                 )}
-              </span>
+              </>
+            )}
+          </span>
         </button>
-        ) : (
-          <button
-            className="px-3 py-2 sm:px-4 sm:py-2 bg-gray-500 text-white rounded-lg border border-gray-400 opacity-70 cursor-not-allowed text-xs sm:text-sm"
-            disabled={true}
-          >
-            <span className="flex items-center justify-center">
-              <span>Network not supported</span>
-            </span>
-          </button>
-        )
       ) : (
         <button
           onClick={openTransactionInExplorer}
@@ -266,12 +271,6 @@ export default function TransactionButton({
       {/* Zakomentowana pulsująca animacja tła */}
       {/* <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 to-transparent opacity-50 animate-pulse pointer-events-none"></div> */}
 
-      {/* Network error message as a single line */}
-      {networkError && (
-        <div className="mt-2 text-center text-red-500 text-xs whitespace-nowrap overflow-hidden text-ellipsis w-full">
-          Network Error: Please switch to Base Mainnet
-        </div>
-      )}
     </div>
   );
 } 

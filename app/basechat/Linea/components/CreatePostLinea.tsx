@@ -351,7 +351,7 @@ export default function CreatePostLinea({
             <TransactionButtonLinea
               content={content}
               onTransactionSuccess={handleTransactionSuccess}
-              disabled={!content.trim() || isSaving}
+              disabled={isSaving}
               autoPost={true}
               onPostAdded={onPostCreated}
             />
