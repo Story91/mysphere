@@ -93,6 +93,11 @@ import CreatePostCelo from './Celo/components/CreatePostCelo';
 import CreatePostEthereum from './ETH/components/CreatePostEthereum';
 import CreatePostWorldChain from './World/components/CreatePostWorldChain';
 import MockFeed from './prelogin/MockFeed';
+import { BASECAMP_CHAIN_ID } from '../contracts/BaseCampPostContract';
+import { LINEA_CHAIN_ID } from './Linea/config/LineaNetworkConfig';
+import { CELO_CHAIN_ID } from './Celo/config/CeloNetworkConfig';
+import { ETHEREUM_CHAIN_ID } from './ETH/config/EthereumNetworkConfig';
+import { WORLD_CHAIN_ID } from './World/config/WorldChainNetworkConfig';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -1240,6 +1245,22 @@ export default function BaseChat() {
         new Set((newComments[postId].match(mentionRegex) || []).map(m => m.slice(1)))
       );
 
+      // Określ network na podstawie chainId
+      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
+      if (chainId === base.id || chainId === baseSepolia.id) {
+        network = 'base';
+      } else if (chainId === BASECAMP_CHAIN_ID) {
+        network = 'basecamp';
+      } else if (chainId === LINEA_CHAIN_ID) {
+        network = 'linea';
+      } else if (chainId === CELO_CHAIN_ID) {
+        network = 'celo';
+      } else if (chainId === ETHEREUM_CHAIN_ID) {
+        network = 'ethereum';
+      } else if (chainId === WORLD_CHAIN_ID) {
+        network = 'worldchain';
+      }
+
       const comment = {
         postId,
         author: address,
@@ -1248,7 +1269,8 @@ export default function BaseChat() {
         likes: 0,
         likedBy: [],
         mentions: mentions,
-        txHash: txHash || null // Dodajemy hash transakcji, jeśli istnieje
+        txHash: txHash || null, // Dodajemy hash transakcji, jeśli istnieje
+        network: network // Dodajemy network komentarza
       };
 
       await addComment(postId, comment);
@@ -1964,10 +1986,26 @@ export default function BaseChat() {
   };
 
   // Dodaj funkcję obsługi odpowiedzi
-  const handleAddReply = async (postId: string, commentId: string) => {
+  const handleAddReply = async (postId: string, commentId: string, txHash?: string) => {
     if (!address || !replyContent.trim() || !canCreatePosts) return;
     
     try {
+      // Określ network na podstawie chainId
+      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
+      if (chainId === base.id || chainId === baseSepolia.id) {
+        network = 'base';
+      } else if (chainId === BASECAMP_CHAIN_ID) {
+        network = 'basecamp';
+      } else if (chainId === LINEA_CHAIN_ID) {
+        network = 'linea';
+      } else if (chainId === CELO_CHAIN_ID) {
+        network = 'celo';
+      } else if (chainId === ETHEREUM_CHAIN_ID) {
+        network = 'ethereum';
+      } else if (chainId === WORLD_CHAIN_ID) {
+        network = 'worldchain';
+      }
+
       // Wyczyść formularz natychmiast
       setReplyingTo(null);
       setReplyContent('');
@@ -1975,7 +2013,9 @@ export default function BaseChat() {
       // Wykonaj rzeczywistą operację
       await addCommentReply(postId, commentId, {
         author: address,
-        content: replyContent.trim()
+        content: replyContent.trim(),
+        txHash: txHash || null,
+        network: network
       });
       
       // ✅ OPTYMALIZACJA: Usunięto fetchPosts - reply pojawi się po odświeżeniu strony

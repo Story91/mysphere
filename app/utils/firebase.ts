@@ -825,6 +825,7 @@ export const addComment = async (postId: string, comment: {
   likedBy: string[];
   mentions: string[];
   txHash?: string | null;
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
 }): Promise<void> => {
   // Pobierz nazwę autora komentarza
   const authorName = await getUserName(comment.author);
@@ -840,6 +841,7 @@ export const addComment = async (postId: string, comment: {
     likedBy: [],
     mentions: [],
     txHash: comment.txHash || null, // Dodaj hash transakcji
+    network: comment.network || null, // Dodaj network komentarza
     onchain: comment.txHash ? true : false // Oznacz, czy komentarz jest na blockchainie
   });
 
@@ -857,7 +859,8 @@ export const addComment = async (postId: string, comment: {
         timestamp: Date.now(),
         likes: 0,
         likedBy: [],
-        mentions: []
+        mentions: [],
+        network: comment.network || null // Dodaj network komentarza
       }]
     });
 
@@ -1279,7 +1282,8 @@ export const toggleCommentLike = async (postId: string, commentId: string, userI
 export const addCommentReply = async (postId: string, commentId: string, replyData: { 
   author: string, 
   content: string,
-  txHash?: string | null 
+  txHash?: string | null,
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain'
 }) => {
   try {
     const postRef = doc(db, 'posts', postId);
@@ -1310,6 +1314,7 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
       mentions: [], // Dodane pole mentions
       replyTo: commentId, // Dodaj referencję do komentarza nadrzędnego
       txHash: replyData.txHash || null, // Dodajemy obsługę txHash dla onchain
+      network: replyData.network, // Dodajemy network odpowiedzi
       onchain: replyData.txHash ? true : false // Oznaczamy czy jest onchain
     };
 

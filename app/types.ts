@@ -73,6 +73,7 @@ export interface Comment {
   mentions: string[];
   replyTo?: string;
   txHash?: string | null;
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
   tip?: {
     amount: number;
     currency: string;

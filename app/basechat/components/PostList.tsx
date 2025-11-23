@@ -11,7 +11,16 @@ import { Avatar as CoinbaseAvatar } from '@coinbase/onchainkit/identity';
 import LinkPreview from './LinkPreview';
 import CommentTransactionButton from '../../components/CommentTransactionButton';
 import CommentTransactionButtonBaseCamp from './BaseCampPosts/CommentTransactionButtonBaseCamp';
+import CommentTransactionButtonCelo from '../Celo/components/CommentTransactionButtonCelo';
+import CommentTransactionButtonEthereum from '../ETH/components/CommentTransactionButtonEthereum';
+import CommentTransactionButtonWorldChain from '../World/components/CommentTransactionButtonWorldChain';
+import CommentTransactionButtonLinea from '../Linea/components/CommentTransactionButtonLinea';
 import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
+import { CELO_CHAIN_ID } from '../Celo/config/CeloNetworkConfig';
+import { ETHEREUM_CHAIN_ID } from '../ETH/config/EthereumNetworkConfig';
+import { WORLD_CHAIN_ID } from '../World/config/WorldChainNetworkConfig';
+import { LINEA_CHAIN_ID } from '../Linea/config/LineaNetworkConfig';
+import { base, baseSepolia } from 'wagmi/chains';
 import TipButton from './TipButton';
 import TipStats from './TipStats';
 import SpotifyTrackCard from './SpotifyTrackCard';
@@ -519,6 +528,22 @@ export default function PostList({
     if (!address) return;
     
     try {
+      // Określ network na podstawie networkChainId
+      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
+      if (networkChainId === base.id || networkChainId === baseSepolia.id) {
+        network = 'base';
+      } else if (networkChainId === BASECAMP_CHAIN_ID) {
+        network = 'basecamp';
+      } else if (networkChainId === LINEA_CHAIN_ID) {
+        network = 'linea';
+      } else if (networkChainId === CELO_CHAIN_ID) {
+        network = 'celo';
+      } else if (networkChainId === ETHEREUM_CHAIN_ID) {
+        network = 'ethereum';
+      } else if (networkChainId === WORLD_CHAIN_ID) {
+        network = 'worldchain';
+      }
+
       const newComment: Comment = {
         id: `temp-${Date.now()}`, // Tymczasowe ID
         postId: postId,
@@ -528,7 +553,8 @@ export default function PostList({
         txHash: txHash,
         likes: 0,
         likedBy: [],
-        mentions: []
+        mentions: [],
+        network: network // Dodajemy network komentarza
       };
       
       await addComment(postId, newComment);
@@ -817,11 +843,28 @@ export default function PostList({
     if (!address || !replyContent.trim()) return;
     
     try {
+      // Określ network na podstawie networkChainId
+      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
+      if (networkChainId === base.id || networkChainId === baseSepolia.id) {
+        network = 'base';
+      } else if (networkChainId === BASECAMP_CHAIN_ID) {
+        network = 'basecamp';
+      } else if (networkChainId === LINEA_CHAIN_ID) {
+        network = 'linea';
+      } else if (networkChainId === CELO_CHAIN_ID) {
+        network = 'celo';
+      } else if (networkChainId === ETHEREUM_CHAIN_ID) {
+        network = 'ethereum';
+      } else if (networkChainId === WORLD_CHAIN_ID) {
+        network = 'worldchain';
+      }
+
       // Dodajemy odpowiedź z poprawnie ustawionym polem replyTo
       const newReply = await addCommentReply(postId, commentId, {
         author: address,
         content: replyContent.trim(),
-        txHash // Uproszczona wersja, pozwalamy aby undefined było przekazywane
+        txHash, // Uproszczona wersja, pozwalamy aby undefined było przekazywane
+        network: network
       });
       
       setReplyingTo(null);
@@ -841,7 +884,8 @@ export default function PostList({
             likedBy: [],
             mentions: [],
             replyTo: commentId, // Kluczowe pole - oznaczamy, że to odpowiedź do konkretnego komentarza
-            txHash // Uproszczona wersja bez null
+            txHash, // Uproszczona wersja bez null
+            network: network // Dodajemy network odpowiedzi
           };
           
           return {
@@ -1213,6 +1257,41 @@ export default function PostList({
                 disabled={!newComments[post.id]?.trim()}
                 onCommentAdded={onCommentAdded}
               />
+            ) : networkChainId === CELO_CHAIN_ID ? (
+              <CommentTransactionButtonCelo
+                content={newComments[post.id] || ''}
+                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
+                disabled={!newComments[post.id]?.trim()}
+                onCommentAdded={onCommentAdded}
+              />
+            ) : networkChainId === ETHEREUM_CHAIN_ID ? (
+              <CommentTransactionButtonEthereum
+                content={newComments[post.id] || ''}
+                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
+                disabled={!newComments[post.id]?.trim()}
+                onCommentAdded={onCommentAdded}
+              />
+            ) : networkChainId === WORLD_CHAIN_ID ? (
+              <CommentTransactionButtonWorldChain
+                content={newComments[post.id] || ''}
+                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
+                disabled={!newComments[post.id]?.trim()}
+                onCommentAdded={onCommentAdded}
+              />
+            ) : networkChainId === LINEA_CHAIN_ID ? (
+              <CommentTransactionButtonLinea
+                content={newComments[post.id] || ''}
+                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
+                disabled={!newComments[post.id]?.trim()}
+                onCommentAdded={onCommentAdded}
+              />
+            ) : (networkChainId === base.id || networkChainId === baseSepolia.id) ? (
+              <CommentTransactionButton
+                content={newComments[post.id] || ''}
+                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
+                disabled={!newComments[post.id]?.trim()}
+                onCommentAdded={onCommentAdded}
+              />
             ) : (
               <CommentTransactionButton
                 content={newComments[post.id] || ''}
@@ -1248,6 +1327,74 @@ export default function PostList({
                       <span className="text-xs text-gray-500 ml-2">
                         {formatTimestamp(comment.timestamp)}
                       </span>
+                      
+                      {/* Network badges for comments */}
+                      {comment.network === 'basecamp' && (
+                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-orange-50/30 dark:bg-orange-900/20 shadow-sm">
+                          <svg 
+                            className="w-3 h-3 drop-shadow-md"
+                            viewBox="0 0 600 600"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
+                            <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
+                            <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
+                            <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
+                          </svg>
+                        </div>
+                      )}
+                      
+                      {comment.network === 'base' && (
+                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
+                          <img 
+                            src="/logotypy/Base_lockup_2color.png"
+                            alt="Base"
+                            className="h-3 drop-shadow-md"
+                          />
+                        </div>
+                      )}
+                      
+                      {comment.network === 'linea' && (
+                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-cyan-50/30 dark:bg-cyan-900/20 shadow-sm">
+                          <img 
+                            src="/Logomark Blue BG.svg"
+                            alt="Linea"
+                            className="w-3 h-3 drop-shadow-md"
+                          />
+                        </div>
+                      )}
+                      
+                      {comment.network === 'celo' && (
+                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
+                          <img 
+                            src="/logotypy/ENL3ZjX9OnprxVs5u8A81khADqA.webp"
+                            alt="Celo"
+                            className="h-4 drop-shadow-md"
+                          />
+                        </div>
+                      )}
+                      
+                      {comment.network === 'ethereum' && (
+                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
+                          <img 
+                            src="/ethlogo.png"
+                            alt="Ethereum"
+                            className="w-3 h-3 drop-shadow-md"
+                          />
+                        </div>
+                      )}
+                      
+                      {comment.network === 'worldchain' && (
+                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
+                          <div className="bg-white rounded-full p-0.5 flex items-center justify-center drop-shadow-md">
+                            <img 
+                              src="/logotypy/logo.svg"
+                              alt="World Chain"
+                              className="h-2.5 drop-shadow-md"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {editingComment && editingComment.commentId === comment.id ? (
                       <div className="mt-1">
@@ -1354,6 +1501,36 @@ export default function PostList({
                           disabled={!replyContent.trim()} 
                           onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
                         />
+                      ) : networkChainId === CELO_CHAIN_ID ? (
+                        <CommentTransactionButtonCelo
+                          content={replyContent} 
+                          disabled={!replyContent.trim()} 
+                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
+                        />
+                      ) : networkChainId === ETHEREUM_CHAIN_ID ? (
+                        <CommentTransactionButtonEthereum
+                          content={replyContent} 
+                          disabled={!replyContent.trim()} 
+                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
+                        />
+                      ) : networkChainId === WORLD_CHAIN_ID ? (
+                        <CommentTransactionButtonWorldChain
+                          content={replyContent} 
+                          disabled={!replyContent.trim()} 
+                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
+                        />
+                      ) : networkChainId === LINEA_CHAIN_ID ? (
+                        <CommentTransactionButtonLinea
+                          content={replyContent} 
+                          disabled={!replyContent.trim()} 
+                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
+                        />
+                      ) : (networkChainId === base.id || networkChainId === baseSepolia.id) ? (
+                      <CommentTransactionButton 
+                        content={replyContent} 
+                        disabled={!replyContent.trim()} 
+                        onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
+                      />
                       ) : (
                       <CommentTransactionButton 
                         content={replyContent} 
@@ -1390,6 +1567,74 @@ export default function PostList({
                               <span className="text-[10px] text-gray-500 ml-1.5">
                                 {formatTimestamp(reply.timestamp)}
                               </span>
+                              
+                              {/* Network badges for replies */}
+                              {reply.network === 'basecamp' && (
+                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-orange-50/30 dark:bg-orange-900/20 shadow-sm">
+                                  <svg 
+                                    className="w-2.5 h-2.5 drop-shadow-md"
+                                    viewBox="0 0 600 600"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
+                                    <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
+                                    <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
+                                    <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
+                                  </svg>
+                                </div>
+                              )}
+                              
+                              {reply.network === 'base' && (
+                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
+                                  <img 
+                                    src="/logotypy/Base_lockup_2color.png"
+                                    alt="Base"
+                                    className="h-2.5 drop-shadow-md"
+                                  />
+                                </div>
+                              )}
+                              
+                              {reply.network === 'linea' && (
+                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-cyan-50/30 dark:bg-cyan-900/20 shadow-sm">
+                                  <img 
+                                    src="/Logomark Blue BG.svg"
+                                    alt="Linea"
+                                    className="w-2.5 h-2.5 drop-shadow-md"
+                                  />
+                                </div>
+                              )}
+                              
+                              {reply.network === 'celo' && (
+                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
+                                  <img 
+                                    src="/logotypy/ENL3ZjX9OnprxVs5u8A81khADqA.webp"
+                                    alt="Celo"
+                                    className="h-3 drop-shadow-md"
+                                  />
+                                </div>
+                              )}
+                              
+                              {reply.network === 'ethereum' && (
+                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
+                                  <img 
+                                    src="/ethlogo.png"
+                                    alt="Ethereum"
+                                    className="w-2.5 h-2.5 drop-shadow-md"
+                                  />
+                                </div>
+                              )}
+                              
+                              {reply.network === 'worldchain' && (
+                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
+                                  <div className="bg-white rounded-full p-0.5 flex items-center justify-center drop-shadow-md">
+                                    <img 
+                                      src="/logotypy/logo.svg"
+                                      alt="World Chain"
+                                      className="h-2 drop-shadow-md"
+                                    />
+                                  </div>
+                                </div>
+                              )}
                             </div>
                             <div className="text-xs text-gray-800 dark:text-gray-200 mt-0.5 whitespace-pre-wrap">
                               {reply.content}

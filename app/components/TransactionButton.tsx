@@ -206,16 +206,16 @@ export default function TransactionButton({
         <button
           onClick={handleSendTransaction}
           disabled={disabled || isTransacting || (isBaseNetwork && !content.trim())}
-          className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-white transition-all duration-300 font-medium relative overflow-hidden text-xs sm:text-sm ${
+          className={`px-3 py-0.5 sm:px-4 sm:py-0.5 rounded-lg transition-all duration-300 font-medium relative overflow-hidden text-xs sm:text-sm h-[32px] flex items-center justify-center ${
             isBaseNetwork 
-              ? 'bg-gradient-to-r from-[#0052FF] to-[#2D74FF] hover:from-[#0047E1] hover:to-[#2D6AE6] border border-[#0052FF]/30 hover:border-[#0052FF]/60 shadow-[0_0_10px_rgba(0,82,255,0.3)]' 
-              : 'bg-gray-700 hover:bg-gray-600'
+              ? 'bg-white text-[#0052FF] border border-black hover:bg-gray-50' 
+              : 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'
           } ${disabled || isTransacting ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <span className="flex items-center justify-center">
             {isTransacting ? (
               <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-[#0052FF]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -224,26 +224,14 @@ export default function TransactionButton({
               </>
             ) : (
               <>
-                {isBaseNetwork ? (
-                  <>
-                    <img
-                      src="/brand-kit/base/logo/symbol/Base_Symbol_White.png"
-                      alt="Base Logo"
-                      className="w-4 h-4 mr-1.5"
-                    />
-                    <span className="hidden xs:inline">Post Onchain</span>
-                    <span className="inline xs:hidden">Post</span>
-                  </>
-                ) : (
-                  <>
-                    <img
-                      src="/logotypy/Base_square_blue.png"
-                      alt="Base"
-                      className="w-4 h-4 mr-1.5"
-                    />
-                    <span>Switch To Base</span>
-                  </>
-                )}
+                <img
+                  src="/logotypy/Base_square_blue.png"
+                  alt="Base Logo"
+                  className="w-4 h-4 mr-1"
+                />
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
               </>
             )}
           </span>
