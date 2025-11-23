@@ -15,6 +15,9 @@ import { baseCampChain } from './contracts/BaseCampPostContract';
 import { campMainnetChain } from './contracts/CampMainnet';
 import { ENABLE_CAMP_MAINNET, CAMP_MAINNET } from '@/config/camp';
 import { lineaChain } from './basechat/Linea/config/LineaNetworkConfig';
+import { celoChain } from './basechat/Celo/config/CeloNetworkConfig';
+import { ethereumChain } from './basechat/ETH/config/EthereumNetworkConfig';
+import { worldChain } from './basechat/World/config/WorldChainNetworkConfig';
 import { CampProvider } from '@campnetwork/origin/react';
 import { PrivyProvider } from '@privy-io/react-auth';
 
@@ -44,11 +47,14 @@ const queryClient = new QueryClient();
  * Wagmi Configuration (bez Base Sepolia)
  * PL: Przygotowane dwie gałęzie konfiguracji, aby uniknąć błędu typów dla 484
  */
-const CHAINS_BASE = [base, baseCampChain, lineaChain] as const;
+const CHAINS_BASE = [base, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain] as const;
 const TRANSPORTS_BASE = {
   [base.id]: http('https://mainnet.base.org'),
   [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
   [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
+  [celoChain.id]: http('https://forno.celo.org'),
+  [ethereumChain.id]: http('https://eth.llamarpc.com'),
+  [worldChain.id]: http('https://worldchain-mainnet.g.alchemy.com/public'),
 } as const;
 
 const CHAINS_WITH_CAMP_MAINNET = [

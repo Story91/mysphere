@@ -89,6 +89,9 @@ import { Address as ViemAddress, Hex } from 'viem';
 import CreatePostBaseCamp from './components/BaseCampPosts/CreatePostBaseCamp';
 import ClaimPortalBanner from './components/BaseCampPosts/ClaimPortalBanner';
 import CreatePostLinea from './Linea/components/CreatePostLinea';
+import CreatePostCelo from './Celo/components/CreatePostCelo';
+import CreatePostEthereum from './ETH/components/CreatePostEthereum';
+import CreatePostWorldChain from './World/components/CreatePostWorldChain';
 import MockFeed from './prelogin/MockFeed';
 
 // Add global type declaration for CoinGecko widget
@@ -297,7 +300,7 @@ export default function BaseChat() {
   } | null>(null);
   
   // Network filter state - renamed to activePostingNetwork to reflect its new purpose
-  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea'>('base');
+  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea' | 'celo' | 'worldchain'>('base');
   
   // AI Generator Hook
   const aiGenerator = useAIGenerator();
@@ -2343,8 +2346,8 @@ export default function BaseChat() {
 
 
   // Helper function to check if network supports AI
-  const isAINetwork = (network: string): network is 'base' | 'basecamp' | 'linea' => {
-    return ['base', 'basecamp', 'linea'].includes(network);
+  const isAINetwork = (network: string): network is 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' => {
+    return ['base', 'basecamp', 'linea', 'celo', 'ethereum', 'worldchain'].includes(network);
   };
 
   // AI Generation Handler
@@ -3354,39 +3357,72 @@ export default function BaseChat() {
               {/* Network Filter tabs - only for logged in users */}
               {isConnected && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4 border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-6 lg:gap-2 scrollbar-hide">
                   <button
                     onClick={() => setActivePostingNetwork('base')}
-                    className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'base' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
+                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'base' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
                   >
                     <img 
                       src="/brand-kit/base/logo/symbol/Base_Symbol_Blue.png"
                       alt="Base"
-                      className="w-4 h-4 mr-1.5 bg-white rounded-full p-0.5"
+                      className="w-5 h-5 bg-white rounded-full p-0.5"
                     />
-                    Base Post
+                    <span className="hidden sm:inline">Base</span>
                   </button>
                   <button
                     onClick={() => setActivePostingNetwork('basecamp')}
-                    className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'basecamp' ? 'bg-orange-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
+                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'basecamp' ? 'bg-orange-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
                   >
                     <img 
                       src="/Camp.png"
                       alt="Camp"
-                      className="w-4 h-4 mr-1.5"
+                      className="w-5 h-5"
                     />
-                    Camp Post
+                    <span className="hidden sm:inline">Camp</span>
                   </button>
                   <button
                     onClick={() => setActivePostingNetwork('linea')}
-                    className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium ${activePostingNetwork === 'linea' ? 'bg-black text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center`}
+                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'linea' ? 'bg-black text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
                   >
                     <img 
                       src="/Logomark Blue BG.svg" 
                       alt="Linea" 
-                      className="w-4 h-4 mr-1.5"
+                      className="w-5 h-5"
                     />
-                    Linea Post
+                    <span className="hidden sm:inline">Linea</span>
+                  </button>
+                  <button
+                    onClick={() => setActivePostingNetwork('celo')}
+                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'celo' ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
+                  >
+                    <img 
+                      src="/logotypy/AkeHh5LriDwrNIvVvUQ66wSHU.webp"
+                      alt="Celo"
+                      className="w-5 h-5"
+                    />
+                    <span className="hidden sm:inline">Celo</span>
+                  </button>
+                  <button
+                    onClick={() => setActivePostingNetwork('ethereum')}
+                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'ethereum' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
+                  >
+                    <img 
+                      src="/ethlogo.png"
+                      alt="Ethereum"
+                      className="w-5 h-5"
+                    />
+                    <span className="hidden sm:inline">Ethereum</span>
+                  </button>
+                  <button
+                    onClick={() => setActivePostingNetwork('worldchain')}
+                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'worldchain' ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
+                  >
+                    <img 
+                      src="/logotypy/logo-symbol.svg"
+                      alt="World Chain"
+                      className="w-5 h-5"
+                    />
+                    <span className="hidden sm:inline">World Chain</span>
                   </button>
                 </div>
               </div>
@@ -3651,6 +3687,36 @@ export default function BaseChat() {
                               setShowAIModal={aiGenerator.setShowAIModal}
                               aiGeneratedContent={aiGenerator.getGeneratedContent('linea')}
                               onAiContentUsed={() => aiGenerator.clearGeneratedContent('linea')}
+                            />
+                          )}
+
+                          {/* Add Celo post form conditionally */}
+                          {activePostingNetwork === 'celo' && (
+                            <CreatePostCelo
+                              onPostCreated={refreshPosts}
+                              setShowAIModal={aiGenerator.setShowAIModal}
+                              aiGeneratedContent={aiGenerator.getGeneratedContent('celo')}
+                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('celo')}
+                            />
+                          )}
+
+                          {/* Add Ethereum post form conditionally */}
+                          {activePostingNetwork === 'ethereum' && (
+                            <CreatePostEthereum
+                              onPostCreated={refreshPosts}
+                              setShowAIModal={aiGenerator.setShowAIModal}
+                              aiGeneratedContent={aiGenerator.getGeneratedContent('ethereum')}
+                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('ethereum')}
+                            />
+                          )}
+
+                          {/* Add World Chain post form conditionally */}
+                          {activePostingNetwork === 'worldchain' && (
+                            <CreatePostWorldChain
+                              onPostCreated={refreshPosts}
+                              setShowAIModal={aiGenerator.setShowAIModal}
+                              aiGeneratedContent={aiGenerator.getGeneratedContent('worldchain')}
+                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('worldchain')}
                             />
                           )}
                         </div>

@@ -62,10 +62,12 @@ const formatNumberWithSuffix = (value: number | string): string => {
 
 export interface ExtendedPost extends Post {
   pollId?: string;
-  network?: 'base' | 'basecamp' | 'linea';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
   // 🚀 Paid Pin fields
   isPaidPin?: boolean;
   pinExpiresAt?: number;
+  // 🤖 AI Generated flag
+  isAIGenerated?: boolean;
   pinDuration?: string;
   pinOwner?: string;
   pinAmountPaid?: string;
@@ -1546,7 +1548,47 @@ export default function PostList({
                   <span className="ml-1 text-xs bg-gradient-to-r from-cyan-600 to-blue-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Linea</span>
                 </div>
               )}
-              
+
+              {/* Celo network badge */}
+              {post.network === 'celo' && (
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
+                  <div className="w-4 h-4 bg-green-500 rounded-full drop-shadow-md"></div>
+                  <span className="ml-1 text-xs bg-gradient-to-r from-green-600 to-emerald-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Celo</span>
+                </div>
+              )}
+
+              {/* Ethereum network badge */}
+              {post.network === 'ethereum' && (
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
+                  <div className="w-4 h-4 bg-blue-500 rounded-full drop-shadow-md"></div>
+                  <span className="ml-1 text-xs bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Ethereum</span>
+                </div>
+              )}
+
+              {/* World Chain network badge */}
+              {post.network === 'worldchain' && (
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
+                  <div className="w-4 h-4 bg-purple-500 rounded-full drop-shadow-md"></div>
+                  <span className="ml-1 text-xs bg-gradient-to-r from-purple-600 to-pink-500 text-transparent bg-clip-text font-bold drop-shadow-sm">World Chain</span>
+                </div>
+              )}
+
+              {/* AI Generated badge */}
+              {post.isAIGenerated && (
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-green-900/20 dark:to-emerald-900/20 shadow-sm">
+                  <svg
+                    className="w-4 h-4 drop-shadow-md text-green-600 dark:text-green-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9" />
+                  </svg>
+                  <span className="ml-1 text-xs bg-gradient-to-r from-green-600 to-emerald-500 text-transparent bg-clip-text font-bold drop-shadow-sm">AI</span>
+                </div>
+              )}
+
               {/* Zora logo and badge */}
               {post.zoraCoinAddress && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
@@ -1854,14 +1896,32 @@ export default function PostList({
                       )}
                       
                       <a 
-                        href={`${post.network === 'basecamp' 
-                          ? 'https://basecamp.cloud.blockscout.com/token/' 
-                          : 'https://basescan.org/token/'}${post.zoraCoinAddress}`}
+                        href={`${
+                          post.network === 'basecamp' 
+                            ? 'https://camp.cloud.blockscout.com/token/' 
+                            : post.network === 'celo'
+                            ? 'https://explorer.celo.org/token/'
+                            : post.network === 'ethereum'
+                            ? 'https://etherscan.io/token/'
+                            : post.network === 'worldchain'
+                            ? 'https://worldscan.org/token/'
+                            : 'https://basescan.org/token/'
+                        }${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 flex items-center"
                       >
-                        View on {post.network === 'basecamp' ? 'Camp Network Explorer' : 'Basescan'}
+                        View on {
+                          post.network === 'basecamp' 
+                            ? 'Camp Network Explorer' 
+                            : post.network === 'celo'
+                            ? 'Celo Explorer'
+                            : post.network === 'ethereum'
+                            ? 'Etherscan'
+                            : post.network === 'worldchain'
+                            ? 'Worldscan'
+                            : 'Basescan'
+                        }
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
                       
@@ -2004,9 +2064,19 @@ export default function PostList({
 
           {post.txHash && (
             <a
-              href={`${post.network === 'basecamp' 
-                ? 'https://basecamp.cloud.blockscout.com/tx/' 
-                : 'https://basescan.org/tx/'}${post.txHash}`}
+              href={`${
+                post.network === 'basecamp' 
+                  ? 'https://camp.cloud.blockscout.com/tx/' 
+                  : post.network === 'celo'
+                  ? 'https://explorer.celo.org/tx/'
+                  : post.network === 'ethereum'
+                  ? 'https://etherscan.io/tx/'
+                  : post.network === 'worldchain'
+                  ? 'https://worldscan.org/tx/'
+                  : post.network === 'linea'
+                  ? 'https://lineascan.build/tx/'
+                  : 'https://basescan.org/tx/'
+              }${post.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center space-x-1 text-gray-900 dark:text-gray-200 hover:text-blue-500"

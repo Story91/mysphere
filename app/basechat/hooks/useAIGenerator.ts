@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 
-export type PostingNetwork = 'base' | 'basecamp' | 'linea';
+export type PostingNetwork = 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
 
 interface UseAIGeneratorReturn {
   // Modal state
@@ -19,6 +19,9 @@ interface UseAIGeneratorReturn {
   aiGeneratedContentForBase: { content: string; isAIGenerated: boolean } | string;
   aiGeneratedContentForCamp: { content: string; isAIGenerated: boolean } | string;
   aiGeneratedContentForLinea: { content: string; isAIGenerated: boolean } | string;
+  aiGeneratedContentForCelo: { content: string; isAIGenerated: boolean } | string;
+  aiGeneratedContentForEthereum: { content: string; isAIGenerated: boolean } | string;
+  aiGeneratedContentForWorldChain: { content: string; isAIGenerated: boolean } | string;
 
   // Functions
   generateAIPost: (activeNetwork: PostingNetwork) => Promise<void>;
@@ -33,6 +36,9 @@ export function useAIGenerator(): UseAIGeneratorReturn {
   const [aiGeneratedContentForBase, setAiGeneratedContentForBase] = useState<{ content: string; isAIGenerated: boolean } | string>('');
   const [aiGeneratedContentForCamp, setAiGeneratedContentForCamp] = useState<{ content: string; isAIGenerated: boolean } | string>('');
   const [aiGeneratedContentForLinea, setAiGeneratedContentForLinea] = useState<{ content: string; isAIGenerated: boolean } | string>('');
+  const [aiGeneratedContentForCelo, setAiGeneratedContentForCelo] = useState<{ content: string; isAIGenerated: boolean } | string>('');
+  const [aiGeneratedContentForEthereum, setAiGeneratedContentForEthereum] = useState<{ content: string; isAIGenerated: boolean } | string>('');
+  const [aiGeneratedContentForWorldChain, setAiGeneratedContentForWorldChain] = useState<{ content: string; isAIGenerated: boolean } | string>('');
 
   const getSystemMessage = (network: PostingNetwork): string => {
     const baseInstruction = "You are a social media content creator who generates viral, engaging posts that drive interaction and community engagement. Write in a conversational, authentic tone that resonates with crypto/blockchain enthusiasts. Use trending formats, emojis strategically, and include calls-to-action. Keep posts concise but impactful.";
@@ -42,6 +48,12 @@ export function useAIGenerator(): UseAIGeneratorReturn {
         return `${baseInstruction} Focus on Camp Network's community building aspects, gaming features, and innovative ecosystem developments. Make it sound exciting and community-focused.`;
       case 'linea':
         return `${baseInstruction} Focus on Linea's Layer 2 scaling solutions, fast transactions, low fees, and Ethereum compatibility. Highlight speed and efficiency benefits.`;
+      case 'celo':
+        return `${baseInstruction} Focus on Celo's mobile-first approach, carbon-negative blockchain, and mission to make financial tools accessible to anyone with a mobile phone. Emphasize global impact and sustainability.`;
+      case 'ethereum':
+        return `${baseInstruction} Focus on Ethereum's role as the foundation of Web3, smart contracts, DeFi, and NFT ecosystems. Highlight innovation, decentralization, and the future of the internet.`;
+      case 'worldchain':
+        return `${baseInstruction} Focus on World Chain's mission to bring the next billion users onchain, Coinbase integration, and user-friendly blockchain experience. Emphasize accessibility and global reach.`;
       case 'base':
       default:
         return `${baseInstruction} Focus on Base blockchain's developer-friendly ecosystem, Coinbase integration, and growing dApp ecosystem. Emphasize accessibility and mainstream adoption.`;
@@ -91,6 +103,15 @@ export function useAIGenerator(): UseAIGeneratorReturn {
           case 'linea':
             setAiGeneratedContentForLinea(aiGeneratedPost);
             break;
+          case 'celo':
+            setAiGeneratedContentForCelo(aiGeneratedPost);
+            break;
+          case 'ethereum':
+            setAiGeneratedContentForEthereum(aiGeneratedPost);
+            break;
+          case 'worldchain':
+            setAiGeneratedContentForWorldChain(aiGeneratedPost);
+            break;
           case 'base':
           default:
             setAiGeneratedContentForBase(aiGeneratedPost);
@@ -124,6 +145,15 @@ export function useAIGenerator(): UseAIGeneratorReturn {
       case 'linea':
         setAiGeneratedContentForLinea('');
         break;
+      case 'celo':
+        setAiGeneratedContentForCelo('');
+        break;
+      case 'ethereum':
+        setAiGeneratedContentForEthereum('');
+        break;
+      case 'worldchain':
+        setAiGeneratedContentForWorldChain('');
+        break;
       case 'base':
       default:
         setAiGeneratedContentForBase('');
@@ -139,6 +169,15 @@ export function useAIGenerator(): UseAIGeneratorReturn {
         break;
       case 'linea':
         content = aiGeneratedContentForLinea;
+        break;
+      case 'celo':
+        content = aiGeneratedContentForCelo;
+        break;
+      case 'ethereum':
+        content = aiGeneratedContentForEthereum;
+        break;
+      case 'worldchain':
+        content = aiGeneratedContentForWorldChain;
         break;
       case 'base':
       default:
@@ -167,6 +206,9 @@ export function useAIGenerator(): UseAIGeneratorReturn {
     aiGeneratedContentForBase,
     aiGeneratedContentForCamp,
     aiGeneratedContentForLinea,
+    aiGeneratedContentForCelo,
+    aiGeneratedContentForEthereum,
+    aiGeneratedContentForWorldChain,
 
     // Functions
     generateAIPost,

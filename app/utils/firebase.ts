@@ -434,7 +434,7 @@ export const createPost = async (post: {
   visibility?: 'public' | 'followers' | 'private';
   txHash?: string; // Keep this as it now represents the Zora creation tx hash
   zoraCoinAddress?: string; // <-- ADDED
-  network?: 'base' | 'basecamp' | 'linea'; // Add network parameter to identify the source network
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain'; // Add network parameter to identify the source network
   musicTrack?: { // 🎵 Dodaj obsługę załączników muzycznych
     id: string;
     name: string;

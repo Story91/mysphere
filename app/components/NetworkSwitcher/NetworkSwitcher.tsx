@@ -8,6 +8,9 @@ import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 import { campMainnetChain } from '@/app/contracts/CampMainnet';
 import { ENABLE_CAMP_MAINNET } from '@/config/camp';
 import { lineaChain } from '@/app/basechat/Linea/config/LineaNetworkConfig';
+import { celoChain } from '@/app/basechat/Celo/config/CeloNetworkConfig';
+import { ethereumChain } from '@/app/basechat/ETH/config/EthereumNetworkConfig';
+import { worldChain } from '@/app/basechat/World/config/WorldChainNetworkConfig';
 
 // Definicja sieci z polskimi komentarzami
 // Definition of networks with Polish comments
@@ -39,8 +42,36 @@ const lineaEntry = {
   bgWhite: false,
 } as const;
 
-// Kolejność: Base, Camp Mainnet, Linea
-const networks = [baseEntry, campMainnetEntry, lineaEntry] as const;
+const celoEntry = {
+  id: celoChain.id,
+  name: 'Celo',
+  shortName: 'CELO',
+  iconUrl: '/logotypy/AkeHh5LriDwrNIvVvUQ66wSHU.webp', // Ikona dla sieci Celo
+  color: '#FCFF52',
+  bgWhite: false, // Czarne tło
+  bgBlack: true, // Czarne tło dla Celo
+} as const;
+
+const ethereumEntry = {
+  id: ethereumChain.id,
+  name: 'Ethereum',
+  shortName: 'ETH',
+  iconUrl: '/ethlogo.png', // Logo Ethereum
+  color: '#627EEA',
+  bgWhite: false,
+} as const;
+
+const worldChainEntry = {
+  id: worldChain.id,
+  name: 'World Chain',
+  shortName: 'WORLD',
+  iconUrl: '/logotypy/logo-symbol.svg', // Ikona dla sieci World Chain
+  color: '#8B5CF6',
+  bgWhite: true, // Białe tło dla World Chain
+} as const;
+
+// Kolejność: Base, Camp Mainnet, Linea, Celo, Ethereum, World Chain
+const networks = [baseEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry] as const;
 type Network = (typeof networks)[number];
 
 export function NetworkSwitcher() {
@@ -100,7 +131,7 @@ export function NetworkSwitcher() {
         aria-label="Przełącz sieć"
       >
         <div className={`w-5 h-5 rounded-full overflow-hidden ${
-          (activeNetwork as any).bgWhite ? 'bg-white' : 'bg-white/10'
+          (activeNetwork as any).bgWhite ? 'bg-white' : (activeNetwork as any).bgBlack ? 'bg-black' : 'bg-white/10'
         } flex items-center justify-center`}>
           <Image
             src={activeNetwork.iconUrl}
@@ -140,7 +171,7 @@ export function NetworkSwitcher() {
                 title={('disabled' in network && network.disabled) ? 'Locked' : undefined}
               >
                 <div className={`w-6 h-6 rounded-full overflow-hidden ${
-                  (network as any).bgWhite ? 'bg-white' : 'bg-white/10'
+                  (network as any).bgWhite ? 'bg-white' : (network as any).bgBlack ? 'bg-black' : 'bg-white/10'
                 } flex items-center justify-center flex-shrink-0`}>
                   <Image
                     src={network.iconUrl}

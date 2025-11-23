@@ -18,7 +18,7 @@ export interface Post {
   txHash?: string;
   zoraCoinAddress?: string;
   lastEdited?: any;
-  network?: 'base' | 'basecamp' | 'linea';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
   isPinned?: boolean;
   pinnedAt?: number;
   pinnedBy?: string;
