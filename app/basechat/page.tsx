@@ -80,6 +80,9 @@ import PostList, { ExtendedPost } from './components/PostList';
 import ProfileCard from './components/ProfileCard';
 import PinnedPosts from './components/PinnedPosts';
 import { HomeIcon, UserIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
+import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
+import GlassIcons from '../components/GlassIcons/GlassIcons';
+import GooeyNav from '../components/GooeyNav/GooeyNav';
 import MusicSelector from './components/MusicSelector';
 import SpotifyTrackCard from './components/SpotifyTrackCard';
 // Import Zora SDK functions
@@ -3246,225 +3249,187 @@ export default function BaseChat() {
               {isConnected && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4">
                 <div className="flex flex-col gap-3">
-                  {/* Main filters row */}
+                  {/* Main filters row - Glass Icons */}
                   <div className="relative">
-                    <div className="flex items-center gap-1 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-6 lg:gap-2 scrollbar-hide">
-                    <button
-                      onClick={() => {
-                        setSelectedTag('');
-                        setSelectedAuthor('');
-                        setActiveMainPanel('feed');
-                        clearViewParams();
-                      }}
-                      className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                        activeMainPanel === 'feed' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                      } flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors`}
-                    >
-                      All Posts
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (address) {
-                          handleViewBuilderProfile(address);
-                          clearViewParams();
-                        } else {
-                          toast.error('Connect your wallet to view builder profiles');
-                        }
-                      }}
-                      className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                        activeMainPanel === 'builders' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                      } flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors`}
-                    >
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                      My Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowMyFeed(!showMyFeed);
-                        clearViewParams();
-                        // Przeładuj posty gdy przełączamy tryb
-                        if (isConnected && address) {
-                          const loadPosts = async () => {
-                            try {
-                              setIsLoadingPosts(true);
-                              const { posts: fetchedPosts } = await fetchPosts({ 
-                                userId: address,
-                                ...(!showMyFeed ? { authorFilter: address } : {}) // Odwróć logikę bo stan zmieni się po kliknięciu
-                              });
-                              setPosts(fetchedPosts);
-                            } catch (error) {
-                              console.error('Error fetching posts:', error);
-                            } finally {
-                              setIsLoadingPosts(false);
+                    <GlassIcons
+                      items={[
+                        {
+                          icon: <LayoutGrid className="w-5 h-5" />,
+                          label: 'All Posts',
+                          onClick: () => {
+                            setSelectedTag('');
+                            setSelectedAuthor('');
+                            setActiveMainPanel('feed');
+                            clearViewParams();
+                          },
+                          isActive: activeMainPanel === 'feed'
+                        },
+                        {
+                          icon: <UserCircle className="w-5 h-5" />,
+                          label: 'My Profile',
+                          onClick: () => {
+                            if (address) {
+                              handleViewBuilderProfile(address);
+                              clearViewParams();
+                            } else {
+                              toast.error('Connect your wallet to view builder profiles');
                             }
-                          };
-                          loadPosts();
-                        }
-                      }}
-                      className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                        showMyFeed 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                      } flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors`}
-                      >
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      {showMyFeed ? 'All Posts' : 'My Feed'}
-                    </button>
-
-                                            {/* 🆕 NEW SOCIAL BUTTONS - Updated with gradients and modern icons */}
-                    {address && (
-                      <>
-                        <button
-                          onClick={() => {
-                            setActiveMainPanel('following');
+                          },
+                          isActive: activeMainPanel === 'builders'
+                        },
+                        {
+                          icon: <Rss className="w-5 h-5" />,
+                          label: showMyFeed ? 'All Posts' : 'My Feed',
+                          onClick: () => {
+                            setShowMyFeed(!showMyFeed);
                             clearViewParams();
-                          }}
-                          className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                            activeMainPanel === 'following' 
-                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                          } flex items-center justify-center hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 hover:text-white transition-all duration-200`}
-                        >
-                          <div className="w-4 h-4 mr-1 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 flex items-center justify-center">
-                            <svg className="w-2.5 h-2.5" fill="white" viewBox="0 0 24 24">
-                              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                            </svg>
-                          </div>
-                          Follows
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setActiveMainPanel('friends');
-                            clearViewParams();
-                          }}
-                          className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                            activeMainPanel === 'friends' 
-                              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg' 
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                          } flex items-center justify-center hover:bg-gradient-to-r hover:from-emerald-600 hover:to-teal-600 hover:text-white transition-all duration-200`}
-                        >
-                          <div className="w-4 h-4 mr-1 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 flex items-center justify-center">
-                            <svg className="w-2.5 h-2.5" fill="white" viewBox="0 0 24 24">
-                              <path d="M16 4c0-1.11.89-2 2-2s2 .89 2 2-.89 2-2 2-2-.89-2-2zM4 18v-1c0-2.66 5.33-4 8-4s8 1.34 8 4v1H4zM12 12c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zM12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/>
-                            </svg>
-                          </div>
-                          Friends
-                          {socialFeatures.friendsStats && socialFeatures.friendsStats.pendingRequests > 0 && (
-                            <span className="ml-1 text-xs bg-red-500 text-white px-1 rounded-full">
-                              {socialFeatures.friendsStats.pendingRequests}
-                            </span>
-                          )}
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setActiveMainPanel('discover');
-                            clearViewParams();
-                          }}
-                          className={`flex-shrink-0 lg:flex-1 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                            activeMainPanel === 'discover' 
-                              ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg' 
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                          } flex items-center justify-center hover:bg-gradient-to-r hover:from-orange-600 hover:to-red-600 hover:text-white transition-all duration-200`}
-                        >
-                          <div className="w-4 h-4 mr-1 rounded-full bg-gradient-to-r from-orange-400 to-red-400 flex items-center justify-center">
-                            <svg className="w-2.5 h-2.5" fill="white" viewBox="0 0 24 24">
-                              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                            </svg>
-                          </div>
-                          Discover
-                        </button>
-                      </>
-                    )}
-                    </div>
-                    
-                    {/* Mobile scroll indicator (Wskaźnik przewijania na mobile) */}
-                    <div className="flex lg:hidden justify-center mt-2 space-x-1">
-                      <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                      <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                    </div>
+                            if (isConnected && address) {
+                              const loadPosts = async () => {
+                                try {
+                                  setIsLoadingPosts(true);
+                                  const { posts: fetchedPosts } = await fetchPosts({ 
+                                    userId: address,
+                                    ...(!showMyFeed ? { authorFilter: address } : {})
+                                  });
+                                  setPosts(fetchedPosts);
+                                } catch (error) {
+                                  console.error('Error fetching posts:', error);
+                                } finally {
+                                  setIsLoadingPosts(false);
+                                }
+                              };
+                              loadPosts();
+                            }
+                          },
+                          isActive: showMyFeed
+                        },
+                        ...(address ? [
+                          {
+                            icon: <Eye className="w-5 h-5" />,
+                            label: 'Follows',
+                            onClick: () => {
+                              setActiveMainPanel('following');
+                              clearViewParams();
+                            },
+                            isActive: activeMainPanel === 'following'
+                          },
+                          {
+                            icon: <Users className="w-5 h-5" />,
+                            label: 'Friends',
+                            onClick: () => {
+                              setActiveMainPanel('friends');
+                              clearViewParams();
+                            },
+                            isActive: activeMainPanel === 'friends'
+                          },
+                          {
+                            icon: <Compass className="w-5 h-5" />,
+                            label: 'Discover',
+                            onClick: () => {
+                              setActiveMainPanel('discover');
+                              clearViewParams();
+                            },
+                            isActive: activeMainPanel === 'discover'
+                          }
+                        ] : [])
+                      ]}
+                    />
                   </div>
                  </div>
               </div>
               )}
 
-              {/* Network Filter tabs - only for logged in users */}
+              {/* Network Filter tabs - Gooey Nav */}
               {isConnected && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4 border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-center gap-2 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-6 lg:gap-2 scrollbar-hide">
-                  <button
-                    onClick={() => setActivePostingNetwork('base')}
-                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'base' ? 'bg-white text-gray-900 border border-black' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
-                  >
-                    <img 
-                      src="/logotypy/Base_square_blue.png"
-                      alt="Base"
-                      className="w-5 h-5"
-                    />
-                    <span className="hidden sm:inline">Base</span>
-                  </button>
-                  <button
-                    onClick={() => setActivePostingNetwork('basecamp')}
-                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'basecamp' ? 'bg-orange-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
-                  >
-                    <img 
-                      src="/Camp.png"
-                      alt="Camp"
-                      className="w-5 h-5"
-                    />
-                    <span className="hidden sm:inline">Camp</span>
-                  </button>
-                  <button
-                    onClick={() => setActivePostingNetwork('linea')}
-                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'linea' ? 'bg-black text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
-                  >
-                    <img 
-                      src="/Logomark Blue BG.svg" 
-                      alt="Linea" 
-                      className="w-5 h-5"
-                    />
-                    <span className="hidden sm:inline">Linea</span>
-                  </button>
-                  <button
-                    onClick={() => setActivePostingNetwork('celo')}
-                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'celo' ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
-                  >
-                    <img 
-                      src="/logotypy/AkeHh5LriDwrNIvVvUQ66wSHU.webp"
-                      alt="Celo"
-                      className="w-5 h-5"
-                    />
-                    <span className="hidden sm:inline">Celo</span>
-                  </button>
-                  <button
-                    onClick={() => setActivePostingNetwork('ethereum')}
-                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'ethereum' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
-                  >
-                    <img 
-                      src="/ethlogo.png"
-                      alt="Ethereum"
-                      className="w-5 h-5"
-                    />
-                    <span className="hidden sm:inline">Ethereum</span>
-                  </button>
-                  <button
-                    onClick={() => setActivePostingNetwork('worldchain')}
-                    className={`flex-shrink-0 lg:flex-1 px-3 py-2 rounded-lg text-sm font-medium ${activePostingNetwork === 'worldchain' ? 'bg-purple-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} flex items-center justify-center gap-2 transition-colors whitespace-nowrap`}
-                  >
-                    <img 
-                      src="/logotypy/logo-symbol.svg"
-                      alt="World Chain"
-                      className="w-5 h-5"
-                    />
-                    <span className="hidden sm:inline">World Chain</span>
-                  </button>
-                </div>
+                <GooeyNav
+                  items={[
+                    {
+                      icon: (
+                        <img 
+                          src="/logotypy/Base_square_blue.png"
+                          alt="Base"
+                          className="w-5 h-5 rounded-none"
+                        />
+                      ),
+                      label: 'Base',
+                      onClick: () => setActivePostingNetwork('base'),
+                      isActive: activePostingNetwork === 'base',
+                      color: '#0052FF',
+                      specialStyle: 'base'
+                    },
+                    {
+                      icon: (
+                        <img 
+                          src="/Camp.png"
+                          alt="Camp"
+                          className="w-5 h-5 rounded-none"
+                        />
+                      ),
+                      label: 'Camp',
+                      onClick: () => setActivePostingNetwork('basecamp'),
+                      isActive: activePostingNetwork === 'basecamp',
+                      color: '#FF6B35',
+                      specialStyle: 'camp'
+                    },
+                    {
+                      icon: (
+                        <img 
+                          src="/Logomark Blue BG.svg" 
+                          alt="Linea" 
+                          className="w-5 h-5 rounded-none"
+                        />
+                      ),
+                      label: 'Linea',
+                      onClick: () => setActivePostingNetwork('linea'),
+                      isActive: activePostingNetwork === 'linea',
+                      color: '#000000',
+                      specialStyle: 'linea'
+                    },
+                    {
+                      icon: (
+                        <img 
+                          src="/logotypy/AkeHh5LriDwrNIvVvUQ66wSHU.webp"
+                          alt="Celo"
+                          className="w-6 h-6 rounded-none"
+                        />
+                      ),
+                      label: 'Celo',
+                      onClick: () => setActivePostingNetwork('celo'),
+                      isActive: activePostingNetwork === 'celo',
+                      color: '#FCFF52',
+                      specialStyle: 'celo'
+                    },
+                    {
+                      icon: (
+                        <img 
+                          src="/icons/eth.svg"
+                          alt="Ethereum"
+                          className="w-5 h-5 rounded-none"
+                        />
+                      ),
+                      label: 'Ethereum',
+                      onClick: () => setActivePostingNetwork('ethereum'),
+                      isActive: activePostingNetwork === 'ethereum',
+                      color: '#627EEA',
+                      specialStyle: 'ethereum'
+                    },
+                    {
+                      icon: (
+                        <img 
+                          src="/logotypy/logo-symbol.svg"
+                          alt="World Chain"
+                          className="w-5 h-5 rounded-none"
+                        />
+                      ),
+                      label: 'World Chain',
+                      onClick: () => setActivePostingNetwork('worldchain'),
+                      isActive: activePostingNetwork === 'worldchain',
+                      color: '#9333EA',
+                      specialStyle: 'world'
+                    }
+                  ]}
+                />
               </div>
               )}
 
