@@ -112,39 +112,36 @@ export function Providers({ children }: { children: React.ReactNode }) {
             clientId={process.env.NEXT_PUBLIC_CAMP_CLIENT_ID!}
             redirectUri={typeof window !== 'undefined' ? `${window.location.origin}/mycamp` : ''}
           >
-            <FarcasterFrameProvider>
-              <PrivyProvider
-                appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
+            <PrivyProvider
+              appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
+              config={{
+                loginMethods: ['email', 'wallet', 'google', 'twitter'],
+                appearance: {
+                  theme: 'dark',
+                  accentColor: '#0052FF',
+                  showWalletLoginFirst: false,
+                },
+                defaultChain: base,
+                supportedChains: [base],
+              }}
+            >
+              <MiniKitProvider
+                apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+                chain={base}
                 config={{
-                  loginMethods: ['email', 'wallet', 'google', 'twitter'],
                   appearance: {
-                    theme: 'dark',
-                    accentColor: '#0052FF',
-                    showWalletLoginFirst: false,
+                    name: 'MySphere',
+                    logo: '/android-chrome-192x192.png',
+                    mode: 'auto',
+                    theme: 'mini-app-theme',
                   },
-                  defaultChain: base,
-                  supportedChains: [base],
-                  // embeddedWallets: {
-                  //   createOnLogin: 'users-without-wallets',
-                  // },
                 }}
               >
-                <MiniKitProvider
-                  apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-                  chain={base}
-                  config={{
-                    appearance: {
-                      name: 'MySphere',
-                      logo: '/android-chrome-192x192.png',
-                      mode: 'auto',
-                      theme: 'mini-app-theme',
-                    },
-                  }}
-                >
+                <FarcasterFrameProvider>
                   {children}
-                </MiniKitProvider>
-              </PrivyProvider>
-            </FarcasterFrameProvider>
+                </FarcasterFrameProvider>
+              </MiniKitProvider>
+            </PrivyProvider>
           </CampProvider>
           </RainbowKitProvider>
         </WagmiConfig>
