@@ -1,7 +1,7 @@
 'use client';
 
 import { base } from 'viem/chains';
-import { OnchainKitProvider } from '@coinbase/onchainkit';
+import { MiniKitProvider } from '@coinbase/onchainkit/minikit';
 import { createContext, useContext, useState } from 'react';
 import { createConfig, http } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
@@ -129,7 +129,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                   // },
                 }}
               >
-                <OnchainKitProvider
+                <MiniKitProvider
                   apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
                   chain={base}
                   config={{
@@ -137,18 +137,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
                       name: 'MySphere',
                       logo: '/android-chrome-192x192.png',
                       mode: 'auto',
-                      theme: 'base',
+                      theme: 'mini-app-theme',
                     },
-                    wallet: {
-                      display: 'modal',
-                      termsUrl: 'https://mysphere.fun/docs',
-                      privacyUrl: 'https://mysphere.fun/docs',
-                    }
                   }}
-                  projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
                 >
                   {children}
-                </OnchainKitProvider>
+                </MiniKitProvider>
               </PrivyProvider>
             </FarcasterFrameProvider>
           </CampProvider>

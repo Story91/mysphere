@@ -1,120 +1,122 @@
 'use client';
 
 import { PropsWithChildren, useEffect, useState } from 'react';
-import FrameSDK from '@farcaster/frame-sdk';
+import sdk from '@farcaster/miniapp-sdk';
 import { useConnect } from 'wagmi';
 import { farcasterFrame } from '@farcaster/frame-wagmi-connector';
+import { useMiniKit } from '@coinbase/onchainkit/minikit';
 
 export function FarcasterFrameProvider({ children }: PropsWithChildren) {
   const { connect } = useConnect();
+  const { setFrameReady, isFrameReady } = useMiniKit();
   const [isMounted, setIsMounted] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Set frame ready when mounted
+  useEffect(() => {
+    if (!isFrameReady && isMounted) {
+      setFrameReady();
+    }
+  }, [setFrameReady, isFrameReady, isMounted]);
+
+  // Auto-connect wallet if in mini app
   useEffect(() => {
     if (!isMounted) return;
-    
-    let mounted = true;
 
     const init = async () => {
       try {
-        const context = await FrameSDK.context;
+        const isInMiniApp = await sdk.isInMiniApp();
+        if (!isInMiniApp) {
+          return;
+        }
 
-        if (!mounted) return;
-
-        // Autoconnect if running in frame
-        if (context?.client.clientFid) {
+        const context = await sdk.context;
+        
+        // Autoconnect if running in mini app
+        if (context?.user?.fid) {
           connect({ connector: farcasterFrame() });
         }
-
-        // Hide splash screen after UI render
-        setTimeout(() => {
-          if (mounted) {
-            FrameSDK.actions.ready();
-          }
-        }, 500);
-
-        // Auto-prompt addMiniApp if not already added
-        // This triggers the "Add Mini App" modal automatically
-        if (context && !context.client.added) {
-          // Small delay to let UI settle
-          setTimeout(async () => {
-            if (!mounted) return;
-            try {
-              const result = await FrameSDK.actions.addFrame();
-              // addFrame returns { notificationDetails } if user enabled notifications
-              // or throws if user declined
-              console.log('✅ Mini app added successfully');
-              if (result?.notificationDetails) {
-                console.log('🔔 Notifications enabled:', result.notificationDetails);
-              }
-            } catch (addError) {
-              // User declined or error - that's fine
-              console.log('ℹ️ Add mini app declined or failed:', addError);
-            }
-          }, 1500);
-        } else if (context?.client.added) {
-          console.log('✅ Mini app already added');
-        }
       } catch (error) {
-        console.error('Failed to initialize Farcaster Frame:', error);
-        setError(error instanceof Error ? error : new Error('Unknown error initializing Farcaster Frame'));
+        console.error('Failed to initialize Farcaster Mini App:', error);
       }
     };
 
     init();
-
-    return () => {
-      mounted = false;
-    };
   }, [connect, isMounted]);
 
-  // Add a global error handler for Transaction component errors
+  // Auto-prompt addMiniApp after frame is ready
   useEffect(() => {
-    // Original error handler to catch Transaction component errors
+    const promptAddMiniApp = async () => {
+      if (hasTriedAddMiniApp || !isFrameReady) return;
+
+      try {
+        const isInMiniApp = await sdk.isInMiniApp();
+        if (!isInMiniApp) {
+          return;
+        }
+
+        setHasTriedAddMiniApp(true);
+
+        try {
+          const result = await sdk.actions.addMiniApp();
+          console.log('✅ Add Mini App result:', result);
+
+          if (result.notificationDetails) {
+            console.log('🔔 Notifications enabled!');
+          } else {
+            console.log('⚠️ Mini App added but notifications not enabled');
+          }
+        } catch (error: unknown) {
+          const err = error as { name?: string };
+          if (err?.name === 'AddMiniApp.InvalidDomainManifest') {
+            console.error('❌ Invalid domain manifest - check your .well-known/farcaster.json');
+          } else if (err?.name === 'AddMiniApp.RejectedByUser') {
+            console.log('User rejected add Mini App prompt');
+          } else {
+            console.error('❌ Add Mini App failed:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking Mini App status:', error);
+      }
+    };
+
+    if (isFrameReady) {
+      const timer = setTimeout(() => {
+        promptAddMiniApp();
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isFrameReady, hasTriedAddMiniApp]);
+
+  // Global error handler for Transaction component errors
+  useEffect(() => {
     const originalError = console.error;
-    
+
     console.error = (...args) => {
-      // Check if this is the Transaction prop error
       const errorMessage = args[0]?.toString() || '';
-      if (typeof errorMessage === 'string' && 
+      if (typeof errorMessage === 'string' &&
           (errorMessage.includes('Transaction: calls or contracts must be provided') ||
            errorMessage.includes('Transaction component'))) {
-        // Log it but prevent it from crashing the app
         console.warn('Intercepted Transaction component error:', errorMessage);
-        // Don't rethrow - this suppresses the error
         return;
       }
-      
-      // For other errors, use the original handler
       originalError.apply(console, args);
     };
-    
+
     return () => {
-      // Restore original handler on cleanup
       console.error = originalError;
     };
   }, []);
-
-  // Add error boundary functionality
-  if (error) {
-    console.error('FarcasterFrameProvider caught error:', error);
-    // Return children anyway to prevent the app from breaking entirely
-    return <>{children}</>;
-  }
 
   if (!isMounted) {
     return <>{children}</>;
   }
 
-  // Return the children wrapped in an error boundary
-  try {
-    return <>{children}</>;
-  } catch (err) {
-    console.error('Error rendering FarcasterFrameProvider children:', err);
-    return <>{children}</>;
-  }
+  return <>{children}</>;
 }
