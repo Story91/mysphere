@@ -115,7 +115,7 @@ export default function MarketplaceGrid({
       const cache = getListingCache();
       let allActiveAuctionIds: bigint[] = cache.activeAuctionIds || [];
       let allActiveListingIds: bigint[] = cache.activeIds || activeListingIds;
-      let listingsCache = new Map(cache.listings);
+      let listingsCache = new Map<string, any>(cache.listings);
 
       // Calculate items for the page (use same logic as normal loading)
       const startIndex = (pageToFetch - 1) * pageSize;
@@ -399,7 +399,7 @@ export default function MarketplaceGrid({
           
           let allActiveIds: bigint[] = [];
           let allActiveAuctionIds: bigint[] = [];
-          let listingsCache = new Map(cache.listings);
+          let listingsCache = new Map<string, any>(cache.listings);
           
           if (isCacheValid && cache.activeIds.length > 0) {
             console.log('📋 Using cached active listing IDs:', cache.activeIds.length, 'auctions:', cache.activeAuctionIds?.length || 0);
