@@ -36,6 +36,29 @@ export function FarcasterFrameProvider({ children }: PropsWithChildren) {
             FrameSDK.actions.ready();
           }
         }, 500);
+
+        // Auto-prompt addMiniApp if not already added
+        // This triggers the "Add Mini App" modal automatically
+        if (context && !context.client.added) {
+          // Small delay to let UI settle
+          setTimeout(async () => {
+            if (!mounted) return;
+            try {
+              const result = await FrameSDK.actions.addFrame();
+              // addFrame returns { notificationDetails } if user enabled notifications
+              // or throws if user declined
+              console.log('✅ Mini app added successfully');
+              if (result?.notificationDetails) {
+                console.log('🔔 Notifications enabled:', result.notificationDetails);
+              }
+            } catch (addError) {
+              // User declined or error - that's fine
+              console.log('ℹ️ Add mini app declined or failed:', addError);
+            }
+          }, 1500);
+        } else if (context?.client.added) {
+          console.log('✅ Mini app already added');
+        }
       } catch (error) {
         console.error('Failed to initialize Farcaster Frame:', error);
         setError(error instanceof Error ? error : new Error('Unknown error initializing Farcaster Frame'));
@@ -92,6 +115,6 @@ export function FarcasterFrameProvider({ children }: PropsWithChildren) {
     return <>{children}</>;
   } catch (err) {
     console.error('Error rendering FarcasterFrameProvider children:', err);
-  return <>{children}</>;
+    return <>{children}</>;
   }
-} 
+}
