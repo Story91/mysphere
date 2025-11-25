@@ -17,7 +17,7 @@
     "splashImageUrl": "https://mysphere.fun/SPLASH.gif",
     "splashBackgroundColor": "#FFFFFF",
     "homeUrl": "https://mysphere.fun",
-    "webhookUrl": "https://mysphere.fun/api/webhook",
+    "webhookUrl": "https://api.neynar.com/f/app/abc550bb-3909-43b2-921a-ce797f9e925b/event",
     "primaryCategory": "social",
     "tags": ["web3", "base", "social", "onchain", "creator"],
     "heroImageUrl": "https://mysphere.fun/SphereWhite.png",
