@@ -1,10 +1,9 @@
 'use client';
 
 import { base } from 'viem/chains';
-import { MiniKitProvider, useMiniKit } from '@coinbase/onchainkit/minikit';
-import { createContext, useContext, useState, useEffect, PropsWithChildren } from 'react';
+import { OnchainKitProvider } from '@coinbase/onchainkit';
+import { createContext, useContext, useState } from 'react';
 import { createConfig, http } from 'wagmi';
-import sdk from '@farcaster/miniapp-sdk';
 import { WagmiConfig } from 'wagmi';
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors';
@@ -100,59 +99,6 @@ export const wagmiConfig = ENABLE_CAMP_MAINNET
       connectors: COMMON_CONNECTORS as unknown as any,
     });
 
-// MiniKit initializer - must be inside MiniKitProvider
-function MiniKitInitializer({ children }: PropsWithChildren) {
-  const { setFrameReady, isFrameReady } = useMiniKit();
-  const [isMounted, setIsMounted] = useState(false);
-  const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Set frame ready when mounted
-  useEffect(() => {
-    if (!isFrameReady && isMounted) {
-      setFrameReady();
-    }
-  }, [setFrameReady, isFrameReady, isMounted]);
-
-  // Auto-prompt addMiniApp after frame is ready
-  useEffect(() => {
-    const promptAddMiniApp = async () => {
-      if (hasTriedAddMiniApp || !isFrameReady) return;
-
-      try {
-        const isInMiniApp = await sdk.isInMiniApp();
-        if (!isInMiniApp) return;
-
-        setHasTriedAddMiniApp(true);
-
-        try {
-          const result = await sdk.actions.addMiniApp();
-          if (result.notificationDetails) {
-            console.log('🔔 Notifications enabled!');
-          }
-        } catch (error: unknown) {
-          const err = error as { name?: string };
-          if (err?.name === 'AddMiniApp.RejectedByUser') {
-            console.log('User rejected add Mini App prompt');
-          }
-        }
-      } catch (error) {
-        // Silent fail
-      }
-    };
-
-    if (isFrameReady) {
-      const timer = setTimeout(() => promptAddMiniApp(), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [isFrameReady, hasTriedAddMiniApp]);
-
-  return <>{children}</>;
-}
-
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>('auto');
   const [style, setStyle] = useState<ThemeStyle>('base');
@@ -178,9 +124,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
                   },
                   defaultChain: base,
                   supportedChains: [base],
+                  // embeddedWallets: {
+                  //   createOnLogin: 'users-without-wallets',
+                  // },
                 }}
               >
-                <MiniKitProvider
+                <OnchainKitProvider
                   apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
                   chain={base}
                   config={{
@@ -188,14 +137,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
                       name: 'MySphere',
                       logo: '/android-chrome-192x192.png',
                       mode: 'auto',
-                      theme: 'mini-app-theme',
+                      theme: 'base',
                     },
+                    wallet: {
+                      display: 'modal',
+                      termsUrl: 'https://mysphere.fun/docs',
+                      privacyUrl: 'https://mysphere.fun/docs',
+                    }
                   }}
+                  projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
                 >
-                  <MiniKitInitializer>
-                    {children}
-                  </MiniKitInitializer>
-                </MiniKitProvider>
+                  {children}
+                </OnchainKitProvider>
               </PrivyProvider>
             </FarcasterFrameProvider>
           </CampProvider>
