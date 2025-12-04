@@ -61,12 +61,12 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0052FF" />
       </head>
-      <body className="min-h-screen bg-[#0F172A]">
+      <body className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-blue-50">
         <ThemeProvider>
           <ContextProvider>
             <Providers>
               <ClientOnly fallback={
-                <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-black to-[#050B20]">
+                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-gray-50 to-blue-50">
                   <div className="relative">
                     <div className="absolute -inset-6 rounded-full bg-blue-500/20 animate-pulse"></div>
                     <div className="relative w-32 h-32 animate-spin">

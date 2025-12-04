@@ -314,8 +314,8 @@ html {
 }
 
 body {
-  color: #E5E7EB;
-  background: #0F172A;
+  color: #1F2937;
+  background: linear-gradient(to bottom right, white, #f9fafb, #eff6ff);
   font-family: 'Space Grotesk', sans-serif;
   letter-spacing: 0.3px;
 }

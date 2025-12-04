@@ -148,6 +148,7 @@
     "postcss": "^8.4.35",
     "postcss-flexbugs-fixes": "^5.0.2",
     "postcss-preset-env": "^9.3.0",
+    "shadcn": "^3.5.1",
     "solidity-coverage": "^0.8.1",
     "stream-browserify": "^3.0.0",
     "stream-http": "^3.2.0",
