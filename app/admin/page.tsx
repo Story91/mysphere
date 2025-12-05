@@ -11,7 +11,7 @@ import Statistics from './components/Statistics';
 import PaidPinsManagement from './components/PaidPinsManagement';
 import { refreshTop50UsersOnly } from '../utils/firebase';
 import AdminQuotes from './quotes/page';
-import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache, fixAllUserStats, fixUserPostStats, getUsersWithBasenameCount, migrateHistoricalBaseNamePosts, rebuildReferralAggregates, recomputeReferralPointsStrict, clearPaginatedActiveUsersCache, fixUserRankingStrict } from '../utils/firebase';
+import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getMySphereGlobalStats, getUserNamesCacheStats, clearUserNamesCache, fixAllUserStats, fixUserPostStats, getUsersWithBasenameCount, migrateHistoricalBaseNamePosts, rebuildReferralAggregates, recomputeReferralPointsStrict, clearPaginatedActiveUsersCache, fixUserRankingStrict, refreshAllDomainBonuses } from '../utils/firebase';
 
 // Usuwam stałą ADMIN_ADDRESS, bo importujemy ją z firebase.ts
 const ADMIN_BASENAME = "story91.base.eth";
@@ -650,6 +650,41 @@ export default function AdminPanel() {
             } text-white transition-all text-sm`}
           >
             {isRefreshing ? '🔧' : '🔧 Jeden'}
+          </button>
+
+          <button
+            onClick={async () => {
+              try {
+                setIsRefreshing(true);
+                const result = await refreshAllDomainBonuses();
+                setRefreshStatus({
+                  success: result.success,
+                  message: result.success 
+                    ? `Odświeżono bonusy domenowe: 🌐 .sphere: ${result.sphere}, 🏕️ .camper: ${result.camper}, 💛 .celo: ${result.celo}, 🌍 .world: ${result.world}` 
+                    : `Błąd: ${result.error || 'Nieznany błąd'}`,
+                  sphere: result.sphere,
+                  camper: result.camper,
+                  celo: result.celo,
+                  world: result.world
+                });
+              } catch (error) {
+                console.error('Błąd podczas odświeżania bonusów domenowych:', error);
+                setRefreshStatus({ 
+                  success: false, 
+                  error: error instanceof Error ? error.message : 'Nieznany błąd' 
+                });
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
+            disabled={isRefreshing}
+            className={`px-4 py-2 rounded-lg ${
+              isRefreshing 
+                ? 'bg-gray-500 cursor-not-allowed' 
+                : 'bg-green-600 hover:bg-green-700'
+            } text-white transition-all`}
+          >
+            {isRefreshing ? '🔄 Odświeżam...' : '🔄 Odśwież Bonusy Domenowe'}
           </button>
         </div>
         

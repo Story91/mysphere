@@ -422,6 +422,223 @@ export const addBaseNameBonusToAllUsers = async (): Promise<{success: boolean, u
   }
 };
 
+// Funkcja dodająca bonus .sphere dla wszystkich użytkowników z .sphere
+export const addSphereBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
+  try {
+    console.log('🌐 Rozpoczynam dodawanie bonusu .sphere dla wszystkich użytkowników...');
+    
+    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isSphere: true
+    const usernamesRef = collection(db, 'usernames');
+    const sphereQuery = query(usernamesRef, where('isSphere', '==', true));
+    const sphereSnapshot = await getDocs(sphereQuery);
+    
+    let updatedUsers = 0;
+    
+    // Przetwórz każdego użytkownika z .sphere
+    for (const usernameDoc of sphereSnapshot.docs) {
+      const userAddress = usernameDoc.id;
+      
+      // Dodaj bonus .sphere dla użytkownika
+      await addSphereBonusToUser(userAddress);
+      updatedUsers++;
+      
+      // Loguj co 10 użytkowników
+      if (updatedUsers % 10 === 0) {
+        console.log(`🌐 Zaktualizowano ${updatedUsers} użytkowników z .sphere...`);
+      }
+    }
+    
+    console.log(`🌐 Zakończono dodawanie bonusu .sphere: Zaktualizowano ${updatedUsers} użytkowników`);
+    
+    return {
+      success: true,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas dodawania bonusu .sphere:', error);
+    return {
+      success: false,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu .sphere'
+    };
+  }
+};
+
+// Funkcja dodająca bonus .camper dla wszystkich użytkowników z .camper
+export const addCamperBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
+  try {
+    console.log('🏕️ Rozpoczynam dodawanie bonusu .camper dla wszystkich użytkowników...');
+    
+    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isCamper: true
+    const usernamesRef = collection(db, 'usernames');
+    const camperQuery = query(usernamesRef, where('isCamper', '==', true));
+    const camperSnapshot = await getDocs(camperQuery);
+    
+    let updatedUsers = 0;
+    
+    // Przetwórz każdego użytkownika z .camper
+    for (const usernameDoc of camperSnapshot.docs) {
+      const userAddress = usernameDoc.id;
+      
+      // Dodaj bonus .camper dla użytkownika
+      await addCamperBonusToUser(userAddress);
+      updatedUsers++;
+      
+      // Loguj co 10 użytkowników
+      if (updatedUsers % 10 === 0) {
+        console.log(`🏕️ Zaktualizowano ${updatedUsers} użytkowników z .camper...`);
+      }
+    }
+    
+    console.log(`🏕️ Zakończono dodawanie bonusu .camper: Zaktualizowano ${updatedUsers} użytkowników`);
+    
+    return {
+      success: true,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas dodawania bonusu .camper:', error);
+    return {
+      success: false,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu .camper'
+    };
+  }
+};
+
+// Funkcja dodająca bonus .celo dla wszystkich użytkowników z .celo
+export const addCeloBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
+  try {
+    console.log('💛 Rozpoczynam dodawanie bonusu .celo dla wszystkich użytkowników...');
+    
+    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isCelo: true
+    const usernamesRef = collection(db, 'usernames');
+    const celoQuery = query(usernamesRef, where('isCelo', '==', true));
+    const celoSnapshot = await getDocs(celoQuery);
+    
+    let updatedUsers = 0;
+    
+    // Przetwórz każdego użytkownika z .celo
+    for (const usernameDoc of celoSnapshot.docs) {
+      const userAddress = usernameDoc.id;
+      
+      // Dodaj bonus .celo dla użytkownika
+      await addCeloBonusToUser(userAddress);
+      updatedUsers++;
+      
+      // Loguj co 10 użytkowników
+      if (updatedUsers % 10 === 0) {
+        console.log(`💛 Zaktualizowano ${updatedUsers} użytkowników z .celo...`);
+      }
+    }
+    
+    console.log(`💛 Zakończono dodawanie bonusu .celo: Zaktualizowano ${updatedUsers} użytkowników`);
+    
+    return {
+      success: true,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas dodawania bonusu .celo:', error);
+    return {
+      success: false,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu .celo'
+    };
+  }
+};
+
+// Funkcja dodająca bonus .world dla wszystkich użytkowników z .world
+export const addWorldBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
+  try {
+    console.log('🌍 Rozpoczynam dodawanie bonusu .world dla wszystkich użytkowników...');
+    
+    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isWorld: true
+    const usernamesRef = collection(db, 'usernames');
+    const worldQuery = query(usernamesRef, where('isWorld', '==', true));
+    const worldSnapshot = await getDocs(worldQuery);
+    
+    let updatedUsers = 0;
+    
+    // Przetwórz każdego użytkownika z .world
+    for (const usernameDoc of worldSnapshot.docs) {
+      const userAddress = usernameDoc.id;
+      
+      // Dodaj bonus .world dla użytkownika
+      await addWorldBonusToUser(userAddress);
+      updatedUsers++;
+      
+      // Loguj co 10 użytkowników
+      if (updatedUsers % 10 === 0) {
+        console.log(`🌍 Zaktualizowano ${updatedUsers} użytkowników z .world...`);
+      }
+    }
+    
+    console.log(`🌍 Zakończono dodawanie bonusu .world: Zaktualizowano ${updatedUsers} użytkowników`);
+    
+    return {
+      success: true,
+      updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas dodawania bonusu .world:', error);
+    return {
+      success: false,
+      updatedUsers: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu .world'
+    };
+  }
+};
+
+// Funkcja do odświeżenia wszystkich bonusów domenowych dla istniejących użytkowników
+export const refreshAllDomainBonuses = async (): Promise<{
+  success: boolean;
+  sphere: number;
+  camper: number;
+  celo: number;
+  world: number;
+  error?: string;
+}> => {
+  try {
+    console.log('🔄 Rozpoczynam odświeżanie wszystkich bonusów domenowych...');
+    
+    const [sphereResult, camperResult, celoResult, worldResult] = await Promise.all([
+      addSphereBonusToAllUsers(),
+      addCamperBonusToAllUsers(),
+      addCeloBonusToAllUsers(),
+      addWorldBonusToAllUsers()
+    ]);
+    
+    const totalUpdated = sphereResult.updatedUsers + camperResult.updatedUsers + 
+                        celoResult.updatedUsers + worldResult.updatedUsers;
+    
+    console.log(`✅ Zakończono odświeżanie wszystkich bonusów domenowych:`);
+    console.log(`   🌐 .sphere: ${sphereResult.updatedUsers} użytkowników`);
+    console.log(`   🏕️ .camper: ${camperResult.updatedUsers} użytkowników`);
+    console.log(`   💛 .celo: ${celoResult.updatedUsers} użytkowników`);
+    console.log(`   🌍 .world: ${worldResult.updatedUsers} użytkowników`);
+    console.log(`   📊 Łącznie: ${totalUpdated} użytkowników`);
+    
+    return {
+      success: true,
+      sphere: sphereResult.updatedUsers,
+      camper: camperResult.updatedUsers,
+      celo: celoResult.updatedUsers,
+      world: worldResult.updatedUsers
+    };
+  } catch (error) {
+    console.error('Błąd podczas odświeżania bonusów domenowych:', error);
+    return {
+      success: false,
+      sphere: 0,
+      camper: 0,
+      celo: 0,
+      world: 0,
+      error: error instanceof Error ? error.message : 'Nieznany błąd podczas odświeżania bonusów domenowych'
+    };
+  }
+};
+
 // Zaawansowany system lajków
 export const toggleLike = async (postId: string, userId: string): Promise<boolean> => {
   try {

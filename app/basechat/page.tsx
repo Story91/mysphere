@@ -595,6 +595,14 @@ export default function BaseChat() {
           await fetchUserNames(posts);
         }
         
+        // Jeśli użytkownik ma otwarty swój profil, odśwież go
+        if (selectedBuilderProfile && selectedBuilderProfile.address === address) {
+          // Poczekaj chwilę, żeby Firebase zdążył zapisać dane (w tym bonusy)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Odśwież profil po zapisaniu nazwy (punkty mogą się zmienić)
+          await handleViewBuilderProfile(address);
+        }
+        
         // Pokaż komunikat o bonusie punktów za wybraną domenę
         if (selectedSuffix === 'sphere') {
           alert('🎉 Congratulations! You earned 1500 bonus points for choosing .sphere!');
