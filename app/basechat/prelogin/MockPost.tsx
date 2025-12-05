@@ -18,6 +18,8 @@ const MockPost: React.FC<MockPostProps> = ({ userName, userHandle, network, cont
   const isBaseName = userName.endsWith('.base.eth');
   const isSphereName = userName.endsWith('.sphere');
   const isCamperName = userName.endsWith('.camper');
+  const isCeloName = userName.endsWith('.celo');
+  const isWorldName = userName.endsWith('.world');
 
   const networkStyles = {
     'Base': 'bg-blue-100 text-blue-800 border-blue-200',
@@ -40,6 +42,8 @@ const MockPost: React.FC<MockPostProps> = ({ userName, userHandle, network, cont
                 isBaseName ? 'text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600' : 
                 isSphereName ? 'text-blue-600' :
                 isCamperName ? 'text-orange-600' :
+                isCeloName ? 'text-yellow-600' :
+                isWorldName ? 'text-green-600' :
                 'text-gray-800'
               }`}>
                 {userName}

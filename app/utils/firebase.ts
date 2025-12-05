@@ -136,6 +136,10 @@ const addCamperBonusToUser = async (userAddress: string): Promise<void> => {
       baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
       baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
       baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
+      baseChatPoints.sphereBonus = Number(baseChatPoints.sphereBonus || 0);
+      baseChatPoints.celoBonus = Number(baseChatPoints.celoBonus || 0);
+      baseChatPoints.worldBonus = Number(baseChatPoints.worldBonus || 0);
+      baseChatPoints.referralPoints = Number(baseChatPoints.referralPoints || 0);
       
       // Sprawdź czy użytkownik już ma camperBonus - jeśli tak, nie dodawaj ponownie
       if (baseChatPoints.camperBonus) {
@@ -144,7 +148,7 @@ const addCamperBonusToUser = async (userAddress: string): Promise<void> => {
       }
       
       // Dodaj camperBonus jako liczbę
-      baseChatPoints.camperBonus = 500;
+      baseChatPoints.camperBonus = 1000;
       
       // Przelicz totalPoints jako sumę wszystkich składników
       baseChatPoints.totalPoints = 
@@ -152,7 +156,11 @@ const addCamperBonusToUser = async (userAddress: string): Promise<void> => {
         baseChatPoints.likePoints + 
         baseChatPoints.postPoints + 
         baseChatPoints.baseNameBonus + 
-        baseChatPoints.camperBonus;
+        baseChatPoints.camperBonus +
+        baseChatPoints.sphereBonus +
+        baseChatPoints.celoBonus +
+        baseChatPoints.worldBonus +
+        baseChatPoints.referralPoints;
       
       // Zaktualizuj dokument użytkownika
       await updateDoc(userRef, {
@@ -160,10 +168,214 @@ const addCamperBonusToUser = async (userAddress: string): Promise<void> => {
         lastUpdated: serverTimestamp()
       });
       
-      console.log(`🏕️ Dodano camperBonus (500 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
+      console.log(`🏕️ Dodano camperBonus (1000 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
     }
   } catch (error) {
     console.error('Error adding Camper bonus:', error);
+  }
+};
+
+// Funkcja dodająca bonus 1500 punktów za .sphere
+const addSphereBonusToUser = async (userAddress: string): Promise<void> => {
+  try {
+    console.log(`🌐 [addSphereBonusToUser] Rozpoczynam dodawanie bonusu dla ${userAddress}`);
+    const userRef = doc(db, 'users', userAddress);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      
+      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
+      let baseChatPoints: any = userData.baseChatPoints;
+      
+      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
+      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
+        baseChatPoints = {
+          activityBonus: 0,
+          likePoints: 0,
+          postPoints: 0,
+          totalPoints: 0
+        };
+      }
+      
+      // Upewnij się, że wszystkie pola są liczbami
+      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
+      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
+      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
+      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
+      baseChatPoints.camperBonus = Number(baseChatPoints.camperBonus || 0);
+      baseChatPoints.sphereBonus = Number(baseChatPoints.sphereBonus || 0);
+      baseChatPoints.celoBonus = Number(baseChatPoints.celoBonus || 0);
+      baseChatPoints.worldBonus = Number(baseChatPoints.worldBonus || 0);
+      baseChatPoints.referralPoints = Number(baseChatPoints.referralPoints || 0);
+      
+      // Sprawdź czy użytkownik już ma sphereBonus - jeśli tak, nie dodawaj ponownie
+      if (baseChatPoints.sphereBonus) {
+        console.log(`Użytkownik ${userAddress} już ma sphereBonus, pomijam dodawanie`);
+        return;
+      }
+      
+      // Dodaj sphereBonus jako liczbę
+      baseChatPoints.sphereBonus = 1500;
+      
+      // Przelicz totalPoints jako sumę wszystkich składników
+      baseChatPoints.totalPoints = 
+        baseChatPoints.activityBonus + 
+        baseChatPoints.likePoints + 
+        baseChatPoints.postPoints + 
+        baseChatPoints.baseNameBonus + 
+        baseChatPoints.camperBonus +
+        baseChatPoints.sphereBonus +
+        baseChatPoints.celoBonus +
+        baseChatPoints.worldBonus +
+        baseChatPoints.referralPoints;
+      
+      // Zaktualizuj dokument użytkownika
+      await updateDoc(userRef, {
+        baseChatPoints: baseChatPoints,
+        lastUpdated: serverTimestamp()
+      });
+      
+      console.log(`🌐 Dodano sphereBonus (1500 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
+    }
+  } catch (error) {
+    console.error('Error adding Sphere bonus:', error);
+  }
+};
+
+// Funkcja dodająca bonus 1250 punktów za .celo
+const addCeloBonusToUser = async (userAddress: string): Promise<void> => {
+  try {
+    console.log(`💛 [addCeloBonusToUser] Rozpoczynam dodawanie bonusu dla ${userAddress}`);
+    const userRef = doc(db, 'users', userAddress);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      
+      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
+      let baseChatPoints: any = userData.baseChatPoints;
+      
+      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
+      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
+        baseChatPoints = {
+          activityBonus: 0,
+          likePoints: 0,
+          postPoints: 0,
+          totalPoints: 0
+        };
+      }
+      
+      // Upewnij się, że wszystkie pola są liczbami
+      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
+      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
+      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
+      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
+      baseChatPoints.camperBonus = Number(baseChatPoints.camperBonus || 0);
+      baseChatPoints.sphereBonus = Number(baseChatPoints.sphereBonus || 0);
+      baseChatPoints.celoBonus = Number(baseChatPoints.celoBonus || 0);
+      baseChatPoints.worldBonus = Number(baseChatPoints.worldBonus || 0);
+      baseChatPoints.referralPoints = Number(baseChatPoints.referralPoints || 0);
+      
+      // Sprawdź czy użytkownik już ma celoBonus - jeśli tak, nie dodawaj ponownie
+      if (baseChatPoints.celoBonus) {
+        console.log(`Użytkownik ${userAddress} już ma celoBonus, pomijam dodawanie`);
+        return;
+      }
+      
+      // Dodaj celoBonus jako liczbę
+      baseChatPoints.celoBonus = 1250;
+      
+      // Przelicz totalPoints jako sumę wszystkich składników
+      baseChatPoints.totalPoints = 
+        baseChatPoints.activityBonus + 
+        baseChatPoints.likePoints + 
+        baseChatPoints.postPoints + 
+        baseChatPoints.baseNameBonus + 
+        baseChatPoints.camperBonus +
+        baseChatPoints.sphereBonus +
+        baseChatPoints.celoBonus +
+        baseChatPoints.worldBonus +
+        baseChatPoints.referralPoints;
+      
+      // Zaktualizuj dokument użytkownika
+      await updateDoc(userRef, {
+        baseChatPoints: baseChatPoints,
+        lastUpdated: serverTimestamp()
+      });
+      
+      console.log(`💛 Dodano celoBonus (1250 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
+    }
+  } catch (error) {
+    console.error('Error adding Celo bonus:', error);
+  }
+};
+
+// Funkcja dodająca bonus 1250 punktów za .world
+const addWorldBonusToUser = async (userAddress: string): Promise<void> => {
+  try {
+    console.log(`🌍 [addWorldBonusToUser] Rozpoczynam dodawanie bonusu dla ${userAddress}`);
+    const userRef = doc(db, 'users', userAddress);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      
+      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
+      let baseChatPoints: any = userData.baseChatPoints;
+      
+      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
+      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
+        baseChatPoints = {
+          activityBonus: 0,
+          likePoints: 0,
+          postPoints: 0,
+          totalPoints: 0
+        };
+      }
+      
+      // Upewnij się, że wszystkie pola są liczbami
+      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
+      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
+      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
+      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
+      baseChatPoints.camperBonus = Number(baseChatPoints.camperBonus || 0);
+      baseChatPoints.sphereBonus = Number(baseChatPoints.sphereBonus || 0);
+      baseChatPoints.celoBonus = Number(baseChatPoints.celoBonus || 0);
+      baseChatPoints.worldBonus = Number(baseChatPoints.worldBonus || 0);
+      baseChatPoints.referralPoints = Number(baseChatPoints.referralPoints || 0);
+      
+      // Sprawdź czy użytkownik już ma worldBonus - jeśli tak, nie dodawaj ponownie
+      if (baseChatPoints.worldBonus) {
+        console.log(`Użytkownik ${userAddress} już ma worldBonus, pomijam dodawanie`);
+        return;
+      }
+      
+      // Dodaj worldBonus jako liczbę
+      baseChatPoints.worldBonus = 1250;
+      
+      // Przelicz totalPoints jako sumę wszystkich składników
+      baseChatPoints.totalPoints = 
+        baseChatPoints.activityBonus + 
+        baseChatPoints.likePoints + 
+        baseChatPoints.postPoints + 
+        baseChatPoints.baseNameBonus + 
+        baseChatPoints.camperBonus +
+        baseChatPoints.sphereBonus +
+        baseChatPoints.celoBonus +
+        baseChatPoints.worldBonus +
+        baseChatPoints.referralPoints;
+      
+      // Zaktualizuj dokument użytkownika
+      await updateDoc(userRef, {
+        baseChatPoints: baseChatPoints,
+        lastUpdated: serverTimestamp()
+      });
+      
+      console.log(`🌍 Dodano worldBonus (1250 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
+    }
+  } catch (error) {
+    console.error('Error adding World bonus:', error);
   }
 };
 
@@ -1016,11 +1228,14 @@ export const updateUserName = async (walletAddress: string, newName: string): Pr
 };
 
 // Prosta funkcja do zapisywania nazwy profilowej
-export const saveProfileName = async (address: string, name: string, suffix?: 'sphere' | 'camper') => {
+export const saveProfileName = async (address: string, name: string, suffix?: 'sphere' | 'camper' | 'celo' | 'world') => {
   try {
     const userRef = doc(db, 'usernames', address);
     const isBaseName = name.endsWith('.base.eth');
     const isCamper = name.endsWith('.camper');
+    const isSphere = name.endsWith('.sphere');
+    const isCelo = name.endsWith('.celo');
+    const isWorld = name.endsWith('.world');
     
     // Sprawdź czy użytkownik już ma zapisaną nazwę
     const userDoc = await getDoc(userRef);
@@ -1037,7 +1252,10 @@ export const saveProfileName = async (address: string, name: string, suffix?: 's
       name,
       updatedAt: serverTimestamp(),
       isBaseName,
-      isCamper
+      isCamper,
+      isSphere,
+      isCelo,
+      isWorld
     });
     
     // Zaktualizuj też profil użytkownika
@@ -1052,10 +1270,28 @@ export const saveProfileName = async (address: string, name: string, suffix?: 's
       await addBaseNameBonusToUser(address);
     }
     
-    // Jeśli to .camper, dodaj bonus 500 punktów
+    // Jeśli to .sphere, dodaj bonus 1500 punktów
+    if (isSphere || suffix === 'sphere') {
+      console.log(`🌐 Próba dodania sphereBonus dla ${address}, isSphere: ${isSphere}, suffix: ${suffix}`);
+      await addSphereBonusToUser(address);
+    }
+    
+    // Jeśli to .camper, dodaj bonus 1000 punktów
     if (isCamper || suffix === 'camper') {
       console.log(`🏕️ Próba dodania camperBonus dla ${address}, isCamper: ${isCamper}, suffix: ${suffix}`);
       await addCamperBonusToUser(address);
+    }
+    
+    // Jeśli to .celo, dodaj bonus 1250 punktów
+    if (isCelo || suffix === 'celo') {
+      console.log(`💛 Próba dodania celoBonus dla ${address}, isCelo: ${isCelo}, suffix: ${suffix}`);
+      await addCeloBonusToUser(address);
+    }
+    
+    // Jeśli to .world, dodaj bonus 1250 punktów
+    if (isWorld || suffix === 'world') {
+      console.log(`🌍 Próba dodania worldBonus dla ${address}, isWorld: ${isWorld}, suffix: ${suffix}`);
+      await addWorldBonusToUser(address);
     }
     
     return true;
@@ -3652,6 +3888,10 @@ export const refreshUserRankings = async (): Promise<{
               'baseChatPoints.likePoints': likePoints,
               'baseChatPoints.activityBonus': activityBonus,
               'baseChatPoints.baseNameBonus': baseNameBonus,
+              'baseChatPoints.sphereBonus': sphereBonus,
+              'baseChatPoints.camperBonus': camperBonus,
+              'baseChatPoints.celoBonus': celoBonus,
+              'baseChatPoints.worldBonus': worldBonus,
               'baseChatPoints.referralPoints': referralPoints,
               'baseChatPoints.totalPoints': totalPoints,
               'baseChatPoints.lastUpdated': serverTimestamp()
