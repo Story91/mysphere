@@ -2409,7 +2409,7 @@ export default function BuilderProfile({
                     Base Name Bonus
                   </span>
                   <span className="text-blue-500 font-semibold">
-                    +{profile.baseChatPoints.baseNameBonus}
+                    +{profile.baseChatPoints?.baseNameBonus || 0}
                   </span>
                 </div>
               )}
@@ -2421,7 +2421,7 @@ export default function BuilderProfile({
                     .sphere Bonus
                   </span>
                   <span className="text-blue-500 font-semibold">
-                    +{profile.baseChatPoints.sphereBonus}
+                    +{profile.baseChatPoints?.sphereBonus || 0}
                   </span>
                 </div>
               )}
@@ -2433,7 +2433,7 @@ export default function BuilderProfile({
                     .camper Bonus
                   </span>
                   <span className="text-orange-500 font-semibold">
-                    +{profile.baseChatPoints.camperBonus}
+                    +{profile.baseChatPoints?.camperBonus || 0}
                   </span>
                 </div>
               )}
@@ -2445,7 +2445,7 @@ export default function BuilderProfile({
                     .celo Bonus
                   </span>
                   <span className="text-yellow-500 font-semibold">
-                    +{profile.baseChatPoints.celoBonus}
+                    +{profile.baseChatPoints?.celoBonus || 0}
                   </span>
                 </div>
               )}
@@ -2457,7 +2457,7 @@ export default function BuilderProfile({
                     .world Bonus
                   </span>
                   <span className="text-green-500 font-semibold">
-                    +{profile.baseChatPoints.worldBonus}
+                    +{profile.baseChatPoints?.worldBonus || 0}
                   </span>
                 </div>
               )}
@@ -2470,7 +2470,7 @@ export default function BuilderProfile({
                     Referral Points
                   </span>
                   <span className="text-purple-500 font-semibold">
-                    +{profile.baseChatPoints.referralPoints}
+                    +{profile.baseChatPoints?.referralPoints || 0}
                   </span>
                 </div>
               )}
