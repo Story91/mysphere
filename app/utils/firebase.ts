@@ -3874,10 +3874,16 @@ export const refreshUserRankings = async (): Promise<{
             || (typeof data.name === 'string' && data.name.endsWith('.base.eth'));
           const baseNameBonus = hasBaseName ? (Number(data.baseChatPoints?.baseNameBonus) || 1000) : 0;
 
+          // Domain bonuses: zachowaj istniejące wartości
+          const sphereBonus = Number(data.baseChatPoints?.sphereBonus || 0);
+          const camperBonus = Number(data.baseChatPoints?.camperBonus || 0);
+          const celoBonus = Number(data.baseChatPoints?.celoBonus || 0);
+          const worldBonus = Number(data.baseChatPoints?.worldBonus || 0);
+
           // Referral points: weź zapisane wartości (rekomendowane po rebuildReferralAggregates)
           const referralPoints = Number(data.baseChatPoints?.referralPoints || 0);
 
-          const totalPoints = basePoints + activityBonus + baseNameBonus + referralPoints;
+          const totalPoints = basePoints + activityBonus + baseNameBonus + sphereBonus + camperBonus + celoBonus + worldBonus + referralPoints;
           
           // Aktualizuj tylko jeśli punkty się zmieniły
           const currentPoints = data.baseChatPoints?.totalPoints || 0;
