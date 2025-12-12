@@ -44,6 +44,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   const [selectedToken, setSelectedToken] = useState<TipToken>('ETH');
   const [isTransacting, setIsTransacting] = useState(false);
   const [transactionSuccess, setTransactionSuccess] = useState(false);
+  const [tipSaved, setTipSaved] = useState(false); // Guard against duplicate saves
   
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -132,6 +133,10 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
 
   const handleTransactionStatus = useCallback(async (status: any) => {
     if (status.statusName === 'success') {
+      // Guard against duplicate saves - OnchainKit may call onStatus multiple times
+      if (tipSaved) return;
+      setTipSaved(true);
+      
       try {
         toast.dismiss();
         
@@ -177,6 +182,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         setIsTransacting(false);
         setTransactionSuccess(false);
         setIsOpen(false);
+        setTipSaved(false); // Reset for next tip
       }, 2000);
     } else if (status.statusName === 'error') {
       toast.dismiss();
@@ -184,12 +190,13 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
       console.error('Transaction error:', errorMessage);
       toast.error(`Tip failed: ${errorMessage}`);
       setIsTransacting(false);
+      setTipSaved(false); // Reset on error
     } else if (status.statusName === 'transactionPending') {
       toast.dismiss();
       toast.loading('Sending tip...', { duration: 0 });
       setIsTransacting(true);
     }
-  }, [address, recipientAddress, tipAmount, selectedToken, selectedNetwork, postId, selectedNetworkConfig]);
+  }, [address, recipientAddress, tipAmount, selectedToken, selectedNetwork, postId, selectedNetworkConfig, tipSaved]);
 
   const getCalls = useCallback(() => {
     if (!isConnected || !address || !recipientAddress || !tipAmount) {
@@ -269,7 +276,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overscroll-contain">
           <div 
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setIsOpen(false)}
+            onClick={() => { setIsOpen(false); setTipSaved(false); }}
           ></div>
           
           {/* Ukryj domyślny "View Transaction" link z OnchainKit */}
@@ -296,7 +303,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                   💰 <span className="bg-gradient-to-r from-blue-400 to-cyan-400 text-transparent bg-clip-text">Tip Creator</span>
                 </h3>
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => { setIsOpen(false); setTipSaved(false); }}
                   className="text-blue-300 hover:text-blue-100 transition-colors bg-white/10 rounded-full p-2 border border-blue-400/30"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -533,15 +540,19 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                               });
                               
                               if (status === 'completed') {
-                                await saveTip({
-                                  senderAddress: address!,
-                                  recipientAddress,
-                                  amount: tipAmount,
-                                  token: 'USDC',
-                                  postId,
-                                  txHash: id,
-                                  network: 'base'
-                                });
+                                // Guard against duplicate saves
+                                if (!tipSaved) {
+                                  setTipSaved(true);
+                                  await saveTip({
+                                    senderAddress: address!,
+                                    recipientAddress,
+                                    amount: tipAmount,
+                                    token: 'USDC',
+                                    postId,
+                                    txHash: id,
+                                    network: 'base'
+                                  });
+                                }
                                 
                                 toast.success('Tip sent via Base Pay! 🎉');
                                 setTransactionSuccess(true);
@@ -550,6 +561,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                                 setTimeout(() => {
                                   setIsOpen(false);
                                   setTransactionSuccess(false);
+                                  setTipSaved(false);
                                 }, 2000);
                               } else if (status === 'failed') {
                                 throw new Error('Payment failed');

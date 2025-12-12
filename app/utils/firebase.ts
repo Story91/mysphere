@@ -4448,6 +4448,12 @@ export interface PostTipStats {
   campTips: number;
   tipCount: number;
   uniqueTippers: number;
+  // Per-network tips (ETH grouped by network)
+  networkTips: {
+    network: TipNetworkType;
+    token: TipTokenType;
+    amount: number;
+  }[];
 }
 
 // Zapisuje tip do Firebase po udanej transakcji
@@ -4569,10 +4575,13 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
       lineaTips: 0,
       campTips: 0,
       tipCount: 0,
-      uniqueTippers: 0
+      uniqueTippers: 0,
+      networkTips: []
     };
     
     const uniqueTippers = new Set<string>();
+    // Map to aggregate tips by network+token combination
+    const networkTokenMap = new Map<string, { network: TipNetworkType; token: TipTokenType; amount: number }>();
     
     snapshot.docs.forEach(doc => {
       const tip = doc.data() as Tip;
@@ -4582,6 +4591,7 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
       stats.totalTips += amount;
       uniqueTippers.add(tip.senderAddress);
       
+      // Legacy per-token stats (kept for backwards compatibility)
       switch (tip.token) {
         case 'ETH': stats.ethTips += amount; break;
         case 'USDC': stats.usdcTips += amount; break;
@@ -4590,9 +4600,19 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
         case 'LINEA': stats.lineaTips += amount; break;
         case 'CAMP': stats.campTips += amount; break;
       }
+      
+      // New: aggregate by network+token
+      const key = `${tip.network}:${tip.token}`;
+      const existing = networkTokenMap.get(key);
+      if (existing) {
+        existing.amount += amount;
+      } else {
+        networkTokenMap.set(key, { network: tip.network, token: tip.token, amount });
+      }
     });
     
     stats.uniqueTippers = uniqueTippers.size;
+    stats.networkTips = Array.from(networkTokenMap.values()).filter(t => t.amount > 0);
     return stats;
   } catch (error) {
     console.error('❌ Błąd pobierania statystyk tipów posta:', error);
@@ -4605,7 +4625,8 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
       lineaTips: 0,
       campTips: 0,
       tipCount: 0,
-      uniqueTippers: 0
+      uniqueTippers: 0,
+      networkTips: []
     };
   }
 };
