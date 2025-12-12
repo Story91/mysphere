@@ -3948,14 +3948,14 @@ export default function BaseChat() {
                         Clear Cache
                       </button>
                     )}
-                    <button 
-                      onClick={handleManualRefresh} 
-                      disabled={!canManuallyRefresh}
-                      className={`text-xs ${canManuallyRefresh ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 cursor-not-allowed'} flex items-center`}
-                    >
-                      <RefreshCw className={`w-3 h-3 mr-1 ${isLoadingUsers ? 'animate-spin' : ''}`} />
-                      {isLoadingUsers ? 'Refreshing...' : 'Refresh'}
-                    </button>
+                  <button 
+                    onClick={handleManualRefresh} 
+                    disabled={!canManuallyRefresh}
+                    className={`text-xs ${canManuallyRefresh ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 cursor-not-allowed'} flex items-center`}
+                  >
+                    <RefreshCw className={`w-3 h-3 mr-1 ${isLoadingUsers ? 'animate-spin' : ''}`} />
+                    {isLoadingUsers ? 'Refreshing...' : 'Refresh'}
+                  </button>
                   </div>
                 </div>
                 <div className="space-y-3">

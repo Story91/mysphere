@@ -4402,32 +4402,49 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
 
 // ===== TIP TRACKING SYSTEM =====
 
+// Typy tokenów obsługiwanych przez system tipowania
+export type TipTokenType = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP';
+export type TipNetworkType = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp';
+
 export interface Tip {
   id?: string;
   senderAddress: string;
   recipientAddress: string;
   amount: string;
-  token: 'ETH' | 'USDC';
+  token: TipTokenType;
   postId?: string; // Optional - for tips on specific posts
   txHash: string;
   timestamp: number;
-  network: 'base' | 'basecamp';
+  network: TipNetworkType;
 }
 
 export interface TipStats {
   totalReceived: number;
   totalSent: number;
   tipCount: number;
+  // Per-token stats
   ethReceived: number;
   usdcReceived: number;
+  celoReceived: number;
+  wldReceived: number;
+  lineaReceived: number;
+  campReceived: number;
   ethSent: number;
   usdcSent: number;
+  celoSent: number;
+  wldSent: number;
+  lineaSent: number;
+  campSent: number;
 }
 
 export interface PostTipStats {
   totalTips: number;
   ethTips: number;
   usdcTips: number;
+  celoTips: number;
+  wldTips: number;
+  lineaTips: number;
+  campTips: number;
   tipCount: number;
   uniqueTippers: number;
 }
@@ -4467,8 +4484,16 @@ export const getUserTipStats = async (userAddress: string): Promise<TipStats> =>
       tipCount: 0,
       ethReceived: 0,
       usdcReceived: 0,
+      celoReceived: 0,
+      wldReceived: 0,
+      lineaReceived: 0,
+      campReceived: 0,
       ethSent: 0,
-      usdcSent: 0
+      usdcSent: 0,
+      celoSent: 0,
+      wldSent: 0,
+      lineaSent: 0,
+      campSent: 0
     };
     
     // Policz otrzymane tipy
@@ -4478,10 +4503,13 @@ export const getUserTipStats = async (userAddress: string): Promise<TipStats> =>
       stats.tipCount++;
       stats.totalReceived += amount;
       
-      if (tip.token === 'ETH') {
-        stats.ethReceived += amount;
-      } else {
-        stats.usdcReceived += amount;
+      switch (tip.token) {
+        case 'ETH': stats.ethReceived += amount; break;
+        case 'USDC': stats.usdcReceived += amount; break;
+        case 'CELO': stats.celoReceived += amount; break;
+        case 'WLD': stats.wldReceived += amount; break;
+        case 'LINEA': stats.lineaReceived += amount; break;
+        case 'CAMP': stats.campReceived += amount; break;
       }
     });
     
@@ -4491,10 +4519,13 @@ export const getUserTipStats = async (userAddress: string): Promise<TipStats> =>
       const amount = parseFloat(tip.amount);
       stats.totalSent += amount;
       
-      if (tip.token === 'ETH') {
-        stats.ethSent += amount;
-      } else {
-        stats.usdcSent += amount;
+      switch (tip.token) {
+        case 'ETH': stats.ethSent += amount; break;
+        case 'USDC': stats.usdcSent += amount; break;
+        case 'CELO': stats.celoSent += amount; break;
+        case 'WLD': stats.wldSent += amount; break;
+        case 'LINEA': stats.lineaSent += amount; break;
+        case 'CAMP': stats.campSent += amount; break;
       }
     });
     
@@ -4507,8 +4538,16 @@ export const getUserTipStats = async (userAddress: string): Promise<TipStats> =>
       tipCount: 0,
       ethReceived: 0,
       usdcReceived: 0,
+      celoReceived: 0,
+      wldReceived: 0,
+      lineaReceived: 0,
+      campReceived: 0,
       ethSent: 0,
-      usdcSent: 0
+      usdcSent: 0,
+      celoSent: 0,
+      wldSent: 0,
+      lineaSent: 0,
+      campSent: 0
     };
   }
 };
@@ -4524,6 +4563,10 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
       totalTips: 0,
       ethTips: 0,
       usdcTips: 0,
+      celoTips: 0,
+      wldTips: 0,
+      lineaTips: 0,
+      campTips: 0,
       tipCount: 0,
       uniqueTippers: 0
     };
@@ -4538,10 +4581,13 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
       stats.totalTips += amount;
       uniqueTippers.add(tip.senderAddress);
       
-      if (tip.token === 'ETH') {
-        stats.ethTips += amount;
-      } else {
-        stats.usdcTips += amount;
+      switch (tip.token) {
+        case 'ETH': stats.ethTips += amount; break;
+        case 'USDC': stats.usdcTips += amount; break;
+        case 'CELO': stats.celoTips += amount; break;
+        case 'WLD': stats.wldTips += amount; break;
+        case 'LINEA': stats.lineaTips += amount; break;
+        case 'CAMP': stats.campTips += amount; break;
       }
     });
     
@@ -4553,6 +4599,10 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
       totalTips: 0,
       ethTips: 0,
       usdcTips: 0,
+      celoTips: 0,
+      wldTips: 0,
+      lineaTips: 0,
+      campTips: 0,
       tipCount: 0,
       uniqueTippers: 0
     };
