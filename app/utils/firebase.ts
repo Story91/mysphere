@@ -4404,7 +4404,8 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
 
 // Typy tokenów obsługiwanych przez system tipowania
 export type TipTokenType = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP';
-export type TipNetworkType = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp';
+// 'basecamp' zachowane dla kompatybilności wstecznej ze starymi danymi w Firebase
+export type TipNetworkType = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'basecamp';
 
 export interface Tip {
   id?: string;

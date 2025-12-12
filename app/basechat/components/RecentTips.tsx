@@ -45,21 +45,22 @@ const formatTokenAmount = (amount: number, token: TipToken): string => {
   return amount.toFixed(6);
 };
 
+// Mapuje stare nazwy sieci na nowe
+const mapNetworkId = (network: string): TipNetwork => {
+  if (network === 'basecamp') return 'camp';
+  if (network in NETWORKS) return network as TipNetwork;
+  return 'base'; // fallback
+};
+
 // Pobiera link do explorera dla transakcji
 const getExplorerLink = (network: TipNetworkType, txHash: string): string => {
-  // Mapuj stare wartości na nowe jeśli trzeba
-  const networkId = (network === 'basecamp' ? 'camp' : network) as TipNetwork;
-  const networkConfig = NETWORKS[networkId];
-  if (!networkConfig) {
-    // Fallback do base
-    return `https://basescan.org/tx/${txHash}`;
-  }
+  const networkId = mapNetworkId(network);
   return getExplorerTxLink(networkId, txHash);
 };
 
 // Pobiera ikonę sieci
 const NetworkIcon = ({ network }: { network: TipNetworkType }) => {
-  const networkId = (network === 'basecamp' ? 'camp' : network) as TipNetwork;
+  const networkId = mapNetworkId(network);
   const networkConfig = NETWORKS[networkId];
   if (!networkConfig) return <span>🔵</span>;
   
