@@ -1419,7 +1419,7 @@ export default function HomePage() {
               </div>
             </a>
             
-            <a href="https://basecamp.cloud.blockscout.com/token/0x57CC99c9E1942a34a0cfF7FCC27c227455f14587" target="_blank" rel="noopener noreferrer"
+            <a href="https://camp.cloud.blockscout.com/token/0x57CC99c9E1942a34a0cfF7FCC27c227455f14587" target="_blank" rel="noopener noreferrer"
                className="bg-gradient-to-br from-orange-500/10 via-blue-500/10 to-orange-600/10 backdrop-blur-md rounded-xl p-4 border border-orange-800/50 hover:border-blue-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] group">
               <div className="flex items-center">
                 <div className="flex-1">
@@ -1440,7 +1440,7 @@ export default function HomePage() {
               </div>
             </a>
             
-            <a href="https://basecamp.cloud.blockscout.com/address/0xF528f920d0ce1D1EA230B0ec10F0F64B8F43cbac" target="_blank" rel="noopener noreferrer"
+            <a href="https://camp.cloud.blockscout.com/address/0xF528f920d0ce1D1EA230B0ec10F0F64B8F43cbac" target="_blank" rel="noopener noreferrer"
                className="bg-gradient-to-br from-orange-500/10 via-purple-500/10 to-orange-600/10 backdrop-blur-md rounded-xl p-4 border border-orange-800/50 hover:border-purple-500/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(147,51,234,0.3)] group">
               <div className="flex items-center">
                 <div className="flex-1">
