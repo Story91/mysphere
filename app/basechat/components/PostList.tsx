@@ -2312,12 +2312,6 @@ export default function PostList({
             className="text-gray-900 dark:text-gray-200"
           />
 
-          {/* Tip Stats - Show received tips for posts */}
-          <TipStats
-            postId={post.id}
-            className="text-gray-900 dark:text-gray-200"
-          />
-
           {post.txHash && (
             <a
               href={`${
@@ -2401,6 +2395,14 @@ export default function PostList({
               </button>
             </div>
           )}
+        </div>
+
+        {/* Tip Stats - Always under action buttons for better layout */}
+        <div className="mt-2">
+          <TipStats
+            postId={post.id}
+            className="text-gray-900 dark:text-gray-200"
+          />
         </div>
 
         {editingPost === post.id && (

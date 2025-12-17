@@ -55,21 +55,21 @@ export default function MarketplaceGrid({
 
   // Cache helpers for explore mode
   const getCacheKey = () => `marketplace-listings-cache-v2`;
-  const getListingCache = () => {
-    if (typeof window === 'undefined') return { listings: new Map(), activeIds: [], activeAuctionIds: [], timestamp: 0 };
+  const getListingCache = (): { listings: Map<string, any>; activeIds: bigint[]; activeAuctionIds: bigint[]; timestamp: number } => {
+    if (typeof window === 'undefined') return { listings: new Map<string, any>(), activeIds: [], activeAuctionIds: [], timestamp: 0 };
     try {
       const cached = sessionStorage.getItem(getCacheKey());
       if (cached) {
         const parsed = JSON.parse(cached);
         return {
-          listings: new Map(parsed.listings || []),
+          listings: new Map<string, any>(parsed.listings || []),
           activeIds: (parsed.activeIds || []).map((id: string) => BigInt(id)),
           activeAuctionIds: (parsed.activeAuctionIds || []).map((id: string) => BigInt(id)),
           timestamp: parsed.timestamp || 0
         };
       }
     } catch {}
-    return { listings: new Map(), activeIds: [], activeAuctionIds: [], timestamp: 0 };
+    return { listings: new Map<string, any>(), activeIds: [], activeAuctionIds: [], timestamp: 0 };
   };
 
   const saveListingCache = (listings: Map<string, any>, activeIds: bigint[], activeAuctionIds: bigint[] = []) => {
@@ -115,7 +115,7 @@ export default function MarketplaceGrid({
       const cache = getListingCache();
       let allActiveAuctionIds: bigint[] = cache.activeAuctionIds || [];
       let allActiveListingIds: bigint[] = cache.activeIds || activeListingIds;
-      let listingsCache = new Map(cache.listings);
+      let listingsCache = new Map<string, any>(cache.listings);
 
       // Calculate items for the page (use same logic as normal loading)
       const startIndex = (pageToFetch - 1) * pageSize;
@@ -399,7 +399,7 @@ export default function MarketplaceGrid({
           
           let allActiveIds: bigint[] = [];
           let allActiveAuctionIds: bigint[] = [];
-          let listingsCache = new Map(cache.listings);
+          let listingsCache = new Map<string, any>(cache.listings);
           
           if (isCacheValid && cache.activeIds.length > 0) {
             console.log('📋 Using cached active listing IDs:', cache.activeIds.length, 'auctions:', cache.activeAuctionIds?.length || 0);

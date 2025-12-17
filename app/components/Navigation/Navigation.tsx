@@ -41,6 +41,7 @@ type NavLink = {
   isHighlighted?: boolean;
   icon?: ReactNode;
   isExternal?: boolean;
+  isDisabled?: boolean;
   dropdownItems?: Array<{
     href: string;
     label: string;
@@ -163,43 +164,38 @@ export default function Navigation() {
   }, []);
 
   const navLinks: (NavLink | NavLinkWithDropdown)[] = [
-    { href: '/basechat', label: 'MySphere' },
-    { 
-      href: '/mycamp', 
-      label: 'MyCamp',
-      icon: (
-        <Image src="/Camp.png" alt="Camp" width={14} height={14} className="mr-2 inline" />
-      ),
-      isHighlighted: true 
+    {
+      label: 'Chains',
+      dropdownItems: [
+        { 
+          href: '/mycamp', 
+          label: 'Camp Network',
+          isHighlighted: true 
+        },
+        { href: '#', label: 'Base', isDisabled: true },
+        { href: '#', label: 'Linea', isDisabled: true },
+        { href: '#', label: 'Celo', isDisabled: true },
+        { href: '#', label: 'Ethereum', isDisabled: true },
+        { href: '#', label: 'World Chain', isDisabled: true },
+      ]
     },
-    { href: '/profile', label: 'Identity' },
-    // {
-    //   label: 'Finance',
-    //   dropdownItems: [
-    //     { href: '/bridge', label: 'Bridge' },
-    //     { href: '/earn', label: 'Earn' },
-    //     { href: '/ais', label: 'Buy $AIS' }
-    //   ]
-    // },
     {
       label: 'NFT',
       dropdownItems: [
         { href: '/nft', label: 'SphereGenesis' },
         { href: '/quotes', label: 'Quotes on Base' },
-        { href: '/marketplace', label: 'IP NFT Marketplace', isHighlighted: true }
       ]
     },
-            {
-          label: 'Mini-Apps',
-          isHighlighted: true,
-          dropdownItems: [
-            { href: 'https://farcaster.xyz/miniapps/EKw40VoEc1vi/swipe', label: 'SWIPE', isExternal: true },
-            { href: 'https://farcaster.xyz/?launchFrameUrl=https%3A%2F%2Fstreme.fun%2Ftoken%2F0x35231bb71689687fd127f991ddf3a071a432350f', label: '$BOOST', isExternal: true },
-            { href: 'https://farcaster.xyz/miniapps/wLwL313HxiaE/mysphere', label: 'MySphere', isExternal: true },
-            { href: '/ai-agent', label: 'Spherian', isDisabled: true },
-          ],
-        },
-    { href: '/Docs', label: 'Docs' },
+    { href: '#', label: 'Re-Definition', isDisabled: true },
+    {
+      label: 'Features',
+      dropdownItems: [
+        { href: '#', label: 'Spheres', isDisabled: true },
+        { href: '#', label: 'Spherian', isDisabled: true },
+        { href: '#', label: 'Mini-Apps', isDisabled: true },
+        { href: '#', label: 'Builders Hub', isDisabled: true },
+      ]
+    },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ];
 
@@ -255,7 +251,7 @@ export default function Navigation() {
                             <span
                               key={item.href}
                               className="flex items-center gap-2 px-4 py-2.5 text-gray-400 cursor-not-allowed whitespace-nowrap"
-                              title="Coming soon"
+                              title="Soon"
                             >
                               <svg
                                 className="w-4 h-4"
@@ -274,6 +270,7 @@ export default function Navigation() {
                               <span className="font-['Coinbase_Display']">
                                 {item.label}
                               </span>
+                              <span className="ml-1 text-xs text-gray-400">soon</span>
                             </span>
                           ) : (
                             <Link
@@ -288,7 +285,9 @@ export default function Navigation() {
                                   : undefined
                               }
                             >
-                              {item.label === 'Buy&Swap' ? (
+                              {item.label === 'Camp Network' ? (
+                                <Image src="/Camp.png" alt="Camp" width={16} height={16} className="inline" />
+                              ) : item.label === 'Buy&Swap' ? (
                                 <svg
                                   className="w-4 h-4"
                                   viewBox="0 0 24 24"
@@ -319,7 +318,7 @@ export default function Navigation() {
                                   />
                                 </svg>
                               )}
-                              <span className="font-['Coinbase_Display']">
+                              <span className={`font-['Coinbase_Display'] ${item.isHighlighted ? 'font-semibold text-orange-600' : ''}`}>
                                 {item.label}
                               </span>
                             </Link>
@@ -329,19 +328,29 @@ export default function Navigation() {
                     )}
                   </div>
                 ) : (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`relative group px-5 py-2.5 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 ${
-                      pathname === link.href
-                        ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
-                        : link.isFlashBlock 
-                          ? 'text-white bg-blue-700 shadow-lg shadow-blue-700/30' 
-                          : link.isHighlighted 
-                            ? 'text-white bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20' 
-                            : 'text-gray-100 hover:text-[#0052FF]'
-                    }`}
-                  >
+                  link.isDisabled ? (
+                    <span
+                      key={link.href}
+                      className="relative group px-5 py-2.5 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 text-gray-400 cursor-not-allowed flex items-center"
+                      title="Soon"
+                    >
+                      {link.label}
+                      <span className="ml-2 text-xs text-gray-500">soon</span>
+                    </span>
+                  ) : (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`relative group px-5 py-2.5 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 ${
+                        pathname === link.href
+                          ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
+                          : link.isFlashBlock 
+                            ? 'text-white bg-blue-700 shadow-lg shadow-blue-700/30' 
+                            : link.isHighlighted 
+                              ? 'text-white bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20' 
+                              : 'text-gray-100 hover:text-[#0052FF]'
+                      }`}
+                    >
                     {link.isFlashBlock && (
                       <div className="absolute inset-0 rounded-xl overflow-hidden">
                         <div className="absolute -inset-[1px] rounded-xl border border-transparent bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-500 bg-[length:200%_200%] animate-gradient-rotate opacity-70"></div>
@@ -365,6 +374,7 @@ export default function Navigation() {
                       <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 opacity-80 animate-pulse"></div>
                     )}
                   </Link>
+                  )
                 )
               ))}
             </nav>
@@ -491,10 +501,11 @@ export default function Navigation() {
                         item.isDisabled ? (
                           <span
                             key={item.href}
-                            className="block px-4 py-2 text-gray-500 cursor-not-allowed"
-                            title="Coming soon"
+                            className="block px-4 py-2 text-gray-500 cursor-not-allowed flex items-center justify-between"
+                            title="Soon"
                           >
-                            {item.label}
+                            <span>{item.label}</span>
+                            <span className="text-xs text-gray-400">soon</span>
                           </span>
                         ) : (
                           <Link
@@ -514,20 +525,30 @@ export default function Navigation() {
                   )}
                 </div>
               ) : (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`block px-4 py-2 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 mb-1 last:mb-0 ${
-                    pathname === link.href
-                      ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
-                      : link.isFlashBlock 
-                        ? 'text-white bg-blue-700 relative shadow-lg shadow-blue-700/30' 
-                        : link.isHighlighted 
-                          ? 'text-white bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20' 
-                          : 'text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5'
-                  }`}
-                >
+                link.isDisabled ? (
+                  <span
+                    key={link.href}
+                    className="block px-4 py-2 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 mb-1 last:mb-0 text-gray-500 cursor-not-allowed flex items-center justify-between"
+                    title="Soon"
+                  >
+                    <span>{link.label}</span>
+                    <span className="text-xs text-gray-400">soon</span>
+                  </span>
+                ) : (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`block px-4 py-2 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 mb-1 last:mb-0 ${
+                      pathname === link.href
+                        ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
+                        : link.isFlashBlock 
+                          ? 'text-white bg-blue-700 relative shadow-lg shadow-blue-700/30' 
+                          : link.isHighlighted 
+                            ? 'text-white bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20' 
+                            : 'text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5'
+                    }`}
+                  >
                   {link.isFlashBlock && (
                     <div className="absolute inset-0 rounded-xl overflow-hidden">
                       <div className="absolute -inset-[1px] rounded-xl border border-transparent bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-500 bg-[length:200%_200%] animate-gradient-rotate opacity-70"></div>
@@ -540,6 +561,7 @@ export default function Navigation() {
                     )}
                   </span>
                 </Link>
+                )
               )
             ))}
           </nav>

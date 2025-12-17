@@ -1,14 +1,81 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getRecentTips, getBulkUserNamesOptimized, Tip } from '../../utils/firebase';
+import { getRecentTips, getBulkUserNamesOptimized, Tip, TipNetworkType } from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
+import { TOKENS, NETWORKS, TipToken, TipNetwork, getExplorerTxLink } from './TipNetworkConfig';
 
 interface RecentTipsProps {
   userAddress: string;
   limit?: number;
   className?: string;
 }
+
+// Komponent ikony tokena
+const TokenIcon = ({ token, size = 'sm' }: { token: TipToken; size?: 'sm' | 'md' }) => {
+  const tokenConfig = TOKENS[token];
+  if (!tokenConfig) return <span>💰</span>;
+  
+  const sizeClass = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
+  
+  if (tokenConfig.iconUrl) {
+    return (
+      <img 
+        src={tokenConfig.iconUrl} 
+        alt={tokenConfig.name} 
+        className={`${sizeClass} object-contain rounded-full inline-block`}
+        title={tokenConfig.name}
+      />
+    );
+  }
+  return <span title={tokenConfig.name}>{tokenConfig.icon}</span>;
+};
+
+// Formatuje wartość tokena
+const formatTokenAmount = (amount: number, token: TipToken): string => {
+  const tokenConfig = TOKENS[token];
+  if (!tokenConfig) return amount.toFixed(4);
+  
+  if (tokenConfig.decimals === 6) {
+    return amount.toFixed(2);
+  }
+  if (amount >= 1) {
+    return amount.toFixed(4);
+  }
+  return amount.toFixed(6);
+};
+
+// Mapuje stare nazwy sieci na nowe
+const mapNetworkId = (network: string): TipNetwork => {
+  if (network === 'basecamp') return 'camp';
+  if (network in NETWORKS) return network as TipNetwork;
+  return 'base'; // fallback
+};
+
+// Pobiera link do explorera dla transakcji
+const getExplorerLink = (network: TipNetworkType, txHash: string): string => {
+  const networkId = mapNetworkId(network);
+  return getExplorerTxLink(networkId, txHash);
+};
+
+// Pobiera ikonę sieci
+const NetworkIcon = ({ network }: { network: TipNetworkType }) => {
+  const networkId = mapNetworkId(network);
+  const networkConfig = NETWORKS[networkId];
+  if (!networkConfig) return <span>🔵</span>;
+  
+  if (networkConfig.iconUrl) {
+    return (
+      <img 
+        src={networkConfig.iconUrl} 
+        alt={networkConfig.name} 
+        className="w-2.5 h-2.5 object-contain rounded-full"
+        title={networkConfig.name}
+      />
+    );
+  }
+  return <span title={networkConfig.name}>{networkConfig.icon}</span>;
+};
 
 export default function RecentTips({ userAddress, limit = 10, className = '' }: RecentTipsProps) {
   const [tips, setTips] = useState<Tip[]>([]);
@@ -23,12 +90,10 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
         const recentTips = await getRecentTips(userAddress, limit);
         setTips(recentTips);
         
-        // 🚀 ULTRA-CHEAP: Pobierz nazwy nadawców (95% oszczędności!)
         if (recentTips.length > 0) {
           const senderAddresses = [...new Set(recentTips.map(tip => tip.senderAddress))];
           const names = await getBulkUserNamesOptimized(senderAddresses);
           setSenderNames(names);
-          console.log(`💰 RecentTips: fetched ${senderAddresses.length} sender names with ultra-cheap method`);
         }
       } catch (error) {
         console.error('Error fetching recent tips:', error);
@@ -110,9 +175,14 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
         {displayedTips.map((tip) => (
           <div key={tip.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-full flex items-center justify-center">
-                <span className="text-xs font-medium text-green-700 dark:text-green-300">
-                  {tip.token === 'ETH' ? 'Ξ' : '$'}
+              {/* Token + Network Icon */}
+              <div className="w-8 h-8 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-full flex items-center justify-center relative">
+                <span className="text-sm">
+                  <TokenIcon token={tip.token as TipToken} />
+                </span>
+                {/* Mała ikona sieci w rogu */}
+                <span className="absolute -bottom-0.5 -right-0.5 text-[10px] bg-white dark:bg-gray-800 rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-sm">
+                  <NetworkIcon network={tip.network} />
                 </span>
               </div>
               <div className="flex-1">
@@ -127,12 +197,13 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
             
             <div className="flex items-center space-x-2">
               <div className="text-right">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {parseFloat(tip.amount).toFixed(tip.token === 'ETH' ? 4 : 2)} {tip.token}
+                <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
+                  <TokenIcon token={tip.token as TipToken} />
+                  <span>{formatTokenAmount(parseFloat(tip.amount), tip.token as TipToken)}</span>
                 </div>
                 {tip.txHash && (
                   <a
-                    href={`https://basescan.org/tx/${tip.txHash}`}
+                    href={getExplorerLink(tip.network, tip.txHash)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 flex items-center space-x-1"
@@ -152,4 +223,4 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
   );
 }
 
-export { RecentTips }; 
+export { RecentTips };

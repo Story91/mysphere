@@ -39,7 +39,8 @@ import {
   // preloadUserSearchCache,  // DISABLED
   pinPost,
   unpinPost,
-  isUserAdmin
+  isUserAdmin,
+  clearUserNamesCache
 } from '../utils/firebase';
 import { useSocial } from './friendsystem/hooks';
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
@@ -305,6 +306,18 @@ export default function BaseChat() {
     };
     totalPoints?: number;
     currentRank?: UserRank;
+    baseChatPoints?: {
+      postPoints?: number;
+      likePoints?: number;
+      activityBonus?: number;
+      baseNameBonus?: number;
+      sphereBonus?: number;
+      camperBonus?: number;
+      celoBonus?: number;
+      worldBonus?: number;
+      referralPoints?: number;
+      totalPoints?: number;
+    };
   } | null>(null);
   
   // Network filter state - renamed to activePostingNetwork to reflect its new purpose
@@ -375,7 +388,7 @@ export default function BaseChat() {
   const [isUploading, setIsUploading] = useState(false);
 
   const [customName, setCustomName] = useState('');
-  const [selectedSuffix, setSelectedSuffix] = useState<'sphere' | 'camper'>('sphere');
+  const [selectedSuffix, setSelectedSuffix] = useState<'sphere' | 'camper' | 'celo' | 'world'>('sphere');
   const [userNames, setUserNames] = useState<{[key: string]: {name: string, avatar?: string}}>({});
   const [expandedPosts, setExpandedPosts] = useState<{[key: string]: boolean}>({});
   const [editingPost, setEditingPost] = useState<string | null>(null);
@@ -517,6 +530,16 @@ export default function BaseChat() {
                   <span className="text-gray-900 dark:text-white">{userName.replace('.camper', '')}</span>
                   <span className="text-orange-500">.camper🏕️</span>
                 </>
+              ) : userName.endsWith('.celo') ? (
+                <>
+                  <span className="text-gray-900 dark:text-white">{userName.replace('.celo', '')}</span>
+                  <span className="!text-yellow-500">.celo</span>
+                </>
+              ) : userName.endsWith('.world') ? (
+                <>
+                  <span className="text-gray-900 dark:text-white">{userName.replace('.world', '')}</span>
+                  <span className="text-green-500">.world</span>
+                </>
               ) : (
                 userName
               )}
@@ -563,16 +586,32 @@ export default function BaseChat() {
         
         // Wyczyść formularz
         setCustomName('');
-        setSelectedSuffix('sphere');
+        setSelectedSuffix('sphere' as 'sphere' | 'camper' | 'celo' | 'world');
         
-        // Odśwież nazwy użytkowników
+        // Wyczyść cache nazw użytkowników dla tego adresu i odśwież
+        clearUserNamesCache();
+        // Odśwież nazwy użytkowników dla wszystkich postów
         if (posts.length > 0) {
-          fetchUserNames(posts);
+          await fetchUserNames(posts);
         }
         
-        // Pokaż komunikat o bonusie punktów za .camper
-        if (selectedSuffix === 'camper') {
-          alert('🎉 Congratulations! You earned 500 bonus points for choosing .camper!');
+        // Jeśli użytkownik ma otwarty swój profil, odśwież go
+        if (selectedBuilderProfile && selectedBuilderProfile.address === address) {
+          // Poczekaj chwilę, żeby Firebase zdążył zapisać dane (w tym bonusy)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Odśwież profil po zapisaniu nazwy (punkty mogą się zmienić)
+          await handleViewBuilderProfile(address);
+        }
+        
+        // Pokaż komunikat o bonusie punktów za wybraną domenę
+        if (selectedSuffix === 'sphere') {
+          alert('🎉 Congratulations! You earned 1500 bonus points for choosing .sphere!');
+        } else if (selectedSuffix === 'camper') {
+          alert('🎉 Congratulations! You earned 1000 bonus points for choosing .camper!');
+        } else if (selectedSuffix === 'celo') {
+          alert('🎉 Congratulations! You earned 1250 bonus points for choosing .celo!');
+        } else if (selectedSuffix === 'world') {
+          alert('🎉 Congratulations! You earned 1250 bonus points for choosing .world!');
         }
       } else {
         alert('Wystąpił błąd podczas zapisywania nazwy. Spróbuj ponownie.');
@@ -2046,8 +2085,12 @@ export default function BaseChat() {
       const existing = userSnap.exists() ? (userSnap.data() as any) : {};
       const existingBCP = existing.baseChatPoints || {};
       const baseNameBonus = Number(existingBCP.baseNameBonus || 0);
+      const sphereBonus = Number(existingBCP.sphereBonus || 0);
+      const camperBonus = Number(existingBCP.camperBonus || 0);
+      const celoBonus = Number(existingBCP.celoBonus || 0);
+      const worldBonus = Number(existingBCP.worldBonus || 0);
       const referralPoints = Number(existingBCP.referralPoints || 0);
-      const totalBaseChatPoints = Math.round((postPoints + likePoints) * 1.25 + baseNameBonus + referralPoints);
+      const totalBaseChatPoints = Math.round((postPoints + likePoints) * 1.25 + baseNameBonus + sphereBonus + camperBonus + celoBonus + worldBonus + referralPoints);
 
       // Zapisz punkty w Firebase
       await updateDoc(userRef, {
@@ -2056,6 +2099,10 @@ export default function BaseChat() {
           likePoints,
           activityBonus,
           baseNameBonus,
+          sphereBonus,
+          camperBonus,
+          celoBonus,
+          worldBonus,
           referralPoints,
           totalPoints: totalBaseChatPoints,
           lastUpdated: serverTimestamp()
@@ -2153,6 +2200,16 @@ export default function BaseChat() {
       getActiveUsers(true); // Force refresh when manually triggered
     }
   }, [canManuallyRefresh, getActiveUsers]);
+
+  const handleClearNamesCache = useCallback(() => {
+    clearUserNamesCache();
+    setUserNames({}); // Wyczyść również lokalny state
+    // Odśwież nazwy użytkowników dla aktualnych postów
+    if (posts.length > 0) {
+      fetchUserNames(posts);
+    }
+    toast.success('User names cache cleared');
+  }, [posts, fetchUserNames]);
 
   // Automatyczne odświeżanie przy pierwszym załadowaniu strony
   useEffect(() => {
@@ -2354,6 +2411,16 @@ export default function BaseChat() {
                <span>{userNames[user.address].name.replace('.camper', '')}</span>
                <span className="text-orange-500">.camper🏕️</span>
              </>
+           ) : userNames[user.address]?.name?.endsWith('.celo') ? (
+             <>
+               <span>{userNames[user.address].name.replace('.celo', '')}</span>
+               <span className="!text-yellow-500">.celo</span>
+             </>
+           ) : userNames[user.address]?.name?.endsWith('.world') ? (
+             <>
+               <span>{userNames[user.address].name.replace('.world', '')}</span>
+               <span className="text-green-500">.world</span>
+             </>
            ) : (
             userNames[user.address]?.name || user.address.slice(0, 6) + '...' + user.address.slice(-4)
           )}
@@ -2495,7 +2562,10 @@ export default function BaseChat() {
       const profile = await fetchUserProfile(userAddress, { loadSocialLinks: true });
       
       if (profile) {
-        // ✅ USUNIĘTO: Nie pobieramy już dodatkowych danych (totalPoints, currentRank) - oszczędność Firebase reads!
+        // Pobierz baseChatPoints z Firebase
+        const userRef = doc(db, 'users', userAddress);
+        const userDoc = await getDoc(userRef);
+        const baseChatPoints = userDoc.exists() ? (userDoc.data().baseChatPoints || {}) : {};
         
         // Ustaw wybrany profil
         setSelectedBuilderProfile({
@@ -2505,7 +2575,19 @@ export default function BaseChat() {
           bio: profile.bio,
           postCount: profile.postsCount || 0,
           likesReceived: profile.likesReceived || 0,
-                    socialLinks: profile.socialLinks
+          socialLinks: profile.socialLinks,
+          baseChatPoints: {
+            postPoints: baseChatPoints.postPoints || 0,
+            likePoints: baseChatPoints.likePoints || 0,
+            activityBonus: baseChatPoints.activityBonus || 0,
+            baseNameBonus: baseChatPoints.baseNameBonus || 0,
+            sphereBonus: baseChatPoints.sphereBonus || 0,
+            camperBonus: baseChatPoints.camperBonus || 0,
+            celoBonus: baseChatPoints.celoBonus || 0,
+            worldBonus: baseChatPoints.worldBonus || 0,
+            referralPoints: baseChatPoints.referralPoints || 0,
+            totalPoints: baseChatPoints.totalPoints || 0
+          }
         });
         
         // Przełącz panel
@@ -2661,7 +2743,7 @@ export default function BaseChat() {
                                                       <div className="relative z-10 flex justify-center items-start w-full">
                               <ProfileCard
                                 name={userProfile.name || 'MySphere User'}
-                                handle={userProfile.name?.replace('.sphere', '').replace('.camper', '') || address.slice(0, 6) + '...' + address.slice(-4)}
+                                handle={userProfile.name?.replace('.sphere', '').replace('.camper', '').replace('.celo', '').replace('.world', '') || address.slice(0, 6) + '...' + address.slice(-4)}
                                 status={address.slice(0, 6) + '...' + address.slice(-4)}
                                 fullAddress={address}
                                 contactText="Edit"
@@ -2865,21 +2947,31 @@ export default function BaseChat() {
                                         <span className="text-gray-500 text-sm">Choose domain:</span>
                                         <select
                                           value={selectedSuffix}
-                                          onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper')}
+                                          onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper' | 'celo' | 'world')}
                                           className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         >
-                                          <option value="sphere">.sphere</option>
-                                          <option value="camper">.camper (+500 pts!)</option>
+                                          <option value="sphere">.sphere (+1500 pts!)</option>
+                                          <option value="camper">.camper (+1000 pts!)</option>
+                                          <option value="celo">.celo (+1250 pts!)</option>
+                                          <option value="world">.world (+1250 pts!)</option>
                                         </select>
                                       </div>
                                     </div>
                                     <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-2 border border-blue-200/30 dark:border-purple-700/30">
                                       <div className="text-center text-xs text-gray-600 dark:text-gray-400">
                                         Preview: <span className="font-medium text-gray-900 dark:text-white">{customName || 'username'}</span>.
-                                        <span className={selectedSuffix === 'sphere' ? 'text-blue-500 font-medium' : 'text-orange-500 font-medium'}>
+                                        <span className={
+                                          selectedSuffix === 'sphere' ? 'text-blue-500 font-medium' :
+                                          selectedSuffix === 'camper' ? 'text-orange-500 font-medium' :
+                                          selectedSuffix === 'celo' ? 'text-yellow-500 font-medium' :
+                                          'text-green-500 font-medium'
+                                        }>
                                           {selectedSuffix}
                                         </span>
-                                        {selectedSuffix === 'camper' && <span className="text-orange-600 ml-1">🏕️ +500 pts!</span>}
+                                        {selectedSuffix === 'sphere' && <span className="text-blue-600 ml-1">+1500 pts!</span>}
+                                        {selectedSuffix === 'camper' && <span className="text-orange-600 ml-1">🏕️ +1000 pts!</span>}
+                                        {selectedSuffix === 'celo' && <span className="text-yellow-600 ml-1">+1250 pts!</span>}
+                                        {selectedSuffix === 'world' && <span className="text-green-600 ml-1">+1250 pts!</span>}
                                       </div>
                                     </div>
                                     <button
@@ -3843,6 +3935,19 @@ export default function BaseChat() {
                     Most Active Users
                     <div className="ml-2 text-2xl">👥</div>
                   </h2>
+                  <div className="flex items-center gap-2">
+                    {address && address.toLowerCase() === ADMIN_ADDRESS.toLowerCase() && (
+                      <button 
+                        onClick={handleClearNamesCache}
+                        className="text-xs text-orange-500 hover:text-orange-700 flex items-center"
+                        title="Clear user names cache to see updated names (Admin only)"
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Clear Cache
+                      </button>
+                    )}
                   <button 
                     onClick={handleManualRefresh} 
                     disabled={!canManuallyRefresh}
@@ -3851,6 +3956,7 @@ export default function BaseChat() {
                     <RefreshCw className={`w-3 h-3 mr-1 ${isLoadingUsers ? 'animate-spin' : ''}`} />
                     {isLoadingUsers ? 'Refreshing...' : 'Refresh'}
                   </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   {renderUserList()}

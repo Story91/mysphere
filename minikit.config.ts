@@ -18,7 +18,7 @@ export const minikitConfig = {
     splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE || `${ROOT_URL}/SPLASH.gif`,
     splashBackgroundColor: process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR || "#FFFFFF",
     homeUrl: ROOT_URL,
-    webhookUrl: `${ROOT_URL}/api/webhook`,
+    webhookUrl: process.env.WEBHOOK_URL || "https://api.neynar.com/f/app/abc550bb-3909-43b2-921a-ce797f9e925b/event",
     primaryCategory: process.env.NEXT_PUBLIC_APP_PRIMARY_CATEGORY || "social",
     tags: process.env.NEXT_PUBLIC_APP_TAGS 
       ? process.env.NEXT_PUBLIC_APP_TAGS.split(',').map(tag => tag.trim())
