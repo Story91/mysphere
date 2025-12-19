@@ -2168,7 +2168,7 @@ export default function PostList({
                                 priceUSD: zoraData?.priceUSD,
                                 volume24h: zoraData?.volume24h,
                                 uniqueHolders: zoraData?.uniqueHolders,
-                                imageUrl: zoraData?.imageUrl || postTokenData[post.id]?.imageUrl,
+                                imageUrl: post.image || zoraData?.imageUrl || postTokenData[post.id]?.imageUrl,
                               };
                               setTradeCoinData(coinData);
                               setTradeCoinBalance(userTokenBalances[post.zoraCoinAddress!.toLowerCase()] || '0');
@@ -2190,7 +2190,7 @@ export default function PostList({
                                 priceUSD: zoraData?.priceUSD,
                                 volume24h: zoraData?.volume24h,
                                 uniqueHolders: zoraData?.uniqueHolders,
-                                imageUrl: zoraData?.imageUrl || postTokenData[post.id]?.imageUrl,
+                                imageUrl: post.image || zoraData?.imageUrl || postTokenData[post.id]?.imageUrl,
                               };
                               setTradeCoinData(coinData);
                               setTradeCoinBalance(userTokenBalances[post.zoraCoinAddress!.toLowerCase()] || '0');

@@ -2,10 +2,37 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
-import { parseEther, formatEther, formatUnits } from 'viem';
-import { tradeCoin, createTradeCall, TradeParameters } from '@zoralabs/coins-sdk';
+import { parseEther, formatUnits } from 'viem';
+import { createTradeCall, TradeParameters } from '@zoralabs/coins-sdk';
 import { toast } from 'react-hot-toast';
 import { CreatorCoinData, clearBalanceCache } from '../../utils/creatorCoin';
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
+
+// Format large numbers to K/M/B
+function formatCompactNumber(num: number): string {
+  if (num >= 1_000_000_000) {
+    return (num / 1_000_000_000).toFixed(2) + 'B';
+  }
+  if (num >= 1_000_000) {
+    return (num / 1_000_000).toFixed(2) + 'M';
+  }
+  if (num >= 1_000) {
+    return (num / 1_000).toFixed(2) + 'K';
+  }
+  return num.toFixed(2);
+}
 
 interface TradeCoinModalProps {
   isOpen: boolean;
@@ -30,12 +57,11 @@ export default function TradeCoinModal({
   
   const [mode] = useState<'buy' | 'sell'>(initialMode);
   const [amount, setAmount] = useState('');
-  const [slippage, setSlippage] = useState(0.05); // 5% default
+  const [slippage, setSlippage] = useState(0.05);
   const [isLoading, setIsLoading] = useState(false);
   const [estimatedOutput, setEstimatedOutput] = useState<string | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
 
-  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setAmount('');
@@ -43,7 +69,6 @@ export default function TradeCoinModal({
     }
   }, [isOpen]);
 
-  // Estimate output when amount changes
   const estimateOutput = useCallback(async () => {
     if (!amount || parseFloat(amount) <= 0 || !address || !publicClient) {
       setEstimatedOutput(null);
@@ -52,9 +77,7 @@ export default function TradeCoinModal({
 
     setIsEstimating(true);
     try {
-      const amountIn = mode === 'buy' 
-        ? parseEther(amount) 
-        : parseEther(amount);
+      const amountIn = parseEther(amount);
 
       const tradeParams: TradeParameters = {
         sell: mode === 'buy' 
@@ -124,14 +147,12 @@ export default function TradeCoinModal({
         sender: address as `0x${string}`,
       };
 
-      // Use createTradeCall instead of tradeCoin for better compatibility
       const quote = await createTradeCall(tradeParams);
       
       if (!quote?.call) {
         throw new Error('Failed to get trade quote');
       }
 
-      // Execute the transaction
       const tx = await walletClient.sendTransaction({
         to: quote.call.target as `0x${string}`,
         data: quote.call.data as `0x${string}`,
@@ -141,7 +162,6 @@ export default function TradeCoinModal({
 
       toast.loading('Waiting for confirmation...', { id: toastId });
 
-      // Wait for transaction
       const receipt = await publicClient.waitForTransactionReceipt({ hash: tx });
 
       if (receipt.status === 'success') {
@@ -150,13 +170,10 @@ export default function TradeCoinModal({
           { id: toastId }
         );
         
-        // Clear all balance caches for user to force refresh
         clearBalanceCache(address, coin.address);
         
-        // Small delay to allow blockchain state to propagate
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Call onTradeSuccess callback to refresh balances
         if (onTradeSuccess) {
           onTradeSuccess();
         }
@@ -183,117 +200,212 @@ export default function TradeCoinModal({
     }
   };
 
-  if (!isOpen) return null;
-
   const slippageOptions = [0.01, 0.03, 0.05, 0.1, 0.15];
+  const isBuy = mode === 'buy';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-gray-200 dark:border-gray-700">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className={cn(
+        "sm:max-w-[420px] p-0 gap-0 overflow-hidden",
+        "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950",
+        "border border-slate-800/50 shadow-2xl shadow-black/50"
+      )}>
+        {/* Animated background glow */}
+        <div className={cn(
+          "absolute inset-0 opacity-30 blur-3xl pointer-events-none",
+          isBuy 
+            ? "bg-gradient-to-br from-emerald-500/20 via-transparent to-cyan-500/20" 
+            : "bg-gradient-to-br from-rose-500/20 via-transparent to-orange-500/20"
+        )} />
+        
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-3">
-            {coin.imageUrl && (
-              <img 
-                src={coin.imageUrl} 
-                alt={coin.symbol} 
-                className="w-10 h-10 rounded-full object-cover"
-              />
-            )}
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                {mode === 'buy' ? 'Buy' : 'Sell'} {coin.symbol}
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+        <DialogHeader className="relative p-6 pb-4">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Avatar className="h-14 w-14 ring-2 ring-slate-700/50 shadow-lg">
+                {coin.imageUrl ? (
+                  <AvatarImage src={coin.imageUrl} alt={coin.symbol} className="object-cover" />
+                ) : (
+                  <AvatarFallback className="bg-gradient-to-br from-slate-700 to-slate-800 text-white font-bold text-lg">
+                    {coin.symbol?.slice(0, 2)}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div className={cn(
+                "absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px]",
+                isBuy ? "bg-emerald-500" : "bg-rose-500"
+              )}>
+                {isBuy ? '↗' : '↙'}
+              </div>
+            </div>
+            <div className="flex-1">
+              <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
+                {isBuy ? 'Buy' : 'Sell'} {coin.symbol}
+                <Badge variant="outline" className={cn(
+                  "text-[10px] px-2 py-0.5 font-medium border-none",
+                  isBuy 
+                    ? "bg-emerald-500/20 text-emerald-400" 
+                    : "bg-rose-500/20 text-rose-400"
+                )}>
+                  {isBuy ? 'BUYING' : 'SELLING'}
+                </Badge>
+              </DialogTitle>
+              <DialogDescription className="text-slate-400 text-sm mt-0.5">
                 {coin.name}
-              </p>
+              </DialogDescription>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-          >
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        </DialogHeader>
 
-
-        {/* Amount Input */}
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {mode === 'buy' ? 'ETH Amount' : `${coin.symbol} Amount`}
+        {/* Content */}
+        <div className="relative px-6 pb-6 space-y-5">
+          {/* Amount Input */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-slate-300 flex items-center justify-between">
+              <span>{isBuy ? 'Amount in ETH' : `Amount in ${coin.symbol}`}</span>
+              {!isBuy && (
+                <span className="text-xs text-slate-500">
+                  Balance: {formatCompactNumber(parseFloat(userBalance))}
+                </span>
+              )}
             </label>
-            <div className="relative">
-              <input
+            <div className="relative group">
+              <Input
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.0"
                 min="0"
                 step="0.001"
-                className="w-full px-4 py-3 pr-16 text-lg font-medium bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                className={cn(
+                  "h-14 text-xl font-semibold pr-20 bg-slate-800/50 border-slate-700/50",
+                  "text-white placeholder:text-slate-600",
+                  "focus:ring-2 focus:border-transparent transition-all",
+                  isBuy ? "focus:ring-emerald-500/50" : "focus:ring-rose-500/50"
+                )}
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
-                {mode === 'buy' ? 'ETH' : coin.symbol}
-              </span>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                {!isBuy && (
+                  <button
+                    onClick={() => setAmount(userBalance)}
+                    className="text-xs font-medium text-slate-400 hover:text-white transition-colors px-2 py-1 rounded bg-slate-700/50 hover:bg-slate-700"
+                  >
+                    MAX
+                  </button>
+                )}
+                <span className="text-slate-400 font-medium text-sm">
+                  {isBuy ? 'ETH' : coin.symbol}
+                </span>
+              </div>
             </div>
-            {mode === 'sell' && (
-              <div className="flex items-center justify-between mt-2 text-sm">
-                <span className="text-gray-500">Balance: {parseFloat(userBalance).toFixed(4)} {coin.symbol}</span>
-                <button
-                  onClick={() => setAmount(userBalance)}
-                  className="text-blue-500 hover:text-blue-600 font-medium"
-                >
-                  Max
-                </button>
+            {/* Show USD equivalent for ETH input */}
+            {isBuy && amount && parseFloat(amount) > 0 && (
+              <div className="text-xs text-slate-500 text-right">
+                ≈ ${(parseFloat(amount) * 3500).toFixed(2)} USD
+              </div>
+            )}
+            
+            {/* Quick Amount Buttons */}
+            {isBuy ? (
+              <div className="flex gap-2">
+                {[0.00001, 0.0001, 0.001].map((eth) => {
+                  // Estimate USD value: ETH price ~$3500 (approximate)
+                  const ethPriceUsd = 3500;
+                  const usdValue = eth * ethPriceUsd;
+                  return (
+                    <button
+                      key={eth}
+                      onClick={() => setAmount(eth.toString())}
+                      className={cn(
+                        "flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-0.5",
+                        amount === eth.toString()
+                          ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25"
+                          : "bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-slate-300 border border-slate-700/50"
+                      )}
+                    >
+                      <span className="font-semibold">{eth} ETH</span>
+                      <span className="text-[10px] opacity-70">≈${usdValue.toFixed(2)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                {[25, 50, 75, 100].map((percent) => {
+                  const value = (parseFloat(userBalance) * percent / 100).toString();
+                  return (
+                    <button
+                      key={percent}
+                      onClick={() => setAmount(value)}
+                      className={cn(
+                        "flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all",
+                        parseFloat(amount) === parseFloat(value) && parseFloat(value) > 0
+                          ? "bg-rose-500 text-white shadow-lg shadow-rose-500/25"
+                          : "bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-slate-300 border border-slate-700/50"
+                      )}
+                    >
+                      {percent}%
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
 
           {/* Estimated Output */}
-          {estimatedOutput && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 space-y-2">
+          {(estimatedOutput || isEstimating) && (
+            <div className={cn(
+              "rounded-xl p-4 space-y-3 border",
+              isBuy 
+                ? "bg-emerald-500/5 border-emerald-500/20" 
+                : "bg-rose-500/5 border-rose-500/20"
+            )}>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">
-                  {mode === 'buy' ? `You'll receive` : `You'll receive`}
-                </span>
-                <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                <span className="text-sm text-slate-400">You'll receive</span>
+                <div className="text-right">
                   {isEstimating ? (
-                    <span className="animate-pulse">...</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-slate-600 border-t-slate-300 rounded-full animate-spin" />
+                      <span className="text-slate-500">Calculating...</span>
+                    </div>
                   ) : (
-                    `~${parseFloat(estimatedOutput).toFixed(6)} ${mode === 'buy' ? coin.symbol : 'ETH'}`
+                    <span className={cn(
+                      "text-lg font-bold",
+                      isBuy ? "text-emerald-400" : "text-rose-400"
+                    )}>
+                      ~{formatCompactNumber(parseFloat(estimatedOutput || '0'))} {isBuy ? coin.symbol : 'ETH'}
+                    </span>
                   )}
-                </span>
+                </div>
               </div>
-              {mode === 'buy' && coin.priceUSD && estimatedOutput && !isEstimating && (
-                <div className="flex items-center justify-between pt-1 border-t border-gray-200 dark:border-gray-700">
-                  <span className="text-xs text-gray-500">≈ $USD</span>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    ${(parseFloat(estimatedOutput) * parseFloat(coin.priceUSD)).toFixed(2)}
+              
+              {isBuy && coin.priceUSD && estimatedOutput && !isEstimating && (
+                <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                  <span className="text-xs text-slate-500">≈ USD Value</span>
+                  <span className="text-sm font-medium text-slate-300">
+                    ${formatCompactNumber(parseFloat(estimatedOutput) * parseFloat(coin.priceUSD))}
                   </span>
                 </div>
               )}
             </div>
           )}
 
-          {/* Slippage Settings */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Slippage Tolerance
-            </label>
-            <div className="flex gap-2">
+          {/* Slippage */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-300">Slippage Tolerance</label>
+            <div className="flex gap-1.5">
               {slippageOptions.map((s) => (
                 <button
                   key={s}
                   onClick={() => setSlippage(s)}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  className={cn(
+                    "flex-1 py-2 rounded-lg text-xs font-semibold transition-all",
                     slippage === s
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
+                      ? isBuy 
+                        ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25" 
+                        : "bg-rose-500 text-white shadow-lg shadow-rose-500/25"
+                      : "bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-slate-300"
+                  )}
                 >
                   {(s * 100).toFixed(0)}%
                 </button>
@@ -301,68 +413,80 @@ export default function TradeCoinModal({
             </div>
           </div>
 
-          {/* Coin Info */}
+          {/* Coin Stats */}
           {coin.priceUSD && (
-            <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl p-4 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Price</span>
-                <span className="font-medium text-gray-900 dark:text-white">${parseFloat(coin.priceUSD).toFixed(8)}</span>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-slate-800/30 rounded-lg p-3 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Price</p>
+                <p className="text-sm font-semibold text-white">${parseFloat(coin.priceUSD).toFixed(6)}</p>
               </div>
               {coin.marketCap && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Market Cap</span>
-                  <span className="font-medium text-gray-900 dark:text-white">${Number(coin.marketCap).toLocaleString()}</span>
+                <div className="bg-slate-800/30 rounded-lg p-3 text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">MCap</p>
+                  <p className="text-sm font-semibold text-white">${formatCompactNumber(Number(coin.marketCap))}</p>
                 </div>
               )}
               {coin.volume24h && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">24h Volume</span>
-                  <span className="font-medium text-gray-900 dark:text-white">${Number(coin.volume24h).toLocaleString()}</span>
+                <div className="bg-slate-800/30 rounded-lg p-3 text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">24h Vol</p>
+                  <p className="text-sm font-semibold text-white">${formatCompactNumber(Number(coin.volume24h))}</p>
                 </div>
               )}
             </div>
           )}
-        </div>
 
-        {/* Action Button */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <button
+          {/* Action Button */}
+          <Button
             onClick={handleTrade}
             disabled={isLoading || !amount || parseFloat(amount) <= 0}
-            className={`w-full py-4 rounded-xl text-white font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-              mode === 'buy'
-                ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/25'
-                : 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-lg shadow-red-500/25'
-            }`}
+            className={cn(
+              "w-full h-14 text-base font-bold transition-all",
+              isBuy
+                ? "bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 shadow-lg shadow-emerald-500/25"
+                : "bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 shadow-lg shadow-rose-500/25",
+              "disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+            )}
           >
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Processing...
               </span>
             ) : (
-              `${mode === 'buy' ? 'Buy' : 'Sell'} ${coin.symbol}`
+              <span className="flex items-center justify-center gap-2">
+                {isBuy ? (
+                  <>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Buy {coin.symbol}
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                    </svg>
+                    Sell {coin.symbol}
+                  </>
+                )}
+              </span>
             )}
-          </button>
-          
+          </Button>
+
           {/* Zora Link */}
           <a
             href={`https://zora.co/coin/base:${coin.address}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 mt-3 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            className="flex items-center justify-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
           >
             <span>View on Zora</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </a>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
-
