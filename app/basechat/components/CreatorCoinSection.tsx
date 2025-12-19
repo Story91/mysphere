@@ -88,29 +88,6 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
   return (
     <>
       <div className="bg-gradient-to-r from-purple-50 via-violet-50 to-indigo-50 dark:from-purple-900/20 dark:via-violet-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-700/50 rounded-xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-2">
-            <div className="p-1.5 bg-purple-500 rounded-lg">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <span className="text-sm font-bold text-purple-700 dark:text-purple-300">Creator Coin</span>
-          </div>
-          <a
-            href={`https://zora.co/coin/base:${creatorCoin.address}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-purple-500 hover:text-purple-600 dark:hover:text-purple-400 flex items-center gap-1"
-          >
-            Zora
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </a>
-        </div>
-
         {/* Coin Info */}
         <div className="flex items-center space-x-3">
           {creatorCoin.imageUrl ? (

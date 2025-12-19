@@ -1007,21 +1007,6 @@ export default function BuilderProfile({
           <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-blue-50/30 backdrop-blur-xl"></div>
           <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent"></div>
           
-          {/* MySphere Logo with Verified Badge - Top Right */}
-          <div className="absolute top-6 right-6 flex items-center space-x-2 bg-gradient-to-r from-white/80 to-blue-50/60 backdrop-blur-sm border border-blue-200/50 rounded-full px-3 py-2 shadow-lg">
-            <img 
-              src="/favicon_io (1)/android-chrome-192x1921.png" 
-              alt="MySphere" 
-              className="w-5 h-5 object-contain"
-            />
-            <div className="flex items-center space-x-1">
-              <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              <span className="text-xs font-medium text-blue-700">Verified</span>
-            </div>
-          </div>
-          
           <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 w-full">
           <div className="flex flex-col items-center lg:items-start">
             <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden flex-shrink-0 relative group">
@@ -1045,8 +1030,61 @@ export default function BuilderProfile({
               <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-blue-200/20 to-transparent filter blur-lg opacity-60 group-hover:opacity-80 transition-opacity duration-300"></div>
             </div>
             
+            {/* Nazwa użytkownika pod avatarem */}
+            <div className={`mt-3 text-lg lg:text-xl font-semibold text-center lg:text-left ${
+              isVitalik 
+                ? "bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-transparent bg-clip-text"
+                : ""
+            }`}>
+              {profile.name.endsWith('.base.eth') ? (
+                <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-transparent bg-clip-text font-medium">{profile.name}</span>
+              ) : profile.name.endsWith('.sphere') ? (
+                <>
+                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.sphere', '')}</span>
+                  <span className="text-blue-500">.sphere</span>
+                </>
+              ) : profile.name.endsWith('.camper') ? (
+                <>
+                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.camper', '')}</span>
+                  <span className="text-orange-500">.camper🏕️</span>
+                </>
+              ) : profile.name.endsWith('.celo') ? (
+                <>
+                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.celo', '')}</span>
+                  <span className="!text-yellow-500">.celo</span>
+                </>
+              ) : profile.name.endsWith('.world') ? (
+                <>
+                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.world', '')}</span>
+                  <span className="text-green-500">.world</span>
+                </>
+              ) : (
+                <>
+                  {profile.name}
+                  {isVitalik && (
+                    <span className="inline-flex items-center ml-2">
+                      <img 
+                        src="/ethlogo.png" 
+                        alt="ETH" 
+                        className="w-4 h-4 object-contain"
+                      />
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+            
+            {/* Badge dla Vitalika */}
+            {isVitalik && (
+              <div className="mt-1 flex justify-center lg:justify-start">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-yellow-500 text-white text-xs font-medium">
+                  Ethereum Founder
+                </span>
+              </div>
+            )}
+            
             {/* Skrócony adres portfela pod avatarem */}
-            <div className="mt-4 lg:mt-6 w-full lg:w-auto flex flex-col items-center lg:items-start space-y-3">
+            <div className="mt-3 lg:mt-4 w-full lg:w-auto flex flex-col items-center lg:items-start space-y-3">
               <button
                 onClick={copyAddressToClipboard}
                 className="flex items-center text-xs text-slate-600 hover:text-blue-600 bg-gradient-to-r from-white to-blue-50 hover:from-blue-50 hover:to-blue-100 px-3 py-1.5 rounded-lg border border-blue-200/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 w-fit"
@@ -1075,67 +1113,7 @@ export default function BuilderProfile({
           <div className="flex-1 w-full lg:max-w-none">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-4 lg:mb-6">
               <div className="flex flex-col lg:flex-1">
-                <div className={`text-2xl lg:text-3xl font-semibold mb-2 lg:mb-3 ${
-                  isVitalik 
-                    ? "bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-transparent bg-clip-text"
-                    : "bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text"
-                }`}>
-                  {profile.name.endsWith('.base.eth') ? (
-                    <div className="flex items-center">
-                      <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-transparent bg-clip-text font-medium">{profile.name}</span>
-                      <div className="inline-flex items-center ml-3 px-3 py-1.5 rounded-full bg-gradient-to-r from-white/80 to-blue-50/60 backdrop-blur-sm border border-blue-200/50 shadow-lg">
-                        <div className="w-2.5 h-2.5 bg-blue-600 rounded-full mr-2"></div>
-                        <span className="text-blue-700 text-sm font-medium">basename</span>
-                      </div>
-                    </div>
-                  ) : profile.name.endsWith('.sphere') ? (
-                    <>
-                      <span className="text-gray-900 dark:text-white">{profile.name.replace('.sphere', '')}</span>
-                      <span className="text-blue-500">.sphere</span>
-                    </>
-                                     ) : profile.name.endsWith('.camper') ? (
-                     <>
-                       <span className="text-gray-900 dark:text-white">{profile.name.replace('.camper', '')}</span>
-                       <span className="text-orange-500">.camper🏕️</span>
-                     </>
-                   ) : profile.name.endsWith('.celo') ? (
-                     <>
-                       <span className="text-gray-900 dark:text-white">{profile.name.replace('.celo', '')}</span>
-                       <span className="!text-yellow-500">.celo</span>
-                     </>
-                   ) : profile.name.endsWith('.world') ? (
-                     <>
-                       <span className="text-gray-900 dark:text-white">{profile.name.replace('.world', '')}</span>
-                       <span className="text-green-500">.world</span>
-                     </>
-                   ) : (
-                    <>
-                      {profile.name}
-                      {isVitalik && (
-                        <span className="inline-flex items-center ml-2">
-                          <img 
-                            src="/ethlogo.png" 
-                            alt="ETH" 
-                            className="w-5 h-5 object-contain"
-                          />
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-                
-                {/* Badge dla Vitalika */}
-                {isVitalik && (
-                  <div className="mt-1">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-yellow-500 text-white text-xs font-medium">
-                      Ethereum Founder
-                    </span>
-                  </div>
-                )}
-                {/* Separator gradientowy */}
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent my-4"></div>
-                
-                <div className="flex flex-col space-y-4 lg:space-y-5 mt-2 lg:mt-4">
+                <div className="flex flex-col space-y-4 lg:space-y-5">
                   {/* Creator Earnings - Rozciągnięty na całą szerokość */}
                   {(tipStats && tipStats.tipCount > 0) ? (
                     <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-6 py-4 shadow-md backdrop-blur-sm hover:scale-[1.02] hover:shadow-lg transition-all duration-300 relative w-full">
