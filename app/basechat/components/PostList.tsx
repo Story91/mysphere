@@ -28,14 +28,32 @@ import SpotifyTrackCard from './SpotifyTrackCard';
 // Import Zora SDK functions and types
 import { getProfileBalances } from '@zoralabs/coins-sdk';
 import { getCachedCoin } from '../../utils/zoraSdk';
-import { parseEther, parseUnits, formatEther, formatUnits } from 'viem'; // Import viem utils
+import { parseEther, parseUnits, formatEther, formatUnits, createPublicClient, http } from 'viem'; // Import viem utils
 import { Address as ViemAddress } from 'viem';
+import TradeCoinModal from './TradeCoinModal';
+import { CreatorCoinData } from '../../utils/creatorCoin';
+
+// ERC20 balanceOf ABI - standard for all ERC20 tokens
+const ERC20_BALANCE_ABI = [
+  {
+    inputs: [{ name: 'account', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
 
 // Import social features
 import { useSocial } from '../friendsystem/hooks';
 
 // Import icons
-import { Users, Coins, ShoppingCart, Tag, ExternalLink, X, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Users, Coins, ShoppingCart, Tag, ExternalLink, X } from 'lucide-react';
+
+// Import shadcn components
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import SpotlightCard from '@/components/SpotlightCard';
 
 // 🚀 Import PinnedJobs components
 import PaidPinButton from '../PinnedJobs/components/PaidPinButton';
@@ -219,6 +237,12 @@ export default function PostList({
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [isTransacting, setIsTransacting] = useState(false);
   const [internalPosts, setInternalPosts] = useState<ExtendedPost[]>(posts);
+  
+  // States for TradeCoinModal
+  const [showTradeCoinModal, setShowTradeCoinModal] = useState(false);
+  const [tradeCoinData, setTradeCoinData] = useState<CreatorCoinData | null>(null);
+  const [tradeCoinBalance, setTradeCoinBalance] = useState<string>('0');
+  const [tradeCoinMode, setTradeCoinMode] = useState<'buy' | 'sell'>('buy');
   
   useEffect(() => {
     setInternalPosts(posts);
@@ -1116,90 +1140,55 @@ export default function PostList({
   }, [internalPosts.length, postTokenData]); // Zmienione zależności
 
   useEffect(() => {
-    // Fetch user token balances
+    // Fetch user token balances directly from blockchain (most reliable)
     const fetchUserBalances = async () => {
-      if (!address) return;
+      if (!address || !publicClient) return;
       
       try {
         setIsLoadingBalances(true);
         
         // Get all unique token addresses from posts
-        const tokenAddresses = internalPosts
-          .filter(post => post.zoraCoinAddress)
-          .map(post => post.zoraCoinAddress as string);
+        const tokenAddresses = [...new Set(
+          internalPosts
+            .filter(post => post.zoraCoinAddress)
+            .map(post => post.zoraCoinAddress as string)
+        )];
         
         if (tokenAddresses.length === 0) {
           setIsLoadingBalances(false);
           return;
         }
         
-        // Try to get balances from cache first
-        const cachedBalances: {[tokenAddress: string]: string} = {};
-        let needToFetch = false;
-        
-        tokenAddresses.forEach(tokenAddress => {
-          const cacheKey = `token_balance_${address.toLowerCase()}_${tokenAddress.toLowerCase()}`;
-          const cachedData = localStorage.getItem(cacheKey);
-          
-          if (cachedData) {
-            const { balance, timestamp } = JSON.parse(cachedData);
-            // Use cache if it's less than 5 minutes old
-            if (Date.now() - timestamp < 5 * 60 * 1000) {
-              // Poprawka: balance jest złożonym obiektem, musimy wyciągnąć właściwą wartość
-              if (typeof balance === 'object' && balance !== null && 'balance' in balance) {
-                cachedBalances[tokenAddress.toLowerCase()] = balance.balance;
-              } else {
-                cachedBalances[tokenAddress.toLowerCase()] = balance;
-              }
-            } else {
-              needToFetch = true;
-            }
-          } else {
-            needToFetch = true;
-          }
-        });
-        
-        if (!needToFetch) {
-          setUserTokenBalances(cachedBalances);
-          setIsLoadingBalances(false);
-          return;
-        }
-        
-        // Need to fetch fresh balances
-        const result = await getProfileBalances({
-          identifier: address,
-          count: 100 // Fetch more tokens to ensure we get all needed ones
-        });
-        
         const freshBalances: {[tokenAddress: string]: string} = {};
         
-        result.data?.profile?.coinBalances?.edges?.forEach((edge: any) => {
-          if (edge?.node?.coin?.address && edge?.node?.balance) {
-            const tokenAddress = edge.node.coin.address.toLowerCase();
-            const balance = formatUnits(BigInt(edge.node.balance), 18);
-            
-            freshBalances[tokenAddress] = balance;
-            
-            // Save to localStorage - poprawiony format aby był spójny
-            const cacheKey = `token_balance_${address.toLowerCase()}_${tokenAddress}`;
-            localStorage.setItem(cacheKey, JSON.stringify({
-              balance: balance, // Teraz zapisujemy prostą wartość, nie obiekt
-              timestamp: Date.now()
-            }));
-          }
-        });
+        // Fetch balances directly from blockchain using ERC20 balanceOf
+        await Promise.all(
+          tokenAddresses.map(async (tokenAddress) => {
+            try {
+              const balance = await publicClient.readContract({
+                address: tokenAddress as `0x${string}`,
+                abi: ERC20_BALANCE_ABI,
+                functionName: 'balanceOf',
+                args: [address as `0x${string}`],
+              });
+              
+              const formattedBalance = formatUnits(balance, 18);
+              freshBalances[tokenAddress.toLowerCase()] = formattedBalance;
+              
+              // Save to localStorage cache
+              const cacheKey = `token_balance_${address.toLowerCase()}_${tokenAddress.toLowerCase()}`;
+              localStorage.setItem(cacheKey, JSON.stringify({
+                balance: formattedBalance,
+                timestamp: Date.now()
+              }));
+            } catch (err) {
+              console.error(`Error fetching balance for ${tokenAddress}:`, err);
+              freshBalances[tokenAddress.toLowerCase()] = '0';
+            }
+          })
+        );
         
-        // Combine fresh balances with cached ones for any that weren't found
-        const combinedBalances = { ...freshBalances };
-        
-        tokenAddresses.forEach(tokenAddress => {
-          const lowerAddress = tokenAddress.toLowerCase();
-          if (!combinedBalances[lowerAddress]) {
-            combinedBalances[lowerAddress] = cachedBalances[lowerAddress] || '0';
-          }
-        });
-        
-        setUserTokenBalances(combinedBalances);
+        setUserTokenBalances(freshBalances);
       } catch (error) {
         console.error('Error fetching user balances:', error);
       } finally {
@@ -1208,7 +1197,62 @@ export default function PostList({
     };
     
     fetchUserBalances();
-  }, [address, internalPosts]);
+  }, [address, internalPosts, publicClient]);
+
+  // Function to refresh balances after trade - fetches directly from blockchain
+  const refreshBalancesAfterTrade = useCallback(async () => {
+    if (!address || !publicClient) return;
+    
+    try {
+      setIsLoadingBalances(true);
+      
+      // Get all unique token addresses from posts
+      const tokenAddresses = [...new Set(
+        internalPosts
+          .filter(post => post.zoraCoinAddress)
+          .map(post => post.zoraCoinAddress as string)
+      )];
+      
+      if (tokenAddresses.length === 0) {
+        setIsLoadingBalances(false);
+        return;
+      }
+      
+      const freshBalances: {[tokenAddress: string]: string} = {};
+      
+      // Fetch balances directly from blockchain
+      await Promise.all(
+        tokenAddresses.map(async (tokenAddress) => {
+          try {
+            const balance = await publicClient.readContract({
+              address: tokenAddress as `0x${string}`,
+              abi: ERC20_BALANCE_ABI,
+              functionName: 'balanceOf',
+              args: [address as `0x${string}`],
+            });
+            
+            const formattedBalance = formatUnits(balance, 18);
+            freshBalances[tokenAddress.toLowerCase()] = formattedBalance;
+            
+            // Update localStorage cache
+            const cacheKey = `token_balance_${address.toLowerCase()}_${tokenAddress.toLowerCase()}`;
+            localStorage.setItem(cacheKey, JSON.stringify({
+              balance: formattedBalance,
+              timestamp: Date.now()
+            }));
+          } catch (err) {
+            console.error(`Error refreshing balance for ${tokenAddress}:`, err);
+          }
+        })
+      );
+      
+      setUserTokenBalances(prev => ({ ...prev, ...freshBalances }));
+    } catch (error) {
+      console.error('Error refreshing balances:', error);
+    } finally {
+      setIsLoadingBalances(false);
+    }
+  }, [address, publicClient, internalPosts]);
 
   // Trading functions removed - now handled by direct links to Zora.co in the UI
 
@@ -1974,180 +2018,216 @@ export default function PostList({
 
         {/* --- NEW ZORA TOKEN INFO & ACTIONS SECTION --- */}
         {post.zoraCoinAddress && (
-          <div className="mt-4 mb-2 overflow-hidden">
-            {/* Modern Zora Token Card */}
-            <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl border border-purple-100 dark:border-purple-800/30 p-4">
-              <div className="flex justify-between items-center mb-3">
-                <div className="flex items-center">
+          <div className="mt-4 mb-2">
+            <SpotlightCard 
+              spotlightColor="rgba(147, 51, 234, 0.25)" 
+              className="border-2 border-purple-200/50 dark:border-purple-800/50 bg-gradient-to-br from-purple-50/50 via-blue-50/50 to-purple-50/50 dark:from-purple-950/30 dark:via-blue-950/30 dark:to-purple-950/30 shadow-lg hover:shadow-xl transition-shadow"
+            >
+              <Card className="border-0 bg-transparent shadow-none">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
                   {zoraData?.imageUrl ? (
-                    <img 
-                      src={zoraData.imageUrl} 
-                      alt={zoraData?.name || 'Token'} 
-                      className="w-5 h-5 mr-2 rounded-full"
-                    />
+                    <div className="relative">
+                      <img 
+                        src={zoraData.imageUrl} 
+                        alt={zoraData?.name || 'Token'} 
+                        className="w-10 h-10 rounded-full ring-2 ring-purple-200 dark:ring-purple-800"
+                      />
+                    </div>
                   ) : (
-                    <img 
-                      src="/android-chrome-512x512.png" 
-                      alt="Sphere Logo" 
-                      className="w-5 h-5 mr-2"
-                    />
+                    <div className="relative">
+                      <img 
+                        src="/android-chrome-512x512.png" 
+                        alt="Sphere Logo" 
+                        className="w-10 h-10 rounded-full ring-2 ring-purple-200 dark:ring-purple-800"
+                      />
+                    </div>
                   )}
-                  <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-300">
-                    {zoraData?.symbol || 'POSTCOIN'}
-                  </h3>
-                  {zoraData?.name && zoraData.name !== zoraData?.symbol && (
-                    <span className="ml-1.5 text-xs text-gray-700 dark:text-gray-300 whitespace-normal">
-                      {zoraData.name}
-                    </span>
-                  )}
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg font-bold text-purple-700 dark:text-purple-300 m-0">
+                        {zoraData?.symbol || 'POSTCOIN'}
+                      </CardTitle>
+                      {zoraData?.priceUSD && (
+                        <Badge variant="secondary" className="text-xs font-semibold">
+                          ${formatNumberWithSuffix(zoraData.priceUSD)}
+                        </Badge>
+                      )}
+                      {zoraData?.priceChange24h !== undefined && (
+                        <Badge 
+                          variant="outline"
+                          className={`text-xs font-semibold ${
+                            zoraData.priceChange24h > 0 
+                              ? 'border-green-500 text-green-600 dark:text-green-400' 
+                              : zoraData.priceChange24h < 0 
+                                ? 'border-red-500 text-red-600 dark:text-red-400' 
+                                : ''
+                          }`}
+                        >
+                          {zoraData.priceChange24h > 0 ? '↑' : zoraData.priceChange24h < 0 ? '↓' : ''}
+                          {Math.abs(zoraData.priceChange24h).toFixed(2)}%
+                        </Badge>
+                      )}
+                    </div>
+                    {zoraData?.name && zoraData.name !== zoraData?.symbol && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {zoraData.name}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <a 
-                  href={`https://zora.co/coin/base:${post.zoraCoinAddress}?referrer=0xf1fa20027b6202bc18e4454149c85cb01dc91dfd`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition-colors"
-                >
-                  View on Zora
-                  <ArrowUpRight className="w-3 h-3 ml-1" />
-                </a>
-              </div>
+              </CardHeader>
               
-              {isLoadingData ? (
-                <div className="flex items-center justify-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
-                </div>
-              ) : (
-                <>
-                  {/* First row of kafelki */}
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Symbol</div>
-                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{zoraData?.symbol || 'N/A'}</div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Holders</div>
-                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{zoraData?.uniqueHolders || '0'}</div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Supply</div>
-                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                        {zoraData?.totalSupply 
-                        ? zoraData.totalSupply
-                        : '0.00'}
-                      </div>
-                    </div>
+              <CardContent className="pt-0">
+                {isLoadingData ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                   </div>
-                  
-                  {/* Second row of kafelki with balance */}
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    {/* Balance kafelek */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Your Balance</div>
-                      <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                        {isLoadingBalances 
-                          ? '...' 
-                          : (function() {
-                              // Bezpieczne parsowanie balansu
-                              if (!post.zoraCoinAddress) return '0.000000';
-                              
-                              const balanceStr = userTokenBalances[post.zoraCoinAddress.toLowerCase()];
-                              if (!balanceStr) return '0.000000';
-                              
-                              try {
-                                const balanceNum = parseFloat(balanceStr);
-                                return isNaN(balanceNum) ? '0.000000' : balanceNum.toFixed(6);
-                              } catch (e) {
-                                console.error('Error formatting balance:', e);
-                                return '0.000000';
-                              }
-                            })()
-                        }
-                      </div>
+                ) : (
+                  <>
+                    {/* Token Stats Grid */}
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <Card className="bg-background/50 border">
+                        <CardContent className="p-3 text-center">
+                          <div className="text-xs text-muted-foreground mb-1">Holders</div>
+                          <div className="text-base font-semibold">{zoraData?.uniqueHolders || '0'}</div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-background/50 border">
+                        <CardContent className="p-3 text-center">
+                          <div className="text-xs text-muted-foreground mb-1">Supply</div>
+                          <div className="text-base font-semibold">
+                            {zoraData?.totalSupply 
+                              ? formatNumberWithSuffix(parseFloat(zoraData.totalSupply))
+                              : '0'}
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-background/50 border">
+                        <CardContent className="p-3 text-center">
+                          <div className="text-xs text-muted-foreground mb-1">Your Balance</div>
+                          <div className="text-base font-semibold">
+                            {isLoadingBalances 
+                              ? '...' 
+                              : (function() {
+                                  if (!post.zoraCoinAddress) return '0';
+                                  const balanceStr = userTokenBalances[post.zoraCoinAddress.toLowerCase()];
+                                  if (!balanceStr) return '0';
+                                  try {
+                                    const balanceNum = parseFloat(balanceStr);
+                                    if (isNaN(balanceNum) || balanceNum === 0) return '0';
+                                    return formatNumberWithSuffix(balanceNum);
+                                  } catch (e) {
+                                    return '0';
+                                  }
+                                })()
+                            }
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
-                    
-                    {zoraData?.marketCap && (
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Market Cap</div>
-                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                          ${formatNumberWithSuffix(zoraData.marketCap)}
-                        </div>
+
+                    {/* Market Data Row */}
+                    {(zoraData?.marketCap || zoraData?.volume24h) && (
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        {zoraData?.marketCap && (
+                          <Card className="bg-background/50 border">
+                            <CardContent className="p-3 text-center">
+                              <div className="text-xs text-muted-foreground mb-1">Market Cap</div>
+                              <div className="text-base font-semibold">
+                                ${formatNumberWithSuffix(zoraData.marketCap)}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                        {zoraData?.volume24h && (
+                          <Card className="bg-background/50 border">
+                            <CardContent className="p-3 text-center">
+                              <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
+                              <div className="text-base font-semibold">
+                                ${formatNumberWithSuffix(zoraData.volume24h)}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
                       </div>
                     )}
                     
-                    {zoraData?.volume24h && (
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-                        <div className="text-xs text-gray-500 dark:text-gray-400">24h Volume</div>
-                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                          ${formatNumberWithSuffix(zoraData.volume24h)}
+                    {/* Trade Buttons */}
+                    {address && post.zoraCoinAddress && (
+                      <div className="pt-3 border-t">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              const coinData: CreatorCoinData = {
+                                address: post.zoraCoinAddress!,
+                                name: zoraData?.name || postTokenData[post.id]?.name || 'Post Token',
+                                symbol: zoraData?.symbol || postTokenData[post.id]?.symbol || 'TOKEN',
+                                totalSupply: zoraData?.totalSupply || '0',
+                                marketCap: zoraData?.marketCap,
+                                priceUSD: zoraData?.priceUSD,
+                                volume24h: zoraData?.volume24h,
+                                uniqueHolders: zoraData?.uniqueHolders,
+                                imageUrl: zoraData?.imageUrl || postTokenData[post.id]?.imageUrl,
+                              };
+                              setTradeCoinData(coinData);
+                              setTradeCoinBalance(userTokenBalances[post.zoraCoinAddress!.toLowerCase()] || '0');
+                              setTradeCoinMode('buy');
+                              setShowTradeCoinModal(true);
+                            }}
+                            className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg"
+                          >
+                            Buy
+                          </button>
+                          <button
+                            onClick={() => {
+                              const coinData: CreatorCoinData = {
+                                address: post.zoraCoinAddress!,
+                                name: zoraData?.name || postTokenData[post.id]?.name || 'Post Token',
+                                symbol: zoraData?.symbol || postTokenData[post.id]?.symbol || 'TOKEN',
+                                totalSupply: zoraData?.totalSupply || '0',
+                                marketCap: zoraData?.marketCap,
+                                priceUSD: zoraData?.priceUSD,
+                                volume24h: zoraData?.volume24h,
+                                uniqueHolders: zoraData?.uniqueHolders,
+                                imageUrl: zoraData?.imageUrl || postTokenData[post.id]?.imageUrl,
+                              };
+                              setTradeCoinData(coinData);
+                              setTradeCoinBalance(userTokenBalances[post.zoraCoinAddress!.toLowerCase()] || '0');
+                              setTradeCoinMode('sell');
+                              setShowTradeCoinModal(true);
+                            }}
+                            className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 transition-all shadow-md hover:shadow-lg"
+                          >
+                            Sell
+                          </button>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Third row of kafelki */}
-                  <div className="grid grid-cols-2 gap-2 mb-4">
-                    {zoraData?.priceUSD && (
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center">
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Price</div>
-                        <div className="font-medium text-sm text-gray-900 dark:text-gray-100 flex items-center justify-center">
-                          <span>${formatNumberWithSuffix(zoraData.priceUSD)}</span>
-                          {zoraData.priceChange24h !== undefined && (
-                            <span 
-                              className={`ml-1.5 text-xs ${
-                                zoraData.priceChange24h > 0 
-                                  ? 'text-green-500' 
-                                  : zoraData.priceChange24h < 0 
-                                    ? 'text-red-500' 
-                                    : 'text-gray-500'
-                              }`}
-                            >
-                              {zoraData.priceChange24h > 0 ? '↑' : zoraData.priceChange24h < 0 ? '↓' : ''}
-                              {Math.abs(zoraData.priceChange24h).toFixed(2)}%
+                        {/* User Balance */}
+                        {userTokenBalances[post.zoraCoinAddress.toLowerCase()] && 
+                         parseFloat(userTokenBalances[post.zoraCoinAddress.toLowerCase()]) > 0 && (
+                          <div className="mt-2 text-center">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              Your balance: <span className="font-medium text-purple-600 dark:text-purple-400">
+                                {parseFloat(userTokenBalances[post.zoraCoinAddress.toLowerCase()]).toFixed(4)} {zoraData?.symbol || 'TOKEN'}
+                              </span>
                             </span>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )}
                     
-                    {/* Usuwamy kafelek Created */}
-                  </div>
-                  
-                  <div className="flex space-x-2 mb-4">
-                    <button
-                      onClick={() => {
-                        toast.success(`Opening ${zoraData?.symbol || 'token'} trading on Zora.co`);
-                        window.open(`https://zora.co/coin/base:${post.zoraCoinAddress}`, '_blank');
-                      }}
-                      className="flex-1 flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all duration-200 transform hover:scale-[1.02]"
-                    >
-                      <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
-                      Buy on Zora
-                    </button>
-                    <button
-                      onClick={() => {
-                        toast.success(`Opening ${zoraData?.symbol || 'token'} trading on Zora.co`);
-                        window.open(`https://zora.co/coin/base:${post.zoraCoinAddress}`, '_blank');
-                      }}
-                      className="flex-1 flex items-center justify-center px-3 py-2 text-xs font-medium text-white bg-gradient-to-r from-green-500 to-teal-500 rounded-lg hover:from-green-600 hover:to-teal-600 transition-all duration-200 transform hover:scale-[1.02]"
-                    >
-                      <TrendingDown className="w-3.5 h-3.5 mr-1.5" />
-                      Sell on Zora
-                    </button>
-                  </div>
-                  
-                  {/* Linki do zewnętrznych serwisów */}
-                  <div className="border-t border-purple-100 dark:border-purple-800/30 pt-4">
-                    <div className="flex justify-center space-x-4">
+                    {/* External Links */}
+                    <div className="flex flex-wrap items-center justify-center gap-4 pt-3 border-t">
                       {post.zoraCoinAddress && userTokenBalances[post.zoraCoinAddress.toLowerCase()] && 
                        parseFloat(userTokenBalances[post.zoraCoinAddress.toLowerCase()]) > 0 && (
                         <a 
                           href={`https://zora.co/profile/${address}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-purple-500 hover:text-purple-700 flex items-center"
+                          className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 flex items-center gap-1 transition-colors"
                         >
                           View your tokens
-                          <ExternalLink className="w-3 h-3 ml-1" />
+                          <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
                       
@@ -2165,7 +2245,7 @@ export default function PostList({
                         }${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 flex items-center"
+                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                       >
                         View on {
                           post.network === 'basecamp' 
@@ -2178,23 +2258,34 @@ export default function PostList({
                             ? 'Worldscan'
                             : 'Basescan'
                         }
-                        <ExternalLink className="w-3 h-3 ml-1" />
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                      
+                      <a 
+                        href={`https://zora.co/coin/base:${post.zoraCoinAddress}?referrer=0xf1fa20027b6202bc18e4454149c85cb01dc91dfd`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 flex items-center gap-1 transition-colors"
+                      >
+                        View on Zora
+                        <ExternalLink className="w-3 h-3" />
                       </a>
                       
                       <a 
                         href={`https://dexscreener.com/base/${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-green-500 hover:text-green-700 flex items-center"
+                        className="text-xs text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200 flex items-center gap-1 transition-colors"
                       >
-                        View on Dexscreener
-                        <ExternalLink className="w-3 h-3 ml-1" />
+                        View on DexScreener
+                        <ExternalLink className="w-3 h-3" />
                       </a>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+            </SpotlightCard>
           </div>
         )}
         {/* --- END NEW ZORA TOKEN INFO & ACTIONS --- */}
@@ -2572,6 +2663,21 @@ export default function PostList({
           }
         }}
       />
+
+      {/* Trade Coin Modal */}
+      {showTradeCoinModal && tradeCoinData && (
+        <TradeCoinModal
+          isOpen={showTradeCoinModal}
+          onClose={() => {
+            setShowTradeCoinModal(false);
+            setTradeCoinData(null);
+          }}
+          coin={tradeCoinData}
+          userBalance={tradeCoinBalance}
+          mode={tradeCoinMode}
+          onTradeSuccess={refreshBalancesAfterTrade}
+        />
+      )}
     </div>
   );
 } 
