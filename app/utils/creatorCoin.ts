@@ -60,7 +60,7 @@ export async function getCreatorCoin(userAddress: string): Promise<CreatorCoinDa
       if (profile?.creatorCoin) {
         // Get full coin details
         const coinDetails = await getCoin({ address: profile.creatorCoin.address });
-        const coin = coinDetails?.data?.zora20Token || coinDetails?.data?.coin;
+        const coin = coinDetails?.data?.zora20Token;
         
         const creatorCoin: CreatorCoinData = {
           address: profile.creatorCoin.address,
