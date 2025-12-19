@@ -60,7 +60,7 @@ export async function getCreatorCoin(userAddress: string): Promise<CreatorCoinDa
       if (profile?.creatorCoin) {
         // Get full coin details
         const coinDetails = await getCoin({ address: profile.creatorCoin.address });
-        const coin = coinDetails?.data?.zora20Token;
+        const coin = coinDetails?.data?.zora20Token as any;
         
         const creatorCoin: CreatorCoinData = {
           address: profile.creatorCoin.address,
@@ -205,8 +205,8 @@ export async function getCoinDetails(coinAddress: string): Promise<CreatorCoinDa
   try {
     const result = await getCoin({ address: coinAddress.toLowerCase() });
     
-    // Handle different response structures
-    const coin = result.data?.zora20Token || result.data?.coin;
+    // Handle response structure - cast to any for flexible property access
+    const coin = result.data?.zora20Token as any;
     
     if (!coin) {
       return null;
