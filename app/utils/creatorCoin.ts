@@ -281,7 +281,7 @@ export async function forceRefreshBalance(userAddress: string, tokenAddress: str
     const edges = result.data?.profile?.coinBalances?.edges || [];
     
     for (const edge of edges) {
-      const node = edge?.node;
+      const node = edge?.node as any;
       const coin = node?.coin || node?.token;
       
       if (coin?.address?.toLowerCase() === tokenAddress.toLowerCase()) {
