@@ -28,7 +28,7 @@ export default function TradeCoinModal({
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   
-  const [mode, setMode] = useState<'buy' | 'sell'>(initialMode);
+  const [mode] = useState<'buy' | 'sell'>(initialMode);
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState(0.05); // 5% default
   const [isLoading, setIsLoading] = useState(false);
@@ -40,9 +40,8 @@ export default function TradeCoinModal({
     if (isOpen) {
       setAmount('');
       setEstimatedOutput(null);
-      setMode(initialMode);
     }
-  }, [isOpen, initialMode]);
+  }, [isOpen]);
 
   // Estimate output when amount changes
   const estimateOutput = useCallback(async () => {
@@ -71,8 +70,8 @@ export default function TradeCoinModal({
 
       const quote = await createTradeCall(tradeParams);
       
-      if (quote?.amountOut) {
-        const formatted = formatUnits(BigInt(quote.amountOut), 18);
+      if (quote?.quote?.amountOut) {
+        const formatted = formatUnits(BigInt(quote.quote.amountOut), 18);
         setEstimatedOutput(formatted);
       }
     } catch (error) {
@@ -203,7 +202,7 @@ export default function TradeCoinModal({
             )}
             <div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                Trade {coin.symbol}
+                {mode === 'buy' ? 'Buy' : 'Sell'} {coin.symbol}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {coin.name}
@@ -220,31 +219,6 @@ export default function TradeCoinModal({
           </button>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-            <button
-              onClick={() => setMode('buy')}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
-                mode === 'buy'
-                  ? 'bg-green-500 text-white shadow-lg'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Buy
-            </button>
-            <button
-              onClick={() => setMode('sell')}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
-                mode === 'sell'
-                  ? 'bg-red-500 text-white shadow-lg'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Sell
-            </button>
-          </div>
-        </div>
 
         {/* Amount Input */}
         <div className="p-4 space-y-4">
@@ -281,17 +255,27 @@ export default function TradeCoinModal({
 
           {/* Estimated Output */}
           {estimatedOutput && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Estimated {mode === 'buy' ? coin.symbol : 'ETH'}</span>
+                <span className="text-sm text-gray-500">
+                  {mode === 'buy' ? `You'll receive` : `You'll receive`}
+                </span>
                 <span className="text-lg font-semibold text-gray-900 dark:text-white">
                   {isEstimating ? (
                     <span className="animate-pulse">...</span>
                   ) : (
-                    `~${parseFloat(estimatedOutput).toFixed(6)}`
+                    `~${parseFloat(estimatedOutput).toFixed(6)} ${mode === 'buy' ? coin.symbol : 'ETH'}`
                   )}
                 </span>
               </div>
+              {mode === 'buy' && coin.priceUSD && estimatedOutput && !isEstimating && (
+                <div className="flex items-center justify-between pt-1 border-t border-gray-200 dark:border-gray-700">
+                  <span className="text-xs text-gray-500">≈ $USD</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    ${(parseFloat(estimatedOutput) * parseFloat(coin.priceUSD)).toFixed(2)}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
