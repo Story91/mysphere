@@ -13,6 +13,7 @@ import { useSocial } from '../friendsystem/hooks';
 import { sendFriendRequest as sendFriendRequestDirect } from '../friendsystem/friends_system';
 import ReferralDashboard from '../../utils/referrals/components/ReferralDashboard';
 import { initializeReferralStats } from '../../utils/referrals';
+import CreatorCoinSection from './CreatorCoinSection';
 
 // Talent Protocol API types
 interface TalentScore {
@@ -1192,6 +1193,12 @@ export default function BuilderProfile({
                       </div>
                     </div>
                   ) : null}
+
+                  {/* Creator Coin Section */}
+                  <CreatorCoinSection 
+                    userAddress={userAddress} 
+                    currentUserAddress={currentUserAddress}
+                  />
 
                   {/* Separator gradientowy przed social stats */}
                   {(followStats || friendsStats) && (
