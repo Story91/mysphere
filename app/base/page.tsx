@@ -180,21 +180,24 @@ export default function BasePage() {
   const navigationItems = [
     {
       id: 'identity' as const,
-      name: 'Identity',
+      step: 1,
+      name: 'Check Stats',
       icon: '🪪',
-      description: 'Your Base identity stats',
+      description: 'View your onchain activity',
     },
     {
       id: 'profile-pic' as const,
-      name: 'Profile Pic AI',
+      step: 2,
+      name: 'Create Avatar',
       icon: '🎨',
       description: 'Generate AI profile picture',
     },
     {
       id: 'claim' as const,
-      name: 'Claim NFT',
+      step: 3,
+      name: 'Mint NFT',
       icon: '🎫',
-      description: 'Mint your identity NFT',
+      description: 'Claim your identity NFT',
     },
   ];
 
@@ -214,64 +217,48 @@ export default function BasePage() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Header */}
+        {/* Pill Navigation with Logo */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="flex justify-center mb-8"
         >
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-[#0052FF] to-[#00A3FF] flex items-center justify-center shadow-lg shadow-[#0052FF]/25">
-              <svg width="32" height="32" viewBox="0 0 111 111" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M54.921 110.034C85.359 110.034 110.034 85.402 110.034 55.017C110.034 24.6319 85.359 0 54.921 0C26.0432 0 2.35281 22.1714 0 50.3923H72.8467V59.6416H3.9565e-07C2.35281 87.8625 26.0432 110.034 54.921 110.034Z" fill="white"/>
-              </svg>
-            </div>
-            <div className="text-left">
-              <h1 className="text-4xl font-bold text-gray-900">Base Identity</h1>
-              <p className="text-gray-500">Your onchain identity on Base</p>
+          <div className="relative inline-flex items-center bg-white rounded-full p-1 shadow-lg border border-gray-200">
+            {/* Animated pill background */}
+            <div className="relative flex items-center">
+              <motion.div
+                className="absolute h-[calc(100%-4px)] top-[2px] bg-gradient-to-r from-[#0052FF] to-[#00A3FF] rounded-full shadow-md"
+                layout
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                style={{
+                  width: `calc(${100 / navigationItems.length}% - 2px)`,
+                  left: `calc(${navigationItems.findIndex(item => item.id === activeView) * (100 / navigationItems.length)}% + 1px)`,
+                }}
+              />
+              
+              {navigationItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveView(item.id)}
+                  className={`relative z-10 flex items-center gap-1.5 px-4 py-2 rounded-full transition-all duration-200 ${
+                    activeView === item.id
+                      ? 'text-white font-semibold'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  {/* Step Number */}
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                    activeView === item.id
+                      ? 'bg-white/30 text-white'
+                      : 'bg-gray-100 text-[#0052FF]'
+                  }`}>
+                    {item.step}
+                  </span>
+                  <span className="text-sm whitespace-nowrap">{item.name}</span>
+                </button>
+              ))}
             </div>
           </div>
-
-          {/* Connection Status */}
-          <div className="flex items-center justify-center gap-2 mt-4">
-            {isConnected ? (
-              <BaseBadge variant="success" icon={<span>✓</span>}>
-                Connected: {address?.slice(0, 6)}...{address?.slice(-4)}
-              </BaseBadge>
-            ) : (
-              <BaseBadge variant="warning" icon={<span>⚠</span>}>
-                Wallet not connected
-              </BaseBadge>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Navigation Tabs */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="flex flex-wrap justify-center gap-3 mb-8"
-        >
-          {navigationItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveView(item.id)}
-              className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all duration-300 ${
-                activeView === item.id
-                  ? 'bg-gradient-to-r from-[#0052FF] to-[#00A3FF] text-white shadow-lg shadow-[#0052FF]/25 scale-105'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 hover:border-[#0052FF]/30'
-              }`}
-            >
-              <span className="text-2xl">{item.icon}</span>
-              <div className="text-left">
-                <p className="font-semibold">{item.name}</p>
-                <p className={`text-xs ${activeView === item.id ? 'text-white/80' : 'text-gray-500'}`}>
-                  {item.description}
-                </p>
-              </div>
-            </button>
-          ))}
         </motion.div>
 
         {/* Main Content */}

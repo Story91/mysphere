@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import { IdentityCard } from '@coinbase/onchainkit/identity';
 import { base } from 'wagmi/chains';
+import { ArrowUpRight, Coins, Image, FileCode2, Trophy, Zap, Star, TrendingUp } from 'lucide-react';
 import BaseCard, { BaseCardContent, BaseCardHeader, BaseStatsCard } from './BaseCard';
 import BaseButton from './BaseButton';
 import BaseBadge, { RankBadge } from './BaseBadge';
@@ -459,6 +460,65 @@ export default function BaseIdentity() {
 
   return (
     <div className="space-y-6">
+      {/* Main Scan Identity Button with Electric Border */}
+      <div className="flex justify-center">
+        <div className="relative group">
+          {/* Electric Border - Rotating gradient */}
+          <div className="absolute -inset-[2px] rounded-2xl overflow-hidden">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+              className="absolute inset-[-100%] bg-[conic-gradient(from_0deg,transparent_0%,#0052FF_10%,#00FF00_20%,#00A3FF_30%,transparent_40%)]"
+            />
+          </div>
+          
+          {/* Button Content */}
+          <motion.button
+            onClick={fetchData}
+            disabled={isLoading}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="relative px-8 py-4 bg-black rounded-2xl overflow-hidden transition-all duration-300 disabled:opacity-70"
+          >
+            {/* Inner glow on hover */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0052FF]/20 via-[#00FF00]/10 to-[#00A3FF]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            
+            {/* Scan line animation when loading */}
+            <div className="absolute inset-0 overflow-hidden">
+              <motion.div
+                animate={isLoading ? { y: ['-100%', '200%'] } : {}}
+                transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                className={`absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#00FF00] to-transparent ${isLoading ? 'opacity-100' : 'opacity-0'}`}
+              />
+            </div>
+            
+            <div className="relative flex items-center gap-3">
+              {isLoading ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  className="w-9 h-9 rounded-lg border-2 border-white overflow-hidden"
+                >
+                  <img src="/Base_square_blue.png" alt="Base" className="w-full h-full object-cover" />
+                </motion.div>
+              ) : (
+                <div className="w-9 h-9 rounded-lg border-2 border-white overflow-hidden group-hover:border-[#00FF00] transition-colors shadow-md">
+                  <img src="/Base_square_blue.png" alt="Base" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="text-left">
+                <p className="text-white font-bold text-lg tracking-wide">
+                  {isLoading ? 'Scanning...' : 'Scan Identity'}
+                </p>
+                <p className="text-white/50 text-xs group-hover:text-white/70 transition-colors">
+                  {isLoading ? 'Fetching onchain data' : 'Reveal your onchain profile'}
+                </p>
+              </div>
+            </div>
+          </motion.button>
+        </div>
+      </div>
+
       {/* Header Section */}
       <BaseCard variant="gradient">
         <BaseCardContent className="flex flex-col md:flex-row items-center gap-6">
@@ -471,36 +531,18 @@ export default function BaseIdentity() {
 
           {/* Stats Overview */}
           <div className="flex-1 text-center md:text-left">
-            <div className="flex items-center gap-3 justify-center md:justify-start mb-4 flex-wrap">
-              <RankBadge rank={stats.rank} size="lg" />
-              <BaseBadge variant="info">
-                {stats.totalPoints.toLocaleString()} pts
-              </BaseBadge>
-              <BaseButton
-                onClick={fetchData}
-                loading={isLoading}
-                variant="primary"
-                size="sm"
-                icon={<span>🔍</span>}
-              >
-                {isLoading ? 'Loading...' : 'Check Stats'}
-              </BaseButton>
-            </div>
-
             {/* Score Cards Row */}
             <div className="grid grid-cols-3 gap-3 mb-4">
-              {/* ETH Balance - with Base logo in square */}
-              {walletData && (
-                <div className="p-3 rounded-xl bg-white/50 border border-white/20 text-center relative">
-                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded overflow-hidden border-2 border-white shadow-md z-10">
-                    <img src="/Base_square_blue.png" alt="Base" className="w-full h-full object-cover" />
-                  </div>
-                  <p className="text-xs text-gray-500">ETH Balance</p>
-                  <p className="text-lg font-bold text-gray-900">
-                    {walletData.ethBalanceFormatted}
-                  </p>
+              {/* ETH Balance - with Base logo in square + gray border */}
+              <div className="p-3 rounded-xl bg-white border-2 border-gray-300 text-center shadow-[0_0_10px_rgba(0,0,0,0.1)] relative">
+                <div className="absolute -top-2 -right-2 w-6 h-6 rounded overflow-hidden border-2 border-gray-300 bg-white shadow-md z-10">
+                  <img src="/Base_square_blue.png" alt="Base" className="w-full h-full object-cover" />
                 </div>
-              )}
+                <p className="text-xs text-gray-500">ETH Balance</p>
+                <p className="text-lg font-bold text-gray-900">
+                  {walletData?.ethBalanceFormatted || '0.0000'}
+                </p>
+              </div>
               
               {/* Builder Score - Black with neon green + Talent logo */}
               <div className="p-3 rounded-xl bg-black border-2 border-[#00FF00] text-center shadow-[0_0_15px_rgba(0,255,0,0.3)] relative">
@@ -538,44 +580,79 @@ export default function BaseIdentity() {
               </div>
             </div>
 
-            {/* Progress Bar */}
-            <div className="mb-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
-                <span>Progress to next rank</span>
-                <span>{getProgressToNextRank().toFixed(1)}%</span>
-              </div>
-              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${getProgressToNextRank()}%` }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                  className="h-full bg-gradient-to-r from-[#0052FF] to-[#00A3FF] rounded-full"
-                />
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-4 gap-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{stats.stats.transactions}</p>
+            {/* Quick Stats - 5 columns including Contracts */}
+            <div className="grid grid-cols-5 gap-3">
+              <div className="text-center p-2 rounded-lg bg-white/30">
+                <p className="text-xl font-bold text-gray-900">{stats.stats.transactions.toLocaleString()}</p>
                 <p className="text-xs text-gray-500">Transactions</p>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{stats.stats.tokens}</p>
+              <div className="text-center p-2 rounded-lg bg-white/30">
+                <p className="text-xl font-bold text-gray-900">{stats.stats.tokens.toLocaleString()}</p>
                 <p className="text-xs text-gray-500">Tokens</p>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{stats.stats.nfts}</p>
+              <div className="text-center p-2 rounded-lg bg-white/30">
+                <p className="text-xl font-bold text-gray-900">{stats.stats.nfts.toLocaleString()}</p>
                 <p className="text-xs text-gray-500">NFTs</p>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{earnedBadges.length}</p>
+              <div className="text-center p-2 rounded-lg bg-white/30">
+                <p className="text-xl font-bold text-gray-900">{stats.stats.contracts.toLocaleString()}</p>
+                <p className="text-xs text-gray-500">Contracts</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-white/30">
+                <p className="text-xl font-bold text-gray-900">{earnedBadges.length}</p>
                 <p className="text-xs text-gray-500">Badges</p>
               </div>
             </div>
           </div>
         </BaseCardContent>
       </BaseCard>
+
+      {/* Rank & Points Card */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <BaseCard variant="default">
+          <BaseCardContent>
+            <div className="flex items-center gap-4">
+              <RankBadge rank={stats.rank} size="lg" />
+              <div className="flex-1">
+                <p className="text-sm text-gray-500">Your Rank</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.rank}</p>
+                {/* Progress Bar */}
+                <div className="mt-2">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>Progress to next rank</span>
+                    <span>{getProgressToNextRank().toFixed(1)}%</span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${getProgressToNextRank()}%` }}
+                      transition={{ duration: 1, ease: 'easeOut' }}
+                      className="h-full bg-gradient-to-r from-[#0052FF] to-[#00A3FF] rounded-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </BaseCardContent>
+        </BaseCard>
+
+        <BaseCard variant="default">
+          <BaseCardContent>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#00A3FF] flex items-center justify-center">
+                <Star className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-gray-500">Total Points</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalPoints.toLocaleString()}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  From {stats.stats.transactions} txs, {stats.stats.tokens} tokens, {stats.stats.nfts} NFTs
+                </p>
+              </div>
+            </div>
+          </BaseCardContent>
+        </BaseCard>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
@@ -612,7 +689,7 @@ export default function BaseIdentity() {
               title="Transactions"
               value={stats.stats.transactions}
               subtitle={`${stats.breakdown.transactionPoints.toLocaleString()} pts`}
-              icon={<span className="text-2xl">📤</span>}
+              icon={<ArrowUpRight className="w-6 h-6" />}
               isLoading={isLoading && !dataStatus.eth.loaded}
               isLoaded={dataStatus.eth.loaded}
             />
@@ -620,7 +697,7 @@ export default function BaseIdentity() {
               title="Tokens"
               value={stats.stats.tokens}
               subtitle={`${stats.breakdown.tokenPoints.toLocaleString()} pts`}
-              icon={<span className="text-2xl">🪙</span>}
+              icon={<Coins className="w-6 h-6" />}
               isLoading={isLoading && dataStatus.eth.loaded && !dataStatus.tokens.loaded}
               isLoaded={dataStatus.tokens.loaded}
             />
@@ -628,7 +705,7 @@ export default function BaseIdentity() {
               title="NFTs"
               value={stats.stats.nfts}
               subtitle={`${stats.breakdown.nftPoints.toLocaleString()} pts`}
-              icon={<span className="text-2xl">🖼️</span>}
+              icon={<Image className="w-6 h-6" />}
               isLoading={isLoading && dataStatus.tokens.loaded && !dataStatus.nfts.loaded}
               isLoaded={dataStatus.nfts.loaded}
             />
@@ -636,7 +713,7 @@ export default function BaseIdentity() {
               title="Contracts"
               value={stats.stats.contracts}
               subtitle={`${stats.breakdown.uniqueContractPoints.toLocaleString()} pts`}
-              icon={<span className="text-2xl">📜</span>}
+              icon={<FileCode2 className="w-6 h-6" />}
               isLoading={isLoading && dataStatus.nfts.loaded && !dataStatus.transactions.loaded}
               isLoaded={dataStatus.transactions.loaded}
             />
@@ -655,10 +732,10 @@ export default function BaseIdentity() {
               <BaseCard key={category} variant="default">
                 <BaseCardHeader>
                   <h3 className="text-lg font-semibold text-gray-900 capitalize flex items-center gap-2">
-                    {category === 'transactions' && '📤'}
-                    {category === 'tokens' && '🪙'}
-                    {category === 'nfts' && '🖼️'}
-                    {category === 'contracts' && '📜'}
+                    {category === 'transactions' && <ArrowUpRight className="w-5 h-5 text-[#0052FF]" />}
+                    {category === 'tokens' && <Coins className="w-5 h-5 text-[#0052FF]" />}
+                    {category === 'nfts' && <Image className="w-5 h-5 text-[#0052FF]" />}
+                    {category === 'contracts' && <FileCode2 className="w-5 h-5 text-[#0052FF]" />}
                     {category}
                   </h3>
                 </BaseCardHeader>
