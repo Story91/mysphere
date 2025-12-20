@@ -172,7 +172,7 @@ export default function Navigation() {
           label: 'Camp Network',
           isHighlighted: true 
         },
-        { href: '#', label: 'Base', isDisabled: true },
+        { href: '/base', label: 'Base', isHighlighted: true },
         { href: '#', label: 'Linea', isDisabled: true },
         { href: '#', label: 'Celo', isDisabled: true },
         { href: '#', label: 'Ethereum', isDisabled: true },
