@@ -471,18 +471,30 @@ export default function BaseIdentity() {
 
           {/* Stats Overview */}
           <div className="flex-1 text-center md:text-left">
-            <div className="flex items-center gap-3 justify-center md:justify-start mb-4">
+            <div className="flex items-center gap-3 justify-center md:justify-start mb-4 flex-wrap">
               <RankBadge rank={stats.rank} size="lg" />
               <BaseBadge variant="info">
                 {stats.totalPoints.toLocaleString()} pts
               </BaseBadge>
+              <BaseButton
+                onClick={fetchData}
+                loading={isLoading}
+                variant="primary"
+                size="sm"
+                icon={<span>🔍</span>}
+              >
+                {isLoading ? 'Loading...' : 'Check Stats'}
+              </BaseButton>
             </div>
 
             {/* Score Cards Row */}
             <div className="grid grid-cols-3 gap-3 mb-4">
-              {/* ETH Balance */}
+              {/* ETH Balance - with Base logo in square */}
               {walletData && (
-                <div className="p-3 rounded-xl bg-white/50 border border-white/20 text-center">
+                <div className="p-3 rounded-xl bg-white/50 border border-white/20 text-center relative">
+                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded overflow-hidden border-2 border-white shadow-md z-10">
+                    <img src="/Base_square_blue.png" alt="Base" className="w-full h-full object-cover" />
+                  </div>
                   <p className="text-xs text-gray-500">ETH Balance</p>
                   <p className="text-lg font-bold text-gray-900">
                     {walletData.ethBalanceFormatted}
@@ -490,9 +502,12 @@ export default function BaseIdentity() {
                 </div>
               )}
               
-              {/* Builder Score - Black with neon green */}
-              <div className="p-3 rounded-xl bg-black border-2 border-[#00FF00] text-center shadow-[0_0_15px_rgba(0,255,0,0.3)] relative overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,255,0,0.1),transparent_70%)]" />
+              {/* Builder Score - Black with neon green + Talent logo */}
+              <div className="p-3 rounded-xl bg-black border-2 border-[#00FF00] text-center shadow-[0_0_15px_rgba(0,255,0,0.3)] relative">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,255,0,0.1),transparent_70%)] z-0" />
+                <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full overflow-hidden border-2 border-[#00FF00] bg-black shadow-md z-30">
+                  <img src="/talent.png" alt="Talent" className="w-full h-full object-cover" />
+                </div>
                 <p className="text-xs text-white relative z-10">Builder Score</p>
                 {loadingExtras ? (
                   <div className="h-6 flex items-center justify-center relative z-10">
@@ -559,86 +574,6 @@ export default function BaseIdentity() {
               </div>
             </div>
           </div>
-        </BaseCardContent>
-      </BaseCard>
-
-      {/* Data Status & Refresh */}
-      <BaseCard variant="default">
-        <BaseCardContent>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-gray-900">Onchain Data</h3>
-                <span className="px-2 py-0.5 text-xs bg-[#0052FF]/10 text-[#0052FF] rounded-full font-medium">
-                  CDP Node
-                </span>
-                <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full font-medium">
-                  Etherscan V2
-                </span>
-              </div>
-              <p className="text-sm text-gray-500">
-                {lastFetchTime
-                  ? `Last updated: ${new Date(lastFetchTime).toLocaleTimeString()}`
-                  : 'Click Refresh to load onchain data'}
-              </p>
-            </div>
-            <BaseButton
-              onClick={fetchData}
-              loading={isLoading}
-              variant="primary"
-              icon={<span>🔄</span>}
-            >
-              Refresh Stats
-            </BaseButton>
-          </div>
-
-          {/* Data Status Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {Object.entries(dataStatus).map(([dataType, status]) => {
-              const hasData = status.loaded;
-              const hasError = status.error && !hasData;
-              const source = dataType === 'eth' ? 'CDP' : 'Etherscan';
-
-              return (
-                <div
-                  key={dataType}
-                  className={`p-3 rounded-xl border transition-all ${
-                    isLoading && !hasData
-                      ? 'bg-blue-50 border-blue-200'
-                      : hasData
-                        ? 'bg-green-50 border-green-200'
-                        : hasError
-                          ? 'bg-red-50 border-red-200'
-                          : 'bg-gray-50 border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {isLoading && !hasData ? (
-                      <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
-                    ) : hasData ? (
-                      <span className="text-green-500">✓</span>
-                    ) : hasError ? (
-                      <span className="text-red-500">✗</span>
-                    ) : (
-                      <span className="text-gray-400">○</span>
-                    )}
-                    <div>
-                      <span className="text-sm font-medium capitalize text-gray-700">
-                        {dataType === 'eth' ? 'ETH Balance' : dataType}
-                      </span>
-                      <p className="text-xs text-gray-400">{source}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {fetchError && (
-            <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200">
-              <p className="text-red-600 text-sm">{fetchError}</p>
-            </div>
-          )}
         </BaseCardContent>
       </BaseCard>
 
@@ -823,59 +758,45 @@ export default function BaseIdentity() {
           >
             <BaseCard variant="default">
               <BaseCardHeader>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h3 className="text-lg font-bold text-gray-900">Hybrid Data Sources</h3>
-                  <div className="flex gap-2">
-                    <span className="text-xs bg-[#0052FF] text-white px-2 py-1 rounded-full">
-                      CDP Node RPC
-                    </span>
-                    <span className="text-xs bg-amber-500 text-white px-2 py-1 rounded-full">
-                      Etherscan V2
-                    </span>
-                  </div>
-                </div>
+                <h3 className="text-lg font-bold text-gray-900">How Points Are Calculated</h3>
               </BaseCardHeader>
               <BaseCardContent className="space-y-4">
-                <div className="p-4 rounded-xl bg-[#0052FF]/5 border border-[#0052FF]/20">
-                  <h4 className="font-semibold text-[#0052FF] mb-2">🔗 CDP Node RPC</h4>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Fast, reliable blockchain data directly from Coinbase:
-                  </p>
-                  <ul className="space-y-1 text-sm text-gray-500">
-                    <li>• <code className="text-xs bg-gray-100 px-1 rounded">eth_getBalance</code> - ETH balance</li>
-                    <li>• <code className="text-xs bg-gray-100 px-1 rounded">eth_getTransactionCount</code> - Nonce</li>
-                  </ul>
-                </div>
-
-                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
-                  <h4 className="font-semibold text-amber-700 mb-2">🔍 Etherscan API V2</h4>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Comprehensive indexed data for tokens and NFTs (chainid=8453 for Base):
-                  </p>
-                  <ul className="space-y-1 text-sm text-gray-500">
-                    <li>• <code className="text-xs bg-gray-100 px-1 rounded">tokentx</code> - ERC20 token transfers</li>
-                    <li>• <code className="text-xs bg-gray-100 px-1 rounded">tokennfttx</code> - ERC721 NFT transfers</li>
-                    <li>• <code className="text-xs bg-gray-100 px-1 rounded">token1155tx</code> - ERC1155 transfers</li>
-                    <li>• <code className="text-xs bg-gray-100 px-1 rounded">txlist</code> - Transaction history</li>
-                  </ul>
-                </div>
+                <p className="text-sm text-gray-600">
+                  Your identity score is based on your onchain activity on Base. The more you interact with the network, the higher your score!
+                </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
                     <h4 className="font-semibold text-blue-800 mb-2">📤 Transactions</h4>
                     <p className="text-sm text-blue-600">10 points per transaction</p>
+                    <p className="text-xs text-gray-500 mt-1">Every transaction you send on Base</p>
                   </div>
                   <div className="p-4 rounded-xl bg-green-50 border border-green-200">
                     <h4 className="font-semibold text-green-800 mb-2">🪙 Tokens</h4>
                     <p className="text-sm text-green-600">50 points per unique token</p>
+                    <p className="text-xs text-gray-500 mt-1">Each different token you've held</p>
                   </div>
                   <div className="p-4 rounded-xl bg-pink-50 border border-pink-200">
                     <h4 className="font-semibold text-pink-800 mb-2">🖼️ NFTs</h4>
                     <p className="text-sm text-pink-600">100 points per unique NFT</p>
+                    <p className="text-xs text-gray-500 mt-1">Every NFT you own or have owned</p>
                   </div>
                   <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
                     <h4 className="font-semibold text-amber-800 mb-2">📜 Contracts</h4>
                     <p className="text-sm text-amber-600">25 points per unique contract</p>
+                    <p className="text-xs text-gray-500 mt-1">Each smart contract you've interacted with</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-gradient-to-r from-[#0052FF]/10 to-[#00A3FF]/10 border border-[#0052FF]/20">
+                  <h4 className="font-semibold text-[#0052FF] mb-2">🏆 Rank Thresholds</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                    <div><span className="text-gray-600">Newbie:</span> <span className="font-medium">0+</span></div>
+                    <div><span className="text-gray-600">Explorer:</span> <span className="font-medium">4,500+</span></div>
+                    <div><span className="text-gray-600">Trader:</span> <span className="font-medium">22,500+</span></div>
+                    <div><span className="text-gray-600">Investor:</span> <span className="font-medium">90,000+</span></div>
+                    <div><span className="text-gray-600">Whale:</span> <span className="font-medium">225,000+</span></div>
+                    <div><span className="text-gray-600">Legend:</span> <span className="font-medium">450,000+</span></div>
                   </div>
                 </div>
               </BaseCardContent>
@@ -883,19 +804,6 @@ export default function BaseIdentity() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* BaseScan Link */}
-      <div className="text-center">
-        <a
-          href={`https://basescan.org/address/${address}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#0052FF] hover:text-[#0041CC] text-sm font-medium inline-flex items-center gap-1"
-        >
-          View on BaseScan
-          <span>→</span>
-        </a>
-      </div>
     </div>
   );
 }

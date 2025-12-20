@@ -330,25 +330,6 @@ export default function BasePage() {
           </AnimatePresence>
         </motion.div>
 
-        {/* Footer Info */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-12 text-center"
-        >
-          <BaseCard variant="glass" className="inline-block mx-auto">
-            <BaseCardContent className="flex items-center gap-4 py-4">
-              <div className="w-10 h-10 rounded-full bg-[#0052FF]/10 flex items-center justify-center">
-                <span className="text-xl">⚡</span>
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-medium text-gray-900">Powered by Coinbase CDP</p>
-                <p className="text-xs text-gray-500">Data fetched via Coinbase Developer Platform</p>
-              </div>
-            </BaseCardContent>
-          </BaseCard>
-        </motion.div>
       </div>
     </div>
   );
