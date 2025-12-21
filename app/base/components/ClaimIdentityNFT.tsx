@@ -97,33 +97,40 @@ export default function ClaimIdentityNFT({
       {/* Avatar Selector - above the card */}
       {(diceBearAvatar || generatedImage) && (
         <div className="flex justify-center">
-          <div className="flex gap-2 p-1.5 bg-white rounded-2xl shadow-lg border border-gray-200">
-            <button
-              onClick={() => setSelectedAvatar('dicebear')}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                selectedAvatar === 'dicebear'
-                  ? 'bg-[#0052FF] text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <span>🎭</span>
-              <span>Base Avatar</span>
-            </button>
-            <button
-              onClick={() => setSelectedAvatar('ai')}
-              disabled={!generatedImage}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                selectedAvatar === 'ai'
-                  ? 'bg-[#0052FF] text-white shadow-md'
-                  : generatedImage 
-                    ? 'text-gray-600 hover:bg-gray-100'
-                    : 'text-gray-300 cursor-not-allowed'
-              }`}
-            >
-              <span>✨</span>
-              <span>AI Avatar</span>
-              {!generatedImage && <span className="text-xs opacity-60">(create first)</span>}
-            </button>
+          <div className="relative group">
+            {/* Electric Border - Rotating gradient - jedna ramka wokół całej grupy */}
+            <div className="absolute -inset-[2px] rounded-2xl overflow-hidden">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                className="absolute inset-[-100%] bg-[conic-gradient(from_0deg,transparent_0%,#0052FF_10%,#00FF00_20%,#00A3FF_30%,transparent_40%)]"
+              />
+            </div>
+            <div className="relative flex gap-0 bg-black rounded-2xl p-1">
+              <button
+                onClick={() => setSelectedAvatar('dicebear')}
+                className={`px-4 py-2 rounded-l-xl text-sm font-bold tracking-wide transition-colors flex items-center justify-center ${
+                  selectedAvatar === 'dicebear'
+                    ? 'text-[#0052FF]'
+                    : 'text-gray-400'
+                } relative after:absolute after:right-0 after:top-1/2 after:-translate-y-1/2 after:w-px after:h-2/3 after:bg-gray-700`}
+              >
+                Base Avatar
+              </button>
+              <button
+                onClick={() => setSelectedAvatar('ai')}
+                disabled={!generatedImage}
+                className={`px-4 py-2 rounded-r-xl text-sm font-bold tracking-wide transition-colors flex items-center justify-center ${
+                  selectedAvatar === 'ai'
+                    ? 'text-[#FF00FF]'
+                    : generatedImage 
+                      ? 'text-gray-400'
+                      : 'text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                AI Avatar
+              </button>
+            </div>
           </div>
         </div>
       )}

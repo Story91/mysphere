@@ -190,22 +190,30 @@ export default function AvatarCreator({ onGenerated, onDiceBearChange }: AvatarC
           onValueChange={(v) => setCreatorMode(v as CreatorMode)}
           className="w-full"
         >
-          <TabsList className="w-full grid grid-cols-2 h-12 p-1 bg-gray-100">
-            <TabsTrigger 
-              value="base-avatar"
-              className="flex items-center gap-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-[#0052FF] data-[state=active]:shadow-md"
-            >
-              <span>🎭</span>
-              <span>Base Avatar</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="ai-studio"
-              className="flex items-center gap-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-[#0052FF] data-[state=active]:shadow-md"
-            >
-              <span>✨</span>
-              <span>AI Studio</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="relative group">
+            {/* Electric Border - Rotating gradient - jedna ramka wokół całej grupy */}
+            <div className="absolute -inset-[2px] rounded-2xl overflow-hidden">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                className="absolute inset-[-100%] bg-[conic-gradient(from_0deg,transparent_0%,#0052FF_10%,#00FF00_20%,#00A3FF_30%,transparent_40%)]"
+              />
+            </div>
+            <TabsList className="relative w-full grid grid-cols-2 h-14 p-1 bg-black rounded-2xl gap-0">
+              <TabsTrigger 
+                value="base-avatar"
+                className="flex items-center justify-center h-full bg-black rounded-l-xl text-base font-bold tracking-wide data-[state=active]:text-[#0052FF] data-[state=inactive]:text-gray-400 transition-colors relative after:absolute after:right-0 after:top-1/2 after:-translate-y-1/2 after:w-px after:h-2/3 after:bg-gray-700"
+              >
+                Base Avatar
+              </TabsTrigger>
+              <TabsTrigger 
+                value="ai-studio"
+                className="flex items-center justify-center h-full bg-black rounded-r-xl text-base font-bold tracking-wide data-[state=active]:text-[#FF00FF] data-[state=inactive]:text-gray-400 transition-colors"
+              >
+                AI Studio
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* ==================== BASE AVATAR MODE ==================== */}
           <TabsContent value="base-avatar" className="mt-6">
