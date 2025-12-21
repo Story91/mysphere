@@ -1074,3 +1074,80 @@
     font-size: 12px;
   }
 }
+
+/* Mobile/Touch device optimizations - disable tilt and complex animations */
+@media (hover: none) and (pointer: coarse) {
+  .pc-wrapper {
+    perspective: none;
+  }
+  
+  .pc-wrapper::before {
+    display: none !important;
+  }
+  
+  .pc-card {
+    animation: none !important;
+    transform: translate3d(0, 0, 0) !important;
+    transition: none !important;
+  }
+  
+  .pc-card:hover,
+  .pc-card.active {
+    transform: translate3d(0, 0, 0) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 25px rgba(0, 82, 255, 0.25) !important;
+  }
+  
+  .pc-shine {
+    animation: none !important;
+    filter: brightness(0.85) contrast(1.1) saturate(0.6) !important;
+  }
+  
+  .pc-shine::before,
+  .pc-shine::after {
+    animation: none !important;
+    transition: none !important;
+    opacity: 0.5 !important;
+  }
+  
+  .pc-glare {
+    opacity: 0.4 !important;
+  }
+  
+  /* Disable tilt transform on touch */
+  .pc-avatar-content .avatar {
+    transform: translateX(-50%) translateZ(0) !important;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .pc-card {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  .pc-shine {
+    animation: none !important;
+  }
+  
+  .pc-card:hover,
+  .pc-card.active {
+    transform: translate3d(0, 0, 0) !important;
+  }
+  
+  .pc-wrapper::before {
+    transition: none !important;
+  }
+}
+
+/* Small mobile screens - ensure card fits properly */
+@media (max-width: 480px) {
+  .pc-wrapper {
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  
+  .pc-card {
+    max-height: 380px;
+  }
+}
