@@ -183,12 +183,16 @@ const ProfileCardComponent = ({
       const shell = shellRef.current;
       if (!shell || !tiltEngine) return;
 
-      shell.classList.add('active');
-      shell.classList.add('entering');
-      if (enterTimerRef.current) window.clearTimeout(enterTimerRef.current);
-      enterTimerRef.current = window.setTimeout(() => {
-        shell.classList.remove('entering');
-      }, ANIMATION_CONFIG.ENTER_TRANSITION_MS);
+      // Skip active class on touch devices to prevent flickering
+      const isTouch = event.pointerType === 'touch';
+      if (!isTouch) {
+        shell.classList.add('active');
+        shell.classList.add('entering');
+        if (enterTimerRef.current) window.clearTimeout(enterTimerRef.current);
+        enterTimerRef.current = window.setTimeout(() => {
+          shell.classList.remove('entering');
+        }, ANIMATION_CONFIG.ENTER_TRANSITION_MS);
+      }
 
       const { x, y } = getOffsets(event, shell);
       tiltEngine.setTarget(x, y);
@@ -196,11 +200,18 @@ const ProfileCardComponent = ({
     [tiltEngine]
   );
 
-  const handlePointerLeave = useCallback(() => {
+  const handlePointerLeave = useCallback((event) => {
     const shell = shellRef.current;
     if (!shell || !tiltEngine) return;
 
     tiltEngine.toCenter();
+
+    // Skip animation check on touch devices
+    const isTouch = event?.pointerType === 'touch';
+    if (isTouch) {
+      shell.classList.remove('active');
+      return;
+    }
 
     const checkSettle = () => {
       const { x, y, tx, ty } = tiltEngine.getCurrent();

@@ -152,80 +152,62 @@ export default function ClaimIdentityNFT({
           backContent={
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', width: '100%' }}>
               {/* Title */}
-              <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: 'white', marginBottom: '8px', textAlign: 'center', letterSpacing: '0.5px' }}>
+              <h2 className="pc-back-title">
                 {displayName}
               </h2>
 
               {/* Rank & Total Points Badges */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '10px' }}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  padding: '6px 12px', 
-                  background: 'linear-gradient(135deg, rgba(0,82,255,0.3) 0%, rgba(0,163,255,0.2) 100%)',
-                  borderRadius: '16px',
-                  border: '1px solid rgba(255,255,255,0.2)'
-                }}>
-                  <span style={{ fontSize: '14px' }}>🌱</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '12px' }}>{stats.rank}</span>
+              <div className="pc-back-badges">
+                <div className="pc-back-badge-item">
+                  <span>🌱</span>
+                  <span>{stats.rank}</span>
                 </div>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  padding: '6px 12px', 
-                  background: 'linear-gradient(135deg, rgba(0,82,255,0.3) 0%, rgba(0,163,255,0.2) 100%)',
-                  borderRadius: '16px',
-                  border: '1px solid rgba(255,255,255,0.2)'
-                }}>
-                  <span style={{ fontSize: '14px' }}>⭐</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '12px' }}>{stats.totalPoints.toLocaleString()}</span>
+                <div className="pc-back-badge-item">
+                  <span>⭐</span>
+                  <span>{stats.totalPoints.toLocaleString()}</span>
                 </div>
               </div>
               
               {/* Stats List - compact */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🔄 Transactions</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{stats.stats.transactions.toLocaleString()}</span>
+              <div className="pc-back-stats">
+                <div className="pc-back-stat-row">
+                  <span className="pc-back-stat-label">🔄 Transactions</span>
+                  <span className="pc-back-stat-value">{stats.stats.transactions.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🪙 Tokens</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{stats.stats.tokens.toLocaleString()}</span>
+                <div className="pc-back-stat-row">
+                  <span className="pc-back-stat-label">🪙 Tokens</span>
+                  <span className="pc-back-stat-value">{stats.stats.tokens.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🖼️ NFTs</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{stats.stats.nfts.toLocaleString()}</span>
+                <div className="pc-back-stat-row">
+                  <span className="pc-back-stat-label">🖼️ NFTs</span>
+                  <span className="pc-back-stat-value">{stats.stats.nfts.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>📜 Contracts</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{stats.stats.contracts.toLocaleString()}</span>
+                <div className="pc-back-stat-row">
+                  <span className="pc-back-stat-label">📜 Contracts</span>
+                  <span className="pc-back-stat-value">{stats.stats.contracts.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🏅 Badges</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{earnedBadges.length}</span>
+                <div className="pc-back-stat-row">
+                  <span className="pc-back-stat-label">🏅 Badges</span>
+                  <span className="pc-back-stat-value">{earnedBadges.length}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>Ξ ETH Balance</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{ethBalance || '0.0000'}</span>
+                <div className="pc-back-stat-row">
+                  <span className="pc-back-stat-label">Ξ ETH Balance</span>
+                  <span className="pc-back-stat-value">{ethBalance || '0.0000'}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🛠️ Builder Score</span>
-                  <span style={{ color: '#00FF00', fontWeight: 'bold', fontSize: '14px' }}>{builderScore?.score || 0}</span>
+                <div className="pc-back-stat-row">
+                  <span className="pc-back-stat-label">🛠️ Builder Score</span>
+                  <span className="pc-back-stat-value green">{builderScore?.score || 0}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🌐 Sphere Points</span>
-                  <span style={{ color: '#00A3FF', fontWeight: 'bold', fontSize: '14px' }}>{spherePoints?.totalPoints || 0}</span>
+                <div className="pc-back-stat-row">
+                  <span className="pc-back-stat-label">🌐 Sphere Points</span>
+                  <span className="pc-back-stat-value blue">{spherePoints?.totalPoints || 0}</span>
                 </div>
               </div>
 
               {/* Combined Score (all sources) */}
-              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '2px solid rgba(255,255,255,0.15)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>Combined Score</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '18px' }}>{totalCombinedScore.toLocaleString()}</span>
-                </div>
+              <div className="pc-back-total">
+                <span className="pc-back-total-label">Combined Score</span>
+                <span className="pc-back-total-value">{totalCombinedScore.toLocaleString()}</span>
               </div>
             </div>
           }

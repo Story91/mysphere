@@ -184,6 +184,35 @@
   opacity: 1;
 }
 
+/* Disable shine effects on touch devices to prevent flickering */
+@media (hover: none) and (pointer: coarse) {
+  .pc-shine {
+    transition: none;
+    filter: brightness(0.66) contrast(1.33) saturate(0.33) opacity(0.5);
+    animation-play-state: running;
+  }
+
+  .pc-shine::before,
+  .pc-shine::after {
+    transition: none;
+    opacity: 0;
+  }
+
+  .pc-card.active .pc-shine {
+    filter: brightness(0.66) contrast(1.33) saturate(0.33) opacity(0.5);
+    animation-play-state: running;
+  }
+
+  .pc-card.active .pc-shine::before,
+  .pc-card.active .pc-shine::after {
+    opacity: 0;
+  }
+
+  .pc-glare {
+    opacity: 0.5;
+  }
+}
+
 .pc-shine::before {
   background-image:
     linear-gradient(
@@ -249,8 +278,7 @@
   position: absolute;
   left: 50%;
   transform-origin: 50% 100%;
-  transform: translateX(calc(-50% + (var(--pointer-from-left) - 0.5) * 6px)) translateZ(0)
-    scaleY(calc(1 + (var(--pointer-from-top) - 0.5) * 0.02)) scaleX(calc(1 + (var(--pointer-from-left) - 0.5) * 0.01));
+  transform: translateX(-50%) translateZ(0);
   bottom: -1px;
   backface-visibility: hidden;
   will-change: transform;
@@ -624,12 +652,14 @@
 }
 
 .pc-flippable .pc-card-front {
-  transition: opacity 0.3s ease;
+  opacity: 1;
+  will-change: opacity;
 }
 
 .pc-flipped .pc-card-front {
   opacity: 0;
   pointer-events: none;
+  transition: opacity 0.3s ease;
 }
 
 .pc-flipped .pc-card-back {
@@ -704,6 +734,101 @@
   pointer-events: auto;
 }
 
+/* Back content responsive text sizing */
+.pc-back-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+  margin-bottom: 8px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.pc-back-badges {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.pc-back-badge-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(0,82,255,0.3) 0%, rgba(0,163,255,0.2) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.pc-back-badge-item span:first-child {
+  font-size: 14px;
+}
+
+.pc-back-badge-item span:last-child {
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.pc-back-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pc-back-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.pc-back-stat-row:last-child {
+  border-bottom: none;
+}
+
+.pc-back-stat-label {
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+}
+
+.pc-back-stat-value {
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.pc-back-stat-value.green {
+  color: #00FF00;
+}
+
+.pc-back-stat-value.blue {
+  color: #00A3FF;
+}
+
+.pc-back-total {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid rgba(255,255,255,0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pc-back-total-label {
+  color: rgba(255,255,255,0.8);
+  font-size: 12px;
+}
+
+.pc-back-total-value {
+  color: white;
+  font-weight: bold;
+  font-size: 18px;
+}
+
 /* ==================== LOGO & ENS BADGE ==================== */
 
 .pc-logo {
@@ -767,6 +892,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
 }
 
 .pc-verify-shield {
@@ -781,6 +907,7 @@
   font-weight: 700;
   color: white;
   letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
 @media (max-width: 480px) {
@@ -805,5 +932,145 @@
     width: 32px;
     height: 32px;
     font-size: 14px;
+  }
+
+  .pc-bottom-badge {
+    bottom: 12px;
+    padding: 6px 10px;
+    gap: 4px;
+  }
+
+  .pc-verify-shield {
+    width: 16px;
+    height: 16px;
+  }
+
+  .pc-bottom-badge-text {
+    font-size: 11px;
+  }
+
+  .pc-back-content {
+    padding: 12px 16px;
+  }
+}
+
+@media (max-width: 380px) {
+  .pc-bottom-badge {
+    bottom: 10px;
+    padding: 5px 8px;
+    gap: 3px;
+  }
+
+  .pc-verify-shield {
+    width: 14px;
+    height: 14px;
+  }
+
+  .pc-bottom-badge-text {
+    font-size: 10px;
+  }
+
+  .pc-back-content {
+    padding: 10px 12px;
+  }
+}
+
+/* Back content mobile responsive */
+@media (max-width: 480px) {
+  .pc-back-title {
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+
+  .pc-back-badges {
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .pc-back-badge-item {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  .pc-back-badge-item span:first-child {
+    font-size: 11px;
+  }
+
+  .pc-back-badge-item span:last-child {
+    font-size: 10px;
+  }
+
+  .pc-back-stats {
+    gap: 2px;
+  }
+
+  .pc-back-stat-row {
+    padding: 4px 0;
+  }
+
+  .pc-back-stat-label {
+    font-size: 11px;
+  }
+
+  .pc-back-stat-value {
+    font-size: 11px;
+  }
+
+  .pc-back-total {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+
+  .pc-back-total-label {
+    font-size: 10px;
+  }
+
+  .pc-back-total-value {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  .pc-back-title {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+
+  .pc-back-badges {
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+
+  .pc-back-badge-item {
+    padding: 3px 6px;
+    gap: 3px;
+  }
+
+  .pc-back-badge-item span:first-child {
+    font-size: 10px;
+  }
+
+  .pc-back-badge-item span:last-child {
+    font-size: 9px;
+  }
+
+  .pc-back-stat-row {
+    padding: 3px 0;
+  }
+
+  .pc-back-stat-label {
+    font-size: 10px;
+  }
+
+  .pc-back-stat-value {
+    font-size: 10px;
+  }
+
+  .pc-back-total-label {
+    font-size: 9px;
+  }
+
+  .pc-back-total-value {
+    font-size: 12px;
   }
 }
