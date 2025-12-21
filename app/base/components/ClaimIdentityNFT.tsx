@@ -7,6 +7,7 @@ import { useName } from '@coinbase/onchainkit/identity';
 import { base } from 'wagmi/chains';
 import ProfileCard from '@/components/ProfileCard';
 import '@/components/ProfileCard.css';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import BaseCard, { BaseCardContent } from './BaseCard';
 import BaseButton from './BaseButton';
 import BaseBadge from './BaseBadge';
@@ -149,53 +150,81 @@ export default function ClaimIdentityNFT({
           bottomBadge="Sphere Identity"
           bottomBadgeIcon="verify"
           backContent={
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', width: '100%' }}>
               {/* Title */}
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white', marginBottom: '16px', textAlign: 'center' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: 'white', marginBottom: '8px', textAlign: 'center', letterSpacing: '0.5px' }}>
                 {displayName}
               </h2>
+
+              {/* Rank & Total Points Badges */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '10px' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  padding: '6px 12px', 
+                  background: 'linear-gradient(135deg, rgba(0,82,255,0.3) 0%, rgba(0,163,255,0.2) 100%)',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  <span style={{ fontSize: '14px' }}>🌱</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '12px' }}>{stats.rank}</span>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  padding: '6px 12px', 
+                  background: 'linear-gradient(135deg, rgba(0,82,255,0.3) 0%, rgba(0,163,255,0.2) 100%)',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  <span style={{ fontSize: '14px' }}>⭐</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '12px' }}>{stats.totalPoints.toLocaleString()}</span>
+                </div>
+              </div>
               
-              {/* Stats List */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>🔄 Transactions</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>{stats.stats.transactions.toLocaleString()}</span>
+              {/* Stats List - compact */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🔄 Transactions</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{stats.stats.transactions.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>🪙 Tokens</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>{stats.stats.tokens.toLocaleString()}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🪙 Tokens</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{stats.stats.tokens.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>🖼️ NFTs</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>{stats.stats.nfts.toLocaleString()}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🖼️ NFTs</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{stats.stats.nfts.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>📜 Contracts</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>{stats.stats.contracts.toLocaleString()}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>📜 Contracts</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{stats.stats.contracts.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>🏅 Badges</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>{earnedBadges.length}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🏅 Badges</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{earnedBadges.length}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>Ξ ETH Balance</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '16px' }}>{ethBalance || '0.0000'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>Ξ ETH Balance</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>{ethBalance || '0.0000'}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>🛠️ Builder Score</span>
-                  <span style={{ color: '#00FF00', fontWeight: 'bold', fontSize: '16px' }}>{builderScore?.score || 0}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🛠️ Builder Score</span>
+                  <span style={{ color: '#00FF00', fontWeight: 'bold', fontSize: '14px' }}>{builderScore?.score || 0}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>🌐 Sphere Points</span>
-                  <span style={{ color: '#00A3FF', fontWeight: 'bold', fontSize: '16px' }}>{spherePoints?.totalPoints || 0}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>🌐 Sphere Points</span>
+                  <span style={{ color: '#00A3FF', fontWeight: 'bold', fontSize: '14px' }}>{spherePoints?.totalPoints || 0}</span>
                 </div>
               </div>
 
-              {/* Total Score */}
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '2px solid rgba(255,255,255,0.2)' }}>
+              {/* Combined Score (all sources) */}
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '2px solid rgba(255,255,255,0.15)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>Combined Score</span>
-                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '24px' }}>{totalCombinedScore.toLocaleString()}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>Combined Score</span>
+                  <span style={{ color: 'white', fontWeight: 'bold', fontSize: '18px' }}>{totalCombinedScore.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -255,32 +284,49 @@ export default function ClaimIdentityNFT({
         )}
       </AnimatePresence>
 
-      {/* Claim Button */}
+      {/* Claim Button - Currently disabled */}
       {claimStep !== 'success' && claimStep !== 'error' && (
         <div className="flex justify-center">
           <button
-            onClick={handleClaim}
-            disabled={!isConnected || stats.totalPoints === 0 || isClaiming}
-            className="px-8 py-3 rounded-2xl bg-gradient-to-r from-[#0052FF] to-[#00A3FF] text-white font-semibold text-base shadow-lg shadow-[#0052FF]/30 hover:shadow-xl hover:shadow-[#0052FF]/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2"
+            disabled={true}
+            className="px-8 py-3 rounded-2xl bg-gradient-to-r from-[#0052FF] to-[#00A3FF] text-white font-semibold text-base shadow-lg shadow-[#0052FF]/30 transition-all opacity-50 cursor-not-allowed flex items-center gap-2"
           >
-            {isClaiming ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>
-                  {claimStep === 'preparing' && 'Preparing...'}
-                  {claimStep === 'signing' && 'Signing...'}
-                  {claimStep === 'confirming' && 'Confirming...'}
-                </span>
-              </>
-            ) : (
-              <>
-                <span>🎫</span>
-                <span>Mint Identity NFT</span>
-              </>
-            )}
+            <span>🔒</span>
+            <span>Mint Your Sphere Identity</span>
+            <span className="text-xs ml-1 opacity-70">(Coming Soon)</span>
           </button>
         </div>
       )}
+
+      {/* Coming Soon Info */}
+      <Alert className="bg-gradient-to-r from-[#0052FF]/5 to-[#00A3FF]/5 border-[#0052FF]/20">
+        <span className="text-lg">🚀</span>
+        <AlertTitle className="text-[#0052FF] font-semibold">
+          Sphere Identity System Update
+        </AlertTitle>
+        <AlertDescription className="text-gray-600">
+          <p className="mt-1">
+            We're building a unified scoring system that combines:
+          </p>
+          <ul className="mt-2 space-y-1 text-sm">
+            <li className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0052FF]"></span>
+              <span>Onchain Activity (transactions, tokens, NFTs, contracts)</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00FF00]"></span>
+              <span>Builder Score from Talent Protocol</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00A3FF]"></span>
+              <span>Sphere Points (posts, likes, activity)</span>
+            </li>
+          </ul>
+          <p className="mt-3 text-xs text-gray-500">
+            Your identity rank and total points will be calculated based on all these metrics. Stay tuned for the full launch!
+          </p>
+        </AlertDescription>
+      </Alert>
 
     </div>
   );

@@ -423,6 +423,14 @@ const ProfileCardComponent = ({
         {enableFlip && (
           <section className="pc-card pc-card-back">
             <div className="pc-inside">
+              {/* Background image with blur */}
+              <div className="pc-back-bg">
+                <img 
+                  src={avatarUrl} 
+                  alt="Background" 
+                  className="pc-back-bg-img"
+                />
+              </div>
               <div className="pc-back-blur" />
               <div className="pc-back-content">
                 {backContent}
