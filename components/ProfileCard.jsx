@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './ProfileCard.css';
 
 const DEFAULT_INNER_GRADIENT = 'linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)';
@@ -44,7 +44,8 @@ const ProfileCardComponent = ({
   backContent = null,
   onContactClick
 }) => {
-  const [isFlipped, setIsFlipped] = React.useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
   const wrapRef = useRef(null);
   const shellRef = useRef(null);
 
@@ -250,7 +251,7 @@ const ProfileCardComponent = ({
   );
 
   useEffect(() => {
-    if (!enableTilt || !tiltEngine) return;
+    if (!enableTilt || !tiltEngine || isMobileDevice) return;
 
     const shell = shellRef.current;
     if (!shell) return;
@@ -306,7 +307,8 @@ const ProfileCardComponent = ({
     handlePointerMove,
     handlePointerEnter,
     handlePointerLeave,
-    handleDeviceOrientation
+    handleDeviceOrientation,
+    isMobileDevice
   ]);
 
   const cardStyle = useMemo(
@@ -319,6 +321,68 @@ const ProfileCardComponent = ({
     }),
     [iconUrl, grainUrl, innerGradient, behindGlowColor, behindGlowSize]
   );
+
+  // Detect mobile devices and reduced motion preference
+  useEffect(() => {
+    const detectMobile = () => {
+      const isMobile = window.innerWidth <= 768 || 
+                      /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                      ('ontouchstart' in window) ||
+                      (navigator.maxTouchPoints > 0);
+      
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      
+      setIsMobileDevice(isMobile || prefersReducedMotion);
+    };
+
+    detectMobile();
+    window.addEventListener('resize', detectMobile);
+    
+    return () => window.removeEventListener('resize', detectMobile);
+  }, []);
+
+  // Set static styles for mobile devices
+  useEffect(() => {
+    if (isMobileDevice) {
+      const shell = shellRef.current;
+      const wrap = wrapRef.current;
+
+      if (!shell || !wrap) return;
+
+      // Cancel any running tilt animations
+      if (tiltEngine) {
+        tiltEngine.cancel();
+        tiltEngine.toCenter();
+      }
+
+      // Set static position for mobile - prevent any movement
+      wrap.style.setProperty('--pointer-x', '50%');
+      wrap.style.setProperty('--pointer-y', '50%');
+      wrap.style.setProperty('--pointer-from-center', '0');
+      wrap.style.setProperty('--pointer-from-top', '0.5');
+      wrap.style.setProperty('--pointer-from-left', '0.5');
+      wrap.style.setProperty('--rotate-x', '0deg');
+      wrap.style.setProperty('--rotate-y', '0deg');
+      wrap.style.setProperty('--background-x', '50%');
+      wrap.style.setProperty('--background-y', '50%');
+
+      // Add mobile class for CSS targeting
+      wrap.classList.add('mobile-device');
+      shell.classList.add('mobile-device');
+      
+      // Remove active class to prevent any animations
+      shell.classList.remove('active');
+      shell.classList.remove('entering');
+    } else {
+      // On desktop, ensure mobile classes are removed
+      const shell = shellRef.current;
+      const wrap = wrapRef.current;
+      if (shell && wrap) {
+        wrap.classList.remove('mobile-device');
+        shell.classList.remove('mobile-device');
+      }
+    }
+  }, [isMobileDevice, tiltEngine]);
 
   const handleContactClick = useCallback(() => {
     onContactClick?.();

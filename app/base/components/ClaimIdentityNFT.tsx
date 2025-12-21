@@ -139,6 +139,7 @@ export default function ClaimIdentityNFT({
           iconUrl="/_base-brand/1_Base Brand Assets/Basemark/Base_basemark_white.png"
           showUserInfo={false}
           enableTilt={true}
+          enableMobileTilt={false}
           behindGlowEnabled={true}
           behindGlowColor="rgba(0, 82, 255, 0.5)"
           behindGlowSize="60%"

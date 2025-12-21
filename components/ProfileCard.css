@@ -173,7 +173,7 @@
 
 .pc-card:hover .pc-shine,
 .pc-card.active .pc-shine {
-  filter: brightness(0.85) contrast(1.5) saturate(0.5);
+  filter: brightness(0.7) contrast(1.5) saturate(0.5);
   animation-play-state: paused;
 }
 
@@ -262,7 +262,7 @@
     hsla(207, 40%, 30%, 0.8) 90%
   );
   mix-blend-mode: overlay;
-  filter: brightness(0.8) contrast(1.2);
+  filter: brightness(0.65) contrast(1.2);
   z-index: 4;
 }
 
@@ -1113,9 +1113,15 @@
     opacity: 0.4 !important;
   }
   
-  /* Disable tilt transform on touch */
+  /* Disable tilt transform on touch - but respect avatar-contain and avatar-cover modes */
   .pc-avatar-content .avatar {
     transform: translateX(-50%) translateZ(0) !important;
+  }
+  
+  .pc-avatar-content.avatar-contain .avatar,
+  .pc-avatar-content.avatar-cover .avatar {
+    transform: none !important;
+    left: 0 !important;
   }
 }
 
