@@ -6,7 +6,7 @@ import { useAccount } from 'wagmi';
 import BaseCard, { BaseCardContent } from './components/BaseCard';
 import BaseBadge from './components/BaseBadge';
 import BaseIdentity from './components/BaseIdentity';
-import ProfilePicAI from './components/ProfilePicAI';
+import { AvatarCreator } from './components/AvatarCreator';
 import ClaimIdentityNFT from './components/ClaimIdentityNFT';
 import { calculateRanking, BADGES, UserRank, RankingStats } from '../utils/ranking';
 import { fetchBuilderScore, TalentScore } from './utils/talentApi';
@@ -22,6 +22,7 @@ export default function BasePage() {
   const { address, isConnected } = useAccount();
   const [activeView, setActiveView] = useState<ActiveView>('identity');
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [diceBearAvatar, setDiceBearAvatar] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   
   // Builder Score and Sphere Points
@@ -177,6 +178,10 @@ export default function BasePage() {
     setGeneratedImage(imageData);
   };
 
+  const handleDiceBearChange = (diceBearUrl: string, config: any) => {
+    setDiceBearAvatar(diceBearUrl);
+  };
+
   const navigationItems = [
     {
       id: 'identity' as const,
@@ -289,7 +294,10 @@ export default function BasePage() {
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.3 }}
               >
-                <ProfilePicAI onGenerated={handleImageGenerated} />
+                <AvatarCreator 
+                  onGenerated={handleImageGenerated} 
+                  onDiceBearChange={handleDiceBearChange}
+                />
               </motion.div>
             )}
 
@@ -305,6 +313,7 @@ export default function BasePage() {
                   stats={stats}
                   earnedBadges={earnedBadges}
                   generatedImage={generatedImage}
+                  diceBearAvatar={diceBearAvatar}
                   builderScore={builderScore}
                   spherePoints={spherePoints}
                   ethBalance={ethBalance}
