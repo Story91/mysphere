@@ -7,6 +7,60 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 
+// --- AUTONOMOUS AGENT WALLET SYSTEM INTERFACES ---
+
+interface IAutonomousAgentWallet {
+    struct SessionKey {
+        address agentAddress;
+        uint256 permissions; // Bitmask for permissions
+        uint256 expiresAt;
+        uint256 dailyLimit; // Maximum ETH that can be spent per day
+        uint256 spentToday; // ETH spent today
+        uint256 lastActivityDay; // Last day of activity
+        bool isActive;
+    }
+
+    struct AgentPolicy {
+        address agentAddress;
+        string name;
+        string description;
+        uint256 maxTransactionValue;
+        uint256 dailyTransactionLimit;
+        address[] allowedContracts;
+        bytes4[] allowedFunctions;
+        bool canTransferNative;
+        bool canTransferERC20;
+        bool canTransferNFT;
+        bool canSwap;
+        bool canBridge;
+        bool isActive;
+    }
+
+    event SessionKeyCreated(address indexed user, address indexed agent, uint256 indexed sessionId);
+    event SessionKeyRevoked(address indexed user, address indexed agent, uint256 indexed sessionId);
+    event AutonomousTransaction(address indexed user, address indexed agent, address indexed target, uint256 value);
+    event AgentPolicyUpdated(address indexed user, address indexed agent);
+    event EmergencyStop(address indexed user, address indexed agent);
+
+    function createSessionKey(
+        address agentAddress,
+        uint256 permissions,
+        uint256 duration,
+        uint256 dailyLimit
+    ) external returns (uint256 sessionId);
+
+    function executeAutonomousTransaction(
+        uint256 sessionId,
+        address target,
+        uint256 value,
+        bytes calldata data
+    ) external returns (bool success, bytes memory result);
+
+    function revokeSessionKey(uint256 sessionId) external;
+    function emergencyStop() external;
+    function updateAgentPolicy(address agent, AgentPolicy calldata policy) external;
+}
+
 contract HybridCommunityPlatform is ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
     using Counters for Counters.Counter;
 

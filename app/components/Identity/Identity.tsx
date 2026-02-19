@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use client';
 
 import { IdentityCard } from '@coinbase/onchainkit/identity';

@@ -32,7 +32,7 @@ CAMP_CLIENT_ID=6a886b9d-e637-49ab-8c06-a66a20b7a778
 # Frontend (public)
 NEXT_PUBLIC_CAMP_CLIENT_ID=6a886b9d-e637-49ab-8c06-a66a20b7a778
 NEXT_PUBLIC_CAMP_FAUCET_URL=https://faucet.campnetwork.xyz/
-NEXT_PUBLIC_CAMP_EXPLORER_URL=https://basecamp.cloud.blockscout.com/
+NEXT_PUBLIC_CAMP_EXPLORER_URL=https://camp.cloud.blockscout.com/
 ```
 
 ### 2. CampProvider Configuration
@@ -44,7 +44,7 @@ The `CampProvider` is configured in `/app/providers.tsx` with:
 ### 3. Camp Network URLs
 
 - **Faucet**: https://faucet.campnetwork.xyz/
-- **Explorer**: https://basecamp.cloud.blockscout.com/
+- **Explorer**: https://camp.cloud.blockscout.com/
 
 ## 🚀 Features
 

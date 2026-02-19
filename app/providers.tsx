@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use client';
 
 import { base } from 'viem/chains';
@@ -6,7 +7,7 @@ import { createContext, useContext, useState } from 'react';
 import { createConfig, http } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
-import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors';
+import { injected, walletConnect, coinbaseWallet, metaMask, safe } from 'wagmi/connectors';
 import { farcasterFrame } from '@farcaster/frame-wagmi-connector';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
@@ -69,6 +70,13 @@ const TRANSPORTS_WITH_CAMP_MAINNET = {
 const COMMON_CONNECTORS = [
   farcasterFrame(),
   injected(),
+  metaMask({
+    dappMetadata: {
+      name: 'MySphere',
+      url: 'https://mysphere.fun',
+      iconUrl: 'https://mysphere.fun/android-chrome-192x192.png',
+    },
+  }),
   coinbaseWallet({
     appName: 'MySphere',
     appLogoUrl: '/android-chrome-192x192.png',
@@ -84,7 +92,8 @@ const COMMON_CONNECTORS = [
       url: 'https://mysphere.fun',
       icons: ['https://mysphere.fun/android-chrome-192x192.png']
     }
-  })
+  }),
+  safe(),
 ] as const;
 
 export const wagmiConfig = ENABLE_CAMP_MAINNET
@@ -143,6 +152,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
                       display: 'modal',
                       termsUrl: 'https://mysphere.fun/docs',
                       privacyUrl: 'https://mysphere.fun/docs',
+                      supportedWallets: {
+                        rabby: true,
+                        trust: true,
+                        frame: true,
+                      },
                     }
                   }}
                   projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}

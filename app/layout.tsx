@@ -1,7 +1,6 @@
 'use client';
 
 import Script from 'next/script';
-import '@coinbase/onchainkit/styles.css';
 import '@rainbow-me/rainbowkit/styles.css';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
@@ -54,6 +53,7 @@ export default function RootLayout({
           }
         }' />
         
+        <link rel="stylesheet" href="https://unpkg.com/@coinbase/onchainkit@1.1.2/dist/assets/style.css" />
         <link rel="icon" type="image/x-icon" href="/favicon_io (1)/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io (1)/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io (1)/favicon-16x16.png" />

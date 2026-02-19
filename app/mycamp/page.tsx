@@ -42,7 +42,7 @@ import HolographicStats from './components/HolographicStats';
 import FloatingNavigation from './components/FloatingNavigation';
 // Removed API imports - these should only be used in backend
 
-const CAMP_NFT_CONTRACT = '0x1eD74B27f846C699A90926daD057A7f6FD22C126';
+const CAMP_NFT_CONTRACT = '0x57CC99c9E1942a34a0cfF7FCC27c227455f14587';
 
 // Static MySphere data
 const STATIC_MYSPHERE_DATA = {
@@ -1561,7 +1561,7 @@ export default function MyCampPage() {
               <div className="flex items-center gap-2">
                 <div className="text-sm text-orange-200/70">Powered by</div>
                 <Link 
-                  href="https://basecamp.cloud.blockscout.com" 
+                  href="https://camp.cloud.blockscout.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-blue-400 hover:text-blue-300 transition-colors font-medium"

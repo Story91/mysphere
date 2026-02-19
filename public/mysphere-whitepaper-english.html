@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MySphere Whitepaper - Web3 Social Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0052FF 0%, #00D4FF 100%);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="10" cy="60" r="0.5" fill="white" opacity="0.1"/><circle cx="90" cy="40" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            opacity: 0.9;
+        }
+
+        .tagline {
+            font-size: 1.1rem;
+            font-weight: 300;
+            opacity: 0.8;
+            font-style: italic;
+        }
+
+        .version {
+            margin-top: 2rem;
+            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50px;
+            display: inline-block;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+        }
+
+        .content {
+            padding: 3rem 2rem;
+        }
+
+        .toc {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 3rem;
+            border: 1px solid #e2e8f0;
+        }
+
+        .toc h2 {
+            color: #1e293b;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .toc h2::before {
+            content: '📋';
+            margin-right: 0.5rem;
+        }
+
+        .toc ol {
+            list-style: none;
+            counter-reset: item;
+        }
+
+        .toc li {
+            counter-increment: item;
+            margin-bottom: 0.5rem;
+            position: relative;
+            padding-left: 2rem;
+        }
+
+        .toc li::before {
+            content: counter(item) ".";
+            position: absolute;
+            left: 0;
+            font-weight: 600;
+            color: #0052FF;
+        }
+
+        .toc a {
+            color: #475569;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .toc a:hover {
+            color: #0052FF;
+        }
+
+        .toc ul {
+            list-style: none;
+            margin-top: 0.5rem;
+            margin-left: 1rem;
+        }
+
+        .toc ul li {
+            font-size: 0.9rem;
+            color: #64748b;
+            padding-left: 1.5rem;
+        }
+
+        .toc ul li::before {
+            content: '•';
+            color: #94a3b8;
+        }
+
+        h2 {
+            color: #1e293b;
+            font-size: 2rem;
+            font-weight: 600;
+            margin: 3rem 0 1.5rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #0052FF;
+            position: relative;
+        }
+
+        h2::before {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #0052FF, #00D4FF);
+        }
+
+        h3 {
+            color: #334155;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 2rem 0 1rem 0;
+        }
+
+        h4 {
+            color: #475569;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.5rem 0;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: #475569;
+            font-size: 1rem;
+        }
+
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+            color: #475569;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        strong {
+            color: #1e293b;
+            font-weight: 600;
+        }
+
+        em {
+            color: #64748b;
+            font-style: italic;
+        }
+
+        hr {
+            border: none;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+            margin: 2rem 0;
+        }
+
+        .section {
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #f1f5f9;
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-left: 4px solid #0052FF;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+        }
+
+        .footer {
+            background: #1e293b;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+
+        .footer p {
+            color: #94a3b8;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 0;
+                box-shadow: none;
+            }
+            
+            .header {
+                padding: 2rem 1rem;
+            }
+            
+            h1 {
+                font-size: 2.5rem;
+            }
+            
+            .subtitle {
+                font-size: 1.2rem;
+            }
+            
+            .content {
+                padding: 2rem 1rem;
+            }
+            
+            .toc {
+                padding: 1.5rem;
+            }
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+            
+            .container {
+                box-shadow: none;
+            }
+            
+            .header {
+                background: #0052FF !important;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1>MY SPHERE</h1>
+                <div class="subtitle">Web3 Social Platform, Onchain Dapp</div>
+                <div class="tagline">Revolutionizing Content Creation and Monetization through Blockchain Technology</div>
+                <div class="version">WHITEPAPER - Version 1.0 - March 2025</div>
+            </div>
+        </header>
+
+        <main class="content">
+            <div class="toc">
+                <h2>Table of Contents</h2>
+                <ol type="1">
+                    <li><a href="#1-executive-summary">Executive Summary</a></li>
+                    <li><a href="#2-introduction">Introduction</a>
+                        <ul>
+                            <li>2.1 <a href="#21-vision">Vision</a></li>
+                            <li>2.2 <a href="#22-problem">Problem</a></li>
+                            <li>2.3 <a href="#23-our-solution">Our Solution</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#3-market-analysis">Market Analysis</a>
+                        <ul>
+                            <li>3.1 <a href="#31-target-market">Target Market</a></li>
+                            <li>3.2 <a href="#32-competitive-landscape">Competitive Landscape</a></li>
+                            <li>3.3 <a href="#33-market-trends">Market Trends</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#4-platform-overview">Platform Overview</a>
+                        <ul>
+                            <li>4.1 <a href="#41-key-features">Key Features</a></li>
+                            <li>4.2 <a href="#42-user-journey">User Journey</a></li>
+                            <li>4.3 <a href="#43-use-cases">Use Cases</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#5-technical-architecture">Technical Architecture</a>
+                        <ul>
+                            <li>5.1 <a href="#51-technology-stack">Technology Stack</a></li>
+                            <li>5.2 <a href="#52-smart-contract-architecture">Smart Contract Architecture</a></li>
+                            <li>5.3 <a href="#53-data-management">Data Management</a></li>
+                            <li>5.4 <a href="#54-security-considerations">Security Considerations</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#6-token-economics">Token Economics</a>
+                        <ul>
+                            <li>6.1 <a href="#61-nft-implementation">NFT Implementation</a></li>
+                            <li>6.2 <a href="#62-market-mechanics">Market Mechanics</a></li>
+                            <li>6.3 <a href="#63-platform-token-future-implementation">Platform Token (Future Implementation)</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#7-onchain-reputation-system">Onchain Reputation System</a>
+                        <ul>
+                            <li>7.1 <a href="#71-reputation-framework">Reputation Framework</a></li>
+                            <li>7.2 <a href="#72-reputation-rewards">Reputation Rewards</a></li>
+                            <li>7.3 <a href="#73-anti-manipulation-measures">Anti-Manipulation Measures</a></li>
+                            <li>7.4 <a href="#74-reputation-portability">Reputation Portability</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#8-business-model">Business Model</a>
+                        <ul>
+                            <li>8.1 <a href="#81-revenue-streams">Revenue Streams</a></li>
+                            <li>8.2 <a href="#82-value-distribution">Value Distribution</a></li>
+                            <li>8.3 <a href="#83-growth-strategy">Growth Strategy</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#9-team-advisors">Team & Advisors</a>
+                        <ul>
+                            <li>9.1 <a href="#91-core-team">Core Team</a></li>
+                            <li>9.2 <a href="#92-advisors">Advisors</a></li>
+                            <li>9.3 <a href="#93-partnerships">Partnerships</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#10-roadmap">Roadmap</a>
+                        <ul>
+                            <li>10.1 <a href="#101-phase-1-foundation-completed">Phase 1: Foundation (Completed)</a></li>
+                            <li>10.2 <a href="#102-phase-2-expansion-q2-q3-2024">Phase 2: Expansion (Q2-Q3 2024)</a></li>
+                            <li>10.3 <a href="#103-phase-3-tokenization-q4-2024---q1-2025">Phase 3: Tokenization (Q4 2024 - Q1 2025)</a></li>
+                            <li>10.4 <a href="#104-phase-4-ecosystem-q2-q3-2025">Phase 4: Ecosystem (Q2-Q3 2025)</a></li>
+                            <li>10.5 <a href="#105-phase-5-decentralization-q4-2025---q6">Phase 5: Decentralization (Q4 2025 - 2026)</a></li>
+                            <li>10.6 <a href="#106-success-metrics">Success Metrics</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#11-conclusion">Conclusion</a></li>
+                </ol>
+            </div>
+
+            <!-- Full content will be inserted here -->
+        </main>
+
+        <footer class="footer">
+            <p>© 2025 mySphere.fun | All Rights Reserved</p>
+        </footer>
+    </div>
+</body>
+</html>

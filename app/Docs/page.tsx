@@ -25,7 +25,7 @@ export default function DocsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-12">
             {/* Whitepaper Card */}
             <div 
-              onClick={() => navigateToDoc('/docs/mysphere-whitepaper')}
+              onClick={() => window.open('/mysphere-whitepaper-english.html', '_blank')}
               className="bg-gray-900 border border-[#0052FF]/20 rounded-lg p-6 hover:border-[#0052FF] transition-all cursor-pointer"
             >
               <h2 className="text-2xl font-bold mb-4">MySphere Whitepaper</h2>
@@ -34,7 +34,7 @@ export default function DocsPage() {
                 technology stack, tokenomics, and roadmap.
               </p>
               <div className="flex justify-between items-center mt-6">
-                <span className="text-[#0052FF]">Read Whitepaper</span>
+                <span className="text-[#0052FF]">View Whitepaper</span>
                 <span className="text-gray-500 text-sm">Version 1.0</span>
               </div>
             </div>

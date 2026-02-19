@@ -1,4 +1,7 @@
 /* globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
 
@@ -124,10 +127,6 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 82, 255, 0.2);
 }
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /* Display font for NFT titles */
 @font-face {
@@ -690,9 +689,16 @@ appkit-button::part(button):hover {
   }
 }
 
-/* OnchainKit Modal Styling - Custom appearance */
-[data-testid="ockConnectWallet_Container"] {
-  /* Custom styling for connect wallet modal */
+/* OnchainKit Modal Styling - center on desktop */
+@media (min-width: 768px) {
+  div[role="dialog"] {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    right: auto !important;
+    bottom: auto !important;
+  }
 }
 
 /* Hide Sign up text with more specific selectors */

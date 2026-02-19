@@ -155,7 +155,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
             className="underline hover:text-white" 
             target="_blank" 
             rel="noreferrer" 
-            href={`https://basecamp.cloud.blockscout.com/token/${item.contract || '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E'}/instance/${item.tokenId || item.id}`}
+                            href={`https://camp.cloud.blockscout.com/token/${item.contract || '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E'}/instance/${item.tokenId || item.id}`}
           >
             Explorer
           </a>

@@ -97,7 +97,7 @@ export default function MarketplacePage() {
           // Try Blockscout v2 token endpoint first
           let got = false;
           try {
-            const rV2 = await fetch(`https://basecamp.cloud.blockscout.com/api/v2/tokens/${IP_MAIN}`);
+            const rV2 = await fetch(`https://camp.cloud.blockscout.com/api/v2/tokens/${IP_MAIN}`);
             if (rV2.ok) {
               const j = await rV2.json();
               const total = j?.holders?.toString ? Number(j.holders) : (j?.holders_count || 0);
@@ -107,7 +107,7 @@ export default function MarketplacePage() {
           if (!got) {
             // Try legacy token info
             try {
-              const rInfo = await fetch(`https://basecamp.cloud.blockscout.com/api?module=token&action=tokeninfo&contractaddress=${IP_MAIN}`);
+              const rInfo = await fetch(`https://camp.cloud.blockscout.com/api?module=token&action=tokeninfo&contractaddress=${IP_MAIN}`);
               const jInfo = await rInfo.json();
               const total2 = Number(jInfo?.result?.holders || jInfo?.count || 0);
               if (total2 && total2 > 0) { creators = total2; got = true; }
@@ -116,7 +116,7 @@ export default function MarketplacePage() {
           if (!got) {
             // Last resort: scrape holders page
             try {
-              const page = await fetch(`https://basecamp.cloud.blockscout.com/token/${IP_MAIN}`);
+              const page = await fetch(`https://camp.cloud.blockscout.com/token/${IP_MAIN}`);
               const html = await page.text();
               const m = html.match(/Holders[^\d]*([\d,]+)/i);
               if (m && m[1]) {
@@ -131,7 +131,7 @@ export default function MarketplacePage() {
         // Volume in CAMP to marketplace contract
         let volumeCamp = 0;
         try {
-          const BLOCKSCOUT = 'https://basecamp.cloud.blockscout.com/api';
+          const BLOCKSCOUT = 'https://camp.cloud.blockscout.com/api';
           const addr = MARKETPLACE_ADDRESS;
           const res = await fetch(`${BLOCKSCOUT}?module=account&action=txlist&address=${addr}`);
           const json = await res.json();

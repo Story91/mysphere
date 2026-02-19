@@ -182,7 +182,7 @@ export default function SimpleMint({
               Copy Hash
             </button>
             <a
-              href={`https://basecamp.cloud.blockscout.com/tx/${txHash}`}
+                              href={`https://camp.cloud.blockscout.com/tx/${txHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"

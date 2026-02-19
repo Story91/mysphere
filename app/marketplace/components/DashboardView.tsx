@@ -385,7 +385,7 @@ export default function DashboardView() {
         console.log('🔍 Scanning AccessPurchased events for user:', address);
         
         // Look for AccessPurchased events in recent transactions
-        const BLOCKSCOUT = 'https://basecamp.cloud.blockscout.com/api';
+        const BLOCKSCOUT = 'https://camp.cloud.blockscout.com/api';
         const logsResponse = await fetch(
           `${BLOCKSCOUT}?module=logs&action=getLogs&address=${MARKETPLACE_ADDRESS}&topic0=0x79f205d05e1d9f99a7e4a6d2e5d9fc75c372c7033d239fefe5e5dec18d472bd9&topic2=0x000000000000000000000000${address.slice(2)}&fromBlock=0&toBlock=latest`,
           { signal: AbortSignal.timeout(5000) }
@@ -1627,7 +1627,7 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
           </button>
 
           <a
-            href={`https://basecamp.cloud.blockscout.com/token/${listing.nftContract}/instance/${listing.tokenId}`}
+                            href={`https://camp.cloud.blockscout.com/token/${listing.nftContract}/instance/${listing.tokenId}`}
             target="_blank"
             rel="noreferrer"
             className="px-4 py-2 bg-gray-600 text-white text-center rounded-lg hover:bg-gray-700 transition-colors text-xs"

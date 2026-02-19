@@ -153,7 +153,7 @@ export default function CommentTransactionButtonBaseCamp({
   const openTransactionInExplorer = useCallback(() => {
     if (transactionHash) {
       setIsViewingExplorer(true);
-      window.open(`https://basecamp.cloud.blockscout.com/tx/${transactionHash}`, '_blank');
+              window.open(`https://camp.cloud.blockscout.com/tx/${transactionHash}`, '_blank');
       
       // Reset after a delay so users can make another comment
       setTimeout(() => {

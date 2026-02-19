@@ -22,7 +22,7 @@ const ERC721_ABI = [
   },
 ] as const;
 
-const BLOCKSCOUT = 'https://basecamp.cloud.blockscout.com/api';
+const BLOCKSCOUT = 'https://camp.cloud.blockscout.com/api';
 
 export async function fetchIpNftsFor(address: string) {
   const res = await fetch(`${BLOCKSCOUT}?module=account&action=tokennfttx&address=${address}`);

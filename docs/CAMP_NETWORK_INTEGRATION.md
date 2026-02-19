@@ -46,7 +46,7 @@ const baseCampChain = {
   blockExplorers: { 
     default: { 
       name: "Camp Blockscout",
-      url: "https://basecamp.cloud.blockscout.com" 
+      url: "https://camp.cloud.blockscout.com" 
     } 
   }
 }
@@ -191,7 +191,7 @@ POST /api/camp-stats { address, connectedPlatforms }
 GET /api/wallet-stats?address=${address}
 
 // Integration with Blockscout API
-GET https://basecamp.cloud.blockscout.com/api/v2/addresses/${contractAddress}/transactions
+GET https://camp.cloud.blockscout.com/api/v2/addresses/${contractAddress}/transactions
 ```
 
 ### Firebase Tracking
@@ -426,7 +426,7 @@ This integration positions Camp Network as a viable blockchain infrastructure fo
 NEXT_PUBLIC_CAMP_CLIENT_ID=your_camp_client_id
 NEXT_PUBLIC_CAMP_API_KEY=your_camp_api_key
 NEXT_PUBLIC_CAMP_FAUCET_URL=camp_faucet_url
-NEXT_PUBLIC_CAMP_EXPLORER_URL=https://basecamp.cloud.blockscout.com
+NEXT_PUBLIC_CAMP_EXPLORER_URL=https://camp.cloud.blockscout.com
 ```
 
 ### Installation & Setup
@@ -445,7 +445,7 @@ npm install @campnetwork/sdk
 ```typescript
 // Camp Network Blockscout API integration
 const response = await fetch(
-  `https://basecamp.cloud.blockscout.com/api/v2/addresses/${contractAddress}/transactions`
+  `https://camp.cloud.blockscout.com/api/v2/addresses/${contractAddress}/transactions`
 );
 ```
 

@@ -261,7 +261,7 @@ export default function MyIpSection() {
               </div>
             </button>
             <a
-              href={`https://basecamp.cloud.blockscout.com/token/${nft.contract}/instance/${nft.tokenId}`}
+                              href={`https://camp.cloud.blockscout.com/token/${nft.contract}/instance/${nft.tokenId}`}
               target="_blank"
               rel="noreferrer"
               className="block text-[10px] text-black/70 hover:text-black underline px-2 pb-1"
@@ -392,7 +392,7 @@ function PreviewModal({ item, onClose }: { item: any | null; onClose: () => void
         <div className="px-3 pb-3 text-xs text-white/60 flex items-center gap-3">
           <span>Type: {type}</span>
           {mime && <span>MIME: {mime}</span>}
-          <a className="underline hover:text-white" target="_blank" rel="noreferrer" href={`https://basecamp.cloud.blockscout.com/token/${item.contract}/instance/${item.tokenId}`}>Explorer</a>
+                          <a className="underline hover:text-white" target="_blank" rel="noreferrer" href={`https://camp.cloud.blockscout.com/token/${item.contract}/instance/${item.tokenId}`}>Explorer</a>
           {mediaUrl && <a className="underline hover:text-white" target="_blank" rel="noreferrer" href={mediaUrl}>Open media</a>}
         </div>
       </div>

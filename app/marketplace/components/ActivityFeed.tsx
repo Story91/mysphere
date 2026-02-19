@@ -126,7 +126,7 @@ export default function ActivityFeed() {
 
         // 3. Get recent sales from Blockscout API
         try {
-          const BLOCKSCOUT = 'https://basecamp.cloud.blockscout.com/api';
+          const BLOCKSCOUT = 'https://camp.cloud.blockscout.com/api';
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
           
@@ -393,7 +393,7 @@ export default function ActivityFeed() {
           
           <div className="text-center pt-2">
             <a 
-              href={`https://basecamp.cloud.blockscout.com/address/${MARKETPLACE_ADDRESS}/transactions`}
+                              href={`https://camp.cloud.blockscout.com/address/${MARKETPLACE_ADDRESS}/transactions`}
               target="_blank"
               rel="noreferrer"
               className="text-xs text-orange-400 hover:text-orange-300 underline"

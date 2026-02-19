@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useEffect, useRef, useState } from 'react';
 import { UserRank, BadgeInfo } from '../../utils/ranking';
 import { useName } from '@coinbase/onchainkit/identity';

@@ -402,7 +402,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
               {nftContract && (
                 <>
                   <span className="ml-2">Contract:</span>
-                  <a className="underline ml-1" href={`https://basecamp.cloud.blockscout.com/token/${nftContract}`} target="_blank" rel="noreferrer">{nftContract.slice(0,6)}...{nftContract.slice(-4)}</a>
+                  <a className="underline ml-1" href={`https://camp.cloud.blockscout.com/token/${nftContract}`} target="_blank" rel="noreferrer">{nftContract.slice(0,6)}...{nftContract.slice(-4)}</a>
                 </>
               )}
               {tokenId && nftContract && (

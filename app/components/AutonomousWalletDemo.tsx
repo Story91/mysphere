@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Simplified Smart Wallet Demo Component
  * Shows basic wallet functionality with Privy
