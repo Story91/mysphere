@@ -110,6 +110,7 @@ export default function Navigation() {
     { href: '/base', label: 'MyBase' },
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },
+    { href: '/MyClaw', label: 'MyClaw' },
     { href: '#', label: 'Re-Definition', isDisabled: true },
   ];
 
@@ -118,6 +119,7 @@ export default function Navigation() {
     MyBase: { suffix: 'text-[#0052FF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
     MyCamp: { suffix: 'text-orange-600', border: 'border-orange-200', hoverBorder: 'hover:border-orange-300' },
     MyAgents: { suffix: 'text-cyan-600', border: 'border-cyan-200', hoverBorder: 'hover:border-cyan-300' },
+    MyClaw: { suffix: 'text-red-500', border: 'border-red-200', hoverBorder: 'hover:border-red-300' },
   };
 
   const renderLinkLabel = (label: string) => {
@@ -183,6 +185,9 @@ export default function Navigation() {
                   >
                     {link.label === 'MyCamp' && (
                       <Image src="/Camp.png" alt="Camp" width={14} height={14} className="rounded-sm flex-shrink-0 brightness-110" />
+                    )}
+                    {link.label === 'MyClaw' && (
+                      <span className="text-sm flex-shrink-0">🦞</span>
                     )}
                     {renderLinkLabel(link.label)}
                   </Link>
@@ -290,6 +295,9 @@ export default function Navigation() {
                 >
                   {link.label === 'MyCamp' && (
                     <Image src="/Camp.png" alt="Camp" width={14} height={14} className="rounded-sm brightness-110" />
+                  )}
+                  {link.label === 'MyClaw' && (
+                    <span className="text-sm flex-shrink-0">🦞</span>
                   )}
                   {renderLinkLabel(link.label)}
                 </Link>
