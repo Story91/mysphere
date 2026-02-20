@@ -37,10 +37,10 @@ interface Tweet {
 
 // Enhanced fetch function using Camp Network direct API
 async function fetchTwitterDataDirect(address: string) {
-  const apiKey = process.env.CAMP_API_KEY || process.env.NEXT_PUBLIC_CAMP_API_KEY;
+  const apiKey = process.env.CAMP_API_KEY;
   
   if (!apiKey) {
-    throw new Error('Camp API key not found in environment variables');
+    throw new Error('CAMP_API_KEY not found in environment variables');
   }
 
   const baseURL = 'https://wv2h4to5qa.execute-api.us-east-2.amazonaws.com/dev/twitter';
@@ -97,9 +97,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Initialize Twitter API with backend API key
-    // First try non-public env var, fallback to public one for development
-    const apiKey = process.env.CAMP_API_KEY || process.env.NEXT_PUBLIC_CAMP_API_KEY;
+    const apiKey = process.env.CAMP_API_KEY;
     
     if (!apiKey) {
       throw new Error('Camp API key not found in environment variables');

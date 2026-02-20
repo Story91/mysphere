@@ -2707,6 +2707,7 @@ export default function BaseChat() {
                   initial-currency="usd"
                 />
               </div>
+              {/* Second marquee disabled
               <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
                 <gecko-coin-price-marquee-widget 
                   locale="en" 
@@ -2715,6 +2716,7 @@ export default function BaseChat() {
                   initial-currency="usd"
                 />
               </div>
+              */}
             </div>
 
             {/* Main content with panels */}

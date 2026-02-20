@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 });
     }
 
-    const apiKey = process.env.CAMP_API_KEY || process.env.NEXT_PUBLIC_CAMP_API_KEY;
+    const apiKey = process.env.CAMP_API_KEY;
     
     if (!apiKey) {
       throw new Error('Camp API key not found in environment variables');

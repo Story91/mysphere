@@ -9,7 +9,7 @@ import { NFTMedia, NFTTitle, NFTOwner, NFTLastSoldPrice, NFTNetwork } from '@coi
 import { NFTCreator, NFTCollectionTitle, NFTQuantitySelector, NFTAssetCost, NFTMintButton } from '@coinbase/onchainkit/nft/mint';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const BASESCAN_API_KEY = 'YB9ZQ71MVDJU3CQQXFJ6GQ4Y17MPKEQCBN';
+const BASESCAN_API_KEY = process.env.NEXT_PUBLIC_BASESCAN_API_KEY || '';
 const ITEMS_PER_PAGE = 15; // 3 columns x 5 rows
 
 interface NFTMetadata {

@@ -109,11 +109,12 @@ export async function GET() {
     },
     disciplines: DISCIPLINES,
     total_lessons: DISCIPLINES.reduce((sum, d) => sum + d.lessons.length, 0),
+    x402_status: "preview — endpoints are functional but x402 payment enforcement is not yet active",
     endpoints: {
-      catalog: "/api/myclaw/catalog (FREE)",
-      lesson: "/api/myclaw/lessons/{id} (x402 $0.001)",
-      challenge: "/api/myclaw/challenges/{id} (x402 $0.005)",
-      certify: "/api/myclaw/certify (x402 $0.01)",
+      catalog: { path: "/api/myclaw/catalog", price: "FREE", status: "live" },
+      lesson: { path: "/api/myclaw/lessons/{id}", price: "$0.001 USDC", status: "live (x402 preview)" },
+      challenge: { path: "/api/myclaw/challenges/{id}", price: "$0.005 USDC", status: "live (x402 preview)" },
+      certify: { path: "/api/myclaw/certify", price: "$0.01 USDC", status: "live (x402 preview)" },
     },
   });
 }

@@ -278,7 +278,8 @@ export async function GET(
       amount: "0.001",
       currency: "USDC",
       network: "base",
-      note: "This endpoint will require x402 payment when middleware is enabled",
+      status: "preview",
+      note: "x402 payment will be enforced when middleware is enabled. Currently accessible without payment.",
     },
   });
 }

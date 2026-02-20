@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Initialize Spotify API with backend API key
-    const apiKey = process.env.CAMP_API_KEY || process.env.NEXT_PUBLIC_CAMP_API_KEY;
+    const apiKey = process.env.CAMP_API_KEY;
     
     if (!apiKey) {
       throw new Error('Camp API key not found in environment variables');

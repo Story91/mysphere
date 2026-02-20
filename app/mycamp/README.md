@@ -25,12 +25,12 @@ This directory contains the Camp Network integration for MySphere, enabling seam
 Add these to your `.env.local` file:
 
 ```bash
-# Backend only (secure)
-CAMP_API_KEY=d77f0d1c-a29a-46b1-a02c-5447d489070f
-CAMP_CLIENT_ID=6a886b9d-e637-49ab-8c06-a66a20b7a778
+# Backend only (secure) — get your key from Camp Network dashboard
+CAMP_API_KEY=your_camp_api_key_here
+CAMP_CLIENT_ID=your_camp_client_id_here
 
 # Frontend (public)
-NEXT_PUBLIC_CAMP_CLIENT_ID=6a886b9d-e637-49ab-8c06-a66a20b7a778
+NEXT_PUBLIC_CAMP_CLIENT_ID=your_camp_client_id_here
 NEXT_PUBLIC_CAMP_FAUCET_URL=https://faucet.campnetwork.xyz/
 NEXT_PUBLIC_CAMP_EXPLORER_URL=https://camp.cloud.blockscout.com/
 ```

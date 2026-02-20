@@ -2,11 +2,9 @@
 // CDP for: ETH balance, transaction count
 // Etherscan V2 for: Token list, NFT list, Transaction history
 
-const CDP_RPC_URL = 'https://api.developer.coinbase.com/rpc/v1/base/oMc2GB9cTF7I8zaD11NHTuIVDxECmWz1';
+const CDP_RPC_URL = process.env.CDP_RPC_URL || process.env.NEXT_PUBLIC_CDP_RPC_URL || '';
 
-// Etherscan API V2 - supports all chains via chainid
-// API key from etherscan.io (works for all chains including Base)
-const ETHERSCAN_API_KEY = process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY || '1QU7WWC7EKAVKKB9PV3S7H62JZPS2G5JXW';
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY || '';
 const BASE_CHAIN_ID = 8453; // Base Mainnet
 
 // --- Types ---
