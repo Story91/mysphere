@@ -27,7 +27,6 @@ import { NotificationsBell } from './NotificationsBell';
 type NavLink = {
   href: string;
   label: string;
-  isHighlighted?: boolean;
   isDisabled?: boolean;
 };
 
@@ -107,10 +106,30 @@ export default function Navigation() {
   }, []);
 
   const navLinks: NavLink[] = [
-    { href: '/basechat', label: 'Base' },
-    { href: '/mycamp', label: 'Camp Network', isHighlighted: true },
+    { href: '/', label: 'MySphere' },
+    { href: '/base', label: 'MyBase' },
+    { href: '/mycamp', label: 'MyCamp' },
+    { href: '/MyAgents', label: 'MyAgents' },
     { href: '#', label: 'Re-Definition', isDisabled: true },
   ];
+
+  const linkTheme: Record<string, { suffix: string; border: string; hoverBorder: string }> = {
+    MySphere: { suffix: 'text-fuchsia-600', border: 'border-fuchsia-200', hoverBorder: 'hover:border-fuchsia-300' },
+    MyBase: { suffix: 'text-[#0052FF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
+    MyCamp: { suffix: 'text-orange-600', border: 'border-orange-200', hoverBorder: 'hover:border-orange-300' },
+    MyAgents: { suffix: 'text-cyan-600', border: 'border-cyan-200', hoverBorder: 'hover:border-cyan-300' },
+  };
+
+  const renderLinkLabel = (label: string) => {
+    if (!label.startsWith('My')) return <span>{label}</span>;
+    const suffix = label.slice(2);
+    return (
+      <span className="inline-flex items-center gap-0.5">
+        <span className="text-slate-900">My</span>
+        <span className={linkTheme[label]?.suffix ?? 'text-sky-300'}>{suffix}</span>
+      </span>
+    );
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-b border-[#0052FF]/20">
@@ -122,7 +141,7 @@ export default function Navigation() {
           <div className="flex items-center">
             <Link 
               href="/"
-              className="hover:scale-105 transition-transform duration-300 relative group mr-6"
+              className="hover:scale-105 transition-transform duration-300 relative group mr-5"
             >
               <div className="absolute -inset-2 bg-gradient-to-r from-[#0052FF] to-[#00A3FF] opacity-0 group-hover:opacity-20 rounded-xl blur transition-all duration-300"></div>
               <Image
@@ -136,49 +155,39 @@ export default function Navigation() {
             </Link>
             
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-2 bg-black/20 p-1.5 rounded-2xl backdrop-blur-xl border border-[#0052FF]/20 relative">
-              {navLinks.map((link) => (
-                link.isDisabled ? (
-                  <span
-                    key={link.href}
-                    className="relative group px-5 py-2.5 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 text-gray-400 cursor-not-allowed flex items-center"
-                    title="Soon"
-                  >
-                    {link.label}
-                    <span className="ml-2 text-xs text-gray-500">soon</span>
-                  </span>
-                ) : (
+            <nav className="hidden md:flex items-center gap-2 bg-white/10 backdrop-blur-xl border border-white/20 p-1.5 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.22)]">
+              {navLinks.map((link) => {
+                const isActive = pathname === link.href || pathname?.startsWith(link.href + '/');
+                if (link.isDisabled) {
+                  return (
+                    <span
+                      key={link.href}
+                      title="Coming soon"
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-white/50 bg-white/10 border border-white/20 cursor-not-allowed select-none"
+                    >
+                      {link.label}
+                      <span className="text-[10px] font-normal bg-white/20 text-white/70 px-1.5 py-0.5 rounded-full">soon</span>
+                    </span>
+                  );
+                }
+                const theme = linkTheme[link.label] ?? linkTheme.MyBase;
+                return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`relative group px-5 py-2.5 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 ${
-                      pathname === link.href
-                        ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
-                        : link.isHighlighted 
-                          ? 'text-white bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20' 
-                          : 'text-gray-100 hover:text-[#0052FF]'
+                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border bg-white transition-all duration-200 ${theme.border} ${theme.hoverBorder} ${
+                      isActive
+                        ? 'shadow-[0_10px_22px_rgba(0,0,0,0.24)] -translate-y-0.5'
+                        : 'opacity-95 hover:opacity-100 hover:-translate-y-0.5'
                     }`}
                   >
-                    <span className={`relative z-10 ${link.isHighlighted && 'font-bold'} flex items-center`}>
-                      {link.label === 'Camp Network' && (
-                        <Image src="/Camp.png" alt="Camp" width={16} height={16} className="inline mr-1.5" />
-                      )}
-                      {link.label}
-                    </span>
-                    <div className={`absolute inset-0 rounded-xl ${
-                      link.isHighlighted 
-                        ? 'bg-gradient-to-r from-orange-500/80 to-orange-600/80 group-hover:from-orange-400 group-hover:to-orange-500' 
-                        : 'bg-[#0052FF]/0 group-hover:bg-[#0052FF]/5'
-                      } transition-all duration-300`}></div>
-                    {pathname === link.href && !link.isHighlighted && (
-                      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4C8FFF] opacity-20 animate-pulse"></div>
+                    {link.label === 'MyCamp' && (
+                      <Image src="/Camp.png" alt="Camp" width={14} height={14} className="rounded-sm flex-shrink-0 brightness-110" />
                     )}
-                    {link.isHighlighted && (
-                      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 opacity-80 animate-pulse"></div>
-                    )}
+                    {renderLinkLabel(link.label)}
                   </Link>
-                )
-              ))}
+                );
+              })}
             </nav>
 
             {/* Mobile Menu Button */}
@@ -252,39 +261,40 @@ export default function Navigation() {
 
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
-          <nav className="md:hidden mt-4 bg-black/20 p-2 rounded-2xl backdrop-blur-xl border border-[#0052FF]/20">
-            {navLinks.map((link) => (
-              link.isDisabled ? (
-                <span
-                  key={link.href}
-                  className="block px-4 py-2 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 mb-1 last:mb-0 text-gray-500 cursor-not-allowed flex items-center justify-between"
-                  title="Soon"
-                >
-                  <span>{link.label}</span>
-                  <span className="text-xs text-gray-400">soon</span>
-                </span>
-              ) : (
+          <nav className="md:hidden mt-3 bg-white/10 backdrop-blur-xl border border-white/20 p-1.5 rounded-2xl flex flex-col gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href || pathname?.startsWith(link.href + '/');
+              if (link.isDisabled) {
+                return (
+                  <span
+                    key={link.href}
+                    title="Coming soon"
+                    className="flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium text-white/50 bg-white/10 border border-white/20 cursor-not-allowed"
+                  >
+                    <span>{link.label}</span>
+                    <span className="text-[10px] bg-white/20 text-white/70 px-1.5 py-0.5 rounded-full">soon</span>
+                  </span>
+                );
+              }
+              const theme = linkTheme[link.label] ?? linkTheme.MyBase;
+              return (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`block px-4 py-2 rounded-xl font-['Coinbase_Display'] text-base transition-all duration-300 mb-1 last:mb-0 ${
-                    pathname === link.href
-                      ? 'text-white bg-[#0052FF] shadow-lg shadow-[#0052FF]/20'
-                      : link.isHighlighted 
-                        ? 'text-white bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg shadow-orange-500/20' 
-                        : 'text-gray-100 hover:text-[#0052FF] hover:bg-[#0052FF]/5'
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border bg-white transition-all duration-200 ${theme.border} ${theme.hoverBorder} ${
+                    isActive
+                      ? 'shadow-[0_8px_20px_rgba(2,6,23,0.30)]'
+                      : 'opacity-95'
                   }`}
                 >
-                  <span className={`flex items-center relative z-10 ${link.isHighlighted && 'font-bold'}`}>
-                    {link.label === 'Camp Network' && (
-                      <Image src="/Camp.png" alt="Camp" width={16} height={16} className="inline mr-1.5" />
-                    )}
-                    {link.label}
-                  </span>
+                  {link.label === 'MyCamp' && (
+                    <Image src="/Camp.png" alt="Camp" width={14} height={14} className="rounded-sm brightness-110" />
+                  )}
+                  {renderLinkLabel(link.label)}
                 </Link>
-              )
-            ))}
+              );
+            })}
           </nav>
         )}
       </div>

@@ -63,6 +63,7 @@
     "@rainbow-me/rainbowkit": "^2.2.4",
     "@react-three/drei": "^9.99.7",
     "@react-three/fiber": "^8.15.19",
+    "@registrai/kya": "^0.1.0",
     "@solana/web3.js": "^1.98.0",
     "@stacks/connect": "^8.2.3",
     "@stacks/network": "^7.2.0",
