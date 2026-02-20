@@ -2,28 +2,28 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    // Pobierz dane z żądania
     const requestData = await request.json();
 
-    // Wykonaj żądanie do API merkle.io
     const merkleResponse = await fetch('https://eth.merkle.io/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestData),
     });
 
-    // Pobierz dane odpowiedzi
-    const data = await merkleResponse.json();
+    const contentType = merkleResponse.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return NextResponse.json(
+        { error: 'Merkle API unavailable', jsonrpc: '2.0', id: requestData?.id ?? null },
+        { status: 502 }
+      );
+    }
 
-    // Zwróć odpowiedź
+    const data = await merkleResponse.json();
     return NextResponse.json(data);
-  } catch (error) {
-    console.error('Merkle proxy error:', error);
+  } catch {
     return NextResponse.json(
-      { error: 'Failed to fetch data from Merkle API' },
-      { status: 500 }
+      { error: 'Merkle proxy failed', jsonrpc: '2.0', id: null },
+      { status: 502 }
     );
   }
 } 

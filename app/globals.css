@@ -689,16 +689,16 @@ appkit-button::part(button):hover {
   }
 }
 
-/* OnchainKit Modal Styling - center on desktop */
-@media (min-width: 768px) {
-  div[role="dialog"] {
-    position: fixed !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    right: auto !important;
-    bottom: auto !important;
-  }
+/* OnchainKit Connect Wallet modal - center only when not logged in */
+body.wallet-not-connected div[role="dialog"] {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  right: auto !important;
+  bottom: auto !important;
+  max-height: 90vh !important;
+  max-width: 90vw !important;
 }
 
 /* Hide Sign up text with more specific selectors */
