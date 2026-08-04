@@ -15,6 +15,12 @@ interface TipStatsProps {
   userAddress?: string;
   postId?: string;
   className?: string;
+  /**
+   * Statystyki dostarczone z zewnatrz (jedno zbiorcze zapytanie dla calego feedu).
+   * Gdy podane, komponent nie robi wlasnego getDocs - to eliminuje N zapytan
+   * przy N postach w feedzie.
+   */
+  presetPostStats?: PostTipStats | null;
 }
 
 // Mapuje stare nazwy sieci na nowe
@@ -265,12 +271,21 @@ const TipStatsCollapsible = ({ networkGroups, getAmount, activeTips, className =
   );
 };
 
-export default function TipStats({ userAddress, postId, className = '' }: TipStatsProps) {
+export default function TipStats({ userAddress, postId, className = '', presetPostStats }: TipStatsProps) {
   const [userStats, setUserStats] = useState<TipStatsType | null>(null);
-  const [postStats, setPostStats] = useState<PostTipStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [postStats, setPostStats] = useState<PostTipStats | null>(presetPostStats ?? null);
+  const [loading, setLoading] = useState(presetPostStats === undefined);
 
   useEffect(() => {
+    // Statystyki posta przyszly propsem - zero zapytan.
+    if (presetPostStats !== undefined) {
+      setPostStats(presetPostStats);
+      if (!userAddress) {
+        setLoading(false);
+        return;
+      }
+    }
+
     const fetchStats = async () => {
       setLoading(true);
       try {
@@ -279,7 +294,7 @@ export default function TipStats({ userAddress, postId, className = '' }: TipSta
           setUserStats(stats);
         }
         
-        if (postId) {
+        if (postId && presetPostStats === undefined) {
           const stats = await getPostTipStats(postId);
           setPostStats(stats);
         }
@@ -290,10 +305,10 @@ export default function TipStats({ userAddress, postId, className = '' }: TipSta
       }
     };
 
-    if (userAddress || postId) {
+    if (userAddress || (postId && presetPostStats === undefined)) {
       fetchStats();
     }
-  }, [userAddress, postId]);
+  }, [userAddress, postId, presetPostStats]);
 
   if (loading) {
     return (

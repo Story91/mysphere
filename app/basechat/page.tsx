@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, PropsWithChildren, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
 import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
@@ -48,33 +49,28 @@ import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestam
 import { Post, Comment, UserProfile, Stats } from '../types';
 import { calculateRanking, UserRank, RANK_DESCRIPTIONS, BADGES } from '../utils/ranking';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
-import CoinGeckoMarqueeWidget from '../components/CryptoWidget/CoinGeckoMarqueeWidget';
 import Script from 'next/script';
 import { put } from '@vercel/blob';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
 import { useBanStatus } from '../hooks/useBanStatus';
-import ReferralLeaderboard from '../utils/referrals/components/ReferralLeaderboard';
+const ReferralLeaderboard = dynamic(() => import('../utils/referrals/components/ReferralLeaderboard'), { ssr: false });
 import LinkPreview from './components/LinkPreview';
 import BuilderProfile from './components/BuilderProfile';
-import FollowingView from './friendsystem/FollowingView';
-import FriendsView from './friendsystem/FriendsView';
-import DiscoverView from './friendsystem/DiscoverView';
+const FollowingView = dynamic(() => import('./friendsystem/FollowingView'), { ssr: false });
+const FriendsView = dynamic(() => import('./friendsystem/FriendsView'), { ssr: false });
+const DiscoverView = dynamic(() => import('./friendsystem/DiscoverView'), { ssr: false });
 
-import NotificationsView from './friendsystem/NotificationsView';
+const NotificationsView = dynamic(() => import('./friendsystem/NotificationsView'), { ssr: false });
 
-import FrameSDK from '@farcaster/frame-sdk'
-import farcasterFrame from '@farcaster/frame-wagmi-connector'
-import { connect } from 'wagmi/actions'
-import { FarcasterFrameProvider } from '../components/FarcasterFrameProvider/FarcasterFrameProvider';
 import { RefreshCw } from 'lucide-react';
 import TransactionButton from '../components/TransactionButton';
 import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
-import YapsMetrics from '../yapscan/components/YapsMetrics';
+const YapsMetrics = dynamic(() => import('../yapscan/components/YapsMetrics'), { ssr: false });
 import { useAIGenerator } from './hooks/useAIGenerator';
-import AIPostGenerator from './components/AIPostGenerator';
+const AIPostGenerator = dynamic(() => import('./components/AIPostGenerator'), { ssr: false });
 import AIButton from './components/AIButton';
 
 
@@ -85,18 +81,17 @@ import { HomeIcon, UserIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, Magni
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 import GlassIcons from '../components/GlassIcons/GlassIcons';
 import GooeyNav from '../components/GooeyNav/GooeyNav';
-import MusicSelector from './components/MusicSelector';
+const MusicSelector = dynamic(() => import('./components/MusicSelector'), { ssr: false });
 import SpotifyTrackCard from './components/SpotifyTrackCard';
 // Import Zora SDK functions
-import { createCoin, getCoinCreateFromLogs } from '@zoralabs/coins-sdk';
 // Import Viem types
 import { Address as ViemAddress, Hex } from 'viem';
-import CreatePostBaseCamp from './components/BaseCampPosts/CreatePostBaseCamp';
+const CreatePostBaseCamp = dynamic(() => import('./components/BaseCampPosts/CreatePostBaseCamp'), { ssr: false });
 import ClaimPortalBanner from './components/BaseCampPosts/ClaimPortalBanner';
-import CreatePostLinea from './Linea/components/CreatePostLinea';
-import CreatePostCelo from './Celo/components/CreatePostCelo';
-import CreatePostEthereum from './ETH/components/CreatePostEthereum';
-import CreatePostWorldChain from './World/components/CreatePostWorldChain';
+const CreatePostLinea = dynamic(() => import('./Linea/components/CreatePostLinea'), { ssr: false });
+const CreatePostCelo = dynamic(() => import('./Celo/components/CreatePostCelo'), { ssr: false });
+const CreatePostEthereum = dynamic(() => import('./ETH/components/CreatePostEthereum'), { ssr: false });
+const CreatePostWorldChain = dynamic(() => import('./World/components/CreatePostWorldChain'), { ssr: false });
 import MockFeed from './prelogin/MockFeed';
 import { BASECAMP_CHAIN_ID } from '../contracts/BaseCampPostContract';
 import { LINEA_CHAIN_ID } from './Linea/config/LineaNetworkConfig';
@@ -181,12 +176,6 @@ function BanPage({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <Script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
-        crossOrigin="anonymous"
-        strategy="afterInteractive"
-      />
       {children}
     </>
   );
@@ -327,14 +316,19 @@ export default function BaseChat() {
   // AI Generator Hook
   const aiGenerator = useAIGenerator();
 
-  // Update newPost when AI generates content for Base network
+  // Update newPost when AI generates content for Base network.
+  // Deps musza byc surowym stanem - `getGeneratedContent('base')` w tablicy zaleznosci
+  // to wywolanie funkcji przy kazdym renderze, a `aiGenerator` to swiezy obiekt,
+  // wiec efekt odpalal sie w kolko.
+  const aiBaseContent = aiGenerator.aiGeneratedContentForBase;
   useEffect(() => {
     const baseContent = aiGenerator.getGeneratedContent('base');
     if (baseContent && activePostingNetwork === 'base') {
       setNewPost(baseContent);
       aiGenerator.clearGeneratedContent('base');
     }
-  }, [aiGenerator.getGeneratedContent('base'), activePostingNetwork, aiGenerator]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiBaseContent, activePostingNetwork]);
   
   // Globalne deklaracje stanów modalu przeniesione na początek funkcji
   const [modalMessage, setModalMessage] = useState('');
@@ -407,7 +401,6 @@ export default function BaseChat() {
 
 
   const [isAppleDevice, setIsAppleDevice] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPostDialog, setShowPostDialog] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -419,10 +412,10 @@ export default function BaseChat() {
   const [activeFeed, setActiveFeed] = useState<'forYou' | 'following' | 'baseName'>('forYou'); // Dodajemy 'baseName'
   
   // Hook do sprawdzania BaseName
-  const { data: baseName, isLoading: isBaseNameLoading } = useName({ 
-    address: address || '0x0000000000000000000000000000000000000000', 
-    chain: base 
-  });
+  const { data: baseName, isLoading: isBaseNameLoading } = useName(
+    { address: (address || '0x0000000000000000000000000000000000000000') as `0x${string}`, chain: base },
+    { enabled: Boolean(address) }
+  );
 
   // Funkcja sprawdzająca czy użytkownik może tworzyć posty - dostępne dla wszystkich
   const canCreatePosts = true; // Zmieniono z Boolean(baseName) na true, aby wszyscy mogli tworzyć posty
@@ -1092,6 +1085,9 @@ export default function BaseChat() {
         }
         
         // 5. Call createCoin
+      // SDK Zory ladowany na zadanie - uzywany tylko w tym jednym handlerze,
+      // a na topie pliku szedl do initial chunka kazdej sesji basechatu.
+      const { createCoin, getCoinCreateFromLogs } = await import('@zoralabs/coins-sdk');
       console.log("Calling createCoin via Zora SDK...");
       // Make sure walletClient is not null/undefined before calling createCoin
       if (!walletClient) {
@@ -1590,43 +1586,46 @@ export default function BaseChat() {
   };
 
   // useEffect do pobierania profilu użytkownika
+  const savedNameWrittenRef = useRef<string | null>(null);
   useEffect(() => {
     if (isConnected && address) {
       const loadUserProfile = async () => {
         if (!address) return;
         
         try {
-          // Pobierz profil z Firebase
-          const profile = await fetchUserProfile(address, { loadSocialLinks: true });
+          // Rownolegle zamiast seryjnie - to dwa niezalezne odczyty.
+          const [profile, savedName] = await Promise.all([
+            fetchUserProfile(address, { loadSocialLinks: true }),
+            getProfileName(address)
+          ]);
           
           if (profile) {
-            // Pobierz nazwę z Firebase
-            const savedName = await getProfileName(address);
+            // Ustaw profil z odpowiednią nazwą
+            setUserProfile({
+              name: baseName || savedName || profile.name || `${address.slice(0, 6)}...${address.slice(-4)}`,
+              avatar: profile.avatar,
+              postCount: profile.postsCount || 0,
+              likesReceived: profile.likesReceived || 0,
+              address: address,
+              bio: profile.bio,
+              socialLinks: profile.socialLinks
+            });
             
-            if (profile) {
-              // Ustaw profil z odpowiednią nazwą
-              setUserProfile({
-                name: baseName || savedName || profile.name || `${address.slice(0, 6)}...${address.slice(-4)}`,
-                avatar: profile.avatar,
-                postCount: profile.postsCount || 0,
-                likesReceived: profile.likesReceived || 0,
-                address: address,
-                bio: profile.bio,
-                socialLinks: profile.socialLinks
-              });
-              
-              // Jeśli mamy BaseName, zapisz go do Firebase wraz z avatarem
-              if (baseName) {
+            // Zapis TYLKO gdy BaseName rzeczywiscie sie zmienil. Wczesniej byl to
+            // bezwarunkowy WRITE przy kazdym przebiegu efektu (min. 2x przez dep
+            // baseName, x2 w StrictMode).
+            if (baseName && savedNameWrittenRef.current !== baseName) {
+              savedNameWrittenRef.current = baseName;
+              if (savedName !== baseName) {
                 await saveProfileName(address, baseName);
-                // Zaktualizuj userNames dla aktualnego użytkownika
-                setUserNames(prev => ({
-                  ...prev,
-                  [address]: {
-                    name: baseName,
-                    avatar: profile.avatar
-                  }
-                }));
               }
+              setUserNames(prev => ({
+                ...prev,
+                [address]: {
+                  name: baseName,
+                  avatar: profile.avatar
+                }
+              }));
             }
           }
         } catch (error) {
@@ -1816,41 +1815,55 @@ export default function BaseChat() {
   const searchFilteredPosts = posts;
 
   // Filtruj posty przypięte z głównego feeda (są już w sekcji PinnedPosts)
-  const nonPinnedPosts = searchFilteredPosts.filter(post => !post.isPinned);
+  const nonPinnedPosts = useMemo(
+    () => searchFilteredPosts.filter(post => !post.isPinned),
+    [searchFilteredPosts]
+  );
   
-  const sortedPosts = [...nonPinnedPosts].sort((a, b) => {
-    // Sortuj normalnie według timestamp (bez logiki dla postów przypiętych)
-    if (sortOrder === 'newest') {
-      return b.timestamp - a.timestamp;
-    } else {
-      return a.timestamp - b.timestamp;
-    }
-  });
+  const sortedPosts = useMemo(() => {
+    return [...nonPinnedPosts].sort((a, b) => {
+      // Sortuj normalnie według timestamp (bez logiki dla postów przypiętych)
+      if (sortOrder === 'newest') {
+        return b.timestamp - a.timestamp;
+      } else {
+        return a.timestamp - b.timestamp;
+      }
+    });
+  }, [nonPinnedPosts, sortOrder]);
 
   // ⚡ OPTYMALIZACJA: Lazy loading - start z 25, maksymalnie 250 postów
   const [displayLimit, setDisplayLimit] = useState(15);
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
   const MAX_DISPLAY_LIMIT = 150; // Maksymalnie 150 postów (zmniejszono dla oszczędności)
 
-  const displayedPosts = expandedPosts ? sortedPosts : sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT));
+  // `expandedPosts` to mapa {postId: bool} rozwinietych tresci - zawsze truthy, wiec
+  // warunek na niej wylaczal lazy loading calkowicie. Slice jest bezwarunkowy.
+  const displayedPosts = useMemo(
+    () => sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT)),
+    [sortedPosts, displayLimit]
+  );
+
+  // Swieza dlugosc listy przez ref, zeby observer nie byl odtwarzany przy kazdej zmianie postow
+  const sortedPostsLengthRef = useRef(sortedPosts.length);
+  sortedPostsLengthRef.current = sortedPosts.length;
 
   useEffect(() => {
-    if (expandedPosts) return; // Gdy mamy pełny widok, nie korzystamy z infinite scroll
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && sortedPosts.length > displayLimit && displayLimit < MAX_DISPLAY_LIMIT) {
+      if (entries[0].isIntersecting && sortedPostsLengthRef.current > displayLimit && displayLimit < MAX_DISPLAY_LIMIT) {
         setDisplayLimit(prev => Math.min(prev + 15, MAX_DISPLAY_LIMIT)); // ⚡ OPTYMALIZACJA: Ładuj po 15 postów (-40% Firebase reads)
       }
     }, { threshold: 1.0 });
 
-    if (loadMoreTriggerRef.current) {
-      observer.observe(loadMoreTriggerRef.current);
+    const trigger = loadMoreTriggerRef.current;
+    if (trigger) {
+      observer.observe(trigger);
     }
     return () => {
-      if (loadMoreTriggerRef.current) {
-        observer.unobserve(loadMoreTriggerRef.current);
+      if (trigger) {
+        observer.unobserve(trigger);
       }
     };
-  }, [displayLimit, sortedPosts, expandedPosts]);
+  }, [displayLimit]);
 
   // Funkcja do obsługi edycji posta
   const handleEditPost = async (postId: string, newContent: string) => {
@@ -2221,17 +2234,9 @@ export default function BaseChat() {
     }
   }, [isMounted, initialRefreshDone, getActiveUsers]);
   
-  // Automatyczne odświeżanie po zalogowaniu - symuluje kliknięcie przycisku Refresh
-  useEffect(() => {
-    if (isConnected && address) {
-      // Odśwież po 1 sekundzie od zalogowania (force refresh)
-      const timer = setTimeout(() => {
-        getActiveUsers(true);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isConnected, address, getActiveUsers]);
+  // Force-refresh po zalogowaniu usuniety - omijal OBA poziomy cache i dublowal
+  // pobranie zrobione juz przy mouncie. Dane sa odswiezane interwalem ponizej
+  // oraz recznie przyciskiem Refresh.
   
   // Regularne odświeżanie co 10 minut (zwiększono z 2 minut)
   useEffect(() => {
@@ -2245,11 +2250,15 @@ export default function BaseChat() {
     }
   }, [isMounted, getActiveUsers]);
 
-  // 🚀 DODANY useEffect do reagowania na zmiany currentPage
+  // 🚀 useEffect reagujacy na REALNA zmiane currentPage.
+  // Bez guarda odpalal sie takze przy mouncie i przy kazdej nowej referencji
+  // getActiveUsers, dublujac pobranie z efektu inicjalnego.
+  const prevPageRef = useRef(currentPage);
   useEffect(() => {
-    if (initialRefreshDone) {
-      getActiveUsers(false); // Automatycznie ładuj nową stronę
-    }
+    if (!initialRefreshDone) return;
+    if (prevPageRef.current === currentPage) return;
+    prevPageRef.current = currentPage;
+    getActiveUsers(false);
   }, [currentPage, getActiveUsers, initialRefreshDone]);
 
   // ===============================================
@@ -2487,7 +2496,6 @@ export default function BaseChat() {
     const setVh = () => {
       const vh = window.innerHeight * 0.01;
       document.documentElement.style.setProperty('--vh', `${vh}px`);
-      setViewportHeight(window.innerHeight);
     };
     
     setVh();
@@ -2628,7 +2636,7 @@ export default function BaseChat() {
   const today = new Date().toISOString().split('T')[0];
 
   // Pending Pin management functions
-  const handlePinPending = (postId: string, txHash: string, duration: string) => {
+  const handlePinPending = useCallback((postId: string, txHash: string, duration: string) => {
     const expectedAt = Date.now() + (5 * 60 * 1000); // Expected confirmation in 5 minutes
     
     setPendingPins(prev => ({
@@ -2641,7 +2649,7 @@ export default function BaseChat() {
     }));
     
     console.log(`⏳ BaseChat: Post ${postId} set to pending pin state`, { txHash, duration, expectedAt });
-  };
+  }, []);
 
   const handlePinConfirmed = (postId: string) => {
     setPendingPins(prev => {
@@ -2661,10 +2669,10 @@ export default function BaseChat() {
   };
 
   return (
-    <FarcasterFrameProvider>
+    <>
       {/* Contract Event Listener - listens for PinCreated events and refreshes feed */}
-      
-    
+
+
       <BanPage>
         <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
         
@@ -4188,6 +4196,6 @@ export default function BaseChat() {
         />
       )}
     </BanPage>
-  </FarcasterFrameProvider>
+  </>
   );
 }

@@ -4631,6 +4631,71 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
   }
 };
 
+/**
+ * Statystyki tipow dla WIELU postow naraz - jedno zapytanie na kazde 30 postow
+ * zamiast osobnego getDocs() per post (feed z 25 postami = 25 zapytan).
+ */
+export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId: string]: PostTipStats }> => {
+  const empty = (): PostTipStats => ({
+    totalTips: 0, ethTips: 0, usdcTips: 0, celoTips: 0, wldTips: 0,
+    lineaTips: 0, campTips: 0, tipCount: 0, uniqueTippers: 0, networkTips: []
+  });
+
+  const result: { [postId: string]: PostTipStats } = {};
+  const unique = Array.from(new Set(postIds.filter(Boolean)));
+  if (unique.length === 0) return result;
+
+  unique.forEach(id => { result[id] = empty(); });
+
+  const tippersByPost = new Map<string, Set<string>>();
+  const networkTokenByPost = new Map<string, Map<string, { network: TipNetworkType; token: TipTokenType; amount: number }>>();
+
+  try {
+    for (let i = 0; i < unique.length; i += 30) {
+      const chunk = unique.slice(i, i + 30);
+      const snapshot = await getDocs(query(collection(db, 'tips'), where('postId', 'in', chunk)));
+
+      snapshot.docs.forEach(d => {
+        const tip = d.data() as Tip;
+        const stats = result[tip.postId as string];
+        if (!stats) return;
+
+        const amount = parseFloat(tip.amount);
+        stats.tipCount++;
+        stats.totalTips += amount;
+
+        if (!tippersByPost.has(tip.postId as string)) tippersByPost.set(tip.postId as string, new Set());
+        tippersByPost.get(tip.postId as string)!.add(tip.senderAddress);
+
+        switch (tip.token) {
+          case 'ETH': stats.ethTips += amount; break;
+          case 'USDC': stats.usdcTips += amount; break;
+          case 'CELO': stats.celoTips += amount; break;
+          case 'WLD': stats.wldTips += amount; break;
+          case 'LINEA': stats.lineaTips += amount; break;
+          case 'CAMP': stats.campTips += amount; break;
+        }
+
+        if (!networkTokenByPost.has(tip.postId as string)) networkTokenByPost.set(tip.postId as string, new Map());
+        const map = networkTokenByPost.get(tip.postId as string)!;
+        const key = `${tip.network}:${tip.token}`;
+        const existing = map.get(key);
+        if (existing) existing.amount += amount;
+        else map.set(key, { network: tip.network, token: tip.token, amount });
+      });
+    }
+
+    Object.keys(result).forEach(postId => {
+      result[postId].uniqueTippers = tippersByPost.get(postId)?.size || 0;
+      result[postId].networkTips = Array.from(networkTokenByPost.get(postId)?.values() || []).filter(t => t.amount > 0);
+    });
+  } catch (error) {
+    console.error('❌ Błąd pobierania zbiorczych statystyk tipów:', error);
+  }
+
+  return result;
+};
+
 // Pobiera ostatnie tipy użytkownika (otrzymane)
 export const getRecentTips = async (userAddress: string, limit: number = 10): Promise<Tip[]> => {
   try {
@@ -4662,6 +4727,27 @@ const USER_NAMES_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 godziny
 const USER_NAMES_STORAGE_KEY = 'userNamesCache_v2';
 const USER_NAMES_STORAGE_TTL = 48 * 60 * 60 * 1000; // 48 godzin
 
+let userNamesCacheHydrated = false;
+
+const hydrateUserNamesCacheFromStorage = (now: number) => {
+  if (userNamesCacheHydrated) return;
+  userNamesCacheHydrated = true;
+  if (typeof window === 'undefined') return;
+
+  try {
+    const storedCache = localStorage.getItem(USER_NAMES_STORAGE_KEY);
+    if (!storedCache) return;
+    const parsed = JSON.parse(storedCache);
+    Object.keys(parsed).forEach(addr => {
+      if (now - parsed[addr].timestamp < USER_NAMES_STORAGE_TTL) {
+        userNamesCache[addr] = parsed[addr];
+      }
+    });
+  } catch (e) {
+    console.log('Failed to parse localStorage cache');
+  }
+};
+
 // ===============================================
 // 🚀 ULTRA-CHEAP getBulkUserNames() REPLACEMENT
 // ===============================================
@@ -4673,20 +4759,10 @@ export const getBulkUserNamesOptimized = async (addresses: string[]): Promise<{[
   const now = Date.now();
   
   try {
-    // 1. LOAD localStorage cache
-    const storedCache = localStorage.getItem(USER_NAMES_STORAGE_KEY);
-    if (storedCache) {
-      try {
-        const parsed = JSON.parse(storedCache);
-        Object.keys(parsed).forEach(addr => {
-          if (now - parsed[addr].timestamp < USER_NAMES_STORAGE_TTL) {
-            userNamesCache[addr] = parsed[addr];
-          }
-        });
-      } catch (e) {
-        console.log('Failed to parse localStorage cache');
-      }
-    }
+    // 1. HYDRATE z localStorage - tylko RAZ na sesje. Wczesniej caly blob byl
+    // parsowany przy KAZDEJ zmianie feedu; po pierwszym przebiegu pamiec i tak
+    // jest zrodlem prawdy (zapisy ida do obu naraz).
+    hydrateUserNamesCacheFromStorage(now);
     
     // 2. CHECK memory + localStorage cache
     const addressesToFetch: string[] = [];
@@ -4824,6 +4900,7 @@ export const getUserNamesCacheStats = () => {
 
 export const clearUserNamesCache = () => {
   userNamesCache = {};
+  userNamesCacheHydrated = false;
   localStorage.removeItem(USER_NAMES_STORAGE_KEY);
   console.log('🧹 User names cache cleared');
 };

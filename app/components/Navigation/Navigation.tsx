@@ -49,72 +49,6 @@ export default function Navigation() {
     router.push('/basechat?view=notifications');
   };
 
-  // Override OnchainKit modal "Sign up" text to "Sign In With Base"
-  useEffect(() => {
-    const replaceSignUpText = () => {
-      const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_TEXT,
-        null,
-        false
-      );
-
-      let node;
-      const nodesToUpdate = [];
-      
-      while (node = walker.nextNode()) {
-        if (node.textContent && node.textContent.trim() === 'Sign up') {
-          nodesToUpdate.push(node);
-        }
-      }
-
-      nodesToUpdate.forEach(node => {
-        node.textContent = 'Sign In With Base';
-      });
-
-      const elements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, button, span, div');
-      elements.forEach(element => {
-        if (element.textContent && element.textContent.trim() === 'Sign up') {
-          element.textContent = 'Sign In With Base';
-        }
-      });
-    };
-
-    replaceSignUpText();
-
-    const observer = new MutationObserver((mutations) => {
-      let shouldCheck = false;
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          mutation.addedNodes.forEach(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as Element;
-              if (
-                element.querySelector('[data-testid*="connect"]') ||
-                element.querySelector('[role="dialog"]') ||
-                element.textContent?.includes('Sign up')
-              ) {
-                shouldCheck = true;
-              }
-            }
-          });
-        }
-      });
-      
-      if (shouldCheck) {
-        setTimeout(replaceSignUpText, 100);
-        setTimeout(replaceSignUpText, 500);
-      }
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
   const navLinks: NavLink[] = [
     { href: '/', label: 'MySphere' },
     { href: '/base', label: 'MyBase' },
@@ -167,7 +101,7 @@ export default function Navigation() {
             </Link>
             
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-2 bg-white/10 backdrop-blur-xl border border-white/20 p-1.5 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.22)]">
+            <nav className="hidden md:flex items-center gap-2 bg-white/20 border border-white/20 p-1.5 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.22)]">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href || pathname?.startsWith(link.href + '/');
                 if (link.isDisabled) {
@@ -224,7 +158,10 @@ export default function Navigation() {
             <NetworkSwitcher />
             <NotificationsBell onNotificationsClick={handleNotificationsClick} />
             <Wallet>
-              <ConnectWallet className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2">
+              <ConnectWallet
+                className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2"
+                disconnectedLabel="Sign In With Base"
+              >
                 <Avatar className="h-6 w-6" />
                 <Name className="text-white inline" />
               </ConnectWallet>
@@ -276,7 +213,7 @@ export default function Navigation() {
 
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
-          <nav className="md:hidden mt-3 bg-white/10 backdrop-blur-xl border border-white/20 p-1.5 rounded-2xl flex flex-col gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
+          <nav className="md:hidden mt-3 bg-white/20 border border-white/20 p-1.5 rounded-2xl flex flex-col gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
             {navLinks.map((link) => {
               const isActive = pathname === link.href || pathname?.startsWith(link.href + '/');
               if (link.isDisabled) {

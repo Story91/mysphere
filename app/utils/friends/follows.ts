@@ -314,36 +314,37 @@ export const getFollowing = async (
 
     if (followingIds.length === 0) return [];
 
-    // Pobierz profile obserwowanych użytkowników w batch'ach
-    const users: UserWithFollowStatus[] = [];
-    
-    for (let i = 0; i < followingIds.length; i += SOCIAL_CONFIG.BATCH_SIZE) {
-      const batch = followingIds.slice(i, i + SOCIAL_CONFIG.BATCH_SIZE);
-      const userRefs = batch.map(id => doc(db, COLLECTIONS.USERS, id));
-      const userDocs = await Promise.all(userRefs.map(ref => getDoc(ref)));
+    // Profile + status mutual jednym zestawem zapytan zamiast 2N odczytow.
+    const [userMap, followersSnapshot] = await Promise.all([
+      fetchUsersByIds(followingIds),
+      getDocs(
+        query(
+          collection(db, `${COLLECTIONS.USERS}/${userId}/${COLLECTIONS.USER_FOLLOWERS}`),
+          limit(SOCIAL_CONFIG.MAX_FOLLOWERS_FETCH)
+        )
+      )
+    ]);
+    const followerIdSet = new Set(followersSnapshot.docs.map(d => d.id));
 
-      for (let j = 0; j < userDocs.length; j++) {
-        const userDoc = userDocs[j];
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const followData = followingSnapshot.docs.find(doc => doc.id === userDoc.id)?.data();
-          
-          // Sprawdź czy jest też obserwującym (mutual follow)
-          const isFollower = await checkIfFollowing(userDoc.id, userId);
-          
-          users.push({
-            address: userDoc.id,
-            name: userData.name || `${userDoc.id.slice(0, 6)}...${userDoc.id.slice(-4)}`,
-            avatar: userData.avatar,
-            isFollowing: true,
-            isFollower,
-            isMutual: isFollower,
-            followedAt: formatTimestamp(followData?.[FIELDS.FOLLOWED_AT]),
-            isOnline: userData[FIELDS.USER_IS_ONLINE] || false,
-            lastActive: formatTimestamp(userData[FIELDS.USER_LAST_ACTIVE])
-          });
-        }
-      }
+    const users: UserWithFollowStatus[] = [];
+    for (const followDoc of followingSnapshot.docs) {
+      const userData = userMap.get(followDoc.id);
+      if (!userData) continue;
+
+      const followData = followDoc.data();
+      const isFollower = followerIdSet.has(followDoc.id);
+
+      users.push({
+        address: followDoc.id,
+        name: userData.name || `${followDoc.id.slice(0, 6)}...${followDoc.id.slice(-4)}`,
+        avatar: userData.avatar,
+        isFollowing: true,
+        isFollower,
+        isMutual: isFollower,
+        followedAt: formatTimestamp(followData?.[FIELDS.FOLLOWED_AT]),
+        isOnline: userData[FIELDS.USER_IS_ONLINE] || false,
+        lastActive: formatTimestamp(userData[FIELDS.USER_LAST_ACTIVE])
+      });
     }
 
     return users.sort((a, b) => (b.followedAt || 0) - (a.followedAt || 0));
@@ -352,6 +353,39 @@ export const getFollowing = async (
     console.error('Błąd pobierania listy obserwowanych:', error);
     return [];
   }
+};
+
+// ===============================================
+// 🔎 BATCH HELPERS
+// ===============================================
+
+/**
+ * Pobierz dokumenty userow po ID jednym zapytaniem na kazde 30 sztuk.
+ * Wczesniej bylo getDoc() per user = 50 odczytow na liste 50 osob.
+ */
+const fetchUsersByIds = async (ids: string[]): Promise<Map<string, any>> => {
+  const result = new Map<string, any>();
+  for (let i = 0; i < ids.length; i += 30) {
+    const chunk = ids.slice(i, i + 30);
+    if (chunk.length === 0) continue;
+    const snap = await getDocs(query(collection(db, COLLECTIONS.USERS), where('__name__', 'in', chunk)));
+    snap.docs.forEach(d => result.set(d.id, d.data()));
+  }
+  return result;
+};
+
+/**
+ * Zbior ID, ktore `userId` obserwuje - jedno zapytanie zamiast checkIfFollowing()
+ * wolanego w petli dla kazdego usera z listy.
+ */
+const fetchFollowingIdSet = async (userId: string): Promise<Set<string>> => {
+  const snap = await getDocs(
+    query(
+      collection(db, `${COLLECTIONS.USERS}/${userId}/${COLLECTIONS.USER_FOLLOWING}`),
+      limit(SOCIAL_CONFIG.MAX_FOLLOWERS_FETCH)
+    )
+  );
+  return new Set(snap.docs.map(d => d.id));
 };
 
 /**
@@ -378,36 +412,31 @@ export const getFollowers = async (
 
     if (followerIds.length === 0) return [];
 
-    // Pobierz profile obserwujących użytkowników w batch'ach
-    const users: UserWithFollowStatus[] = [];
-    
-    for (let i = 0; i < followerIds.length; i += SOCIAL_CONFIG.BATCH_SIZE) {
-      const batch = followerIds.slice(i, i + SOCIAL_CONFIG.BATCH_SIZE);
-      const userRefs = batch.map(id => doc(db, COLLECTIONS.USERS, id));
-      const userDocs = await Promise.all(userRefs.map(ref => getDoc(ref)));
+    // Profile + status mutual jednym zestawem zapytan zamiast 2N odczytow.
+    const [userMap, followingIdSet] = await Promise.all([
+      fetchUsersByIds(followerIds),
+      fetchFollowingIdSet(userId)
+    ]);
 
-      for (let j = 0; j < userDocs.length; j++) {
-        const userDoc = userDocs[j];
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const followData = followersSnapshot.docs.find(doc => doc.id === userDoc.id)?.data();
-          
-          // Sprawdź czy użytkownik też go obserwuje (mutual follow)
-          const isFollowing = await checkIfFollowing(userId, userDoc.id);
-          
-          users.push({
-            address: userDoc.id,
-            name: userData.name || `${userDoc.id.slice(0, 6)}...${userDoc.id.slice(-4)}`,
-            avatar: userData.avatar,
-            isFollowing,
-            isFollower: true,
-            isMutual: isFollowing,
-            followedAt: formatTimestamp(followData?.[FIELDS.FOLLOWED_AT]),
-            isOnline: userData[FIELDS.USER_IS_ONLINE] || false,
-            lastActive: formatTimestamp(userData[FIELDS.USER_LAST_ACTIVE])
-          });
-        }
-      }
+    const users: UserWithFollowStatus[] = [];
+    for (const followDoc of followersSnapshot.docs) {
+      const userData = userMap.get(followDoc.id);
+      if (!userData) continue;
+
+      const followData = followDoc.data();
+      const isFollowing = followingIdSet.has(followDoc.id);
+
+      users.push({
+        address: followDoc.id,
+        name: userData.name || `${followDoc.id.slice(0, 6)}...${followDoc.id.slice(-4)}`,
+        avatar: userData.avatar,
+        isFollowing,
+        isFollower: true,
+        isMutual: isFollowing,
+        followedAt: formatTimestamp(followData?.[FIELDS.FOLLOWED_AT]),
+        isOnline: userData[FIELDS.USER_IS_ONLINE] || false,
+        lastActive: formatTimestamp(userData[FIELDS.USER_LAST_ACTIVE])
+      });
     }
 
     return users.sort((a, b) => (b.followedAt || 0) - (a.followedAt || 0));
@@ -613,5 +642,3 @@ export const cleanupInactiveFollows = async (daysInactive: number = 180): Promis
     return 0;
   }
 };
-
-console.log('👥 Follow System initialized');

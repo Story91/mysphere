@@ -3,7 +3,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
 
 /* Dodanie czcionki SF Pro Display */
 @font-face {
@@ -316,12 +315,12 @@ html {
 body {
   color: #1F2937;
   background: linear-gradient(to bottom right, white, #f9fafb, #eff6ff);
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-body), 'Space Grotesk', sans-serif;
   letter-spacing: 0.3px;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-heading), 'Outfit', sans-serif;
   color: #111827;
   letter-spacing: -0.5px;
 }
@@ -580,21 +579,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Google Fonts Styles */
-.font-roboto { font-family: 'Roboto', sans-serif; }
-.font-open-sans { font-family: 'Open Sans', sans-serif; }
-.font-montserrat { font-family: 'Montserrat', sans-serif; }
-.font-lato { font-family: 'Lato', sans-serif; }
-.font-poppins { font-family: 'Poppins', sans-serif; }
-.font-pacifico { font-family: 'Pacifico', cursive; }
-.font-dancing-script { font-family: 'Dancing Script', cursive; }
-.font-lobster { font-family: 'Lobster', cursive; }
-.font-permanent-marker { font-family: 'Permanent Marker', cursive; }
-.font-playfair { font-family: 'Playfair Display', serif; }
-.font-merriweather { font-family: 'Merriweather', serif; }
-.font-crimson { font-family: 'Crimson Text', serif; }
-.font-bebas { font-family: 'Bebas Neue', sans-serif; }
-.font-oswald { font-family: 'Oswald', sans-serif; }
-.font-anton { font-family: 'Anton', sans-serif; }
+/* 15 martwych rodzin fontow usunietych - klasy .font-* nie byly uzywane nigdzie,
+   a same fonty nigdy sie nie ladowaly (brak @font-face i brak importu). */
 
 /* Style dla ikon w menu rozwijanym */
 .wallet-dropdown svg {
@@ -689,8 +675,11 @@ appkit-button::part(button):hover {
   }
 }
 
-/* OnchainKit Connect Wallet modal - center only when not logged in */
-body.wallet-not-connected div[role="dialog"] {
+/* OnchainKit Connect Wallet modal - center only when not logged in.
+   Selektor zawezony do modala OnchainKit - wczesniej lapal KAZDY dialog w aplikacji
+   i nadpisywal !importantem pozycjonowanie/animacje cudzych modali. */
+body.wallet-not-connected div[data-testid="ockModalOverlay"] div[role="dialog"],
+body.wallet-not-connected div[role="dialog"][data-testid^="ockModal"] {
   position: fixed !important;
   top: 50% !important;
   left: 50% !important;
@@ -701,9 +690,3 @@ body.wallet-not-connected div[role="dialog"] {
   max-width: 90vw !important;
 }
 
-/* Hide Sign up text with more specific selectors */
-div[role="dialog"] h1,
-div[role="dialog"] h2, 
-div[role="dialog"] h3 {
-  /* Let JavaScript handle text replacement */
-}
