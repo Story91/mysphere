@@ -5,6 +5,8 @@ const CACHE_EXPIRY = 10 * 60 * 1000;
 
 // Ustaw API key dla Zora - należy zastąpić rzeczywistym kluczem
 // lub ustawić w zmiennych środowiskowych
+// UWAGA: NEXT_PUBLIC_ZORA_API_KEY nie jest ustawiony w env - przekazywany jest pusty string,
+// wiec SDK Zory dziala na limitach anonimowych (rate limit dla ruchu bez klucza).
 setApiKey(process.env.NEXT_PUBLIC_ZORA_API_KEY || '');
 
 // Cache dla wyników zapytań

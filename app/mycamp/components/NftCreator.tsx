@@ -152,7 +152,9 @@ export default function NftCreator() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const PINATA_JWT = process.env.NEXT_PUBLIC_PINATA_JWT || process.env.NEXT_PUBLIC_PINATA_JWT_TOKEN;
+      // Jedyny realny klucz to NEXT_PUBLIC_PINATA_JWT. Wariant NEXT_PUBLIC_PINATA_JWT_TOKEN
+      // nigdy nie istnial w env, wiec fallback byl martwym kodem i zostal usuniety.
+      const PINATA_JWT = process.env.NEXT_PUBLIC_PINATA_JWT;
       
       const uploadResponse = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
         method: 'POST',
