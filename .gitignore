@@ -4,8 +4,11 @@
 # Ignoruj foldery node_modules
 node_modules/
 
-# Ignoruj folder .next
+# Ignoruj folder .next oraz alternatywne distDir.
+# distDir jest sterowany zmienna NEXT_DIST_DIR (patrz next.config.js), zeby build
+# nie nadpisywal .next uzywanego przez dzialajacy `next dev`.
 .next/
+.next-*/
 
 # Ignoruj plik .env.local
 .env.local

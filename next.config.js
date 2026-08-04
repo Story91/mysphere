@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Pozwala zbudowac projekt bez nadpisywania .next uzywanego przez dzialajacy
+  // `next dev`. Bez tego oba procesy niszcza sobie nawzajem cache i produkcyjny
+  // build wywala sie na "Cannot find module './vendor-chunks/...'".
+  // Uzycie: NEXT_DIST_DIR=.next-build npm run build
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   swcMinify: true,
   trailingSlash: true,
@@ -8,6 +13,19 @@ const nextConfig = {
   },
   experimental: {
     serverComponentsExternalPackages: ['mongodb'],
+    // Kompiluje bundle klienta i serwera rownolegle, w osobnych workerach.
+    webpackBuildWorker: true,
+    // Pakiety z barrel files (index re-eksportujacy setki modulow). Bez tego
+    // webpack musi przejsc caly barrel, zeby wyciagnac jeden import.
+    // Lista wylacznie z tego, co faktycznie jest w repo.
+    optimizePackageImports: [
+      'framer-motion',
+      'lucide-react',
+      'react-icons',
+      'recharts',
+      '@heroicons/react',
+      'date-fns',
+    ],
   },
   webpack: (config, { isServer }) => {
     // WalletConnect optional deps that break client bundling

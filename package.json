@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "prebuild": "node scripts/copy-onchainkit-css.js",
-    "dev": "next dev -H 0.0.0.0",
+    "dev": "next dev -H 0.0.0.0 --turbo",
     "build": "next build --no-lint",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
@@ -49,6 +49,7 @@
     "@zoralabs/coins-sdk": "^0.2.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
     "dotenv": "^16.4.1",
     "firebase": "^11.4.0",
     "framer-motion": "^11.18.2",
@@ -101,6 +102,7 @@
     "shadcn": "^3.5.1",
     "solidity-coverage": "^0.8.1",
     "tailwindcss": "^3.4.1",
+    "tailwindcss-animate": "^1.0.7",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.0",
     "typescript": "^5.3.3"
