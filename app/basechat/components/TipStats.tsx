@@ -276,41 +276,52 @@ const TipStatsCollapsible = ({ networkGroups, getAmount, activeTips, className =
 export default function TipStats({ userAddress, postId, className = '', presetPostStats, presetLoading }: TipStatsProps) {
   const [userStats, setUserStats] = useState<TipStatsType | null>(null);
   const [postStats, setPostStats] = useState<PostTipStats | null>(presetPostStats ?? null);
-  const [loading, setLoading] = useState(presetPostStats === undefined || presetLoading === true);
+  // Wylacznie wlasne pobrania. `presetLoading` NIE moze byc czescia tego stanu ani
+  // zaleznoscia efektu ponizej - to tylko flaga wyswietlania. Trzymanie jej w deps
+  // powodowalo ponowne fetchStats() przy kazdym przelaczeniu flagi.
+  const [fetching, setFetching] = useState(presetPostStats === undefined);
+  const loading = presetLoading === true || fetching;
+
+  // Statystyki posta przyszly propsem - zero zapytan.
+  useEffect(() => {
+    if (presetPostStats !== undefined) setPostStats(presetPostStats);
+  }, [presetPostStats]);
 
   useEffect(() => {
-    // Statystyki posta przyszly propsem - zero zapytan.
-    if (presetPostStats !== undefined) {
-      setPostStats(presetPostStats);
-      if (!userAddress) {
-        setLoading(presetLoading === true);
-        return;
-      }
+    const needsUserFetch = Boolean(userAddress);
+    const needsPostFetch = Boolean(postId) && presetPostStats === undefined;
+
+    if (!needsUserFetch && !needsPostFetch) {
+      setFetching(false);
+      return;
     }
 
+    let cancelled = false;
     const fetchStats = async () => {
-      setLoading(true);
+      setFetching(true);
       try {
-        if (userAddress) {
-          const stats = await getUserTipStats(userAddress);
-          setUserStats(stats);
+        if (needsUserFetch) {
+          const stats = await getUserTipStats(userAddress!);
+          if (!cancelled) setUserStats(stats);
         }
-        
-        if (postId && presetPostStats === undefined) {
-          const stats = await getPostTipStats(postId);
-          setPostStats(stats);
+
+        if (needsPostFetch) {
+          const stats = await getPostTipStats(postId!);
+          if (!cancelled) setPostStats(stats);
         }
       } catch (error) {
         console.error('Error fetching tip stats:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setFetching(false);
       }
     };
 
-    if (userAddress || (postId && presetPostStats === undefined)) {
-      fetchStats();
-    }
-  }, [userAddress, postId, presetPostStats, presetLoading]);
+    fetchStats();
+    return () => { cancelled = true; };
+    // presetPostStats celowo tylko przez `=== undefined`, zeby nowa referencja
+    // obiektu ze zbiorczego fetcha nie wywolywala ponownego pobrania.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userAddress, postId, presetPostStats === undefined]);
 
   if (loading) {
     return (

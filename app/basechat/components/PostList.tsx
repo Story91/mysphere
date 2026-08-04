@@ -274,8 +274,16 @@ function PostList({
   const [tipStatsLoading, setTipStatsLoading] = useState(true);
 
   useEffect(() => {
-    const ids = (posts || []).map(p => p.id).filter(Boolean) as string[];
-    if (ids.length === 0) return;
+    // Zrodlem jest internalPosts, nie prop `posts` - to z internalPosts renderuje
+    // sie lista i to tam trafiaja posty dodane optymistycznie (event 'post-created').
+    const ids = (internalPosts || []).map(p => p.id).filter(Boolean) as string[];
+
+    if (ids.length === 0) {
+      // Bez tego flaga zostawala na `true` i TipStats krecil spinner w nieskonczonosc.
+      setTipStatsLoading(false);
+      setPostTipStats({});
+      return;
+    }
 
     let cancelled = false;
     setTipStatsLoading(true);
@@ -285,7 +293,7 @@ function PostList({
       .finally(() => { if (!cancelled) setTipStatsLoading(false); });
 
     return () => { cancelled = true; };
-  }, [posts]);
+  }, [internalPosts]);
   
   // 🎵 Stan odtwarzacza mieszka w audioPlayerStore (poza Reactem) - patrz PostAudioPlayer.
   useEffect(() => stopAudio, []);
