@@ -20,8 +20,72 @@ import {
   EthBalance,
 } from '@coinbase/onchainkit/identity';
 import { useState } from 'react';
+import { useFundingUrl } from './useFundingUrl';
 import { NetworkSwitcher } from '../NetworkSwitcher';
 import { NotificationsBell } from './NotificationsBell';
+
+/* ---------------------------------------------------------------------------
+   Tokeny dropdownu portfela.
+
+   Powierzchnia jest CIEMNA, nie biala. Dropdown wisi pod przeszklonym, ciemnym
+   headerem, a kazda inna plywajaca powierzchnia w aplikacji (karta Sphere
+   Identity) tez jest ciemnogranatowa - wymuszony wczesniej `!bg-white` byl tu
+   anomalia i dlatego calosc wygladala jak niestylowany default.
+
+   Jeden rytm wiersza wymuszony rowniez na komponentach OnchainKit: mialy wlasne
+   px-4 py-3, podczas gdy nasze <Link> mialy px-4 py-2, wiec ikony i etykiety
+   nie trzymaly linii.
+--------------------------------------------------------------------------- */
+const DROPDOWN_SURFACE = [
+  '!w-[300px] max-[360px]:!w-[calc(100vw-24px)]',
+  '!p-0 !overflow-hidden !rounded-2xl',
+  '!bg-[#0A1024]/95 !backdrop-blur-xl',
+  '!border !border-white/10',
+  '!shadow-[0_24px_64px_-16px_rgba(0,0,0,0.75)]',
+  'wallet-dropdown',
+].join(' ');
+
+const DROPDOWN_ROW_BASE = [
+  '!flex !items-center !gap-3 !w-full',
+  '!px-4 !py-2.5',
+  '!bg-transparent',
+  '!text-[13px] !font-medium !text-[#C7D4EE]',
+  'transition-colors duration-150',
+].join(' ');
+
+const DROPDOWN_ROW = `${DROPDOWN_ROW_BASE} hover:!bg-white/[0.06] hover:!text-[#EEF3FF]`;
+
+/** Staly 16px slot na ikone - gwarantuje, ze etykiety trzymaja jedna os. */
+function IconSlot({ children }: { children: React.ReactNode }) {
+  return (
+    <svg
+      className="h-4 w-4 shrink-0 text-[#7E93BC]"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+/** Znak wyjscia poza aplikacje - niesie informacje, nie dekoruje. */
+function ExternalMark() {
+  return (
+    <svg
+      className="h-3 w-3 shrink-0 text-[#5C6F94]"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path d="M7 17 17 7M17 7H9m8 0v8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 type NavLink = {
   href: string;
@@ -33,6 +97,7 @@ export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const fundingUrl = useFundingUrl();
 
   const handleNotificationsClick = () => {
     router.push('/basechat?view=notifications');
@@ -154,55 +219,82 @@ export default function Navigation() {
                 <Avatar className="h-6 w-6" />
                 <Name className="text-white inline" />
               </ConnectWallet>
-              {/* Bez nadpisywania pozycjonowania. OnchainKit renderuje ten dropdown
-                  w FloatingPortal (na document.body) i ustawia position/top/left
-                  INLINE przez Floating UI, kotwiczac go do przycisku ConnectWallet
-                  (z flip + shift, wiec sam sie miesci w viewporcie). Klasy typu
-                  `!fixed md:!absolute md:!top-full` biły te inline'owe style
-                  !importantem - `top:100%` liczone wzgledem body wyrzucalo
-                  dropdown na dol strony na desktopie. Zostaja tylko klasy
-                  wygladu i szerokosci. */}
-              <WalletDropdown className="!w-[calc(100%-32px)] md:!w-auto !max-w-[400px] !z-[9999] !bg-white wallet-dropdown">
-                  <Identity hasCopyAddressOnClick className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-link">
-                    <Avatar />
-                    <Name className="!text-gray-900" />
-                    <Address className="!text-gray-900" />
-                    <EthBalance className="!text-gray-900" />
+              {/* Pozycjonowanie zostawiamy Floating UI (OnchainKit renderuje ten
+                  dropdown w FloatingPortal i ustawia position/top/left inline,
+                  kotwiczac do przycisku). Nadpisywanie tego utilities z !important
+                  wyrzucalo dropdown na dol strony. Tu ustawiamy wylacznie wyglad. */}
+              <WalletDropdown className={DROPDOWN_SURFACE}>
+                  {/* Blok tozsamosci czytany jak karta profilu, nie jak wiersz
+                      portfela - to jest apka spolecznosciowa, gdzie portfel JEST
+                      tozsamoscia (Basename, punkty Sphere). */}
+                  <Identity
+                    hasCopyAddressOnClick
+                    className="!bg-transparent !px-4 !py-4 !gap-3 border-b border-white/[0.08]"
+                  >
+                    <Avatar className="!h-10 !w-10 rounded-full ring-2 ring-[#0052FF]/70" />
+                    <Name className="!text-[15px] !font-semibold !text-[#EEF3FF] font-['Coinbase_Display']" />
+                    <Address className="!text-[12px] !text-[#93A5C9] !tabular-nums" />
+                    <EthBalance className="!text-[12px] !text-[#93A5C9] !tabular-nums" />
                   </Identity>
-                  <WalletDropdownBasename className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-link" />
-                  <Link 
-                    href="https://keys.coinbase.com"
-                    target="_blank"
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 wallet-dropdown-link"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2"/>
-                      <path d="M12 16V8M12 8L9 11M12 8L15 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Wallet
-                  </Link>
-                  <Link 
-                    href="https://basescan.org"
-                    target="_blank"
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 wallet-dropdown-link"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M21 21L15.8033 15.8033M15.8033 15.8033C17.1605 14.4461 18 12.5711 18 10.5C18 6.35786 14.6421 3 10.5 3C6.35786 3 3 6.35786 3 10.5C3 14.6421 6.35786 18 10.5 18C12.5711 18 14.4461 17.1605 15.8033 15.8033Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Base Scan
-                  </Link>
-                  <Link 
-                    href="https://bridge.base.org"
-                    target="_blank"
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 wallet-dropdown-link"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M7 10V14M17 10V14M3 12H7M17 12H21M8 17H16C16.5523 17 17 16.5523 17 16V8C17 7.44772 16.5523 7 16 7H8C7.44772 7 7 7.44772 7 8V16C7 16.5523 7.44772 17 8 17Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Base Bridge
-                  </Link>
-                  <WalletDropdownFundLink className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-fund" />
-                  <WalletDropdownDisconnect className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-disconnect" />
+
+                  <div className="py-1">
+                    <WalletDropdownBasename className={DROPDOWN_ROW} />
+
+                    <Link
+                      href="https://keys.coinbase.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={DROPDOWN_ROW}
+                    >
+                      <IconSlot>
+                        <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        <path d="M12 16V8m0 0-3 3m3-3 3 3" strokeLinecap="round" strokeLinejoin="round" />
+                      </IconSlot>
+                      <span className="flex-1">Wallet</span>
+                      <ExternalMark />
+                    </Link>
+
+                    <Link
+                      href="https://basescan.org"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={DROPDOWN_ROW}
+                    >
+                      <IconSlot>
+                        <path d="M21 21l-5.2-5.2m0 0A7.5 7.5 0 1 0 5.2 5.2a7.5 7.5 0 0 0 10.6 10.6Z" strokeLinecap="round" strokeLinejoin="round" />
+                      </IconSlot>
+                      <span className="flex-1">Base Scan</span>
+                      <ExternalMark />
+                    </Link>
+
+                    <Link
+                      href="https://bridge.base.org"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={DROPDOWN_ROW}
+                    >
+                      <IconSlot>
+                        <path d="M7 10v4m10-4v4M3 12h4m10 0h4M8 17h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1Z" strokeLinecap="round" strokeLinejoin="round" />
+                      </IconSlot>
+                      <span className="flex-1">Base Bridge</span>
+                      <ExternalMark />
+                    </Link>
+
+                    {/* fundingUrl podawany jawnie: bez niego OnchainKit wygasza ten
+                        wiersz dla kazdego portfela, ktory nie jest Coinbase Smart
+                        Walletem. `undefined` oddaje decyzje z powrotem OnchainKitowi. */}
+                    <WalletDropdownFundLink
+                      className={DROPDOWN_ROW}
+                      fundingUrl={fundingUrl}
+                      text="Add funds"
+                    />
+                  </div>
+
+                  <div className="border-t border-white/[0.08] py-1">
+                    <WalletDropdownDisconnect
+                      className={`${DROPDOWN_ROW_BASE} !text-[#FF8A8A] hover:!bg-[#FF6B6B]/10 hover:!text-[#FFB3B3]`}
+                    />
+                  </div>
               </WalletDropdown>
             </Wallet>
           </div>

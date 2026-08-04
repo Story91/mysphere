@@ -582,25 +582,22 @@ h1, h2, h3, h4, h5, h6 {
 /* 15 martwych rodzin fontow usunietych - klasy .font-* nie byly uzywane nigdzie,
    a same fonty nigdy sie nie ladowaly (brak @font-face i brak importu). */
 
-/* Style dla ikon w menu rozwijanym */
+/* Ikony w dropdownie portfela.
+
+   Wczesniej wymuszaly tu czern (#111111) pod biala powierzchnie. Powierzchnia
+   jest teraz ciemna, wiec ikony dziedzicza kolor z wiersza (`currentColor`),
+   dzieki czemu reaguja na hover razem z etykieta. OnchainKit wstrzykuje wlasne
+   kolory w niektore ikony - stad `!important` na dziedziczeniu. */
 .wallet-dropdown svg {
-  color: #111111 !important;
-  stroke: #111111 !important;
+  color: inherit !important;
+  stroke: currentColor !important;
 }
 
-.wallet-dropdown-link svg {
-  color: #111111 !important;
-  stroke: #111111 !important;
-}
-
-.wallet-dropdown-fund svg {
-  color: #111111 !important;
-  stroke: #111111 !important;
-}
-
-.wallet-dropdown-disconnect svg {
-  color: #111111 !important;
-  stroke: #111111 !important;
+/* Avatar w bloku tozsamosci to <img>/<svg> z wlasna paleta - nie nadpisujemy go. */
+.wallet-dropdown [data-testid='ockAvatar'] svg,
+.wallet-dropdown [data-testid='ockAvatar'] img {
+  color: revert !important;
+  stroke: revert !important;
 }
 
 /* Color Picker Styles */
