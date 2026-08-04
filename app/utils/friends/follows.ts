@@ -377,8 +377,11 @@ const fetchUsersByIds = async (ids: string[]): Promise<Map<string, any>> => {
 /**
  * Zbior ID, ktore `userId` obserwuje - jedno zapytanie zamiast checkIfFollowing()
  * wolanego w petli dla kazdego usera z listy.
+ *
+ * Czyta wylacznie ID dokumentow z subkolekcji - bez laczenia z profilami.
+ * getFollowing() dla tego samego celu kosztowalby dodatkowe N odczytow userow.
  */
-const fetchFollowingIdSet = async (userId: string): Promise<Set<string>> => {
+export const fetchFollowingIdSet = async (userId: string): Promise<Set<string>> => {
   const snap = await getDocs(
     query(
       collection(db, `${COLLECTIONS.USERS}/${userId}/${COLLECTIONS.USER_FOLLOWING}`),

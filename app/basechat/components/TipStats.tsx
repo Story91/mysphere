@@ -21,6 +21,8 @@ interface TipStatsProps {
    * przy N postach w feedzie.
    */
   presetPostStats?: PostTipStats | null;
+  /** true dopoki zbiorcze zapytanie nie wrocilo - trzyma stan ladowania. */
+  presetLoading?: boolean;
 }
 
 // Mapuje stare nazwy sieci na nowe
@@ -271,17 +273,17 @@ const TipStatsCollapsible = ({ networkGroups, getAmount, activeTips, className =
   );
 };
 
-export default function TipStats({ userAddress, postId, className = '', presetPostStats }: TipStatsProps) {
+export default function TipStats({ userAddress, postId, className = '', presetPostStats, presetLoading }: TipStatsProps) {
   const [userStats, setUserStats] = useState<TipStatsType | null>(null);
   const [postStats, setPostStats] = useState<PostTipStats | null>(presetPostStats ?? null);
-  const [loading, setLoading] = useState(presetPostStats === undefined);
+  const [loading, setLoading] = useState(presetPostStats === undefined || presetLoading === true);
 
   useEffect(() => {
     // Statystyki posta przyszly propsem - zero zapytan.
     if (presetPostStats !== undefined) {
       setPostStats(presetPostStats);
       if (!userAddress) {
-        setLoading(false);
+        setLoading(presetLoading === true);
         return;
       }
     }
@@ -308,7 +310,7 @@ export default function TipStats({ userAddress, postId, className = '', presetPo
     if (userAddress || (postId && presetPostStats === undefined)) {
       fetchStats();
     }
-  }, [userAddress, postId, presetPostStats]);
+  }, [userAddress, postId, presetPostStats, presetLoading]);
 
   if (loading) {
     return (

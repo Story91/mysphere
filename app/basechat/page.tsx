@@ -385,7 +385,6 @@ export default function BaseChat() {
   const [customName, setCustomName] = useState('');
   const [selectedSuffix, setSelectedSuffix] = useState<'sphere' | 'camper' | 'celo' | 'world'>('sphere');
   const [userNames, setUserNames] = useState<{[key: string]: {name: string, avatar?: string}}>({});
-  const [expandedPosts, setExpandedPosts] = useState<{[key: string]: boolean}>({});
   const [editingPost, setEditingPost] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState('');
   const [editingComment, setEditingComment] = useState<{postId: string, commentId: string} | null>(null);
@@ -1836,8 +1835,9 @@ export default function BaseChat() {
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
   const MAX_DISPLAY_LIMIT = 150; // Maksymalnie 150 postów (zmniejszono dla oszczędności)
 
-  // `expandedPosts` to mapa {postId: bool} rozwinietych tresci - zawsze truthy, wiec
-  // warunek na niej wylaczal lazy loading calkowicie. Slice jest bezwarunkowy.
+  // Wczesniej stal tu warunek na `expandedPosts` - mapie {postId: bool}, ktora jest
+  // zawsze truthy, wiec slice nigdy nie dzialal. Stan byl przy tym martwy (nikt go
+  // nie ustawial ani nie czytal), wiec zostal usuniety razem z warunkiem.
   const displayedPosts = useMemo(
     () => sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT)),
     [sortedPosts, displayLimit]
@@ -2557,6 +2557,24 @@ export default function BaseChat() {
     }
   }, [showShareModal, showPostDialog, showSettingsModal, showProfileModal, showGroupModal, showPostImagePreview, isAppleDevice]);
 
+  // handlePinPending musi byc PRZED tym wczesnym returnem - to hook (useCallback),
+  // a hooki za warunkowym returnem lamia kolejnosc wywolan Reacta
+  // ("Rendered more hooks than during the previous render").
+  const handlePinPending = useCallback((postId: string, txHash: string, duration: string) => {
+    const expectedAt = Date.now() + (5 * 60 * 1000); // Expected confirmation in 5 minutes
+    
+    setPendingPins(prev => ({
+      ...prev,
+      [postId]: {
+        txHash,
+        duration,
+        expectedAt
+      }
+    }));
+    
+    console.log(`⏳ BaseChat: Post ${postId} set to pending pin state`, { txHash, duration, expectedAt });
+  }, []);
+
   // Jeśli komponent nie jest zamontowany, zwracamy pusty div
   if (!isMounted) {
     return <div></div>;
@@ -2636,20 +2654,6 @@ export default function BaseChat() {
   const today = new Date().toISOString().split('T')[0];
 
   // Pending Pin management functions
-  const handlePinPending = useCallback((postId: string, txHash: string, duration: string) => {
-    const expectedAt = Date.now() + (5 * 60 * 1000); // Expected confirmation in 5 minutes
-    
-    setPendingPins(prev => ({
-      ...prev,
-      [postId]: {
-        txHash,
-        duration,
-        expectedAt
-      }
-    }));
-    
-    console.log(`⏳ BaseChat: Post ${postId} set to pending pin state`, { txHash, duration, expectedAt });
-  }, []);
 
   const handlePinConfirmed = (postId: string) => {
     setPendingPins(prev => {

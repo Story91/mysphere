@@ -271,15 +271,18 @@ function PostList({
   // Statystyki tipow dla calego feedu jednym zapytaniem na 30 postow.
   // Wczesniej kazdy <TipStats> robil wlasne getDocs - przy 25 postach 25 zapytan.
   const [postTipStats, setPostTipStats] = useState<{ [postId: string]: PostTipStats }>({});
+  const [tipStatsLoading, setTipStatsLoading] = useState(true);
 
   useEffect(() => {
     const ids = (posts || []).map(p => p.id).filter(Boolean) as string[];
     if (ids.length === 0) return;
 
     let cancelled = false;
+    setTipStatsLoading(true);
     getBulkPostTipStats(ids)
       .then(stats => { if (!cancelled) setPostTipStats(stats); })
-      .catch(err => console.error('Error fetching bulk tip stats:', err));
+      .catch(err => console.error('Error fetching bulk tip stats:', err))
+      .finally(() => { if (!cancelled) setTipStatsLoading(false); });
 
     return () => { cancelled = true; };
   }, [posts]);
@@ -2427,6 +2430,7 @@ function PostList({
           <TipStats
             postId={post.id}
             presetPostStats={postTipStats[post.id] ?? null}
+            presetLoading={tipStatsLoading}
             className="text-gray-900 dark:text-gray-200"
           />
         </div>

@@ -715,13 +715,16 @@ export const useSocialActions = (currentUserAddress: string | null): UseSocialAc
 
   const loadFollowingSet = useCallback(async (): Promise<Set<string>> => {
     if (followingSetRef.current) return followingSetRef.current;
-    const api = apiRef.current;
-    if (!api) return new Set();
-    const following = await api.getFollowing(200);
-    const set = new Set(following.map(u => u.address.toLowerCase()));
+    if (!currentUserAddress) return new Set();
+
+    // Same ID z subkolekcji - jedno zapytanie. getFollowing() doczytywalby
+    // jeszcze profile kazdego obserwowanego, czego tu w ogole nie potrzebujemy.
+    const { fetchFollowingIdSet } = await import('../../utils/friends/follows');
+    const ids = await fetchFollowingIdSet(currentUserAddress);
+    const set = new Set(Array.from(ids).map(id => id.toLowerCase()));
     followingSetRef.current = set;
     return set;
-  }, []);
+  }, [currentUserAddress]);
 
   const getFollowStatuses = useCallback(async (targetUserIds: string[]) => {
     const set = await loadFollowingSet();
