@@ -675,18 +675,21 @@ appkit-button::part(button):hover {
   }
 }
 
-/* OnchainKit Connect Wallet modal - center only when not logged in.
-   Selektor zawezony do modala OnchainKit - wczesniej lapal KAZDY dialog w aplikacji
-   i nadpisywal !importantem pozycjonowanie/animacje cudzych modali. */
-body.wallet-not-connected div[data-testid="ockModalOverlay"] div[role="dialog"],
-body.wallet-not-connected div[role="dialog"][data-testid^="ockModal"] {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  right: auto !important;
-  bottom: auto !important;
-  max-height: 90vh !important;
-  max-width: 90vw !important;
+/* Modal Connect Wallet z OnchainKit.
+
+   Poprzednia wersja tej reguly celowala w `div[role="dialog"]`, czyli w KAZDY
+   dialog w aplikacji, i nadpisywala !importantem pozycjonowanie oraz animacje
+   cudzych modali. Wlasciwy hak to data-testid="ockDialog" - OnchainKit stawia
+   go na DialogContent, czyli na tym samym elemencie co role="dialog"
+   (`ockModalOverlay` to element WEWNATRZ dialogu, nie jego rodzic).
+
+   OnchainKit 1.1.2 centruje ten dialog samodzielnie
+   (ock:fixed ock:top-[50%] ock:left-[50%] ock:translate-x/y-[-50%]), wiec
+   nadpisywanie position/top/left/transform jest tu zbedne i tylko walczyloby
+   z jego wlasnymi animacjami. Zostaja same ograniczenia rozmiaru, zeby modal
+   nie wychodzil poza ekran na malych viewportach. */
+div[role="dialog"][data-testid="ockDialog"] {
+  max-height: 90vh;
+  max-width: 90vw;
 }
 

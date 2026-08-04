@@ -19,8 +19,7 @@ import {
   Identity,
   EthBalance,
 } from '@coinbase/onchainkit/identity';
-import { useAccount } from 'wagmi';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { NetworkSwitcher } from '../NetworkSwitcher';
 import { NotificationsBell } from './NotificationsBell';
 
@@ -34,16 +33,6 @@ export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isConnected } = useAccount();
-
-  useEffect(() => {
-    if (isConnected) {
-      document.body.classList.remove('wallet-not-connected');
-    } else {
-      document.body.classList.add('wallet-not-connected');
-    }
-    return () => document.body.classList.remove('wallet-not-connected');
-  }, [isConnected]);
 
   const handleNotificationsClick = () => {
     router.push('/basechat?view=notifications');
