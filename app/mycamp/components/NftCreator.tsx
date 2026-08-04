@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { formatEther } from 'ethers';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@campnetwork/origin/react';
 import { useAccount } from 'wagmi';

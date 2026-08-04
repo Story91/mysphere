@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import { encodeFunctionData } from 'viem';
 
 export const PostABI2 = [
   {
@@ -214,32 +214,15 @@ export const getContractAddress2 = (chainId: number) => {
   return undefined;
 };
 
-// Funkcja do tworzenia instancji kontraktu
-export const getPostContract2 = (signer: ethers.Signer, contractAddress: string) => {
-  return new ethers.Contract(
-    contractAddress,
-    PostABI2,
-    signer
-  );
-};
-
-// Funkcja do tworzenia posta
-export const createPost2 = async (
-  signer: ethers.Signer,
-  contractAddress: string,
-  contentHash: string
-) => {
-  const contract = getPostContract2(signer, contractAddress);
-  const tx = await contract.createPost(contentHash);
-  await tx.wait();
-  return tx;
-};
-
 // Funkcja do kodowania danych dla wywołania kontraktu
+// viem zamiast ethers.Interface - ethers v6 ciagnal ~100-130 KB do klienckiego
+// bundle'a duplikujac to, co viem juz robi.
 export const encodeCreatePostData2 = (contentHash: string) => {
-  // Użyj interfejsu ABI do zakodowania danych
-  const iface = new ethers.Interface(PostABI2);
-  return iface.encodeFunctionData('createPost', [contentHash]);
+  return encodeFunctionData({
+    abi: PostABI2 as any,
+    functionName: 'createPost',
+    args: [contentHash],
+  });
 };
 
 // Funkcja do przygotowania danych dla wywołania kontraktu w formacie Call
@@ -247,60 +230,10 @@ export const prepareCreatePostCall2 = (contractAddress: string, contentHash: str
   if (!contractAddress) {
     return undefined;
   }
-  
+
   return [{
     to: contractAddress as `0x${string}`,
     data: encodeCreatePostData2(contentHash) as `0x${string}`,
     value: BigInt(0)
   }];
 };
-
-// Funkcja do pobierania liczby postów użytkownika
-export const getPostCount2 = async (
-  signer: ethers.Signer,
-  contractAddress: string,
-  userAddress: string
-) => {
-  const contract = getPostContract2(signer, contractAddress);
-  return await contract.getPostCount(userAddress);
-};
-
-// Funkcja do pobierania całkowitej liczby postów
-export const getTotalPosts2 = async (
-  signer: ethers.Signer,
-  contractAddress: string
-) => {
-  const contract = getPostContract2(signer, contractAddress);
-  return await contract.totalPosts();
-};
-
-// Funkcja do wstrzymania kontraktu (tylko dla właściciela)
-export const pauseContract2 = async (
-  signer: ethers.Signer,
-  contractAddress: string
-) => {
-  const contract = getPostContract2(signer, contractAddress);
-  const tx = await contract.pause();
-  await tx.wait();
-  return tx;
-};
-
-// Funkcja do wznowienia kontraktu (tylko dla właściciela)
-export const unpauseContract2 = async (
-  signer: ethers.Signer,
-  contractAddress: string
-) => {
-  const contract = getPostContract2(signer, contractAddress);
-  const tx = await contract.unpause();
-  await tx.wait();
-  return tx;
-};
-
-// Funkcja do sprawdzenia, czy kontrakt jest wstrzymany
-export const isPaused2 = async (
-  signer: ethers.Signer,
-  contractAddress: string
-) => {
-  const contract = getPostContract2(signer, contractAddress);
-  return await contract.paused();
-}; 

@@ -10,6 +10,11 @@ const nextConfig = {
     serverComponentsExternalPackages: ['mongodb'],
   },
   webpack: (config, { isServer }) => {
+    // WalletConnect optional deps that break client bundling
+    // https://github.com/WalletConnect/walletconnect-monorepo/issues/1908
+    config.externals = config.externals || [];
+    config.externals.push('pino-pretty', 'lokijs', 'encoding');
+
     // Fixes npm packages that depend on `fs` module
     if (!isServer) {
       config.resolve.fallback = {
@@ -36,7 +41,6 @@ const nextConfig = {
     }
 
     // Handle MongoDB and other Node.js specific modules
-    config.externals = config.externals || [];
     if (isServer) {
       config.externals.push({
         'gcp-metadata': 'commonjs gcp-metadata',
@@ -46,6 +50,33 @@ const nextConfig = {
 
     return config;
   },
+  async rewrites() {
+    return [
+      {
+        source: '/flashblock/:path*',
+        destination: 'https://base-is-10x-faster.vercel.app/:path*',
+      },
+      {
+        source: '/docs/:path*',
+        destination: '/Docs/:path*',
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.mysphere.fun',
+          },
+        ],
+        destination: 'https://mysphere.fun/:path*',
+        permanent: true,
+      },
+    ];
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -54,4 +85,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig 
+module.exports = nextConfig

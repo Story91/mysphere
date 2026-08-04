@@ -3,12 +3,11 @@
 
 import { base } from 'viem/chains';
 import { OnchainKitProvider } from '@coinbase/onchainkit';
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useMemo } from 'react';
 import { createConfig, http } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
-import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { injected, walletConnect, coinbaseWallet, metaMask, safe } from 'wagmi/connectors';
-import { farcasterFrame } from '@farcaster/frame-wagmi-connector';
+import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
 import { defineChain } from 'viem';
@@ -19,8 +18,6 @@ import { lineaChain } from './basechat/Linea/config/LineaNetworkConfig';
 import { celoChain } from './basechat/Celo/config/CeloNetworkConfig';
 import { ethereumChain } from './basechat/ETH/config/EthereumNetworkConfig';
 import { worldChain } from './basechat/World/config/WorldChainNetworkConfig';
-import { CampProvider } from '@campnetwork/origin/react';
-import { PrivyProvider } from '@privy-io/react-auth';
 
 type ThemeMode = 'auto' | 'light' | 'dark';
 type ThemeStyle = 'default' | 'base' | 'cyberpunk' | 'hacker';
@@ -42,7 +39,19 @@ export function useTheme() {
   return context;
 }
 
-const queryClient = new QueryClient();
+// Domyslne opcje: bez nich staleTime=0 + refetchOnWindowFocus powoduje, ze kazdy
+// powrot do zakladki re-fetchuje WSZYSTKIE query (identity per wiersz, useBalance,
+// useName) po publicznych RPC.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 300_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 /**
  * Wagmi Configuration (bez Base Sepolia)
@@ -67,14 +76,22 @@ const TRANSPORTS_WITH_CAMP_MAINNET = {
   [campMainnetChain.id]: http(CAMP_MAINNET.RPC_HTTP),
 } as const;
 
+// Wallet metadata must match the origin actually serving the app — a hardcoded
+// prod URL makes WalletConnect Verify / MetaMask flag localhost sessions as
+// mismatched ("unverified") and some wallets refuse to connect.
+const APP_ORIGIN =
+  typeof window !== 'undefined' ? window.location.origin : 'https://mysphere.fun';
+
 const COMMON_CONNECTORS = [
-  farcasterFrame(),
+  // Aktualny connector spec miniapp (v2). @farcaster/frame-wagmi-connector
+  // i @farcaster/frame-sdk to przestarzale nazwy - frame-sdk byl juz tylko shimem.
+  farcasterMiniApp(),
   injected(),
   metaMask({
     dappMetadata: {
       name: 'MySphere',
-      url: 'https://mysphere.fun',
-      iconUrl: 'https://mysphere.fun/android-chrome-192x192.png',
+      url: APP_ORIGIN,
+      iconUrl: `${APP_ORIGIN}/android-chrome-192x192.png`,
     },
   }),
   coinbaseWallet({
@@ -84,13 +101,13 @@ const COMMON_CONNECTORS = [
     preference: 'smartWalletOnly',
     version: '4'
   }),
-  walletConnect({ 
+  walletConnect({
     projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '',
     metadata: {
       name: 'MySphere',
       description: 'The onchain social Dapp on Base. Build, grow, and own your digital Sphere.',
-      url: 'https://mysphere.fun',
-      icons: ['https://mysphere.fun/android-chrome-192x192.png']
+      url: APP_ORIGIN,
+      icons: [`${APP_ORIGIN}/android-chrome-192x192.png`]
     }
   }),
   safe(),
@@ -112,61 +129,44 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>('auto');
   const [style, setStyle] = useState<ThemeStyle>('base');
 
+  // Bez useMemo kazdy render Providers tworzy nowy obiekt kontekstu i re-renderuje
+  // kazdego konsumenta useTheme().
+  const themeValue = useMemo(
+    () => ({ mode, setMode, style, setStyle }),
+    [mode, style]
+  );
+
   return (
-    <ThemeContext.Provider value={{ mode, setMode, style, setStyle }}>
+    <ThemeContext.Provider value={themeValue}>
       <QueryClientProvider client={queryClient}>
         <WagmiConfig config={wagmiConfig}>
-          <RainbowKitProvider>
-          <CampProvider 
-            clientId={process.env.NEXT_PUBLIC_CAMP_CLIENT_ID!}
-            redirectUri={typeof window !== 'undefined' ? `${window.location.origin}/mycamp` : ''}
-          >
-            <FarcasterFrameProvider>
-              <PrivyProvider
-                appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
-                config={{
-                  loginMethods: ['email', 'wallet', 'google', 'twitter'],
-                  appearance: {
-                    theme: 'dark',
-                    accentColor: '#0052FF',
-                    showWalletLoginFirst: false,
+          <FarcasterFrameProvider>
+            <OnchainKitProvider
+              apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+              chain={base}
+              config={{
+                appearance: {
+                  name: 'MySphere',
+                  logo: '/android-chrome-192x192.png',
+                  mode: 'auto',
+                  theme: 'base',
+                },
+                wallet: {
+                  display: 'modal',
+                  termsUrl: 'https://mysphere.fun/docs',
+                  privacyUrl: 'https://mysphere.fun/docs',
+                  supportedWallets: {
+                    rabby: true,
+                    trust: true,
+                    frame: true,
                   },
-                  defaultChain: base,
-                  supportedChains: [base],
-                  // embeddedWallets: {
-                  //   createOnLogin: 'users-without-wallets',
-                  // },
-                }}
-              >
-                <OnchainKitProvider
-                  apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-                  chain={base}
-                  config={{
-                    appearance: {
-                      name: 'MySphere',
-                      logo: '/android-chrome-192x192.png',
-                      mode: 'auto',
-                      theme: 'base',
-                    },
-                    wallet: {
-                      display: 'modal',
-                      termsUrl: 'https://mysphere.fun/docs',
-                      privacyUrl: 'https://mysphere.fun/docs',
-                      supportedWallets: {
-                        rabby: true,
-                        trust: true,
-                        frame: true,
-                      },
-                    }
-                  }}
-                  projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
-                >
-                  {children}
-                </OnchainKitProvider>
-              </PrivyProvider>
-            </FarcasterFrameProvider>
-          </CampProvider>
-          </RainbowKitProvider>
+                }
+              }}
+              projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
+            >
+              {children}
+            </OnchainKitProvider>
+          </FarcasterFrameProvider>
         </WagmiConfig>
       </QueryClientProvider>
     </ThemeContext.Provider>
