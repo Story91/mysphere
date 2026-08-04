@@ -27,6 +27,13 @@ const nextConfig = {
       'date-fns',
     ],
   },
+  // UWAGA: NIE wlaczac `next dev --turbo`. Turbopack w Next 14.2 calkowicie
+  // ignoruje ponizsza funkcje webpack(), a ten projekt zalezy od niej w dwoch
+  // miejscach: externals (pino-pretty/lokijs/encoding) oraz ~20 wpisow
+  // resolve.fallback ustawionych na false. Bez nich SDK portfeli (m.in. MetaMask)
+  // probuja rozwiazac wbudowane moduly Node'a w przegladarce i dev wywala sie
+  // na module-not-found. Turbopack sygnalizuje to tylko ostrzezeniem
+  // "Webpack is configured while Turbopack is not".
   webpack: (config, { isServer }) => {
     // WalletConnect optional deps that break client bundling
     // https://github.com/WalletConnect/walletconnect-monorepo/issues/1908
