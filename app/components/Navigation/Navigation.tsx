@@ -154,7 +154,15 @@ export default function Navigation() {
                 <Avatar className="h-6 w-6" />
                 <Name className="text-white inline" />
               </ConnectWallet>
-              <WalletDropdown className="!fixed md:!absolute !top-[70px] md:!top-full !right-4 !w-[calc(100%-32px)] md:!w-auto !max-w-[400px] !z-[9999] !bg-white wallet-dropdown">
+              {/* Bez nadpisywania pozycjonowania. OnchainKit renderuje ten dropdown
+                  w FloatingPortal (na document.body) i ustawia position/top/left
+                  INLINE przez Floating UI, kotwiczac go do przycisku ConnectWallet
+                  (z flip + shift, wiec sam sie miesci w viewporcie). Klasy typu
+                  `!fixed md:!absolute md:!top-full` biły te inline'owe style
+                  !importantem - `top:100%` liczone wzgledem body wyrzucalo
+                  dropdown na dol strony na desktopie. Zostaja tylko klasy
+                  wygladu i szerokosci. */}
+              <WalletDropdown className="!w-[calc(100%-32px)] md:!w-auto !max-w-[400px] !z-[9999] !bg-white wallet-dropdown">
                   <Identity hasCopyAddressOnClick className="!bg-white hover:!bg-gray-100 !text-gray-900 wallet-dropdown-link">
                     <Avatar />
                     <Name className="!text-gray-900" />
