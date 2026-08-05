@@ -51,6 +51,7 @@ export default function Navigation() {
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
+    { href: '/leaderboard', label: 'Paid' },
     { href: '/re-definition', label: 'Re-Definition' },
   ];
 
@@ -61,6 +62,9 @@ export default function Navigation() {
   const linkTheme: Record<string, { suffix: string; border: string; hoverBorder: string }> = {
     MySphere: { suffix: 'text-fuchsia-600', border: 'border-fuchsia-200', hoverBorder: 'hover:border-fuchsia-300' },
     'Re-Definition': { suffix: 'text-[#5B8CFF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
+    // Zielen zarezerwowana w tej aplikacji dla rozliczonych pieniedzy - ten sam
+    // kolor niesie kwota na paragonie i w rankingu.
+    Paid: { suffix: 'text-emerald-600', border: 'border-emerald-200', hoverBorder: 'hover:border-emerald-300' },
     MyBase: { suffix: 'text-[#0052FF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
     MyCamp: { suffix: 'text-orange-600', border: 'border-orange-200', hoverBorder: 'hover:border-orange-300' },
     MyAgents: { suffix: 'text-cyan-600', border: 'border-cyan-200', hoverBorder: 'hover:border-cyan-300' },
