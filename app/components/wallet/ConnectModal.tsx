@@ -17,11 +17,11 @@ import { useConnect, type Connector } from 'wagmi';
 
 /** Etykiety i ikony per id konektora. Nieznane id dostaje nazwe z wagmi. */
 const CONNECTOR_META: Record<string, { label: string; hint?: string; icon: string }> = {
-  baseAccount: { label: 'Base Account', hint: 'Smart wallet', icon: '🔵' },
-  farcaster: { label: 'Farcaster', hint: 'W aplikacji Farcaster', icon: '🟣' },
-  injected: { label: 'Portfel w przeglądarce', icon: '🦊' },
+  baseAccount: { label: 'Base Account', hint: 'Smart wallet, no extension needed', icon: '🔵' },
+  farcaster: { label: 'Farcaster', hint: 'Inside the Farcaster app', icon: '🟣' },
+  injected: { label: 'Browser wallet', icon: '🦊' },
   metaMask: { label: 'MetaMask', icon: '🦊' },
-  walletConnect: { label: 'WalletConnect', hint: 'Skanuj kodem QR', icon: '🔗' },
+  walletConnect: { label: 'WalletConnect', hint: 'Scan with your phone', icon: '🔗' },
   safe: { label: 'Safe', icon: '🔐' },
 };
 
@@ -67,11 +67,11 @@ export default function ConnectModal({
       className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Wybierz portfel"
+      aria-label="Choose a wallet"
     >
       <button
         type="button"
-        aria-label="Zamknij"
+        aria-label="Close"
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
@@ -79,13 +79,13 @@ export default function ConnectModal({
       <div className="relative w-full max-w-[360px] overflow-hidden rounded-2xl border border-white/10 bg-[#0A1024]/95 shadow-[0_24px_64px_-16px_rgba(0,0,0,0.75)] backdrop-blur-xl">
         <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4">
           <h2 className="font-['Coinbase_Display'] text-[15px] font-semibold text-[#EEF3FF]">
-            Połącz portfel
+            Connect a wallet
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-1 text-[#7E93BC] transition-colors hover:bg-white/[0.06] hover:text-[#EEF3FF]"
-            aria-label="Zamknij"
+            aria-label="Close"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
