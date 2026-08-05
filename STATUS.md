@@ -82,17 +82,31 @@ Wycięte źródła janku: `MutationObserver` skanujący cały dokument w pętli 
 
 Base wygasiło OnchainKit 19 marca 2026: npm zamrożony na 1.1.2, docs usunięte, repo bez commitów od stycznia, termin migracji minął w maju.
 
-**Gotowe:**
-- `ConnectModal.tsx` — wybór portfela z listy konektorów wagmi (bez osobnej listy do utrzymania)
-- `WalletButton.tsx` — przycisk i menu, pozycjonowane własnym `absolute` zamiast portalu Floating UI
-- `Navigation.tsx` — zero odwołań do OnchainKit
-- Martwy import `ConnectWallet` w `basechat/page.tsx` usunięty
+**Warstwa portfela — zrobiona.** `ConnectModal` (lista konektorów z wagmi), `WalletButton` (menu pozycjonowane własnym `absolute`, koniec z portalem Floating UI), `Navigation` bez odwołań do OnchainKit.
 
-**W toku:** warstwa tożsamości (`Avatar`/`Name`/`Address`/`useName`) — odtworzenie rozwiązywania Basename: odczyt z L2Resolvera → **weryfikacja w przód** → fallback ENS.
+**Warstwa tożsamości — zrobiona.** Własne `getName`/`getAvatar` na viem z **weryfikacją w przód**, hooki `useName`/`useAvatar`, komponenty `Avatar`/`Name`/`Address`/`Identity`/`IdentityCard`.
 
-**Zostaje po tym kroku:** `/transaction` w `TipButton`, `/swap`+`/token` w `Swap.tsx` (trasa wyłączona) oraz 4 pliki na wyłączonych trasach. Dopiero po nich `@coinbase/onchainkit` zniknie z `package.json`.
+Zweryfikowane na prawdziwym adresie, wynik **identyczny z OnchainKit**:
+```
+getName(base)    -> "story91.base.eth"
+getName(mainnet) -> "story91.eth"
+getName(vitalik) -> "vitalik.eth"
+getName(random)  -> null
+```
 
----
+**Zmigrowane: 9 plików.** `/basechat` First Load: 857 → **826 kB**.
+
+**Zostaje do domknięcia 0.1:**
+- `TipButton.tsx` — `@coinbase/onchainkit/transaction` (żywy)
+- `providers.tsx` — `OnchainKitProvider`
+- 3 pliki na wyłączonej trasie `/base`
+- Dopiero po nich `@coinbase/onchainkit` zniknie z `package.json`
+
+**Efekt uboczny wart odnotowania:** nowa warstwa używa jawnych URL-i RPC zamiast domyślek viem, więc nie strzela w `eth.merkle.io` — czyli w host, dla którego istnieje hack `app/utils/merkleProxy.ts`. Po domknięciu 0.1 ten patch prawdopodobnie da się usunąć całkowicie.
+
+### Faza 0.3 — dual-mode ✅
+
+Zamknięta. Base App (od 9.04.2026 traktuje appki jak zwykłe strony) i Farcaster (nadal rozwija spec) rozdzielone strażnikiem `isInMiniApp()` z sekundowym timeoutem. `addFrame()` → `addMiniApp()`.
 
 ## ⬜ ZOSTAŁO
 
@@ -101,7 +115,6 @@ Base wygasiło OnchainKit 19 marca 2026: npm zamrożony na 1.1.2, docs usunięte
 | # | Co | Blokada |
 |---|---|---|
 | 0.2 | Podbicie 4 zależności: `miniapp-sdk` 0.2.1→0.3.0, `miniapp-wagmi-connector` 1.1.0→**2.0.0** (major), `coins-sdk` 0.2.11→0.8.0 | — |
-| 0.3 | Dual-mode: Base App (od 9.04.2026 traktuje appki jak zwykłe strony) + Farcaster (nadal rozwija spec) | — |
 | 0.4 | Reguły Firestore + dokończenie SIWE | **Potrzebny eksport reguł z konsoli Firebase** |
 
 ### Faza 1 — most KYA ↔ x402
