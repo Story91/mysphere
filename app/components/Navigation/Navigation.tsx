@@ -36,14 +36,23 @@ import { NotificationsBell } from './NotificationsBell';
    px-4 py-3, podczas gdy nasze <Link> mialy px-4 py-2, wiec ikony i etykiety
    nie trzymaly linii.
 --------------------------------------------------------------------------- */
-const DROPDOWN_SURFACE = [
-  '!w-[300px] max-[360px]:!w-[calc(100vw-24px)]',
+/* Stylowanie idzie przez `classNames.container`, NIE przez `className`.
+   WalletDropdown renderuje wewnatrz siebie WalletDropdownContent z wlasnym,
+   nieprzezroczystym `ock:bg-ock-background` oraz `ock:min-w-80` - powierzchnia
+   ustawiona na zewnetrznym kontenerze portalu byla przez nie po prostu
+   przykrywana. `classNames.container` trafia dokladnie na ten wewnetrzny div
+   (a na malych ekranach na Sheet, ktory OnchainKit tam podstawia). */
+const DROPDOWN_CONTAINER = [
+  '!w-[300px] max-[360px]:!w-[calc(100vw-24px)] !min-w-0',
   '!p-0 !overflow-hidden !rounded-2xl',
   '!bg-[#0A1024]/95 !backdrop-blur-xl',
   '!border !border-white/10',
   '!shadow-[0_24px_64px_-16px_rgba(0,0,0,0.75)]',
   'wallet-dropdown',
 ].join(' ');
+
+/* Zewnetrzny kontener portalu - tylko szerokosc i warstwa, bez tla. */
+const DROPDOWN_SURFACE = '!w-auto !z-[9999]';
 
 const DROPDOWN_ROW_BASE = [
   '!flex !items-center !gap-3 !w-full',
@@ -223,7 +232,7 @@ export default function Navigation() {
                   dropdown w FloatingPortal i ustawia position/top/left inline,
                   kotwiczac do przycisku). Nadpisywanie tego utilities z !important
                   wyrzucalo dropdown na dol strony. Tu ustawiamy wylacznie wyglad. */}
-              <WalletDropdown className={DROPDOWN_SURFACE}>
+              <WalletDropdown className={DROPDOWN_SURFACE} classNames={{ container: DROPDOWN_CONTAINER }}>
                   {/* Blok tozsamosci czytany jak karta profilu, nie jak wiersz
                       portfela - to jest apka spolecznosciowa, gdzie portfel JEST
                       tozsamoscia (Basename, punkty Sphere). */}
