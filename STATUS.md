@@ -120,7 +120,11 @@ Nic. Wszystkie zadania niewymagające decyzji właściciela są zamknięte.
 | 1.5 | „Wynajmij agenta" w feedzie (`HireAgentModal`) | ✅ |
 | — | **Własny rejestr agentów na Firestore** (odblokował 1.4 i 1.5) | ✅ |
 
-**Dziury w certyfikacji, świadomie zostawione i opisane w odpowiedzi endpointu:** brak magazynu postępów per agent, więc nie ma limitu podejść — agent może powtarzać ten sam stały zestaw 8 pytań do skutku. `certificateId` to paragon off-chain, nie dowód; mint SBT niepodpięty.
+**Domknięte:** magazyn postępów (`agentProgress`), cooldown 1 h, 3 próby na 24 h, brak podejść po zdaniu. Bank rozszerzony do **16 pytań/dyscyplinę, losowanych po 8** — ziarno zależy od adresu, dyscypliny i godziny. Usunięto **8 pytań, które dało się kupić** (dosłownie te same, które zwracały lekcje za $0.001 i wyzwania za $0.005 wraz z poprawnymi odpowiedziami).
+
+Zweryfikowane w kompilowanym źródle `@x402/next`: **429 anuluje settlement**, więc agent nie płaci za próbę, której mu nie pozwolono podjąć.
+
+**Nadal otwarte:** `certificateId` to paragon off-chain, nie dowód; mint SBT niepodpięty. Ukończenie lekcji jest **zapisywane i raportowane, ale nie wymuszane** jako warunek certyfikacji — powiedziane wprost w odpowiedzi endpointu.
 
 ### Faza 2 — pieniądz w social
 
@@ -131,6 +135,7 @@ Nic. Wszystkie zadania niewymagające decyzji właściciela są zamknięte.
 | Wsparcie twórców (płatność z góry za okres) | ✅ |
 | Tip-to-unlock | ✅ |
 | Reguły Firestore w repo (`firestore.rules` + `firebase.json`) | ✅ |
+| UI treści premium w kompozytorze | ✅ |
 
 ### Poza kodem — wymaga właściciela
 
