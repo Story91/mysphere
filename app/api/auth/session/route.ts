@@ -7,16 +7,27 @@
  * Prawdziwa autoryzacja ma sie dziac w trasach, ktore cos zmieniaja, przez
  * getSessionFromCookies().
  *
+ * ROLLOWANIE: sesja zyje 2 godziny i jest tu odnawiana, gdy zuzyla polowe
+ * swojego zycia. Dzieki temu aktywny uzytkownik nie jest wylogowywany co dwie
+ * godziny, a sesja porzucona (np. po odlaczeniu portfela na wspoldzielonym
+ * komputerze) wygasa w godziny zamiast w tydzien. Sesja jest bezstanowa, wiec
+ * krotki TTL jest jedynym mechanizmem jej wygaszania.
+ *
  * CZEGO JESZCZE NIE ROBI:
- * - nikt tej trasy jeszcze nie wola; klient nadal czyta adres z localStorage
- *   (app/basechat/page.tsx),
- * - nie odswieza (nie rolluje) sesji, ktora zaraz wygasa,
+ * - nikt tej trasy jeszcze nie wola z glownego przeplywu; klient nadal czyta
+ *   adres z localStorage (app/basechat/page.tsx),
  * - nie zwraca zadnego profilu ani uprawnien - tylko adres.
  */
 
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getSessionFromCookies } from '../../../utils/auth/session';
+import {
+  getSessionFromCookies,
+  shouldRollSession,
+  rollSession,
+  SESSION_COOKIE,
+  SESSION_TTL_SECONDS,
+} from '../../../utils/auth/session';
 
 // getSessionFromCookies uzywa node:crypto
 export const runtime = 'nodejs';
@@ -28,6 +39,25 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ address: null });
     }
+    // Sesja zuzyla polowe zycia - wystawiamy swiezy token. To NIE jest ponowne
+    // uwierzytelnienie, tylko przesuniecie okna waznosci dla aktywnego klienta.
+    if (shouldRollSession(session)) {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const response = NextResponse.json({
+        address: session.address,
+        chainId: session.chainId,
+        expiresAt: nowSeconds + SESSION_TTL_SECONDS,
+      });
+      response.cookies.set(SESSION_COOKIE, rollSession(session, nowSeconds), {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: SESSION_TTL_SECONDS,
+        path: '/',
+      });
+      return response;
+    }
+
     return NextResponse.json({
       address: session.address,
       chainId: session.chainId,

@@ -24,7 +24,45 @@ export const SESSION_COOKIE = 'mysphere_session';
 export const NONCE_COOKIE = 'mysphere_nonce';
 
 /** Czas zycia sesji w sekundach (7 dni). */
-export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+/**
+ * Zywotnosc sesji: 2 godziny, odnawiana przy aktywnosci (patrz
+ * shouldRollSession + GET /api/auth/session).
+ *
+ * Dlaczego tak krotko: sesja jest BEZSTANOWA, wiec nie da sie jej uniewaznic
+ * zdalnie - jedyne co dziala to skasowanie cookie w tej konkretnej przegladarce.
+ * Przy 7 dniach cookie przezywalo odlaczenie portfela i na wspoldzielonym
+ * urzadzeniu pozwalaloby dzialac w cudzym imieniu przez tydzien. Rollowanie
+ * sprawia, ze aktywny uzytkownik nie odczuwa krotkiego TTL, a porzucona sesja
+ * wygasa w godziny, nie w dni.
+ */
+export const SESSION_TTL_SECONDS = 60 * 60 * 2;
+
+/**
+ * Sesje odnawiamy, gdy zuzyla juz polowe swojego zycia. Nie przy kazdym
+ * zadaniu - inaczej wysylalibysmy Set-Cookie bez przerwy.
+ */
+export const SESSION_ROLL_AFTER_SECONDS = SESSION_TTL_SECONDS / 2;
+
+/**
+ * Czy warto wystawic swiezy token dla tej sesji.
+ */
+export function shouldRollSession(session: SessionPayload, nowSeconds = Math.floor(Date.now() / 1000)): boolean {
+  return nowSeconds - session.issuedAt >= SESSION_ROLL_AFTER_SECONDS;
+}
+
+/**
+ * Nowy token dla juz zweryfikowanej sesji, z przesunietym oknem waznosci.
+ * Adres i chainId przenoszone bez zmian - rollowanie NIE jest ponownym
+ * uwierzytelnieniem, tylko przedluzeniem waznosci.
+ */
+export function rollSession(session: SessionPayload, nowSeconds = Math.floor(Date.now() / 1000)): string {
+  return createSession({
+    address: session.address,
+    chainId: session.chainId,
+    issuedAt: nowSeconds,
+    expiresAt: nowSeconds + SESSION_TTL_SECONDS,
+  });
+}
 
 /**
  * Zawartosc sesji. issuedAt / expiresAt sa w SEKUNDACH uniksowych,
