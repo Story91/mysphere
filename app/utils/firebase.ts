@@ -863,7 +863,7 @@ export const createPost = async (post: {
   visibility?: 'public' | 'followers' | 'private';
   txHash?: string; // Keep this as it now represents the Zora creation tx hash
   zoraCoinAddress?: string; // <-- ADDED
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain'; // Add network parameter to identify the source network
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood'; // Add network parameter to identify the source network
   musicTrack?: { // 🎵 Dodaj obsługę załączników muzycznych
     id: string;
     name: string;
@@ -1254,7 +1254,7 @@ export const addComment = async (postId: string, comment: {
   likedBy: string[];
   mentions: string[];
   txHash?: string | null;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
 }): Promise<void> => {
   // Pobierz nazwę autora komentarza
   const authorName = await getUserName(comment.author);
@@ -1736,7 +1736,7 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
   author: string, 
   content: string,
   txHash?: string | null,
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain'
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood'
 }) => {
   try {
     const postRef = doc(db, 'posts', postId);
@@ -4405,7 +4405,7 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
 // Typy tokenów obsługiwanych przez system tipowania
 export type TipTokenType = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP';
 // 'basecamp' zachowane dla kompatybilności wstecznej ze starymi danymi w Firebase
-export type TipNetworkType = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'basecamp';
+export type TipNetworkType = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'robinhood' | 'basecamp';
 
 export interface Tip {
   id?: string;

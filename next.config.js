@@ -83,10 +83,6 @@ const nextConfig = {
         source: '/flashblock/:path*',
         destination: 'https://base-is-10x-faster.vercel.app/:path*',
       },
-      {
-        source: '/docs/:path*',
-        destination: '/Docs/:path*',
-      },
     ];
   },
   async redirects() {
@@ -98,6 +94,15 @@ const nextConfig = {
       // router.replace w useEffect - czyli pusty ekran, potem skok. Serwerowe
       // przekierowanie jest natychmiastowe i nie wymaga zaladowania JS-a.
       { source: '/', destination: '/basechat', permanent: false },
+      // Male litery -> kanoniczne /Docs. Wczesniej byl tu REWRITE
+      // ('/docs/:path*' -> '/Docs/:path*'), ktory na Vercelu najpewniej
+      // zapetlal sie sam na siebie: routing Vercela dopasowuje sciezki bez
+      // uwzgledniania wielkosci liter, wiec '/Docs/' trafialo we wlasne
+      // zrodlo rewrite'a i konczylo sie 404. Lokalny `next start` tego nie
+      // pokazywal, bo Next dopasowuje z uwzglednieniem wielkosci liter.
+      // Przekierowanie zamiast przepisania zrywa te petle.
+      { source: '/docs', destination: '/Docs', permanent: false },
+      { source: '/docs/:path*', destination: '/Docs/:path*', permanent: false },
       ...buildRedirects(),
       {
         source: '/:path*',

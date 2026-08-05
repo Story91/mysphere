@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 
-export type PostingNetwork = 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
+export type PostingNetwork = 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
 
 interface UseAIGeneratorReturn {
   // Modal state
@@ -22,6 +22,7 @@ interface UseAIGeneratorReturn {
   aiGeneratedContentForCelo: { content: string; isAIGenerated: boolean } | string;
   aiGeneratedContentForEthereum: { content: string; isAIGenerated: boolean } | string;
   aiGeneratedContentForWorldChain: { content: string; isAIGenerated: boolean } | string;
+  aiGeneratedContentForRobinhood: { content: string; isAIGenerated: boolean } | string;
 
   // Functions
   generateAIPost: (activeNetwork: PostingNetwork) => Promise<void>;
@@ -39,6 +40,7 @@ export function useAIGenerator(): UseAIGeneratorReturn {
   const [aiGeneratedContentForCelo, setAiGeneratedContentForCelo] = useState<{ content: string; isAIGenerated: boolean } | string>('');
   const [aiGeneratedContentForEthereum, setAiGeneratedContentForEthereum] = useState<{ content: string; isAIGenerated: boolean } | string>('');
   const [aiGeneratedContentForWorldChain, setAiGeneratedContentForWorldChain] = useState<{ content: string; isAIGenerated: boolean } | string>('');
+  const [aiGeneratedContentForRobinhood, setAiGeneratedContentForRobinhood] = useState<{ content: string; isAIGenerated: boolean } | string>('');
 
   const getSystemMessage = (network: PostingNetwork): string => {
     const baseInstruction = "You are a social media content creator who generates viral, engaging posts that drive interaction and community engagement. Write in a conversational, authentic tone that resonates with crypto/blockchain enthusiasts. Use trending formats, emojis strategically, and include calls-to-action. Keep posts concise but impactful.";
@@ -54,6 +56,8 @@ export function useAIGenerator(): UseAIGeneratorReturn {
         return `${baseInstruction} Focus on Ethereum's role as the foundation of Web3, smart contracts, DeFi, and NFT ecosystems. Highlight innovation, decentralization, and the future of the internet.`;
       case 'worldchain':
         return `${baseInstruction} Focus on World Chain's mission to bring the next billion users onchain, Coinbase integration, and user-friendly blockchain experience. Emphasize accessibility and global reach.`;
+      case 'robinhood':
+        return `${baseInstruction} Focus on Robinhood Chain bringing tokenized real-world assets and traditional finance onchain with a familiar, retail-friendly experience. Emphasize accessibility, 24/7 markets and bridging TradFi with crypto.`;
       case 'base':
       default:
         return `${baseInstruction} Focus on Base blockchain's developer-friendly ecosystem, Coinbase integration, and growing dApp ecosystem. Emphasize accessibility and mainstream adoption.`;
@@ -112,6 +116,9 @@ export function useAIGenerator(): UseAIGeneratorReturn {
           case 'worldchain':
             setAiGeneratedContentForWorldChain(aiGeneratedPost);
             break;
+          case 'robinhood':
+            setAiGeneratedContentForRobinhood(aiGeneratedPost);
+            break;
           case 'base':
           default:
             setAiGeneratedContentForBase(aiGeneratedPost);
@@ -154,6 +161,9 @@ export function useAIGenerator(): UseAIGeneratorReturn {
       case 'worldchain':
         setAiGeneratedContentForWorldChain('');
         break;
+      case 'robinhood':
+        setAiGeneratedContentForRobinhood('');
+        break;
       case 'base':
       default:
         setAiGeneratedContentForBase('');
@@ -178,6 +188,9 @@ export function useAIGenerator(): UseAIGeneratorReturn {
         break;
       case 'worldchain':
         content = aiGeneratedContentForWorldChain;
+        break;
+      case 'robinhood':
+        content = aiGeneratedContentForRobinhood;
         break;
       case 'base':
       default:
@@ -209,6 +222,7 @@ export function useAIGenerator(): UseAIGeneratorReturn {
     aiGeneratedContentForCelo,
     aiGeneratedContentForEthereum,
     aiGeneratedContentForWorldChain,
+    aiGeneratedContentForRobinhood,
 
     // Functions
     generateAIPost,

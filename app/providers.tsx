@@ -17,6 +17,7 @@ import { lineaChain } from './basechat/Linea/config/LineaNetworkConfig';
 import { celoChain } from './basechat/Celo/config/CeloNetworkConfig';
 import { ethereumChain } from './basechat/ETH/config/EthereumNetworkConfig';
 import { worldChain } from './basechat/World/config/WorldChainNetworkConfig';
+import { robinhoodChain, ROBINHOOD_RPC_URLS } from './basechat/Robinhood/config/RobinhoodNetworkConfig';
 
 type ThemeMode = 'auto' | 'light' | 'dark';
 type ThemeStyle = 'default' | 'base' | 'cyberpunk' | 'hacker';
@@ -56,7 +57,7 @@ const queryClient = new QueryClient({
  * Wagmi Configuration (bez Base Sepolia)
  * PL: Przygotowane dwie gałęzie konfiguracji, aby uniknąć błędu typów dla 484
  */
-const CHAINS_BASE = [base, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain] as const;
+const CHAINS_BASE = [base, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain] as const;
 const TRANSPORTS_BASE = {
   [base.id]: http('https://mainnet.base.org'),
   [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
@@ -64,6 +65,11 @@ const TRANSPORTS_BASE = {
   [celoChain.id]: http('https://forno.celo.org'),
   [ethereumChain.id]: http('https://eth.llamarpc.com'),
   [worldChain.id]: http('https://worldchain-mainnet.g.alchemy.com/public'),
+  // Robinhood Chain: publiczny RPC jest rate-limited i "not recommended for
+  // production" - pod produkcje ustaw NEXT_PUBLIC_ROBINHOOD_RPC_URL na wlasny
+  // endpoint (Alchemy/QuickNode). ROBINHOOD_RPC_URLS[0] bierze env, a jak go
+  // brak - publiczny fallback.
+  [robinhoodChain.id]: http(ROBINHOOD_RPC_URLS[0]),
 } as const;
 
 const CHAINS_WITH_CAMP_MAINNET = [

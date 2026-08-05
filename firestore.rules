@@ -3,37 +3,34 @@ rules_version = '2';
 // ============================================================================
 // MySphere - reguly Firestore
 //
-// UWAGA, ZANIM WDROZYSZ: ten plik NIE zawiera regul dla kolekcji, ktore juz
-// dzialaja w produkcji (posts, users, tips, follows, friendships,
-// friendRequests i ich subkolekcje). Do repo trafil jako punkt startowy dla
-// NOWYCH kolekcji, bo wczesniej w projekcie nie bylo zadnego pliku regul -
-// zyly wylacznie w konsoli Firebase.
+// STAN ZASTANY (17 stycznia 2025 - 5 sierpnia 2026): cala baza byla otwarta
+// regula `match /{document=**} { allow read, write: if true; }` z komentarzem
+// "Tymczasowo". Przez 19 miesiecy kazdy, kto otworzyl konsole przegladarki,
+// mogl skasowac wszystkie posty albo podmienic cudze dane - konfiguracja
+// Firebase jest publiczna, bo trafia do bundle'a klienta.
 //
-// WDROZENIE TEGO PLIKU W OBECNEJ POSTACI ZABLOKUJE ISTNIEJACE FUNKCJE.
-// Wlasciwa kolejnosc:
-//   1. wyeksportuj obecne reguly z konsoli (Firestore -> Rules)
-//   2. wklej je ponizej, w sekcji "ISTNIEJACE KOLEKCJE"
-//   3. dopiero wtedy `firebase deploy --only firestore:rules`
+// CZEGO TE REGULY NIE ROBIA I DLACZEGO:
+// Aplikacja NIE loguje sie do Firebase Auth (getAuth jest zaimportowane, ale
+// nie ma ani jednego signInWith*). Skutek: `request.auth` jest ZAWSZE null,
+// wiec reguly nie moga sprawdzic, KTO pisze. Kazda regula w stylu "tylko
+// wlasciciel moze edytowac" jest dzis niewykonalna - tozsamosc to tylko adres
+// w polu dokumentu, a pole mozna wpisac dowolne.
 //
-// OGRANICZENIE, KTOREGO TE REGULY NIE ZAMYKAJA: projekt nie ma firebase-admin,
-// wiec trasy serwerowe (/api/unlock, /api/unlock/subscription) pisza tym samym
-// klienckim SDK co przegladarka - reguly nie odroznia jednego od drugiego.
-// Weryfikacja platnosci na lancuchu, cena brana z dokumentu posta i blokada
-// powtorzenia txHash chronia sciezke aplikacji, ale zdeterminowany uzytkownik
-// moze zapisac dokument o poprawnym ksztalcie prosto do Firestore.
-// Domkniecie tego wymaga konta uslugowego i `allow create, update: if false`
-// na kolekcjach zapisywanych wylacznie przez serwer.
+// Prawdziwe domkniecie wymaga mintowania tokenu Firebase po weryfikacji SIWE
+// (backend juz istnieje: /api/auth/verify), zeby request.auth.uid bylo adresem
+// portfela. Dopiero wtedy da sie egzekwowac wlasnosc.
+//
+// DLATEGO ISTNIEJACE KOLEKCJE ZOSTAJA NA RAZIE OTWARTE - zamkniecie ich bez
+// warstwy tozsamosci albo nic nie da, albo zablokuje dzialajace funkcje.
+// ZYSK JEST W SEKCJI NOWYCH KOLEKCJI: sa od poczatku scisle walidowane.
 // ============================================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ========================================================================
-    // ISTNIEJACE KOLEKCJE - DO UZUPELNIENIA Z KONSOLI
-    // ========================================================================
-    // Tu wklej obecne reguly dla: posts, users, tips, follows, friendships,
-    // friendRequests oraz subkolekcji users/{id}/{followers,following,friends,
-    // notifications,settings}. Bez nich czat przestanie dzialac.
+    // NOWE KOLEKCJE ponizej musza stac PRZED regula ogolna na koncu pliku.
+    // Firestore przyznaje dostep, gdy JAKAKOLWIEK pasujaca regula na to
+    // pozwala, a sciezki sa rozlaczne, wiec obie sekcje wspolistnieja.
 
     // ========================================================================
     // REJESTR AGENTOW
@@ -252,6 +249,25 @@ service cloud.firestore {
 
       // Kasowanie postepu = kasowanie limitu prob. Nigdy.
       allow delete: if false;
+    }
+    // ========================================================================
+    // ISTNIEJACE KOLEKCJE - NADAL OTWARTE
+    // ========================================================================
+    // posts, users, comments, likes, tips, friendships, friendRequests, groups,
+    // paidPins, payments, referrals, referralStats, referralRewards, usernames,
+    // userRatings, baseNameFeed, mySphereUserSocials, authorizedQuotes
+    // + subkolekcje users/{id}/{followers,following,friends,notifications,settings}
+    //
+    // Nie zamykamy ich teraz - patrz naglowek pliku. Bez Firebase Auth reguly
+    // nie wiedza, kto pisze, wiec zamkniecie na slepo albo nic nie zmieni, albo
+    // zablokuje dzialajace funkcje (aplikacja zapisuje i kasuje w kilkunastu
+    // miejscach).
+    //
+    // KOLEJNY KROK: po weryfikacji SIWE mintowac token Firebase z uid = adres
+    // portfela, zalogowac klienta przez signInWithCustomToken i DOPIERO WTEDY
+    // zamienic ta regule na wymagajaca request.auth.uid == wlasciciel dokumentu.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

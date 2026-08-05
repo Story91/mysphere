@@ -3,6 +3,10 @@ require("@nomicfoundation/hardhat-ethers");
 require("@typechain/hardhat");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
+// Projekt trzyma konfiguracje w .env.local (tam siedzi PRIVATE_KEY do deployu),
+// a dotenv domyslnie czyta tylko .env - stad jawna sciezka. `.env` zostaje jako
+// fallback, zeby nie zepsuc istniejacych ustawien.
+require("dotenv").config({ path: ".env.local" });
 require("dotenv").config();
 
 const config = {
@@ -37,6 +41,20 @@ const config = {
       url: process.env.BASE_GOERLI_RPC_URL || "https://goerli.base.org",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 84531
+    },
+    // Robinhood Chain - L2 na Arbitrum Orbit, ETH jako gas.
+    // Publiczny RPC jest rate-limited i oficjalnie nie jest zalecany pod
+    // produkcje - do deployu wystarczy, ale przy wiekszym ruchu wstaw wlasny
+    // endpoint przez ROBINHOOD_RPC_URL.
+    robinhood: {
+      url: process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 4663,
+    },
+    robinhoodTestnet: {
+      url: process.env.ROBINHOOD_TESTNET_RPC_URL || "https://rpc.testnet.chain.robinhood.com",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 46630,
     },
     linea: {
       url: process.env.LINEA_RPC_URL || "https://linea-rpc.publicnode.com",

@@ -14,6 +14,8 @@
     "contracts:deploy:post2": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run app/basemorning/scripts/deployPostContract2.ts",
     "contracts:deploy:post2:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run app/basemorning/scripts/deployPostContract2.ts --network base",
     "contracts:deploy:post2:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run app/basemorning/scripts/deployPostContract2.ts --network base-sepolia",
+    "contracts:deploy:robinhood": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run app/basechat/Robinhood/scripts/deploy-robinhood.ts --network robinhood",
+    "contracts:deploy:robinhood:testnet": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run app/basechat/Robinhood/scripts/deploy-robinhood.ts --network robinhoodTestnet",
     "contracts:test": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat test",
     "db:setup": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts",
     "db:indexes": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts"
@@ -53,6 +55,7 @@
     "date-fns": "^3.6.0",
     "dotenv": "^16.4.1",
     "firebase": "^11.4.0",
+    "firebase-admin": "^14.2.0",
     "framer-motion": "^11.18.2",
     "hardhat": "^2.19.5",
     "linkifyjs": "^4.2.0",

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 
 /**
  * Odczyt pojedynczego posta PO STRONIE SERWERA, na potrzeby udostepnialnej
@@ -62,6 +62,34 @@ export async function getPostForShare(postId: string): Promise<SharedPost | null
   } catch (error) {
     console.error('[getPostForShare] Nie udalo sie odczytac posta:', error);
     return null;
+  }
+}
+
+/**
+ * Identyfikatory ostatnich postow do sitemapy.
+ *
+ * Ograniczone celowo: sitemapa ma prowadzic crawlera do swiezej tresci, a nie
+ * odtwarzac calego feedu. Przy bledzie odczytu zwracamy pusta liste - sitemapa
+ * ze statycznymi trasami jest lepsza niz build wywalony na Firestore.
+ */
+export async function getRecentPostRefs(
+  max = 500
+): Promise<{ id: string; timestamp: number }[]> {
+  try {
+    const snapshot = await getDocs(
+      query(collection(getDb(), 'posts'), orderBy('timestamp', 'desc'), limit(max))
+    );
+
+    return snapshot.docs.map((entry) => {
+      const data = entry.data() as Record<string, any>;
+      return {
+        id: entry.id,
+        timestamp: typeof data.timestamp === 'number' ? data.timestamp : Date.now(),
+      };
+    });
+  } catch (error) {
+    console.error('[getRecentPostRefs] Nie udalo sie pobrac listy postow:', error);
+    return [];
   }
 }
 

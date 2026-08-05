@@ -1,0 +1,39 @@
+# MySphere
+
+> An onchain social feed on Base. People post, tip each other in ETH and USDC across
+> eight chains, and carry an identity that resolves to a Basename. Every post and every
+> profile has a public URL with its own metadata and share card.
+
+MySphere is moving toward a single idea: money entering the feed from outside — including
+from AI agents paying over x402 — buying human judgment, with reputation minted only by
+settled payments. That direction is described in full at /re-definition. It is a stated
+direction, not a shipped feature; treat anything on that page marked "building" as unbuilt.
+
+## Public pages
+
+- [Feed](https://mysphere.fun/basechat): the product. Posts, tips, comments, pinned posts.
+- [Re-Definition](https://mysphere.fun/re-definition): product direction, how an Ask is
+  meant to work, what runs today and what does not.
+- [Documentation](https://mysphere.fun/Docs): index of written material.
+- [Whitepaper](https://mysphere.fun/mysphere-whitepaper-english.html): the long version.
+
+## Addressable content
+
+- Post: `https://mysphere.fun/post/{postId}` — one page per post, with an OG card.
+- Profile: `https://mysphere.fun/u/{address}` — one page per wallet address. Shows the
+  Basename (verified in both directions), post count, likes, and tips received summed
+  per token. Nothing on it is self-reported.
+- [Sitemap](https://mysphere.fun/sitemap.xml): static routes plus the 500 most recent posts.
+
+## Machine payments
+
+Paid endpoints speak x402 on Base (CAIP-2 `eip155:8453`, USDC). A request without payment
+returns `402 Payment Required` with the price and payment details; sign and retry. The
+current catalogue is at `https://mysphere.fun/api/myclaw/catalog`, which also reports
+whether enforcement is active on this deployment — when no payout address is configured,
+paid endpoints are served for free and say so.
+
+## Not part of MySphere
+
+`/mycamp`, `/base`, `/marketplace`, `/basemorning`, `/yapscan` and `/swap` redirect to the
+feed. They are parked, not deprecated aliases — do not describe them as features.

@@ -7,10 +7,11 @@ import { WORLD_CHAIN_ID } from '../World/config/WorldChainNetworkConfig';
 import { LINEA_CHAIN_ID } from '../Linea/config/LineaNetworkConfig';
 import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
 import { ETHEREUM_CHAIN_ID } from '../ETH/config/EthereumNetworkConfig';
+import { ROBINHOOD_CHAIN_ID } from '../Robinhood/config/RobinhoodNetworkConfig';
 
 // ===== TOKEN TYPES =====
 export type TipToken = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP';
-export type TipNetwork = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp';
+export type TipNetwork = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'robinhood';
 
 // ===== TOKEN CONFIG =====
 export interface TokenConfig {
@@ -188,6 +189,24 @@ export const NETWORKS: Record<TipNetwork, NetworkConfig> = {
     tokens: [
       TOKENS.ETH,
       TOKENS.LINEA,
+    ],
+  },
+  // Robinhood Chain - tipy to zwykle transfery natywnego ETH, wiec dzialaja
+  // od razu, niezaleznie od tego czy kontrakt postow jest juz wdrozony.
+  robinhood: {
+    id: 'robinhood',
+    chainId: ROBINHOOD_CHAIN_ID,
+    name: 'Robinhood Chain',
+    shortName: 'Robinhood',
+    icon: '🟢',
+    iconUrl: '/logotypy/robinhood.svg',
+    color: '#00C805', // Firmowa zielen Robinhooda
+    explorerUrl: 'https://robinhoodchain.blockscout.com',
+    explorerTxPath: '/tx/',
+    nativeToken: 'ETH',
+    tokens: [
+      // ETH jest juz zdefiniowany w TOKENS - reuzywamy zamiast duplikowac
+      TOKENS.ETH,
     ],
   },
   camp: {

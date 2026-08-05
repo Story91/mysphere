@@ -95,12 +95,14 @@ const CreatePostLinea = dynamic(() => import('./Linea/components/CreatePostLinea
 const CreatePostCelo = dynamic(() => import('./Celo/components/CreatePostCelo'), { ssr: false });
 const CreatePostEthereum = dynamic(() => import('./ETH/components/CreatePostEthereum'), { ssr: false });
 const CreatePostWorldChain = dynamic(() => import('./World/components/CreatePostWorldChain'), { ssr: false });
+const CreatePostRobinhood = dynamic(() => import('./Robinhood/components/CreatePostRobinhood'), { ssr: false });
 import MockFeed from './prelogin/MockFeed';
 import { BASECAMP_CHAIN_ID } from '../contracts/BaseCampPostContract';
 import { LINEA_CHAIN_ID } from './Linea/config/LineaNetworkConfig';
 import { CELO_CHAIN_ID } from './Celo/config/CeloNetworkConfig';
 import { ETHEREUM_CHAIN_ID } from './ETH/config/EthereumNetworkConfig';
 import { WORLD_CHAIN_ID } from './World/config/WorldChainNetworkConfig';
+import { ROBINHOOD_CHAIN_ID } from './Robinhood/config/RobinhoodNetworkConfig';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -314,7 +316,7 @@ function BaseChatContent() {
   } | null>(null);
   
   // Network filter state - renamed to activePostingNetwork to reflect its new purpose
-  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea' | 'celo' | 'worldchain'>('base');
+  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea' | 'celo' | 'worldchain' | 'robinhood'>('base');
   
   // AI Generator Hook
   const aiGenerator = useAIGenerator();
@@ -518,7 +520,7 @@ function BaseChatContent() {
               setHoveredElement(null);
             }}
           >
-            <span className={`${hasBaseName ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'} text-base`}>
+            <span className={`${hasBaseName ? 'username-gradient' : 'text-gray-900 dark:text-white'} text-base`}>
               {userName.endsWith('.sphere') ? (
                 <>
                   <span className="text-gray-900 dark:text-white">{userName.replace('.sphere', '')}</span>
@@ -1350,7 +1352,7 @@ function BaseChatContent() {
       );
 
       // Określ network na podstawie chainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
+      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | undefined = undefined;
       if (chainId === base.id || chainId === baseSepolia.id) {
         network = 'base';
       } else if (chainId === BASECAMP_CHAIN_ID) {
@@ -1363,6 +1365,8 @@ function BaseChatContent() {
         network = 'ethereum';
       } else if (chainId === WORLD_CHAIN_ID) {
         network = 'worldchain';
+      } else if (chainId === ROBINHOOD_CHAIN_ID) {
+        network = 'robinhood';
       }
 
       const comment = {
@@ -2113,7 +2117,7 @@ function BaseChatContent() {
     
     try {
       // Określ network na podstawie chainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
+      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | undefined = undefined;
       if (chainId === base.id || chainId === baseSepolia.id) {
         network = 'base';
       } else if (chainId === BASECAMP_CHAIN_ID) {
@@ -2126,6 +2130,8 @@ function BaseChatContent() {
         network = 'ethereum';
       } else if (chainId === WORLD_CHAIN_ID) {
         network = 'worldchain';
+      } else if (chainId === ROBINHOOD_CHAIN_ID) {
+        network = 'robinhood';
       }
 
       // Wyczyść formularz natychmiast
@@ -2532,8 +2538,8 @@ function BaseChatContent() {
 
 
   // Helper function to check if network supports AI
-  const isAINetwork = (network: string): network is 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' => {
-    return ['base', 'basecamp', 'linea', 'celo', 'ethereum', 'worldchain'].includes(network);
+  const isAINetwork = (network: string): network is 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' => {
+    return ['base', 'basecamp', 'linea', 'celo', 'ethereum', 'worldchain', 'robinhood'].includes(network);
   };
 
   // AI Generation Handler
@@ -3604,6 +3610,20 @@ function BaseChatContent() {
                       isActive: activePostingNetwork === 'worldchain',
                       color: '#9333EA',
                       specialStyle: 'world'
+                    },
+                    {
+                      icon: (
+                        <img
+                          src="/logotypy/robinhood.svg"
+                          alt="Robinhood Chain"
+                          className="w-5 h-5 rounded-none"
+                        />
+                      ),
+                      label: 'Robinhood',
+                      onClick: () => setActivePostingNetwork('robinhood'),
+                      isActive: activePostingNetwork === 'robinhood',
+                      color: '#00C805',
+                      specialStyle: 'robinhood'
                     }
                   ]}
                 />
@@ -3912,6 +3932,18 @@ function BaseChatContent() {
                               setShowAIModal={aiGenerator.setShowAIModal}
                               aiGeneratedContent={aiGenerator.getGeneratedContent('worldchain')}
                               onAiContentUsed={() => aiGenerator.clearGeneratedContent('worldchain')}
+                            />
+                          )}
+
+                          {/* Add Robinhood Chain post form conditionally.
+                              Kontrakt postow nie jest jeszcze wdrozony - komponent sam
+                              pokazuje baner i wylacza przycisk wysylki. */}
+                          {activePostingNetwork === 'robinhood' && (
+                            <CreatePostRobinhood
+                              onPostCreated={refreshPosts}
+                              setShowAIModal={aiGenerator.setShowAIModal}
+                              aiGeneratedContent={aiGenerator.getGeneratedContent('robinhood')}
+                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('robinhood')}
                             />
                           )}
                         </div>
