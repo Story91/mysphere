@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import Navigation from './Navigation/Navigation';
 import { ThemeProvider } from '../context/ThemeContext';
 import { Providers } from '../providers';
+import SessionPrompt from './auth/SessionPrompt';
 import { installMerkleProxy } from '../utils/merkleProxy';
 
 /**
@@ -37,6 +38,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Providers>
         <Navigation />
         <main className="w-full">{children}</main>
+
+        {/* Zaproszenie do podpisu SIWE dla portfeli podlaczonych z pominieciem
+            ekranu przedlogowania. Bez tego lancuch tozsamosci konczyl sie na
+            jednym ekranie, a Firestore widzial wszystkich jako anonimow. */}
+        <SessionPrompt />
 
         <Toaster
           position="top-right"
