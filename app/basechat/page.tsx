@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import { useState, useRef, useEffect, useCallback, PropsWithChildren, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, PropsWithChildren, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
@@ -271,7 +271,7 @@ const clearPostsCache = () => {
   }
 };
 
-export default function BaseChat() {
+function BaseChatContent() {
   const [isMounted, setIsMounted] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
   const [activeMainPanel, setActiveMainPanel] = useState<'feed' | 'builders' | 'following' | 'friends' | 'discover' | 'notifications'>('feed');
@@ -4201,5 +4201,26 @@ export default function BaseChat() {
       )}
     </BanPage>
   </>
+  );
+}
+
+/**
+ * Granica Suspense wokol calej strony.
+ *
+ * BaseChatContent wola useSearchParams(), a ten hook nie ma prawa dzialac
+ * podczas statycznego prerenderu - Next przerywa wtedy render bledem
+ * "useSearchParams() should be wrapped in a suspense boundary". Wczesniej nie
+ * bylo tego widac, bo root layout owijal cala aplikacje w ClientOnly i strona w
+ * ogole nie renderowala sie na serwerze.
+ *
+ * Fallback to pusty <div>, czyli dokladnie to, co BaseChatContent i tak zwraca
+ * dopoki nie ustawi sie isMounted - wyjscie na serwerze jest identyczne jak
+ * wczesniej, wiec nic sie wizualnie nie zmienia.
+ */
+export default function BaseChat() {
+  return (
+    <Suspense fallback={<div></div>}>
+      <BaseChatContent />
+    </Suspense>
   );
 }

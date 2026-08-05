@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -143,7 +143,7 @@ const STATIC_MYSPHERE_DATA = {
   ]
 };
 
-export default function MyCampPage() {
+function MyCampPageContent() {
   const { address, isConnected } = useAccount();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2060,5 +2060,36 @@ export default function MyCampPage() {
       )}
     </div>
     </ToastProvider>
+  );
+}
+
+/**
+ * Granica Suspense wokol calej strony.
+ *
+ * MyCampPageContent wola useSearchParams(), a ten hook nie ma prawa dzialac
+ * podczas statycznego prerenderu - Next przerywa wtedy render bledem
+ * "useSearchParams() should be wrapped in a suspense boundary". Wczesniej nie
+ * bylo tego widac, bo root layout owijal cala aplikacje w ClientOnly i strona w
+ * ogole nie renderowala sie na serwerze. Fallback powiela same warstwy tla, wiec
+ * przejscie do wlasciwej tresci nie daje bialego blysku.
+ */
+export default function MyCampPage() {
+  return (
+    <Suspense fallback={<MyCampBackdrop />}>
+      <MyCampPageContent />
+    </Suspense>
+  );
+}
+
+// Samo tlo strony - dokladnie te warstwy, ktore renderuje MyCampPageContent.
+function MyCampBackdrop() {
+  return (
+    <div className="min-h-screen overflow-x-hidden relative">
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url(/CampBack.jpg)' }}
+      ></div>
+      <div className="fixed inset-0 bg-gradient-to-br from-black/70 via-orange-800/60 to-orange-600/70"></div>
+    </div>
   );
 }
