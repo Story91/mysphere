@@ -5,7 +5,8 @@ import { db } from '../../utils/firebase';
 import ProfileSocials from './ProfileSocials';
 import { toast } from 'react-hot-toast';
 // ✅ USUNIĘTO: UserRank i RANK_DESCRIPTIONS - nie używane już
-import { Avatar } from '@coinbase/onchainkit/identity';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { Avatar } from '../../components/identity';
 import TipButton from './TipButton';
 import RecentTips from './RecentTips';
 import { getUserTipStats, TipStats as TipStatsType } from '../../utils/firebase';

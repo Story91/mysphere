@@ -4,7 +4,8 @@
 import { useState, useEffect } from 'react';
 import { collection, query, getDocs, where, orderBy, limit, Timestamp, getDoc, doc } from 'firebase/firestore';
 import { db, updateAllUserJoinDates, addBaseNameBonusToAllUsers, fixBaseChatPointsRadical, refreshAllPosts, saveProfileName, refreshUserRankings } from '../../utils/firebase';
-import { useName } from '@coinbase/onchainkit/identity';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { useName } from '../../components/identity';
 import { base } from 'wagmi/chains';
 
 interface UserWithJoinDate {

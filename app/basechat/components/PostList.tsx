@@ -10,7 +10,8 @@ import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment,
   PostTipStats} from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-hot-toast';
-import { Avatar as CoinbaseAvatar } from '@coinbase/onchainkit/identity';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { Avatar as CoinbaseAvatar } from '../../components/identity';
 import LinkPreview from './LinkPreview';
 import CommentTransactionButton from '../../components/CommentTransactionButton';
 import CommentTransactionButtonBaseCamp from './BaseCampPosts/CommentTransactionButtonBaseCamp';
