@@ -54,25 +54,28 @@ export default function DocsPage() {
               </div>
             </div>
             
-            {/* User Guide Card */}
-            <div 
-              className="bg-gray-900 border border-[#0052FF]/20 rounded-lg p-6 hover:border-[#0052FF] transition-all cursor-pointer opacity-50"
+            {/* User Guide Card - prowadzi do /re-definition, ktore jest teraz
+                realnym przewodnikiem dla uzytkownika (co dziala, czego nie
+                i dlaczego). Wczesniej bylo tu "Coming Soon". */}
+            <Link
+              href="/re-definition"
+              className="block bg-gray-900 border border-[#0052FF]/20 rounded-lg p-6 hover:border-[#0052FF] transition-all"
             >
               <h2 className="text-2xl font-bold mb-4">User Guide</h2>
               <p className="text-gray-400 mb-4">
-                Step-by-step instructions for using MySphere platform features, 
-                from account creation to NFT minting.
+                What runs and what was switched off, why the product changed, and how to
+                connect a wallet, post, tip and pin.
               </p>
               <div className="flex justify-between items-center mt-6">
-                <span className="text-[#0052FF]">Coming Soon</span>
-                <span className="text-gray-500 text-sm">In Development</span>
+                <span className="text-[#0052FF]">Read the guide</span>
+                <span className="text-gray-500 text-sm">Updated 5 Aug 2026</span>
               </div>
-            </div>
+            </Link>
           </div>
           
           <div className="mt-16 flex justify-center">
             <Link 
-              href="/"
+              href="/basechat"
               className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-[#0052FF] hover:bg-[#0052FF]/80"
             >
               Return to Home

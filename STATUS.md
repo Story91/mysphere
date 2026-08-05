@@ -1,0 +1,145 @@
+# MySphere — status prac
+
+Stan na 5 sierpnia 2026. Dokument roboczy: co jest zrobione, co w toku, co zostało.
+
+Dokumenty powiązane: [`AUDYT.md`](AUDYT.md) (audyt wejściowy), [`MARTWY-KOD.md`](MARTWY-KOD.md) (inwentarz martwego kodu), [`FALE-WYKONANE.md`](FALE-WYKONANE.md) (raport z fal A–E), [`REDEFINICJA.md`](REDEFINICJA.md) (plan produktowy).
+
+---
+
+## ✅ ZROBIONE
+
+### Audyt i sprzątanie
+
+| | |
+|---|---:|
+| Usunięte pliki | **290** |
+| Usunięty kod | **22 149 linii** |
+| `public/` | 71 MB → **22 MB** |
+| Artefakty Hardhata wyjęte z gita | 6,5 MB |
+| Zależności | 107 → **51** (devDeps 42 → 31) |
+
+Metoda: graf importów od punktów wejścia App Routera, zweryfikowany brak dynamicznych importów ze zmienną.
+
+### Naprawione błędy — zastane
+
+- **Lazy loading feedu był wyłączony.** `expandedPosts ? ... : slice(...)` — mapa `{postId: bool}` jest zawsze truthy, więc `slice` nigdy nie działał i renderowały się wszystkie posty naraz. Stan okazał się przy tym całkowicie martwy.
+- **Dropdown portfela lądował na dole strony** na desktopie — klasy z `!important` biły inline'owe style Floating UI.
+- **`Add funds` był martwy dla EOA** — OnchainKit wygasza go bez `sessionToken`.
+- **`vendor/kya` nie było w repo**, a `package.json` wskazuje `file:./vendor/kya` — deploy z czystego checkoutu by nie wstał.
+- **`date-fns` był pakietem-duchem** — importowany, niezadeklarowany.
+- **Tokeny shadcn niezmapowane** w Tailwindzie — 15 żywych komponentów z martwymi klasami.
+- **`/profile`** — link w czacie do trasy, która nigdy nie istniała.
+- **`VERCEL_FORCE_NO_BUILD_CACHE`** wymuszał zimny build przy każdym deployu (był w `vercel.json` **oraz** w dashboardzie).
+
+### Naprawione błędy — wprowadzone przeze mnie i złapane
+
+Zapisane, bo pokazują, czego build nie weryfikuje:
+
+- **Hook za wczesnym `return`** — `handlePinPending` zamieniony na `useCallback` stał się hookiem warunkowym. Zgłoszone przez użytkownika.
+- **`cookieToInitialState` w root layoucie kasował prerender całego serwisu** — 46 stron statycznych → 2. Wykryte przez równoległą sesję.
+- **Skrypt `prebuild` w katalogu wykluczonym przez `.vercelignore`** — wywalał deploy. Widoczne dopiero przy realnym deployu.
+- **Ciemna powierzchnia dropdownu przykryta tłem OnchainKit** — style szły na zewnętrzny div portalu zamiast na `classNames.container`. Zgłoszone przez użytkownika.
+- **`next dev --turbo`** — Turbopack ignoruje funkcję `webpack()` z configu, przez co padały polyfille i SDK portfeli.
+
+### Wydajność
+
+| Obszar | Efekt |
+|---|---|
+| Lista 50 znajomych | 100 → **3** zapytania |
+| Feed 25 postów, statystyki tipów | 25 → **1** |
+| Status obserwowania autorów | N → **1** |
+| Mount feedu (`useSocial`) | ~150 → **~1** odczyt |
+| `getActiveUsers` na starcie | 3 → **1** |
+| Bundle `/basechat` | 885 → **857 kB** |
+| Build lokalny | 125 → **101 s** |
+
+Wycięte źródła janku: `MutationObserver` skanujący cały dokument w pętli oraz odtwarzacz audio re-renderujący feed 4–60×/s.
+
+**`ethers` całkowicie usunięty z klienckiego bundle'a** — `grep "from 'ethers'"` w `app/` daje 0 trafień.
+
+### Architektura
+
+- **Root layout jako komponent serwerowy**, koniec globalnego `ClientOnly`. Metadane przez Metadata API — crawlery i podgląd miniappki widzą je w HTML.
+- **Fundament SIWE**: `/api/auth/{nonce,verify,session,logout}`, sesja HMAC bez nowych zależności, weryfikacja przez `publicClient.verifyMessage` (obsługa ERC-6492 dla smart walletów). Sesja **2 h z rollowaniem**.
+- **Connector `baseAccount`** zamiast wygaszanego `coinbaseWallet({smartWalletOnly})`.
+- **Migracja Farcastera** na `@farcaster/miniapp-wagmi-connector`, manifest `version: "1"` + `fc:miniapp`.
+
+### Produkt
+
+- **9 modułów wyłączonych** przekierowaniami z jednej listy (`config/routeStatus.js`). Kod nietknięty, powrót to usunięcie jednej pozycji.
+- **MySphere = BaseChat** — usunięty sztuczny podział, `/` przekierowuje serwerowo.
+- **`/re-definition`** — strona dla użytkownika: rejestr modułów czytany z tej samej konfiguracji co przekierowania, uzasadnienie zmiany kierunku, praktyczne przewodniki. Podpięta do nawigacji i do `/Docs` jako „User Guide".
+
+### Vercel
+
+`AUTH_SESSION_SECRET` ustawiony w trzech środowiskach. Usunięte: `VERCEL_FORCE_NO_BUILD_CACHE`, `NODE_ENV` (nadpisywał wstrzyknięcie Vercela) i 5 martwych kluczy WalletConnect/Reown.
+
+---
+
+## 🔄 W TOKU
+
+### Faza 0.1 — migracja z OnchainKit
+
+Base wygasiło OnchainKit 19 marca 2026: npm zamrożony na 1.1.2, docs usunięte, repo bez commitów od stycznia, termin migracji minął w maju.
+
+**Gotowe:**
+- `ConnectModal.tsx` — wybór portfela z listy konektorów wagmi (bez osobnej listy do utrzymania)
+- `WalletButton.tsx` — przycisk i menu, pozycjonowane własnym `absolute` zamiast portalu Floating UI
+- `Navigation.tsx` — zero odwołań do OnchainKit
+- Martwy import `ConnectWallet` w `basechat/page.tsx` usunięty
+
+**W toku:** warstwa tożsamości (`Avatar`/`Name`/`Address`/`useName`) — odtworzenie rozwiązywania Basename: odczyt z L2Resolvera → **weryfikacja w przód** → fallback ENS.
+
+**Zostaje po tym kroku:** `/transaction` w `TipButton`, `/swap`+`/token` w `Swap.tsx` (trasa wyłączona) oraz 4 pliki na wyłączonych trasach. Dopiero po nich `@coinbase/onchainkit` zniknie z `package.json`.
+
+---
+
+## ⬜ ZOSTAŁO
+
+### Faza 0 — fundament
+
+| # | Co | Blokada |
+|---|---|---|
+| 0.2 | Podbicie 4 zależności: `miniapp-sdk` 0.2.1→0.3.0, `miniapp-wagmi-connector` 1.1.0→**2.0.0** (major), `coins-sdk` 0.2.11→0.8.0 | — |
+| 0.3 | Dual-mode: Base App (od 9.04.2026 traktuje appki jak zwykłe strony) + Farcaster (nadal rozwija spec) | — |
+| 0.4 | Reguły Firestore + dokończenie SIWE | **Potrzebny eksport reguł z konsoli Firebase** |
+
+### Faza 1 — most KYA ↔ x402
+
+Kolejność wymuszona: **1.1 → 1.2 → 1.3**. Odwrócenie oznacza pobieranie pieniędzy za endpoint, który każdemu przyznaje certyfikat.
+
+| # | Co |
+|---|---|
+| 1.1 | x402 **v2** — `@x402/next` 2.21.0. Pakiety w komentarzach kodu (`x402-next`) to martwa gałąź v1 |
+| 1.2 | Realna certyfikacja agenta — dziś `certify` zwraca `passed: true` bezwarunkowo, bez kontraktu |
+| 1.3 | Egzekwowanie płatności (wymaga 1.1 i 1.2) |
+| 1.4 | Odznaka agent/człowiek + trust score KYA w feedzie — **można równolegle**, `useAgents` gotowe |
+| 1.5 | „Wynajmij agenta" w feedzie |
+
+### Faza 2 — pieniądz w social
+
+Subskrypcje przez x402, tip-to-unlock, dynamiczne karty OG (wykonalne od czasu przejścia na serwerowy layout).
+
+### Poza kodem — wymaga właściciela
+
+1. **Eksport reguł Firestore** — blokuje 0.4, a przez to całą fazę 1.
+2. **`NEXT_PUBLIC_COINBASE_PRIVATE_KEY`** — 0 użyć w kodzie, ale publiczny prefiks i 548 dni w env. Do rotacji i usunięcia.
+3. **Automatyczny deploy z GitHuba nie działa od 166 dni.** Repo podłączone, ale nic się nie buduje. Do sprawdzenia: Settings → Git → Ignored Build Step / Production Branch. Do tego czasu każdy release wymaga ręcznego `vercel --prod`.
+4. **Decyzja: MyClaw Academy zostaje czy wypada?** Jeśli tezą są agenty, akademia ma sens — ale wymaga zbudowania certyfikacji od zera.
+
+### Świadomie odrzucone
+
+| Odrzucone | Powód |
+|---|---|
+| Auto-coin profilu, attention market, remix z rev-share | Rynek creator coins zawalił się w 2026 (ZORA −95%, Creator Rewards wygaszone w lutym) |
+| „Stock Card" na tokenizowanych akcjach | Papiery **dłużne** emitenta z Jersey, tylko dla klientów Robinhood po KYC, wykluczone USA/Kanada/UK/Szwajcaria/ZEA |
+| Mikro-predykcje na postach | Najwyższy wysiłek, wymaga oracle. Dopiero po działającej warstwie płatności |
+| Pełne wydzielenie `PostComposer` | `React.memo` na `PostList` zdjął dominujący koszt; reszta to ~20 miejsc z `newPost` i realne ryzyko regresji |
+
+---
+
+## Znane ograniczenia
+
+- **`/mycamp` renderuje statycznie tylko tło.** `useSearchParams()` na górze 2000-liniowego komponentu. Nie regresja (wcześniej `ClientOnly` nie renderował nic), ale widać „pop" treści.
+- **Brak cookie-SSR dla wagmi.** Na Next 14 wyklucza się z prerenderem całego serwisu. Rozwiąże PPR z Next 15.
+- **Build bywa flaky na Windowsie** — `collect-build-traces` rzuca `UNKNOWN errno -4094` (blokada pliku, `@vercel/nft`). Powtórka przechodzi, ale w CI to potrafi wywalić deploy.

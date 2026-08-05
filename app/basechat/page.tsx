@@ -7,8 +7,8 @@ import dynamic from 'next/dynamic';
 import { isRouteDisabled } from '@/config/routeStatus';
 import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
-import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
-import { ConnectWallet } from '@coinbase/onchainkit/wallet';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { Identity, Name, Address, Avatar, IdentityCard, useName } from '../components/identity';
 import { parseEther } from 'viem';
 import {
   saveUserProfile, 
