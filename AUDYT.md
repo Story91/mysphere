@@ -132,6 +132,49 @@ transakcja zapisywała tip, który nigdy nie doszedł.
 
 ---
 
+## 2a. Druga tura porządków (5 sierpnia, wieczór)
+
+Dwie tury po czterech agentów na rozłącznych zakresach plików, potem mój przegląd.
+Łącznie **netto −2500 linii**, build przechodzi, `tsc --noEmit` = 0.
+
+**`app/basechat/page.tsx` miał `@ts-nocheck` w pierwszej linii** — 4342 linie nigdy
+nie sprawdzone przez kompilator. Po zdjęciu wyszedł jeden, za to poważny błąd:
+**przycisk „PostCoin" nie może działać**, bo `@zoralabs/coins-sdk` 0.8.0 ma
+dwuetapowe API, a kod woła stary podpis z trzema argumentami. Rozjazd wszedł
+z podbiciem zależności i był niewidoczny właśnie przez `@ts-nocheck`. Świadomie
+nie naprawiony — nowe API wymaga wyboru `currency` i `startingMarketCap`, czyli
+decyzji produktowej.
+
+**Duplikacja per łańcuch zlikwidowana.** 6 kopii przycisku postu, 6 kopii przycisku
+komentarza i 5 kopii composera → trzy implementacje sterowane konfiguracją
+(`app/basechat/chainPosting/`). Każdy łańcuch to teraz jeden plik konfigu, a nie
+trzy skopiowane komponenty. To samo w feedzie: 36 ręcznych bloków `network ===`
+→ jeden `NetworkBadge`.
+
+**Cache feedu: dopisujemy zamiast kasować.** Post szedł do stanu Reacta, ale nie do
+`localStorage`, więc powrót na zakładkę odtwarzał listę sprzed publikacji — stąd
+zgłoszone „musiałem przeklikać i wrócić". Kasowanie całego cache'u naprawiłoby
+objaw, ale kazałoby pobrać wszystkie listy od nowa; Firestore liczy za każdy
+odczyt dokumentu. `prependPostToCache` daje ten sam efekt za zero odczytów.
+
+**Daty z Firestore były zerowane.** Kolekcja `posts` trzyma `timestamp` w dwóch
+postaciach (Timestamp z `serverTimestamp()` albo liczba). Czytniki serwerowe
+sprawdzały `typeof === 'number'` i przy pierwszej wstawiały 0 — profile pokazywały
+1970, sitemapa dawała crawlerom `lastModified` sprzed pół wieku. Nowy
+`app/utils/firestoreTime.ts` obsługuje wszystkie postacie, przetestowany na 9
+przypadkach.
+
+**Znalezione i naprawione przy okazji:** `eth.llamarpc.com` przestał wysyłać CORS
+(każdy odczyt z mainnetu padał — teraz `fallback()` na publicnode + ankr), salda
+monet Zory czytane klientem aktualnej sieci zamiast Base, `SessionPrompt` znikał
+w chwili kliknięcia „Sign", `<button>` zagnieżdżony w `<button>` w menu posta,
+wyścigi w `RecentTips` i w ładowaniu feedu.
+
+**Logo Robinhooda** — `/logotypy/robinhood.svg` był 449-bajtową atrapą (zielony
+kwadrat z kreską), nie logo. Zastąpiony przez `/robin.webp`, atrapa skasowana.
+Selektor sieci pokazuje teraz same znaki bez podpisów — siedem nazw rozciągało
+rząd na całą szerokość kompozytora.
+
 ## 2b. NIEROZWIĄZANE — logowanie SIWE nie działa na produkcji
 
 **Objaw:** na `mysphere.fun` trasy `/api/auth/verify/`, `/api/auth/session/` i
