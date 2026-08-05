@@ -1,7 +1,6 @@
 # Ignore deployment scripts.
 # UWAGA: caly katalog scripts/ jest wykluczony z deploya, wiec NIE WOLNO tam
-# trzymac niczego, co jest potrzebne przy buildzie na Vercelu. Skrypty buildu
-# zyja w tools/ (patrz prebuild w package.json).
+# trzymac niczego, co jest potrzebne przy buildzie na Vercelu.
 app/basechat/Linea/scripts/
 scripts/
 
