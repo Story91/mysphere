@@ -31,22 +31,28 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   // Nie pokazuj dzwoneczka jeśli user nie jest zalogowany
   if (!address) return null;
 
+  // Reszta interfejsu jest po angielsku - tooltip i nazwa dostepna tez.
+  const label = unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications';
+
   return (
     <button
+      type="button"
       onClick={onNotificationsClick}
       className={`
-        relative p-2 rounded-xl transition-all duration-300 
+        relative p-2 rounded-xl transition-all duration-300
         text-gray-100 hover:text-white hover:bg-[#0052FF]/20
         ${isAnimating ? 'animate-bounce' : ''}
         ${unreadCount > 0 ? 'text-blue-300' : 'text-gray-300'}
       `}
-      title={unreadCount > 0 ? `${unreadCount} nieprzeczytanych powiadomień` : 'Powiadomienia'}
+      title={label}
+      aria-label={label}
     >
       {/* Bell Icon (Ikonka dzwoneczka) */}
-      <svg 
-        className="w-6 h-6" 
-        fill="none" 
-        stroke="currentColor" 
+      <svg
+        aria-hidden="true"
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
         viewBox="0 0 24 24"
       >
         <path 
@@ -59,7 +65,9 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
 
       {/* Red Dot for Unread Notifications (Czerwona kropka dla nieprzeczytanych) */}
       {unreadCount > 0 && (
-        <div className="absolute -top-1 -right-1 flex items-center justify-center">
+        // Liczba jest juz w nazwie dostepnej przycisku - powtorzona w drzewie
+        // dostepnosci czytalaby sie dwa razy.
+        <div aria-hidden="true" className="absolute -top-1 -right-1 flex items-center justify-center">
           {/* Pulsating background (Pulsujące tło) */}
           <div className="absolute w-5 h-5 bg-red-500 rounded-full animate-ping opacity-75"></div>
           
@@ -74,7 +82,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
 
       {/* Loading indicator (Wskaźnik ładowania) */}
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center">
           <div className="w-3 h-3 border-2 border-blue-300 border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}

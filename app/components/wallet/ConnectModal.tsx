@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useConnect, type Connector } from 'wagmi';
 
@@ -50,26 +50,80 @@ export default function ConnectModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const { connectors, connect, status, error } = useConnect();
-
-  // Escape zamyka, a blokada scrolla zapobiega przewijaniu tla pod modalem.
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [isOpen, onClose]);
+  const { connectors, connect, status, error, variables } = useConnect();
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Portal montujemy dopiero po stronie klienta - document nie istnieje na serwerze.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  /**
+   * Escape zamyka, blokada scrolla zapobiega przewijaniu tla, a Tab krazy
+   * WEWNATRZ modalu.
+   *
+   * Pulapka fokusu nie jest ozdobnikiem: `aria-modal="true"` oglasza czytnikowi
+   * ekranu, ze reszta strony jest niedostepna, wiec jesli Tab i tak z modalu
+   * wychodzi, uzytkownik klawiatury laduje w tresci, o ktorej mu wlasnie
+   * powiedziano, ze jej nie ma. Do tego bez tego kodu fokus po otwarciu zostawal
+   * na przycisku pod spodem, a po zamknieciu - na elemencie, ktorego juz nie ma.
+   */
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const focusable = () =>
+      Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]):not([tabindex="-1"]), a[href], input, [tabindex]:not([tabindex="-1"])'
+        ) ?? []
+      );
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+
+      // Fokus wypada poza modal takze bez Taba: gdy trwa laczenie, wszystkie
+      // wiersze robia sie `disabled` i przegladarka odklada fokus na <body>.
+      // Wtedy nastepny Tab poszedlby w tresc pod modalem.
+      if (!dialogRef.current?.contains(active)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+        return;
+      }
+
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    // Fokus do srodka (pierwszy jest przycisk zamkniecia), zeby klawiatura
+    // zaczela od modalu, a nie od tresci pod nim.
+    focusable()[0]?.focus();
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, [isOpen, mounted, onClose]);
 
   if (!isOpen || !mounted) return null;
 
@@ -86,6 +140,14 @@ export default function ConnectModal({
     ? connectors.filter((connector) => connector.id !== 'injected')
     : connectors;
 
+  // `variables.connector` bywa fabryka konektora, a nie instancja - uid ma
+  // tylko instancja, wiec pytamy o nie ostroznie.
+  const pendingConnector = variables?.connector;
+  const pendingConnectorUid =
+    pendingConnector && typeof pendingConnector === 'object' && 'uid' in pendingConnector
+      ? (pendingConnector as Connector).uid
+      : undefined;
+
   const handleConnect = (connector: Connector) => {
     // Wywolanie MUSI zostac w handlerze klikniecia - popup keys.coinbase.com
     // jest blokowany, jesli otwiera sie po asynchronicznej przerwie.
@@ -99,14 +161,20 @@ export default function ConnectModal({
 
   return createPortal(
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Choose a wallet"
     >
+      {/* Tlo zamyka przez klikniecie, ale jest poza kolejnoscia Taba i poza
+          drzewem dostepnosci: dla klawiatury i czytnika ekranu ta sama akcja
+          jest juz w przycisku "Close" i pod Escape, a pelnoekranowy przycisk
+          "Close" jako pierwszy przystanek Taba byl tylko przeszkoda. */}
       <button
         type="button"
-        aria-label="Close"
+        tabIndex={-1}
+        aria-hidden="true"
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
@@ -122,7 +190,7 @@ export default function ConnectModal({
             className="rounded-lg p-1 text-[#7E93BC] transition-colors hover:bg-white/[0.06] hover:text-[#EEF3FF]"
             aria-label="Close"
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
             </svg>
           </button>
@@ -132,6 +200,10 @@ export default function ConnectModal({
           {visibleConnectors.map((connector) => {
             const meta = CONNECTOR_META[connector.id];
             const isPending = status === 'pending';
+            // Ktory portfel czeka na odpowiedz. Bez tego caly modal tylko
+            // gasl i nic nie mowilo, ze cokolwiek sie dzieje - a niektore
+            // portfele otwieraja swoje okno z paroma sekundami opoznienia.
+            const isConnecting = isPending && pendingConnectorUid === connector.uid;
             // Portfele wykryte przez EIP-6963 podaja wlasna ikone jako data URI.
             // Uzywamy jej, zamiast rysowac wszystkim ten sam emoji-zastepnik.
             const iconUrl = connector.icon;
@@ -141,6 +213,7 @@ export default function ConnectModal({
                 key={connector.uid}
                 type="button"
                 disabled={isPending}
+                aria-busy={isConnecting}
                 onClick={() => handleConnect(connector)}
                 className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -157,8 +230,10 @@ export default function ConnectModal({
                   <span className="block text-[13px] font-medium text-[#C7D4EE]">
                     {meta?.label ?? connector.name}
                   </span>
-                  {meta?.hint && (
-                    <span className="block text-[11px] text-[#7E93BC]">{meta.hint}</span>
+                  {isConnecting ? (
+                    <span className="block text-[11px] text-[#7E93BC]">Check your wallet…</span>
+                  ) : (
+                    meta?.hint && <span className="block text-[11px] text-[#7E93BC]">{meta.hint}</span>
                   )}
                 </span>
               </button>
@@ -167,7 +242,7 @@ export default function ConnectModal({
         </div>
 
         {error && (
-          <p className="border-t border-white/[0.08] px-5 py-3 text-[12px] text-[#FF8A8A]">
+          <p role="alert" className="border-t border-white/[0.08] px-5 py-3 text-[12px] text-[#FF8A8A]">
             {error.message.slice(0, 140)}
           </p>
         )}

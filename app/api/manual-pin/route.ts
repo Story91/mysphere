@@ -7,11 +7,17 @@ import { createPaidPin } from '../../utils/firebase';
  */
 export async function POST(request: NextRequest) {
   try {
-    // Check authorization
+    // Autoryzacja MUSI failowac zamknieto.
+    //
+    // Poprzedni warunek brzmial `if (cronSecret && ...)`, czyli przy braku
+    // CRON_SECRET trasa stawala sie w pelni otwarta - a tworzy ona PLATNE
+    // przypiecie posta z dowolnym txHash. Deployment bez tej zmiennej rozdawal
+    // wiec platna funkcje za darmo kazdemu, kto znal sciezke. Brak sekretu ma
+    // oznaczac "nikt nie wejdzie", nigdy "wchodza wszyscy".
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -57,8 +63,9 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const urlSecret = request.nextUrl.searchParams.get('secret');
   const cronSecret = process.env.CRON_SECRET;
-  
-  if (urlSecret !== cronSecret) {
+
+  // Bez ustawionego sekretu ta trasa jest niedostepna - patrz komentarz w POST.
+  if (!cronSecret || urlSecret !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

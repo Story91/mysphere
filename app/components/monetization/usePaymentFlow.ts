@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAccount, useChainId, useSendTransaction, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
 import { encodeFunctionData, parseEther, parseUnits } from 'viem';
 import { ERC20_TRANSFER_ABI, TOKENS } from '../../basechat/components/TipNetworkConfig';
+import { isUserRejection } from '../../utils/auth/useSiweAuth';
 import { MONETIZATION_CHAIN_ID, type MonetizationToken } from '../../utils/monetization/types';
 
 export type PaymentPhase =
@@ -49,6 +50,18 @@ export interface UsePaymentFlowResult {
   switchToBase: () => void;
   pay: (params: PayParams) => void;
   reset: () => void;
+}
+
+/**
+ * Bledy z portfela sa pisane pod maszyne, nie pod czlowieka: viem doklada do
+ * `message` wersje, docs URL i pelne argumenty wywolania, wiec surowy tekst
+ * potrafil zajac w UI kilkanascie linii. Bierzemy pierwsza linie, a odmowe
+ * podpisu nazywamy po imieniu - to nie jest awaria.
+ */
+function describeSendError(error: Error): string {
+  if (isUserRejection(error)) return 'You rejected the request in your wallet.';
+  const firstLine = error.message?.split('\n')[0]?.trim();
+  return firstLine && firstLine.length > 0 ? firstLine.slice(0, 160) : 'Transaction failed';
 }
 
 /**
@@ -111,7 +124,7 @@ export function usePaymentFlow(onConfirmed: (txHash: `0x${string}`) => Promise<v
 
   useEffect(() => {
     if (!sendError) return;
-    setError(sendError.message || 'Transaction failed');
+    setError(describeSendError(sendError));
     setPhase('error');
     resetSend();
   }, [sendError, resetSend]);

@@ -1,5 +1,5 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { getPublicDb as getDb } from '../publicFirestore';
 
 /**
  * Ranking zarobkow z tipow za ostatnie 7 dni.
@@ -33,29 +33,27 @@ export type Leaderboard = {
   totalTips: number;
   /** Laczne kwoty per token w oknie. */
   totalReceived: Record<string, number>;
-  windowDays: number;
+  /** Ile dni obejmuje wynik. `null` = cala historia (fallback ponizej). */
+  windowDays: number | null;
 };
-
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-function getDb() {
-  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  return getFirestore(app);
-}
 
 const WINDOW_DAYS = 7;
 const FETCH_CAP = 1000;
 
 /**
- * Ranking dla okna. Blad odczytu zwraca pusty ranking, a nie wyjatek: strona ma
- * sie wyrenderowac zawsze, choćby z komunikatem "jeszcze nikt nic nie dostal".
+ * Ranking. Blad odczytu zwraca pusty wynik, a nie wyjatek: strona ma sie
+ * wyrenderowac zawsze.
+ *
+ * FALLBACK NA CALA HISTORIE. Okno tygodniowe jest wlasciwe dla zywego produktu,
+ * ale gdy w tygodniu nie bylo ani jednego tipa, strona pokazywala pustke -
+ * a pusta tabela jest bezwartosciowa jako obiekt do wyslania i wyglada jak
+ * zepsuta funkcja, nie jak brak ruchu. Sprawdzone 5 sierpnia 2026: najnowszy
+ * tip w bazie mial wtedy 367 dni, wiec /leaderboard bylo martwa strona.
+ *
+ * Gdy okno jest puste, powtarzamy zapytanie bez ograniczenia czasu i oznaczamy
+ * wynik przez `windowDays: null`, zeby strona mogla uczciwie napisac "all time"
+ * zamiast klamac o ostatnim tygodniu. Gdy ruch wroci, ranking sam przelacza sie
+ * z powrotem na okno tygodniowe - bez zadnej zmiany w kodzie.
  */
 export async function getLeaderboard(topN = 20): Promise<Leaderboard> {
   const empty: Leaderboard = {
@@ -67,16 +65,25 @@ export async function getLeaderboard(topN = 20): Promise<Leaderboard> {
 
   const cutoff = Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
-  let snapshot;
-  try {
-    snapshot = await getDocs(
+  /** Jedno zapytanie. `since === null` znaczy: bez ograniczenia czasu. */
+  const fetchTips = (since: number | null) =>
+    getDocs(
       query(
         collection(getDb(), 'tips'),
-        where('timestamp', '>=', cutoff),
+        ...(since === null ? [] : [where('timestamp', '>=', since)]),
         orderBy('timestamp', 'desc'),
         limit(FETCH_CAP)
       )
     );
+
+  let snapshot;
+  let windowDays: number | null = WINDOW_DAYS;
+  try {
+    snapshot = await fetchTips(cutoff);
+    if (snapshot.empty) {
+      snapshot = await fetchTips(null);
+      windowDays = null;
+    }
   } catch (error) {
     console.error('[getLeaderboard] Odczyt tipow nie powiodl sie:', error);
     return empty;
@@ -132,7 +139,7 @@ export async function getLeaderboard(topN = 20): Promise<Leaderboard> {
     .sort((a, b) => topAmount(b.received) - topAmount(a.received))
     .slice(0, topN);
 
-  return { entries, totalTips, totalReceived, windowDays: WINDOW_DAYS };
+  return { entries, totalTips, totalReceived, windowDays };
 }
 
 function topAmount(received: Record<string, number>): number {

@@ -1,12 +1,42 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
+import { getSessionFromCookies } from '../../utils/auth/session';
 
-export async function POST(request: Request) {
+// getSessionFromCookies uzywa node:crypto
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+
+/**
+ * Odswiezenie statystyk WLASNEGO profilu.
+ *
+ * Poprzednio trasa brala adres z ciala zadania i nadpisywala nim
+ * `users/{address}.stats` bez zadnego uwierzytelnienia - dowolny anonim mogl
+ * przepisac statystyki dowolnego uzytkownika, a przy okazji zamienic trase w
+ * darmowy proxy do BaseScan na cudzy klucz API. Adres musi pochodzic z
+ * podpisanej sesji.
+ *
+ * Adres jest tez walidowany regexem, bo trafia do sciezki dokumentu: wartosc ze
+ * znakiem `/` rozjezdza sciezke Firestore na inna kolekcje.
+ */
+function sessionAddress(request: NextRequest): string | null {
   try {
-    const { address } = await request.json();
-    
+    return getSessionFromCookies(request.cookies)?.address ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const address = sessionAddress(request);
+
     if (!address) {
+      return NextResponse.json({ error: 'Zaloguj sie portfelem' }, { status: 401 });
+    }
+    if (!ADDRESS_REGEX.test(address)) {
       return NextResponse.json({ error: 'Brak adresu' }, { status: 400 });
     }
 

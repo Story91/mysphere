@@ -12,18 +12,16 @@ interface RecentTipsProps {
 }
 
 // Komponent ikony tokena
-const TokenIcon = ({ token, size = 'sm' }: { token: TipToken; size?: 'sm' | 'md' }) => {
+const TokenIcon = ({ token }: { token: TipToken }) => {
   const tokenConfig = TOKENS[token];
   if (!tokenConfig) return <span>💰</span>;
-  
-  const sizeClass = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
-  
+
   if (tokenConfig.iconUrl) {
     return (
-      <img 
-        src={tokenConfig.iconUrl} 
-        alt={tokenConfig.name} 
-        className={`${sizeClass} object-contain rounded-full inline-block`}
+      <img
+        src={tokenConfig.iconUrl}
+        alt={tokenConfig.name}
+        className="w-3.5 h-3.5 object-contain rounded-full inline-block"
         title={tokenConfig.name}
       />
     );
@@ -78,25 +76,34 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
+    // Bez tej flagi zmiana `userAddress` w trakcie pobierania potrafila wpisac
+    // do stanu odpowiedz POPRZEDNIEGO uzytkownika - kto pierwszy wrocil, ten
+    // wygrywal. Dodatkowo zapis stanu po odmontowaniu.
+    let cancelled = false;
+
     const fetchRecentTips = async () => {
       setLoading(true);
       try {
         const recentTips = await getRecentTips(userAddress, limit);
+        if (cancelled) return;
         setTips(recentTips);
-        
+
         if (recentTips.length > 0) {
           const senderAddresses = [...new Set(recentTips.map(tip => tip.senderAddress))];
           const names = await getBulkUserNamesOptimized(senderAddresses);
+          if (cancelled) return;
           setSenderNames(names);
         }
       } catch (error) {
         console.error('Error fetching recent tips:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchRecentTips();
+
+    return () => { cancelled = true; };
   }, [userAddress, limit]);
 
   const formatTimestamp = (timestamp: number) => {
@@ -158,6 +165,7 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
         {tips.length > 3 && (
           <button
             onClick={() => setShowAll(!showAll)}
+            aria-expanded={showAll}
             className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
           >
             {showAll ? 'Show Less' : 'Show All'}
@@ -206,7 +214,7 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
                     className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 flex items-center space-x-1"
                   >
                     <span>Receipt</span>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </a>

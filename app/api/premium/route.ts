@@ -20,6 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import { getSessionFromCookies } from '../../utils/auth/session';
@@ -132,7 +133,7 @@ interface StoreBody {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isPremiumStoreAvailable()) {
+  if (!(await isPremiumStoreAvailable())) {
     // Bez konta uslugowego nie da sie zapisac tresci poza zasiegiem klienta.
     // Odmawiamy zamiast zapisac ja tam, gdzie kazdy ja przeczyta.
     return NextResponse.json(
@@ -204,7 +205,7 @@ export async function POST(request: NextRequest) {
     ? body.unlockToken
     : DEFAULT_UNLOCK_TOKEN;
 
-  const adminDb = getAdminDb();
+  const adminDb = await getAdminDb();
   if (!adminDb) {
     return NextResponse.json({ error: 'Failed to mark post as premium' }, { status: 500 });
   }
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
       // Stare posty trzymaly tresc tutaj. Gdy autor edytuje taki post, pole
       // znika z dokumentu - tresc zyje juz wylacznie w kolekcji poza zasiegiem
       // klienta.
-      premiumContent: (await import('firebase-admin/firestore')).FieldValue.delete(),
+      premiumContent: FieldValue.delete(),
     });
   } catch (error) {
     console.error('[api/premium] blad oznaczania posta jako platnego:', error);

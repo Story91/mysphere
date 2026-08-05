@@ -22,23 +22,31 @@ const headingFont = Outfit({
   variable: '--font-heading',
 });
 
+// Kanoniczny adres produkcyjny. Jedno miejsce, bo uzywaja go i metadane, i
+// embed miniappki, i musi sie zgadzac z domena podpisana w
+// public/.well-known/farcaster.json (accountAssociation -> domain).
+const APP_URL = 'https://mysphere.fun';
+
 // Miniapp embed. `fc:miniapp` to aktualny tag; `fc:frame` zostawiony dla
 // wstecznej zgodnosci ze starszymi klientami. W obu `version` musi byc
 // stringiem "1" - "next" jest przestarzale i klienci je odrzucaja.
 const MINIAPP_EMBED = JSON.stringify({
   version: '1',
-  imageUrl: 'https://mysphere.fun/SphereWhite.png',
+  imageUrl: `${APP_URL}/SphereWhite.png`,
   button: {
     title: 'Tip Creators',
     action: {
       type: 'launch_miniapp',
       name: 'MySphere',
-      url: 'https://mysphere.fun',
-      splashImageUrl: 'https://mysphere.fun/SPLASH.gif',
+      url: APP_URL,
+      splashImageUrl: `${APP_URL}/SPLASH.gif`,
       splashBackgroundColor: '#FFFFFF',
     },
   },
 });
+
+const APP_DESCRIPTION =
+  'The onchain social Dapp on Base. Build, grow, and own your digital Sphere.';
 
 /**
  * Metadane generowane po stronie SERWERA.
@@ -48,9 +56,30 @@ const MINIAPP_EMBED = JSON.stringify({
  * (w tym embed miniappki Farcastera) widzialy pusty dokument.
  */
 export const metadata: Metadata = {
+  // Bez metadataBase Next liczy adresy Open Graph wzgledem localhost i wypisuje
+  // ostrzezenie przy kazdym buildzie ("metadataBase property in metadata export
+  // is not set"), a podglady linkow dostaja wtedy wzgledne, nieklikalne URL-e.
+  metadataBase: new URL(APP_URL),
   title: 'MySphere.fun',
-  description: 'The onchain social Dapp on Base. Build, grow, and own your digital Sphere.',
+  description: APP_DESCRIPTION,
   manifest: '/manifest.json',
+  // Uwaga: to jest layout GLOWNY - kazde pole dziedzicza wszystkie podstrony,
+  // ktore go nie nadpisza. Dlatego nie ma tu ani `alternates.canonical`, ani
+  // `openGraph.url`: wpisane raz na gorze wskazywalyby strone glowna dla calego
+  // serwisu. Podstrona, ktora chce wlasny canonical/og:url, dodaje go u siebie.
+  openGraph: {
+    type: 'website',
+    siteName: 'MySphere',
+    title: 'MySphere - Social on Base',
+    description: APP_DESCRIPTION,
+    images: [{ url: '/SphereWhite.png', width: 640, height: 360, alt: 'MySphere' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'MySphere - Social on Base',
+    description: APP_DESCRIPTION,
+    images: ['/SphereWhite.png'],
+  },
   icons: {
     icon: [
       { url: '/favicon_io (1)/favicon.ico', type: 'image/x-icon' },
@@ -75,7 +104,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pl" className={`${bodyFont.variable} ${headingFont.variable}`}>
+    // lang="en": cala tresc interfejsu i metadanych jest po angielsku. Przy
+    // lang="pl" czytniki ekranu czytaly angielskie teksty polska fonetyka,
+    // a wyszukiwarki dostawaly zly jezyk strony.
+    <html lang="en" className={`${bodyFont.variable} ${headingFont.variable}`}>
       <body className="min-h-screen bg-white">
         <AppShell>{children}</AppShell>
 

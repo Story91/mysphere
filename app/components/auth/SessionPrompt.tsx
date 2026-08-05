@@ -80,10 +80,23 @@ export default function SessionPrompt() {
     }
   };
 
-  if (!isConnected || isAuthenticated || isLoading || dismissed || !graceElapsed) return null;
+  /**
+   * `isLoading` z useSiweAuth znaczy dwie rozne rzeczy: "sprawdzam, czy jest
+   * sesja" (przy starcie - wtedy paska nie pokazujemy) ORAZ "trwa podpisywanie",
+   * bo signIn() tez je podnosi. Bez wyjatku na `isSigning` klikniecie "Sign"
+   * natychmiast KASOWALO caly pasek, a stan "Check your wallet…" nie mial jak
+   * sie pokazac - uzytkownik widzial tylko, ze panel znika, i po odrzuceniu
+   * podpisu wraca.
+   */
+  const isCheckingSession = isLoading && !isSigning;
+  if (!isConnected || isAuthenticated || isCheckingSession || dismissed || !graceElapsed) return null;
 
   return (
-    <div className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-[420px] rounded-2xl border border-white/[0.1] bg-[#0E1730]/95 p-4 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:right-4">
+    <div
+      role="region"
+      aria-label="Confirm this wallet is yours"
+      className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-[420px] rounded-2xl border border-white/[0.1] bg-[#0E1730]/95 p-4 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:right-4"
+    >
       <p className="mb-1 font-['Coinbase_Display'] text-[14px] font-semibold text-[#EEF3FF]">
         Confirm this wallet is yours
       </p>
@@ -92,17 +105,24 @@ export default function SessionPrompt() {
         transaction.
       </p>
 
-      {error && <p className="mb-3 text-[12px] text-[#FF8080]">{error}</p>}
+      {error && (
+        <p role="alert" className="mb-3 text-[12px] text-[#FF8080]">
+          {error}
+        </p>
+      )}
 
       <div className="flex gap-2">
         <button
+          type="button"
           onClick={handleSignIn}
           disabled={isSigning}
+          aria-busy={isSigning}
           className="rounded-lg bg-[#0052FF] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[#0044D6] disabled:opacity-60"
         >
           {isSigning ? 'Check your wallet…' : 'Sign'}
         </button>
         <button
+          type="button"
           onClick={hide}
           className="rounded-lg border border-white/[0.12] px-4 py-2 text-[13px] font-medium text-[#9EB0D2] transition hover:bg-white/[0.04]"
         >

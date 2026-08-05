@@ -1,9 +1,12 @@
 {
   "name": "MySphere",
   "short_name": "Sphere",
+  "description": "The onchain social Dapp on Base. Build, grow, and own your digital Sphere.",
+  "lang": "en",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0F172A",
+  "background_color": "#FFFFFF",
   "theme_color": "#0052FF",
   "icons": [
     {
@@ -17,4 +20,4 @@
       "type": "image/png"
     }
   ]
-} 
+}

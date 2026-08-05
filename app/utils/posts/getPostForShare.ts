@@ -1,5 +1,5 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { getPublicDb as getDb } from '../publicFirestore';
 
 /**
  * Odczyt pojedynczego posta PO STRONIE SERWERA, na potrzeby udostepnialnej
@@ -23,21 +23,6 @@ export type SharedPost = {
   commentCount: number;
   network?: string;
 };
-
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-/** Reuzywa aplikacji Firebase, jesli juz istnieje w tym procesie. */
-function getDb() {
-  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  return getFirestore(app);
-}
 
 export async function getPostForShare(postId: string): Promise<SharedPost | null> {
   if (!postId) return null;

@@ -56,23 +56,33 @@ export default function PremiumGate({
   // Tresc pobierana z serwera - nie ma jej w propsach i nie ma jej w feedzie.
   const [content, setContent] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
-  const [isFetchingContent, setIsFetchingContent] = useState(false);
 
   const isAuthor = !!address && address.toLowerCase() === creatorAddress.toLowerCase();
   const unlocked = isUnlocked || justUnlocked || isAuthor;
+
+  /**
+   * "Ani tresci, ani bledu" znaczy dokladnie tyle, co "pobieranie trwa albo
+   * zaraz sie zacznie" - wiec szkielet pokazuje sie juz w pierwszej klatce.
+   * Osobny stan `isFetchingContent` byl na to za wolny: ustawial go dopiero
+   * efekt PO renderze, wiec miedzy odslonieciem a startem pobierania mrugala
+   * pusta ramka.
+   */
+  const isLoadingContent = unlocked && content === null && contentError === null;
 
   /**
    * Pobranie tresci. Odpalane tylko wtedy, gdy klient ma POWODY sadzic, ze
    * uzytkownik ma prawo - ale to serwer jest tu rozstrzygajacy. 401 znaczy
    * "nie wiem, kim jestes": bez podpisanej sesji nie da sie odroznic
    * placacego od kogos, kto poda cudzy adres.
+   *
+   * Warunek na `contentError` pilnuje, zeby nieudana proba nie zapetlila sie
+   * w kolko; wyzerowanie bledu ("Try again") jest jednoczesnie sygnalem do
+   * ponownego pobrania.
    */
   useEffect(() => {
-    if (!unlocked || content !== null) return;
+    if (!unlocked || content !== null || contentError !== null) return;
 
     let cancelled = false;
-    setIsFetchingContent(true);
-    setContentError(null);
 
     (async () => {
       try {
@@ -100,15 +110,13 @@ export default function PremiumGate({
         setContent(typeof data.content === 'string' ? data.content : '');
       } catch {
         if (!cancelled) setContentError('Could not load the premium content.');
-      } finally {
-        if (!cancelled) setIsFetchingContent(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [unlocked, content, postId]);
+  }, [unlocked, content, contentError, postId]);
 
   const recordUnlock = useCallback(
     async (txHash: `0x${string}`) => {
@@ -145,17 +153,37 @@ export default function PremiumGate({
           <span>🔓</span>
           <span>{isAuthor ? 'Premium content (yours)' : 'Premium content unlocked'}</span>
         </div>
-        {isFetchingContent && content === null && !contentError ? (
-          <div className="space-y-2" aria-live="polite">
+        {isLoadingContent ? (
+          <div className="space-y-2" aria-live="polite" aria-label="Loading premium content">
             <div className="h-3 w-11/12 animate-pulse rounded bg-amber-200/60 dark:bg-amber-800/40" />
             <div className="h-3 w-8/12 animate-pulse rounded bg-amber-200/60 dark:bg-amber-800/40" />
           </div>
         ) : contentError ? (
-          <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200">{contentError}</p>
-        ) : (
+          <div className="flex items-start justify-between gap-3">
+            <p role="alert" className="text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+              {contentError}
+            </p>
+            {/* Wyzerowanie bledu odpala efekt jeszcze raz. Bez tego jedna
+                chwilowa awaria sieci zostawiala zaplacona tresc niedostepna
+                az do przeladowania strony. */}
+            <button
+              type="button"
+              onClick={() => setContentError(null)}
+              className="shrink-0 text-xs underline text-amber-800 dark:text-amber-200"
+            >
+              Try again
+            </button>
+          </div>
+        ) : content ? (
           <div className="prose prose-sm max-w-none whitespace-pre-wrap break-words text-black dark:text-white">
             {content}
           </div>
+        ) : (
+          // Pusta tresc to nie to samo, co blad: post jest oznaczony jako platny,
+          // ale nic w nim nie ma. Puste miejsce wygladaloby jak zaciecie.
+          <p className="text-xs leading-relaxed text-amber-800/80 dark:text-amber-200/80">
+            This post has no premium text.
+          </p>
         )}
 
         {/* Informacja WIDOCZNA DLA AUTORA - to jedyna osoba decydujaca o
@@ -221,7 +249,7 @@ export default function PremiumGate({
       </div>
 
       {phase === 'error' && error && (
-        <div className="mt-3 flex items-start justify-between gap-3 rounded-lg border border-red-400/50 bg-red-500/10 p-2 text-xs text-red-600 dark:text-red-300">
+        <div role="alert" className="mt-3 flex items-start justify-between gap-3 rounded-lg border border-red-400/50 bg-red-500/10 p-2 text-xs text-red-600 dark:text-red-300">
           <span>{error}</span>
           <button type="button" onClick={reset} className="underline shrink-0">
             Try again

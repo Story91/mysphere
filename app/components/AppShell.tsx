@@ -17,11 +17,11 @@ import { installMerkleProxy } from '../utils/merkleProxy';
  * spinner, a metadane byly generowane po stronie klienta.
  *
  * Tutaj laduje wylacznie to, co naprawde potrzebuje przegladarki:
- *  - providery Reactowe (wagmi / react-query / OnchainKit / motyw),
+ *  - providery Reactowe (wagmi / react-query / motyw),
  *  - installMerkleProxy - UWAGA: to bylo wczesniej wolane w efekcie ClientOnly.
  *    Zdjecie globalnego ClientOnly bez przeniesienia tego zabiloby przekierowanie
  *    zapytan do eth.merkle.io, z ktorego korzystaja lookupy ENS/Basename
- *    komponentow Identity z OnchainKit.
+ *    naszej warstwy tozsamosci (app/components/identity).
  *
  * Czego tu NIE MA i byc nie powinno: bramki blokujacej render dzieci do czasu
  * hydracji. Poszczegolne komponenty czytajace window/localStorage maja same
