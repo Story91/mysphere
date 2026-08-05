@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAccount, useWriteContract, useReadContract } from 'wagmi';
-import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI } from '../config/contractConfig';
-import { getPriceForDuration, calculateTotalCost, getDurationInMilliseconds } from '../utils/pinPricing';
+import { useAccount, useWriteContract } from 'wagmi';
+import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI, toContractDuration } from '../config/contractConfig';
+import { calculateTotalCost, getDurationInMilliseconds } from '../utils/pinPricing';
 import { PinDuration } from '../../../utils/firebase';
-import { parseEther, formatEther } from 'viem';
+import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { Clock, Plus, X } from 'lucide-react';
 
@@ -35,14 +35,7 @@ export default function ExtendPinModal({
   const [selectedDuration, setSelectedDuration] = useState<PinDuration>('HOURS_24');
   const [isExtending, setIsExtending] = useState(false);
 
-  const { writeContract } = useWriteContract();
-
-  // Read user's ETH balance
-  const { data: balance } = useReadContract({
-    address: PAID_PIN_CONTRACT_CONFIG.address as `0x${string}`,
-    abi: PAID_PIN_CONTRACT_ABI,
-    functionName: 'getBalance',
-  });
+  const { writeContractAsync } = useWriteContract();
 
   const selectedPrice = calculateTotalCost(selectedDuration);
 
@@ -51,31 +44,34 @@ export default function ExtendPinModal({
       toast.error('Please connect your wallet');
       return;
     }
+    if (isExtending) return;
 
     try {
       setIsExtending(true);
 
-             const tx = await writeContract({
-         address: PAID_PIN_CONTRACT_CONFIG.address as `0x${string}`,
-         abi: PAID_PIN_CONTRACT_ABI,
-         functionName: 'extendPin',
-         args: [postId, selectedDuration],
-         value: parseEther(selectedPrice.ethAmount),
-       });
+      // writeContractAsync, nie writeContract: wariant synchroniczny zwraca void
+      // i nie odrzuca obietnicy, wiec komunikat "transaction sent" pokazywal sie
+      // zanim uzytkownik cokolwiek podpisal - takze po odmowie i po bledzie.
+      const txHash = await writeContractAsync({
+        address: PAID_PIN_CONTRACT_CONFIG.address as `0x${string}`,
+        abi: PAID_PIN_CONTRACT_ABI,
+        functionName: 'extendPin',
+        // Kontrakt oczekuje uint8, nie nazwy czasu trwania.
+        args: [postId, toContractDuration(selectedDuration)],
+        value: parseEther(selectedPrice.ethAmount),
+        chainId: PAID_PIN_CONTRACT_CONFIG.chainId,
+      });
 
-       toast.success('Extension transaction sent! Pin will be extended after confirmation.');
-       
-       if (onExtendSuccess && tx) {
-         onExtendSuccess(tx, selectedDuration);
-       }
+      toast.success('Extension transaction sent! Pin will be extended after confirmation.');
 
+      onExtendSuccess?.(txHash, selectedDuration);
       onClose();
     } catch (error: any) {
       console.error('Extension error:', error);
-      
-      if (error.message?.includes('user rejected')) {
+
+      if (error?.message?.includes('user rejected')) {
         toast.error('Transaction cancelled by user');
-      } else if (error.message?.includes('insufficient funds')) {
+      } else if (error?.message?.includes('insufficient funds')) {
         toast.error('Insufficient funds for extension');
       } else {
         toast.error('Extension failed. Please try again.');
@@ -130,6 +126,7 @@ export default function ExtendPinModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close extend pin dialog"
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <X className="w-6 h-6" />

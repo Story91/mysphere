@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { getAddress, isAddress } from 'viem';
 import { getPublicDb as getDb } from '../publicFirestore';
+import { toMillis } from '../firestoreTime';
 
 /**
  * Odczyt publicznego profilu PO STRONIE SERWERA, na potrzeby trasy /u/[address].
@@ -117,7 +118,7 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
       recentPosts.push({
         id: entry.id,
         content: typeof data.content === 'string' ? data.content : '',
-        timestamp: typeof data.timestamp === 'number' ? data.timestamp : 0,
+        timestamp: toMillis(data.timestamp),
         likes,
         commentCount: Array.isArray(data.comments) ? data.comments.length : 0,
         network: data.network ?? undefined,

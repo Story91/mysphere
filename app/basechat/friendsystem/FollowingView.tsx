@@ -116,8 +116,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
       {/* Users list based on active tab */}
       {(() => {
         const currentList = activeTab === 'following' ? following : followers;
-        const currentCount = activeTab === 'following' ? followStats?.following : followStats?.followers;
-        
+
         if (currentList.length === 0) {
           return (
             <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl">

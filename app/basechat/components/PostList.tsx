@@ -280,8 +280,17 @@ const NETWORK_BADGES: Record<string, NetworkBadgeDef> = {
   robinhood: {
     alt: 'Robinhood Chain',
     chipClass: 'bg-green-50/30 dark:bg-green-900/20',
-    src: '/logotypy/robinhood.svg',
-    iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
+    // Logo ma WLASNE, limonkowe tlo wypelniajace caly kwadrat - inaczej niz
+    // pozostale ikony sieci, ktore sa przezroczyste. Bez zaokraglenia rysowaloby
+    // sie jako ostry zielony kwadrat w owalnej pigulce. `rounded-[4px]` sprawia,
+    // ze czyta sie jak ikona aplikacji, czyli tak, jak to logo jest uzywane
+    // wszedzie indziej.
+    src: '/robin.webp',
+    iconClass: {
+      post: 'w-4 h-4 rounded-[4px]',
+      comment: 'w-3 h-3 rounded-[3px]',
+      reply: 'w-2.5 h-2.5 rounded-[3px]',
+    },
     label: { text: 'RH', className: 'text-[#00C805]' },
   },
 };
@@ -509,7 +518,18 @@ function PostList({
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [enlargedImage]);
-  const publicClient = usePublicClient();
+  /**
+   * Klient PRZYPIETY DO BASE, nie do aktualnie podlaczonej sieci.
+   *
+   * Jedyne, co przez niego czytamy, to salda monet Zora (`zoraCoinAddress`),
+   * a te kontrakty istnieja WYLACZNIE na Base. Wczesniej stalo tu
+   * `usePublicClient()` bez argumentu, czyli klient sieci, na ktorej akurat
+   * siedzi portfel - wiec gdy uzytkownik byl na Ethereum, `balanceOf` szlo pod
+   * adres, pod ktorym na mainnecie nic nie ma, i wracalo puste `0x`. W konsoli
+   * dawalo to serie ContractFunctionZeroDataError ("returned no data"), a w UI
+   * ciche zero zamiast salda.
+   */
+  const publicClient = usePublicClient({ chainId: base.id });
   const { data: walletClient } = useWalletClient();
   const networkChainId = useChainId();
   // Jeden wybor przycisku komentarza dla calego feedu - wczesniej ta sama

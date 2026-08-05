@@ -1,7 +1,5 @@
 'use client';
 
-import { PostingNetwork } from '../hooks/useAIGenerator';
-
 interface AIButtonProps {
   onClick: () => void;
   disabled?: boolean;

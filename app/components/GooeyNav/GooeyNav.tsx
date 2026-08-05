@@ -78,9 +78,14 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
               onClick={item.onClick}
               onHoverStart={() => setHoveredIndex(index)}
               onHoverEnd={() => setHoveredIndex(null)}
-              // Ponizej progu `sm` etykieta jest ukryta (display:none), wiec bez
-              // tego przycisk sieci nie ma na telefonie zadnej nazwy dostepnej.
+              // Etykieta tekstowa nie renderuje sie WCALE (patrz nizej), wiec
+              // aria-label jest jedyna nazwa dostepna tego przycisku. Bez niego
+              // czytnik ekranu przeczytalby "przycisk" i nic wiecej.
               aria-label={item.label}
+              // Natywny dymek dla myszy. Znaki sieci nie sa powszechnie
+              // rozpoznawalne - ktos musi miec jak sprawdzic, ktora to, bez
+              // klikania na probe.
+              title={item.label}
               aria-pressed={!!item.isActive}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
@@ -105,12 +110,16 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                 {item.icon}
               </div>
               
-              {/* Label */}
-              <span className={`relative z-10 hidden sm:inline ${
-                item.specialStyle === 'celo' && item.isActive ? 'text-black' : ''
-              }`}>
-                {item.label}
-              </span>
+              {/* ETYKIETY TEKSTOWEJ NIE MA - celowo.
+
+                  Selektor ma siedem sieci. Z podpisami ("Camp Network",
+                  "World Chain", "Robinhood"...) rzad rozciagal sie na cala
+                  szerokosc kompozytora, spychal pole tekstowe w dol i tak czy
+                  owak konczyl sie zawijaniem. Same znaki sieci mieszcza sie
+                  w jednym rzedzie na kazdej szerokosci ekranu.
+
+                  Nazwa NIE ginie: siedzi w aria-label (czytnik ekranu) oraz
+                  w title (dymek przy najechaniu myszy). */}
               
               {/* Active background with dynamic colors - fills entire button */}
               {item.isActive && (

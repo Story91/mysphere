@@ -55,7 +55,9 @@ export default function TradeCoinModal({
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   
-  const [mode] = useState<'buy' | 'sell'>(initialMode);
+  // Tryb ustala rodzic przy otwarciu i nigdy sie nie zmienia w trakcie zycia
+  // modala - to byl useState bez settera, czyli stala udajaca stan.
+  const mode = initialMode;
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState(0.05);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +71,22 @@ export default function TradeCoinModal({
     }
   }, [isOpen]);
 
-  const estimateOutput = useCallback(async () => {
+  /** Jedna definicja zlecenia - wczesniej ten sam obiekt byl budowany osobno
+   *  do wyceny i osobno do transakcji, z ryzykiem rozjechania sie parametrow. */
+  const buildTradeParams = useCallback((amountIn: bigint): TradeParameters => {
+    const coinAsset = { type: 'erc20' as const, address: coin.address as `0x${string}` };
+    const ethAsset = { type: 'eth' as const };
+
+    return {
+      sell: mode === 'buy' ? ethAsset : coinAsset,
+      buy: mode === 'buy' ? coinAsset : ethAsset,
+      amountIn,
+      slippage,
+      sender: address as `0x${string}`,
+    };
+  }, [mode, coin.address, slippage, address]);
+
+  const estimateOutput = useCallback(async (isStale: () => boolean) => {
     if (!amount || parseFloat(amount) <= 0 || !address || !publicClient) {
       setEstimatedOutput(null);
       return;
@@ -77,39 +94,33 @@ export default function TradeCoinModal({
 
     setIsEstimating(true);
     try {
-      const amountIn = parseEther(amount);
+      const quote = await createTradeCall(buildTradeParams(parseEther(amount)));
+      // Wycena dla poprzedniej kwoty nie moze wygrac z biezaca - inaczej po
+      // szybkiej zmianie pola uzytkownik widzial kurs dla innej liczby.
+      if (isStale()) return;
 
-      const tradeParams: TradeParameters = {
-        sell: mode === 'buy' 
-          ? { type: 'eth' as const }
-          : { type: 'erc20' as const, address: coin.address as `0x${string}` },
-        buy: mode === 'buy'
-          ? { type: 'erc20' as const, address: coin.address as `0x${string}` }
-          : { type: 'eth' as const },
-        amountIn,
-        slippage,
-        sender: address as `0x${string}`,
-      };
-
-      const quote = await createTradeCall(tradeParams);
-      
       if (quote?.quote?.amountOut) {
-        const formatted = formatUnits(BigInt(quote.quote.amountOut), 18);
-        setEstimatedOutput(formatted);
+        setEstimatedOutput(formatUnits(BigInt(quote.quote.amountOut), 18));
       }
     } catch (error) {
+      if (isStale()) return;
       console.error('Error estimating output:', error);
       setEstimatedOutput(null);
     } finally {
-      setIsEstimating(false);
+      if (!isStale()) setIsEstimating(false);
     }
-  }, [amount, mode, coin.address, address, publicClient, slippage]);
+  }, [amount, address, publicClient, buildTradeParams]);
 
   useEffect(() => {
+    let stale = false;
     const debounce = setTimeout(() => {
-      estimateOutput();
+      estimateOutput(() => stale);
     }, 500);
-    return () => clearTimeout(debounce);
+
+    return () => {
+      stale = true;
+      clearTimeout(debounce);
+    };
   }, [estimateOutput]);
 
   const handleTrade = async () => {
@@ -133,22 +144,8 @@ export default function TradeCoinModal({
     const toastId = toast.loading(`${mode === 'buy' ? 'Buying' : 'Selling'} ${coin.symbol}...`);
 
     try {
-      const amountIn = parseEther(amount);
+      const quote = await createTradeCall(buildTradeParams(parseEther(amount)));
 
-      const tradeParams: TradeParameters = {
-        sell: mode === 'buy' 
-          ? { type: 'eth' as const }
-          : { type: 'erc20' as const, address: coin.address as `0x${string}` },
-        buy: mode === 'buy'
-          ? { type: 'erc20' as const, address: coin.address as `0x${string}` }
-          : { type: 'eth' as const },
-        amountIn,
-        slippage,
-        sender: address as `0x${string}`,
-      };
-
-      const quote = await createTradeCall(tradeParams);
-      
       if (!quote?.call) {
         throw new Error('Failed to get trade quote');
       }

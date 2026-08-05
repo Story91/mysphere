@@ -1,57 +1,38 @@
-// @ts-nocheck
 'use client';
 
-import { useState, useRef, useEffect, useCallback, PropsWithChildren, useMemo, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import PremiumComposer, { EMPTY_PREMIUM, type PremiumComposerValue } from '../components/monetization/PremiumComposer';
 // @ts-ignore - config CommonJS wspoldzielony z next.config.js
 import { isRouteDisabled } from '@/config/routeStatus';
-import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
+import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
 // Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
-import { Identity, Name, Address, Avatar, IdentityCard, useName } from '../components/identity';
-import { parseEther } from 'viem';
+import { Avatar, useName } from '../components/identity';
+// Zawezone do tego, co ta strona faktycznie wola. Wypadly importy po skasowanych
+// martwych handlerach (addComment, toggleLike, toggleCommentLike, editComment,
+// deleteComment, addCommentReply, deletePost) oraz takie, ktorych nikt tu nigdy
+// nie uzyl: updateUserName, getBulkUserNamesOptimized, getCachedActiveUsers,
+// clearPaginatedActiveUsersCache, getPaginatedActiveUsersCacheInfo,
+// getGlobalStats, refreshTop50UsersOnly, pinPost, unpinPost, isUserAdmin.
 import {
-  saveUserProfile, 
-  createPost, 
-  addComment, 
-  toggleLike,
-  toggleCommentLike,
+  saveUserProfile,
+  createPost,
   fetchPosts,
   fetchBaseNameFeedPosts, // Import nowej funkcji
   fetchUserProfile,
-  deletePost,
   db,
-  updateUserName,
-  getBulkUserNamesOptimized,
   getBulkUserNamesVisibleOnly,
   getUserNamesCacheStats,
   saveProfileName,
   getProfileName,
-  editComment,
-  deleteComment,
-  addCommentReply,
   ADMIN_ADDRESS,
-  getCachedActiveUsers,
   getTopActiveUsersPaginated, // 🚀 NOWA FUNKCJA PAGINOWANA
-  clearPaginatedActiveUsersCache,
-  getPaginatedActiveUsersCacheInfo,
-  // searchUsers,  // DISABLED
-  getGlobalStats,
-  refreshTop50UsersOnly,
-  // searchUsersUltraFast,  // DISABLED
-  // getCachedFullUsers,  // DISABLED
-  // preloadUserSearchCache,  // DISABLED
-  pinPost,
-  unpinPost,
-  isUserAdmin,
   clearUserNamesCache
 } from '../utils/firebase';
-import { useSocial } from './friendsystem/hooks';
-import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
-import { Post, Comment, UserProfile, Stats } from '../types';
-import { calculateRanking, UserRank, RANK_DESCRIPTIONS, BADGES } from '../utils/ranking';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc, setDoc, increment } from 'firebase/firestore';
+import { Post, Stats } from '../types';
+import { UserRank } from '../utils/ranking';
 import Script from 'next/script';
 import { put } from '@vercel/blob';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -59,7 +40,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
 import { useBanStatus } from '../hooks/useBanStatus';
 const ReferralLeaderboard = dynamic(() => import('../utils/referrals/components/ReferralLeaderboard'), { ssr: false });
-import LinkPreview from './components/LinkPreview';
 import BuilderProfile from './components/BuilderProfile';
 const FollowingView = dynamic(() => import('./friendsystem/FollowingView'), { ssr: false });
 const FriendsView = dynamic(() => import('./friendsystem/FriendsView'), { ssr: false });
@@ -69,7 +49,6 @@ const NotificationsView = dynamic(() => import('./friendsystem/NotificationsView
 
 import { RefreshCw } from 'lucide-react';
 import TransactionButton from '../components/TransactionButton';
-import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
 const YapsMetrics = dynamic(() => import('../yapscan/components/YapsMetrics'), { ssr: false });
 import { useAIGenerator } from './hooks/useAIGenerator';
@@ -80,7 +59,7 @@ import AIButton from './components/AIButton';
 import PostList, { ExtendedPost } from './components/PostList';
 import ProfileCard from './components/ProfileCard';
 import PinnedPosts from './components/PinnedPosts';
-import { HomeIcon, UserIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
+import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 import GlassIcons from '../components/GlassIcons/GlassIcons';
 import GooeyNav from '../components/GooeyNav/GooeyNav';
@@ -88,7 +67,7 @@ const MusicSelector = dynamic(() => import('./components/MusicSelector'), { ssr:
 import SpotifyTrackCard from './components/SpotifyTrackCard';
 // Import Zora SDK functions
 // Import Viem types
-import { Address as ViemAddress, Hex } from 'viem';
+import { Address as ViemAddress } from 'viem';
 const CreatePostBaseCamp = dynamic(() => import('./components/BaseCampPosts/CreatePostBaseCamp'), { ssr: false });
 import ClaimPortalBanner from './components/BaseCampPosts/ClaimPortalBanner';
 const CreatePostLinea = dynamic(() => import('./Linea/components/CreatePostLinea'), { ssr: false });
@@ -142,15 +121,9 @@ interface ActiveUser {
   lastActive: number;
 }
 
-const BASESCAN_API_KEY = 'YB9ZQ71MVDJU3CQQXFJ6GQ4Y17MPKEQCBN';
-// 🚨 USUNIĘTO: REFRESH_INTERVAL - już nie jest potrzebne bo usunęliśmy funkcję fetchData
-
-// Usuwamy animację gradientu która obciąża przeglądarkę
-const gradientAnimation = `
-  .static-gradient {
-    background-size: 200% 200%;
-  }
-`;
+// Usuniete jako martwe: BASESCAN_API_KEY (klucz wpisany na sztywno, ladowal do
+// publicznego bundle'a, a zadne zapytanie go nie uzywalo - fetchData skasowano
+// wczesniej) oraz `gradientAnimation` (string CSS, ktorego nikt nie wstrzykiwal).
 
 // Zaktualizuj funkcję sprawdzającą czy nazwa to BaseName
 const isBaseName = (name: string) => {
@@ -195,36 +168,9 @@ const toEthereumAddress = (address: string): EthereumAddress => {
   return address as `0x${string}`;
 };
 
-// Komponent odznaki BaseName
-const BaseNameBadge = () => (
-  <span className="inline-flex items-center px-2 py-0.5 ml-2 text-xs font-medium rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white">
-    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-      <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-    </svg>
-    BaseName
-  </span>
-);
-
-// Helper function to upload metadata JSON (replace with actual implementation)
-async function uploadMetadataJson(metadata: object): Promise<string> {
-  // Example: Upload to Vercel Blob or IPFS
-  console.log("Uploading metadata:", metadata);
-  // Use fetch to call an API route or directly upload to IPFS/Blob
-  const response = await fetch('/api/upload-metadata', { // Assuming an API route exists
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ metadata }),
-  });
-  if (!response.ok) {
-    throw new Error('Failed to upload metadata');
-  }
-  const data = await response.json();
-  if (!data.uri) {
-    throw new Error('Metadata URI not returned from upload');
-  }
-  console.log("Metadata URI:", data.uri);
-  return data.uri; // Should be like "ipfs://<hash>" or "https://<...>/metadata.json"
-}
+// Usuniete jako martwe: komponent BaseNameBadge (nigdzie nierenderowany) oraz
+// uploadMetadataJson() - helper strzelajacy do nieistniejacej trasy
+// /api/upload-metadata. Metadane Zory wysyla /api/upload w handleCreatePost.
 
 // 🚀 POSTS CACHE FUNCTIONS - localStorage cache z 5-minutowym TTL
 const POSTS_CACHE_DURATION = 5 * 60 * 1000; // 5 minut w ms
@@ -273,6 +219,92 @@ const clearPostsCache = () => {
     console.log('🗑️ Posts cache cleared');
   } catch (error) {
     console.error('Error clearing posts cache:', error);
+  }
+};
+
+/**
+ * Dopisuje SWIEZO UTWORZONY post na gore kazdej zapisanej listy.
+ *
+ * PROBLEM, KTORY TO ROZWIAZUJE. Cache postow jest kluczowany per zakladka
+ * (`posts_forYou_<adres>`, `posts_all`, ...) i zyje 5 minut. Sciezka publikacji
+ * dopisywala post optymistycznie do stanu Reacta, ale NIE do cache'u - wiec po
+ * przejsciu na inna zakladke i powrocie widok odtwarzal sie z zapisanej listy
+ * SPRZED posta. Uzytkownik widzial wtedy, ze post zniknal. Odwrotnie tez:
+ * przelaczenie na zakladke, ktorej cache akurat wygasl, pokazywalo post - stad
+ * "musialem przeklikac na swoj feed i wrocic".
+ *
+ * DLACZEGO DOPISUJEMY, A NIE KASUJEMY. Kasowanie calego cache'u (clearPostsCache)
+ * dziala, ale kaze potem pobrac WSZYSTKIE listy od nowa - czyli placimy pelnym
+ * przeladowaniem feedu za jeden post, ktorego tresc i tak mamy juz w pamieci.
+ * Przy Firestore, ktory liczy za kazdy odczyt dokumentu, to jest czysta strata.
+ * Dopisanie kosztuje zero odczytow i daje ten sam efekt.
+ *
+ * Znacznik czasu cache'u zostaje NIETKNIETY: dopisanie posta nie jest powodem,
+ * zeby przedluzyc waznosc reszty listy.
+ */
+const prependPostToCache = (post: ExtendedPost) => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('posts_') && !key.endsWith('_timestamp'))
+      .forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+
+        try {
+          const cached = JSON.parse(raw);
+          if (!Array.isArray(cached)) return;
+
+          // Idempotencja: ta sama funkcja bywa wolana po optymistycznym
+          // dopisaniu i ponownie po potwierdzeniu z Firestore.
+          if (cached.some((entry: ExtendedPost) => entry?.id === post.id)) return;
+
+          localStorage.setItem(key, JSON.stringify([post, ...cached]));
+        } catch {
+          // Uszkodzony wpis kasujemy - lepiej pobrac na nowo niz czytac smiec.
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
+  } catch (error) {
+    console.error('Error prepending post to cache:', error);
+  }
+};
+
+/**
+ * Podmienia tymczasowe ID posta na prawdziwe, gdy Firestore je odda.
+ *
+ * Bez tego w cache zostawalby wpis z ID "temp-...", ktory po odswiezeniu
+ * strony wygladalby jak istniejacy post, ale kazde klikniecie w niego
+ * prowadzilo by do nieistniejacej trasy /post/temp-...
+ */
+const replacePostIdInCache = (tempId: string, realId: string) => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('posts_') && !key.endsWith('_timestamp'))
+      .forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+
+        try {
+          const cached = JSON.parse(raw);
+          if (!Array.isArray(cached)) return;
+          if (!cached.some((entry: ExtendedPost) => entry?.id === tempId)) return;
+
+          localStorage.setItem(
+            key,
+            JSON.stringify(
+              cached.map((entry: ExtendedPost) =>
+                entry?.id === tempId ? { ...entry, id: realId } : entry
+              )
+            )
+          );
+        } catch {
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
+  } catch (error) {
+    console.error('Error replacing post id in cache:', error);
   }
 };
 
@@ -355,7 +387,8 @@ function BaseChatContent() {
     duration: string;
     expectedAt: number;
   }}>({});
-  const [newComments, setNewComments] = useState<{[key: string]: string}>({});
+  // `newComments` (tresci pol komentarzy) zniknelo razem z handleAddComment -
+  // pola komentarzy renderuje i trzyma PostList.
   const [userProfile, setUserProfile] = useState<LocalUserProfile>({
     name: '',
     postCount: 0,
@@ -371,8 +404,8 @@ function BaseChatContent() {
     nftPoints: 0,
     contractPoints: 0
   });
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const postFileInputRef = useRef<HTMLInputElement>(null);
+  // fileInputRef / postFileInputRef byly tworzone, ale nie podpiete do zadnego
+  // <input> - wybor pliku idzie przez document.getElementById('fileInput').
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
@@ -393,15 +426,10 @@ function BaseChatContent() {
   const [customName, setCustomName] = useState('');
   const [selectedSuffix, setSelectedSuffix] = useState<'sphere' | 'camper' | 'celo' | 'world'>('sphere');
   const [userNames, setUserNames] = useState<{[key: string]: {name: string, avatar?: string}}>({});
-  const [editingPost, setEditingPost] = useState<string | null>(null);
-  const [editedContent, setEditedContent] = useState('');
-  const [editingComment, setEditingComment] = useState<{postId: string, commentId: string} | null>(null);
-  const [editedCommentContent, setEditedCommentContent] = useState('');
-  const [replyingTo, setReplyingTo] = useState<{postId: string, commentId: string} | null>(null);
-  const [replyContent, setReplyContent] = useState('');
-  const [expandedComments, setExpandedComments] = useState<{[key: string]: boolean}>({});
-  const [showOnlyUserPosts, setShowOnlyUserPosts] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  // Stany edycji posta i komentarza, tresci odpowiedzi, rozwinietych komentarzy,
+  // `showOnlyUserPosts` oraz `searchTerm` obslugiwaly wylacznie skasowane wyzej
+  // handlery. Zaden z nich nie byl czytany w renderze tej strony - komentarze,
+  // edycja i wyszukiwanie maja wlasne stany w PostList.
   const [selectedTag, setSelectedTag] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [selectedAuthor, setSelectedAuthor] = useState('');
@@ -419,7 +447,7 @@ function BaseChatContent() {
   const [activeFeed, setActiveFeed] = useState<'forYou' | 'following' | 'baseName'>('forYou'); // Dodajemy 'baseName'
   
   // Hook do sprawdzania BaseName
-  const { data: baseName, isLoading: isBaseNameLoading } = useName(
+  const { data: baseName } = useName(
     { address: (address || '0x0000000000000000000000000000000000000000') as `0x${string}`, chain: base },
     { enabled: Boolean(address) }
   );
@@ -427,14 +455,15 @@ function BaseChatContent() {
   // Funkcja sprawdzająca czy użytkownik może tworzyć posty - dostępne dla wszystkich
   const canCreatePosts = true; // Zmieniono z Boolean(baseName) na true, aby wszyscy mogli tworzyć posty
 
-  // Sprawdzenie czy użytkownik ma BaseName (do wyróżnienia w UI)
-  const userHasBaseName = Boolean(baseName);
-
   // Dodaj nowy stan dla tooltipa
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
 
-  // Social features hook (Hook funkcji społecznościowych)
-  const socialFeatures = useSocial(address || null);
+  // useSocial() bylo tu wolane, ale wynik nie byl czytany ani razu. Hook przy
+  // kazdym wejsciu na strone robil siedem zapytan do Firestore (followers 50,
+  // following 50, friends 50, notifications 20 + trzy statystyki) i zakladal
+  // subskrypcje czasu rzeczywistego. Widoki, ktore tych danych faktycznie
+  // uzywaja - FollowingView, FriendsView, DiscoverView, NotificationsView,
+  // BuilderProfile - wolaja useSocial samodzielnie i sa ladowane leniwie.
 
   // URL params for navigation (Parametry URL do nawigacji)
   const searchParams = useSearchParams();
@@ -442,7 +471,10 @@ function BaseChatContent() {
   const urlView = searchParams.get('view');
   const welcomeParam = searchParams.get('welcome');
   const [userStats, setUserStats] = useState<{[key: string]: Stats & { totalPoints: number }}>({});
-  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+  // `hoveredElement` bylo ustawiane przy kazdym najechaniu na nazwe uzytkownika w
+  // feedzie, ale nikt tej wartosci nie czytal - podpowiedz "Click to view profile"
+  // robi CSS (group-hover). Efektem byl pelny re-render tej ~4000-liniowej strony
+  // na kazde wejscie i zejscie kursora z dowolnego nicku. Stan usuniety.
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
 
   const chainId = useChainId();
@@ -510,14 +542,21 @@ function BaseChatContent() {
               <Avatar address={toEthereumAddress(userAddress)} className="w-10 h-10 rounded-full mr-2" />
             )
           )}
-          <div 
+          {/* Klikalny div, a nie <button>, bo w srodku siedzi pozycjonowana
+              podpowiedz - <div> w <button> to niepoprawne zagniezdzenie. Stad
+              rola, focus z klawiatury i obsluga Enter/Spacji, zeby profil dalo
+              sie otworzyc bez myszy. */}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={`View profile of ${userName}`}
             className="cursor-pointer group relative"
             onClick={() => handleViewBuilderProfile(userAddress)}
-            onMouseEnter={() => {
-              setHoveredElement(elementId);
-            }}
-            onMouseLeave={() => {
-              setHoveredElement(null);
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleViewBuilderProfile(userAddress);
+              }
             }}
           >
             <span className={`${hasBaseName ? 'username-gradient' : 'text-gray-900 dark:text-white'} text-base`}>
@@ -656,41 +695,58 @@ function BaseChatContent() {
 
   // Zmodyfikuj useEffect, który pobiera posty, aby obsługiwał stan ładowania
   useEffect(() => {
-    if (isConnected && address) {
-      const loadPosts = async () => {
-        try {
-          setIsLoadingPosts(true);
-          
-          const cacheKey = `${activeFeed}_${address}`;
-          
-          const cachedPosts = getCachedPosts(cacheKey);
-          if (cachedPosts) {
+    if (!isConnected || !address) return;
+
+    // Straznik wyscigu: przelaczenie zakladki feedu albo zmiana portfela w trakcie
+    // pobierania konczyla sie tym, ze wolniejsza, JUZ NIEAKTUALNA odpowiedz
+    // wpisywala sie do stanu po tej wlasciwej - feed pokazywal posty z poprzednio
+    // wybranej zakladki.
+    let cancelled = false;
+
+    const loadPosts = async () => {
+      try {
+        setIsLoadingPosts(true);
+
+        const cacheKey = `${activeFeed}_${address}`;
+
+        const cachedPosts = getCachedPosts(cacheKey);
+        if (cachedPosts) {
+          if (!cancelled) {
             setPosts(cachedPosts);
             setIsLoadingPosts(false);
-            return;
           }
+          return;
+        }
 
-          let fetchedResult;
-          if (activeFeed === 'baseName') {
-            fetchedResult = await fetchBaseNameFeedPosts({});
-          } else {
-            fetchedResult = await fetchPosts({ 
-              userId: address,
-              ...(activeFeed === 'following' ? { authorFilter: address } : {})
-            });
-          }
-          
-          setCachedPosts(cacheKey, fetchedResult.posts);
-          setPosts(fetchedResult.posts);
-          
-        } catch (error) {
-          console.error('Error fetching posts:', error);
-        } finally {
+        let fetchedResult;
+        if (activeFeed === 'baseName') {
+          fetchedResult = await fetchBaseNameFeedPosts({});
+        } else {
+          fetchedResult = await fetchPosts({
+            userId: address,
+            ...(activeFeed === 'following' ? { authorFilter: address } : {})
+          });
+        }
+
+        if (cancelled) return;
+
+        setCachedPosts(cacheKey, fetchedResult.posts);
+        setPosts(fetchedResult.posts);
+
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+      } finally {
+        if (!cancelled) {
           setIsLoadingPosts(false);
         }
-      };
-      loadPosts();
-    }
+      }
+    };
+
+    loadPosts();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isConnected, address, activeFeed]);
 
   // Handle URL params for navigation (Obsługa parametrów URL do nawigacji)
@@ -760,10 +816,97 @@ function BaseChatContent() {
     }
   }, [address, activeFeed]); // Dodano showMyFeed do dependencies
 
-  // Dodaj stan dla przechowywania hash transakcji i flagi blokującej wielokrotne tworzenie postów
-  const [storedTxHash, setStoredTxHash] = useState<string | null>(null);
+  // Flaga blokujaca wielokrotne tworzenie postow
   const [isCreatingPost, setIsCreatingPost] = useState(false);
-  
+
+  // ---------------------------------------------------------------------------
+  // Wspolne czesci sciezki tworzenia posta.
+  //
+  // Ponizsze cztery pomocnicze funkcje byly wczesniej wklejone osobno w kazdym
+  // z trzech handlerow tworzacych post (onchain, Zora, awaryjny zwykly post),
+  // a czesc premium az szesc razy. Roznice miedzy kopiami byly przypadkowe -
+  // np. sciezka awaryjna gubila zdjecie. Jedno zrodlo prawdy sprawia, ze
+  // dolozenie kolejnego wariantu nie oznacza kolejnej kopii.
+  // ---------------------------------------------------------------------------
+
+  // Pola platnej czesci ZAPISYWANE do Firestore. Puste, gdy autor nic nie wpisal,
+  // wiec post wyglada dokladnie tak jak przed monetyzacja.
+  const buildPremiumWriteFields = () => {
+    if (!isPremiumOpen || !premium.premiumContent.trim()) return {};
+    return {
+      premiumContent: premium.premiumContent.trim(),
+      unlockPrice: premium.unlockPrice,
+      unlockToken: premium.unlockToken,
+    };
+  };
+
+  // Pola platnej czesci pokazywane OPTYMISTYCZNIE: znacznik i cena, bez tresci.
+  // Sama tresc nie trafia do stanu klienta ani do dokumentu posta - zapisuje ja
+  // /api/premium.
+  const buildPremiumPreviewFields = () => {
+    if (!isPremiumOpen || !premium.premiumContent.trim()) return {};
+    return {
+      hasPremium: true,
+      unlockPrice: premium.unlockPrice,
+      unlockToken: premium.unlockToken,
+    };
+  };
+
+  // Hashtagi i wzmianki z tresci posta.
+  const extractTagsAndMentions = (content: string) => ({
+    tags: Array.from(new Set((content.match(/#(\w+)/g) || []).map(tag => tag.slice(1)))),
+    mentions: Array.from(new Set((content.match(/@(\w+)/g) || []).map(mention => mention.slice(1)))),
+  });
+
+  // Wyslanie zalacznika na /api/upload. Zwraca URL pod wlasciwym kluczem oraz typ
+  // MIME (potrzebny metadanym Zory). Brak zalacznika = same nulle, bez zapytania.
+  const uploadPostMedia = async (): Promise<{
+    imageUrl: string | null;
+    videoUrl: string | null;
+    mediaMimeType: string | undefined;
+  }> => {
+    const mediaContent = postPreviewImage || postPreviewVideo;
+    if (!mediaContent) return { imageUrl: null, videoUrl: null, mediaMimeType: undefined };
+
+    setUploadProgress(0);
+    const base64Response = await fetch(mediaContent);
+    const blob = await base64Response.blob();
+
+    const isVideo = postPreviewVideo !== null;
+    const fileExtension = blob.type.split('/')[1] || (isVideo ? 'mp4' : 'jpg');
+    const fileName = `post-media-${Date.now()}.${fileExtension}`;
+
+    const formData = new FormData();
+    formData.append('file', blob, fileName);
+
+    const response = await fetch('/api/upload', { method: 'POST', body: formData });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
+    }
+
+    const data = await response.json();
+    setUploadProgress(100);
+
+    return {
+      imageUrl: isVideo ? null : data.url,
+      videoUrl: isVideo ? data.url : null,
+      mediaMimeType: blob.type,
+    };
+  };
+
+  // Czyszczenie formularza po udanej publikacji.
+  const resetComposer = () => {
+    setNewPost('');
+    setPremium(EMPTY_PREMIUM);
+    setIsPremiumOpen(false);
+    setPostPreviewImage(null);
+    setPostPreviewVideo(null);
+    setUploadProgress(0);
+    setSelectedMusic(null);
+  };
+
+
   // Obsługa sukcesu transakcji
   const handleTransactionSuccess = (txHash: string) => {
     // Jeśli już trwa tworzenie posta, nie wywołuj ponownie
@@ -794,49 +937,11 @@ function BaseChatContent() {
     const toastId = toast.loading("Creating post...");
 
     try {
-      // Sprawdzenie czy użytkownik jest adminem
-      const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
-
-
-
-      let imageUrl: string | null = null;
-      let videoUrl: string | null = null;
-
       // 1. Handle media upload (image or video) - jeśli istnieje
-      if (postPreviewImage || postPreviewVideo) {
-        setUploadProgress(0);
-        const mediaContent = postPreviewImage || postPreviewVideo;
-        if (!mediaContent) throw new Error('No media content');
-
-        const base64Response = await fetch(mediaContent);
-        const blob = await base64Response.blob();
-
-        const isVideo = postPreviewVideo !== null;
-        const fileExtension = isVideo ? (blob.type.split('/')[1] || 'mp4') : (blob.type.split('/')[1] || 'jpg');
-        const fileName = `post-media-${Date.now()}.${fileExtension}`;
-
-        const formData = new FormData();
-        formData.append('file', blob, fileName);
-
-        const response = await fetch('/api/upload', { method: 'POST', body: formData });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (isVideo) {
-          videoUrl = data.url;
-        } else {
-          imageUrl = data.url;
-        }
-        setUploadProgress(100);
-      }
+      const { imageUrl, videoUrl } = await uploadPostMedia();
 
       // Extract hashtags and mentions
-      const tags = Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1))));
-      const mentions = Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))));
+      const { tags, mentions } = extractTagsAndMentions(newPost);
 
       // 2. ✅ OPTIMISTIC UPDATE: Dodaj post na górę NATYCHMIAST (zamiast 15 Firebase reads)
       const tempPostId = 'temp-' + Date.now();
@@ -844,15 +949,7 @@ function BaseChatContent() {
         id: tempPostId,
         author: address,
         content: newPost,
-        // Optymistyczny podglad platnej czesci: znacznik i cena, bez tresci.
-        // Sama tresc NIE trafia tu ani do Firestore - zapisuje ja /api/premium.
-        ...(isPremiumOpen && premium.premiumContent.trim()
-          ? {
-              hasPremium: true,
-              unlockPrice: premium.unlockPrice,
-              unlockToken: premium.unlockToken,
-            }
-          : {}),
+        ...buildPremiumPreviewFields(),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -869,20 +966,16 @@ function BaseChatContent() {
 
       // Dodaj post na górę listy NATYCHMIAST
       setPosts(currentPosts => [newPostObject, ...currentPosts]);
+      // ...oraz do ZAPISANYCH list. Bez tego post istnial tylko w stanie
+      // Reacta i znikal po przejsciu na inna zakladke i powrocie, bo widok
+      // odtwarzal sie z cache'u sprzed publikacji.
+      prependPostToCache(newPostObject as ExtendedPost);
 
       // 3. Save to Firebase w tle (bez czekania na UI)
       createPost({
         author: address,
         content: newPost,
-        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
-        // wyglada dokladnie tak jak przed monetyzacja.
-        ...(isPremiumOpen && premium.premiumContent.trim()
-          ? {
-              premiumContent: premium.premiumContent.trim(),
-              unlockPrice: premium.unlockPrice,
-              unlockToken: premium.unlockToken,
-            }
-          : {}),
+        ...buildPremiumWriteFields(),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -894,39 +987,47 @@ function BaseChatContent() {
         musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór
       }).then((realPostId) => {
         // Zaktualizuj tempPost z prawdziwym ID z Firebase
-        setPosts(currentPosts => 
-          currentPosts.map(post => 
+        setPosts(currentPosts =>
+          currentPosts.map(post =>
             post.id === tempPostId ? { ...post, id: realPostId } : post
           )
         );
+        // To samo w cache - inaczej po odswiezeniu strony zostawalby wpis
+        // z ID "temp-...", ktory wyglada jak post, ale prowadzi donikad.
+        replacePostIdInCache(tempPostId, realPostId);
       }).catch((error) => {
         console.error('Error saving post to Firebase:', error);
-        // W przypadku błędu, usuń optimistic post
+        // W przypadku błędu, usuń optimistic post - RAZEM z cache'em, inaczej
+        // nieudany post przezylby odswiezenie strony.
         setPosts(currentPosts => currentPosts.filter(post => post.id !== tempPostId));
+        clearPostsCache();
         toast.error('Failed to save post');
       });
 
       // 4. Update UI
       toast.success('Post created successfully!', { id: toastId });
-      setNewPost('');
-      setPremium(EMPTY_PREMIUM);
-      setIsPremiumOpen(false);
-      setPostPreviewImage(null);
-      setPostPreviewVideo(null);
-      setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę
-      
+      resetComposer();
+
       // ✅ OPTYMALIZACJA: Usunięto refreshPosts() - oszczędność 15 Firebase reads po każdym poście!
-      
-      // 5. Increment daily count
-      await updateDoc(doc(db, 'users', address), {
-        [`dailyPosts.${today}`]: increment(1)
-      });
-      
-      // 6. Update user stats
-      await updateDoc(doc(db, 'users', address), {
-        postCount: increment(1)
-      });
-      
+
+      // 5-8. Liczniki i punkty. Post jest juz zapisany, wiec bledy tych zapisow
+      // NIE moga cofnac komunikatu sukcesu - wczesniej wyjatek z licznika
+      // dziennego albo postCount leczial do glownego catch i pokazywal
+      // "Failed to create post" nad postem, ktory wlasnie sie udal.
+      try {
+        // 5. Increment daily count
+        await updateDoc(doc(db, 'users', address), {
+          [`dailyPosts.${today}`]: increment(1)
+        });
+
+        // 6. Update user stats
+        await updateDoc(doc(db, 'users', address), {
+          postCount: increment(1)
+        });
+      } catch (error) {
+        console.log("Error updating user counters, but post was created:", error);
+      }
+
       // 7. Update global stats
       try {
         await setDoc(doc(db, 'stats', 'global'), {
@@ -936,7 +1037,7 @@ function BaseChatContent() {
         console.log("Error updating global stats, but post was created:", error);
         // Nie przerywamy procesu tworzenia posta, tylko logujemy błąd
       }
-      
+
       // 8. Calculate and update BaseChatPoints
       try {
         await calculateAndSaveBaseChatPoints();
@@ -980,63 +1081,26 @@ function BaseChatContent() {
     setIsCreatingPost(true);
     const toastId = toast.loading("Creating post token..."); // Store toast ID
     
-    // Declare variables outside try block so they're accessible in catch
+    // Zadeklarowane PRZED `try`, zeby sciezka awaryjna w `catch` (zwykly post
+    // zamiast tokena) widziala juz wgrane media. Wczesniej byly tu deklarowane
+    // po raz drugi wewnatrz `try` - przeslanialy te zmienne, wiec post awaryjny
+    // zawsze gubil zdjecie albo wideo.
     let imageUrl: string | null = null;
     let videoUrl: string | null = null;
     let mediaMimeType: string | undefined = undefined;
 
     try {
-      // Sprawdzenie czy użytkownik jest adminem
-      const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
-
-      // Sprawdzenie limitu postów dziennie (tylko dla zwykłych użytkowników)
-
-      // Optimistically update count, handle potential failure later if needed
-      // setDailyPostCount(prev => prev + 1); // Moved after successful creation
-
       console.log('🚀 Starting Zora coin creation for post...');
 
-      // Declare variables for media URLs
-      let imageUrl: string | null = null;
-      let videoUrl: string | null = null;
-      let mediaMimeType: string | undefined = undefined;
-
       // 1. Handle media upload (image or video)
-      if (postPreviewImage || postPreviewVideo) {
-        setUploadProgress(0); // Start progress indication
-        const mediaContent = postPreviewImage || postPreviewVideo;
-        if (!mediaContent) throw new Error('No media content');
-
-        const base64Response = await fetch(mediaContent);
-        const blob = await base64Response.blob();
-        mediaMimeType = blob.type; // Store mime type
-
-        const isVideo = postPreviewVideo !== null;
-        const fileExtension = isVideo ? (blob.type.split('/')[1] || 'mp4') : (blob.type.split('/')[1] || 'jpg');
-        const fileName = `post-media-${Date.now()}.${fileExtension}`;
-
-        const formData = new FormData();
-        formData.append('file', blob, fileName);
-
-        const response = await fetch('/api/upload', { method: 'POST', body: formData });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (isVideo) {
-          videoUrl = data.url;
-        } else {
-          imageUrl = data.url;
-        }
-        setUploadProgress(100); // Finish progress indication
-        console.log("Media uploaded:", isVideo ? videoUrl : imageUrl);
+      ({ imageUrl, videoUrl, mediaMimeType } = await uploadPostMedia());
+      if (imageUrl || videoUrl) {
+        console.log("Media uploaded:", videoUrl || imageUrl);
       }
 
       // 2. Generate Metadata
       const postContentExcerpt = newPost.length > 100 ? newPost.substring(0, 97) + "..." : newPost;
+      const { tags: contentTags, mentions: contentMentions } = extractTagsAndMentions(newPost);
       const metadata = {
         name: `Post by ${userProfile.name || address.slice(0,6)}: ${postContentExcerpt}`, // Example name
         description: newPost,
@@ -1052,8 +1116,8 @@ function BaseChatContent() {
           category: "social", // Example property
           author: address,
           createdAt: new Date().toISOString(),
-          tags: Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1)))),
-          mentions: Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))))
+          tags: contentTags,
+          mentions: contentMentions
         }
       };
 
@@ -1120,6 +1184,20 @@ function BaseChatContent() {
       if (!walletClient) {
           throw new Error("Wallet client is not available.");
       }
+      // ⚠️ TO WYWOLANIE JEST NIEZGODNE Z ZAINSTALOWANYM SDK I MUSI SIE WYWROCIC.
+      // @zoralabs/coins-sdk 0.8.0 ma dwa kroki i przyjmuje JEDEN obiekt:
+      //   const { calls } = await createCoinCall({ creator, name, symbol,
+      //       metadata: { type: 'RAW_URI', uri }, currency, chainId, ... });
+      //   await createCoin({ call, walletClient, publicClient });
+      // Tu leci stary podpis 0.x (trzy argumenty pozycyjne, pole `uri`, `owners`,
+      // `payoutRecipient`), wiec przycisk "PostCoin" nie moze dzialac - blad
+      // wpada w catch i konczy sie zwyklym postem albo czerwonym toastem.
+      // Rozjazd wszedl razem z podbiciem zaleznosci (commit ad646df) i byl
+      // niewidoczny, bo caly plik mial `@ts-nocheck`.
+      // NIE poprawiam tego tutaj: nowe API wymaga wyboru `currency`
+      // (ETH / ZORA / CREATOR_COIN) i `startingMarketCap`, czyli decyzji
+      // produktowej, a sciezki nie da sie sprawdzic bez portfela na Base.
+      // @ts-expect-error - patrz komentarz wyzej: podpis createCoin z SDK 0.8.0
       const result = await createCoin(coinParams, walletClient, publicClient);
 
       console.log("Zora coin creation transaction sent:", result.hash);
@@ -1144,19 +1222,13 @@ function BaseChatContent() {
 
       // 7. Save to Firebase (including the new zoraCoinAddress)
       console.log("Saving post data to Firebase...");
-      const visibilityValue = 'public'; // Use simple string type
+      // `as const`, inaczej typ rozszerza sie do `string`, a createPost przyjmuje
+      // tylko 'public' | 'followers' | 'private'.
+      const visibilityValue = 'public' as const;
       const postDataForFirebase = {
         author: address,
         content: newPost,
-        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
-        // wyglada dokladnie tak jak przed monetyzacja.
-        ...(isPremiumOpen && premium.premiumContent.trim()
-          ? {
-              premiumContent: premium.premiumContent.trim(),
-              unlockPrice: premium.unlockPrice,
-              unlockToken: premium.unlockToken,
-            }
-          : {}),
+        ...buildPremiumWriteFields(),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -1164,7 +1236,8 @@ function BaseChatContent() {
         mentions: mentions,
         visibility: visibilityValue, // Use simple string
         zoraCoinAddress: zoraCoinAddress, // <-- Save the Zora Coin address
-        txHash: result.hash // <-- Save the Zora creation tx hash
+        txHash: result.hash, // <-- Save the Zora creation tx hash
+        musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór
       };
 
       // Optimistic UI update (Add temporary post)
@@ -1172,15 +1245,7 @@ function BaseChatContent() {
         id: `temp-${Date.now()}`,
         author: address,
         content: newPost,
-        // Optymistyczny podglad platnej czesci: znacznik i cena, bez tresci.
-        // Sama tresc NIE trafia tu ani do Firestore - zapisuje ja /api/premium.
-        ...(isPremiumOpen && premium.premiumContent.trim()
-          ? {
-              hasPremium: true,
-              unlockPrice: premium.unlockPrice,
-              unlockToken: premium.unlockToken,
-            }
-          : {}),
+        ...buildPremiumPreviewFields(),
         timestamp: Date.now(),
         image: imageUrl ?? undefined, // Ensure undefined if null
         video: videoUrl ?? undefined, // Ensure undefined if null
@@ -1195,49 +1260,23 @@ function BaseChatContent() {
       };
       setPosts(currentPosts => [tempPost, ...currentPosts]);
 
-      // Actual Firebase save
-      // Assuming createPost in firebase.ts can handle the new zoraCoinAddress field
-      await createPost({
-          author: address,
-          content: newPost,
-        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
-        // wyglada dokladnie tak jak przed monetyzacja.
-        ...(isPremiumOpen && premium.premiumContent.trim()
-          ? {
-              premiumContent: premium.premiumContent.trim(),
-              unlockPrice: premium.unlockPrice,
-              unlockToken: premium.unlockToken,
-            }
-          : {}),
-          timestamp: Date.now(),
-          image: imageUrl,
-          video: videoUrl,
-          tags: tags,
-          mentions: mentions,
-          visibility: visibilityValue,
-          zoraCoinAddress: zoraCoinAddress,
-          txHash: result.hash,
-          musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór
-      });
+      // Actual Firebase save - dokladnie ten sam obiekt, ktory zostal zlozony wyzej.
+      // Wczesniej byl skladany drugi raz recznie i obie kopie zdazyly sie rozjechac.
+      const zoraPostId = await createPost(postDataForFirebase);
       console.log("Post saved to Firebase.");
 
-      // Successfully created, now increment daily count
-
-      // 🗑️ Wyczyść cache bo mamy nowy post
-      clearPostsCache();
+      // Dopisujemy post do zapisanych list zamiast kasowac caly cache.
+      // Kasowanie dzialalo, ale kazalo potem pobrac WSZYSTKIE listy od nowa -
+      // czyli placilismy pelnym przeladowaniem feedu za jeden post, ktorego
+      // tresc i tak mamy w pamieci. Firestore liczy za kazdy odczyt dokumentu.
+      prependPostToCache({ ...tempPost, id: zoraPostId } as ExtendedPost);
 
       // Refresh posts list from Firebase to get the real ID
       const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
 
       // Reset form
-      setNewPost('');
-      setPremium(EMPTY_PREMIUM);
-      setIsPremiumOpen(false);
-      setPostPreviewImage(null);
-      setPostPreviewVideo(null);
-      setUploadProgress(0);
-      setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę
+      resetComposer();
 
       // Show success message
       toast.dismiss(toastId);
@@ -1249,28 +1288,34 @@ function BaseChatContent() {
       console.error('Error creating Zora coin post:', error);
       toast.dismiss(toastId); // Ensure loading toast is dismissed on error
       
-      // Determine the specific error type and show appropriate message
+      // Determine the specific error type and show appropriate message.
+      // `rawMessage` zamiast `error.message`: rzucone moze byc cokolwiek (string,
+      // obiekt bez `message`), a wtedy samo `error.message.includes(...)` rzucalo
+      // TypeError wewnatrz catch - sciezka awaryjna nie startowala, toast
+      // "trwa tworzenie" zostawal na ekranie na zawsze, a `finally` nie zdazyl
+      // odblokowac przycisku w czytelny sposob.
+      const rawMessage = typeof error?.message === 'string' ? error.message : String(error ?? '');
       let errorMessage = 'Unknown error occurred while creating post';
       let shouldFallback = false;
-      
-      if (error.message.includes('execution reverted') || error.message.includes('ContractFunctionExecutionError')) {
+
+      if (rawMessage.includes('execution reverted') || rawMessage.includes('ContractFunctionExecutionError')) {
         errorMessage = 'Token creation failed due to contract error. Creating as regular post instead.';
         shouldFallback = true;
-      } else if (error.message.includes('Missing or invalid parameters')) {
+      } else if (rawMessage.includes('Missing or invalid parameters')) {
         errorMessage = 'Invalid token parameters. Creating as regular post instead.';
         shouldFallback = true;
-      } else if (error.message.includes('insufficient funds')) {
+      } else if (rawMessage.includes('insufficient funds')) {
         errorMessage = 'Insufficient funds to create the token. Please ensure you have enough ETH for gas fees.';
-      } else if (error.message.includes('user rejected')) {
+      } else if (rawMessage.includes('user rejected')) {
         errorMessage = 'Transaction was rejected by user.';
-      } else if (error.message.includes('Failed to upload')) {
+      } else if (rawMessage.includes('Failed to upload')) {
         errorMessage = 'Failed to upload media or metadata. Please try again.';
-      } else if (error.message.includes('Token name cannot be empty') || 
-                 error.message.includes('Token symbol cannot be empty') ||
-                 error.message.includes('Invalid metadata URI')) {
-        errorMessage = error.message;
-      } else if (error.message) {
-        errorMessage = error.message.substring(0, 100);
+      } else if (rawMessage.includes('Token name cannot be empty') ||
+                 rawMessage.includes('Token symbol cannot be empty') ||
+                 rawMessage.includes('Invalid metadata URI')) {
+        errorMessage = rawMessage;
+      } else if (rawMessage) {
+        errorMessage = rawMessage.substring(0, 100);
       }
       
       // Try fallback to regular post if token creation failed
@@ -1279,23 +1324,14 @@ function BaseChatContent() {
           console.log('Attempting fallback to regular post...');
           toast.loading('Creating as regular post...', { id: toastId });
           
-          // Extract hashtags and mentions  
-          const tags = Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1))));
-          const mentions = Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))));
-          
+          // Extract hashtags and mentions
+          const { tags, mentions } = extractTagsAndMentions(newPost);
+
           // Create regular post without token
           await createPost({
             author: address,
             content: newPost,
-        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
-        // wyglada dokladnie tak jak przed monetyzacja.
-        ...(isPremiumOpen && premium.premiumContent.trim()
-          ? {
-              premiumContent: premium.premiumContent.trim(),
-              unlockPrice: premium.unlockPrice,
-              unlockToken: premium.unlockToken,
-            }
-          : {}),
+            ...buildPremiumWriteFields(),
             timestamp: Date.now(),
             image: imageUrl ?? undefined,
             video: videoUrl ?? undefined,
@@ -1305,21 +1341,22 @@ function BaseChatContent() {
             network: 'base', // Identify as a Base network post without token
             musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór do fallback post
           });
-          
+
           // Update UI
           toast.success('Post created successfully!', { id: toastId });
-          setNewPost('');
-      setPremium(EMPTY_PREMIUM);
-      setIsPremiumOpen(false);
-          setPostPreviewImage(null);
-          setPostPreviewVideo(null);
-          setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę w fallback
-          
+          resetComposer();
+
+          // Tutaj KASUJEMY cache, zamiast dopisywac - inaczej niz w sciezkach
+          // powyzej. Powod: ta galaz nie zbudowala obiektu posta (jest
+          // ratunkiem po nieudanym tworzeniu monety), wiec nie ma czego
+          // dopisac, a loadPosts czyta cache PRZED siegnieciem do Firestore
+          // i bez tego pokazalby liste sprzed posta. To sciezka awaryjna,
+          // wiec pelne przeladowanie jest tu akceptowalna cena.
+          clearPostsCache();
+
           // Refresh posts
           await refreshPosts();
-          
-          // Increment daily count
-          
+
         } catch (fallbackError) {
           console.error('Fallback post creation also failed:', fallbackError);
           toast.error('Failed to create post. Please try again.', { id: toastId });
@@ -1330,10 +1367,10 @@ function BaseChatContent() {
       
       // Log detailed error for debugging
       console.error('Detailed error:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        cause: error.cause
+        message: rawMessage,
+        stack: error?.stack,
+        name: error?.name,
+        cause: error?.cause
       });
     } finally {
       // Zawsze resetuj flagę blokującą, nawet w przypadku błędu
@@ -1341,130 +1378,8 @@ function BaseChatContent() {
     }
   };
 
-  const handleAddComment = async (postId: string, txHash?: string) => {
-    if (!isConnected || !address || !newComments[postId]?.trim()) return;
-
-    try {
-      // Wykryj wzmianki w treści
-      const mentionRegex = /@(\w+)/g;
-      const mentions = Array.from(
-        new Set((newComments[postId].match(mentionRegex) || []).map(m => m.slice(1)))
-      );
-
-      // Określ network na podstawie chainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | undefined = undefined;
-      if (chainId === base.id || chainId === baseSepolia.id) {
-        network = 'base';
-      } else if (chainId === BASECAMP_CHAIN_ID) {
-        network = 'basecamp';
-      } else if (chainId === LINEA_CHAIN_ID) {
-        network = 'linea';
-      } else if (chainId === CELO_CHAIN_ID) {
-        network = 'celo';
-      } else if (chainId === ETHEREUM_CHAIN_ID) {
-        network = 'ethereum';
-      } else if (chainId === WORLD_CHAIN_ID) {
-        network = 'worldchain';
-      } else if (chainId === ROBINHOOD_CHAIN_ID) {
-        network = 'robinhood';
-      }
-
-      const comment = {
-        postId,
-        author: address,
-        content: newComments[postId],
-        timestamp: Date.now(),
-        likes: 0,
-        likedBy: [],
-        mentions: mentions,
-        txHash: txHash || null, // Dodajemy hash transakcji, jeśli istnieje
-        network: network // Dodajemy network komentarza
-      };
-
-      await addComment(postId, comment);
-      
-      // Clear comment input
-      setNewComments(prev => ({...prev, [postId]: ''}));
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update w PostList już pokazuje komentarz
-      // Oszczędność: 50 Firebase reads po każdym komentarzu
-      
-      toast.success('Comment added successfully!');
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      toast.error('Failed to add comment');
-    }
-  };
-
-  // Funkcja do obsługi polubienia
-  const handleToggleLike = async (postId: string) => {
-    if (!isConnected || !address) return;
-    
-    try {
-      // Optymistyczna aktualizacja UI - natychmiastowa reakcja
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          const isLiked = post.likedBy?.includes(address);
-          return {
-            ...post,
-            likes: (post.likes || 0) + (isLiked ? -1 : 1),
-            likedBy: isLiked 
-              ? (post.likedBy || []).filter(id => id !== address)
-              : [...(post.likedBy || []), address]
-          };
-        }
-        return post;
-      });
-      
-      // Aktualizuj stan natychmiast, aby użytkownik widział efekt od razu
-      setPosts(updatedPosts);
-      
-      // Wykonaj rzeczywistą operację w tle
-      await toggleLike(postId, address);
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował UI
-      // Oszczędność: 50 Firebase reads po każdym like
-      await fetchUserStats(address);
-    } catch (error) {
-      console.error('Error toggling like:', error);
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        // 🗑️ Wyczyść cache bo może być niespójny po błędzie
-        clearPostsCache();
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after like error');
-      }
-    }
-  };
-
-  const formatTimestamp = (timestamp: number) => {
-    const diff = Date.now() - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return 'just now';
-  };
-
-  const handleSendCrypto = async (toAddress: string, amount: string = "0.01") => {
-    if (!isConnected) return;
-    
-    try {
-      const { sendTransaction } = useSendTransaction();
-      
-      await sendTransaction({
-        to: toAddress as `0x${string}`,
-        value: parseEther(amount)
-      });
-    } catch (error) {
-      console.error('Error sending crypto:', error);
-    }
-  };
+  // Usuniete jako martwe: handleAddComment, handleToggleLike i formatTimestamp.
+  // Komentarze, polubienia i format czasu obsluguje PostList wlasnymi funkcjami.
 
   // Funkcja do pobierania trendujących hashtagów z postów
   const getTrendingTags = (posts: Post[]) => {
@@ -1524,38 +1439,16 @@ function BaseChatContent() {
     setTrendingTags(trending);
   }, [posts]);
 
-  // useEffect do ustawienia isMounted i wczytania cache'u
+  // useEffect do ustawienia isMounted i wczytania cache'u.
+  // Sprzatanie nie ustawia juz isMounted na false - to zapis do stanu
+  // odmontowanego komponentu, ktory nic nie dawal, bo komponent i tak znikal.
   useEffect(() => {
     setIsMounted(true);
     loadInitialData(); // Załaduj cache od razu
-    return () => {
-      setIsMounted(false);
-      // Cleanup search timeout
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
   }, [loadInitialData]);
 
-  // Dodaj funkcję do tworzenia grupy
-  const handleCreateGroup = async () => {
-    if (!address) return;
-    const groupName = prompt('Enter group name:');
-    if (!groupName) return;
+  // Usuniete jako martwe: handleCreateGroup - grupy nie maja zadnego UI.
 
-    try {
-      const groupRef = collection(db, 'groups');
-      await addDoc(groupRef, {
-        name: groupName,
-        creator: address,
-        members: [address],
-        createdAt: serverTimestamp()
-      });
-      alert('Group created successfully!');
-    } catch (error) {
-      console.error('Error creating group:', error);
-    }
-  };
 
   // ⚠️ OPTIMIZED - 12h cache per user for global stats using same system as main page
   const fetchGlobalStats = async () => {
@@ -1624,35 +1517,7 @@ function BaseChatContent() {
     // No auto-refresh - cache lasts 12h per user
   }, [address]);
 
-  // Dodaj funkcję do obsługi usuwania posta
-  const handleDeletePost = async (postId: string) => {
-    if (!isConnected || !address) return;
-
-    try {
-      if (confirm('Are you sure you want to delete this post?')) {
-        // ✅ OPTIMISTIC UPDATE: Usuń post z UI natychmiast
-        const updatedPosts = posts.filter(post => post.id !== postId);
-        setPosts(updatedPosts);
-        
-        // Wykonaj rzeczywistą operację w tle
-        await deletePost(postId, address);
-        
-        // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już usunął post
-        // Oszczędność: 50 Firebase reads po każdym usunięciu posta
-      }
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        // 🗑️ Wyczyść cache bo może być niespójny po błędzie
-        clearPostsCache();
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after delete error');
-      }
-    }
-  };
+  // Usuniete jako martwe: handleDeletePost - kasowanie posta obsluguje PostList.
 
   // useEffect do pobierania profilu użytkownika
   const savedNameWrittenRef = useRef<string | null>(null);
@@ -1831,15 +1696,9 @@ function BaseChatContent() {
     }
   };
 
-  // Dodaj funkcję do pobierania danych z BaseScan
-  useEffect(() => {
-    // 🚨 USUNIĘTO: Funkcja fetchData - generowała ogromne koszty Firebase!
-    // Była wywoływana co 5 sekund dla każdego użytkownika i wykonywała:
-    // - getDoc(userRef) - 1 Firebase READ
-    // - updateDoc(userRef) - 1 Firebase WRITE
-    // = 144,000 Firebase operations/godzinę dla 100 użytkowników = $6,892/dzień!
-    // ✅ OSZCZĘDNOŚĆ: Brak niepotrzebnych Firebase reads/writes na stronie BaseChat
-  }, [address, isConnected, baseName]);
+  // Stal tu useEffect z PUSTYM cialem i zaleznoscia [address, isConnected, baseName]
+  // - pozostalosc po skasowanej funkcji fetchData (odpytywala Firebase co 5 sekund).
+  // Sam efekt nic juz nie robil, wiec zniknal razem z komentarzem-nagrobkiem.
 
   // 🚀 ULTRA-CHEAP Funkcja do pobierania nazw użytkowników (95% oszczędności!)
   const fetchUserNames = async (posts: Post[]) => {
@@ -1880,281 +1739,21 @@ function BaseChatContent() {
     }));
   }, []);
 
-  // Simplified post filtering - show all posts since we removed search and "My Posts"
-  const searchFilteredPosts = posts;
+  // Sortowanie, filtr postow przypietych i lazy loading zyly tu w drugiej kopii:
+  // `searchFilteredPosts` -> `nonPinnedPosts` -> `sortedPosts` -> `displayedPosts`
+  // plus `displayLimit` i IntersectionObserver na znaczniku 1px na koncu strony.
+  // Nic z tego nie trafialo do renderu - do PostList idzie surowe `posts`, a
+  // PostList ma wlasny, kompletny lazy loading (`displayLimit`, przycisk "load
+  // more", ten sam limit 150). Jedynym efektem tej kopii bylo dobijanie
+  // `displayLimit` o 15 przy kazdym przecieciu znacznika, czyli przerenderowanie
+  // calej strony bez zadnej zmiany na ekranie. Zostalo usuniete w calosci
+  // razem ze znacznikiem.
 
-  // Filtruj posty przypięte z głównego feeda (są już w sekcji PinnedPosts)
-  const nonPinnedPosts = useMemo(
-    () => searchFilteredPosts.filter(post => !post.isPinned),
-    [searchFilteredPosts]
-  );
-  
-  const sortedPosts = useMemo(() => {
-    return [...nonPinnedPosts].sort((a, b) => {
-      // Sortuj normalnie według timestamp (bez logiki dla postów przypiętych)
-      if (sortOrder === 'newest') {
-        return b.timestamp - a.timestamp;
-      } else {
-        return a.timestamp - b.timestamp;
-      }
-    });
-  }, [nonPinnedPosts, sortOrder]);
-
-  // ⚡ OPTYMALIZACJA: Lazy loading - start z 25, maksymalnie 250 postów
-  const [displayLimit, setDisplayLimit] = useState(15);
-  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
-  const MAX_DISPLAY_LIMIT = 150; // Maksymalnie 150 postów (zmniejszono dla oszczędności)
-
-  // Wczesniej stal tu warunek na `expandedPosts` - mapie {postId: bool}, ktora jest
-  // zawsze truthy, wiec slice nigdy nie dzialal. Stan byl przy tym martwy (nikt go
-  // nie ustawial ani nie czytal), wiec zostal usuniety razem z warunkiem.
-  const displayedPosts = useMemo(
-    () => sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT)),
-    [sortedPosts, displayLimit]
-  );
-
-  // Swieza dlugosc listy przez ref, zeby observer nie byl odtwarzany przy kazdej zmianie postow
-  const sortedPostsLengthRef = useRef(sortedPosts.length);
-  sortedPostsLengthRef.current = sortedPosts.length;
-
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && sortedPostsLengthRef.current > displayLimit && displayLimit < MAX_DISPLAY_LIMIT) {
-        setDisplayLimit(prev => Math.min(prev + 15, MAX_DISPLAY_LIMIT)); // ⚡ OPTYMALIZACJA: Ładuj po 15 postów (-40% Firebase reads)
-      }
-    }, { threshold: 1.0 });
-
-    const trigger = loadMoreTriggerRef.current;
-    if (trigger) {
-      observer.observe(trigger);
-    }
-    return () => {
-      if (trigger) {
-        observer.unobserve(trigger);
-      }
-    };
-  }, [displayLimit]);
-
-  // Funkcja do obsługi edycji posta
-  const handleEditPost = async (postId: string, newContent: string) => {
-    if (!address) return;
-    
-    try {
-      // ✅ OPTIMISTIC UPDATE: Zaktualizuj post w UI natychmiast
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-        content: newContent,
-            lastEdited: Date.now()
-          };
-        }
-        return post;
-      });
-      
-      setPosts(updatedPosts);
-      setEditingPost(null);
-      setEditedContent('');
-      
-      // Wykonaj rzeczywistą operację w tle
-      const postRef = doc(db, 'posts', postId);
-      await updateDoc(postRef, {
-        content: newContent,
-        lastEdited: serverTimestamp()
-      });
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował post
-      // Oszczędność: 50 Firebase reads po każdej edycji posta
-      
-    } catch (error) {
-      console.error('Error editing post:', error);
-      alert('Wystąpił błąd podczas edycji posta. Spróbuj ponownie.');
-      
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after edit error');
-      }
-    }
-  };
-
-  // Funkcja do obsługi edycji komentarza
-  const handleEditComment = async (postId: string, commentId: string, newContent: string) => {
-    if (!address) return;
-    
-    try {
-      // ✅ OPTIMISTIC UPDATE: Zaktualizuj komentarz w UI natychmiast
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          const updatedComments = post.comments?.map(comment => {
-            if (comment.id === commentId) {
-              return {
-                ...comment,
-                content: newContent,
-                lastEdited: Date.now()
-              };
-            }
-            return comment;
-          });
-          return { ...post, comments: updatedComments };
-        }
-        return post;
-      });
-      
-      setPosts(updatedPosts);
-      setEditingComment(null);
-      setEditedCommentContent('');
-      
-      // Wykonaj rzeczywistą operację w tle
-      await editComment(postId, commentId, newContent);
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował komentarz
-      // Oszczędność: 50 Firebase reads po każdej edycji komentarza
-      
-    } catch (error) {
-      console.error('Error editing comment:', error);
-      alert('An error occurred while editing the comment. Please try again.');
-      
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after comment edit error');
-      }
-    }
-  };
-
-  // Funkcja do obsługi usuwania komentarza
-  const handleDeleteComment = async (postId: string, commentId: string) => {
-    if (!isConnected || !address) return;
-    
-    try {
-      if (confirm('Are you sure you want to delete this comment?')) {
-        // ✅ OPTIMISTIC UPDATE: Usuń komentarz z UI natychmiast
-        const updatedPosts = posts.map(post => {
-          if (post.id === postId) {
-            const updatedComments = post.comments?.filter(comment => comment.id !== commentId);
-            return { ...post, comments: updatedComments };
-          }
-          return post;
-        });
-        
-        setPosts(updatedPosts);
-        
-        // Wykonaj rzeczywistą operację w tle
-        await deleteComment(postId, commentId, address);
-        
-        // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już usunął komentarz
-        // Oszczędność: 50 Firebase reads po każdym usunięciu komentarza
-      }
-    } catch (error) {
-      console.error('Error deleting comment:', error);
-      alert('An error occurred while deleting the comment. Please try again.');
-      
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after comment delete error');
-      }
-    }
-  };
-
-  // Dodaj funkcję do obsługi polubienia komentarza
-  const handleToggleCommentLike = async (postId: string, commentId: string) => {
-    if (!address) return;
-    
-    try {
-      // ✅ OPTIMISTIC UPDATE: Aktualizuj UI natychmiast
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          const updatedComments = post.comments?.map(comment => {
-            if (comment.id === commentId) {
-              const isLiked = comment.likedBy?.includes(address);
-              return {
-                ...comment,
-                likes: (comment.likes || 0) + (isLiked ? -1 : 1),
-                likedBy: isLiked
-                  ? (comment.likedBy || []).filter(id => id !== address)
-                  : [...(comment.likedBy || []), address]
-              };
-            }
-            return comment;
-          });
-          return { ...post, comments: updatedComments };
-        }
-        return post;
-      });
-      
-      // Zaktualizuj UI natychmiast
-      setPosts(updatedPosts);
-      
-      // Wykonaj rzeczywistą operację w tle
-      await toggleCommentLike(postId, commentId, address);
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował UI
-      // Oszczędność: 50 Firebase reads po każdym like komentarza
-      
-    } catch (error) {
-      console.error('Error toggling comment like:', error);
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after comment like error');
-      }
-    }
-  };
-
-  // Dodaj funkcję obsługi odpowiedzi
-  const handleAddReply = async (postId: string, commentId: string, txHash?: string) => {
-    if (!address || !replyContent.trim() || !canCreatePosts) return;
-    
-    try {
-      // Określ network na podstawie chainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | undefined = undefined;
-      if (chainId === base.id || chainId === baseSepolia.id) {
-        network = 'base';
-      } else if (chainId === BASECAMP_CHAIN_ID) {
-        network = 'basecamp';
-      } else if (chainId === LINEA_CHAIN_ID) {
-        network = 'linea';
-      } else if (chainId === CELO_CHAIN_ID) {
-        network = 'celo';
-      } else if (chainId === ETHEREUM_CHAIN_ID) {
-        network = 'ethereum';
-      } else if (chainId === WORLD_CHAIN_ID) {
-        network = 'worldchain';
-      } else if (chainId === ROBINHOOD_CHAIN_ID) {
-        network = 'robinhood';
-      }
-
-      // Wyczyść formularz natychmiast
-      setReplyingTo(null);
-      setReplyContent('');
-      
-      // Wykonaj rzeczywistą operację
-      await addCommentReply(postId, commentId, {
-        author: address,
-        content: replyContent.trim(),
-        txHash: txHash || null,
-        network: network
-      });
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - reply pojawi się po odświeżeniu strony
-      // Oszczędność: 50 Firebase reads po każdym reply
-      // (Alternatywnie: użytkownik może odświeżyć stronę aby zobaczyć reply)
-      
-    } catch (error) {
-      console.error('Error adding reply:', error);
-      alert('An error occurred while adding the reply. Please try again.');
-    }
-  };
+  // Usuniete jako martwe: handleEditPost, handleEditComment, handleDeleteComment,
+  // handleToggleCommentLike i handleAddReply. Zadna z tych piatki nie byla nigdzie
+  // wywolywana ani przekazywana w dol - edycja i kasowanie postow oraz komentarzy
+  // maja wlasne, uzywane implementacje w PostList. Kazda kopia trzymala przy tym
+  // wlasny optymistyczny update i wlasna sciezke ratunkowa z fetchPosts.
 
   // Dodaj nową funkcję do obliczania i zapisywania BaseChat Points
   const calculateAndSaveBaseChatPoints = async () => {
@@ -2216,18 +1815,11 @@ function BaseChatContent() {
   // Dodaj nowe stany dla modalu
   const [currentPage, setCurrentPage] = useState(1);
   const [totalUsersPages, setTotalUsersPages] = useState(5); // 🚀 LIMIT: Maksymalnie 5 stron
-  const [showAllUsers, setShowAllUsers] = useState(false);
-  const usersPerPage = 10;
 
-  // Stany dla wyszukiwarki użytkowników
-  const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  // ✅ USUNIĘTO: State dla BaseChatPoints - przeniesiono do BuilderProfile
-  // Removed isSearchingAll - now using hybrid search by default
-
-  // Ref dla debounce timer
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Usunieta martwa wyszukiwarka uzytkownikow: `userSearchQuery`, `searchResults`,
+  // `isSearching`, `searchTimeoutRef`, `showAllUsers`, `usersPerPage` oraz
+  // handleUserSearch(). Sama funkcja byla wylaczona (natychmiastowy `return`,
+  // reszta zakomentowana), a zaden z tych stanow nie mial pola ani wyniku w UI.
 
   // 🚀 ZOPTYMALIZOWANA funkcja getActiveUsers - używa nowej paginowanej funkcji
   const getActiveUsers = useCallback(async (forceRefresh: boolean = false) => {
@@ -2332,68 +1924,6 @@ function BaseChatContent() {
     prevPageRef.current = currentPage;
     getActiveUsers(false);
   }, [currentPage, getActiveUsers, initialRefreshDone]);
-
-  // ===============================================
-  // 🚫 DISABLED: USER SEARCH to save Firebase reads
-  // ===============================================
-  // Funkcja do wyszukiwania użytkowników - WYŁĄCZONA
-  const handleUserSearch = useCallback(async (query: string) => {
-    console.log('🚫 User search DISABLED - saving Firebase reads');
-    setUserSearchQuery(query);
-    setSearchResults([]);
-    setIsSearching(false);
-    
-    // Original search code disabled to save Firebase costs
-    // 💰 Saving: 1000 reads per user visit × 20k users = $1,200/day
-    return;
-    
-    /* DISABLED CODE:
-    if (!query.trim()) {
-      setSearchResults([]);
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-      return;
-    }
-    
-    if (query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        setIsSearching(true);
-        
-        const results = await searchUsersUltraFast(query, 50);
-        
-        const formattedResults = results.map(user => ({
-          address: user.a,
-          name: user.n,
-          avatar: undefined,
-          totalPoints: user.p || 0,
-          postsCount: 0,
-          likesReceived: 0
-        }));
-        
-        setSearchResults(formattedResults.slice(0, 50));
-        console.log(`⚡ Ultra-fast search completed: ${formattedResults.length} results (0 Firebase reads)`);
-        
-      } catch (error) {
-        console.error('❌ Ultra-fast search failed:', error);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 200);
-    */
-  }, []);
-
-  // Removed toggleSearchMode - now using unified hybrid search
 
   // Funkcja renderująca pusty element listy
   const renderEmptyItem = (index: number) => (
@@ -2525,13 +2055,19 @@ function BaseChatContent() {
           {displayPoints.toLocaleString()} pts
         </div>
       </div>
-      <div 
-        onTouchStart={() => handleViewBuilderProfile(user.address)} 
+      {/* Bylo <div> z onTouchStart ORAZ onClick - na dotyku odpalaly sie oba,
+          wiec profil ladowal sie dwa razy (dwa odczyty z Firestore i dwa
+          ustawienia stanu na jedno tkniecie). Zostal sam onClick, ktory
+          przegladarka wywoluje takze po dotknieciu, a <button> daje focus
+          i obsluge klawiatury za darmo. */}
+      <button
+        type="button"
         onClick={() => handleViewBuilderProfile(user.address)}
+        aria-label={`View profile of ${userNames[user.address]?.name || user.address}`}
         className="text-[11px] px-2 py-1 rounded-md bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors cursor-pointer"
       >
         View
-      </div>
+      </button>
     </div>
   )};
 
@@ -2549,13 +2085,9 @@ function BaseChatContent() {
     }
   };
 
-  // Efekt uruchamiany przy montowaniu komponentu
-  useEffect(() => {
-    if (!isMounted) {
-      setIsMounted(true);
-      // Usunięto automatyczne wykonanie funkcji naprawiających strukturę baseChatPoints i dodających bonus BaseName
-    }
-  }, [isMounted]);
+  // Drugi efekt ustawiajacy isMounted zostal usuniety - robil dokladnie to samo,
+  // co ten przy loadInitialData, tyle ze z zaleznoscia [isMounted], czyli sam
+  // wyzwalal wlasne ponowne uruchomienie.
 
   // Wykrywanie urządzeń Apple i naprawianie vh
   useEffect(() => {
@@ -2718,24 +2250,15 @@ function BaseChatContent() {
     setActiveMainPanel('feed');
     setSelectedBuilderProfile(null);
     // Resetowanie tooltipów
-    setHoveredElement(null);
     setHoveredUser(null);
   };
 
   // Na początku pliku po inicjalizacji wszystkich stanów, dodajmy funkcję refreshPosts i zmienną today
   const today = new Date().toISOString().split('T')[0];
 
-  // Pending Pin management functions
-
-  const handlePinConfirmed = (postId: string) => {
-    setPendingPins(prev => {
-      const updated = { ...prev };
-      delete updated[postId];
-      return updated;
-    });
-    
-    console.log(`✅ BaseChat: Post ${postId} pin confirmed, removing pending state`);
-  };
+  // handlePinConfirmed() usuniete jako martwe - nic go nie wywolywalo, wiec wpis
+  // w `pendingPins` nie byl kasowany po potwierdzeniu przypiecia z tego miejsca.
+  // Czysci go PostList, ktory jako jedyny dostaje `pendingPins` i `onPinPending`.
 
   // Funkcja do odświeżania postów
   const refreshPosts = async () => {
@@ -3614,7 +3137,7 @@ function BaseChatContent() {
                     {
                       icon: (
                         <img
-                          src="/logotypy/robinhood.svg"
+                          src="/robin.webp"
                           alt="Robinhood Chain"
                           className="w-5 h-5 rounded-none"
                         />
@@ -4244,7 +3767,6 @@ function BaseChatContent() {
       <div className="pb-8">
         {/* ... rest of the content ... */}
       </div>
-      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
 
 
       {/* Mobile footer */}

@@ -3,7 +3,7 @@
 
 import { base } from 'viem/chains';
 import { createContext, useContext, useState, useMemo } from 'react';
-import { createConfig, http, cookieStorage, createStorage } from 'wagmi';
+import { createConfig, http, fallback, cookieStorage, createStorage } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
 import {
   injected,
@@ -71,7 +71,19 @@ const TRANSPORTS_BASE = {
   [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
   [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
   [celoChain.id]: http('https://forno.celo.org'),
-  [ethereumChain.id]: http('https://eth.llamarpc.com'),
+  // Ethereum: eth.llamarpc.com PRZESTAL wysylac naglowki CORS - w konsoli
+  // produkcyjnej dawalo to kilkadziesiat bledow "blocked by CORS policy" pod
+  // rzad i kazdy odczyt z mainnetu (m.in. rozwiazywanie ENS) konczyl sie
+  // porazka. Zweryfikowane 5 sierpnia 2026: publicnode odpowiada 200 z
+  // `access-control-allow-origin: *`, llamarpc nie odpowiada na preflight.
+  //
+  // fallback() zamiast pojedynczego http(): gdy pierwszy endpoint padnie, viem
+  // przechodzi do nastepnego zamiast zwracac blad. Jeden publiczny RPC to
+  // pojedynczy punkt awarii dla calego lancucha.
+  [ethereumChain.id]: fallback([
+    http('https://ethereum-rpc.publicnode.com'),
+    http('https://rpc.ankr.com/eth'),
+  ]),
   [worldChain.id]: http('https://worldchain-mainnet.g.alchemy.com/public'),
   // Robinhood Chain: publiczny RPC jest rate-limited i "not recommended for
   // production" - pod produkcje ustaw NEXT_PUBLIC_ROBINHOOD_RPC_URL na wlasny

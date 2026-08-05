@@ -75,7 +75,7 @@ const robinhoodEntry = {
   id: robinhoodChain.id,
   name: 'Robinhood Chain',
   shortName: 'RH',
-  iconUrl: '/logotypy/robinhood.svg', // Ikona dla sieci Robinhood Chain
+  iconUrl: '/robin.webp', // Oficjalne logo Robinhooda
   color: '#00C805', // Firmowa zielen Robinhooda
   bgWhite: false,
 } as const;

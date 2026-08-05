@@ -29,24 +29,52 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'follow' | 'friend' | null>(null);
   const [discoverLoading, setDiscoverLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Load suggested users
   useEffect(() => {
-    if (socialAPI) {
-      const loadSuggestedUsers = async () => {
-        setDiscoverLoading(true);
-        try {
-          const suggested = await socialAPI.getSuggestedUsers(20);
-          setSuggestedUsers(suggested);
-        } catch (error) {
-          console.error('Error loading suggested users:', error);
-        } finally {
-          setDiscoverLoading(false);
-        }
-      };
-      loadSuggestedUsers();
-    }
+    if (!socialAPI) return;
+
+    // Odpowiedz dla poprzedniego uzytkownika (albo po odmontowaniu) nie moze
+    // nadpisac biezacej listy.
+    let cancelled = false;
+
+    const loadSuggestedUsers = async () => {
+      setDiscoverLoading(true);
+      try {
+        const suggested = await socialAPI.getSuggestedUsers(20);
+        if (cancelled) return;
+        setSuggestedUsers(suggested);
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Error loading suggested users:', error);
+      } finally {
+        if (!cancelled) setDiscoverLoading(false);
+      }
+    };
+
+    loadSuggestedUsers();
+
+    return () => { cancelled = true; };
   }, [socialAPI]);
+
+  // Handle "Discover More"
+  const handleDiscoverMore = async () => {
+    if (!socialAPI || loadingMore) return;
+
+    setLoadingMore(true);
+    try {
+      const more = await socialAPI.getSuggestedUsers(suggestedUsers.length + 20);
+      setSuggestedUsers(more);
+    } catch (error) {
+      // Wczesniej bylo golе `.then(setSuggestedUsers)` - blad leciał jako
+      // nieobsluzone odrzucenie, a przycisk wygladal, jakby nic sie nie stalo.
+      console.error('Error loading more suggested users:', error);
+      toast.error('Could not load more people. Please try again.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Handle follow user
   const handleFollow = async (targetUserId: string) => {
@@ -132,7 +160,6 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
       <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-6 text-white">
         <h2 className="text-2xl font-bold mb-2">🔍 Discover</h2>
         <p className="text-orange-100">
-          Find interesting people to follow and connect with! 
           Find interesting people to follow and connect with!
         </p>
       </div>
@@ -154,7 +181,6 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
               No suggestions available
             </h3>
             <p className="text-gray-500">
-              Start following users to get personalized recommendations! 
               Start following users to get personalized recommendations!
             </p>
           </div>
@@ -299,17 +325,12 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
       {/* Load more button */}
       {suggestedUsers.length > 0 && suggestedUsers.length % 20 === 0 && (
         <div className="text-center">
-          <button 
-            onClick={() => {
-              // Reload suggested users with higher limit
-              if (socialAPI) {
-                socialAPI.getSuggestedUsers(suggestedUsers.length + 20)
-                  .then(setSuggestedUsers);
-              }
-            }}
-            className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+          <button
+            onClick={handleDiscoverMore}
+            disabled={loadingMore}
+            className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Discover More
+            {loadingMore ? 'Loading...' : 'Discover More'}
           </button>
         </div>
       )}

@@ -1,23 +1,36 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAccount, useBalance, useSwitchChain } from 'wagmi';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
-import { X, Clock, DollarSign, Zap, Crown } from 'lucide-react';
-import { getAllDurations, calculateTotalCost, formatTimeLeft, calculateExpirationTime } from '../utils/pinPricing';
+import { X, Crown } from 'lucide-react';
+import { getAllDurations, calculateTotalCost, calculateExpirationTime } from '../utils/pinPricing';
 import { createPaidPin, canPinPost, PinDuration } from '../../../utils/firebase';
 // Base Pay imports
 import { pay, getPaymentStatus } from '@base-org/account';
 import { BasePayButton } from '@base-org/account-ui/react';
 
 // Smart Contract Integration
-import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI, ContractPinDuration } from '../config/contractConfig';
+import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI, toContractDuration } from '../config/contractConfig';
 
 // MySphere wallet address for Base Pay payments
 const MYSPHERE_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd';
+
+// Pin jest kupowany i rozliczany wylacznie na Base Mainnet.
+const PIN_CHAIN_ID = PAID_PIN_CONTRACT_CONFIG.chainId;
+
+// Base Pay potrafi wisiec w 'pending'. Bez limitu odpytywalismy w nieskonczonosc.
+const BASE_PAY_POLL_INTERVAL_MS = 2000;
+const BASE_PAY_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** Co uzytkownik faktycznie kupil - zamrozone w chwili platnosci. */
+interface PinOrder {
+  duration: PinDuration;
+  amount: string;
+}
 
 
 interface PaidPinModalProps {
@@ -39,128 +52,238 @@ export default function PaidPinModal({
 }: PaidPinModalProps) {
   const { address, chain } = useAccount();
   const { data: balance } = useBalance({ address });
-  const { switchChain } = useSwitchChain();
-  
+  const { switchChainAsync } = useSwitchChain();
+
   const [selectedDuration, setSelectedDuration] = useState<PinDuration>('HOURS_24');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentEthPrice, setCurrentEthPrice] = useState(2500); // Mock
-  
-  const { data: hash, writeContract, isPending, error: contractError } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ 
-    hash, 
+  const { data: hash, writeContractAsync } = useWriteContract();
+
+  // Paragon czytamy zawsze z Base - inaczej po recznej zmianie sieci w portfelu
+  // czekalibysmy na potwierdzenie na lancuchu, na ktorym transakcji nie ma.
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+    chainId: PIN_CHAIN_ID,
   });
 
+  // Zamowienie zamrozone w chwili wyslania platnosci. Bez tego zmiana wyboru
+  // w trakcie potwierdzania zapisywala do Firestore inny czas niz oplacony.
+  const paidOrderRef = useRef<PinOrder | null>(null);
+  // Jedna transakcja = jeden zapis pinu, nawet gdy hook przeliczy paragon ponownie.
+  const recordedHashRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (isConfirming) {
+    return () => {
+      isMountedRef.current = false;
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (hash && isConfirming) {
       toast.loading('Processing transaction... Please wait.', { id: hash });
     }
-    if (isConfirmed) {
-      toast.success('Transaction successful! Your post will be pinned in ~5 minutes.', { id: hash, duration: 6000 });
-      // The actual pin creation logic will now be triggered here
-      handleFirebasePinning();
-    }
-    if (contractError) {
-      toast.error(contractError.message || 'Transaction failed.', { id: hash });
+  }, [hash, isConfirming]);
+
+  useEffect(() => {
+    if (!hash || !isConfirmed) return;
+    if (recordedHashRef.current === hash) return;
+    recordedHashRef.current = hash;
+
+    toast.success('Transaction successful! Your post will be pinned in ~5 minutes.', { id: hash, duration: 6000 });
+    void recordPaidPin(hash, paidOrderRef.current);
+    // recordPaidPin czyta wylacznie zamrozone zamowienie i propsy, wiec nie
+    // potrzebuje byc zaleznoscia efektu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash, isConfirmed]);
+
+  /** Zapis pinu po potwierdzonej platnosci. Uzywa zamrozonego zamowienia. */
+  const recordPaidPin = async (txHash: string, order: PinOrder | null) => {
+    if (!address || !order) {
+      // Pieniadze juz poszly - uzytkownik musi dostac dowod, a nie ciszę.
+      toast.error(
+        `Payment confirmed but the pin could not be saved. Keep this transaction: ${txHash}`,
+        { id: txHash, duration: 10000 }
+      );
       setIsProcessing(false);
+      return;
     }
-  }, [isConfirming, isConfirmed, contractError, hash]);
-  
-  const handleFirebasePinning = async () => {
-    if (!hash || !address || !chain) return;
-    
+
     const success = await createPaidPin(
       postId,
       address,
-      selectedDuration,
-      hash,
-      selectedPrice.ethAmount,
-      chain.id
+      order.duration,
+      txHash,
+      order.amount,
+      PIN_CHAIN_ID
     );
 
     if (success) {
-      toast.success('Post pinned successfully!', { id: hash });
-      if (onPinSuccess) {
-        onPinSuccess(hash, selectedDuration);
-      }
-    } else {
-      toast.error('Failed to save pin data to Firebase.', { id: hash });
+      toast.success('Post pinned successfully!', { id: txHash });
+      onPinSuccess?.(txHash, order.duration);
+      setIsProcessing(false);
+      onClose();
+      return;
     }
+
+    toast.error(
+      `Payment confirmed but saving the pin failed. Keep this transaction: ${txHash}`,
+      { id: txHash, duration: 10000 }
+    );
     setIsProcessing(false);
-    onClose();
   };
 
   // Function to ensure we're on Base network before transaction
-  const ensureBaseNetwork = async () => {
-    const BASE_CHAIN_ID = 8453;
-    if (chain?.id !== BASE_CHAIN_ID) {
-      try {
-        console.log('🔄 Switching to Base network...');
-        await switchChain({ chainId: BASE_CHAIN_ID });
-        console.log('✅ Switched to Base network');
-        return true;
-      } catch (error) {
-        console.error('❌ Failed to switch to Base network:', error);
-        toast.error('Please switch to Base network manually');
-        return false;
-      }
+  const ensureBaseNetwork = async (): Promise<boolean> => {
+    if (chain?.id === PIN_CHAIN_ID) return true;
+
+    try {
+      // switchChainAsync, nie switchChain: wariant synchroniczny nie odrzuca
+      // obietnicy, wiec odmowa w portfelu przechodzila jako sukces i platnosc
+      // szla na zla siec.
+      await switchChainAsync({ chainId: PIN_CHAIN_ID });
+      return true;
+    } catch (error) {
+      console.error('Failed to switch to Base network:', error);
+      toast.error('Please switch to Base network manually');
+      return false;
     }
-    return true;
   };
 
   const handlePayAndPin = async () => {
     if (!address || !canPin || !hasEnoughBalance || isProcessing) return;
-    
+
+    setIsProcessing(true);
+
     try {
-      setIsProcessing(true);
-      
       // Ensure we're on Base network first
       const switched = await ensureBaseNetwork();
       if (!switched) {
         setIsProcessing(false);
         return;
       }
-      
+
       const canPostBePinned = await canPinPost(postId);
       if (!canPostBePinned) {
         toast.error('This post is already pinned or cannot be pinned');
         setIsProcessing(false);
         return;
       }
-      
-      console.log("🚀 Calling smart contract...");
-      writeContract({
+
+      const order: PinOrder = { duration: selectedDuration, amount: selectedPrice.ethAmount };
+      paidOrderRef.current = order;
+      recordedHashRef.current = null;
+
+      await writeContractAsync({
         address: PAID_PIN_CONTRACT_CONFIG.address as `0x${string}`,
         abi: PAID_PIN_CONTRACT_ABI,
         functionName: 'pinPost',
-        args: [postId, getContractDuration(selectedDuration)],
-        value: parseEther(selectedPrice.ethAmount)
+        args: [postId, toContractDuration(order.duration)],
+        value: parseEther(order.amount),
+        // Wymus lancuch takze na poziomie wagmi - portfel mogl przelaczyc siec
+        // miedzy sprawdzeniem a podpisem.
+        chainId: PIN_CHAIN_ID,
       });
-      // Logic continues in the useEffect hook watching for transaction status
-      
+      // Dalszy ciag w efekcie obserwujacym potwierdzenie transakcji.
+
     } catch (error) {
+      paidOrderRef.current = null;
       console.error('Error initiating pin transaction:', error);
-      toast.error('Failed to start transaction. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to start transaction. Please try again.');
       setIsProcessing(false);
     }
   };
-  
-  // Map internal duration to contract enum
-  const getContractDuration = (duration: PinDuration): number => {
-    const mapping: Record<PinDuration, number> = {
-      'HOUR_1': ContractPinDuration.HOUR_1,
-      'HOURS_6': ContractPinDuration.HOURS_6, 
-      'HOURS_24': ContractPinDuration.HOURS_24,
-      'DAYS_7': ContractPinDuration.DAYS_7
-    };
-    return mapping[duration];
+
+  /** Odpytuje Base Pay o status platnosci do skutku albo do limitu czasu. */
+  const waitForBasePayment = async (paymentId: string): Promise<void> => {
+    const deadline = Date.now() + BASE_PAY_POLL_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+      await new Promise<void>(resolve => {
+        pollTimerRef.current = setTimeout(resolve, BASE_PAY_POLL_INTERVAL_MS);
+      });
+      if (!isMountedRef.current) return;
+
+      try {
+        const { status } = await getPaymentStatus({ id: paymentId, testnet: false });
+        if (!isMountedRef.current) return;
+        if (status === 'completed') return;
+        if (status === 'failed') throw new Error('Payment failed');
+      } catch (error) {
+        // Chwilowy blad sieci nie moze przerwac pilnowania oplaconej platnosci.
+        console.error('Error checking payment status:', error);
+      }
+    }
+
+    throw new Error('Payment confirmation timed out');
   };
-  
+
+  const handleBasePayAndPin = async () => {
+    if (!address || !canPin || isProcessing) return;
+
+    setIsProcessing(true);
+
+    try {
+      const switched = await ensureBaseNetwork();
+      if (!switched) {
+        setIsProcessing(false);
+        return;
+      }
+
+      const canPostBePinned = await canPinPost(postId);
+      if (!canPostBePinned) {
+        toast.error('This post is already pinned or cannot be pinned');
+        setIsProcessing(false);
+        return;
+      }
+
+      const order: PinOrder = { duration: selectedDuration, amount: selectedPrice.usdcAmount.toString() };
+
+      const paymentResult = await pay({
+        amount: order.amount,
+        to: MYSPHERE_ADDRESS,
+        testnet: false
+      });
+
+      // Bezpieczne wydobycie ID z różnych możliwych struktur PaymentResult
+      const paymentId = String(
+        (paymentResult as any)?.id ||
+        (paymentResult as any)?.paymentId ||
+        (paymentResult as any)?.transactionId ||
+        paymentResult
+      );
+
+      await waitForBasePayment(paymentId);
+      if (!isMountedRef.current) return;
+
+      const success = await createPaidPin(postId, address, order.duration, paymentId, order.amount, PIN_CHAIN_ID);
+      if (!isMountedRef.current) return;
+
+      if (success) {
+        toast.success(`Post pinned for $${selectedPrice.usdcAmount.toFixed(2)} USDC via Base Pay! 🎉`);
+        onPinSuccess?.(paymentId, order.duration);
+        setIsProcessing(false);
+        onClose();
+        return;
+      }
+
+      toast.error(`Payment confirmed but saving the pin failed. Keep this payment id: ${paymentId}`, { duration: 10000 });
+      setIsProcessing(false);
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      console.error('Base Pay error:', error);
+      toast.error(`Base Pay failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsProcessing(false);
+    }
+  };
+
   const durations = getAllDurations();
-  const selectedPrice = calculateTotalCost(selectedDuration, currentEthPrice);
+  const selectedPrice = calculateTotalCost(selectedDuration);
   const expirationTime = calculateExpirationTime(selectedDuration);
-  
-  const isCorrectNetwork = chain?.id === PAID_PIN_CONTRACT_CONFIG.chainId;
+
+  const isCorrectNetwork = chain?.id === PIN_CHAIN_ID;
   const hasEnoughBalance = balance && parseFloat(balance.formatted) >= parseFloat(selectedPrice.ethAmount);
   const canPin = address && address.toLowerCase() === authorAddress.toLowerCase();
   
@@ -234,6 +357,7 @@ export default function PaidPinModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close pin dialog"
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <X className="w-6 h-6" />
@@ -260,15 +384,21 @@ export default function PaidPinModal({
               Choose Duration
             </h4>
             
-            <div className="space-y-2 sm:space-y-3">
+            <div className="space-y-2 sm:space-y-3" role="radiogroup" aria-label="Pin duration">
             {durations.map((duration) => {
-              const cost = calculateTotalCost(duration.duration, currentEthPrice);
+              const cost = calculateTotalCost(duration.duration);
               const isSelected = selectedDuration === duration.duration;
-              
+
               return (
-                <div
+                <button
                   key={duration.duration}
-                  className={`relative border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 cursor-pointer transition-all ${
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  // Wybor jest zamrazany przy platnosci, ale blokada w trakcie
+                  // przetwarzania oszczedza uzytkownikowi mylacego widoku.
+                  disabled={isProcessing}
+                  className={`relative w-full text-left border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 cursor-pointer transition-all disabled:cursor-not-allowed ${
                     isSelected
                       ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20'
                       : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
@@ -311,7 +441,7 @@ export default function PaidPinModal({
                       POPULAR
                     </div>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -378,88 +508,14 @@ export default function PaidPinModal({
               <span className="text-xs text-gray-600 dark:text-gray-400">Or pay with Base Pay </span>
               <span className="text-xs text-green-600 dark:text-green-400 font-semibold">(50% cheaper - ${selectedPrice.usdcAmount.toFixed(2)} USDC!)</span>
             </div>
-            <BasePayButton
-              colorScheme="light"
-              onClick={async () => {
-                try {
-                  // Ensure we're on Base network first
-                  const switched = await ensureBaseNetwork();
-                  if (!switched) {
-                    return;
-                  }
-                  
-                  setIsProcessing(true);
-                  
-                  const canPostBePinned = await canPinPost(postId);
-                  if (!canPostBePinned) {
-                    toast.error('This post is already pinned or cannot be pinned');
-                    setIsProcessing(false);
-                    return;
-                  }
-                  
-                  const paymentResult = await pay({
-                    amount: selectedPrice.usdcAmount.toString(),
-                    to: MYSPHERE_ADDRESS,
-                    testnet: false
-                  });
-                  
-                  // Bezpieczne wydobycie ID z różnych możliwych struktur PaymentResult
-                  const id = (paymentResult as any)?.id || 
-                            (paymentResult as any)?.paymentId || 
-                            (paymentResult as any)?.transactionId || 
-                            paymentResult;
-                  
-                  // Poll for transaction status
-                  const pollStatus = async () => {
-                    try {
-                      const { status } = await getPaymentStatus({ 
-                        id,
-                        testnet: false
-                      });
-                      
-                      if (status === 'completed') {
-                        // Zapisz do Firebase tak samo jak ETH pin
-                        const success = await createPaidPin(
-                          postId,
-                          address!,
-                          selectedDuration,
-                          id, // Base Pay transaction ID
-                          selectedPrice.usdcAmount.toString(),
-                          chain?.id || 8453
-                        );
-
-                        if (success) {
-                          toast.success(`Post pinned for $${selectedPrice.usdcAmount.toFixed(2)} USDC via Base Pay! 🎉`);
-                          if (onPinSuccess) {
-                            onPinSuccess(id, selectedDuration);
-                          }
-                          onClose();
-                        } else {
-                          toast.error('Failed to create pin record');
-                        }
-                        setIsProcessing(false);
-                      } else if (status === 'failed') {
-                        throw new Error('Payment failed');
-                      } else {
-                        setTimeout(pollStatus, 2000);
-                      }
-                    } catch (error) {
-                      console.error('Error checking payment status:', error);
-                      toast.error('Failed to verify payment status');
-                      setIsProcessing(false);
-                    }
-                  };
-                  
-                  setTimeout(pollStatus, 1000);
-                  
-                } catch (error) {
-                  console.error('Base Pay error:', error);
-                  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                  toast.error(`Base Pay failed: ${errorMessage}`);
-                  setIsProcessing(false);
-                }
-              }}
-            />
+            {/* BasePayButton nie przyjmuje `disabled`, wiec blokujemy wrapperem
+                i strazą w handlerze - inaczej drugie kliknieciu placilo drugi raz. */}
+            <div className={isProcessing || !canPin ? 'pointer-events-none opacity-50' : ''}>
+              <BasePayButton
+                colorScheme="light"
+                onClick={handleBasePayAndPin}
+              />
+            </div>
           </div>
 
           <p className="text-center text-gray-500 mt-4 text-xs">

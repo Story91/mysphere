@@ -1,5 +1,6 @@
 import { doc, getDoc, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { getPublicDb as getDb } from '../publicFirestore';
+import { toMillis } from '../firestoreTime';
 
 /**
  * Odczyt pojedynczego posta PO STRONIE SERWERA, na potrzeby udostepnialnej
@@ -38,7 +39,7 @@ export async function getPostForShare(postId: string): Promise<SharedPost | null
       author: data.author ?? '',
       authorName: data.authorName ?? undefined,
       content: typeof data.content === 'string' ? data.content : '',
-      timestamp: typeof data.timestamp === 'number' ? data.timestamp : 0,
+      timestamp: toMillis(data.timestamp),
       image: data.image ?? null,
       likes: typeof data.likes === 'number' ? data.likes : 0,
       commentCount: Array.isArray(data.comments) ? data.comments.length : 0,
@@ -69,7 +70,9 @@ export async function getRecentPostRefs(
       const data = entry.data() as Record<string, any>;
       return {
         id: entry.id,
-        timestamp: typeof data.timestamp === 'number' ? data.timestamp : Date.now(),
+        // Brak daty w sitemapie jest gorszy niz data przyblizona -
+        // crawler dostalby wtedy 1970 i uznal wpis za archiwalny.
+        timestamp: toMillis(data.timestamp) || Date.now(),
       };
     });
   } catch (error) {

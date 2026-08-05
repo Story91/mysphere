@@ -17,12 +17,13 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
   currentUserAddress,
   onUserClick
 }) => {
-  const { 
-    friends, 
-    friendsStats, 
-    loading, 
-    error, 
-    socialAPI
+  const {
+    friends,
+    friendsStats,
+    loading,
+    error,
+    socialAPI,
+    refreshData
   } = useSocial(currentUserAddress);
 
   const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'sent'>('friends');
@@ -33,58 +34,66 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
 
   // Load friend requests when tab changes
   React.useEffect(() => {
-    if (socialAPI && (activeTab === 'requests' || activeTab === 'sent')) {
-      const loadRequests = async () => {
-        setRequestsLoading(true);
-        try {
-          if (activeTab === 'requests') {
-            const received = await socialAPI.getReceivedFriendRequests(20);
-            setFriendRequests(received);
-          } else if (activeTab === 'sent') {
-            const sent = await socialAPI.getSentFriendRequests(20);
-            setSentRequests(sent);
-          }
-        } catch (error) {
-          console.error('Error loading friend requests:', error);
-        } finally {
-          setRequestsLoading(false);
+    if (!socialAPI || (activeTab !== 'requests' && activeTab !== 'sent')) return;
+
+    // Szybkie przeskakiwanie miedzy zakladkami: odpowiedz dla poprzedniej
+    // zakladki nie moze wygrac z biezaca.
+    let cancelled = false;
+
+    const loadRequests = async () => {
+      setRequestsLoading(true);
+      try {
+        if (activeTab === 'requests') {
+          const received = await socialAPI.getReceivedFriendRequests(20);
+          if (cancelled) return;
+          setFriendRequests(received);
+        } else {
+          const sent = await socialAPI.getSentFriendRequests(20);
+          if (cancelled) return;
+          setSentRequests(sent);
         }
-      };
-      loadRequests();
-    }
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Error loading friend requests:', error);
+      } finally {
+        if (!cancelled) setRequestsLoading(false);
+      }
+    };
+
+    loadRequests();
+
+    return () => { cancelled = true; };
   }, [activeTab, socialAPI]);
 
-  // Handle accept friend request
-  const handleAcceptRequest = async (requestId: string) => {
-    if (!socialAPI) return;
+  /**
+   * Rozpatrzenie zaproszenia. Po akceptacji trzeba przeladowac dane, bo inaczej
+   * licznik "Pending Requests" i lista znajomych zostawaly na starych wartosciach.
+   */
+  const respondToRequest = async (
+    requestId: string,
+    respond: (id: string) => Promise<{ success: boolean; error?: string }>
+  ) => {
+    if (!socialAPI || loadingAction) return;
+
     setLoadingAction(requestId);
     try {
-      const result = await socialAPI.acceptFriendRequest(requestId);
+      const result = await respond(requestId);
       if (result.success) {
         setFriendRequests(prev => prev.filter(req => req.id !== requestId));
+        await refreshData();
       }
     } catch (error) {
-      console.error('Error accepting friend request:', error);
+      console.error('Error responding to friend request:', error);
     } finally {
       setLoadingAction(null);
     }
   };
 
-  // Handle reject friend request
-  const handleRejectRequest = async (requestId: string) => {
-    if (!socialAPI) return;
-    setLoadingAction(requestId);
-    try {
-      const result = await socialAPI.rejectFriendRequest(requestId);
-      if (result.success) {
-        setFriendRequests(prev => prev.filter(req => req.id !== requestId));
-      }
-    } catch (error) {
-      console.error('Error rejecting friend request:', error);
-    } finally {
-      setLoadingAction(null);
-    }
-  };
+  const handleAcceptRequest = (requestId: string) =>
+    respondToRequest(requestId, id => socialAPI!.acceptFriendRequest(id));
+
+  const handleRejectRequest = (requestId: string) =>
+    respondToRequest(requestId, id => socialAPI!.rejectFriendRequest(id));
 
   if (loading) {
     return (

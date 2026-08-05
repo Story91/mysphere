@@ -30,16 +30,28 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
   const [activeTab, setActiveTab] = useState<'recent' | 'saved' | 'albums' | 'playlists'>('recent');
   const [error, setError] = useState<string | null>(null);
 
+  // Dane naleza do konkretnego portfela. Bez tego po zmianie konta warunek
+  // `!spotifyData` blokowal pobranie i modal pokazywal muzyke poprzedniego adresu.
+  useEffect(() => {
+    setSpotifyData(null);
+    setError(null);
+  }, [address]);
+
   // Pobierz dane Spotify gdy modal się otwiera
   useEffect(() => {
-    if (isOpen && address && !spotifyData) {
-      fetchSpotifyData();
-    }
+    if (!isOpen || !address || spotifyData) return;
+
+    let cancelled = false;
+    fetchSpotifyData(() => cancelled);
+
+    return () => { cancelled = true; };
+    // spotifyData celowo poza deps - jest tylko straza "juz mamy dane".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, address]);
 
-  const fetchSpotifyData = async () => {
+  const fetchSpotifyData = async (isCancelled: () => boolean = () => false) => {
     if (!address) return;
-    
+
     // Check cache first (30 minutes)
     const cacheKey = `spotify_music_data_${address}`;
     const cachedData = localStorage.getItem(cacheKey);
@@ -52,7 +64,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
         
         if (cacheAge < CACHE_DURATION) {
           console.log('🎵 Using cached Spotify data');
-          setSpotifyData(data);
+          if (!isCancelled()) setSpotifyData(data);
           return;
         }
       } catch (e) {
@@ -67,16 +79,18 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
       console.log('🎵 Fetching fresh Spotify data for music selector...');
       const response = await fetch(`/api/camp/spotify?address=${address}&type=full`);
       const data = await response.json();
-      
+      // Odpowiedz dla poprzedniego adresu (albo po zamknieciu) nie moze wygrac.
+      if (isCancelled()) return;
+
       if (data.success) {
         setSpotifyData(data.data);
-        
+
         // Cache the data
         localStorage.setItem(cacheKey, JSON.stringify({
           data: data.data,
           timestamp: Date.now()
         }));
-        
+
         console.log('✅ Spotify data loaded and cached:', {
           recentTracks: data.data.profile?.playedTracks?.length || 0,
           savedTracks: data.data.profile?.savedTracks?.length || 0,
@@ -87,10 +101,11 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
         setError(data.message || 'Failed to fetch Spotify data');
       }
     } catch (err) {
+      if (isCancelled()) return;
       console.error('❌ Error fetching Spotify data:', err);
       setError('Network error while fetching Spotify data');
     } finally {
-      setLoading(false);
+      if (!isCancelled()) setLoading(false);
     }
   };
 
@@ -208,7 +223,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
             <div className="text-center py-12">
               <div className="text-red-500 mb-4">❌ {error}</div>
               <button
-                onClick={fetchSpotifyData}
+                onClick={() => { void fetchSpotifyData(); }}
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
               >
                 Try Again
