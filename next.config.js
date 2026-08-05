@@ -14,7 +14,25 @@ const nextConfig = {
     unoptimized: true,
   },
   experimental: {
-    serverComponentsExternalPackages: ['mongodb'],
+    // firebase-admin MUSI byc tutaj, a nie w config.externals ponizej.
+    //
+    // Objaw, ktory to naprawia: /api/auth/verify, /api/auth/session i
+    // /api/premium zwracaly na produkcji 500 w postaci strony HTML - czyli
+    // wybuchaly przy ladowaniu modulu, zanim handler wystartowal. /api/auth/nonce,
+    // jedyna z tych tras nieimportujaca firebaseAdmin, dzialala. Skutek: cale
+    // logowanie SIWE bylo martwe na produkcji ("Server sign-in is not configured
+    // yet"), mimo poprawnie ustawionych zmiennych srodowiskowych.
+    //
+    // Przyczyna: `config.externals.push({'gcp-metadata': 'commonjs gcp-metadata'})`
+    // wypychalo tranzytywna zaleznosc firebase-admin (przez google-auth-library)
+    // poza bundle, ALE recznie dopisany external omija sledzenie plikow Vercela
+    // (@vercel/nft). Pakiet nie trafial do bundle'a funkcji, wiec require w
+    // runtime rzucal MODULE_NOT_FOUND. Lokalnie bylo niewidoczne, bo tam caly
+    // node_modules lezy na dysku.
+    //
+    // serverComponentsExternalPackages robi jedno i drugie naraz: zostawia
+    // pakiet niezbundlowany I kaze go sledzic, wiec laduje w funkcji.
+    serverComponentsExternalPackages: ['mongodb', 'firebase-admin'],
     // Kompiluje bundle klienta i serwera rownolegle, w osobnych workerach.
     webpackBuildWorker: true,
     // Pakiety z barrel files (index re-eksportujacy setki modulow). Bez tego
@@ -69,8 +87,11 @@ const nextConfig = {
 
     // Handle MongoDB and other Node.js specific modules
     if (isServer) {
+      // gcp-metadata USUNIETE stad celowo - patrz komentarz przy
+      // serverComponentsExternalPackages. Recznie dopisany external omija
+      // sledzenie plikow Vercela, wiec pakiet nie trafial do bundle'a funkcji
+      // i firebase-admin wywracal sie przy imporcie na produkcji.
       config.externals.push({
-        'gcp-metadata': 'commonjs gcp-metadata',
         'mongodb': 'commonjs mongodb',
       });
     }

@@ -66,16 +66,32 @@ function getAdminApp(): App | null {
     return null;
   }
 
-  cachedApp = initializeApp({
-    credential: cert({
-      projectId: serviceAccount.project_id,
-      clientEmail: serviceAccount.client_email,
-      // Klucze w env maja czesto zescapowane znaki nowej linii.
-      privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
-    }),
-  });
-
-  return cachedApp;
+  // cert() i initializeApp() POTRAFIA RZUCIC - np. gdy klucz w GOOGLE_CREDENTIALS
+  // jest obciety albo ma zle znaki nowej linii. Wczesniej to wywolanie stalo poza
+  // jakimkolwiek try, wiec wyjatek leciał przez mintFirebaseToken az do wolajacego
+  // i przewracal cala trase uwierzytelnienia zamiast tylko wylaczyc tokeny
+  // Firebase. Blad konfiguracji jednej rzeczy nie moze kasowac logowania.
+  try {
+    cachedApp = initializeApp({
+      credential: cert({
+        projectId: serviceAccount.project_id,
+        clientEmail: serviceAccount.client_email,
+        // Klucze w env maja czesto zescapowane znaki nowej linii.
+        privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
+      }),
+    });
+    return cachedApp;
+  } catch (error) {
+    if (!warnedMissing) {
+      warnedMissing = true;
+      console.error(
+        '[firebaseAdmin] Nie udalo sie zainicjowac konta uslugowego. Tokeny Firebase ' +
+          'nie beda mintowane, ale logowanie SIWE dziala dalej. Blad:',
+        error
+      );
+    }
+    return null;
+  }
 }
 
 /**

@@ -96,7 +96,7 @@ export default function WalletButton() {
           onClick={() => setIsModalOpen(true)}
           className="rounded-xl bg-[#0052FF] px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#0052FF]/90"
         >
-          Sign In With Base
+          Connect wallet
         </button>
         <ConnectModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       </>
