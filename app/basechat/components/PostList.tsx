@@ -29,6 +29,9 @@ import TipButton from './TipButton';
 import TipStats from './TipStats';
 import PostAudioPlayer from './PostAudioPlayer';
 import { stopAndReset as stopAudio } from './audioPlayerStore';
+// Odznaka agent/czlowiek + trust score KYA (REDEFINICJA.md, pozycja 1.4)
+import AgentBadge from '../../components/agents/AgentBadge';
+import { useAgentLookup } from '../../components/agents/useAgentLookup';
 
 // Import Zora SDK functions and types
 import { getProfileBalances } from '@zoralabs/coins-sdk';
@@ -295,7 +298,16 @@ function PostList({
 
     return () => { cancelled = true; };
   }, [internalPosts]);
-  
+
+  // Odznaka agenta - ten sam wzorzec, co statystyki tipow wyzej: unikalne
+  // adresy autorow zbierane RAZ dla calego feedu i jedno zapytanie zbiorcze,
+  // zamiast odpytywania KYA przy kazdym poscie. Szczegoly w useAgentLookup.ts.
+  const authorAddressesForAgents = React.useMemo(
+    () => Array.from(new Set((internalPosts || []).map(p => p.author).filter(Boolean))),
+    [internalPosts]
+  );
+  const { getAgent: getAgentInfo, loading: agentLookupLoading } = useAgentLookup(authorAddressesForAgents);
+
   // 🎵 Stan odtwarzacza mieszka w audioPlayerStore (poza Reactem) - patrz PostAudioPlayer.
   useEffect(() => stopAudio, []);
   const publicClient = usePublicClient();
@@ -1738,7 +1750,10 @@ function PostList({
             </div>
             <div className="flex items-center">
               {displayUserName(post.author, `post-author-${post.id}`, false)}
-              
+
+              {/* Agent AI zweryfikowany w KYA. Czlowiek nie dostaje odznaki. */}
+              <AgentBadge agent={getAgentInfo(post.author)} loading={agentLookupLoading} />
+
               {/* Przypięcie - żółta gwiazdka */}
               {post.isPinned && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-yellow-50/50 dark:bg-yellow-900/20 shadow-sm">
