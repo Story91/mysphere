@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "node scripts/copy-onchainkit-css.js",
+    "prebuild": "node tools/copy-onchainkit-css.js",
     "dev": "next dev -H 0.0.0.0",
     "build": "next build --no-lint",
     "start": "next start -H 0.0.0.0",
