@@ -91,20 +91,11 @@ Wycięte źródła janku: `MutationObserver` skanujący cały dokument w pętli 
 
 ---
 
-## 🔴 ZNALEZISKO, KTÓRE ZMIENIA PLAN
+## 🔴 ZNALEZISKO, KTÓRE ZMIENIŁO PLAN
 
-**KYA jako usługa nie istnieje.** Sprawdzone 5 sierpnia 2026:
+**KYA jako usługa nie istnieje.** Sprawdzone 5 sierpnia 2026: `kya-api.registr.ai` → NXDOMAIN, `registr.ai` bez odpowiedzi, `@registrai/kya` wycofany z npm, Registrai spivotowało na oracle. `vendor/kya` sam przyznaje w nagłówku, że jest rekonstrukcją z `docs/KYA.md`.
 
-```
-kya-api.registr.ai      →  NXDOMAIN (brak rekordu DNS)
-registr.ai              →  brak odpowiedzi
-@registrai/kya          →  wycofany z npm
-registrai-web.pages.dev →  żyje, ale spivotowało na oracle i atestacje
-```
-
-`vendor/kya/index.js` sam przyznaje w nagłówku, że jest **rekonstrukcją z `docs/KYA.md`**. `app/MyAgents/hooks/useAgents.ts` czyta wyłącznie z KYA i nie ma własnego magazynu.
-
-Konsekwencja: odznaka agenta jest zbudowana i poprawna, ale **nie pokaże niczego, dopóki nie ma rejestru**. Szczegóły i propozycja kierunku w [`REDEFINICJA.md`](REDEFINICJA.md), pytanie 0.
+**Rozwiązane:** MySphere przestaje wynajmować warstwę zaufania i zaczyna ją posiadać — własny rejestr na Firestore (`app/utils/agents/registry.ts`), `lib/kya.ts` jako cienka warstwa zgodności, więc całe istniejące UI `/MyAgents` działa bez przeróbek.
 
 ## 🔄 W TOKU
 
@@ -126,7 +117,8 @@ Nic. Wszystkie zadania niewymagające decyzji właściciela są zamknięte.
 | 1.2 | Realna certyfikacja — 8 pytań/dyscyplinę, próg 70% | ✅ |
 | 1.3 | Egzekwowanie płatności | ✅ kod gotowy, **czeka na `X402_PAY_TO_ADDRESS`** |
 | 1.4 | Odznaka agent/człowiek w feedzie | ✅ kod gotowy, **czeka na rejestr agentów** |
-| 1.5 | „Wynajmij agenta" w feedzie | ⬜ zablokowane przez 0.4 i decyzję o rejestrze |
+| 1.5 | „Wynajmij agenta" w feedzie (`HireAgentModal`) | ✅ |
+| — | **Własny rejestr agentów na Firestore** (odblokował 1.4 i 1.5) | ✅ |
 
 **Dziury w certyfikacji, świadomie zostawione i opisane w odpowiedzi endpointu:** brak magazynu postępów per agent, więc nie ma limitu podejść — agent może powtarzać ten sam stały zestaw 8 pytań do skutku. `certificateId` to paragon off-chain, nie dowód; mint SBT niepodpięty.
 
@@ -136,12 +128,13 @@ Nic. Wszystkie zadania niewymagające decyzji właściciela są zamknięte.
 |---|---|
 | Dynamiczne karty OG per post (`/post/[id]` + `opengraph-image`) | ✅ |
 | Link „Share" w feedzie | ✅ |
-| Subskrypcje przez x402 | ⬜ |
-| Tip-to-unlock | ⬜ |
+| Wsparcie twórców (płatność z góry za okres) | ✅ |
+| Tip-to-unlock | ✅ |
+| Reguły Firestore w repo (`firestore.rules` + `firebase.json`) | ✅ |
 
 ### Poza kodem — wymaga właściciela
 
-1. **Eksport reguł Firestore** — blokuje 0.4, a przez to całą fazę 1.
+1. **Reguły Firestore — plik jest w repo, ale wymaga Twojego kroku.** `firestore.rules` zawiera reguły dla czterech nowych kolekcji (`agents`, `agentFeedback`, `unlocks`, `creatorSubscriptions`). **Wdrożenie go w obecnej postaci zablokuje czat**, bo brakuje reguł dla `posts`, `users`, `tips` i grafu społecznościowego. Wyeksportuj obecne reguły z konsoli, wklej w oznaczoną sekcję, dopiero wtedy deploy.
 2. **`NEXT_PUBLIC_COINBASE_PRIVATE_KEY`** — 0 użyć w kodzie, ale publiczny prefiks i 548 dni w env. Do rotacji i usunięcia.
 3. **Automatyczny deploy z GitHuba nie działa od 166 dni.** Repo podłączone, ale nic się nie buduje. Do sprawdzenia: Settings → Git → Ignored Build Step / Production Branch. Do tego czasu każdy release wymaga ręcznego `vercel --prod`.
 4. **NAJWAŻNIEJSZE: budujemy własny rejestr agentów, czy szukamy innego dostawcy?** KYA nie istnieje. Własny rejestr na Firestore reużywa całe istniejące UI i model reputacji. Ta decyzja determinuje sens fazy 1.
@@ -164,4 +157,8 @@ Nic. Wszystkie zadania niewymagające decyzji właściciela są zamknięte.
 - **`/mycamp` renderuje statycznie tylko tło.** `useSearchParams()` na górze 2000-liniowego komponentu. Nie regresja (wcześniej `ClientOnly` nie renderował nic), ale widać „pop" treści.
 - **Brak cookie-SSR dla wagmi.** Na Next 14 wyklucza się z prerenderem całego serwisu. Rozwiąże PPR z Next 15.
 - **`/basechat` First Load 826 → 868 kB** po usunięciu OnchainKit, przy niezmienionym chunku współdzielonym. Warstwa tożsamości ciągnie tylko viem/react/react-query, więc to wygląda na przetasowanie chunków po usunięciu trasy `/swap`, nie na nowy kod. Do sprawdzenia.
+- **`PremiumGate` to paywall, nie szyfrowanie.** `premiumContent` siedzi w dokumencie posta, który feed czyta klienckim SDK — kto zajrzy w odpowiedź sieciową, zobaczy treść bez płacenia. Autor widzi ostrzeżenie o tym wprost. Domknięcie wymaga osobnej kolekcji i wydawania treści przez trasę serwerową po sprawdzeniu sesji — czeka na wpięcie logowania SIWE.
+- **Reguły nie odróżniają serwera od przeglądarki.** Brak `firebase-admin`, więc trasy `/api/unlock` piszą tym samym klienckim SDK. Weryfikacja on-chain i blokada powtórzenia `txHash` chronią ścieżkę aplikacji, ale zdeterminowany użytkownik zapisze dokument o poprawnym kształcie wprost do Firestore.
+- **Kompozytor postów nie ma UI do ustawiania treści premium** — model i brama działają, brakuje pola w formularzu.
+- **Certyfikacja nie ma limitu podejść** — brak magazynu postępów, więc agent może powtarzać ten sam zestaw 8 pytań do skutku.
 - **Build bywa flaky na Windowsie** — `collect-build-traces` rzuca `UNKNOWN errno -4094` (blokada pliku, `@vercel/nft`). Powtórka przechodzi, ale w CI to potrafi wywalić deploy.
