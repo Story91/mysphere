@@ -94,6 +94,10 @@ const nextConfig = {
       // Trasy wylaczone na czas redefinicji MySphere. Lista zyje w
       // config/routeStatus.js - kod stron zostaje nietkniety w repo.
       // permanent: false, zeby przegladarki nie zapamietaly tego na stale.
+      // MySphere === BaseChat. Wczesniej app/page.tsx renderowal null i robil
+      // router.replace w useEffect - czyli pusty ekran, potem skok. Serwerowe
+      // przekierowanie jest natychmiastowe i nie wymaga zaladowania JS-a.
+      { source: '/', destination: '/basechat', permanent: false },
       ...buildRedirects(),
       {
         source: '/:path*',

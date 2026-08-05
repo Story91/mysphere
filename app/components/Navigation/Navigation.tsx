@@ -118,12 +118,13 @@ export default function Navigation() {
   // ponizej, zeby nawigacja nie prowadzila w przekierowanie. Wpisy zostaja tu
   // celowo - powrot trasy to usuniecie jej z DISABLED_ROUTES, bez ruszania UI.
   const allNavLinks: NavLink[] = [
-    { href: '/', label: 'MySphere' },
+    // MySphere === BaseChat. `/` to tylko przekierowanie na /basechat
+    // (obsluzone serwerowo w next.config.js), wiec kierujemy tu wprost.
+    { href: '/basechat', label: 'MySphere' },
     { href: '/base', label: 'MyBase' },
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
-    { href: '/basechat', label: 'BaseChat' },
     { href: '#', label: 'Re-Definition', isDisabled: true },
   ];
 
@@ -133,7 +134,6 @@ export default function Navigation() {
 
   const linkTheme: Record<string, { suffix: string; border: string; hoverBorder: string }> = {
     MySphere: { suffix: 'text-fuchsia-600', border: 'border-fuchsia-200', hoverBorder: 'hover:border-fuchsia-300' },
-    BaseChat: { suffix: 'text-[#0052FF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
     MyBase: { suffix: 'text-[#0052FF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
     MyCamp: { suffix: 'text-orange-600', border: 'border-orange-200', hoverBorder: 'hover:border-orange-300' },
     MyAgents: { suffix: 'text-cyan-600', border: 'border-cyan-200', hoverBorder: 'hover:border-cyan-300' },
