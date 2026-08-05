@@ -19,10 +19,12 @@ import CommentTransactionButtonCelo from '../Celo/components/CommentTransactionB
 import CommentTransactionButtonEthereum from '../ETH/components/CommentTransactionButtonEthereum';
 import CommentTransactionButtonWorldChain from '../World/components/CommentTransactionButtonWorldChain';
 import CommentTransactionButtonLinea from '../Linea/components/CommentTransactionButtonLinea';
+import CommentTransactionButtonRobinhood from '../Robinhood/components/CommentTransactionButtonRobinhood';
 import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
 import { CELO_CHAIN_ID } from '../Celo/config/CeloNetworkConfig';
 import { ETHEREUM_CHAIN_ID } from '../ETH/config/EthereumNetworkConfig';
 import { WORLD_CHAIN_ID } from '../World/config/WorldChainNetworkConfig';
+import { ROBINHOOD_CHAIN_ID } from '../Robinhood/config/RobinhoodNetworkConfig';
 import { LINEA_CHAIN_ID } from '../Linea/config/LineaNetworkConfig';
 import { base, baseSepolia } from 'wagmi/chains';
 import TipButton from './TipButton';
@@ -102,7 +104,7 @@ const formatNumberWithSuffix = (value: number | string): string => {
 
 export interface ExtendedPost extends Post {
   pollId?: string;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
   // 🚀 Paid Pin fields
   isPaidPin?: boolean;
   pinExpiresAt?: number;
@@ -542,7 +544,7 @@ function PostList({
     
     try {
       // Określ network na podstawie networkChainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
+      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | undefined = undefined;
       if (networkChainId === base.id || networkChainId === baseSepolia.id) {
         network = 'base';
       } else if (networkChainId === BASECAMP_CHAIN_ID) {
@@ -555,6 +557,8 @@ function PostList({
         network = 'ethereum';
       } else if (networkChainId === WORLD_CHAIN_ID) {
         network = 'worldchain';
+      } else if (networkChainId === ROBINHOOD_CHAIN_ID) {
+        network = 'robinhood';
       }
 
       const newComment: Comment = {
@@ -852,7 +856,7 @@ function PostList({
     
     try {
       // Określ network na podstawie networkChainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
+      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | undefined = undefined;
       if (networkChainId === base.id || networkChainId === baseSepolia.id) {
         network = 'base';
       } else if (networkChainId === BASECAMP_CHAIN_ID) {
@@ -865,6 +869,8 @@ function PostList({
         network = 'ethereum';
       } else if (networkChainId === WORLD_CHAIN_ID) {
         network = 'worldchain';
+      } else if (networkChainId === ROBINHOOD_CHAIN_ID) {
+        network = 'robinhood';
       }
 
       // Dodajemy odpowiedź z poprawnie ustawionym polem replyTo
@@ -1313,6 +1319,13 @@ function PostList({
                 disabled={!newComments[post.id]?.trim()}
                 onCommentAdded={onCommentAdded}
               />
+            ) : networkChainId === ROBINHOOD_CHAIN_ID ? (
+              <CommentTransactionButtonRobinhood
+                content={newComments[post.id] || ''}
+                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
+                disabled={!newComments[post.id]?.trim()}
+                onCommentAdded={onCommentAdded}
+              />
             ) : (networkChainId === base.id || networkChainId === baseSepolia.id) ? (
               <CommentTransactionButton
                 content={newComments[post.id] || ''}
@@ -1421,6 +1434,16 @@ function PostList({
                               className="h-2.5 drop-shadow-md"
                             />
                           </div>
+                        </div>
+                      )}
+
+                      {comment.network === 'robinhood' && (
+                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
+                          <img
+                            src="/logotypy/robinhood.svg"
+                            alt="Robinhood Chain"
+                            className="w-3 h-3 drop-shadow-md"
+                          />
                         </div>
                       )}
                     </div>
@@ -1553,6 +1576,12 @@ function PostList({
                           disabled={!replyContent.trim()} 
                           onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
                         />
+                      ) : networkChainId === ROBINHOOD_CHAIN_ID ? (
+                        <CommentTransactionButtonRobinhood
+                          content={replyContent} 
+                          disabled={!replyContent.trim()} 
+                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
+                        />
                       ) : (networkChainId === base.id || networkChainId === baseSepolia.id) ? (
                       <CommentTransactionButton 
                         content={replyContent} 
@@ -1661,6 +1690,16 @@ function PostList({
                                       className="h-2 drop-shadow-md"
                                     />
                                   </div>
+                                </div>
+                              )}
+
+                              {reply.network === 'robinhood' && (
+                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
+                                  <img
+                                    src="/logotypy/robinhood.svg"
+                                    alt="Robinhood Chain"
+                                    className="w-2.5 h-2.5 drop-shadow-md"
+                                  />
                                 </div>
                               )}
                             </div>
@@ -1857,6 +1896,18 @@ function PostList({
                       className="h-3 drop-shadow-md"
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Robinhood Chain network badge */}
+              {post.network === 'robinhood' && (
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
+                  <img
+                    src="/logotypy/robinhood.svg"
+                    alt="Robinhood Chain"
+                    className="w-4 h-4 drop-shadow-md"
+                  />
+                  <span className="ml-1 text-xs text-[#00C805] font-bold drop-shadow-sm">RH</span>
                 </div>
               )}
 
@@ -2417,6 +2468,8 @@ function PostList({
                   ? 'https://worldscan.org/tx/'
                   : post.network === 'linea'
                   ? 'https://lineascan.build/tx/'
+                  : post.network === 'robinhood'
+                  ? 'https://robinhoodchain.blockscout.com/tx/'
                   : 'https://basescan.org/tx/'
               }${post.txHash}`}
               target="_blank"

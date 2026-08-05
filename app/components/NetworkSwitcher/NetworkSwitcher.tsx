@@ -11,6 +11,7 @@ import { lineaChain } from '@/app/basechat/Linea/config/LineaNetworkConfig';
 import { celoChain } from '@/app/basechat/Celo/config/CeloNetworkConfig';
 import { ethereumChain } from '@/app/basechat/ETH/config/EthereumNetworkConfig';
 import { worldChain } from '@/app/basechat/World/config/WorldChainNetworkConfig';
+import { robinhoodChain } from '@/app/basechat/Robinhood/config/RobinhoodNetworkConfig';
 
 // Definicja sieci z polskimi komentarzami
 // Definition of networks with Polish comments
@@ -70,8 +71,17 @@ const worldChainEntry = {
   bgWhite: true, // Białe tło dla World Chain
 } as const;
 
-// Kolejność: Base, Camp Mainnet, Linea, Celo, Ethereum, World Chain
-const networks = [baseEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry] as const;
+const robinhoodEntry = {
+  id: robinhoodChain.id,
+  name: 'Robinhood Chain',
+  shortName: 'RH',
+  iconUrl: '/logotypy/robinhood.svg', // Ikona dla sieci Robinhood Chain
+  color: '#00C805', // Firmowa zielen Robinhooda
+  bgWhite: false,
+} as const;
+
+// Kolejność: Base, Camp Mainnet, Linea, Celo, Ethereum, World Chain, Robinhood Chain
+const networks = [baseEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry] as const;
 type Network = (typeof networks)[number];
 
 export function NetworkSwitcher() {

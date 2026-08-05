@@ -10,7 +10,7 @@ export type GooeyNavItem = {
   onClick: () => void;
   isActive?: boolean;
   color?: string;
-  specialStyle?: 'base' | 'world' | 'celo' | 'camp' | 'linea' | 'ethereum';
+  specialStyle?: 'base' | 'world' | 'celo' | 'camp' | 'linea' | 'ethereum' | 'robinhood';
 };
 
 export type GooeyNavProps = {
@@ -64,7 +64,8 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
         </defs>
       </svg>
       
-      <div className="flex items-center justify-center gap-2 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-6 lg:gap-2 scrollbar-hide gooey-nav">
+      {/* grid-cols-7: siedem sieci w rzedzie (doszla Robinhood Chain) */}
+      <div className="flex items-center justify-center gap-2 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-7 lg:gap-2 scrollbar-hide gooey-nav">
         {items.map((item, index) => {
           const itemColor = item.color || '#3b82f6';
           const itemRgb = hexToRgb(itemColor);
@@ -119,7 +120,7 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                       ? 'bg-white border'
                       : item.specialStyle === 'camp' || item.specialStyle === 'celo'
                       ? 'border'
-                      : item.specialStyle === 'linea' || item.specialStyle === 'ethereum'
+                      : item.specialStyle === 'linea' || item.specialStyle === 'ethereum' || item.specialStyle === 'robinhood'
                       ? 'border'
                       : ''
                   }`}
@@ -136,8 +137,10 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                       ? '#7FFFD4' // jasno seledynowa
                       : item.specialStyle === 'ethereum'
                       ? '#ADD8E6' // bladoniebieska
+                      : item.specialStyle === 'robinhood'
+                      ? '#00C805' // firmowa zielen Robinhooda
                       : 'transparent',
-                    borderWidth: item.specialStyle === 'base' ? '2px' : item.specialStyle === 'world' || item.specialStyle === 'celo' || item.specialStyle === 'camp' || item.specialStyle === 'linea' || item.specialStyle === 'ethereum' ? '1px' : '0px',
+                    borderWidth: item.specialStyle === 'base' ? '2px' : item.specialStyle === 'world' || item.specialStyle === 'celo' || item.specialStyle === 'camp' || item.specialStyle === 'linea' || item.specialStyle === 'ethereum' || item.specialStyle === 'robinhood' ? '1px' : '0px',
                     zIndex: 0
                   }}
                 />
