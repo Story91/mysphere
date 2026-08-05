@@ -4,9 +4,9 @@
 import { base } from 'viem/chains';
 import { OnchainKitProvider } from '@coinbase/onchainkit';
 import { createContext, useContext, useState, useMemo } from 'react';
-import { createConfig, http } from 'wagmi';
+import { createConfig, http, cookieStorage, createStorage } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
-import { injected, walletConnect, coinbaseWallet, metaMask, safe } from 'wagmi/connectors';
+import { injected, walletConnect, baseAccount, metaMask, safe } from 'wagmi/connectors';
 import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
@@ -94,12 +94,12 @@ const COMMON_CONNECTORS = [
       iconUrl: `${APP_ORIGIN}/android-chrome-192x192.png`,
     },
   }),
-  coinbaseWallet({
+  // Dedykowany connector Base Account. Zastapil coinbaseWallet({preference:
+  // 'smartWalletOnly'}) - Base wydzielilo Base Account z konektora Coinbase
+  // Wallet, a wariant smartWalletOnly jest sciezka wygaszana.
+  baseAccount({
     appName: 'MySphere',
-    appLogoUrl: '/android-chrome-192x192.png',
-    // Force Base network for smart wallet
-    preference: 'smartWalletOnly',
-    version: '4'
+    appLogoUrl: `${APP_ORIGIN}/android-chrome-192x192.png`,
   }),
   walletConnect({
     projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '',
@@ -113,19 +113,37 @@ const COMMON_CONNECTORS = [
   safe(),
 ] as const;
 
+// Stan wagmi trzymany w COOKIE, nie w localStorage.
+// Dzieki temu serwer widzi go przy renderze (cookieToInitialState w layoucie)
+// i strona nie miga stanem "niezalogowany" przy kazdym wejsciu, czekajac az
+// klient odczyta localStorage i wykona reconnect.
+const SSR_STORAGE = {
+  ssr: true,
+  storage: createStorage({ storage: cookieStorage }),
+} as const;
+
 export const wagmiConfig = ENABLE_CAMP_MAINNET
   ? createConfig({
+      ...SSR_STORAGE,
       chains: CHAINS_WITH_CAMP_MAINNET,
       transports: TRANSPORTS_WITH_CAMP_MAINNET,
       connectors: COMMON_CONNECTORS as unknown as any,
     })
   : createConfig({
+      ...SSR_STORAGE,
       chains: CHAINS_BASE,
       transports: TRANSPORTS_BASE,
       connectors: COMMON_CONNECTORS as unknown as any,
     });
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  initialState,
+}: {
+  children: React.ReactNode;
+  /** Stan wagmi odczytany z cookie po stronie serwera (cookieToInitialState). */
+  initialState?: any;
+}) {
   const [mode, setMode] = useState<ThemeMode>('auto');
   const [style, setStyle] = useState<ThemeStyle>('base');
 
@@ -139,7 +157,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeContext.Provider value={themeValue}>
       <QueryClientProvider client={queryClient}>
-        <WagmiConfig config={wagmiConfig}>
+        <WagmiConfig config={wagmiConfig} initialState={initialState}>
           <FarcasterFrameProvider>
             <OnchainKitProvider
               apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
