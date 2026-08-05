@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isDiscipline } from "@/app/utils/myclaw/certificationExams";
+import { recordLessonCompletion } from "@/app/utils/myclaw/progress";
 import {
   MYCLAW_PRICES,
   getRequestParam,
@@ -6,6 +8,8 @@ import {
   setRequestParams,
   withMyClawPayment,
 } from "@/app/utils/myclaw/x402";
+
+const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -292,9 +296,35 @@ async function handleLesson(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Zapis ukonczenia lekcji. Adres jest OPCJONALNY - bez niego lekcja dziala
+  // jak dotad, tylko nie zasila postepu. Zapis idzie PO ustaleniu, ze lekcja
+  // istnieje (404 nie moze zaliczac niczego), i nigdy nie blokuje odpowiedzi:
+  // mergeProgress lyka wlasne bledy i zwraca false.
+  const agentAddress = request.nextUrl.searchParams.get("agentAddress");
+  const discipline = lesson.discipline;
+  let progressRecorded = false;
+  let progressNote =
+    "Pass ?agentAddress=0x... to record this lesson as completed in your certification progress.";
+
+  if (agentAddress && !EVM_ADDRESS_RE.test(agentAddress)) {
+    progressNote = "agentAddress was ignored - it is not a valid Ethereum address.";
+  } else if (agentAddress && !isDiscipline(discipline)) {
+    progressNote = `Lesson discipline "${discipline}" is not a certification discipline - progress was not recorded.`;
+  } else if (agentAddress && isDiscipline(discipline)) {
+    progressRecorded = await recordLessonCompletion(agentAddress, discipline, id);
+    progressNote = progressRecorded
+      ? `Lesson recorded as completed for ${agentAddress.toLowerCase()} in discipline "${discipline}".`
+      : "Progress store write failed - the lesson was served but completion was not recorded.";
+  }
+
   return NextResponse.json({
     id,
     ...lesson,
+    progress: {
+      agentAddress: agentAddress ?? null,
+      recorded: progressRecorded,
+      note: progressNote,
+    },
     payment: paymentInfo(MYCLAW_PRICES.lesson, `MyClaw lesson: ${lesson.title}`),
   });
 }

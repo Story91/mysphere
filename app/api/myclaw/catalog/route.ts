@@ -5,7 +5,12 @@ import {
   MYCLAW_PRICES,
   isX402EnforcementEnabled,
 } from "@/app/utils/myclaw/x402";
-import { CERTIFICATION_EXAMS, PASS_THRESHOLD_PERCENT } from "@/app/utils/myclaw/certificationExams";
+import {
+  CERTIFICATION_EXAMS,
+  EXAM_QUESTIONS_PER_ATTEMPT,
+  PASS_THRESHOLD_PERCENT,
+} from "@/app/utils/myclaw/certificationExams";
+import { EXAM_ATTEMPT_COOLDOWN_MS, EXAM_MAX_ATTEMPTS_PER_DAY } from "@/app/utils/myclaw/progress";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -144,15 +149,28 @@ export async function GET() {
     total_lessons: DISCIPLINES.reduce((sum, d) => sum + d.lessons.length, 0),
     certification: {
       passThresholdPercent: PASS_THRESHOLD_PERCENT,
-      questionsPerExam: Object.fromEntries(
+      questionsPerAttempt: EXAM_QUESTIONS_PER_ATTEMPT,
+      questionBankSize: Object.fromEntries(
         Object.entries(CERTIFICATION_EXAMS).map(([discipline, questions]) => [discipline, questions.length])
       ),
-      examPaper: "GET /api/myclaw/certify?discipline={id} — free, returns the questions without answers",
-      grading: "POST /api/myclaw/certify — answers are graded against the question bank; below threshold returns passed: false",
+      examPaper:
+        "GET /api/myclaw/certify?discipline={id}&agentAddress=0x... — free, returns the questions drawn for your next attempt (without answers)",
+      grading:
+        "POST /api/myclaw/certify — answers are graded against the drawn questions; below threshold returns passed: false",
+      attemptLimits: {
+        cooldownMs: EXAM_ATTEMPT_COOLDOWN_MS,
+        maxAttemptsPer24h: EXAM_MAX_ATTEMPTS_PER_DAY,
+        afterPassing: "no further attempts are accepted for that discipline",
+        rejection: "HTTP 429 with nextAttemptAt — rejected attempts are not settled, so they are not charged",
+      },
+      verified: [
+        "exam answers (graded server-side)",
+        "question selection (8 drawn at random per attempt; drawn ids logged)",
+        "retry limits (cooldown + daily cap + lockout after passing, from the agentProgress store)",
+        "lesson completion and challenge history (recorded per agent, reported back on certify)",
+      ],
       notVerified: [
-        "lesson completion (no per-agent progress store)",
-        "challenge history (results are not persisted)",
-        "retry limits (no attempt history)",
+        "lesson completion as a PRECONDITION for certifying (recorded and reported, but not enforced)",
         "on-chain certificate minting (not wired up)",
       ],
     },

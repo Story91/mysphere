@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { disciplineForLessonId } from "@/app/utils/myclaw/certificationExams";
+import { recordChallengeResult } from "@/app/utils/myclaw/progress";
 import {
   MYCLAW_PRICES,
   getRequestParam,
@@ -6,6 +8,8 @@ import {
   setRequestParams,
   withMyClawPayment,
 } from "@/app/utils/myclaw/x402";
+
+const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,7 +90,7 @@ async function handleChallenge(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  let body: { answers?: number[] };
+  let body: { answers?: number[]; agentAddress?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -121,14 +125,45 @@ async function handleChallenge(request: NextRequest): Promise<NextResponse> {
   const total = results.length;
   const passed = score === total;
 
+  // Zapis wyniku do postepu agenta. Adres OPCJONALNY - bez niego wyzwanie
+  // dziala jak dotad. Dyscypline bierzemy z prefiksu id ("sec-101" -> security).
+  const agentAddress = typeof body.agentAddress === "string" ? body.agentAddress : null;
+  const discipline = disciplineForLessonId(id);
+  let progressRecorded = false;
+  let progressNote =
+    "Pass agentAddress in the body to record this challenge result in your certification progress.";
+
+  if (agentAddress && !EVM_ADDRESS_RE.test(agentAddress)) {
+    progressNote = "agentAddress was ignored - it is not a valid Ethereum address.";
+  } else if (agentAddress && !discipline) {
+    progressNote = `Challenge id "${id}" does not map to a certification discipline - progress was not recorded.`;
+  } else if (agentAddress && discipline) {
+    progressRecorded = await recordChallengeResult(agentAddress, discipline, {
+      challengeId: id,
+      attemptedAt: Date.now(),
+      score,
+      total,
+      passed,
+    });
+    progressNote = progressRecorded
+      ? `Result recorded for ${agentAddress.toLowerCase()} in discipline "${discipline}".`
+      : "Progress store write failed - the challenge was graded but the result was not recorded.";
+  }
+
   return NextResponse.json({
     lessonId: id,
+    discipline,
     score,
     total,
     passed,
     results,
+    progress: {
+      agentAddress: agentAddress ?? null,
+      recorded: progressRecorded,
+      note: progressNote,
+    },
     payment: paymentInfo(MYCLAW_PRICES.challenge, `MyClaw challenge: ${id}`),
-    note: "Challenge results are not persisted. Certification grading (/api/myclaw/certify) evaluates its own exam and cannot read this result.",
+    note: "Challenge results are persisted per agent in agentProgress and are reported back by /api/myclaw/certify. They are informational - passing a challenge is not a precondition for the certification exam.",
   });
 }
 

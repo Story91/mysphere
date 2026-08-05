@@ -163,5 +163,95 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+
+    // ========================================================================
+    // POSTEPY AGENTOW W MYCLAW ACADEMY
+    // ========================================================================
+    // docId = "{agentAddress_lowercase}__{discipline}" - zapis idempotentny,
+    // odczyt po kluczu, bez indeksow zlozonych (ten sam wzorzec co `unlocks`).
+    //
+    // NAJWAZNIEJSZA REGULA TEJ SEKCJI: `examAttempts` (log podejsc do egzaminu)
+    // jest TYLKO DOPISYWALNY. Gdyby dalo sie go skrocic albo nadpisac, agent
+    // kasowalby historie i obchodzil cooldown oraz limit dzienny - czyli
+    // wracalibysmy do brute-force'owania egzaminu za $0.01 od proby. To samo
+    // dotyczy `challengeLog`, `completedLessons` i `passedChallenges`.
+    //
+    // `certified` jest jednokierunkowe (false -> true): po zdaniu dyscyplina
+    // jest zamknieta i nikt nie moze jej "odzdac", zeby dostac nowe podejscia.
+    match /agentProgress/{progressId} {
+      function isAgentAddr(v) {
+        return v is string && v.matches('^0x[0-9a-f]{40}$');
+      }
+
+      function validIdentity() {
+        return isAgentAddr(request.resource.data.agentAddress)
+            && request.resource.data.agentAddress == request.resource.data.agentAddress.lower()
+            && request.resource.data.discipline in ['trading','defi','security','social','creative']
+            && progressId == request.resource.data.agentAddress + '__' + request.resource.data.discipline
+            && request.resource.data.updatedAt is number;
+      }
+
+      // Pole listowe jest opcjonalne (dokument powstaje przy pierwszym zapisie
+      // i moze zawierac tylko czesc pol), ale jesli jest - musi byc lista.
+      function listOk(field) {
+        return !(field in request.resource.data) || request.resource.data[field] is list;
+      }
+
+      // TYLKO DOPISYWANIE: nowa lista musi zawierac wszystkie dotychczasowe
+      // elementy i nie moze byc krotsza. To odrzuca skrocenie tablicy, podmiane
+      // wpisow, arrayRemove oraz usuniecie calego pola (deleteField) - czyli
+      // kazdy sposob skasowania historii podejsc.
+      //
+      // Swiadomie NIE wymuszamy zachowania KOLEJNOSCI (dalby to warunek na
+      // prefiksie listy): przestawienie wpisow niczego nie obchodzi, bo limity
+      // licza sie z timestampow, a nie z pozycji w tablicy.
+      function appendOnly(field) {
+        return !(field in resource.data)
+            || ( field in request.resource.data
+                 && request.resource.data[field] is list
+                 && request.resource.data[field].size() >= resource.data[field].size()
+                 && request.resource.data[field].hasAll(resource.data[field]) );
+      }
+
+      // Odznaki i historia sa publiczne - tak jak reputacja agentow wyzej.
+      allow read: if true;
+
+      allow create: if validIdentity()
+                    && listOk('completedLessons')
+                    && listOk('passedChallenges')
+                    && listOk('challengeLog')
+                    && listOk('examAttempts')
+                    && (!('certified' in request.resource.data)
+                        || request.resource.data.certified is bool)
+                    // Certyfikat nie moze powstac bez ani jednego podejscia.
+                    && (!('certified' in request.resource.data)
+                        || request.resource.data.certified == false
+                        || ('examAttempts' in request.resource.data
+                            && request.resource.data.examAttempts.size() > 0));
+
+      allow update: if validIdentity()
+                    // Tozsamosc dokumentu jest niezmienna.
+                    && request.resource.data.agentAddress == resource.data.agentAddress
+                    && request.resource.data.discipline == resource.data.discipline
+                    && listOk('completedLessons')
+                    && listOk('passedChallenges')
+                    && listOk('challengeLog')
+                    && listOk('examAttempts')
+                    && appendOnly('completedLessons')
+                    && appendOnly('passedChallenges')
+                    && appendOnly('challengeLog')
+                    && appendOnly('examAttempts')
+                    // certified: tylko false -> true, nigdy z powrotem.
+                    && (!('certified' in resource.data)
+                        || resource.data.certified != true
+                        || request.resource.data.certified == true)
+                    // Znacznik ostatniej proby nie moze sie cofnac.
+                    && (!('lastAttemptAt' in resource.data)
+                        || (request.resource.data.lastAttemptAt is number
+                            && request.resource.data.lastAttemptAt >= resource.data.lastAttemptAt));
+
+      // Kasowanie postepu = kasowanie limitu prob. Nigdy.
+      allow delete: if false;
+    }
   }
 }
