@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { getPostForShare, shortAddress } from '../../utils/posts/getPostForShare';
+import { getPostForShare, getPostTipTotals, shortAddress } from '../../utils/posts/getPostForShare';
 
 /**
  * Karta OG generowana per post.
@@ -17,8 +17,32 @@ export const alt = 'Post on MySphere';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
+/**
+ * Kwoty sumowane per token - ETH dodane do USDC nie znaczyloby nic.
+ * Pokazujemy najwyzej dwa najwieksze, zeby stopka karty zostala czytelna.
+ */
+function formatTips(totals: Record<string, number>): string | null {
+  const parts = Object.entries(totals)
+    .filter(([, amount]) => amount > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([token, amount]) => {
+      const value =
+        amount >= 1
+          ? amount.toFixed(2).replace(/\.00$/, '')
+          : amount.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+      return `${value} ${token}`;
+    });
+
+  return parts.length ? parts.join(' + ') : null;
+}
+
 export default async function Image({ params }: { params: { id: string } }) {
-  const post = await getPostForShare(params.id);
+  const [post, tipTotals] = await Promise.all([
+    getPostForShare(params.id),
+    getPostTipTotals(params.id),
+  ]);
+  const tips = formatTips(tipTotals);
 
   const author = post?.authorName || shortAddress(post?.author ?? '');
   // Tresc przycieta tak, zeby zmiescila sie bez lamania layoutu obrazka.
@@ -86,7 +110,22 @@ export default async function Image({ params }: { params: { id: string } }) {
         >
           <div style={{ display: 'flex' }}>{author}</div>
           {post && (
-            <div style={{ display: 'flex', gap: '28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
+              {/* Kwota idzie PRZED lajkami i na zielono. To jedyna liczba na tej
+                  karcie, ktora kazdy moze sprawdzic u zrodla - i jedyna, dla
+                  ktorej ktos wysle ten link dalej. */}
+              {tips && (
+                <div
+                  style={{
+                    display: 'flex',
+                    color: '#00E28A',
+                    fontWeight: 600,
+                    fontSize: '28px',
+                  }}
+                >
+                  {tips} in tips
+                </div>
+              )}
               <div style={{ display: 'flex' }}>{post.likes} likes</div>
               <div style={{ display: 'flex' }}>{post.commentCount} comments</div>
             </div>

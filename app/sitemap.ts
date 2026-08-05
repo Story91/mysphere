@@ -26,6 +26,8 @@ const BASE_URL = 'https://mysphere.fun';
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: 'daily' | 'weekly' | 'monthly' }[] = [
   { path: '/basechat', priority: 1, changeFrequency: 'daily' },
   { path: '/re-definition', priority: 0.9, changeFrequency: 'weekly' },
+  // Paragony (/tip/[txHash]) celowo NIE trafiaja do sitemapy: sa niezmienne i
+  // istnieja po to, zeby ktos je WYSLAL, a nie zeby crawler je zindeksowal.
   { path: '/Docs', priority: 0.6, changeFrequency: 'monthly' },
 ];
 

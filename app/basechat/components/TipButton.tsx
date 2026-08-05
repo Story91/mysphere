@@ -169,20 +169,45 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         
         if (txHash) {
           const explorerLink = getExplorerTxLink(selectedNetwork, txHash);
+          // Paragon dostaje pierwszenstwo przed linkiem do eksploratora.
+          // Eksplorator jest dowodem dla jednej osoby; paragon jest tym samym
+          // dowodem w formie, ktora da sie komus wyslac - z wlasna karta OG,
+          // wiec podglad linku pokazuje kwote, zanim ktokolwiek kliknie.
+          const receiptLink = `/tip/${txHash}`;
           setTimeout(() => {
             toast.success(
-              <div className="flex flex-col gap-1">
-                <span>View on {selectedNetworkConfig?.name}:</span>
-                <a 
-                  href={explorerLink} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:text-blue-700 underline text-xs"
-                >
-                  {txHash.slice(0, 16)}...
-                </a>
+              <div className="flex flex-col gap-1.5">
+                <span className="font-medium">Receipt ready to share</span>
+                <div className="flex items-center gap-3 text-xs">
+                  <a
+                    href={receiptLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-500 underline hover:text-blue-700"
+                  >
+                    Open receipt
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}${receiptLink}`);
+                      toast.success('Receipt link copied');
+                    }}
+                    className="text-blue-500 underline hover:text-blue-700"
+                  >
+                    Copy link
+                  </button>
+                  <a
+                    href={explorerLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-400 underline hover:text-gray-200"
+                  >
+                    {selectedNetworkConfig?.name}
+                  </a>
+                </div>
               </div>,
-              { duration: 10000 }
+              { duration: 12000 }
             );
           }, 2000);
         }
