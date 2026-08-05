@@ -10,6 +10,7 @@ import SoftTabs from './SoftTabs';
 import SoftComposerPill from './SoftComposerPill';
 import SoftDock, { SOFT_DOCK_ICONS } from './SoftDock';
 import SoftPostCard from './SoftPostCard';
+import SoftTrends from './SoftTrends';
 
 /**
  * Kierunek Soft Social na ZYWYCH danych.
@@ -129,6 +130,20 @@ export default function SoftFeedPage() {
         </span>
       </header>
 
+      {activeSection === 'trends' ? (
+        <SoftTrends
+          tickers={[
+            { symbol: 'BTC', price: '$114,236', change: '0.8%', isUp: true },
+            { symbol: 'ETH', price: '$4,861', change: '1.2%', isUp: true },
+            { symbol: 'SOL', price: '$212', change: '0.4%', isUp: false },
+          ]}
+          stats={[
+            { label: 'Posts', value: String(posts.length) },
+            { label: 'Networks', value: '8' },
+          ]}
+        />
+      ) : (
+      <>
       <SoftStoryRail activeNetwork={activeNetwork} onSelect={setActiveNetwork} />
       <SoftTabs tabs={TABS} activeTab={activeTab} onSelect={setActiveTab} />
 
@@ -184,6 +199,8 @@ export default function SoftFeedPage() {
             />
           ))}
       </main>
+      </>
+      )}
 
       <SoftDock
         items={[

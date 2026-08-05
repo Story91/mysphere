@@ -405,3 +405,22 @@ h1, h2, h3, h4, h5, h6 {
 .bg-clip-text.text-transparent {
   -webkit-text-fill-color: transparent;
 }
+
+/* Tasma kursow w widoku Trends (app/basechat/soft/SoftTrends.tsx).
+   Przesuwamy o -50%, bo zawartosc jest zduplikowana - petla nie ma wtedy szwu.
+   linear jest tu jedynym poprawnym wyborem: przyspieszanie i zwalnianie tasmy
+   wyglada jak zacinanie, a nie jak ruch. */
+.soft-marquee {
+  animation: soft-marquee-scroll 32s linear infinite;
+}
+
+@keyframes soft-marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Dekoracja - przy ograniczonym ruchu znika bez straty informacji,
+   bo kursy sa nadal czytelne, tylko nieruchome. */
+@media (prefers-reduced-motion: reduce) {
+  .soft-marquee { animation: none; }
+}
