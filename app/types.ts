@@ -29,6 +29,14 @@ export interface Post {
   pinOwner?: string;
   pinAmountPaid?: string;
   pinTxHash?: string;
+  // 💰 Tip-to-unlock: wszystkie pola OPCJONALNE, wiec istniejace posty bez nich
+  // renderuja sie dokladnie jak dotad. Szczegoly: app/utils/monetization/types.ts
+  /** Tresc widoczna dopiero po mikroplatnosci. Brak = post nie jest premium. */
+  premiumContent?: string;
+  /** Cena odblokowania jako string dziesietny, np. "0.5". */
+  unlockPrice?: string;
+  /** Token ceny. Brak = USDC (domyslny, bo w pelni weryfikowalny na serwerze). */
+  unlockToken?: 'ETH' | 'USDC';
   // 🎵 Music attachment field
   musicTrack?: {
     id: string;           // Spotify track ID

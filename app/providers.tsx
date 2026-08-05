@@ -2,7 +2,6 @@
 'use client';
 
 import { base } from 'viem/chains';
-import { OnchainKitProvider } from '@coinbase/onchainkit';
 import { createContext, useContext, useState, useMemo } from 'react';
 import { createConfig, http, cookieStorage, createStorage } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
@@ -166,31 +165,7 @@ export function Providers({
       <QueryClientProvider client={queryClient}>
         <WagmiConfig config={wagmiConfig} initialState={initialState}>
           <FarcasterFrameProvider>
-            <OnchainKitProvider
-              apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-              chain={base}
-              config={{
-                appearance: {
-                  name: 'MySphere',
-                  logo: '/android-chrome-192x192.png',
-                  mode: 'auto',
-                  theme: 'base',
-                },
-                wallet: {
-                  display: 'modal',
-                  termsUrl: 'https://mysphere.fun/docs',
-                  privacyUrl: 'https://mysphere.fun/docs',
-                  supportedWallets: {
-                    rabby: true,
-                    trust: true,
-                    frame: true,
-                  },
-                }
-              }}
-              projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
-            >
-              {children}
-            </OnchainKitProvider>
+            {children}
           </FarcasterFrameProvider>
         </WagmiConfig>
       </QueryClientProvider>

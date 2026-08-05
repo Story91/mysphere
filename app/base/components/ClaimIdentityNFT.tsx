@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
-import { useName } from '@coinbase/onchainkit/identity';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { useName } from '../../utils/identity';
 import { base } from 'wagmi/chains';
 import ProfileCard from '@/components/ProfileCard';
 import '@/components/ProfileCard.css';

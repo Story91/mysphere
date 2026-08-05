@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
-import { IdentityCard } from '@coinbase/onchainkit/identity';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { IdentityCard } from '../../components/identity';
 import { base } from 'wagmi/chains';
 import { ArrowUpRight, Coins, Image, FileCode2, Trophy, Zap, Star, TrendingUp } from 'lucide-react';
 import BaseCard, { BaseCardContent, BaseCardHeader, BaseStatsCard } from './BaseCard';

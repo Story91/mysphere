@@ -76,12 +76,6 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pl" className={`${bodyFont.variable} ${headingFont.variable}`}>
-      <head>
-        {/* Arkusz OnchainKit serwowany same-origin. Nie da sie go zaimportowac
-            przez bundler - Tailwind odrzuca ten plik ("@layer base is used but
-            no matching @tailwind base"), wiec kopiuje go skrypt prebuild. */}
-        <link rel="stylesheet" href="/vendor/onchainkit.css" />
-      </head>
       <body className="min-h-screen bg-white">
         <AppShell>{children}</AppShell>
 

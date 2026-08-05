@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
 import { Toaster } from 'react-hot-toast';
 import Navigation from './Navigation/Navigation';
 import { ThemeProvider } from '../context/ThemeContext';
@@ -17,7 +16,6 @@ import { installMerkleProxy } from '../utils/merkleProxy';
  * spinner, a metadane byly generowane po stronie klienta.
  *
  * Tutaj laduje wylacznie to, co naprawde potrzebuje przegladarki:
- *  - usePathname (decyduje, czy pokazac nawigacje na stronie glownej),
  *  - providery Reactowe (wagmi / react-query / OnchainKit / motyw),
  *  - installMerkleProxy - UWAGA: to bylo wczesniej wolane w efekcie ClientOnly.
  *    Zdjecie globalnego ClientOnly bez przeniesienia tego zabiloby przekierowanie
@@ -29,8 +27,6 @@ import { installMerkleProxy } from '../utils/merkleProxy';
  * uzywac <ClientOnly>, zamiast wstrzymywac cala aplikacje.
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isHomepage = pathname === '/';
 
   useEffect(() => {
     installMerkleProxy();
@@ -39,7 +35,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <Providers>
-        {!isHomepage && <Navigation />}
+        <Navigation />
         <main className="w-full">{children}</main>
 
         <Toaster

@@ -4,22 +4,10 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  ConnectWallet,
-  Wallet,
-  WalletDropdown,
-  WalletDropdownDisconnect,
-  WalletDropdownBasename,
-  WalletDropdownFundLink,
-} from '@coinbase/onchainkit/wallet';
-import {
-  Address,
-  Avatar,
-  Name,
-  Identity,
-  EthBalance,
-} from '@coinbase/onchainkit/identity';
+import WalletButton from '../wallet/WalletButton';
 import { useState } from 'react';
+// @ts-ignore - config CommonJS wspoldzielony z next.config.js
+import { isRouteDisabled } from '@/config/routeStatus';
 import { useFundingUrl } from './useFundingUrl';
 import { NetworkSwitcher } from '../NetworkSwitcher';
 import { NotificationsBell } from './NotificationsBell';
@@ -36,57 +24,6 @@ import { NotificationsBell } from './NotificationsBell';
    px-4 py-3, podczas gdy nasze <Link> mialy px-4 py-2, wiec ikony i etykiety
    nie trzymaly linii.
 --------------------------------------------------------------------------- */
-const DROPDOWN_SURFACE = [
-  '!w-[300px] max-[360px]:!w-[calc(100vw-24px)]',
-  '!p-0 !overflow-hidden !rounded-2xl',
-  '!bg-[#0A1024]/95 !backdrop-blur-xl',
-  '!border !border-white/10',
-  '!shadow-[0_24px_64px_-16px_rgba(0,0,0,0.75)]',
-  'wallet-dropdown',
-].join(' ');
-
-const DROPDOWN_ROW_BASE = [
-  '!flex !items-center !gap-3 !w-full',
-  '!px-4 !py-2.5',
-  '!bg-transparent',
-  '!text-[13px] !font-medium !text-[#C7D4EE]',
-  'transition-colors duration-150',
-].join(' ');
-
-const DROPDOWN_ROW = `${DROPDOWN_ROW_BASE} hover:!bg-white/[0.06] hover:!text-[#EEF3FF]`;
-
-/** Staly 16px slot na ikone - gwarantuje, ze etykiety trzymaja jedna os. */
-function IconSlot({ children }: { children: React.ReactNode }) {
-  return (
-    <svg
-      className="h-4 w-4 shrink-0 text-[#7E93BC]"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  );
-}
-
-/** Znak wyjscia poza aplikacje - niesie informacje, nie dekoruje. */
-function ExternalMark() {
-  return (
-    <svg
-      className="h-3 w-3 shrink-0 text-[#5C6F94]"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      aria-hidden="true"
-    >
-      <path d="M7 17 17 7M17 7H9m8 0v8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 type NavLink = {
   href: string;
   label: string;
@@ -103,17 +40,27 @@ export default function Navigation() {
     router.push('/basechat?view=notifications');
   };
 
-  const navLinks: NavLink[] = [
-    { href: '/', label: 'MySphere' },
+  // Pelna lista tras. Te wylaczone (config/routeStatus.js) sa odfiltrowywane
+  // ponizej, zeby nawigacja nie prowadzila w przekierowanie. Wpisy zostaja tu
+  // celowo - powrot trasy to usuniecie jej z DISABLED_ROUTES, bez ruszania UI.
+  const allNavLinks: NavLink[] = [
+    // MySphere === BaseChat. `/` to tylko przekierowanie na /basechat
+    // (obsluzone serwerowo w next.config.js), wiec kierujemy tu wprost.
+    { href: '/basechat', label: 'MySphere' },
     { href: '/base', label: 'MyBase' },
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
-    { href: '#', label: 'Re-Definition', isDisabled: true },
+    { href: '/re-definition', label: 'Re-Definition' },
   ];
+
+  const navLinks: NavLink[] = allNavLinks.filter(
+    (link) => link.href === '#' || !isRouteDisabled(link.href)
+  );
 
   const linkTheme: Record<string, { suffix: string; border: string; hoverBorder: string }> = {
     MySphere: { suffix: 'text-fuchsia-600', border: 'border-fuchsia-200', hoverBorder: 'hover:border-fuchsia-300' },
+    'Re-Definition': { suffix: 'text-[#5B8CFF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
     MyBase: { suffix: 'text-[#0052FF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
     MyCamp: { suffix: 'text-orange-600', border: 'border-orange-200', hoverBorder: 'hover:border-orange-300' },
     MyAgents: { suffix: 'text-cyan-600', border: 'border-cyan-200', hoverBorder: 'hover:border-cyan-300' },
@@ -211,92 +158,7 @@ export default function Navigation() {
           <div className="flex items-center space-x-2">
             <NetworkSwitcher />
             <NotificationsBell onNotificationsClick={handleNotificationsClick} />
-            <Wallet>
-              <ConnectWallet
-                className="bg-[#0052FF] hover:bg-[#0052FF]/90 rounded-xl p-2"
-                disconnectedLabel="Sign In With Base"
-              >
-                <Avatar className="h-6 w-6" />
-                <Name className="text-white inline" />
-              </ConnectWallet>
-              {/* Pozycjonowanie zostawiamy Floating UI (OnchainKit renderuje ten
-                  dropdown w FloatingPortal i ustawia position/top/left inline,
-                  kotwiczac do przycisku). Nadpisywanie tego utilities z !important
-                  wyrzucalo dropdown na dol strony. Tu ustawiamy wylacznie wyglad. */}
-              <WalletDropdown className={DROPDOWN_SURFACE}>
-                  {/* Blok tozsamosci czytany jak karta profilu, nie jak wiersz
-                      portfela - to jest apka spolecznosciowa, gdzie portfel JEST
-                      tozsamoscia (Basename, punkty Sphere). */}
-                  <Identity
-                    hasCopyAddressOnClick
-                    className="!bg-transparent !px-4 !py-4 !gap-3 border-b border-white/[0.08]"
-                  >
-                    <Avatar className="!h-10 !w-10 rounded-full ring-2 ring-[#0052FF]/70" />
-                    <Name className="!text-[15px] !font-semibold !text-[#EEF3FF] font-['Coinbase_Display']" />
-                    <Address className="!text-[12px] !text-[#93A5C9] !tabular-nums" />
-                    <EthBalance className="!text-[12px] !text-[#93A5C9] !tabular-nums" />
-                  </Identity>
-
-                  <div className="py-1">
-                    <WalletDropdownBasename className={DROPDOWN_ROW} />
-
-                    <Link
-                      href="https://keys.coinbase.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={DROPDOWN_ROW}
-                    >
-                      <IconSlot>
-                        <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                        <path d="M12 16V8m0 0-3 3m3-3 3 3" strokeLinecap="round" strokeLinejoin="round" />
-                      </IconSlot>
-                      <span className="flex-1">Wallet</span>
-                      <ExternalMark />
-                    </Link>
-
-                    <Link
-                      href="https://basescan.org"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={DROPDOWN_ROW}
-                    >
-                      <IconSlot>
-                        <path d="M21 21l-5.2-5.2m0 0A7.5 7.5 0 1 0 5.2 5.2a7.5 7.5 0 0 0 10.6 10.6Z" strokeLinecap="round" strokeLinejoin="round" />
-                      </IconSlot>
-                      <span className="flex-1">Base Scan</span>
-                      <ExternalMark />
-                    </Link>
-
-                    <Link
-                      href="https://bridge.base.org"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={DROPDOWN_ROW}
-                    >
-                      <IconSlot>
-                        <path d="M7 10v4m10-4v4M3 12h4m10 0h4M8 17h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1Z" strokeLinecap="round" strokeLinejoin="round" />
-                      </IconSlot>
-                      <span className="flex-1">Base Bridge</span>
-                      <ExternalMark />
-                    </Link>
-
-                    {/* fundingUrl podawany jawnie: bez niego OnchainKit wygasza ten
-                        wiersz dla kazdego portfela, ktory nie jest Coinbase Smart
-                        Walletem. `undefined` oddaje decyzje z powrotem OnchainKitowi. */}
-                    <WalletDropdownFundLink
-                      className={DROPDOWN_ROW}
-                      fundingUrl={fundingUrl}
-                      text="Add funds"
-                    />
-                  </div>
-
-                  <div className="border-t border-white/[0.08] py-1">
-                    <WalletDropdownDisconnect
-                      className={`${DROPDOWN_ROW_BASE} !text-[#FF8A8A] hover:!bg-[#FF6B6B]/10 hover:!text-[#FFB3B3]`}
-                    />
-                  </div>
-              </WalletDropdown>
-            </Wallet>
+            <WalletButton />
           </div>
         </div>
 

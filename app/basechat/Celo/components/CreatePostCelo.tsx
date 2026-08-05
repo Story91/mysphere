@@ -7,7 +7,9 @@ import BanRestriction from '../../../admin/components/BanRestriction';
 import TransactionButtonCelo from './TransactionButtonCelo';
 import { createPost } from '../../../utils/firebase';
 import { toast } from 'react-hot-toast';
-import { Avatar } from '@coinbase/onchainkit/identity';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+// (Base wygasilo OnchainKit 19 marca 2026)
+import { Avatar } from '../../../components/identity';
 import MusicSelector from '../../components/MusicSelector';
 import SpotifyTrackCard from '../../components/SpotifyTrackCard';
 import AIButton from '../../components/AIButton';

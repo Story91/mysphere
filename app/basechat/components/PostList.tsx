@@ -10,7 +10,8 @@ import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment,
   PostTipStats} from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-hot-toast';
-import { Avatar as CoinbaseAvatar } from '@coinbase/onchainkit/identity';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { Avatar as CoinbaseAvatar } from '../../components/identity';
 import LinkPreview from './LinkPreview';
 import CommentTransactionButton from '../../components/CommentTransactionButton';
 import CommentTransactionButtonBaseCamp from './BaseCampPosts/CommentTransactionButtonBaseCamp';
@@ -28,6 +29,14 @@ import TipButton from './TipButton';
 import TipStats from './TipStats';
 import PostAudioPlayer from './PostAudioPlayer';
 import { stopAndReset as stopAudio } from './audioPlayerStore';
+// Odznaka agent/czlowiek + trust score KYA (REDEFINICJA.md, pozycja 1.4)
+import AgentBadge from '../../components/agents/AgentBadge';
+import { useAgentLookup } from '../../components/agents/useAgentLookup';
+// Monetyzacja (REDEFINICJA.md, faza 2): tip-to-unlock + wsparcie tworcy
+import PremiumGate from '../../components/monetization/PremiumGate';
+import SubscribeButton from '../../components/monetization/SubscribeButton';
+import { useFeedUnlocks, useFeedSubscriptions } from '../../components/monetization/useFeedMonetization';
+import { hasPremiumContent } from '../../utils/monetization/types';
 
 // Import Zora SDK functions and types
 import { getProfileBalances } from '@zoralabs/coins-sdk';
@@ -294,7 +303,27 @@ function PostList({
 
     return () => { cancelled = true; };
   }, [internalPosts]);
-  
+
+  // Odznaka agenta - ten sam wzorzec, co statystyki tipow wyzej: unikalne
+  // adresy autorow zbierane RAZ dla calego feedu i jedno zapytanie zbiorcze,
+  // zamiast odpytywania KYA przy kazdym poscie. Szczegoly w useAgentLookup.ts.
+  const authorAddressesForAgents = React.useMemo(
+    () => Array.from(new Set((internalPosts || []).map(p => p.author).filter(Boolean))),
+    [internalPosts]
+  );
+  const { getAgent: getAgentInfo, loading: agentLookupLoading } = useAgentLookup(authorAddressesForAgents);
+
+  // Monetyzacja - ten sam wzorzec zbiorczy, co statystyki tipow wyzej.
+  // Odblokowania pytamy TYLKO o posty, ktore w ogole maja tresc premium, wiec
+  // feed bez takich postow (czyli caly dzisiejszy stan bazy) nie robi zadnego
+  // dodatkowego zapytania. Wsparcia - jedno zapytanie na 30 unikalnych autorow.
+  const premiumPostIds = React.useMemo(
+    () => (internalPosts || []).filter(p => hasPremiumContent(p)).map(p => p.id).filter(Boolean),
+    [internalPosts]
+  );
+  const { unlockedPostIds, markUnlocked } = useFeedUnlocks(address, premiumPostIds);
+  const { subscribedCreators, markSubscribed } = useFeedSubscriptions(address, authorAddressesForAgents);
+
   // 🎵 Stan odtwarzacza mieszka w audioPlayerStore (poza Reactem) - patrz PostAudioPlayer.
   useEffect(() => stopAudio, []);
   const publicClient = usePublicClient();
@@ -1737,7 +1766,10 @@ function PostList({
             </div>
             <div className="flex items-center">
               {displayUserName(post.author, `post-author-${post.id}`, false)}
-              
+
+              {/* Agent AI zweryfikowany w KYA. Czlowiek nie dostaje odznaki. */}
+              <AgentBadge agent={getAgentInfo(post.author)} loading={agentLookupLoading} />
+
               {/* Przypięcie - żółta gwiazdka */}
               {post.isPinned && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-yellow-50/50 dark:bg-yellow-900/20 shadow-sm">
@@ -1917,6 +1949,20 @@ function PostList({
             </div>
           )}
         </div>
+
+        {/* 💰 Tip-to-unlock: renderowane WYLACZNIE dla postow z trescia premium.
+            Post bez tych pol nie renderuje tu niczego. */}
+        {hasPremiumContent(post) && (
+          <PremiumGate
+            postId={post.id}
+            creatorAddress={post.author}
+            premiumContent={post.premiumContent as string}
+            unlockPrice={post.unlockPrice as string}
+            unlockToken={post.unlockToken}
+            isUnlocked={unlockedPostIds.has(post.id)}
+            onUnlocked={markUnlocked}
+          />
+        )}
 
         {/* Zawsze umieszczaj LinkPreview tutaj, pod treścią posta */}
         <LinkPreview content={post.content} />
@@ -2348,6 +2394,16 @@ function PostList({
             className="text-gray-900 dark:text-gray-200"
           />
 
+          {/* 🤝 Wsparcie tworcy na okres - platnosc Z GORY, bez odnawiania.
+              Stan bierze sie ze zbiorczego sprawdzenia dla calego feedu. */}
+          <SubscribeButton
+            creatorAddress={post.author}
+            creatorName={userNames[post.author]?.name}
+            isSupported={subscribedCreators.has((post.author || '').toLowerCase())}
+            onSubscribed={markSubscribed}
+            className="text-gray-900 dark:text-gray-200"
+          />
+
           {post.txHash && (
             <a
               href={`${
@@ -2431,6 +2487,23 @@ function PostList({
               </button>
             </div>
           )}
+        </div>
+
+        {/* Link do udostepnialnej trasy posta. Do tej pory posty nie mialy
+            wlasnych URL-i - caly feed to jedna strona - wiec nie bylo czego
+            wkleic. /post/[id] ma pelne metadane i wlasna karte OG. */}
+        <div className="mt-2">
+          <a
+            href={`/post/${post.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-gray-500 transition-colors hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Share
+          </a>
         </div>
 
         {/* Tip Stats - Always under action buttons for better layout */}

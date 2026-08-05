@@ -3,10 +3,13 @@
 
 import { useState, useRef, useEffect, useCallback, PropsWithChildren, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import PremiumComposer, { EMPTY_PREMIUM, type PremiumComposerValue } from '../components/monetization/PremiumComposer';
+// @ts-ignore - config CommonJS wspoldzielony z next.config.js
+import { isRouteDisabled } from '@/config/routeStatus';
 import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
-import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
-import { ConnectWallet } from '@coinbase/onchainkit/wallet';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { Identity, Name, Address, Avatar, IdentityCard, useName } from '../components/identity';
 import { parseEther } from 'viem';
 import {
   saveUserProfile, 
@@ -337,6 +340,9 @@ function BaseChatContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [posts, setPosts] = useState<ExtendedPost[]>([]);
   const [newPost, setNewPost] = useState('');
+  // Platna czesc posta. Domyslnie wylaczona - wiekszosc postow nie jest platna.
+  const [premium, setPremium] = useState<PremiumComposerValue>(EMPTY_PREMIUM);
+  const [isPremiumOpen, setIsPremiumOpen] = useState(false);
   // 🎵 Stany dla funkcjonalności muzyki
   const [selectedMusic, setSelectedMusic] = useState<any>(null);
   const [showMusicSelector, setShowMusicSelector] = useState(false);
@@ -836,6 +842,15 @@ function BaseChatContent() {
         id: tempPostId,
         author: address,
         content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -857,6 +872,15 @@ function BaseChatContent() {
       createPost({
         author: address,
         content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -883,6 +907,8 @@ function BaseChatContent() {
       // 4. Update UI
       toast.success('Post created successfully!', { id: toastId });
       setNewPost('');
+      setPremium(EMPTY_PREMIUM);
+      setIsPremiumOpen(false);
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
       setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę
@@ -1120,6 +1146,15 @@ function BaseChatContent() {
       const postDataForFirebase = {
         author: address,
         content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -1135,6 +1170,15 @@ function BaseChatContent() {
         id: `temp-${Date.now()}`,
         author: address,
         content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
         timestamp: Date.now(),
         image: imageUrl ?? undefined, // Ensure undefined if null
         video: videoUrl ?? undefined, // Ensure undefined if null
@@ -1154,6 +1198,15 @@ function BaseChatContent() {
       await createPost({
           author: address,
           content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
           timestamp: Date.now(),
           image: imageUrl,
           video: videoUrl,
@@ -1177,6 +1230,8 @@ function BaseChatContent() {
 
       // Reset form
       setNewPost('');
+      setPremium(EMPTY_PREMIUM);
+      setIsPremiumOpen(false);
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
       setUploadProgress(0);
@@ -1230,6 +1285,15 @@ function BaseChatContent() {
           await createPost({
             author: address,
             content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
             timestamp: Date.now(),
             image: imageUrl ?? undefined,
             video: videoUrl ?? undefined,
@@ -1243,6 +1307,8 @@ function BaseChatContent() {
           // Update UI
           toast.success('Post created successfully!', { id: toastId });
           setNewPost('');
+      setPremium(EMPTY_PREMIUM);
+      setIsPremiumOpen(false);
           setPostPreviewImage(null);
           setPostPreviewVideo(null);
           setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę w fallback
@@ -3207,10 +3273,14 @@ function BaseChatContent() {
                         </div>
                       </div>
 
-                      {/* Base Tracking Identity Link */}
-                      <div className="mt-4">
+                      {/* Base Tracking Identity Link.
+                          UWAGA: /base jest teraz wylaczone (config/routeStatus.js).
+                          Poprzednio kafelek wskazywal na /profile - trase, ktora
+                          NIGDY nie istniala w tym repo (brak app/profile), wiec
+                          byl to martwy link zwracajacy 404. */}
+                      <div className={`mt-4 ${isRouteDisabled('/base') ? 'hidden' : ''}`}>
                         <a
-                          href="/profile"
+                          href="/base"
                           className="block w-full p-6 bg-gradient-to-r from-gray-900 via-blue-900 to-black rounded-xl text-center hover:from-black hover:via-blue-800 hover:to-gray-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
                         >
                           <div className="flex items-center justify-center mb-3">
@@ -3628,6 +3698,19 @@ function BaseChatContent() {
                                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                                 rows={3}
                               />
+
+                              <PremiumComposer
+                                value={premium}
+                                onChange={setPremium}
+                                isOpen={isPremiumOpen}
+                                onToggle={() => {
+                                  const next = !isPremiumOpen;
+                                  setIsPremiumOpen(next);
+                                  // Zamkniecie sekcji czysci tresc, zeby nie zapisac
+                                  // platnej czesci, ktorej autor juz nie widzi.
+                                  if (!next) setPremium(EMPTY_PREMIUM);
+                                }}
+                              />
                             </div>
                           </div>
 
@@ -4038,8 +4121,10 @@ function BaseChatContent() {
                 </div>
               </div>
 
-              {/* Yaps Stats Widget */}
-              <div className="mb-4">
+              {/* Yaps Stats Widget - ukryty, gdy /yapscan jest wylaczony
+                  (config/routeStatus.js). Bez tego kafelek prowadzilby
+                  w przekierowanie z powrotem na /basechat. */}
+              <div className={`mb-4 ${isRouteDisabled('/yapscan') ? 'hidden' : ''}`}>
                 <a 
                   href="/yapscan" 
                   className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300"
