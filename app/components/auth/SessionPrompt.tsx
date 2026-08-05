@@ -27,10 +27,21 @@ import useSiweAuth from '../../utils/auth/useSiweAuth';
  *  - odrzucenie chowa pasek do konca sesji karty. Nie pytamy drugi raz.
  */
 
-const DISMISS_KEY = 'mysphere.sessionPrompt.dismissed';
+/**
+ * Odmowa jest zapamietywana NA ADRES i NA CZAS, w localStorage.
+ *
+ * Bylo w sessionStorage, czyli "do zamkniecia karty" - a to znaczylo, ze kazda
+ * nowa karta pytala od nowa. Uzytkownik, ktory raz powiedzial "nie teraz",
+ * slyszal to samo pytanie przy nastepnym wejsciu i przy kazdym kolejnym.
+ *
+ * Nie zapamietujemy odmowy na zawsze: bez podpisu Firestore widzi tego czlowieka
+ * jako anonima, wiec pytanie ma prawo wrocic - ale za tydzien, nie za minute.
+ */
+const DISMISS_PREFIX = 'mysphere.sessionPrompt.dismissed.';
+const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function SessionPrompt() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const { isAuthenticated, isLoading, signIn, error } = useSiweAuth();
 
   const [dismissed, setDismissed] = useState(true); // domyslnie ukryty do czasu odczytu
@@ -40,16 +51,25 @@ export default function SessionPrompt() {
   // trakcie i proponowal drugi podpis tej samej rzeczy.
   const [graceElapsed, setGraceElapsed] = useState(false);
 
-  // sessionStorage czytamy dopiero po zamontowaniu - inaczej render serwerowy
+  // Magazyn czytamy dopiero po zamontowaniu - inaczej render serwerowy
   // i kliencki rozjechalyby sie przy hydracji.
+  //
+  // Zaleznosc od `address`: odmowa jednego portfela nie moze uciszac pytania
+  // dla innego. Kto przepial konto, dostaje pytanie o NOWY adres.
   useEffect(() => {
+    if (!address) {
+      setDismissed(true);
+      return;
+    }
     try {
-      setDismissed(window.sessionStorage.getItem(DISMISS_KEY) === '1');
+      const raw = window.localStorage.getItem(DISMISS_PREFIX + address.toLowerCase());
+      const until = raw ? Number(raw) : 0;
+      setDismissed(Number.isFinite(until) && until > Date.now());
     } catch {
-      // tryb prywatny bez sessionStorage - pokazujemy pasek
+      // tryb prywatny bez localStorage - pokazujemy pasek
       setDismissed(false);
     }
-  }, []);
+  }, [address]);
 
   useEffect(() => {
     if (!isConnected) {
@@ -62,8 +82,12 @@ export default function SessionPrompt() {
 
   const hide = () => {
     setDismissed(true);
+    if (!address) return;
     try {
-      window.sessionStorage.setItem(DISMISS_KEY, '1');
+      window.localStorage.setItem(
+        DISMISS_PREFIX + address.toLowerCase(),
+        String(Date.now() + DISMISS_TTL_MS)
+      );
     } catch {
       // brak magazynu oznacza tylko tyle, ze pasek wroci po odswiezeniu
     }
