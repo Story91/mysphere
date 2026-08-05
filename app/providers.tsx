@@ -5,7 +5,15 @@ import { base } from 'viem/chains';
 import { createContext, useContext, useState, useMemo } from 'react';
 import { createConfig, http, cookieStorage, createStorage } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
-import { injected, walletConnect, baseAccount, metaMask, safe } from 'wagmi/connectors';
+import {
+  injected,
+  walletConnect,
+  baseAccount,
+  coinbaseWallet,
+  gemini,
+  metaMask,
+  safe,
+} from 'wagmi/connectors';
 import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
@@ -106,6 +114,17 @@ const COMMON_CONNECTORS = [
     appName: 'MySphere',
     appLogoUrl: `${APP_ORIGIN}/android-chrome-192x192.png`,
   }),
+  // Coinbase Wallet - rozlaczny przypadek wobec baseAccount. Base Account to
+  // smart wallet zakladany passkeyem; ten connector obsluguje ludzi, ktorzy maja
+  // rozszerzenie albo aplikacje Coinbase Wallet z wlasnym kluczem. Bez niego
+  // odsylalismy ich do "Browser wallet", gdzie czesto laduje inny portfel.
+  coinbaseWallet({
+    appName: 'MySphere',
+    appLogoUrl: `${APP_ORIGIN}/android-chrome-192x192.png`,
+  }),
+  // Gemini Wallet - dostarczany przez @wagmi/connectors, wiec kosztuje nas
+  // jedna linie, a komus zamyka droge do zalogowania.
+  gemini(),
   walletConnect({
     projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '',
     metadata: {

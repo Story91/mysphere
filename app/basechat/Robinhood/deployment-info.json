@@ -1,0 +1,10 @@
+{
+  "contractAddress": "0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6",
+  "deployerAddress": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "blockNumber": 28672626,
+  "timestamp": "2026-08-05T17:40:07.533Z",
+  "network": "robinhood",
+  "chainId": 4663,
+  "explorerUrl": "https://robinhoodchain.blockscout.com/address/0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6",
+  "envLine": "NEXT_PUBLIC_ROBINHOOD_POST_CONTRACT=0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6"
+}

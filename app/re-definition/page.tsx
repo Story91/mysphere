@@ -190,6 +190,11 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
     note: 'Every tip gets a page and a share card carrying the amount, both names and the transaction.',
   },
   {
+    name: 'Weekly payouts board',
+    status: 'live',
+    note: 'Who got paid in the last seven days. Settled payments only — there are no points here.',
+  },
+  {
     name: 'Paid sections',
     status: 'live',
     note: 'Text sold per post. It is stored outside the feed, so it is not in the page you did not pay for.',

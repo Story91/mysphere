@@ -64,6 +64,7 @@ i rozchodzą się same.**
 | **Publiczny profil** `/u/[address]` — Basename, policzone posty/lajki/tipy, własna karta OG | `app/u/[address]/` |
 | Post ma własny URL z metadanymi i kartą OG | `app/post/[id]/` |
 | `sitemap.xml` (500 ostatnich postów) + `robots.txt` + `llms.txt` | `app/sitemap.ts`, `app/robots.ts`, `public/llms.txt` |
+| **Ranking** `/leaderboard` — kto dostał zapłacone w 7 dni, z kartą OG niosącą 3 pierwsze nazwiska | `app/leaderboard/` |
 | Link „Public profile” i kopiowanie linku w panelu profilu | `BuilderProfile.tsx` |
 
 Paragony celowo **nie** trafiają do sitemapy — są niezmienne i istnieją po to,
@@ -102,6 +103,14 @@ od 17 stycznia 2025 — **19 miesięcy**. Reguły zaostrzone i opublikowane 5 si
 - Connector `baseAccount`, migracja Farcastera na `@farcaster/miniapp-wagmi-connector`.
 - SIWE: `/api/auth/{nonce,verify,session,logout}`, weryfikacja przez
   `publicClient.verifyMessage` (ERC-6492 dla smart walletów), sesja 2 h z rollowaniem.
+- **Osiem konektorów portfela**: Base Account, Coinbase Wallet, MetaMask,
+  WalletConnect, Safe, Gemini, Farcaster + portfele wykryte przez EIP-6963
+  (Rabby, Phantom, Brave, OKX…), każdy z własną ikoną. Przycisk nie mówi już
+  „Sign In With Base”, bo to była nieprawda.
+- **Portfel administracyjny**: `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e`.
+  Klucz w `.env.local` jako `ADMIN_PRIVATE_KEY` (zweryfikowane, że wyprowadza się
+  na ten adres), ten sam adres jako `X402_PAY_TO_ADDRESS`. `hardhat.config.ts`
+  czyta go we wszystkich ośmiu sieciach.
 
 ### Sprzątanie i wydajność (fale 0–E, zakończone)
 
@@ -122,6 +131,32 @@ Renderowały się wszystkie posty naraz, a stan był całkowicie martwy. Drugie:
 transakcja zapisywała tip, który nigdy nie doszedł.
 
 ---
+
+## 2b. NIEROZWIĄZANE — logowanie SIWE nie działa na produkcji
+
+**Objaw:** na `mysphere.fun` trasy `/api/auth/verify/`, `/api/auth/session/` i
+`/api/premium/` zwracają **500 w postaci strony HTML**. `/api/auth/nonce/` — jedyna
+z nich nieimportująca `firebaseAdmin.ts` — zwraca 200. Użytkownik widzi
+„Server sign-in is not configured yet".
+
+**Czego już nie jest to warte sprawdzania (sprawdzone, wykluczone):**
+
+| Hipoteza | Wynik |
+|---|---|
+| `gcp-metadata` w ręcznych `externals` wypychał `firebase-admin` poza ślad plików | **Obalone.** Porównałem `.nft.json` przed i po zmianie — oba warianty zawierają komplet (50 plików `firebase-admin`, 24 `gcp-metadata`) |
+| Brak pakietu `server-only` | **Obalone.** Next dostarcza własny shim w `dist/compiled/server-only` |
+| Błąd w kodzie tras | **Obalone.** Build produkcyjny lokalnie + `next start`: nonce 200, session 200, verify 405, premium 400 — wszystko poprawnie |
+| `AUTH_SESSION_SECRET` / `GOOGLE_CREDENTIALS` lokalnie | Oba obecne w `.env.local` |
+
+**Co zostaje do sprawdzenia:** różnica środowiskowa po stronie Vercela. Bez logów
+funkcji nie da się tego ustalić zdalnie — potrzebny `npm i -g vercel` i
+`vercel logs`, albo wklejenie logu funkcji z dashboardu.
+
+**Co zrobione mimo braku diagnozy:** `cert()` i `initializeApp()` w
+`firebaseAdmin.ts` stały poza jakimkolwiek `try` — wyjątek leciał przez
+`mintFirebaseToken` do wołającego i przewracał całą trasę uwierzytelnienia.
+Teraz błąd konfiguracji Firebase wyłącza tylko tokeny Firebase, a logowanie
+działa dalej. To usztywnienie, **nie** potwierdzona naprawa.
 
 ## 3. Co jest W TOKU
 

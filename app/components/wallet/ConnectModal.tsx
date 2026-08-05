@@ -24,14 +24,23 @@ import { useConnect, type Connector } from 'wagmi';
  * pod nawigacja.
  */
 
-/** Etykiety i ikony per id konektora. Nieznane id dostaje nazwe z wagmi. */
+/**
+ * Etykiety i podpowiedzi per id konektora.
+ *
+ * Konektory wykryte przez EIP-6963 (Rabby, Phantom, Brave, OKX, Zerion...)
+ * NIE MAJA tu wpisow i miec nie musza: wagmi zna ich nazwe i ikone, bo portfel
+ * sam je oglasza. Lista bierze sie wprost z konektorow w configu, wiec nie ma
+ * osobnego rejestru do utrzymania.
+ */
 const CONNECTOR_META: Record<string, { label: string; hint?: string; icon: string }> = {
   baseAccount: { label: 'Base Account', hint: 'Smart wallet, no extension needed', icon: '🔵' },
+  coinbaseWallet: { label: 'Coinbase Wallet', hint: 'Extension or mobile app', icon: '🔷' },
   farcaster: { label: 'Farcaster', hint: 'Inside the Farcaster app', icon: '🟣' },
-  injected: { label: 'Browser wallet', icon: '🦊' },
+  injected: { label: 'Browser wallet', hint: 'Whatever your browser has', icon: '🧩' },
   metaMask: { label: 'MetaMask', icon: '🦊' },
+  gemini: { label: 'Gemini', icon: '♊' },
   walletConnect: { label: 'WalletConnect', hint: 'Scan with your phone', icon: '🔗' },
-  safe: { label: 'Safe', icon: '🔐' },
+  safe: { label: 'Safe', hint: 'Multisig', icon: '🔐' },
 };
 
 export default function ConnectModal({
@@ -63,6 +72,19 @@ export default function ConnectModal({
   useEffect(() => setMounted(true), []);
 
   if (!isOpen || !mounted) return null;
+
+  /**
+   * Ogolny wpis "Browser wallet" chowamy, gdy przegladarka oglosila konkretne
+   * portfele przez EIP-6963. Inaczej lista pokazuje jednoczesnie "Browser
+   * wallet" i np. "Rabby", ktore w praktyce sa tym samym - a uzytkownik nie ma
+   * jak zgadnac, ktory wybrac.
+   */
+  const hasDiscovered = connectors.some(
+    (connector) => connector.id !== 'injected' && connector.type === 'injected'
+  );
+  const visibleConnectors = hasDiscovered
+    ? connectors.filter((connector) => connector.id !== 'injected')
+    : connectors;
 
   const handleConnect = (connector: Connector) => {
     // Wywolanie MUSI zostac w handlerze klikniecia - popup keys.coinbase.com
@@ -106,10 +128,13 @@ export default function ConnectModal({
           </button>
         </div>
 
-        <div className="py-1">
-          {connectors.map((connector) => {
+        <div className="max-h-[60vh] overflow-y-auto py-1">
+          {visibleConnectors.map((connector) => {
             const meta = CONNECTOR_META[connector.id];
             const isPending = status === 'pending';
+            // Portfele wykryte przez EIP-6963 podaja wlasna ikone jako data URI.
+            // Uzywamy jej, zamiast rysowac wszystkim ten sam emoji-zastepnik.
+            const iconUrl = connector.icon;
 
             return (
               <button
@@ -119,9 +144,15 @@ export default function ConnectModal({
                 onClick={() => handleConnect(connector)}
                 className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span className="text-lg" aria-hidden="true">
-                  {meta?.icon ?? '👛'}
-                </span>
+                {iconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- data URI
+                  // od portfela; next/image wymagalby whitelisty hostow.
+                  <img src={iconUrl} alt="" className="h-5 w-5 shrink-0 rounded" />
+                ) : (
+                  <span className="w-5 shrink-0 text-center text-lg" aria-hidden="true">
+                    {meta?.icon ?? '👛'}
+                  </span>
+                )}
                 <span className="flex-1">
                   <span className="block text-[13px] font-medium text-[#C7D4EE]">
                     {meta?.label ?? connector.name}

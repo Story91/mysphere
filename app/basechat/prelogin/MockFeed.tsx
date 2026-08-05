@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import MockPost from './MockPost';
-import { SignInWithBaseButton } from '@base-org/account-ui/react';
 import { createBaseAccountSDK } from '@base-org/account';
 import { useAccount, useConnect } from 'wagmi';
 import { useSiweAuth, fetchSiweNonce, isUserRejection } from '../../utils/auth/useSiweAuth';
+import ConnectModal from '../../components/wallet/ConnectModal';
 
 const mockPostsData = [
   {
@@ -81,6 +81,8 @@ const MockFeed = () => {
   // Portfel podlaczony przez konektor wagmi pojawia sie asynchronicznie
   // (connect() z useConnect nic nie zwraca), wiec krok SIWE odpalamy z efektu.
   const [pendingSiwe, setPendingSiwe] = useState(false);
+  // Pelna lista portfeli - ta sama, ktorej uzywa przycisk w nawigacji.
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
   const handleSignInWithBase = async () => {
     setIsBusy(true);
@@ -91,22 +93,23 @@ const MockFeed = () => {
     let handedOffToEffect = false;
 
     try {
-      console.log('🔵 Sign In With Base clicked in MockFeed');
-
-      // Find Coinbase Wallet connector (which supports Base Account)
-      const coinbaseConnector = connectors.find(connector =>
-        connector.name === 'Coinbase Wallet' || connector.id === 'coinbaseWallet'
+      // Szukamy DEDYKOWANEGO konektora Base Account.
+      //
+      // Wczesniej ten kod szukal `coinbaseWallet` i dzialal tylko dlatego, ze
+      // takiego konektora w configu NIE BYLO - wiec zawsze spadal do sciezki
+      // Base Account SDK ponizej. Odkad Coinbase Wallet jest osobna opcja na
+      // liscie portfeli, dopasowanie po tamtym id otwieraloby ZLY portfel.
+      const baseAccountConnector = connectors.find(
+        (connector) => connector.id === 'baseAccount'
       );
 
-      if (coinbaseConnector) {
-        console.log('✅ Found Coinbase Wallet connector, connecting...');
+      if (baseAccountConnector) {
         // Krok SIWE dolaczy efekt ponizej, gdy wagmi zaraportuje adres.
         handedOffToEffect = true;
         setPendingSiwe(true);
-        await connect({ connector: coinbaseConnector });
+        await connect({ connector: baseAccountConnector });
         return;
       } else {
-        console.log('❌ Coinbase Wallet connector not found');
 
         // Nonce MUSI pochodzic z naszego serwera, bo /api/auth/verify porownuje
         // go z httpOnly cookie. Gdy trasa nie odpowie, wracamy do losowego nonce
@@ -218,13 +221,33 @@ const MockFeed = () => {
         </div>
         <p className="text-sm text-gray-300 mb-4">Connect your wallet to join the conversation and see the live feed.</p>
         
-        {/* Sign In With Base Button */}
-        <div className="flex justify-center">
-          <SignInWithBaseButton
-            colorScheme="dark"
+        {/* Dwie drogi, obie realne.
+            Base Account jest wyzej, bo dla kogos bez portfela to jedyna sciezka
+            konczaca sie sukcesem - zaklada sie go passkeyem, bez rozszerzenia.
+            Ale to NIE jest jedyna opcja i przycisk nie moze tak wygladac: w
+            configu siedzi osiem konektorow (Base Account, Coinbase Wallet,
+            MetaMask, WalletConnect, Safe, Gemini, Farcaster, portfele wykryte
+            przez EIP-6963), wiec obok stoi wybor pelnej listy. */}
+        <div className="flex flex-col items-center gap-2">
+          <button
+            type="button"
             onClick={handleSignInWithBase}
-          />
+            disabled={isBusy}
+            className="w-full max-w-[260px] rounded-xl bg-[#0052FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0044D6] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Continue with Base Account
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsWalletModalOpen(true)}
+            disabled={isBusy}
+            className="w-full max-w-[260px] rounded-xl border border-white/20 px-5 py-2.5 text-sm font-medium text-gray-200 transition-colors hover:border-white/40 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Use another wallet
+          </button>
         </div>
+
+        <ConnectModal isOpen={isWalletModalOpen} onClose={() => setIsWalletModalOpen(false)} />
 
         {/* Stan logowania - ta sama stylistyka co reszta karty, bez nowych bibliotek */}
         {isBusy && (
