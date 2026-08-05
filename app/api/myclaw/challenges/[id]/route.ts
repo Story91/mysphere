@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MYCLAW_PRICES,
+  getRequestParam,
+  paymentInfo,
+  setRequestParams,
+  withMyClawPayment,
+} from "@/app/utils/myclaw/x402";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * Trasa chroniona przez x402 v2 (@x402/next `withX402`): $0.005 USDC za
+ * wywolanie, siec eip155:8453. Bledy 4xx nie sa rozliczane - settlement
+ * zachodzi dopiero po odpowiedzi ze statusem < 400.
+ */
 const CHALLENGES: Record<string, { question: string; options: string[]; correct: number }[]> = {
   "trading-101": [
     {
@@ -56,11 +71,9 @@ const CHALLENGES: Record<string, { question: string; options: string[]; correct:
   ],
 };
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const challenge = CHALLENGES[params.id];
+async function handleChallenge(request: NextRequest): Promise<NextResponse> {
+  const id = getRequestParam(request, "id") ?? "";
+  const challenge = CHALLENGES[id];
 
   if (!challenge) {
     return NextResponse.json(
@@ -109,18 +122,22 @@ export async function POST(
   const passed = score === total;
 
   return NextResponse.json({
-    lessonId: params.id,
+    lessonId: id,
     score,
     total,
     passed,
     results,
-    payment: {
-      protocol: "x402",
-      amount: "0.005",
-      currency: "USDC",
-      network: "base",
-      status: "preview",
-      note: "x402 payment will be enforced when middleware is enabled",
-    },
+    payment: paymentInfo(MYCLAW_PRICES.challenge, `MyClaw challenge: ${id}`),
+    note: "Challenge results are not persisted. Certification grading (/api/myclaw/certify) evaluates its own exam and cannot read this result.",
   });
+}
+
+const protectedChallenge = withMyClawPayment(handleChallenge, {
+  price: MYCLAW_PRICES.challenge,
+  description: "MyClaw Academy challenge grading",
+});
+
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+  setRequestParams(request, { id: params.id });
+  return protectedChallenge(request);
 }

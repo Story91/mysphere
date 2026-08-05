@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MYCLAW_PRICES,
+  getRequestParam,
+  paymentInfo,
+  setRequestParams,
+  withMyClawPayment,
+} from "@/app/utils/myclaw/x402";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * Lesson content store.
  * In production, move to a database. These are inline for MVP.
- * 
- * x402 payment middleware will be applied via middleware.ts
- * protecting this route with $0.001 USDC per request.
- * 
- * Payment flow (from farcaster-agent reference):
- *   1. Agent hits this endpoint
- *   2. x402-next middleware returns 402 with price header
- *   3. Agent signs EIP-712 transferWithAuthorization for USDC
- *   4. Agent retries with X-PAYMENT header containing base64 payload
- *   5. Middleware verifies via Coinbase facilitator
- *   6. Request forwarded to this handler
+ *
+ * Trasa jest chroniona przez x402 v2 (@x402/next `withX402`), $0.001 USDC
+ * za wywolanie, siec eip155:8453 (Base mainnet).
+ *
+ * Przeplyw platnosci (x402 v2):
+ *   1. Agent uderza w endpoint bez platnosci
+ *   2. withX402 zwraca 402 z payment requirements w ciele odpowiedzi
+ *   3. Agent podpisuje EIP-712 transferWithAuthorization dla USDC
+ *   4. Agent ponawia zadanie z naglowkiem PAYMENT-SIGNATURE (base64 payload)
+ *   5. Facilitator weryfikuje platnosc
+ *   6. Handler zwraca lekcje; settlement dopiero po statusie < 400,
+ *      a potwierdzenie wraca w naglowku PAYMENT-RESPONSE
  */
 
 const LESSONS: Record<string, { title: string; discipline: string; difficulty: string; content: string; quiz?: { question: string; options: string[]; correct: number }[] }> = {
@@ -212,6 +223,11 @@ Large trades move the pool price. Check price impact before executing.
 Farcaster uses x402 micropayments for hub API access.
 Each cast submission costs $0.001 USDC on Base.
 
+This lesson targets x402 **v2**. In v2 networks are CAIP-2 identifiers
+("eip155:8453" for Base mainnet, "eip155:84532" for Base Sepolia) and the
+payment headers were renamed: X-PAYMENT became PAYMENT-SIGNATURE and
+X-PAYMENT-RESPONSE became PAYMENT-RESPONSE.
+
 ## Implementation Steps
 
 ### 1. Prepare USDC on Base
@@ -221,16 +237,17 @@ Minimum recommended: $1 (1000 casts worth).
 ### 2. x402 Payment Flow
 When posting a cast:
   1. Submit to hub-api.neynar.com/v1/submitMessage
-  2. Receive 402 Payment Required response
+  2. Receive 402 Payment Required response with payment requirements
   3. Sign EIP-712 transferWithAuthorization
-  4. Retry with X-PAYMENT header
+  4. Retry with the PAYMENT-SIGNATURE header
+  5. Read the settlement receipt from the PAYMENT-RESPONSE header
 
 ### 3. Payment Payload
-The X-PAYMENT header contains base64-encoded JSON:
+The PAYMENT-SIGNATURE header contains base64-encoded JSON:
 {
-  "x402Version": 1,
+  "x402Version": 2,
   "scheme": "exact",
-  "network": "base",
+  "network": "eip155:8453",
   "payload": {
     "signature": "0x...",
     "authorization": {
@@ -253,11 +270,16 @@ The X-PAYMENT header contains base64-encoded JSON:
   },
 };
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const lesson = LESSONS[params.id];
+/**
+ * withX402 wywoluje handler wylacznie z obiektem request, dlatego `params`
+ * przekazujemy przez WeakMap (setRequestParams / getRequestParam).
+ *
+ * 404 celowo przed rozliczeniem: settlement w withX402 zachodzi dopiero przy
+ * statusie < 400, wiec agent nie placi za nieistniejaca lekcje.
+ */
+async function handleLesson(request: NextRequest): Promise<NextResponse> {
+  const id = getRequestParam(request, "id") ?? "";
+  const lesson = LESSONS[id];
 
   if (!lesson) {
     return NextResponse.json(
@@ -271,15 +293,18 @@ export async function GET(
   }
 
   return NextResponse.json({
-    id: params.id,
+    id,
     ...lesson,
-    payment: {
-      protocol: "x402",
-      amount: "0.001",
-      currency: "USDC",
-      network: "base",
-      status: "preview",
-      note: "x402 payment will be enforced when middleware is enabled. Currently accessible without payment.",
-    },
+    payment: paymentInfo(MYCLAW_PRICES.lesson, `MyClaw lesson: ${lesson.title}`),
   });
+}
+
+const protectedLesson = withMyClawPayment(handleLesson, {
+  price: MYCLAW_PRICES.lesson,
+  description: "MyClaw Academy lesson content",
+});
+
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  setRequestParams(request, { id: params.id });
+  return protectedLesson(request);
 }
