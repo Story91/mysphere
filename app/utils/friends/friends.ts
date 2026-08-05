@@ -500,33 +500,32 @@ export const getFriendsList = async (
 
     if (friendIds.length === 0) return [];
 
-    // Pobierz profile znajomych w batch'ach
-    const friends: FriendWithStatus[] = [];
-    
-    for (let i = 0; i < friendIds.length; i += SOCIAL_CONFIG.BATCH_SIZE) {
-      const batch = friendIds.slice(i, i + SOCIAL_CONFIG.BATCH_SIZE);
-      const userRefs = batch.map(id => doc(db, COLLECTIONS.USERS, id));
-      const userDocs = await Promise.all(userRefs.map(ref => getDoc(ref)));
+    // Jedno zapytanie na 30 znajomych zamiast getDoc() per osoba.
+    const userMap = new Map<string, any>();
+    for (let i = 0; i < friendIds.length; i += 30) {
+      const chunk = friendIds.slice(i, i + 30);
+      if (chunk.length === 0) continue;
+      const chunkSnap = await getDocs(query(collection(db, COLLECTIONS.USERS), where('__name__', 'in', chunk)));
+      chunkSnap.docs.forEach(d => userMap.set(d.id, d.data()));
+    }
 
-      for (let j = 0; j < userDocs.length; j++) {
-        const userDoc = userDocs[j];
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const friendData = snapshot.docs.find(doc => doc.id === userDoc.id)?.data();
-          
-          friends.push({
-            address: userDoc.id,
-            name: userData.name || `${userDoc.id.slice(0, 6)}...${userDoc.id.slice(-4)}`,
-            avatar: userData.avatar,
-            friendshipId: friendData?.friendshipId || '',
-            friendsSince: formatTimestamp(friendData?.[FIELDS.CREATED_AT]),
-            lastInteraction: formatTimestamp(userData[FIELDS.USER_LAST_ACTIVE]),
-            isOnline: userData[FIELDS.USER_IS_ONLINE] || false,
-            lastActive: formatTimestamp(userData[FIELDS.USER_LAST_ACTIVE]),
-            mutualFriends: 0 // TODO: Calculate mutual friends count
-          });
-        }
-      }
+    const friends: FriendWithStatus[] = [];
+    for (const friendDoc of snapshot.docs) {
+      const userData = userMap.get(friendDoc.id);
+      if (!userData) continue;
+
+      const friendData = friendDoc.data();
+      friends.push({
+        address: friendDoc.id,
+        name: userData.name || `${friendDoc.id.slice(0, 6)}...${friendDoc.id.slice(-4)}`,
+        avatar: userData.avatar,
+        friendshipId: friendData?.friendshipId || '',
+        friendsSince: formatTimestamp(friendData?.[FIELDS.CREATED_AT]),
+        lastInteraction: formatTimestamp(userData[FIELDS.USER_LAST_ACTIVE]),
+        isOnline: userData[FIELDS.USER_IS_ONLINE] || false,
+        lastActive: formatTimestamp(userData[FIELDS.USER_LAST_ACTIVE]),
+        mutualFriends: 0 // TODO: Calculate mutual friends count
+      });
     }
 
     return friends.sort((a, b) => (b.friendsSince || 0) - (a.friendsSince || 0));
@@ -843,5 +842,3 @@ export const cleanupOldFriendRequests = async (daysOld: number = SOCIAL_CONFIG.O
     return 0;
   }
 };
-
-console.log('🤝 Friends System initialized');

@@ -1,4 +1,3 @@
-import { ethers } from 'ethers';
 import { LINEA_CHAIN_ID } from '../config/LineaNetworkConfig';
 
 // ABI dla kontraktu LineaPostContract
@@ -241,67 +240,8 @@ export const getLineaContractAddress = (chainId: number) => {
   return undefined;
 };
 
-// Funkcja do tworzenia instancji kontraktu
-export const getLineaPostContract = (signer: ethers.Signer, contractAddress: string) => {
-  return new ethers.Contract(
-    contractAddress,
-    LINEA_POST_CONTRACT_ABI,
-    signer
-  );
-};
-
-// Funkcja do kodowania danych dla wywołania kontraktu
-export const encodeCreatePostDataLinea = (contentHash: string) => {
-  const iface = new ethers.Interface(LINEA_POST_CONTRACT_ABI);
-  return iface.encodeFunctionData('createPost', [contentHash]);
-};
-
-// Funkcja do przygotowania danych dla wywołania kontraktu w formacie Call
-export const prepareCreatePostCallLinea = (contractAddress: string, contentHash: string) => {
-  if (!contractAddress) {
-    return undefined;
-  }
-  
-  return [{
-    to: contractAddress as `0x${string}`,
-    data: encodeCreatePostDataLinea(contentHash) as `0x${string}`,
-    value: BigInt(0)
-  }];
-};
-
-// Funkcje pomocnicze dla interakcji z kontraktem
-export const createPostLinea = async (
-  signer: ethers.Signer,
-  contractAddress: string,
-  contentHash: string
-) => {
-  const contract = getLineaPostContract(signer, contractAddress);
-  const tx = await contract.createPost(contentHash);
-  await tx.wait();
-  return tx;
-};
-
-export const getPostCountLinea = async (
-  signer: ethers.Signer,
-  contractAddress: string,
-  userAddress: string
-) => {
-  const contract = getLineaPostContract(signer, contractAddress);
-  return await contract.getPostCount(userAddress);
-};
-
-export const getTotalPostsLinea = async (
-  signer: ethers.Signer,
-  contractAddress: string
-) => {
-  const contract = getLineaPostContract(signer, contractAddress);
-  return await contract.getTotalPosts();
-};
-
-export const isPausedLinea = async (
-  signer: ethers.Signer,
-  contractAddress: string
-) => {
-  const contract = getLineaPostContract(signer, contractAddress);
-  return await contract.isPaused();
-};
+// Eksporty oparte na ethers (getLineaPostContract, encodeCreatePostDataLinea,
+// prepareCreatePostCallLinea, createPostLinea, getPostCountLinea, getTotalPostsLinea,
+// isPausedLinea, setLineaContractAddress) usuniete - nie mial ich zadnego konsumenta,
+// a ciagnely ethers v6 do bundle'a. Zywe sa tylko LINEA_POST_CONTRACT_ABI
+// i getLineaContractAddress, uzywane przez oba TransactionButtony na wagmi.

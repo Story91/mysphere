@@ -477,7 +477,6 @@ export const moderationOperations = {
  * ```
  */
 
-console.log('🚀 Social Features API initialized - ready to connect people!');
 
 // ===============================================
 // 📱 REAL-TIME SUBSCRIPTIONS HELPER

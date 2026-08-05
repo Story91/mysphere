@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -143,10 +143,9 @@ const STATIC_MYSPHERE_DATA = {
   ]
 };
 
-export default function MyCampPage() {
+function MyCampPageContent() {
   const { address, isConnected } = useAccount();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const [walletStats, setWalletStats] = useState<any>(null);
@@ -187,32 +186,29 @@ export default function MyCampPage() {
   const FAUCET_URL = process.env.NEXT_PUBLIC_CAMP_FAUCET_URL!;
   const EXPLORER_URL = process.env.NEXT_PUBLIC_CAMP_EXPLORER_URL!
 
-  // Handle return from social auth
-  useEffect(() => {
-    const authSuccess = searchParams.get('auth_success');
-    const socialPlatform = searchParams.get('platform');
-    
-    if (authSuccess === 'true' && socialPlatform) {
-      setShowSuccessMessage(true);
-      console.log(`🎉 Successfully connected ${socialPlatform}!`);
-      
-      // Refresh social data
-      if (refetchSocials) {
-        refetchSocials();
-      }
-      
-      // Clear URL parameters
-      const url = new URL(window.location.href);
-      url.searchParams.delete('auth_success');
-      url.searchParams.delete('platform');
-      router.replace(url.pathname, { scroll: false });
-      
-      // Hide success message after 5 seconds
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-      }, 5000);
+  // Handle return from social auth.
+  // Sam odczyt ?auth_success/?platform siedzi w <MyCampSearchParams/> nizej -
+  // tutaj zostala juz tylko reakcja na zdarzenie.
+  const handleAuthSuccess = useCallback((socialPlatform: string) => {
+    setShowSuccessMessage(true);
+    console.log(`🎉 Successfully connected ${socialPlatform}!`);
+
+    // Refresh social data
+    if (refetchSocials) {
+      refetchSocials();
     }
-  }, [searchParams, router, refetchSocials]);
+
+    // Clear URL parameters
+    const url = new URL(window.location.href);
+    url.searchParams.delete('auth_success');
+    url.searchParams.delete('platform');
+    router.replace(url.pathname, { scroll: false });
+
+    // Hide success message after 5 seconds
+    setTimeout(() => {
+      setShowSuccessMessage(false);
+    }, 5000);
+  }, [router, refetchSocials]);
 
   // Debug environment variables
   useEffect(() => {
@@ -633,13 +629,13 @@ export default function MyCampPage() {
   return (
     <ToastProvider>
       <div className="min-h-screen overflow-x-hidden relative">
+      {/* Jedyny konsument useSearchParams() na tej stronie. Nic nie rysuje, wiec
+          Suspense z fallbackiem null jest niewidoczny - a bailout z prerenderu
+          zostaje zamkniety w tym jednym wezle zamiast obejmowac cala strone. */}
+      <Suspense fallback={null}>
+        <MyCampSearchParams onAuthSuccess={handleAuthSuccess} />
+      </Suspense>
       {/* Camp Mainnet banner removed on request */}
-      <Script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
-        crossOrigin="anonymous"
-        strategy="afterInteractive"
-      />
       {/* Background Image */}
       <div 
         className="fixed inset-0 bg-cover bg-center bg-no-repeat" 
@@ -2067,4 +2063,40 @@ export default function MyCampPage() {
     </div>
     </ToastProvider>
   );
+}
+
+/**
+ * Odczyt query stringa wydzielony z MyCampPageContent.
+ *
+ * useSearchParams() wywala render ze statycznego prerenderu az do najblizszej
+ * granicy Suspense. Dopoki hook siedzial na gorze MyCampPageContent, ta granica
+ * musiala obejmowac cala strone - do HTML-a szlo wtedy samo tlo, a tresc
+ * doklejala sie dopiero po hydracji. Tutaj bailout dotyczy wezla, ktory zwraca
+ * null, wiec reszta strony renderuje sie normalnie.
+ *
+ * Parametry ?auth_success=true&platform=... ustawia powrot z OAuth social media
+ * (Twitter/Spotify/TikTok). Sluza wylacznie do pokazania toasta i odswiezenia
+ * listy socials - nie wplywaja na to, co strona rysuje.
+ */
+function MyCampSearchParams({
+  onAuthSuccess,
+}: {
+  onAuthSuccess: (platform: string) => void;
+}) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const authSuccess = searchParams.get('auth_success');
+    const socialPlatform = searchParams.get('platform');
+
+    if (authSuccess === 'true' && socialPlatform) {
+      onAuthSuccess(socialPlatform);
+    }
+  }, [searchParams, onAuthSuccess]);
+
+  return null;
+}
+
+export default function MyCampPage() {
+  return <MyCampPageContent />;
 }

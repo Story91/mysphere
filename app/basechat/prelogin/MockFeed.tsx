@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import MockPost from './MockPost';
 import { SignInWithBaseButton } from '@base-org/account-ui/react';
 import { createBaseAccountSDK } from '@base-org/account';
 import { useAccount, useConnect } from 'wagmi';
+import { useSiweAuth, fetchSiweNonce, isUserRejection } from '../../utils/auth/useSiweAuth';
 
 const mockPostsData = [
   {
@@ -64,52 +65,144 @@ const mockPostsData = [
   },
 ];
 
+/** Skrocony adres do wyswietlenia, np. 0x1234...cdef. */
+const shortenAddress = (value: string) => `${value.slice(0, 6)}...${value.slice(-4)}`;
+
 const MockFeed = () => {
-  const { connect, connectors } = useConnect();
+  const { connect, connectors, status: connectStatus, error: connectError } = useConnect();
+  const { address: walletAddress, status: accountStatus } = useAccount();
+  const { isAuthenticated, address: sessionAddress, error: siweError, signIn } = useSiweAuth();
+
+  // Stan lokalny tylko na potrzeby tego przycisku - hook ma wlasny isLoading,
+  // ale ten jest true takze przy starcie (odczyt sesji), a tu chcemy pokazac
+  // spinner wylacznie po kliknieciu.
+  const [isBusy, setIsBusy] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  // Portfel podlaczony przez konektor wagmi pojawia sie asynchronicznie
+  // (connect() z useConnect nic nie zwraca), wiec krok SIWE odpalamy z efektu.
+  const [pendingSiwe, setPendingSiwe] = useState(false);
 
   const handleSignInWithBase = async () => {
+    setIsBusy(true);
+    setLocalError(null);
+
+    // Gdy sciezka konektora wagmi przekaze robote efektowi, spinner ma zostac
+    // zapalony - dlatego finally nie gasi go bezwarunkowo (return tez odpala finally).
+    let handedOffToEffect = false;
+
     try {
       console.log('🔵 Sign In With Base clicked in MockFeed');
-      
+
       // Find Coinbase Wallet connector (which supports Base Account)
-      const coinbaseConnector = connectors.find(connector => 
+      const coinbaseConnector = connectors.find(connector =>
         connector.name === 'Coinbase Wallet' || connector.id === 'coinbaseWallet'
       );
-      
+
       if (coinbaseConnector) {
         console.log('✅ Found Coinbase Wallet connector, connecting...');
+        // Krok SIWE dolaczy efekt ponizej, gdy wagmi zaraportuje adres.
+        handedOffToEffect = true;
+        setPendingSiwe(true);
         await connect({ connector: coinbaseConnector });
+        return;
       } else {
         console.log('❌ Coinbase Wallet connector not found');
+
+        // Nonce MUSI pochodzic z naszego serwera, bo /api/auth/verify porownuje
+        // go z httpOnly cookie. Gdy trasa nie odpowie, wracamy do losowego nonce
+        // i zachowujemy dotychczasowe zachowanie (polaczenie bez sesji serwerowej).
+        let serverNonce: string | null = null;
+        try {
+          serverNonce = await fetchSiweNonce();
+        } catch (nonceError) {
+          console.warn('⚠️ Nie udalo sie pobrac nonce z serwera:', nonceError);
+        }
+
         // Fallback to Base Account SDK (automatically connects to Base network)
         const sdk = createBaseAccountSDK({
           appName: 'BaseBook'
         });
-        
+
         const provider = sdk.getProvider();
-        
+
         const result = await provider.request({
           method: 'wallet_connect',
           params: [{
             version: '1',
             capabilities: {
-              signInWithEthereum: { 
-                nonce: window.crypto?.randomUUID?.()?.replace(/-/g, '') || Math.random().toString(36).substring(7),
+              signInWithEthereum: {
+                nonce: serverNonce || window.crypto?.randomUUID?.()?.replace(/-/g, '') || Math.random().toString(36).substring(7),
                 chainId: '0x2105' // Base Mainnet - 8453
               }
             }
           }]
         });
-        
+
         if ((result as any)?.accounts?.[0]) {
-          console.log('✅ Base Account connected:', (result as any).accounts[0].address);
+          const account = (result as any).accounts[0];
+          console.log('✅ Base Account connected:', account.address);
+
+          // SDK sam podpisuje wiadomosc SIWE - jesli niesie nasz nonce,
+          // wystarczy oddac ja serwerowi do weryfikacji.
+          const siwe = account?.capabilities?.signInWithEthereum;
+          if (serverNonce && account?.address && siwe?.message && siwe?.signature) {
+            await signIn({
+              presigned: {
+                address: account.address,
+                message: siwe.message,
+                signature: siwe.signature,
+              },
+            });
+          } else {
+            console.warn('⚠️ Base Account nie zwrocil podpisu SIWE - sesja serwerowa pominieta.');
+          }
         }
       }
-      
+
     } catch (error) {
-      console.error('❌ Sign In With Base error:', error);
+      handedOffToEffect = false;
+      setPendingSiwe(false);
+
+      // Odmowa w portfelu to nie awaria - nie krzyczymy na uzytkownika.
+      if (isUserRejection(error)) {
+        console.info('ℹ️ Uzytkownik anulowal logowanie.');
+      } else {
+        console.error('❌ Sign In With Base error:', error);
+        setLocalError('Could not connect your wallet. Please try again.');
+      }
+    } finally {
+      if (!handedOffToEffect) setIsBusy(false);
     }
   };
+
+  // Krok SIWE po tym, jak wagmi faktycznie podlaczyl portfel.
+  useEffect(() => {
+    if (!pendingSiwe) return;
+
+    // Uzytkownik zamknal modal konektora / polaczenie padlo.
+    if (connectStatus === 'error') {
+      setPendingSiwe(false);
+      setIsBusy(false);
+      if (!isUserRejection(connectError)) {
+        setLocalError('Wallet connection was interrupted. Please try again.');
+      }
+      return;
+    }
+
+    if (accountStatus !== 'connected' || !walletAddress) return;
+
+    setPendingSiwe(false);
+
+    if (isAuthenticated && sessionAddress === walletAddress.toLowerCase()) {
+      setIsBusy(false);
+      return;
+    }
+
+    setIsBusy(true);
+    void signIn().finally(() => setIsBusy(false));
+  }, [pendingSiwe, connectStatus, connectError, accountStatus, walletAddress, isAuthenticated, sessionAddress, signIn]);
+
+  const statusMessage = localError || siweError;
 
   return (
     <div className="space-y-4">
@@ -127,11 +220,30 @@ const MockFeed = () => {
         
         {/* Sign In With Base Button */}
         <div className="flex justify-center">
-          <SignInWithBaseButton 
+          <SignInWithBaseButton
             colorScheme="dark"
             onClick={handleSignInWithBase}
           />
         </div>
+
+        {/* Stan logowania - ta sama stylistyka co reszta karty, bez nowych bibliotek */}
+        {isBusy && (
+          <p className="mt-3 text-xs text-gray-400 animate-pulse">
+            Waiting for your signature...
+          </p>
+        )}
+
+        {!isBusy && isAuthenticated && sessionAddress && (
+          <p className="mt-3 text-xs text-green-400">
+            Signed in as {shortenAddress(sessionAddress)}
+          </p>
+        )}
+
+        {!isBusy && !isAuthenticated && statusMessage && (
+          <p className="mt-3 text-xs text-red-400">
+            {statusMessage}
+          </p>
+        )}
       </div>
       
       {mockPostsData.map((post, index) => (

@@ -602,10 +602,10 @@ export const getNotificationsSummary = async (userId: string): Promise<Notificat
       return getEmptyNotificationSummary();
     }
 
-    const [allNotifications, recentNotifications] = await Promise.all([
-      getUserNotifications(userId, 100),
-      getUserNotifications(userId, 5)
-    ]);
+    // Drugie zapytanie bylo zbedne - recent to po prostu pierwsza piatka tej samej
+    // listy. Byly to 105 odczytow Firestore zamiast 100.
+    const allNotifications = await getUserNotifications(userId, 100);
+    const recentNotifications = allNotifications.slice(0, 5);
 
     const byType: { [K in NotificationType]: number } = {
       LIKE: 0,
@@ -895,5 +895,3 @@ export const cleanupOldNotifications = async (
     return 0;
   }
 };
-
-console.log('🔔 Notifications System initialized');

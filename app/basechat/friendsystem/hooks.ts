@@ -326,7 +326,8 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
     }
   }, []);
 
-  // ===============================================
+
+// ===============================================
   // 🛠️ UTILITY FUNCTIONS
   // ===============================================
 
@@ -687,4 +688,71 @@ export const useRelationship = (
   };
 };
 
-console.log('🎣 Social Hooks initialized');
+// ===============================================
+// 🪶 LIGHTWEIGHT ACTIONS HOOK
+// ===============================================
+
+export interface UseSocialActionsResult {
+  followUser: (targetUserId: string) => Promise<boolean>;
+  unfollowUser: (targetUserId: string) => Promise<boolean>;
+  /** Mapa {adres: czy obserwowany} dla podanej listy adresow - JEDNO zapytanie. */
+  getFollowStatuses: (targetUserIds: string[]) => Promise<{ [address: string]: boolean }>;
+}
+
+/**
+ * Lekki wariant useSocial dla konsumentow, ktorzy potrzebuja tylko akcji
+ * follow/unfollow (np. feed). Pelny useSocial przy kazdym mouncie odpala 7
+ * rownoleglych loaderow (~150 odczytow Firestore) i byl montowany 2-3x naraz.
+ */
+export const useSocialActions = (currentUserAddress: string | null): UseSocialActionsResult => {
+  const apiRef = useRef<SocialAPI | null>(null);
+  const followingSetRef = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    apiRef.current = currentUserAddress ? createSocialAPI(currentUserAddress) : null;
+    followingSetRef.current = null;
+  }, [currentUserAddress]);
+
+  const loadFollowingSet = useCallback(async (): Promise<Set<string>> => {
+    if (followingSetRef.current) return followingSetRef.current;
+    if (!currentUserAddress) return new Set();
+
+    // Same ID z subkolekcji - jedno zapytanie. getFollowing() doczytywalby
+    // jeszcze profile kazdego obserwowanego, czego tu w ogole nie potrzebujemy.
+    const { fetchFollowingIdSet } = await import('../../utils/friends/follows');
+    const ids = await fetchFollowingIdSet(currentUserAddress);
+    const set = new Set(Array.from(ids).map(id => id.toLowerCase()));
+    followingSetRef.current = set;
+    return set;
+  }, [currentUserAddress]);
+
+  const getFollowStatuses = useCallback(async (targetUserIds: string[]) => {
+    const set = await loadFollowingSet();
+    const result: { [address: string]: boolean } = {};
+    for (const id of targetUserIds) {
+      if (!id) continue;
+      result[id] = set.has(id.toLowerCase());
+    }
+    return result;
+  }, [loadFollowingSet]);
+
+  const followUser = useCallback(async (targetUserId: string) => {
+    const api = apiRef.current;
+    if (!api) return false;
+    const res = await api.follow(targetUserId);
+    const ok = typeof res === 'boolean' ? res : Boolean(res?.success);
+    if (ok) followingSetRef.current?.add(targetUserId.toLowerCase());
+    return ok;
+  }, []);
+
+  const unfollowUser = useCallback(async (targetUserId: string) => {
+    const api = apiRef.current;
+    if (!api) return false;
+    const res = await api.unfollow(targetUserId);
+    const ok = typeof res === 'boolean' ? res : Boolean(res?.success);
+    if (ok) followingSetRef.current?.delete(targetUserId.toLowerCase());
+    return ok;
+  }, []);
+
+  return { followUser, unfollowUser, getFollowStatuses };
+};

@@ -1,11 +1,40 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import QuestSystem from './components/QuestSystem';
 
+// Pojedyncza czastka tla - pozycje sa wyliczone z rozmiaru viewportu.
+type BackgroundParticle = {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  duration: number;
+  delay: number;
+};
+
 // Epic Loading Component with 3D effects
 const QuestLoader: React.FC = () => {
+  // Pozycje czastek licza sie z window.innerWidth/innerHeight, a na serwerze nie
+  // ma obiektu window - w renderze wywalalo to prerender ("window is not defined").
+  // Na serwerze lista jest pusta; warstwa jest czysto dekoracyjna i startuje z
+  // opacity 0, wiec dolozenie jej tuz po zamontowaniu niczego wizualnie nie zmienia.
+  const [particles, setParticles] = useState<BackgroundParticle[]>([]);
+
+  useEffect(() => {
+    setParticles(
+      Array.from({ length: 15 }, () => ({
+        fromX: Math.random() * window.innerWidth,
+        fromY: Math.random() * window.innerHeight,
+        toX: Math.random() * window.innerWidth,
+        toY: Math.random() * window.innerHeight,
+        duration: 4 + Math.random() * 2,
+        delay: Math.random() * 2,
+      }))
+    );
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 flex items-center justify-center">
       <div className="text-center">
@@ -80,25 +109,25 @@ const QuestLoader: React.FC = () => {
 
         {/* Floating particles */}
         <div className="absolute inset-0 pointer-events-none">
-          {[...Array(15)].map((_, i) => (
+          {particles.map((particle, i) => (
             <motion.div
               key={i}
-              initial={{ 
+              initial={{
                 opacity: 0,
                 scale: 0,
-                x: Math.random() * window.innerWidth,
-                y: Math.random() * window.innerHeight
+                x: particle.fromX,
+                y: particle.fromY
               }}
-              animate={{ 
+              animate={{
                 opacity: [0, 0.8, 0],
                 scale: [0, 1, 0],
-                x: Math.random() * window.innerWidth,
-                y: Math.random() * window.innerHeight
+                x: particle.toX,
+                y: particle.toY
               }}
               transition={{
-                duration: 4 + Math.random() * 2,
+                duration: particle.duration,
                 repeat: Infinity,
-                delay: Math.random() * 2,
+                delay: particle.delay,
                 ease: "easeInOut"
               }}
               className="absolute w-2 h-2 bg-cyan-400 rounded-full"

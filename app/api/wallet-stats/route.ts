@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Trasa czyta dane z zadania (nextUrl / naglowki), wiec nie da sie jej
+// prerenderowac. Bez tej deklaracji Next probuje ja wygenerowac statycznie
+// przy buildzie i zasmieca log stacktrace'ami DYNAMIC_SERVER_USAGE.
+export const dynamic = 'force-dynamic';
+
 const BASECAMP_API_URL = 'https://camp.cloud.blockscout.com/api/v2';
 const CAMP_NFT_CONTRACT = '0x57CC99c9E1942a34a0cfF7FCC27c227455f14587';
 

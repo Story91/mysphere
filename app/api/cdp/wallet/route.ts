@@ -38,7 +38,10 @@ export async function POST(request: NextRequest) {
   try {
     const { type, enableSpendPermissions } = await request.json();
     const cdpClient = getCdpClient();
-    const networkId = process.env.NEXT_PUBLIC_NETWORK_ID || 'base-sepolia';
+    // Trasa serwerowa - prefiks NEXT_PUBLIC_ nie jest tu potrzebny.
+    // W env istnieje NETWORK_ID, dlatego sprawdzamy go jako pierwszy;
+    // NEXT_PUBLIC_NETWORK_ID zostaje tylko jako zgodnosc wsteczna.
+    const networkId = process.env.NETWORK_ID || process.env.NEXT_PUBLIC_NETWORK_ID || 'base-sepolia';
 
     if (type === 'eoa') {
       // Create EOA wallet
