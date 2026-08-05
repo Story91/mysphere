@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback, PropsWithChildren, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import PremiumComposer, { EMPTY_PREMIUM, type PremiumComposerValue } from '../components/monetization/PremiumComposer';
 // @ts-ignore - config CommonJS wspoldzielony z next.config.js
 import { isRouteDisabled } from '@/config/routeStatus';
 import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
@@ -339,6 +340,9 @@ function BaseChatContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [posts, setPosts] = useState<ExtendedPost[]>([]);
   const [newPost, setNewPost] = useState('');
+  // Platna czesc posta. Domyslnie wylaczona - wiekszosc postow nie jest platna.
+  const [premium, setPremium] = useState<PremiumComposerValue>(EMPTY_PREMIUM);
+  const [isPremiumOpen, setIsPremiumOpen] = useState(false);
   // 🎵 Stany dla funkcjonalności muzyki
   const [selectedMusic, setSelectedMusic] = useState<any>(null);
   const [showMusicSelector, setShowMusicSelector] = useState(false);
@@ -838,6 +842,15 @@ function BaseChatContent() {
         id: tempPostId,
         author: address,
         content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -859,6 +872,15 @@ function BaseChatContent() {
       createPost({
         author: address,
         content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -885,6 +907,8 @@ function BaseChatContent() {
       // 4. Update UI
       toast.success('Post created successfully!', { id: toastId });
       setNewPost('');
+      setPremium(EMPTY_PREMIUM);
+      setIsPremiumOpen(false);
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
       setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę
@@ -1122,6 +1146,15 @@ function BaseChatContent() {
       const postDataForFirebase = {
         author: address,
         content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -1137,6 +1170,15 @@ function BaseChatContent() {
         id: `temp-${Date.now()}`,
         author: address,
         content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
         timestamp: Date.now(),
         image: imageUrl ?? undefined, // Ensure undefined if null
         video: videoUrl ?? undefined, // Ensure undefined if null
@@ -1156,6 +1198,15 @@ function BaseChatContent() {
       await createPost({
           author: address,
           content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
           timestamp: Date.now(),
           image: imageUrl,
           video: videoUrl,
@@ -1179,6 +1230,8 @@ function BaseChatContent() {
 
       // Reset form
       setNewPost('');
+      setPremium(EMPTY_PREMIUM);
+      setIsPremiumOpen(false);
       setPostPreviewImage(null);
       setPostPreviewVideo(null);
       setUploadProgress(0);
@@ -1232,6 +1285,15 @@ function BaseChatContent() {
           await createPost({
             author: address,
             content: newPost,
+        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
+        // wyglada dokladnie tak jak przed monetyzacja.
+        ...(isPremiumOpen && premium.premiumContent.trim()
+          ? {
+              premiumContent: premium.premiumContent.trim(),
+              unlockPrice: premium.unlockPrice,
+              unlockToken: premium.unlockToken,
+            }
+          : {}),
             timestamp: Date.now(),
             image: imageUrl ?? undefined,
             video: videoUrl ?? undefined,
@@ -1245,6 +1307,8 @@ function BaseChatContent() {
           // Update UI
           toast.success('Post created successfully!', { id: toastId });
           setNewPost('');
+      setPremium(EMPTY_PREMIUM);
+      setIsPremiumOpen(false);
           setPostPreviewImage(null);
           setPostPreviewVideo(null);
           setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę w fallback
@@ -3633,6 +3697,19 @@ function BaseChatContent() {
                                 placeholder="Add any photo, first letters of your post will be a $ticker, and launch your PostCoin or just Post your thoughts onchain."
                                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                                 rows={3}
+                              />
+
+                              <PremiumComposer
+                                value={premium}
+                                onChange={setPremium}
+                                isOpen={isPremiumOpen}
+                                onToggle={() => {
+                                  const next = !isPremiumOpen;
+                                  setIsPremiumOpen(next);
+                                  // Zamkniecie sekcji czysci tresc, zeby nie zapisac
+                                  // platnej czesci, ktorej autor juz nie widzi.
+                                  if (!next) setPremium(EMPTY_PREMIUM);
+                                }}
                               />
                             </div>
                           </div>
