@@ -3,11 +3,14 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useAccount, useChainId, useBalance, useSwitchChain } from 'wagmi';
-import { 
-  Transaction,
-  TransactionButton,
-} from '@coinbase/onchainkit/transaction';
+import {
+  useAccount,
+  useChainId,
+  useBalance,
+  useSwitchChain,
+  useSendTransaction,
+  useWaitForTransactionReceipt,
+} from 'wagmi';
 import { parseEther, parseUnits, formatEther, formatUnits, encodeFunctionData } from 'viem';
 import { toast } from 'react-hot-toast';
 import { base } from 'wagmi/chains';
@@ -132,9 +135,19 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
     return true;
   }, [chainId, selectedNetworkConfig, switchChain, isCorrectNetwork]);
 
+  // Wysylka transakcji na czystym wagmi. getCalls() zwraca ZAWSZE dokladnie
+  // jedno wywolanie (natywny transfer albo transfer ERC-20), wiec batchowanie
+  // nie jest potrzebne - wystarczy useSendTransaction.
+  const { sendTransaction, data: sentTxHash, error: sendError, reset: resetSend } = useSendTransaction();
+  const { data: receipt, isLoading: isWaitingForReceipt } = useWaitForTransactionReceipt({
+    hash: sentTxHash,
+    query: { enabled: !!sentTxHash },
+  });
+
   const handleTransactionStatus = useCallback(async (status: any) => {
     if (status.statusName === 'success') {
-      // Guard against duplicate saves - OnchainKit may call onStatus multiple times
+      // Straznik przed podwojnym zapisem - efekt reagujacy na potwierdzenie
+      // moze sie wykonac ponownie przy re-renderze.
       if (tipSaved) return;
       setTipSaved(true);
       
@@ -198,6 +211,41 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
       setIsTransacting(true);
     }
   }, [address, recipientAddress, tipAmount, selectedToken, selectedNetwork, postId, selectedNetworkConfig, tipSaved]);
+
+  // Mapowanie stanu wagmi na ten sam cykl statusow, ktory wczesniej dostarczal
+  // OnchainKit przez onStatus. Dzieki temu cala logika ponizej (zapis tipu,
+  // toasty, link do eksploratora) zostaje bez zmian.
+  useEffect(() => {
+    if (sentTxHash && isWaitingForReceipt) {
+      handleTransactionStatus({ statusName: 'transactionPending' });
+    }
+  }, [sentTxHash, isWaitingForReceipt, handleTransactionStatus]);
+
+  useEffect(() => {
+    if (!receipt) return;
+    if (receipt.status === 'success') {
+      handleTransactionStatus({
+        statusName: 'success',
+        statusData: { transactionHash: receipt.transactionHash },
+      });
+    } else {
+      // Transakcja weszla na lancuch, ale sie cofnela - to NIE jest sukces.
+      handleTransactionStatus({
+        statusName: 'error',
+        statusData: { message: 'Transaction reverted on-chain' },
+      });
+    }
+    resetSend();
+  }, [receipt, handleTransactionStatus, resetSend]);
+
+  useEffect(() => {
+    if (!sendError) return;
+    handleTransactionStatus({
+      statusName: 'error',
+      statusData: { message: sendError.message },
+    });
+    resetSend();
+  }, [sendError, handleTransactionStatus, resetSend]);
 
   const getCalls = useCallback(() => {
     if (!isConnected || !address || !recipientAddress || !tipAmount) {
@@ -487,29 +535,30 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     Switch to {selectedNetworkConfig?.name}
                   </button>
                 ) : (
-                  <Transaction
-                    chainId={selectedNetworkConfig?.chainId || 8453}
-                    calls={getCalls()}
-                    onStatus={handleTransactionStatus}
-                    onError={(error) => {
-                      console.error('Transaction error:', error);
-                      toast.dismiss();
-                      toast.error(`Transaction failed: ${error.message || 'Unknown error'}`);
-                      setIsTransacting(false);
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const calls = getCalls();
+                      if (calls.length === 0) return;
+                      const [call] = calls;
+                      setIsTransacting(true);
+                      sendTransaction({
+                        to: call.to,
+                        // Natywny transfer ma `value`, ERC-20 ma `data` - wysylamy
+                        // dokladnie to, co zbudowal getCalls().
+                        ...('value' in call ? { value: call.value } : {}),
+                        ...('data' in call ? { data: call.data } : {}),
+                      });
                     }}
+                    disabled={hasInsufficientBalance() || parseFloat(tipAmount) <= 0 || isTransacting}
+                    className="w-full px-6 py-3 text-base font-medium rounded-xl bg-[#0052FF] text-white transition-colors hover:bg-[#0052FF]/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <TransactionButton
-                      text={
-                        hasInsufficientBalance()
-                          ? `Insufficient ${selectedToken}`
-                          : isTransacting
-                          ? 'Processing...'
-                          : `Tip ${tipAmount} ${selectedToken}`
-                      }
-                      disabled={hasInsufficientBalance() || parseFloat(tipAmount) <= 0 || isTransacting}
-                      className="w-full px-6 py-3 text-base font-medium rounded-xl"
-                    />
-                  </Transaction>
+                    {hasInsufficientBalance()
+                      ? `Insufficient ${selectedToken}`
+                      : isTransacting
+                      ? 'Processing...'
+                      : `Tip ${tipAmount} ${selectedToken}`}
+                  </button>
                 )}
                 
                 {/* Base Pay Button - tylko dla USDC na Base */}

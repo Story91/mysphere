@@ -20,6 +20,12 @@ const FALLBACK_ROUTE = '/basechat';
  * Wylaczone trasy. Kazdy wpis obejmuje takze podtrasy (np. '/mycamp' lapie
  * rowniez '/mycamp/quest').
  */
+// UWAGA o /swap: jego KOD zostal usuniety (wycofany wg REDEFINICJA.md), ale wpis
+// zostaje tutaj celowo. Przekierowania dzialaja przed routingiem, wiec stare
+// zakladki nadal ladnie laduja na /basechat zamiast dostawac 404. Wpis steruje
+// tez statusem na stronie /re-definition - bez niego Swap pokazalby sie jako
+// dzialajacy. Pozostale moduly maja kod nietkniety i wracaja przez usuniecie
+// wpisu stad.
 const DISABLED_ROUTES = [
   '/base',
   '/basemorning',

@@ -32,6 +32,11 @@ import { stopAndReset as stopAudio } from './audioPlayerStore';
 // Odznaka agent/czlowiek + trust score KYA (REDEFINICJA.md, pozycja 1.4)
 import AgentBadge from '../../components/agents/AgentBadge';
 import { useAgentLookup } from '../../components/agents/useAgentLookup';
+// Monetyzacja (REDEFINICJA.md, faza 2): tip-to-unlock + wsparcie tworcy
+import PremiumGate from '../../components/monetization/PremiumGate';
+import SubscribeButton from '../../components/monetization/SubscribeButton';
+import { useFeedUnlocks, useFeedSubscriptions } from '../../components/monetization/useFeedMonetization';
+import { hasPremiumContent } from '../../utils/monetization/types';
 
 // Import Zora SDK functions and types
 import { getProfileBalances } from '@zoralabs/coins-sdk';
@@ -307,6 +312,17 @@ function PostList({
     [internalPosts]
   );
   const { getAgent: getAgentInfo, loading: agentLookupLoading } = useAgentLookup(authorAddressesForAgents);
+
+  // Monetyzacja - ten sam wzorzec zbiorczy, co statystyki tipow wyzej.
+  // Odblokowania pytamy TYLKO o posty, ktore w ogole maja tresc premium, wiec
+  // feed bez takich postow (czyli caly dzisiejszy stan bazy) nie robi zadnego
+  // dodatkowego zapytania. Wsparcia - jedno zapytanie na 30 unikalnych autorow.
+  const premiumPostIds = React.useMemo(
+    () => (internalPosts || []).filter(p => hasPremiumContent(p)).map(p => p.id).filter(Boolean),
+    [internalPosts]
+  );
+  const { unlockedPostIds, markUnlocked } = useFeedUnlocks(address, premiumPostIds);
+  const { subscribedCreators, markSubscribed } = useFeedSubscriptions(address, authorAddressesForAgents);
 
   // 🎵 Stan odtwarzacza mieszka w audioPlayerStore (poza Reactem) - patrz PostAudioPlayer.
   useEffect(() => stopAudio, []);
@@ -1934,6 +1950,20 @@ function PostList({
           )}
         </div>
 
+        {/* 💰 Tip-to-unlock: renderowane WYLACZNIE dla postow z trescia premium.
+            Post bez tych pol nie renderuje tu niczego. */}
+        {hasPremiumContent(post) && (
+          <PremiumGate
+            postId={post.id}
+            creatorAddress={post.author}
+            premiumContent={post.premiumContent as string}
+            unlockPrice={post.unlockPrice as string}
+            unlockToken={post.unlockToken}
+            isUnlocked={unlockedPostIds.has(post.id)}
+            onUnlocked={markUnlocked}
+          />
+        )}
+
         {/* Zawsze umieszczaj LinkPreview tutaj, pod treścią posta */}
         <LinkPreview content={post.content} />
 
@@ -2361,6 +2391,16 @@ function PostList({
           <TipButton
             recipientAddress={post.author}
             postId={post.id}
+            className="text-gray-900 dark:text-gray-200"
+          />
+
+          {/* 🤝 Wsparcie tworcy na okres - platnosc Z GORY, bez odnawiania.
+              Stan bierze sie ze zbiorczego sprawdzenia dla calego feedu. */}
+          <SubscribeButton
+            creatorAddress={post.author}
+            creatorName={userNames[post.author]?.name}
+            isSupported={subscribedCreators.has((post.author || '').toLowerCase())}
+            onSubscribed={markSubscribed}
             className="text-gray-900 dark:text-gray-200"
           />
 

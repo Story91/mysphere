@@ -1,0 +1,167 @@
+rules_version = '2';
+
+// ============================================================================
+// MySphere - reguly Firestore
+//
+// UWAGA, ZANIM WDROZYSZ: ten plik NIE zawiera regul dla kolekcji, ktore juz
+// dzialaja w produkcji (posts, users, tips, follows, friendships,
+// friendRequests i ich subkolekcje). Do repo trafil jako punkt startowy dla
+// NOWYCH kolekcji, bo wczesniej w projekcie nie bylo zadnego pliku regul -
+// zyly wylacznie w konsoli Firebase.
+//
+// WDROZENIE TEGO PLIKU W OBECNEJ POSTACI ZABLOKUJE ISTNIEJACE FUNKCJE.
+// Wlasciwa kolejnosc:
+//   1. wyeksportuj obecne reguly z konsoli (Firestore -> Rules)
+//   2. wklej je ponizej, w sekcji "ISTNIEJACE KOLEKCJE"
+//   3. dopiero wtedy `firebase deploy --only firestore:rules`
+//
+// OGRANICZENIE, KTOREGO TE REGULY NIE ZAMYKAJA: projekt nie ma firebase-admin,
+// wiec trasy serwerowe (/api/unlock, /api/unlock/subscription) pisza tym samym
+// klienckim SDK co przegladarka - reguly nie odroznia jednego od drugiego.
+// Weryfikacja platnosci na lancuchu, cena brana z dokumentu posta i blokada
+// powtorzenia txHash chronia sciezke aplikacji, ale zdeterminowany uzytkownik
+// moze zapisac dokument o poprawnym ksztalcie prosto do Firestore.
+// Domkniecie tego wymaga konta uslugowego i `allow create, update: if false`
+// na kolekcjach zapisywanych wylacznie przez serwer.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================================
+    // ISTNIEJACE KOLEKCJE - DO UZUPELNIENIA Z KONSOLI
+    // ========================================================================
+    // Tu wklej obecne reguly dla: posts, users, tips, follows, friendships,
+    // friendRequests oraz subkolekcji users/{id}/{followers,following,friends,
+    // notifications,settings}. Bez nich czat przestanie dzialac.
+
+    // ========================================================================
+    // REJESTR AGENTOW
+    // ========================================================================
+    // docId = adres wlasciciela, lowercase. Dzieki temu dopasowanie autora
+    // z feedu to odczyt po kluczu, a nie skanowanie kolekcji.
+    match /agents/{agentId} {
+      function isAgentAddr(v) {
+        return v is string && v.matches('^0x[0-9a-f]{40}$');
+      }
+      // Aktualizacja metadanych NIE moze ruszyc licznikow reputacji.
+      function isMetadataUpdate() {
+        return request.resource.data.address == resource.data.address
+            && request.resource.data.feedbackCount == resource.data.feedbackCount
+            && request.resource.data.scoreSum == resource.data.scoreSum;
+      }
+      // Jedna opinia = licznik +1, a suma ocen zmienia sie najwyzej o 100.
+      function isFeedbackCounterUpdate() {
+        return request.resource.data.address == resource.data.address
+            && request.resource.data.feedbackCount == resource.data.feedbackCount + 1
+            && request.resource.data.scoreSum >= resource.data.scoreSum - 100
+            && request.resource.data.scoreSum <= resource.data.scoreSum + 100;
+      }
+
+      // Odznaki w feedzie czyta kazdy, tak jak same posty.
+      allow read: if true;
+
+      allow create: if isAgentAddr(agentId)
+                    && request.resource.data.address == agentId
+                    && isAgentAddr(request.resource.data.ownerAddress)
+                    && request.resource.data.masterAgentId == agentId
+                    && request.resource.data.feedbackCount == 0
+                    && request.resource.data.scoreSum == 0
+                    && request.resource.data.registeredAtMs is number;
+
+      allow update: if isMetadataUpdate() || isFeedbackCounterUpdate();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // OPINIE O AGENTACH
+    // ========================================================================
+    match /agentFeedback/{feedbackId} {
+      allow read: if true;
+
+      allow create: if request.resource.data.agentAddress is string
+                    && request.resource.data.agentAddress.matches('^0x[0-9a-f]{40}$')
+                    && exists(/databases/$(database)/documents/agents/$(request.resource.data.agentAddress))
+                    && request.resource.data.commenterAddress is string
+                    && request.resource.data.commenterAddress.matches('^0x[0-9a-f]{40}$')
+                    && request.resource.data.score is int
+                    && request.resource.data.score >= -100
+                    && request.resource.data.score <= 100
+                    && request.resource.data.createdAtMs is number
+                    && (!('comment' in request.resource.data)
+                        || request.resource.data.comment.size() <= 280);
+
+      // Opinia jest niezmienna - reputacja liczy sie z tego, co juz zapisane.
+      allow update, delete: if false;
+    }
+
+    // ========================================================================
+    // TIP-TO-UNLOCK
+    // ========================================================================
+    // docId = "{postId}__{wallet_lowercase}" - zapis jest idempotentny,
+    // a odczyt zbiorczy idzie po documentId(), wiec nie trzeba indeksow.
+    match /unlocks/{unlockId} {
+      allow read: if true;
+
+      allow create: if request.resource.data.keys().hasAll([
+                         'postId','walletAddress','creatorAddress','amount','token',
+                         'network','chainId','txHash','unlockedAt','verified'])
+                    && unlockId == request.resource.data.postId + '__' + request.resource.data.walletAddress
+                    && request.resource.data.walletAddress is string
+                    && request.resource.data.walletAddress == request.resource.data.walletAddress.lower()
+                    && request.resource.data.creatorAddress is string
+                    && request.resource.data.creatorAddress == request.resource.data.creatorAddress.lower()
+                    && request.resource.data.walletAddress != request.resource.data.creatorAddress
+                    && request.resource.data.txHash is string
+                    && request.resource.data.txHash.size() == 66
+                    && request.resource.data.network == 'base'
+                    && request.resource.data.chainId == 8453
+                    && request.resource.data.token in ['ETH','USDC']
+                    && request.resource.data.verified in ['strict','receipt-only']
+                    && request.resource.data.unlockedAt is int;
+
+      // Nadpisanie dozwolone tylko dla tej samej pary (post, portfel).
+      allow update: if request.resource.data.postId == resource.data.postId
+                    && request.resource.data.walletAddress == resource.data.walletAddress;
+
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // WSPARCIE TWORCOW
+    // ========================================================================
+    // To NIE jest subskrypcja odnawialna: platnosc z gory za okres, wygasa
+    // po expiresAt i nikt nie moze obciazyc portfela ponownie.
+    match /creatorSubscriptions/{subscriptionId} {
+      allow read: if true;
+
+      allow create, update: if request.resource.data.keys().hasAll([
+                                 'subscriberAddress','creatorAddress','tier','periodDays',
+                                 'startedAt','expiresAt','lastPaymentTx','amount','token',
+                                 'network','chainId','updatedAt','verified'])
+                            && subscriptionId == request.resource.data.subscriberAddress + '__' + request.resource.data.creatorAddress
+                            && request.resource.data.subscriberAddress is string
+                            && request.resource.data.subscriberAddress == request.resource.data.subscriberAddress.lower()
+                            && request.resource.data.creatorAddress is string
+                            && request.resource.data.creatorAddress == request.resource.data.creatorAddress.lower()
+                            && request.resource.data.subscriberAddress != request.resource.data.creatorAddress
+                            && request.resource.data.tier in ['supporter','insider','patron']
+                            && request.resource.data.periodDays is int
+                            && request.resource.data.periodDays > 0
+                            && request.resource.data.expiresAt is int
+                            && request.resource.data.expiresAt > request.time.toMillis()
+                            && request.resource.data.lastPaymentTx is string
+                            && request.resource.data.lastPaymentTx.size() == 66
+                            && request.resource.data.network == 'base'
+                            && request.resource.data.chainId == 8453
+                            && request.resource.data.token == 'USDC'
+                            // Adresy w rekordzie sa niezmienne przy przedluzeniu.
+                            && (!('subscriberAddress' in resource.data)
+                                || request.resource.data.subscriberAddress == resource.data.subscriberAddress)
+                            && (!('creatorAddress' in resource.data)
+                                || request.resource.data.creatorAddress == resource.data.creatorAddress);
+
+      allow delete: if false;
+    }
+  }
+}
