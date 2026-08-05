@@ -690,3 +690,46 @@ div[role="dialog"][data-testid="ockDialog"] {
   max-width: 90vw;
 }
 
+/* Nazwa uzytkownika z gradientem.
+
+   Wczesniej robilismy to samymi klasami Tailwinda: `bg-gradient-to-r ...
+   text-transparent bg-clip-text`. Na Androidzie (zwlaszcza Samsung Internet)
+   ta kombinacja renderuje sie jako CZARNY PROSTOKAT z fragmentami koloru -
+   `color: transparent` nie skleja sie tam poprawnie z `background-clip: text`.
+
+   Tutaj: najpierw pelny, solidny kolor jako fallback, a gradient wlaczamy
+   dopiero, gdy przegladarka deklaruje obsluge -webkit-background-clip: text
+   i uzywamy -webkit-text-fill-color zamiast color. Silnik, ktory tego nie
+   ogarnia, pokazuje czytelny kolor zamiast czarnej plamy. */
+.username-gradient {
+  color: #7c3aed;
+  font-weight: 700;
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .username-gradient {
+    background-image: linear-gradient(to right, #3b82f6, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+.dark .username-gradient {
+  color: #c4b5fd;
+}
+
+/* Globalna lataka na artefakt Androida.
+
+   Tailwindowe `bg-clip-text` + `text-transparent` daje `background-clip: text`
+   razem z `color: transparent`. Silniki oparte na Chromium na Androidzie
+   (zwlaszcza Samsung Internet) potrafia w tej kombinacji narysowac czarny
+   prostokat zamiast tekstu w gradiencie. Wlasciwym sposobem wygaszenia koloru
+   przy background-clip jest -webkit-text-fill-color, nie color.
+
+   Wzorzec wystepuje w ~50 miejscach aplikacji, wiec zamiast przepisywac kazde
+   z osobna, wymuszamy poprawna wlasciwosc wszedzie tam, gdzie obie klasy
+   spotykaja sie na jednym elemencie. */
+.bg-clip-text.text-transparent {
+  -webkit-text-fill-color: transparent;
+}

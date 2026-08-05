@@ -518,7 +518,7 @@ function BaseChatContent() {
               setHoveredElement(null);
             }}
           >
-            <span className={`${hasBaseName ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'} text-base`}>
+            <span className={`${hasBaseName ? 'username-gradient' : 'text-gray-900 dark:text-white'} text-base`}>
               {userName.endsWith('.sphere') ? (
                 <>
                   <span className="text-gray-900 dark:text-white">{userName.replace('.sphere', '')}</span>

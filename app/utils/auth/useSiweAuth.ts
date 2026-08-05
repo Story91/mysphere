@@ -212,7 +212,28 @@ export function useSiweAuth(): SiweAuthState {
 
         if (!response.ok) return;
 
-        const data = (await response.json()) as { address?: unknown };
+        const data = (await response.json()) as { address?: unknown; firebaseToken?: unknown };
+
+        // Logowanie do Firebase tokenem zmintowanym przez serwer po weryfikacji
+        // podpisu. Dopiero to sprawia, ze request.auth.uid w regulach Firestore
+        // JEST adresem portfela - bez tego reguly nie wiedza, kto pisze,
+        // i musialy zostac otwarte na oscież.
+        //
+        // Blad tutaj NIE przerywa logowania: sesja serwerowa i tak powstala,
+        // a zapisy do Firestore dzialaja dzis anonimowo. Zaostrzenie regul
+        // nastapi dopiero, gdy klienci beda sie logowac na stale.
+        if (typeof data.firebaseToken === 'string' && data.firebaseToken) {
+          try {
+            const [{ signInWithCustomToken }, { auth }] = await Promise.all([
+              import('firebase/auth'),
+              import('../firebase'),
+            ]);
+            await signInWithCustomToken(auth, data.firebaseToken);
+          } catch (firebaseError) {
+            console.warn('[useSiweAuth] Logowanie do Firebase nie powiodlo sie:', firebaseError);
+          }
+        }
+
         if (cancelled || !isMountedRef.current) return;
 
         if (typeof data.address === 'string' && data.address.length > 0) {
@@ -234,6 +255,18 @@ export function useSiweAuth(): SiweAuthState {
   const signOut = useCallback(async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+
+      // Sesja Firebase musi zniknac razem z sesja serwerowa - inaczej
+      // wylogowany uzytkownik nadal moglby pisac do Firestore jako on sam.
+      try {
+        const [{ signOut: firebaseSignOut }, { auth }] = await Promise.all([
+          import('firebase/auth'),
+          import('../firebase'),
+        ]);
+        await firebaseSignOut(auth);
+      } catch (firebaseError) {
+        console.warn('[useSiweAuth] Wylogowanie z Firebase nie powiodlo sie:', firebaseError);
+      }
     } catch {
       // Nawet gdy zadanie padnie, lokalny stan czyscimy - z punktu widzenia UI
       // uzytkownik jest wylogowany, a cookie i tak wygasnie.
@@ -305,7 +338,28 @@ export function useSiweAuth(): SiweAuthState {
           return false;
         }
 
-        const data = (await response.json()) as { address?: unknown };
+        const data = (await response.json()) as { address?: unknown; firebaseToken?: unknown };
+
+        // Logowanie do Firebase tokenem zmintowanym przez serwer po weryfikacji
+        // podpisu. Dopiero to sprawia, ze request.auth.uid w regulach Firestore
+        // JEST adresem portfela - bez tego reguly nie wiedza, kto pisze,
+        // i musialy zostac otwarte na oscież.
+        //
+        // Blad tutaj NIE przerywa logowania: sesja serwerowa i tak powstala,
+        // a zapisy do Firestore dzialaja dzis anonimowo. Zaostrzenie regul
+        // nastapi dopiero, gdy klienci beda sie logowac na stale.
+        if (typeof data.firebaseToken === 'string' && data.firebaseToken) {
+          try {
+            const [{ signInWithCustomToken }, { auth }] = await Promise.all([
+              import('firebase/auth'),
+              import('../firebase'),
+            ]);
+            await signInWithCustomToken(auth, data.firebaseToken);
+          } catch (firebaseError) {
+            console.warn('[useSiweAuth] Logowanie do Firebase nie powiodlo sie:', firebaseError);
+          }
+        }
+
         const verified =
           typeof data.address === 'string' && data.address.length > 0
             ? data.address.toLowerCase()
