@@ -1,6 +1,7 @@
 import 'server-only';
 import { getApps, initializeApp, cert, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 
 /**
  * Mintowanie tokenow Firebase po weryfikacji SIWE.
@@ -75,6 +76,32 @@ function getAdminApp(): App | null {
   });
 
   return cachedApp;
+}
+
+/**
+ * Firestore z uprawnieniami administracyjnymi - OMIJA reguly bezpieczenstwa.
+ *
+ * PO CO: sa dane, ktorych przegladarka nie moze zobaczyc niezaleznie od tego,
+ * jak dobre sa reguly - bo klient czyta dokument posta w calosci. Tresc premium
+ * jest wlasnie taka: dopoki siedzi w dokumencie posta, kazdy widzi ja w
+ * odpowiedzi sieciowej bez placenia. Rozwiazaniem jest kolekcja, do ktorej
+ * klient nie ma dostepu WCALE (`allow read, write: if false`), a czyta ja
+ * wylacznie serwer tym klientem.
+ *
+ * KAZDE uzycie tej funkcji musi samo sprawdzic, czy wolajacy ma prawo do danych
+ * - tutaj nie ma zadnej bramki. Zwraca null, gdy konto uslugowe nie jest
+ * skonfigurowane; wolajacy ma wtedy zdecydowac, czy to blad, czy degradacja.
+ */
+export function getAdminDb(): Firestore | null {
+  const app = getAdminApp();
+  if (!app) return null;
+
+  try {
+    return getFirestore(app);
+  } catch (error) {
+    console.error('[firebaseAdmin] Nie udalo sie otworzyc Firestore:', error);
+    return null;
+  }
 }
 
 /**

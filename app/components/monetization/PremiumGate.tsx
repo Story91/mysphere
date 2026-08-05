@@ -11,17 +11,20 @@
  * /api/unlock, ktory jeszcze raz sprawdza transakcje na lancuchu. Cofnieta
  * transakcja nie odblokowuje niczego.
  *
- * === CZEGO TO NIE ROBI ===
- * To jest paywall, a nie szyfrowanie. `premiumContent` siedzi w dokumencie
- * posta, a feed czyta posty bezposrednio z Firestore klienckim SDK - kto
- * zajrzy do odpowiedzi sieciowej, zobaczy tresc bez placenia. Zamkniecie tego
- * wymaga przeniesienia `premiumContent` do osobnej kolekcji, ktorej klient nie
- * czyta, i wydawania jej przez trase serwerowa po sprawdzeniu sesji
- * (app/utils/auth/session.ts) i rekordu w `unlocks`. Sesje nie sa jeszcze
- * wystawiane, wiec ten krok czeka na wpiecie logowania.
+ * === SKAD BIERZE SIE TRESC ===
+ * Nie z feedu. Tresc premium NIE jest juz zapisywana w dokumencie posta -
+ * wczesniej byla, a poniewaz feed czyta posty klienckim SDK, kazdy widzial ja
+ * w odpowiedzi sieciowej bez placenia. Teraz mieszka w kolekcji, ktorej klient
+ * nie czyta wcale, i wydaje ja GET /api/premium po sprawdzeniu podpisanej sesji
+ * oraz rekordu w `unlocks`. Ten komponent pobiera ja dopiero wtedy, gdy ma
+ * podstawy sadzic, ze uzytkownik ma prawo - a i tak decyduje serwer.
+ *
+ * ZGODNOSC WSTECZ: posty sprzed tej zmiany maja tresc w polu `premiumContent`.
+ * Ich tresc jest juz publiczna i nic tego nie cofnie, ale trasa serwerowa
+ * podaje ja tak samo, wiec odblokowanie dziala bez zmian.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { toast } from 'react-hot-toast';
 import { getExplorerTxLink } from '../../basechat/components/TipNetworkConfig';
@@ -32,7 +35,6 @@ export interface PremiumGateProps {
   postId: string;
   /** Autor posta - odbiorca platnosci. */
   creatorAddress: string;
-  premiumContent: string;
   unlockPrice: string;
   unlockToken?: MonetizationToken;
   /** Wynik ZBIORCZEGO sprawdzenia z useFeedUnlocks - bez zapytania per post. */
@@ -43,7 +45,6 @@ export interface PremiumGateProps {
 export default function PremiumGate({
   postId,
   creatorAddress,
-  premiumContent,
   unlockPrice,
   unlockToken = DEFAULT_UNLOCK_TOKEN,
   isUnlocked = false,
@@ -52,8 +53,62 @@ export default function PremiumGate({
   const { address, isConnected } = useAccount();
   const [justUnlocked, setJustUnlocked] = useState(false);
 
+  // Tresc pobierana z serwera - nie ma jej w propsach i nie ma jej w feedzie.
+  const [content, setContent] = useState<string | null>(null);
+  const [contentError, setContentError] = useState<string | null>(null);
+  const [isFetchingContent, setIsFetchingContent] = useState(false);
+
   const isAuthor = !!address && address.toLowerCase() === creatorAddress.toLowerCase();
   const unlocked = isUnlocked || justUnlocked || isAuthor;
+
+  /**
+   * Pobranie tresci. Odpalane tylko wtedy, gdy klient ma POWODY sadzic, ze
+   * uzytkownik ma prawo - ale to serwer jest tu rozstrzygajacy. 401 znaczy
+   * "nie wiem, kim jestes": bez podpisanej sesji nie da sie odroznic
+   * placacego od kogos, kto poda cudzy adres.
+   */
+  useEffect(() => {
+    if (!unlocked || content !== null) return;
+
+    let cancelled = false;
+    setIsFetchingContent(true);
+    setContentError(null);
+
+    (async () => {
+      try {
+        const response = await fetch(`/api/premium?postId=${encodeURIComponent(postId)}`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          content?: string;
+          error?: string;
+          code?: string;
+        };
+
+        if (cancelled) return;
+
+        if (!response.ok) {
+          setContentError(
+            data.code === 'session_required'
+              ? 'Sign in with your wallet to read this. Paid content needs a verified signature.'
+              : data.error || 'Could not load the premium content.'
+          );
+          return;
+        }
+
+        setContent(typeof data.content === 'string' ? data.content : '');
+      } catch {
+        if (!cancelled) setContentError('Could not load the premium content.');
+      } finally {
+        if (!cancelled) setIsFetchingContent(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [unlocked, content, postId]);
 
   const recordUnlock = useCallback(
     async (txHash: `0x${string}`) => {
@@ -75,8 +130,9 @@ export default function PremiumGate({
 
   const { phase, error, txHash, isBusy, isOnBase, switchToBase, pay, reset } = usePaymentFlow(recordUnlock);
 
-  // Brak tresci premium albo brak sensownej ceny = post zwykly, nic nie rysujemy.
-  if (!premiumContent || !unlockPrice || !(parseFloat(unlockPrice) > 0)) {
+  // Brak sensownej ceny = post nie jest platny, nic nie rysujemy. O istnieniu
+  // czesci premium decyduje juz hasPremiumContent() po stronie feedu.
+  if (!unlockPrice || !(parseFloat(unlockPrice) > 0)) {
     return null;
   }
 
@@ -89,19 +145,26 @@ export default function PremiumGate({
           <span>🔓</span>
           <span>{isAuthor ? 'Premium content (yours)' : 'Premium content unlocked'}</span>
         </div>
-        <div className="prose prose-sm max-w-none whitespace-pre-wrap break-words text-black dark:text-white">
-          {premiumContent}
-        </div>
+        {isFetchingContent && content === null && !contentError ? (
+          <div className="space-y-2" aria-live="polite">
+            <div className="h-3 w-11/12 animate-pulse rounded bg-amber-200/60 dark:bg-amber-800/40" />
+            <div className="h-3 w-8/12 animate-pulse rounded bg-amber-200/60 dark:bg-amber-800/40" />
+          </div>
+        ) : contentError ? (
+          <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200">{contentError}</p>
+        ) : (
+          <div className="prose prose-sm max-w-none whitespace-pre-wrap break-words text-black dark:text-white">
+            {content}
+          </div>
+        )}
 
-        {/* Ostrzezenie WIDOCZNE DLA AUTORA. To jest jedyna osoba, ktora podejmuje
-            decyzje o zamknieciu tresci, wiec musi wiedziec, czym ta zaslona
-            naprawde jest. Ukrycie tego w komentarzu w kodzie byloby wprowadzaniem
-            w blad kogos, kto liczy na ochrone tresci. */}
+        {/* Informacja WIDOCZNA DLA AUTORA - to jedyna osoba decydujaca o
+            zamknieciu tresci, wiec musi wiedziec, czym ta zaslona naprawde jest. */}
         {isAuthor && (
           <p className="mt-3 border-t border-amber-400/30 pt-2 text-[11px] leading-relaxed text-amber-700/90 dark:text-amber-300/80">
-            This hides the text behind a payment, but it does not encrypt it. Anyone
-            technical enough to read the page&apos;s network response can see it without
-            paying. Do not put anything here you could not afford to have public.
+            This text is stored outside the feed and served only to readers who paid, so it
+            is not visible in the page&apos;s network response. It is still plain text on our
+            server, not end-to-end encrypted.
           </p>
         )}
       </div>

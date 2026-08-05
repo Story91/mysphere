@@ -852,10 +852,30 @@ export const markNotificationAsRead = async (userId: string, notificationId: str
 };
 
 // Utwórz nowy post z zaawansowanymi opcjami
-export const createPost = async (post: { 
-  author: string; 
-  content: string; 
+/**
+ * Post powstal, ale nie udalo sie zapisac jego platnego fragmentu.
+ * Wlasna klasa, bo to jest CALKIEM INNY stan niz "post sie nie utworzyl" -
+ * uzytkownik nie ma publikowac drugi raz.
+ */
+export class PremiumContentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PremiumContentError';
+  }
+}
+
+export const createPost = async (post: {
+  author: string;
+  content: string;
   timestamp: number;
+  /**
+   * Tresc premium. NIE trafia do dokumentu posta - feed czyta posty klienckim
+   * SDK, wiec wszystko, co tam wpiszemy, jest publiczne niezaleznie od UI.
+   * Zapisuje ja trasa /api/premium do kolekcji poza zasiegiem przegladarki.
+   */
+  premiumContent?: string;
+  unlockPrice?: string;
+  unlockToken?: 'ETH' | 'USDC';
   image?: string | null;
   video?: string | null;
   tags?: string[];
@@ -884,8 +904,14 @@ export const createPost = async (post: {
   };
 }): Promise<string> => { // Zmieniamy typ zwracany na Promise<string>
   try {
+    // Tresc premium wyjmujemy z danych posta ZANIM cokolwiek trafi do Firestore.
+    // Dokument posta niesie tylko fakt istnienia platnej czesci i jej cene;
+    // sama tresc idzie osobnym kanalem, do kolekcji, ktorej klient nie czyta.
+    const { premiumContent, ...postFields } = post;
+    const hasPremium = typeof premiumContent === 'string' && premiumContent.trim() !== '';
+
     const postData = {
-      ...post,
+      ...postFields,
       timestamp: serverTimestamp(),
       likes: 0,
       likedBy: [],
@@ -936,7 +962,39 @@ export const createPost = async (post: {
     await batch.commit();
     
     console.log(`✅ Post created with ID: ${newPostRef.id}`);
-    
+
+    // 5b. Tresc premium - osobnym kanalem, po utworzeniu posta.
+    //
+    // Trasa /api/premium zapisuje ja do kolekcji poza zasiegiem przegladarki
+    // i DOPIERO POTEM oznacza post jako platny. Kolejnosc jest celowa: gdy
+    // zapis padnie, post zostaje zwyklym postem, zamiast dostac cene bez
+    // tresci. Autor dowiaduje sie o tym z rzuconego bledu.
+    if (hasPremium) {
+      const response = await fetch('/api/premium', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: newPostRef.id,
+          content: premiumContent,
+          unlockPrice: post.unlockPrice,
+          unlockToken: post.unlockToken,
+        }),
+      });
+
+      if (!response.ok) {
+        let detail = 'Premium content could not be saved.';
+        try {
+          const data = (await response.json()) as { error?: string };
+          if (typeof data.error === 'string' && data.error) detail = data.error;
+        } catch {
+          // odpowiedz bez JSON - zostajemy przy komunikacie domyslnym
+        }
+        console.error('❌ Zapis tresci premium nie powiodl sie:', response.status, detail);
+        throw new PremiumContentError(`${detail} Your post was published without the paid section.`);
+      }
+    }
+
     // 6. Check if this is user's first post and award referral bonus
     const userPostsQuery = query(
       collection(db, 'posts'),
@@ -961,6 +1019,12 @@ export const createPost = async (post: {
     return newPostRef.id;
 
   } catch (error) {
+    // Blad zapisu tresci premium przepuszczamy z wlasnym komunikatem: post
+    // ISTNIEJE i jest widoczny, nie powstal tylko jego platny fragment.
+    // Zamiana tego na "Failed to create post" mowilaby uzytkownikowi
+    // nieprawde i kazalaby publikowac drugi raz.
+    if (error instanceof PremiumContentError) throw error;
+
     console.error('❌ Error creating post:', error);
     throw new Error('Failed to create post in Firebase');
   }

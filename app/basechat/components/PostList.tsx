@@ -2007,7 +2007,6 @@ function PostList({
           <PremiumGate
             postId={post.id}
             creatorAddress={post.author}
-            premiumContent={post.premiumContent as string}
             unlockPrice={post.unlockPrice as string}
             unlockToken={post.unlockToken}
             isUnlocked={unlockedPostIds.has(post.id)}

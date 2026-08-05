@@ -253,6 +253,26 @@ service cloud.firestore {
     // ========================================================================
     // ISTNIEJACE KOLEKCJE - NADAL OTWARTE
     // ========================================================================
+    // premiumContent - TRESC PLATNA. Przegladarka nie ma tu wstepu WCALE.
+    // ========================================================================
+    //
+    // To jest jedyna kolekcja w tym pliku zamknieta calkowicie, i to jest
+    // caly sens jej istnienia. Wczesniej tresc premium siedziala w dokumencie
+    // posta; feed czyta posty klienckim SDK, wiec kazdy widzial platny tekst w
+    // odpowiedzi sieciowej bez placenia. Paywall byl zaslona w UI.
+    //
+    // Teraz czyta i pisze wylacznie serwer, klientem administracyjnym
+    // (firebase-admin), ktory reguly omija z definicji. `if false` dotyczy
+    // przegladarki - i ma dotyczyc.
+    //
+    // Wydaje ja GET /api/premium po sprawdzeniu DWOCH rzeczy: podpisanej sesji
+    // SIWE (kim jestes) oraz rekordu w `unlocks` albo autorstwa posta (czy masz
+    // prawo). Zapisuje POST /api/premium, wylacznie autorowi posta.
+    match /premiumContent/{postId} {
+      allow read, write: if false;
+    }
+
+    // ========================================================================
     // posts, users, comments, likes, tips, friendships, friendRequests, groups,
     // paidPins, payments, referrals, referralStats, referralRewards, usernames,
     // userRatings, baseNameFeed, mySphereUserSocials, authorizedQuotes
