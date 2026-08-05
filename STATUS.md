@@ -68,7 +68,21 @@ Wycięte źródła janku: `MutationObserver` skanujący cały dokument w pętli 
 
 - **9 modułów wyłączonych** przekierowaniami z jednej listy (`config/routeStatus.js`). Kod nietknięty, powrót to usunięcie jednej pozycji.
 - **MySphere = BaseChat** — usunięty sztuczny podział, `/` przekierowuje serwerowo.
-- **`/re-definition`** — strona dla użytkownika: rejestr modułów czytany z tej samej konfiguracji co przekierowania, uzasadnienie zmiany kierunku, praktyczne przewodniki. Podpięta do nawigacji i do `/Docs` jako „User Guide".
+- **`/re-definition`** — **przepisana 5 sierpnia** z rejestru wyłączonych modułów (czyli wewnętrznej informacji o tym, czego *nie* ma) na manifest kierunku: teza produktu, mechanika Aska, wyjaśnienie x402 dla użytkownika, ryzyka wprost. Elementem sygnaturowym jest karta Aska — dokładnie ten obiekt, który ma trafić do feedu, a nie jego ilustracja. Sekcja „What runs right now" nadal czyta `isRouteDisabled`, więc strona nie może skłamać o stanie produkcji.
+
+### Robinhood Chain — ósma sieć
+
+`chainId` potwierdzony na żywym RPC **przed** napisaniem konfiguracji: `eth_chainId` → `0x1237` = 4663 (testnet 46630), explorer Blockscout.
+
+- **Tipy działają od razu** — `NETWORKS.robinhood` reużywa `TOKENS.ETH` (`isNative`), transfer natywny nie dotyka kontraktu i nie czeka na deploy.
+- **Postowanie jest jawnie niedostępne, nie po cichu zepsute** — bez `NEXT_PUBLIC_ROBINHOOD_POST_CONTRACT` przycisk jest `disabled` („Coming soon"), composer pokazuje baner, a przed `writeContract` stoją dwie bramki.
+- Skrypt deployu sprawdza `chainId` **zanim** cokolwiek wyśle — zły `--network` kończy się błędem, nie kontraktem na obcej sieci.
+- Kontrakt w wariancie `Ownable` dla OpenZeppelin **4.9** (projekt ma 4.9.6); wersja z `LineaPostContract.sol` (API OZ 5.x) w ogóle by się nie skompilowała. ABI zweryfikowane względem frontendu: 16/16 sygnatur.
+
+### Dystrybucja
+
+- **`/u/[address]`** — publiczny profil, jedna strona dla człowieka i dla crawlera. Basename z weryfikacją w przód, policzone posty/lajki/tipy, własna karta OG. Obsłużone dwie pułapki w danych: adresy zapisane raz w checksumie, raz małymi literami (bez tego połowa profili byłaby pusta) oraz sumowanie kwot tipów wyłącznie w obrębie tokena — dodanie ETH do USDC dałoby liczbę, która nic nie znaczy.
+- **`sitemap.xml` + `robots.txt`** — każdy post miał już własny URL z metadanymi, ale nic o tych URL-ach nie mówiło wyszukiwarkom. 500 ostatnich postów, rewalidacja co godzinę, trasy statyczne filtrowane przez `isRouteDisabled`.
 
 ### Faza 0 — fundament ✅
 
@@ -97,9 +111,25 @@ Wycięte źródła janku: `MutationObserver` skanujący cały dokument w pętli 
 
 **Rozwiązane:** MySphere przestaje wynajmować warstwę zaufania i zaczyna ją posiadać — własny rejestr na Firestore (`app/utils/agents/registry.ts`), `lib/kya.ts` jako cienka warstwa zgodności, więc całe istniejące UI `/MyAgents` działa bez przeróbek.
 
+## 🧭 KIERUNEK (ustalony 5 sierpnia 2026)
+
+Po głębokim researchu (workflow, 5 agentów) produkt ma jedną tezę:
+
+> **MySphere przestaje być miejscem, w którym ludzie publikują, a staje się miejscem, w którym pieniądze z zewnątrz — coraz częściej maszynowe — kupują ludzki osąd, a jedyną walutą zaufania jest historia rozliczonych płatności.**
+
+Jednostką produktu przestaje być post, a staje się **Ask**: pytanie z budżetem, liczbą miejsc i terminem. Płaci człowiek (USDC na Base) albo agent (x402). Odpowiedzi są zapieczętowane do rozstrzygnięcia. Reputacja obu stron bije się **wyłącznie** z rozliczonych płatności i jest nietransferowalna — czyli niekupowalna.
+
+**Czemu ta luka jest realna:** ponad 230 platform „wynajmij agenta", a realne wypłaty liczone w setkach dolarów łącznie (jedna z największych: 283 ukończone zadania w całej historii). Gdzie jest tłum, nie ma pieniędzy; gdzie są pieniądze, nie ma tłumu. Nikt nie zamknął pętli **zapłacone → ocenione → tańsze/droższe następnym razem**.
+
+**Świadomie odrzucone przy tej decyzji:** klon Moltverr/MoltJobs (walka o zerowy popyt), klon Moltbooka (kategoria kupiona przez Metę, bez pieniędzy w mechanice), Ticker Rooms na Robinhood Chain (subsydium gazu wygasa końcem września 2026 — to feature na dwa tygodnie, nie kierunek), feed realtime na Flashblocks (szczegół implementacyjny, nie powód, żeby otworzyć aplikację).
+
+**Test falsyfikujący przed napisaniem linijki kodu Aska:** wystaw ręcznie 20 Asków w obecnym feedzie jako zwykłe posty, płać ręcznie przez istniejące tipy. Próg: 70% zleceń z ≥3 użytecznymi odpowiedziami w 24 h i ≥5 askerów wracających z własnymi pieniędzmi. Poniżej progu — kierunek pada.
+
 ## 🔄 W TOKU
 
-Nic. Wszystkie zadania niewymagające decyzji właściciela są zamknięte.
+**PR #16 czeka na merge** (`arch/server-auth` → `master`). Zawiera Robinhood Chain, nową stronę Re-Definition, publiczne profile `/u/[address]`, sitemapę i robots.
+
+Poza tym: nic. Wszystkie zadania niewymagające decyzji właściciela są zamknięte.
 
 ## ⬜ ZOSTAŁO
 
@@ -139,12 +169,13 @@ Zweryfikowane w kompilowanym źródle `@x402/next`: **429 anuluje settlement**, 
 
 ### Poza kodem — wymaga właściciela
 
-1. **Reguły Firestore — plik jest w repo, ale wymaga Twojego kroku.** `firestore.rules` zawiera reguły dla czterech nowych kolekcji (`agents`, `agentFeedback`, `unlocks`, `creatorSubscriptions`). **Wdrożenie go w obecnej postaci zablokuje czat**, bo brakuje reguł dla `posts`, `users`, `tips` i grafu społecznościowego. Wyeksportuj obecne reguły z konsoli, wklej w oznaczoną sekcję, dopiero wtedy deploy.
-2. **`NEXT_PUBLIC_COINBASE_PRIVATE_KEY`** — 0 użyć w kodzie, ale publiczny prefiks i 548 dni w env. Do rotacji i usunięcia.
-3. **Automatyczny deploy z GitHuba nie działa od 166 dni.** Repo podłączone, ale nic się nie buduje. Do sprawdzenia: Settings → Git → Ignored Build Step / Production Branch. Do tego czasu każdy release wymaga ręcznego `vercel --prod`.
-4. **NAJWAŻNIEJSZE: budujemy własny rejestr agentów, czy szukamy innego dostawcy?** KYA nie istnieje. Własny rejestr na Firestore reużywa całe istniejące UI i model reputacji. Ta decyzja determinuje sens fazy 1.
-5. **`X402_PAY_TO_ADDRESS`** — bez niego płatności MyClaw nie są egzekwowane (endpointy działają za darmo). Przed produkcją: realny handshake 402 na Base Sepolia, bo `@x402/next` deklaruje peer `next >= 16.2.6`, a jesteśmy na 14.2.35.
-6. **MyClaw Academy zostaje?** Certyfikacja jest już realna, więc akademia ma sens — ale dziury wyżej trzeba domknąć.
+1. **Merge PR #16.** `gh pr merge` jest blokowane po mojej stronie — musisz kliknąć sam. Bez tego nic z tej sesji nie trafi na produkcję.
+2. **`PRIVATE_KEY`** (świeży portfel deployowy) w `.env.local`, **bez prefiksu `NEXT_PUBLIC_`** — z prefiksem klucz prywatny trafiłby do publicznego bundle'a JS. Potem `npm run contracts:deploy:robinhood`, a wypisany adres wstaw jako `NEXT_PUBLIC_ROBINHOOD_POST_CONTRACT`.
+3. **`X402_PAY_TO_ADDRESS`** — bez niego płatności nie są egzekwowane (endpointy działają za darmo). Przed produkcją: realny handshake 402 na Base Sepolia, bo `@x402/next` deklaruje peer `next >= 16.2.6`, a jesteśmy na 14.2.35.
+4. **`NEXT_PUBLIC_ROBINHOOD_RPC_URL`** — publiczny endpoint jest rate-limited i oficjalnie „not recommended for production".
+5. **`NEXT_PUBLIC_COINBASE_PRIVATE_KEY`** — 0 użyć w kodzie, ale publiczny prefiks i 548 dni w env. Do rotacji i usunięcia.
+6. **Reguły Firestore — zaostrzone i opublikowane 5 sierpnia**, ale klient nadal nie loguje się do Firebase Auth, więc `request.auth` bywa `null`. Domknięcie: podpiąć `signInWithCustomToken` tokenem z `/api/auth/verify` (łańcuch po stronie serwera już działa), dopiero potem wymagać `request.auth` w regułach.
+7. **Test falsyfikujący kierunek** — 20 ręcznych Asków przez istniejące tipy, zanim napiszemy backend Aska. Szczegóły w sekcji KIERUNEK.
 
 ### Świadomie odrzucone
 
