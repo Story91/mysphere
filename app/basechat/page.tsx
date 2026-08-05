@@ -3,6 +3,8 @@
 
 import { useState, useRef, useEffect, useCallback, PropsWithChildren, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
+// @ts-ignore - config CommonJS wspoldzielony z next.config.js
+import { isRouteDisabled } from '@/config/routeStatus';
 import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
 import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
@@ -3207,10 +3209,14 @@ function BaseChatContent() {
                         </div>
                       </div>
 
-                      {/* Base Tracking Identity Link */}
-                      <div className="mt-4">
+                      {/* Base Tracking Identity Link.
+                          UWAGA: /base jest teraz wylaczone (config/routeStatus.js).
+                          Poprzednio kafelek wskazywal na /profile - trase, ktora
+                          NIGDY nie istniala w tym repo (brak app/profile), wiec
+                          byl to martwy link zwracajacy 404. */}
+                      <div className={`mt-4 ${isRouteDisabled('/base') ? 'hidden' : ''}`}>
                         <a
-                          href="/profile"
+                          href="/base"
                           className="block w-full p-6 bg-gradient-to-r from-gray-900 via-blue-900 to-black rounded-xl text-center hover:from-black hover:via-blue-800 hover:to-gray-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
                         >
                           <div className="flex items-center justify-center mb-3">
@@ -4038,8 +4044,10 @@ function BaseChatContent() {
                 </div>
               </div>
 
-              {/* Yaps Stats Widget */}
-              <div className="mb-4">
+              {/* Yaps Stats Widget - ukryty, gdy /yapscan jest wylaczony
+                  (config/routeStatus.js). Bez tego kafelek prowadzilby
+                  w przekierowanie z powrotem na /basechat. */}
+              <div className={`mb-4 ${isRouteDisabled('/yapscan') ? 'hidden' : ''}`}>
                 <a 
                   href="/yapscan" 
                   className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300"

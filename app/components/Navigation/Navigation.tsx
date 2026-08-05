@@ -20,6 +20,8 @@ import {
   EthBalance,
 } from '@coinbase/onchainkit/identity';
 import { useState } from 'react';
+// @ts-ignore - config CommonJS wspoldzielony z next.config.js
+import { isRouteDisabled } from '@/config/routeStatus';
 import { useFundingUrl } from './useFundingUrl';
 import { NetworkSwitcher } from '../NetworkSwitcher';
 import { NotificationsBell } from './NotificationsBell';
@@ -112,17 +114,26 @@ export default function Navigation() {
     router.push('/basechat?view=notifications');
   };
 
-  const navLinks: NavLink[] = [
+  // Pelna lista tras. Te wylaczone (config/routeStatus.js) sa odfiltrowywane
+  // ponizej, zeby nawigacja nie prowadzila w przekierowanie. Wpisy zostaja tu
+  // celowo - powrot trasy to usuniecie jej z DISABLED_ROUTES, bez ruszania UI.
+  const allNavLinks: NavLink[] = [
     { href: '/', label: 'MySphere' },
     { href: '/base', label: 'MyBase' },
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
+    { href: '/basechat', label: 'BaseChat' },
     { href: '#', label: 'Re-Definition', isDisabled: true },
   ];
 
+  const navLinks: NavLink[] = allNavLinks.filter(
+    (link) => link.href === '#' || !isRouteDisabled(link.href)
+  );
+
   const linkTheme: Record<string, { suffix: string; border: string; hoverBorder: string }> = {
     MySphere: { suffix: 'text-fuchsia-600', border: 'border-fuchsia-200', hoverBorder: 'hover:border-fuchsia-300' },
+    BaseChat: { suffix: 'text-[#0052FF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
     MyBase: { suffix: 'text-[#0052FF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
     MyCamp: { suffix: 'text-orange-600', border: 'border-orange-200', hoverBorder: 'hover:border-orange-300' },
     MyAgents: { suffix: 'text-cyan-600', border: 'border-cyan-200', hoverBorder: 'hover:border-cyan-300' },

@@ -1,3 +1,5 @@
+const { buildRedirects } = require('./config/routeStatus');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Pozwala zbudowac projekt bez nadpisywania .next uzywanego przez dzialajacy
@@ -89,6 +91,10 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Trasy wylaczone na czas redefinicji MySphere. Lista zyje w
+      // config/routeStatus.js - kod stron zostaje nietkniety w repo.
+      // permanent: false, zeby przegladarki nie zapamietaly tego na stale.
+      ...buildRedirects(),
       {
         source: '/:path*',
         has: [
