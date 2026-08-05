@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getRecentTips, getBulkUserNamesOptimized, Tip, TipNetworkType } from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
-import { TOKENS, NETWORKS, TipToken, TipNetwork, getExplorerTxLink } from './TipNetworkConfig';
+import { TOKENS, NETWORKS, TipToken, TipNetwork } from './TipNetworkConfig';
 
 interface RecentTipsProps {
   userAddress: string;
@@ -50,12 +50,6 @@ const mapNetworkId = (network: string): TipNetwork => {
   if (network === 'basecamp') return 'camp';
   if (network in NETWORKS) return network as TipNetwork;
   return 'base'; // fallback
-};
-
-// Pobiera link do explorera dla transakcji
-const getExplorerLink = (network: TipNetworkType, txHash: string): string => {
-  const networkId = mapNetworkId(network);
-  return getExplorerTxLink(networkId, txHash);
 };
 
 // Pobiera ikonę sieci
@@ -201,14 +195,17 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
                   <TokenIcon token={tip.token as TipToken} />
                   <span>{formatTokenAmount(parseFloat(tip.amount), tip.token as TipToken)}</span>
                 </div>
+                {/* Paragon zamiast surowego linku do eksploratora: ta sama
+                    transakcja, ale w formie, ktora da sie komus wyslac.
+                    Eksplorator zostaje o klikniecie dalej, na samym paragonie. */}
                 {tip.txHash && (
                   <a
-                    href={getExplorerLink(tip.network, tip.txHash)}
+                    href={`/tip/${tip.txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 flex items-center space-x-1"
                   >
-                    <span>View TX</span>
+                    <span>Receipt</span>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>

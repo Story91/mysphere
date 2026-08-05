@@ -844,11 +844,11 @@ function BaseChatContent() {
         id: tempPostId,
         author: address,
         content: newPost,
-        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
-        // wyglada dokladnie tak jak przed monetyzacja.
+        // Optymistyczny podglad platnej czesci: znacznik i cena, bez tresci.
+        // Sama tresc NIE trafia tu ani do Firestore - zapisuje ja /api/premium.
         ...(isPremiumOpen && premium.premiumContent.trim()
           ? {
-              premiumContent: premium.premiumContent.trim(),
+              hasPremium: true,
               unlockPrice: premium.unlockPrice,
               unlockToken: premium.unlockToken,
             }
@@ -1172,11 +1172,11 @@ function BaseChatContent() {
         id: `temp-${Date.now()}`,
         author: address,
         content: newPost,
-        // Pola premium tylko gdy autor faktycznie cos wpisal - inaczej post
-        // wyglada dokladnie tak jak przed monetyzacja.
+        // Optymistyczny podglad platnej czesci: znacznik i cena, bez tresci.
+        // Sama tresc NIE trafia tu ani do Firestore - zapisuje ja /api/premium.
         ...(isPremiumOpen && premium.premiumContent.trim()
           ? {
-              premiumContent: premium.premiumContent.trim(),
+              hasPremium: true,
               unlockPrice: premium.unlockPrice,
               unlockToken: premium.unlockToken,
             }

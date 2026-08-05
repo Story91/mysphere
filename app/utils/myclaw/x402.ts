@@ -102,9 +102,20 @@ function getResourceServer(): x402ResourceServer {
   return resourceServer;
 }
 
+/**
+ * Cena zasobu. Stala (np. "$0.001") albo wyliczana z zadania.
+ *
+ * Wariant funkcyjny istnieje dla zasobow, ktorych cena rozni sie miedzy
+ * zadaniami - jak Ask, gdzie kazde zlecenie ma wlasny budzet. Zwrocenie null
+ * oznacza "tego zasobu nie wyceniamy" i przepuszcza zadanie do handlera, ktory
+ * sam decyduje, co odpowiedziec (np. 404 na nieistniejacy zasob).
+ */
+export type MyClawPrice =
+  | string
+  | ((request: NextRequest) => string | null | Promise<string | null>);
+
 export type MyClawPaymentConfig = {
-  /** Cena w formacie Money, np. "$0.001". */
-  price: string;
+  price: MyClawPrice;
   /** Opis zasobu pokazywany w odpowiedzi 402. */
   description: string;
 };
@@ -113,8 +124,15 @@ export type MyClawPaymentConfig = {
  * Owija handler App Routera platnoscia x402.
  *
  * Gdy X402_PAY_TO_ADDRESS nie jest ustawione - zwraca handler bez zmian, wiec
- * endpoint dziala jak dotad (darmowo). Konstrukcja wrappera jest leniwa i
- * cache'owana: env czytamy przy pierwszym zadaniu, nie w czasie importu modulu.
+ * endpoint dziala jak dotad (darmowo). Env czytamy przy KAZDYM zadaniu, a nie
+ * raz na proces: poprzednia wersja zapamietywala pierwsza decyzje na cale zycie
+ * instancji, wiec ciepla instancja, ktora wystartowala przed ustawieniem
+ * zmiennej, serwowala platne zasoby za darmo do konca swojego zycia.
+ *
+ * Wrapper jest cache'owany tylko dla ceny STALEJ i tylko dla konkretnego
+ * `payTo` - zmiana adresu wymusza zbudowanie nowego. Przy cenie dynamicznej
+ * wrapper powstaje per zadanie, bo `price` jest czescia konfiguracji withX402
+ * i inaczej pierwsza cena zamrozilaby sie dla wszystkich kolejnych zadan.
  *
  * Uwaga: handler dostaje wylacznie `request` (tak wywoluje go withX402), wiec
  * trasy dynamiczne musza przekazac sobie `params` innym kanalem - patrz
@@ -124,31 +142,44 @@ export function withMyClawPayment<T>(
   handler: (request: NextRequest) => Promise<NextResponse<T>>,
   config: MyClawPaymentConfig
 ): (request: NextRequest) => Promise<NextResponse<T>> {
-  let wrapped: ((request: NextRequest) => Promise<NextResponse<T>>) | null = null;
-  let resolved = false;
+  // Cache dla ceny stalej. Klucz to payTo, zeby zmiana adresu nie serwowala
+  // platnosci na stary portfel.
+  let cached: { payTo: string; run: (request: NextRequest) => Promise<NextResponse<T>> } | null =
+    null;
+
+  const build = (payTo: string, price: string) =>
+    withX402<T>(
+      handler,
+      {
+        accepts: {
+          scheme: "exact",
+          network: MYCLAW_NETWORK,
+          payTo,
+          price,
+        },
+        description: config.description,
+        mimeType: "application/json",
+      },
+      getResourceServer()
+    );
 
   return async (request: NextRequest): Promise<NextResponse<T>> => {
-    if (!resolved) {
-      resolved = true;
-      const payTo = getPayToAddress();
-      if (payTo) {
-        wrapped = withX402<T>(
-          handler,
-          {
-            accepts: {
-              scheme: "exact",
-              network: MYCLAW_NETWORK,
-              payTo,
-              price: config.price,
-            },
-            description: config.description,
-            mimeType: "application/json",
-          },
-          getResourceServer()
-        );
+    const payTo = getPayToAddress();
+    if (!payTo) return handler(request);
+
+    if (typeof config.price === "string") {
+      if (!cached || cached.payTo !== payTo) {
+        cached = { payTo, run: build(payTo, config.price) };
       }
+      return cached.run(request);
     }
-    return wrapped ? wrapped(request) : handler(request);
+
+    const price = await config.price(request);
+    // Brak ceny = zasob nie podlega wycenie w tym zadaniu. Handler dostaje
+    // zadanie bez bramki i sam decyduje o odpowiedzi.
+    if (!price) return handler(request);
+
+    return build(payTo, price)(request);
   };
 }
 

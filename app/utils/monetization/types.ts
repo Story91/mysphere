@@ -30,7 +30,17 @@ export const DEFAULT_UNLOCK_TOKEN: MonetizationToken = 'USDC';
  * zachowuje sie dokladnie jak dotad (brak zaslony, brak dodatkowych zapytan).
  */
 export interface PremiumPostFields {
-  /** Tresc widoczna dopiero po odblokowaniu. Brak pola = post nie jest premium. */
+  /**
+   * Znacznik, ze post ma platna czesc. Sama tresc NIE jest juz w dokumencie
+   * posta - wydaje ja trasa /api/premium po sprawdzeniu odblokowania. To pole
+   * jest jedynym, co feed musi wiedziec, zeby narysowac zaslone.
+   */
+  hasPremium?: boolean;
+  /**
+   * ZGODNOSC WSTECZ. Posty sprzed przeniesienia tresci do osobnej kolekcji
+   * maja ja tutaj - i wciaz jest publiczna, bo feed czyta dokument posta w
+   * calosci. Nowe posty tego pola nie zapisuja.
+   */
   premiumContent?: string;
   /** Cena odblokowania jako string dziesietny, np. "0.5". */
   unlockPrice?: string;
@@ -121,9 +131,16 @@ export function isSubscriptionActive(
   return !!subscription && subscription.expiresAt > now;
 }
 
-/** Czy post w ogole ma czesc premium. Tania sciezka dla feedu. */
+/**
+ * Czy post w ogole ma czesc premium. Tania sciezka dla feedu.
+ *
+ * Nowe posty niosa `hasPremium`, stare - sama tresc w `premiumContent`.
+ * Cena musi byc dodatnia w obu przypadkach: post z cena 0 nie jest platny,
+ * tylko zle zapisany.
+ */
 export function hasPremiumContent(post: PremiumPostFields | null | undefined): boolean {
-  return !!post?.premiumContent && !!post?.unlockPrice && parseFloat(post.unlockPrice) > 0;
+  const priced = !!post?.unlockPrice && parseFloat(post.unlockPrice) > 0;
+  return priced && (post?.hasPremium === true || !!post?.premiumContent);
 }
 
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;

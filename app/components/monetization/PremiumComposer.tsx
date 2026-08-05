@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { DEFAULT_UNLOCK_TOKEN, type MonetizationToken } from '../../utils/monetization/types';
 
 /**

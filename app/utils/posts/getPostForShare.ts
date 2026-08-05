@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 
 /**
  * Odczyt pojedynczego posta PO STRONIE SERWERA, na potrzeby udostepnialnej
@@ -90,6 +90,41 @@ export async function getRecentPostRefs(
   } catch (error) {
     console.error('[getRecentPostRefs] Nie udalo sie pobrac listy postow:', error);
     return [];
+  }
+}
+
+/**
+ * Suma tipow na poscie, per token.
+ *
+ * PO CO NA KARCIE OG: podglad linku pokazujacy ZYWY STAN jest w 2026 glowna
+ * mechanika rozchodzenia sie linkow w krypto - to on napedzil wzrost rynkow
+ * predykcyjnych, nie tresc pod nim. Post z widoczna kwota jest obiektem, ktory
+ * ktos wysle dalej; post z samym tekstem nie jest.
+ *
+ * Sumujemy WYLACZNIE w obrebie tokena - dodanie ETH do USDC dalo by liczbe bez
+ * znaczenia. Blad odczytu zwraca pusty obiekt: karta ma sie wygenerowac zawsze,
+ * bo brak podgladu boli bardziej niz brak jednej liczby.
+ */
+export async function getPostTipTotals(postId: string): Promise<Record<string, number>> {
+  if (!postId) return {};
+
+  try {
+    const snapshot = await getDocs(
+      query(collection(getDb(), 'tips'), where('postId', '==', postId), limit(500))
+    );
+
+    const totals: Record<string, number> = {};
+    for (const entry of snapshot.docs) {
+      const data = entry.data() as Record<string, any>;
+      const amount = Number.parseFloat(String(data.amount ?? '0'));
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      const token = typeof data.token === 'string' ? data.token : 'ETH';
+      totals[token] = (totals[token] ?? 0) + amount;
+    }
+    return totals;
+  } catch (error) {
+    console.error('[getPostTipTotals] Nie udalo sie policzyc tipow:', error);
+    return {};
   }
 }
 

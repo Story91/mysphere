@@ -31,7 +31,15 @@ export interface Post {
   pinTxHash?: string;
   // 💰 Tip-to-unlock: wszystkie pola OPCJONALNE, wiec istniejace posty bez nich
   // renderuja sie dokladnie jak dotad. Szczegoly: app/utils/monetization/types.ts
-  /** Tresc widoczna dopiero po mikroplatnosci. Brak = post nie jest premium. */
+  /**
+   * Znacznik, ze post ma platna czesc. Sama tresc NIE jest w dokumencie posta -
+   * wydaje ja GET /api/premium po sprawdzeniu sesji i odblokowania.
+   */
+  hasPremium?: boolean;
+  /**
+   * ZGODNOSC WSTECZ: posty sprzed przeniesienia tresci do osobnej kolekcji maja
+   * ja tutaj, wiec jest publiczna. Nowe posty tego pola nie zapisuja.
+   */
   premiumContent?: string;
   /** Cena odblokowania jako string dziesietny, np. "0.5". */
   unlockPrice?: string;
