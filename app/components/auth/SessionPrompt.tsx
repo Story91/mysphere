@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
+import { toast } from 'react-hot-toast';
 import useSiweAuth from '../../utils/auth/useSiweAuth';
 
 /**
@@ -72,9 +73,21 @@ export default function SessionPrompt() {
     setIsSigning(true);
     try {
       const ok = await signIn();
-      // Sukces sam usuwa pasek (isAuthenticated), wiec chowamy tylko po to,
-      // zeby nie mrugnal miedzy odpowiedzia serwera a przeliczeniem stanu.
-      if (ok) hide();
+      if (ok) {
+        // POTWIERDZENIE JEST OBOWIAZKOWE. Bez niego jedyna informacja zwrotna
+        // po podpisaniu bylo ZNIKNIECIE panelu - a znikanie znaczy w interfejsie
+        // tyle samo co "zadzialalo" i "anulowano". Uzytkownik podpisal wiadomosc
+        // w portfelu i nie wiedzial, czy cokolwiek z tego wyszlo.
+        //
+        // Tresc mowi o SKUTKU, nie o mechanice: nikogo nie obchodzi, ze powstala
+        // sesja - obchodzi go, ze jego posty i tipy sa od teraz przypisane jemu.
+        toast.success('Wallet confirmed — your posts and tips are now recorded as yours.', {
+          duration: 5000,
+        });
+        // Sukces sam usuwa pasek (isAuthenticated), wiec chowamy tylko po to,
+        // zeby nie mrugnal miedzy odpowiedzia serwera a przeliczeniem stanu.
+        hide();
+      }
     } finally {
       setIsSigning(false);
     }

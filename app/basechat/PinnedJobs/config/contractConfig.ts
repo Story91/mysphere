@@ -321,6 +321,11 @@ export const PAID_PIN_CONTRACT_ABI = [
 		"stateMutability": "view",
 		"type": "function"
 	}
+// UWAGA: to ABI celowo NIE jest `as const`. Z `as const` viem sprawdza nazwy
+// funkcji i typy argumentow - i wtedy app/admin/components/PaidPinsManagement.tsx
+// przestaje sie kompilowac, bo wola totalRevenue/paused/updatePrice/
+// withdrawRevenue/pause/unpause/emergencyDeactivatePin, ktorych w tym ABI nie ma.
+// Po naprawieniu panelu admina dopisac tu `as const`.
 ];
 
 // Duration enum mapping (matches contract)
@@ -330,6 +335,24 @@ export enum ContractPinDuration {
   HOURS_24 = 2,
   DAYS_7 = 3
 }
+
+/** 'HOUR_1' | 'HOURS_6' | 'HOURS_24' | 'DAYS_7' - zgodne z PinDuration z utils/firebase. */
+export type PinDurationName = keyof typeof ContractPinDuration;
+
+/**
+ * Nazwa czasu trwania uzywana w aplikacji -> enum uint8 oczekiwany przez kontrakt.
+ * Jedno miejsce: ExtendPinModal wysylal tu goly string, przez co kodowanie
+ * argumentow padalo i przedluzenie pinu nigdy nie dochodzilo do skutku.
+ */
+export const toContractDuration = (duration: PinDurationName): ContractPinDuration => {
+  const mapping: Record<PinDurationName, ContractPinDuration> = {
+    HOUR_1: ContractPinDuration.HOUR_1,
+    HOURS_6: ContractPinDuration.HOURS_6,
+    HOURS_24: ContractPinDuration.HOURS_24,
+    DAYS_7: ContractPinDuration.DAYS_7
+  };
+  return mapping[duration];
+};
 
 // Price mapping in ETH
 export const CONTRACT_PIN_PRICES = {

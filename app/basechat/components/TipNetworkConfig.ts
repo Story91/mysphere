@@ -199,7 +199,8 @@ export const NETWORKS: Record<TipNetwork, NetworkConfig> = {
     name: 'Robinhood Chain',
     shortName: 'Robinhood',
     icon: '🟢',
-    iconUrl: '/logotypy/robinhood.svg',
+    // Oficjalne logo Robinhooda (limonkowe tlo wpisane w obrazek).
+    iconUrl: '/robin.webp',
     color: '#00C805', // Firmowa zielen Robinhooda
     explorerUrl: 'https://robinhoodchain.blockscout.com',
     explorerTxPath: '/tx/',

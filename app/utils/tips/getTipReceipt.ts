@@ -1,5 +1,6 @@
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { getPublicDb as getDb } from '../publicFirestore';
+import { toMillis } from '../firestoreTime';
 
 /**
  * Odczyt pojedynczego tipa PO STRONIE SERWERA, na potrzeby trasy /tip/[txHash].
@@ -61,7 +62,7 @@ export async function getTipReceipt(rawTxHash: string): Promise<TipReceipt | nul
       amount: String(data.amount ?? '0'),
       token: typeof data.token === 'string' ? data.token : 'ETH',
       network: typeof data.network === 'string' ? data.network : 'base',
-      timestamp: typeof data.timestamp === 'number' ? data.timestamp : 0,
+      timestamp: toMillis(data.timestamp),
       postId: typeof data.postId === 'string' ? data.postId : undefined,
     };
   } catch (error) {

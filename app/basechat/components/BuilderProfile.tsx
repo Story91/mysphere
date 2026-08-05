@@ -11,8 +11,17 @@ import TipButton from './TipButton';
 import RecentTips from './RecentTips';
 import { getUserTipStats, TipStats as TipStatsType } from '../../utils/firebase';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
-import { useSocial } from '../friendsystem/hooks';
-import { sendFriendRequest as sendFriendRequestDirect } from '../friendsystem/friends_system';
+import { useSocialActions } from '../friendsystem/hooks';
+// Kanoniczna implementacja z utils/friends. Kopia w friendsystem/friends_system.ts
+// miala zaslepke powiadomien (tylko console.log) i polskie komunikaty bledow,
+// ktorych ten komponent nigdy nie rozpoznawal.
+import {
+  sendFriendRequest as sendFriendRequestDirect,
+  getUserFollowStats,
+  getFriendsStats,
+  type FollowStats,
+  type FriendsStats
+} from '../../utils/friends';
 import ReferralDashboard from '../../utils/referrals/components/ReferralDashboard';
 import { initializeReferralStats } from '../../utils/referrals';
 import CreatorCoinSection from './CreatorCoinSection';
@@ -415,20 +424,46 @@ export default function BuilderProfile({
   const [showReferralDashboard, setShowReferralDashboard] = useState(false);
   const [referralStatsInitialized, setReferralStatsInitialized] = useState(false);
 
-  // 🚀 SOCIAL FEATURES: Hook i stany  
-  // Get stats for the profile we're viewing (userAddress)
-  const { 
-    followStats, 
-    friendsStats
-  } = useSocial(userAddress || null);
-  
+  // 🚀 SOCIAL FEATURES: Hook i stany
+  // Statystyki ogladanego profilu. Wczesniej szedl tu pelny useSocial, ktory dla
+  // dwoch licznikow dociagal listy obserwujacych/znajomych/powiadomien (~150
+  // odczytow) i zakladal nasluch na powiadomienia OBCEGO uzytkownika.
+  const [followStats, setFollowStats] = useState<FollowStats | null>(null);
+  const [friendsStats, setFriendsStats] = useState<FriendsStats | null>(null);
+
+  useEffect(() => {
+    if (!userAddress) {
+      setFollowStats(null);
+      setFriendsStats(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const [follow, friends] = await Promise.all([
+          getUserFollowStats(userAddress),
+          getFriendsStats(userAddress)
+        ]);
+        if (cancelled) return;
+        setFollowStats(follow);
+        setFriendsStats(friends);
+      } catch (error) {
+        console.error('Error loading profile social stats:', error);
+      }
+    })();
+
+    // Odpowiedz dla poprzedniego profilu nie moze nadpisac biezacego.
+    return () => { cancelled = true; };
+  }, [userAddress]);
+
   // Get actions for the current logged-in user
   const {
-    followUser, 
-    unfollowUser, 
-    checkIfFollowing
-  } = useSocial(currentUserAddress || null);
-  
+    followUser,
+    unfollowUser,
+    getFollowStatuses
+  } = useSocialActions(currentUserAddress || null);
+
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [checkingFollowStatus, setCheckingFollowStatus] = useState(true);
@@ -464,21 +499,26 @@ export default function BuilderProfile({
       return;
     }
 
+    let cancelled = false;
     const checkFollowStatusAsync = async () => {
       setCheckingFollowStatus(true);
       try {
-        const isCurrentlyFollowing = await checkIfFollowing(userAddress);
-        setIsFollowing(isCurrentlyFollowing);
+        const statuses = await getFollowStatuses([userAddress]);
+        if (cancelled) return;
+        setIsFollowing(Boolean(statuses[userAddress]));
       } catch (error) {
+        if (cancelled) return;
         console.error('Error checking follow status:', error);
         setIsFollowing(false);
       } finally {
-        setCheckingFollowStatus(false);
+        if (!cancelled) setCheckingFollowStatus(false);
       }
     };
 
     checkFollowStatusAsync();
-  }, [currentUserAddress, userAddress, checkIfFollowing]);
+    // Szybkie przelaczanie profili nie moze wpisac odpowiedzi dla poprzedniego.
+    return () => { cancelled = true; };
+  }, [currentUserAddress, userAddress, getFollowStatuses]);
 
   // 🚀 FOLLOW/UNFOLLOW HANDLERS
   const handleFollowUser = async () => {
