@@ -104,7 +104,10 @@ const config = {
       base: process.env.BASESCAN_API_KEY || "",
       "base-goerli": process.env.BASESCAN_API_KEY || "",
       linea: "HSHV72NNW6KVQA88YB5BFSZHTVPFWC2GJU",
-      "camp": "empty"
+      "camp": "empty",
+      // Blockscout nie sprawdza klucza, ale hardhat-verify wymaga wpisu.
+      robinhood: "empty",
+      robinhoodTestnet: "empty"
     },
     customChains: [
       {
@@ -145,6 +148,25 @@ const config = {
         urls: {
           apiURL: "https://camp.cloud.blockscout.com/api",
           browserURL: "https://camp.cloud.blockscout.com"
+        }
+      },
+      // Robinhood Chain weryfikuje przez Blockscout - potwierdzone w
+      // docs.robinhood.com/chain/deploy-smart-contracts. Bez tego wpisu
+      // `npx hardhat verify --network robinhood` nie ma dokad wyslac zrodla.
+      {
+        network: "robinhood",
+        chainId: 4663,
+        urls: {
+          apiURL: "https://robinhoodchain.blockscout.com/api",
+          browserURL: "https://robinhoodchain.blockscout.com"
+        }
+      },
+      {
+        network: "robinhoodTestnet",
+        chainId: 46630,
+        urls: {
+          apiURL: "https://explorer.testnet.chain.robinhood.com/api",
+          browserURL: "https://explorer.testnet.chain.robinhood.com"
         }
       }
     ]
