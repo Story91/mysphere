@@ -54,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * Kwoty sumujemy WYLACZNIE w obrebie tokena. Dodanie ETH do USDC dalo by
  * liczbe, ktora nic nie znaczy - a profil ma byc rekordem, nie infografika.
  */
-export function summarizeTips(received: Record<string, number>): string {
+function summarizeTips(received: Record<string, number>): string {
   const parts = Object.entries(received)
     .filter(([, amount]) => amount > 0)
     .sort((a, b) => b[1] - a[1])
@@ -206,6 +206,12 @@ export default async function ProfilePage({ params }: Props) {
             className="rounded-xl bg-[#0052FF] px-5 py-3 text-[14px] font-semibold text-white transition hover:bg-[#0044D6]"
           >
             Open the feed
+          </Link>
+          <Link
+            href="/leaderboard"
+            className="rounded-xl border border-white/[0.12] px-5 py-3 text-[14px] font-semibold text-[#DDE6FA] transition hover:border-white/25 hover:bg-white/[0.04]"
+          >
+            Who got paid this week
           </Link>
           <Link
             href="/re-definition"

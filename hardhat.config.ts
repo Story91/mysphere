@@ -9,6 +9,26 @@ require("solidity-coverage");
 require("dotenv").config({ path: ".env.local" });
 require("dotenv").config();
 
+/**
+ * Klucz deployera.
+ *
+ * ADMIN_PRIVATE_KEY jest wiodacy - to portfel administracyjny, ktory wdraza
+ * kontrakty i jest jednoczesnie odbiorca platnosci x402. PRIVATE_KEY zostaje
+ * jako fallback dla starszych ustawien, zeby nikomu nie zepsuc lokalnego setupu.
+ *
+ * ZADEN z tych kluczy NIE MOZE dostac prefiksu NEXT_PUBLIC_ - z nim wartosc
+ * trafilaby do publicznego bundle'a JS, czyli klucz prywatny portfela
+ * administracyjnego bylby do pobrania z przegladarki.
+ *
+ * Hardhat wymaga postaci 0x-prefiksowanej; klucze kopiowane z portfeli bywaja
+ * bez prefiksu, wiec normalizujemy zamiast wywalac sie na "invalid private key".
+ */
+function deployerAccounts() {
+  const raw = (process.env.ADMIN_PRIVATE_KEY || process.env.PRIVATE_KEY || "").trim();
+  if (!raw) return [];
+  return [raw.startsWith("0x") ? raw : `0x${raw}`];
+}
+
 const config = {
   solidity: {
     version: "0.8.20",
@@ -29,17 +49,17 @@ const config = {
   networks: {
     "base-sepolia": {
       url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: deployerAccounts(),
       chainId: 84532
     },
     base: {
       url: process.env.BASE_RPC_URL || "https://mainnet.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: deployerAccounts(),
       chainId: 8453
     },
     "base-goerli": {
       url: process.env.BASE_GOERLI_RPC_URL || "https://goerli.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: deployerAccounts(),
       chainId: 84531
     },
     // Robinhood Chain - L2 na Arbitrum Orbit, ETH jako gas.
@@ -48,17 +68,17 @@ const config = {
     // endpoint przez ROBINHOOD_RPC_URL.
     robinhood: {
       url: process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: deployerAccounts(),
       chainId: 4663,
     },
     robinhoodTestnet: {
       url: process.env.ROBINHOOD_TESTNET_RPC_URL || "https://rpc.testnet.chain.robinhood.com",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: deployerAccounts(),
       chainId: 46630,
     },
     linea: {
       url: process.env.LINEA_RPC_URL || "https://linea-rpc.publicnode.com",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: deployerAccounts(),
       chainId: 59144,
       gasPrice: "auto",
       gas: "auto",
@@ -66,12 +86,12 @@ const config = {
     },
     "camp-mainnet": {
       url: process.env.CAMP_MAINNET_RPC_URL || "https://rpc.camp.raas.gelato.cloud",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: deployerAccounts(),
       chainId: 484
     },
     "camp": {
       url: process.env.CAMP_RPC_URL || "https://rpc.camp.raas.gelato.cloud",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: deployerAccounts(),
       chainId: 484,
       gasPrice: "auto",
       gas: "auto",
