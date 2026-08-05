@@ -47,10 +47,6 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const twitterProvider = new TwitterAuthProvider();
 
-const convertTimestamp = (timestamp: Timestamp): number => {
-  return timestamp.toMillis();
-};
-
 // ===============================================
 // PRYWATNE HELPERY - wzorce powtarzane w calym pliku
 // ===============================================
@@ -389,8 +385,12 @@ export const deletePost = async (postId: string, authorAddress: string) => {
     const postData = postSnap.data();
     
     // ✅ NAPRAWKA: Sprawdź czy użytkownik to autor LUB admin
-    const isAdmin = authorAddress.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
-    const isAuthor = postData.author === authorAddress;
+    // Adresy porownujemy bez wzgledu na wielkosc liter: w bazie leza zapisane
+    // raz w checksumie, raz malymi. Porownanie znak w znak odbieralo autorowi
+    // prawo do skasowania wlasnego posta.
+    const isAdmin = authorAddress.toLowerCase() === ADMIN_ADDRESS;
+    const isAuthor = typeof postData.author === 'string'
+      && postData.author.toLowerCase() === authorAddress.toLowerCase();
     
     if (!isAuthor && !isAdmin) {
       throw new Error('Unauthorized to delete this post');
@@ -458,11 +458,16 @@ export const fetchUnreadNotifications = async (userId: string) => {
   );
   
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-    timestamp: convertTimestamp(doc.data().timestamp as Timestamp)
-  }));
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      // Swiezo zapisane powiadomienie ma timestamp === null (serverTimestamp
+      // jeszcze nie rozwiazany) - wczesniejsze `.toMillis()` wywracalo cala liste.
+      timestamp: toMillis(data.timestamp) || Date.now()
+    };
+  });
 };
 
 // Oznacz powiadomienie jako przeczytane
@@ -565,7 +570,7 @@ export const createPost = async (post: {
 
     // 3. Jeśli autor ma BaseName, dodaj kopię posta do `baseNameFeed`
     if (hasBaseName) {
-      console.log(`👤 Użytkownik ${post.author} ma BaseName. Dodaję post do baseNameFeed.`);
+      console.log('👤 Autor ma BaseName - post trafia tez do baseNameFeed.');
       const baseNameFeedCollection = collection(db, 'baseNameFeed');
       // Użyj tego samego ID dla posta w obu kolekcjach
       const baseNameFeedPostRef = doc(baseNameFeedCollection, newPostRef.id);
@@ -617,13 +622,19 @@ export const createPost = async (post: {
       }
     }
 
-    // 6. Check if this is user's first post and award referral bonus
+    // 6. Check if this is user's first post and award referral bonus.
+    //
+    // firestoreLimit(2) wystarczy, zeby odroznic "dokladnie jeden post" od
+    // "wiecej niz jeden". Bez tego limitu KAZDE opublikowanie posta czytalo
+    // CALA historie autora - uzytkownik z 500 postami placil 500 odczytow za
+    // sprawdzenie, ktore i tak moze dac tylko odpowiedz "nie, nie pierwszy".
     const userPostsQuery = query(
       collection(db, 'posts'),
-      where('author', '==', post.author)
+      where('author', '==', post.author),
+      firestoreLimit(2)
     );
     const userPostsSnapshot = await getDocs(userPostsQuery);
-    
+
     // If this is user's first post (only the one just created)
     if (userPostsSnapshot.size === 1) {
       // Dynamic import to avoid circular dependencies
@@ -634,7 +645,7 @@ export const createPost = async (post: {
       
       // Award first post bonus
       await awardFirstPostBonus(post.author);
-      console.log(`🎁 Checked first post bonus and activated referral for ${post.author}`);
+      console.log('🎁 Checked first post bonus and activated referral');
     }
     
     // Zwróć ID nowego posta
@@ -900,12 +911,8 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
         postsCount: data.postsCount || 0, // 💡 Użyj zapisanej wartości zamiast liczenia na nowo
         likesReceived: data.likesReceived || 0,
         address: address,
-        joinedAt: data.joinedAt instanceof Timestamp 
-          ? data.joinedAt.toMillis() 
-          : (data.joinedAt || Date.now()),
-        lastActive: data.lastActive instanceof Timestamp 
-          ? data.lastActive.toMillis() 
-          : (data.lastActive || Date.now()),
+        joinedAt: toMillis(data.joinedAt) || Date.now(),
+        lastActive: toMillis(data.lastActive) || Date.now(),
         bio: data.bio,
         socialLinks: loadSocialLinks ? data.socialLinks || {
           twitter: '',
@@ -922,7 +929,7 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
     
     // 🆕 PRZYWRÓCENIE ORYGINALNEJ FUNKCJONALNOŚCI: Automatyczne tworzenie konta w Firebase
     // Kiedy użytkownik po raz pierwszy łączy portfel, od razu tworzymy mu dokument w bazie
-    console.log(`🆕 Tworzę nowe konto użytkownika dla ${address}`);
+    console.log('🆕 Tworzę nowe konto użytkownika');
     
     const newUserProfile = {
       walletAddress: address,
@@ -953,7 +960,7 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
     
     // Zapisz nowy profil do Firebase
     await setDoc(userRef, newUserProfile);
-    console.log(`✅ Utworzono nowe konto użytkownika: ${address}`);
+
     
     // 🎉 UWAGA: Base Name i bonus 1000 punktów będą dodane automatycznie 
     // przez useEffect w basechat/page.tsx gdy baseName się załaduje
@@ -1127,7 +1134,6 @@ export const editComment = async (postId: string, commentId: string, newContent:
 // Funkcja do usuwania komentarza - dodaję sprawdzenie uprawnień
 export const deleteComment = async (postId: string, commentId: string, userId: string) => {
   try {
-    console.log(`[DEBUG] Usuwanie komentarza ${commentId} z posta ${postId} przez ${userId}`);
     
     // 1. Przygotuj batch do operacji atomowych
     const batch = writeBatch(db);
@@ -1137,14 +1143,13 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
     const postDoc = await getDoc(postRef);
     
     if (!postDoc.exists()) {
-      console.error(`[DEBUG] Post ${postId} nie istnieje!`);
+      console.error(`Post ${postId} nie istnieje!`);
       throw new Error('Post not found');
     }
     
     const postData = postDoc.data();
     const comments = postData.comments || [];
     
-    console.log(`[DEBUG] Znaleziono ${comments.length} komentarzy w poście ${postId}`);
     
     // Znajdź komentarz który ma zostać usunięty
     const commentToDelete = comments.find((c: any) => c.id === commentId);
@@ -1154,8 +1159,10 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
     }
     
     // Sprawdź uprawnienia - tylko autor komentarza lub admin mogą usuwać
-    const isAdmin = userId.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
-    const isAuthor = commentToDelete.author === userId;
+    // (adresy bez wzgledu na wielkosc liter - patrz komentarz w deletePost)
+    const isAdmin = userId.toLowerCase() === ADMIN_ADDRESS;
+    const isAuthor = typeof commentToDelete.author === 'string'
+      && commentToDelete.author.toLowerCase() === userId.toLowerCase();
     
     if (!isAdmin && !isAuthor) {
       throw new Error('Unauthorized to delete this comment');
@@ -1163,14 +1170,13 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
     
     // 3. Znajdź odpowiedzi do usuwanego komentarza
     const repliesToDelete = comments.filter((c: any) => c.replyTo === commentId);
-    console.log(`[DEBUG] Znaleziono ${repliesToDelete.length} odpowiedzi do usuwanego komentarza`);
     
     // 4. Usuń główny komentarz z kolekcji comments
     try {
       const commentRef = doc(db, 'comments', commentId);
       batch.delete(commentRef);
     } catch (error) {
-      console.error(`[DEBUG] Błąd podczas usuwania komentarza z głównej kolekcji:`, error);
+      console.error(`Błąd podczas usuwania komentarza z głównej kolekcji:`, error);
     }
     
     // 5. Usuń odpowiedzi z kolekcji comments
@@ -1179,7 +1185,7 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
         const replyRef = doc(db, 'comments', reply.id);
         batch.delete(replyRef);
       } catch (error) {
-        console.error(`[DEBUG] Błąd podczas usuwania odpowiedzi ${reply.id}:`, error);
+        console.error(`Błąd podczas usuwania odpowiedzi ${reply.id}:`, error);
       }
     }
     
@@ -1189,7 +1195,6 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
       c.id !== commentId && !replyIds.includes(c.id)
     );
     
-    console.log(`[DEBUG] Po usunięciu zostało ${updatedComments.length} komentarzy (usunięto ${comments.length - updatedComments.length})`);
     
     // 7. Zaktualizuj tablicę komentarzy w dokumencie posta
     batch.update(postRef, { comments: updatedComments });
@@ -1197,11 +1202,10 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
     // 8. Wykonaj wszystkie operacje atomowo
     await batch.commit();
     
-    console.log(`[DEBUG] Komentarz ${commentId} i ${repliesToDelete.length} odpowiedzi zostały usunięte`);
     
     return true;
   } catch (error) {
-    console.error('[DEBUG] Error deleting comment:', error);
+    console.error('Error deleting comment:', error);
     throw error;
   }
 };
@@ -1853,21 +1857,24 @@ export const searchUsers = async (
           }
         }
         
-        // Strategia 3: Jeśli wciąż za mało wyników, przeszukaj batch'ami
+        // Strategia 3: Jeśli wciąż za mało wyników, przeszukaj szeroko.
+        //
+        // Stala tu petla `while (... && batchCount < maxBatches)`, ktora do
+        // pieciu razy wykonywala DOKLADNIE TO SAMO zapytanie - bez kursora,
+        // bez sortowania, bez startAfter. Kazdy przebieg zwracal te same 1000
+        // dokumentow, wiec jedno wyszukiwanie potrafilo kosztowac 5000 odczytow
+        // i ani jednego nowego wyniku. Zostaje jeden przebieg.
         if (matchedUsers.length < limit) {
-          console.log('🔄 Not enough results, performing batch search...');
-          
-          let batchCount = 0;
-          const maxBatches = 5; // Maksymalnie 5 batch'y aby nie przeciążyć
-          
-          while (matchedUsers.length < limit && batchCount < maxBatches) {
-            const batchQuery = query(
-              usersRef,
-              firestoreLimit(1000)
-            );
-            
-            const batchSnapshot = await getDocs(batchQuery);
-            
+          console.log('🔄 Not enough results, performing wide search...');
+
+          const batchQuery = query(
+            usersRef,
+            firestoreLimit(1000)
+          );
+
+          const batchSnapshot = await getDocs(batchQuery);
+
+          {
             batchSnapshot.docs.forEach(doc => {
               const userData = doc.data();
               const userAddress = doc.id.toLowerCase();
@@ -1920,11 +1927,9 @@ export const searchUsers = async (
                 });
               }
             });
-            
-            batchCount++;
           }
         }
-        
+
       } catch (error) {
         console.error('Full search failed:', error);
       }
@@ -2198,14 +2203,17 @@ export const refreshTop50UsersOnly = async () => {
       userStats[post.author].likes += actualLikes;
     }
     
+    // Punkty referralowe czytamy JEDNYM zapytaniem na 30 uzytkownikow.
+    // Wczesniej w tej petli stalo `await getDoc(userRef)` - 50 osobnych
+    // odczytow ustawionych szeregowo, jeden po drugim.
+    const usersById = await fetchDocsByIds('users', Object.keys(userStats));
+
     // Aktualizuj statystyki użytkowników (uwzględnij BaseName i referral)
     for (const [userId, stats] of Object.entries(userStats)) {
       const userRef = doc(db, 'users', userId);
       const baseNameBonus = stats.hasBaseName ? 1000 : 0;
-      // Pobierz referralPoints z bieżących danych użytkownika (jeśli istnieją)
-      const userDoc = await getDoc(userRef);
-      const existingReferralPoints = userDoc.exists() ? Number(userDoc.data().baseChatPoints?.referralPoints || 0) : 0;
-      
+      const existingReferralPoints = Number(usersById.get(userId)?.baseChatPoints?.referralPoints || 0);
+
       batch.update(userRef, {
         postsCount: stats.posts,
         likesReceived: stats.likes,
@@ -3129,7 +3137,7 @@ export const saveMySphereUserConnections = async (
       });
     }
     
-    console.log(`✅ Zapisano połączenia social media dla ${address}:`, connectedPlatforms);
+    console.log('✅ Zapisano połączenia social media:', connectedPlatforms.length);
   } catch (error) {
     console.error('❌ Błąd podczas zapisywania połączeń social media:', error);
     throw error;
@@ -3545,7 +3553,8 @@ export const getCachedActiveUsers = async (limit: number = 50, forceRefresh: boo
   console.log('🔄 Refreshing active users cache...');
   
   try {
-    const userDocs = await getTopActiveUsers(Math.min(limit * 1.2, 1200)); // Pobierz 20% więcej dla lepszego cache'u, max 1200
+    // Math.ceil, bo firestoreLimit() na ulamku (np. 1 * 1.2) wywraca zapytanie.
+    const userDocs = await getTopActiveUsers(Math.ceil(Math.min(limit * 1.2, 1200))); // 20% zapasu dla cache'u, max 1200
     
     const users = userDocs.map(docSnapshot => {
       const data = docSnapshot.data();
@@ -3708,39 +3717,27 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
       return [];
     }
     
-    // Efficiently fetch all post documents in chunks
-    const postDocs: QueryDocumentSnapshot[] = [];
+    // Efficiently fetch all post documents in chunks (rownolegle, nie po kolei)
     const postIdsArray = Array.from(postIds);
-
-    for (let i = 0; i < postIdsArray.length; i += 30) {
-      const chunk = postIdsArray.slice(i, i + 30);
-      if (chunk.length > 0) {
-        const postsQuery = query(collection(db, 'posts'), where('__name__', 'in', chunk));
-        const chunkSnap = await getDocs(postsQuery);
-        postDocs.push(...chunkSnap.docs);
-      }
-    }
+    const postsById = await fetchDocsByIds('posts', postIdsArray);
 
     // Map fetched documents to ExtendedPost objects
     const postsMap = new Map<string, ExtendedPost>();
-    postDocs.forEach(doc => {
-      if (doc.exists()) {
-        const postData = doc.data();
-        const post = { id: doc.id, ...postData } as ExtendedPost;
-        
-        // Add paid pin details if available
-        if (paidPostDetails[doc.id]) {
-          post.isPaidPin = true;
-          post.paidPinExpiresAt = paidPostDetails[doc.id].paidPinExpiresAt;
-        }
+    postsById.forEach((postData, id) => {
+      const post = { id, ...postData } as ExtendedPost;
 
-        // Ensure isPinned is correctly set for admin pins
-        if (postData.isPinned) {
-            post.isPinned = true;
-        }
-
-        postsMap.set(doc.id, post);
+      // Add paid pin details if available
+      if (paidPostDetails[id]) {
+        post.isPaidPin = true;
+        post.paidPinExpiresAt = paidPostDetails[id].paidPinExpiresAt;
       }
+
+      // Ensure isPinned is correctly set for admin pins
+      if (postData.isPinned) {
+        post.isPinned = true;
+      }
+
+      postsMap.set(id, post);
     });
     
     // Create final list and filter out any undefined posts
@@ -3840,7 +3837,7 @@ export const saveTip = async (tip: Omit<Tip, 'id' | 'timestamp'>): Promise<strin
     };
     
     const docRef = await addDoc(collection(db, 'tips'), tipData);
-    console.log('✅ Tip zapisany:', tipData);
+    console.log('✅ Tip zapisany:', docRef.id); // sam identyfikator - bez adresow i kwot w konsoli
     return docRef.id;
   } catch (error) {
     console.error('❌ Błąd zapisywania tipu:', error);
@@ -3999,18 +3996,7 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
     return stats;
   } catch (error) {
     console.error('❌ Błąd pobierania statystyk tipów posta:', error);
-    return {
-      totalTips: 0,
-      ethTips: 0,
-      usdcTips: 0,
-      celoTips: 0,
-      wldTips: 0,
-      lineaTips: 0,
-      campTips: 0,
-      tipCount: 0,
-      uniqueTippers: 0,
-      networkTips: []
-    };
+    return emptyPostTipStats();
   }
 };
 
@@ -4019,54 +4005,47 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
  * zamiast osobnego getDocs() per post (feed z 25 postami = 25 zapytan).
  */
 export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId: string]: PostTipStats }> => {
-  const empty = (): PostTipStats => ({
-    totalTips: 0, ethTips: 0, usdcTips: 0, celoTips: 0, wldTips: 0,
-    lineaTips: 0, campTips: 0, tipCount: 0, uniqueTippers: 0, networkTips: []
-  });
-
   const result: { [postId: string]: PostTipStats } = {};
   const unique = Array.from(new Set(postIds.filter(Boolean)));
   if (unique.length === 0) return result;
 
-  unique.forEach(id => { result[id] = empty(); });
+  unique.forEach(id => { result[id] = emptyPostTipStats(); });
 
   const tippersByPost = new Map<string, Set<string>>();
   const networkTokenByPost = new Map<string, Map<string, { network: TipNetworkType; token: TipTokenType; amount: number }>>();
 
   try {
-    for (let i = 0; i < unique.length; i += 30) {
-      const chunk = unique.slice(i, i + 30);
-      const snapshot = await getDocs(query(collection(db, 'tips'), where('postId', 'in', chunk)));
+    // Kawalki po 30 leca rownolegle - wczesniej feed czekal na kazdy po kolei.
+    const snapshots = await Promise.all(
+      chunkArray(unique, 30).map(chunk =>
+        getDocs(query(collection(db, 'tips'), where('postId', 'in', chunk)))
+      )
+    );
 
+    snapshots.forEach(snapshot => {
       snapshot.docs.forEach(d => {
         const tip = d.data() as Tip;
-        const stats = result[tip.postId as string];
+        const postId = tip.postId as string;
+        const stats = result[postId];
         if (!stats) return;
 
-        const amount = parseFloat(tip.amount);
+        const amount = parseAmount(tip.amount);
         stats.tipCount++;
         stats.totalTips += amount;
 
-        if (!tippersByPost.has(tip.postId as string)) tippersByPost.set(tip.postId as string, new Set());
-        tippersByPost.get(tip.postId as string)!.add(tip.senderAddress);
+        if (!tippersByPost.has(postId)) tippersByPost.set(postId, new Set());
+        tippersByPost.get(postId)!.add(tip.senderAddress);
 
-        switch (tip.token) {
-          case 'ETH': stats.ethTips += amount; break;
-          case 'USDC': stats.usdcTips += amount; break;
-          case 'CELO': stats.celoTips += amount; break;
-          case 'WLD': stats.wldTips += amount; break;
-          case 'LINEA': stats.lineaTips += amount; break;
-          case 'CAMP': stats.campTips += amount; break;
-        }
+        addTipAmount(stats as unknown as Record<string, number>, tip.token, 'Tips', amount);
 
-        if (!networkTokenByPost.has(tip.postId as string)) networkTokenByPost.set(tip.postId as string, new Map());
-        const map = networkTokenByPost.get(tip.postId as string)!;
+        if (!networkTokenByPost.has(postId)) networkTokenByPost.set(postId, new Map());
+        const map = networkTokenByPost.get(postId)!;
         const key = `${tip.network}:${tip.token}`;
         const existing = map.get(key);
         if (existing) existing.amount += amount;
         else map.set(key, { network: tip.network, token: tip.token, amount });
       });
-    }
+    });
 
     Object.keys(result).forEach(postId => {
       result[postId].uniqueTippers = tippersByPost.get(postId)?.size || 0;
@@ -4161,46 +4140,35 @@ export const getBulkUserNamesOptimized = async (addresses: string[]): Promise<{[
       }
     });
     
-    // 3. BATCH FETCH only missing addresses (NOT 2x calls per address!)
+    // 3. BATCH FETCH only missing addresses.
+    //
+    // Wczesniej bylo tu 2 x getDoc() NA KAZDY adres, czyli dla feedu z 25
+    // autorami 50 osobnych zapytan (rownoleglych, ale kazde to osobny round-trip
+    // i osobny odczyt - takze wtedy, gdy dokumentu w ogole nie ma). Teraz sa
+    // dwa zapytania `where(documentId(), 'in', ...)` na kazde 30 adresow.
     if (addressesToFetch.length > 0) {
       console.log(`🔄 Fetching ${addressesToFetch.length}/${uniqueAddresses.length} user names (${((1 - addressesToFetch.length/uniqueAddresses.length) * 100).toFixed(1)}% cache hit)`);
-      
-      // SINGLE batch query for users collection
-      const userRefs = addressesToFetch.map(addr => doc(db, 'users', addr));
-      const userDocs = await Promise.all(userRefs.map(ref => getDoc(ref)));
-      
-      // SINGLE batch query for usernames collection  
-      const usernameRefs = addressesToFetch.map(addr => doc(db, 'usernames', addr));
-      const usernameDocs = await Promise.all(usernameRefs.map(ref => getDoc(ref)));
-      
-      // Process results
-      for (let i = 0; i < addressesToFetch.length; i++) {
-        const address = addressesToFetch[i];
-        const userDoc = userDocs[i];
-        const usernameDoc = usernameDocs[i];
-        
-        let name = '';
-        let avatar = undefined;
-        
+
+      const [usersById, usernamesById] = await Promise.all([
+        fetchDocsByIds('users', addressesToFetch),
+        fetchDocsByIds('usernames', addressesToFetch)
+      ]);
+
+      for (const address of addressesToFetch) {
+        const userData = usersById.get(address);
+        const usernameData = usernamesById.get(address);
+
         // Priority: usernames > users > fallback
-        if (usernameDoc.exists() && usernameDoc.data().name) {
-          name = usernameDoc.data().name;
-        } else if (userDoc.exists() && userDoc.data().name) {
-          name = userDoc.data().name;
-        } else {
-          name = `${address.slice(0, 6)}...${address.slice(-4)}`;
-        }
-        
-        if (userDoc.exists()) {
-          avatar = userDoc.data().avatar;
-        }
-        
-        const userData = { name, avatar };
-        result[address] = userData;
-        
+        const name = usernameData?.name
+          || userData?.name
+          || `${address.slice(0, 6)}...${address.slice(-4)}`;
+
+        const entry = { name, avatar: userData?.avatar };
+        result[address] = entry;
+
         // Cache with timestamp
         userNamesCache[address] = {
-          ...userData,
+          ...entry,
           timestamp: now
         };
       }
@@ -4793,6 +4761,9 @@ export const rebuildReferralAggregates = async (): Promise<{ success: boolean; u
       }
     };
 
+    // Jedno zapytanie na 30 uzytkownikow zamiast getDoc() w kazdym obrocie petli.
+    const usersById = await fetchDocsByIds('users', Object.keys(sumsByUser));
+
     for (const [userId, sum] of Object.entries(sumsByUser)) {
       try {
         // referralStats
@@ -4802,8 +4773,7 @@ export const rebuildReferralAggregates = async (): Promise<{ success: boolean; u
 
         // users.baseChatPoints
         const userRef = doc(db, 'users', userId);
-        const userDoc = await getDoc(userRef);
-        const userData = userDoc.exists() ? (userDoc.data() as any) : {};
+        const userData = (usersById.get(userId) || {}) as any;
         const bcp = userData.baseChatPoints || {};
         const postPoints = Number(bcp.postPoints || 0);
         const likePoints = Number(bcp.likePoints || 0);
@@ -4885,6 +4855,9 @@ export const recomputeReferralPointsStrict = async (): Promise<{
       }
     };
 
+    // Jedno zapytanie na 30 uzytkownikow zamiast getDoc() w kazdym obrocie petli.
+    const usersById = await fetchDocsByIds('users', Object.keys(byReferrer));
+
     for (const [userId, agg] of Object.entries(byReferrer)) {
       try {
         const completed = agg.completed || 0;
@@ -4923,8 +4896,7 @@ export const recomputeReferralPointsStrict = async (): Promise<{
 
         // Update users.baseChatPoints
         const userRef = doc(db, 'users', userId);
-        const userDoc = await getDoc(userRef);
-        const userData = userDoc.exists() ? (userDoc.data() as any) : {};
+        const userData = (usersById.get(userId) || {}) as any;
         const bcp = userData.baseChatPoints || {};
         const postPoints = Number(bcp.postPoints || 0);
         const likePoints = Number(bcp.likePoints || 0);
@@ -5106,50 +5078,47 @@ export const migrateHistoricalBaseNamePosts = async (): Promise<{
       };
     }
     
-    // 2. Pobierz posty od użytkowników z BaseName (w batch'ach po 10 użytkowników)
+    // 2. Pobierz posty od użytkowników z BaseName (w grupach po 10 autorów)
     let totalProcessed = 0;
     let totalMigrated = 0;
-    const batch = writeBatch(db);
+    // `let`, nie `const`: po commit() WriteBatch jest zuzyty i kazdy kolejny
+    // set() na nim rzuca wyjatkiem. Wczesniej probowano go "zresetowac" przez
+    // Object.assign(batch, newBatch), co nie podmienia stanu wewnetrznego -
+    // migracja powyzej 500 postow wywracala sie na pierwszym commicie.
+    let batch = writeBatch(db);
     let batchCount = 0;
     const maxBatchSize = 500; // Firestore limit
-    
-    for (let i = 0; i < baseNameUsers.length; i += 10) {
-      const userChunk = baseNameUsers.slice(i, i + 10);
-      
+
+    for (const userChunk of chunkArray(baseNameUsers, 10)) {
       // Pobierz posty dla tej grupy użytkowników
       const postsRef = collection(db, 'posts');
       const postsQuery = query(postsRef, where('author', 'in', userChunk));
       const postsSnapshot = await getDocs(postsQuery);
-      
-      // Przetwórz każdy post
+
+      // Ktore z tych postow sa juz w baseNameFeed - jedno zapytanie na 30 ID
+      // zamiast getDoc() per post (to byl klasyczny odczyt N+1).
+      const existingIds = await fetchDocsByIds('baseNameFeed', postsSnapshot.docs.map(d => d.id));
+
       for (const postDoc of postsSnapshot.docs) {
         totalProcessed++;
-        
-        // Sprawdź czy post już istnieje w baseNameFeed
-        const baseNameFeedRef = doc(db, 'baseNameFeed', postDoc.id);
-        const existingPost = await getDoc(baseNameFeedRef);
-        
-        if (!existingPost.exists()) {
-          // Dodaj post do batch'a do skopiowania
-          batch.set(baseNameFeedRef, postDoc.data());
-          totalMigrated++;
-          batchCount++;
-          
-          // Wykonaj batch jeśli osiągnęliśmy limit
-          if (batchCount >= maxBatchSize) {
-            await batch.commit();
-            console.log(`✅ Batch wykonany: ${batchCount} postów skopiowanych`);
-            // Rozpocznij nowy batch
-            const newBatch = writeBatch(db);
-            Object.assign(batch, newBatch);
-            batchCount = 0;
-          }
+        if (existingIds.has(postDoc.id)) continue;
+
+        batch.set(doc(db, 'baseNameFeed', postDoc.id), postDoc.data());
+        totalMigrated++;
+        batchCount++;
+
+        // Wykonaj batch jeśli osiągnęliśmy limit
+        if (batchCount >= maxBatchSize) {
+          await batch.commit();
+          console.log(`✅ Batch wykonany: ${batchCount} postów skopiowanych`);
+          batch = writeBatch(db);
+          batchCount = 0;
         }
       }
-      
-      console.log(`📊 Przetworzono ${i + userChunk.length}/${baseNameUsers.length} użytkowników`);
+
+      console.log(`📊 Przetworzono ${totalProcessed} postów, skopiowano ${totalMigrated}`);
     }
-    
+
     // Wykonaj ostatni batch jeśli zawiera jakieś operacje
     if (batchCount > 0) {
       await batch.commit();

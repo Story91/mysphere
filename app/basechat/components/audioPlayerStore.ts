@@ -58,8 +58,12 @@ export function playTrack(previewUrl: string) {
   // Ten sam utwor - tylko play/pause
   if (state.currentTrackUrl === previewUrl && audio) {
     if (audio.paused) {
-      audio.play();
-      emit({ isPlaying: true });
+      const current = audio;
+      // play() zwraca obietnice i odrzuca ja przy blokadzie autoplay. Bez catch
+      // szlo to jako nieobsluzone odrzucenie, a stan zostawal na "gra".
+      current.play()
+        .then(() => { if (audio === current) emit({ isPlaying: true }); })
+        .catch(() => { if (audio === current) emit({ isPlaying: false, isLoading: false }); });
     } else {
       audio.pause();
       emit({ isPlaying: false });
@@ -99,8 +103,12 @@ export function playTrack(previewUrl: string) {
     console.error('Failed to load audio');
   });
 
-  next.play();
-  emit({ isPlaying: true });
+  next.play()
+    .then(() => { if (audio === next) emit({ isPlaying: true }); })
+    .catch(() => {
+      if (audio !== next) return;
+      emit({ isPlaying: false, isLoading: false });
+    });
 }
 
 export function setVolume(volume: number) {

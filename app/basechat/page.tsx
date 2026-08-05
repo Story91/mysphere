@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
@@ -50,7 +49,6 @@ const NotificationsView = dynamic(() => import('./friendsystem/NotificationsView
 
 import { RefreshCw } from 'lucide-react';
 import TransactionButton from '../components/TransactionButton';
-import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
 const YapsMetrics = dynamic(() => import('../yapscan/components/YapsMetrics'), { ssr: false });
 import { useAIGenerator } from './hooks/useAIGenerator';
@@ -224,6 +222,92 @@ const clearPostsCache = () => {
   }
 };
 
+/**
+ * Dopisuje SWIEZO UTWORZONY post na gore kazdej zapisanej listy.
+ *
+ * PROBLEM, KTORY TO ROZWIAZUJE. Cache postow jest kluczowany per zakladka
+ * (`posts_forYou_<adres>`, `posts_all`, ...) i zyje 5 minut. Sciezka publikacji
+ * dopisywala post optymistycznie do stanu Reacta, ale NIE do cache'u - wiec po
+ * przejsciu na inna zakladke i powrocie widok odtwarzal sie z zapisanej listy
+ * SPRZED posta. Uzytkownik widzial wtedy, ze post zniknal. Odwrotnie tez:
+ * przelaczenie na zakladke, ktorej cache akurat wygasl, pokazywalo post - stad
+ * "musialem przeklikac na swoj feed i wrocic".
+ *
+ * DLACZEGO DOPISUJEMY, A NIE KASUJEMY. Kasowanie calego cache'u (clearPostsCache)
+ * dziala, ale kaze potem pobrac WSZYSTKIE listy od nowa - czyli placimy pelnym
+ * przeladowaniem feedu za jeden post, ktorego tresc i tak mamy juz w pamieci.
+ * Przy Firestore, ktory liczy za kazdy odczyt dokumentu, to jest czysta strata.
+ * Dopisanie kosztuje zero odczytow i daje ten sam efekt.
+ *
+ * Znacznik czasu cache'u zostaje NIETKNIETY: dopisanie posta nie jest powodem,
+ * zeby przedluzyc waznosc reszty listy.
+ */
+const prependPostToCache = (post: ExtendedPost) => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('posts_') && !key.endsWith('_timestamp'))
+      .forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+
+        try {
+          const cached = JSON.parse(raw);
+          if (!Array.isArray(cached)) return;
+
+          // Idempotencja: ta sama funkcja bywa wolana po optymistycznym
+          // dopisaniu i ponownie po potwierdzeniu z Firestore.
+          if (cached.some((entry: ExtendedPost) => entry?.id === post.id)) return;
+
+          localStorage.setItem(key, JSON.stringify([post, ...cached]));
+        } catch {
+          // Uszkodzony wpis kasujemy - lepiej pobrac na nowo niz czytac smiec.
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
+  } catch (error) {
+    console.error('Error prepending post to cache:', error);
+  }
+};
+
+/**
+ * Podmienia tymczasowe ID posta na prawdziwe, gdy Firestore je odda.
+ *
+ * Bez tego w cache zostawalby wpis z ID "temp-...", ktory po odswiezeniu
+ * strony wygladalby jak istniejacy post, ale kazde klikniecie w niego
+ * prowadzilo by do nieistniejacej trasy /post/temp-...
+ */
+const replacePostIdInCache = (tempId: string, realId: string) => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('posts_') && !key.endsWith('_timestamp'))
+      .forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+
+        try {
+          const cached = JSON.parse(raw);
+          if (!Array.isArray(cached)) return;
+          if (!cached.some((entry: ExtendedPost) => entry?.id === tempId)) return;
+
+          localStorage.setItem(
+            key,
+            JSON.stringify(
+              cached.map((entry: ExtendedPost) =>
+                entry?.id === tempId ? { ...entry, id: realId } : entry
+              )
+            )
+          );
+        } catch {
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
+  } catch (error) {
+    console.error('Error replacing post id in cache:', error);
+  }
+};
+
 function BaseChatContent() {
   const [isMounted, setIsMounted] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
@@ -303,7 +387,8 @@ function BaseChatContent() {
     duration: string;
     expectedAt: number;
   }}>({});
-  const [newComments, setNewComments] = useState<{[key: string]: string}>({});
+  // `newComments` (tresci pol komentarzy) zniknelo razem z handleAddComment -
+  // pola komentarzy renderuje i trzyma PostList.
   const [userProfile, setUserProfile] = useState<LocalUserProfile>({
     name: '',
     postCount: 0,
@@ -881,6 +966,10 @@ function BaseChatContent() {
 
       // Dodaj post na górę listy NATYCHMIAST
       setPosts(currentPosts => [newPostObject, ...currentPosts]);
+      // ...oraz do ZAPISANYCH list. Bez tego post istnial tylko w stanie
+      // Reacta i znikal po przejsciu na inna zakladke i powrocie, bo widok
+      // odtwarzal sie z cache'u sprzed publikacji.
+      prependPostToCache(newPostObject as ExtendedPost);
 
       // 3. Save to Firebase w tle (bez czekania na UI)
       createPost({
@@ -898,15 +987,20 @@ function BaseChatContent() {
         musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór
       }).then((realPostId) => {
         // Zaktualizuj tempPost z prawdziwym ID z Firebase
-        setPosts(currentPosts => 
-          currentPosts.map(post => 
+        setPosts(currentPosts =>
+          currentPosts.map(post =>
             post.id === tempPostId ? { ...post, id: realPostId } : post
           )
         );
+        // To samo w cache - inaczej po odswiezeniu strony zostawalby wpis
+        // z ID "temp-...", ktory wyglada jak post, ale prowadzi donikad.
+        replacePostIdInCache(tempPostId, realPostId);
       }).catch((error) => {
         console.error('Error saving post to Firebase:', error);
-        // W przypadku błędu, usuń optimistic post
+        // W przypadku błędu, usuń optimistic post - RAZEM z cache'em, inaczej
+        // nieudany post przezylby odswiezenie strony.
         setPosts(currentPosts => currentPosts.filter(post => post.id !== tempPostId));
+        clearPostsCache();
         toast.error('Failed to save post');
       });
 
@@ -1090,6 +1184,20 @@ function BaseChatContent() {
       if (!walletClient) {
           throw new Error("Wallet client is not available.");
       }
+      // ⚠️ TO WYWOLANIE JEST NIEZGODNE Z ZAINSTALOWANYM SDK I MUSI SIE WYWROCIC.
+      // @zoralabs/coins-sdk 0.8.0 ma dwa kroki i przyjmuje JEDEN obiekt:
+      //   const { calls } = await createCoinCall({ creator, name, symbol,
+      //       metadata: { type: 'RAW_URI', uri }, currency, chainId, ... });
+      //   await createCoin({ call, walletClient, publicClient });
+      // Tu leci stary podpis 0.x (trzy argumenty pozycyjne, pole `uri`, `owners`,
+      // `payoutRecipient`), wiec przycisk "PostCoin" nie moze dzialac - blad
+      // wpada w catch i konczy sie zwyklym postem albo czerwonym toastem.
+      // Rozjazd wszedl razem z podbiciem zaleznosci (commit ad646df) i byl
+      // niewidoczny, bo caly plik mial `@ts-nocheck`.
+      // NIE poprawiam tego tutaj: nowe API wymaga wyboru `currency`
+      // (ETH / ZORA / CREATOR_COIN) i `startingMarketCap`, czyli decyzji
+      // produktowej, a sciezki nie da sie sprawdzic bez portfela na Base.
+      // @ts-expect-error - patrz komentarz wyzej: podpis createCoin z SDK 0.8.0
       const result = await createCoin(coinParams, walletClient, publicClient);
 
       console.log("Zora coin creation transaction sent:", result.hash);
@@ -1114,7 +1222,9 @@ function BaseChatContent() {
 
       // 7. Save to Firebase (including the new zoraCoinAddress)
       console.log("Saving post data to Firebase...");
-      const visibilityValue = 'public'; // Use simple string type
+      // `as const`, inaczej typ rozszerza sie do `string`, a createPost przyjmuje
+      // tylko 'public' | 'followers' | 'private'.
+      const visibilityValue = 'public' as const;
       const postDataForFirebase = {
         author: address,
         content: newPost,
@@ -1152,11 +1262,14 @@ function BaseChatContent() {
 
       // Actual Firebase save - dokladnie ten sam obiekt, ktory zostal zlozony wyzej.
       // Wczesniej byl skladany drugi raz recznie i obie kopie zdazyly sie rozjechac.
-      await createPost(postDataForFirebase);
+      const zoraPostId = await createPost(postDataForFirebase);
       console.log("Post saved to Firebase.");
 
-      // 🗑️ Wyczyść cache bo mamy nowy post
-      clearPostsCache();
+      // Dopisujemy post do zapisanych list zamiast kasowac caly cache.
+      // Kasowanie dzialalo, ale kazalo potem pobrac WSZYSTKIE listy od nowa -
+      // czyli placilismy pelnym przeladowaniem feedu za jeden post, ktorego
+      // tresc i tak mamy w pamieci. Firestore liczy za kazdy odczyt dokumentu.
+      prependPostToCache({ ...tempPost, id: zoraPostId } as ExtendedPost);
 
       // Refresh posts list from Firebase to get the real ID
       const { posts: updatedPosts } = await fetchPosts({ userId: address });
@@ -1232,6 +1345,14 @@ function BaseChatContent() {
           // Update UI
           toast.success('Post created successfully!', { id: toastId });
           resetComposer();
+
+          // Tutaj KASUJEMY cache, zamiast dopisywac - inaczej niz w sciezkach
+          // powyzej. Powod: ta galaz nie zbudowala obiektu posta (jest
+          // ratunkiem po nieudanym tworzeniu monety), wiec nie ma czego
+          // dopisac, a loadPosts czyta cache PRZED siegnieciem do Firestore
+          // i bez tego pokazalby liste sprzed posta. To sciezka awaryjna,
+          // wiec pelne przeladowanie jest tu akceptowalna cena.
+          clearPostsCache();
 
           // Refresh posts
           await refreshPosts();
@@ -1575,15 +1696,9 @@ function BaseChatContent() {
     }
   };
 
-  // Dodaj funkcję do pobierania danych z BaseScan
-  useEffect(() => {
-    // 🚨 USUNIĘTO: Funkcja fetchData - generowała ogromne koszty Firebase!
-    // Była wywoływana co 5 sekund dla każdego użytkownika i wykonywała:
-    // - getDoc(userRef) - 1 Firebase READ
-    // - updateDoc(userRef) - 1 Firebase WRITE
-    // = 144,000 Firebase operations/godzinę dla 100 użytkowników = $6,892/dzień!
-    // ✅ OSZCZĘDNOŚĆ: Brak niepotrzebnych Firebase reads/writes na stronie BaseChat
-  }, [address, isConnected, baseName]);
+  // Stal tu useEffect z PUSTYM cialem i zaleznoscia [address, isConnected, baseName]
+  // - pozostalosc po skasowanej funkcji fetchData (odpytywala Firebase co 5 sekund).
+  // Sam efekt nic juz nie robil, wiec zniknal razem z komentarzem-nagrobkiem.
 
   // 🚀 ULTRA-CHEAP Funkcja do pobierania nazw użytkowników (95% oszczędności!)
   const fetchUserNames = async (posts: Post[]) => {
@@ -1970,13 +2085,9 @@ function BaseChatContent() {
     }
   };
 
-  // Efekt uruchamiany przy montowaniu komponentu
-  useEffect(() => {
-    if (!isMounted) {
-      setIsMounted(true);
-      // Usunięto automatyczne wykonanie funkcji naprawiających strukturę baseChatPoints i dodających bonus BaseName
-    }
-  }, [isMounted]);
+  // Drugi efekt ustawiajacy isMounted zostal usuniety - robil dokladnie to samo,
+  // co ten przy loadInitialData, tyle ze z zaleznoscia [isMounted], czyli sam
+  // wyzwalal wlasne ponowne uruchomienie.
 
   // Wykrywanie urządzeń Apple i naprawianie vh
   useEffect(() => {
@@ -3026,7 +3137,7 @@ function BaseChatContent() {
                     {
                       icon: (
                         <img
-                          src="/logotypy/robinhood.svg"
+                          src="/robin.webp"
                           alt="Robinhood Chain"
                           className="w-5 h-5 rounded-none"
                         />

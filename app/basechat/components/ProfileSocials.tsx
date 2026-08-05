@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { doc, updateDoc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import Image from 'next/image';
 
@@ -15,56 +15,69 @@ interface ProfileSocialsProps {
   isOwner?: boolean;
 }
 
-export default function ProfileSocials({ address, initialLinks = {}, onSave, lazyLoad = false, isOwner = false }: ProfileSocialsProps) {
+export default function ProfileSocials({ address, initialLinks, onSave, lazyLoad = false, isOwner = false }: ProfileSocialsProps) {
+  // Rozbite na stringi celowo. Domyslne `initialLinks = {}` tworzylo NOWY obiekt
+  // przy kazdym renderze, wiec efekt z zaleznoscia [initialLinks] odpalal sie
+  // bez konca i setLinks kreciło petle renderow dla kazdego profilu bez linkow.
+  const initialTwitter = initialLinks?.twitter || '';
+  const initialFarcaster = initialLinks?.farcaster || '';
+  const initialDiscord = initialLinks?.discord || '';
+
   const [isEditing, setIsEditing] = useState(false);
   const [links, setLinks] = useState({
-    twitter: initialLinks?.twitter || '',
-    farcaster: initialLinks?.farcaster || '',
-    discord: initialLinks?.discord || ''
+    twitter: initialTwitter,
+    farcaster: initialFarcaster,
+    discord: initialDiscord
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(!lazyLoad);
   const [copiedDiscord, setCopiedDiscord] = useState(false);
 
   useEffect(() => {
-    if (initialLinks) {
-      setLinks({
-        twitter: initialLinks.twitter || '',
-        farcaster: initialLinks.farcaster || '',
-        discord: initialLinks.discord || ''
-      });
-    }
-  }, [initialLinks]);
+    setLinks({
+      twitter: initialTwitter,
+      farcaster: initialFarcaster,
+      discord: initialDiscord
+    });
+  }, [initialTwitter, initialFarcaster, initialDiscord]);
 
   useEffect(() => {
-    // Załaduj dane nawet jeśli lazyLoad=true, ale zrób to po zamontowaniu komponentu
-    if (!hasLoaded && address) {
-      loadData();
+    if (!lazyLoad || !address) {
+      setHasLoaded(!lazyLoad);
+      return;
     }
-  }, [address]);
 
-  const loadData = async () => {
-    if (hasLoaded || !address) return;
-    
-    try {
-      const userRef = doc(db, 'users', address);
-      const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        if (userData.socialLinks) {
+    // `hasLoaded` nie resetowalo sie przy zmianie adresu - drugi ogladany profil
+    // nie doczytywal juz nic i zostawal na linkach poprzedniego uzytkownika.
+    setHasLoaded(false);
+    let cancelled = false;
+
+    const loadData = async () => {
+      try {
+        const userSnap = await getDoc(doc(db, 'users', address));
+        if (cancelled) return;
+
+        const socialLinks = userSnap.exists() ? userSnap.data().socialLinks : null;
+        if (socialLinks) {
           setLinks({
-            twitter: userData.socialLinks.twitter || '',
-            farcaster: userData.socialLinks.farcaster || '',
-            discord: userData.socialLinks.discord || ''
+            twitter: socialLinks.twitter || '',
+            farcaster: socialLinks.farcaster || '',
+            discord: socialLinks.discord || ''
           });
         }
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Error loading social links:', error);
+      } finally {
+        // Takze po bledzie - inaczej sekcja zostawala pusta na zawsze.
+        if (!cancelled) setHasLoaded(true);
       }
-      setHasLoaded(true);
-    } catch (error) {
-      console.error('Error loading social links:', error);
-    }
-  };
+    };
+
+    loadData();
+
+    return () => { cancelled = true; };
+  }, [address, lazyLoad]);
 
   const handleSave = async () => {
     if (!address || !isOwner) return;
@@ -89,10 +102,27 @@ export default function ProfileSocials({ address, initialLinks = {}, onSave, laz
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current);
+    };
+  }, []);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      // writeText odrzuca obietnice bez HTTPS i bez uprawnienia - wczesniej
+      // szlo to jako nieobsluzone odrzucenie, a UI i tak mowilo "Copied!".
+      await navigator.clipboard.writeText(text);
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      return;
+    }
+
     setCopiedDiscord(true);
-    setTimeout(() => setCopiedDiscord(false), 2000);
+    if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current);
+    copyResetTimerRef.current = setTimeout(() => setCopiedDiscord(false), 2000);
   };
 
   return (

@@ -28,7 +28,7 @@ const isValidUrl = (urlString: string) => {
   try {
     new URL(urlString);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 };
@@ -46,19 +46,17 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
     const uniqueLinks = Array.from(new Set(foundLinks.map((link: LinkifyMatch) => link.value)));
     
     // Filtruj tylko prawidłowe URL przed ustawieniem
-    const validLinks = uniqueLinks.filter(link => {
-      try {
-        new URL(link);
-        return true;
-      } catch {
-        return false;
-      }
-    });
-    
-    setLinks(validLinks);
+    // (isValidUrl bylo zadeklarowane wyzej i nieuzywane - ta sama logika stala tu inline)
+    setLinks(uniqueLinks.filter(isValidUrl));
   }, [content]);
 
   useEffect(() => {
+    if (links.length === 0) return;
+
+    // Podglad dla starej tresci nie moze dojechac po zmianie posta ani po
+    // odmontowaniu - wczesniej setPreviews leciał bezwarunkowo.
+    let cancelled = false;
+
     // Pobierz metadane dla każdego linku
     const fetchPreviews = async () => {
       const newPreviews: {[key: string]: LinkPreview} = {};
@@ -74,31 +72,36 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
       
       // Przetwarzaj każdą grupę linków sekwencyjnie
       for (const chunk of chunks) {
+        if (cancelled) return;
+
         // Ale linki w grupie przetwarzaj równolegle
         await Promise.all(chunk.map(async (link) => {
           try {
+            const hostname = new URL(link).hostname;
+
             // Ustaw podstawowe domyślne wartości
             const defaultPreview = {
-              title: new URL(link).hostname,
+              title: hostname,
               description: 'Loading preview...',
               image: '',
-              siteName: new URL(link).hostname
+              siteName: hostname
             };
-            
+
             // Na początku ustaw domyślne wartości, aby użytkownik widział coś od razu
             newPreviews[link] = defaultPreview;
+            if (cancelled) return;
             setPreviews(prev => ({...prev, [link]: defaultPreview}));
-            
+
             // Pobierz metadane z API
             const response = await fetch(`/api/link-preview?url=${encodeURIComponent(link)}`, {
               // Dodaj timeout do fetch
               signal: AbortSignal.timeout(6000)
             });
-            
+
             const data = await response.json();
-            
+
             // Aktualizuj podgląd tylko jeśli dostaliśmy sensowne dane
-            if (data && data.title) {
+            if (data && data.title && !cancelled) {
               newPreviews[link] = data;
               setPreviews(prev => ({...prev, [link]: data}));
             }
@@ -109,9 +112,9 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
       }
     };
 
-    if (links.length > 0) {
-      fetchPreviews();
-    }
+    fetchPreviews();
+
+    return () => { cancelled = true; };
   }, [links]);
 
   // Funkcja do zawijania długich linków
@@ -139,8 +142,10 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
       {media && (
         <div className="mb-4">
           {media.type === 'image' ? (
-            <div 
-              className="relative cursor-pointer group"
+            <button
+              type="button"
+              aria-label="Enlarge image"
+              className="relative cursor-pointer group block w-full"
               onClick={() => handleImageClick(media.url)}
             >
               <img
@@ -156,7 +161,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
               <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity">
                 Click to enlarge
               </div>
-            </div>
+            </button>
           ) : (
             <video
               src={media.url}
@@ -174,7 +179,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
 
       {/* Wyświetl podglądy linków */}
       <div className="space-y-4">
-        {links.map((link, index) => {
+        {links.map((link) => {
           let hostname = '';
           try {
             hostname = new URL(link).hostname;
@@ -189,7 +194,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
 
           return (
             <a
-              key={index}
+              key={link}
               href={link}
               target="_blank"
               rel="noopener noreferrer"
@@ -254,6 +259,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
               className="max-w-full max-h-[90vh] object-contain"
             />
             <button
+              aria-label="Close image"
               className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-70"
               onClick={() => setShowFullImage(false)}
             >

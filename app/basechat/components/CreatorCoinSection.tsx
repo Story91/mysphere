@@ -16,46 +16,60 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell'>('buy');
 
+  /** Saldo zalogowanego uzytkownika w danej monecie. Jedno miejsce - ta sama
+   *  logika stala wczesniej i w fetchBalance, i w efekcie ladujacym monete. */
+  const readCoinBalance = useCallback(async (coinAddress: string): Promise<string> => {
+    if (!currentUserAddress) return '0';
+
+    const balances = await getUserCoinBalances(currentUserAddress);
+    const balance = balances.find(b =>
+      b.coinAddress.toLowerCase() === coinAddress.toLowerCase()
+    );
+    return balance?.balanceFormatted || '0';
+  }, [currentUserAddress]);
+
   const fetchBalance = useCallback(async () => {
     if (!currentUserAddress || !creatorCoin) return;
-    
+
     try {
-      const balances = await getUserCoinBalances(currentUserAddress);
-      const balance = balances.find(b => 
-        b.coinAddress.toLowerCase() === creatorCoin.address.toLowerCase()
-      );
-      setUserBalance(balance?.balanceFormatted || '0');
+      setUserBalance(await readCoinBalance(creatorCoin.address));
     } catch (error) {
       console.error('Error fetching balance:', error);
     }
-  }, [currentUserAddress, creatorCoin]);
+  }, [currentUserAddress, creatorCoin, readCoinBalance]);
 
   useEffect(() => {
+    if (!userAddress) return;
+
+    // Przy szybkiej zmianie profilu odpowiedz dla poprzedniego adresu
+    // pokazywala cudza monete i cudze saldo.
+    let cancelled = false;
+
     const fetchCreatorCoin = async () => {
-      if (!userAddress) return;
-      
       setLoading(true);
       try {
         const coin = await getCreatorCoin(userAddress);
+        if (cancelled) return;
         setCreatorCoin(coin);
 
         // If viewing own profile or logged in, get balance
         if (currentUserAddress && coin) {
-          const balances = await getUserCoinBalances(currentUserAddress);
-          const balance = balances.find(b => 
-            b.coinAddress.toLowerCase() === coin.address.toLowerCase()
-          );
-          setUserBalance(balance?.balanceFormatted || '0');
+          const balance = await readCoinBalance(coin.address);
+          if (cancelled) return;
+          setUserBalance(balance);
         }
       } catch (error) {
+        if (cancelled) return;
         console.error('Error fetching creator coin:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchCreatorCoin();
-  }, [userAddress, currentUserAddress]);
+
+    return () => { cancelled = true; };
+  }, [userAddress, currentUserAddress, readCoinBalance]);
 
   const handleOpenTrade = (mode: 'buy' | 'sell') => {
     setTradeMode(mode);

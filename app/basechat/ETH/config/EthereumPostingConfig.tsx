@@ -3,7 +3,7 @@
 /** Wszystko, czym Ethereum rozni sie od pozostalych lancuchow w sciezce postowania. */
 
 import type { Abi } from 'viem';
-import type { ChainPostingConfig } from '../../chainPosting/types';
+import type { ChainWithComposer } from '../../chainPosting/ChainCreatePost';
 import { ETHEREUM_CHAIN_ID, ethereumChain } from './EthereumNetworkConfig';
 import {
   ETHEREUM_POST_CONTRACT_ABI,
@@ -26,7 +26,7 @@ function EthereumLogo({ className, onChain }: { className: string; onChain: bool
   );
 }
 
-export const ETHEREUM_POSTING: ChainPostingConfig = {
+export const ETHEREUM_POSTING: ChainWithComposer = {
   chainId: ETHEREUM_CHAIN_ID,
   chain: ethereumChain,
   abi: ETHEREUM_POST_CONTRACT_ABI as unknown as Abi,
@@ -54,5 +54,14 @@ export const ETHEREUM_POSTING: ChainPostingConfig = {
     sentAccent: 'bg-gray-400',
     sentText: 'text-white',
     icon: onChain => <EthereumLogo className="w-4 h-4 mr-1.5" onChain={onChain} />,
+  },
+  composer: {
+    background: <div className="w-16 h-16 bg-blue-500 rounded-full" />,
+    focusRing: 'focus:ring-blue-500',
+    progressBar: 'bg-blue-500',
+    placeholder: "What's happening on Ethereum? Drop your current Spotify vibe and share what's on your mind!",
+    network: 'ethereum',
+    mediaFilePrefix: 'ethereum-post-media',
+    savingLabel: 'Ethereum Network',
   },
 };

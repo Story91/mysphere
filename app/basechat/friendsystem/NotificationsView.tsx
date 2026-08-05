@@ -214,11 +214,14 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       ) : (
         <div className="space-y-2">
           {filteredNotifications.map((notification) => (
-            <div
+            // Byl to klikalny <div>: bez focusu z klawiatury i bez Enter/Spacji.
+            <button
               key={notification.id}
+              type="button"
               onClick={() => handleNotificationClick(notification)}
               className={`
-                bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 
+                w-full text-left
+                bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700
                 hover:shadow-md transition-all cursor-pointer
                 ${!notification.isRead ? 'border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}
               `}
@@ -270,7 +273,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

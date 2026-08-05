@@ -3,7 +3,7 @@
 /** Wszystko, czym Linea rozni sie od pozostalych lancuchow w sciezce postowania. */
 
 import type { Abi } from 'viem';
-import type { ChainPostingConfig } from '../../chainPosting/types';
+import type { ChainWithComposer } from '../../chainPosting/ChainCreatePost';
 import { LINEA_CHAIN_ID, lineaChain } from './LineaNetworkConfig';
 import { LINEA_POST_CONTRACT_ABI, getLineaContractAddress } from '../contracts/LineaPostContract';
 
@@ -12,7 +12,7 @@ function LineaLogo({ className }: { className: string }) {
   return <img src="/Logomark Blue BG.svg" alt="Linea" className={className} />;
 }
 
-export const LINEA_POSTING: ChainPostingConfig = {
+export const LINEA_POSTING: ChainWithComposer = {
   chainId: LINEA_CHAIN_ID,
   chain: lineaChain,
   abi: LINEA_POST_CONTRACT_ABI as unknown as Abi,
@@ -40,5 +40,18 @@ export const LINEA_POSTING: ChainPostingConfig = {
     sentAccent: 'bg-cyan-400',
     sentText: 'text-white',
     icon: () => <LineaLogo className="w-4 h-4 mr-1.5" />,
+  },
+  composer: {
+    // eslint-disable-next-line @next/next/no-img-element
+    background: <img src="/Logomark Blue BG.svg" alt="" className="w-16 h-16" />,
+    focusRing: 'focus:ring-black',
+    // UWAGA: pomaranczowy pasek postepu na Linei to najpewniej pozostalosc po
+    // skopiowaniu pliku z Camp. Zostawiony bez zmian - decyzja wizualna nalezy
+    // do wlasciciela, refaktor niczego tu nie przemalowuje.
+    progressBar: 'bg-orange-500',
+    placeholder: "What's happening on Linea? Drop your current Spotify vibe and share what's on your mind!",
+    network: 'linea',
+    mediaFilePrefix: 'linea-post-media',
+    savingLabel: 'Linea Network',
   },
 };

@@ -16,6 +16,16 @@
 import type { ReactNode } from 'react';
 import type { Abi, Chain } from 'viem';
 
+/** Dopuszczalne wartosci pola `network` w dokumencie posta - jak w `createPost`. */
+export type PostNetworkId =
+  | 'base'
+  | 'basecamp'
+  | 'linea'
+  | 'celo'
+  | 'ethereum'
+  | 'worldchain'
+  | 'robinhood';
+
 /** Warstwa czysto wygladowa - osobna dla przycisku postu i przycisku komentarza. */
 export interface ChainButtonSkin {
   /** Klasy przycisku, gdy portfel stoi na tej sieci. */
@@ -72,6 +82,31 @@ export interface ChainPostingConfig {
 
   post: ChainButtonSkin;
   comment: ChainButtonSkin;
+  /** Wyglad i etykiety composera. Brak pola = ten lancuch ma wlasny composer. */
+  composer?: ChainComposerSkin;
+}
+
+/** Warstwa konfiguracji formularza "napisz post" dla danego lancucha. */
+export interface ChainComposerSkin {
+  /** Dekoracja w prawym gornym rogu karty (renderowana z `opacity-5`). */
+  background: ReactNode;
+  /** Klasa obwodki focusa pola tekstowego. */
+  focusRing: string;
+  /** Klasa tla paska postepu wysylki pliku. */
+  progressBar: string;
+  /** Podpowiedz w polu tekstowym. */
+  placeholder: string;
+  /**
+   * Wartosc pola `network` w dokumencie posta.
+   * NIE zmieniac - feed i statystyki filtruja wlasnie po tym stringu.
+   */
+  network: PostNetworkId;
+  /** Prefiks nazwy pliku wgrywanych mediow, np. "celo-post-media". */
+  mediaFilePrefix: string;
+  /** Nazwa sieci w komunikatach zapisu: "Saving your {savingLabel} post...". */
+  savingLabel: string;
+  /** Baner nad polem tekstowym, pokazywany gdy `isLive()` zwraca false. */
+  notice?: ReactNode;
 }
 
 /** Propsy przycisku postu - takie same we wszystkich szesciu sieciach. */

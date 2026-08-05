@@ -62,8 +62,7 @@ export interface UseSocialResult {
  */
 export const useSocial = (currentUserAddress: string | null): UseSocialResult => {
   const [socialAPI, setSocialAPI] = useState<SocialAPI | null>(null);
-  const [subscriptionManager, setSubscriptionManager] = useState<SocialSubscriptionManager | null>(null);
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -82,15 +81,23 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
   // Refs to prevent stale closures
   const socialAPIRef = useRef<SocialAPI | null>(null);
   const subscriptionManagerRef = useRef<SocialSubscriptionManager | null>(null);
+  // Numer biezacego wczytania. Odpowiedz ze starego adresu (albo po odmontowaniu)
+  // nie moze juz nic wpisac do stanu.
+  const loadTokenRef = useRef(0);
+
+  useEffect(() => {
+    return () => { loadTokenRef.current += 1; };
+  }, []);
 
   // ===============================================
   // 🚀 INITIALIZATION
   // ===============================================
 
   useEffect(() => {
+    const token = ++loadTokenRef.current;
+
     if (!currentUserAddress) {
       setSocialAPI(null);
-      setSubscriptionManager(null);
       socialAPIRef.current = null;
       subscriptionManagerRef.current = null;
       setLoading(false);
@@ -105,9 +112,8 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
         // Initialize API and subscription manager
         const api = createSocialAPI(currentUserAddress);
         const subManager = createSubscriptionManager();
-        
+
         setSocialAPI(api);
-        setSubscriptionManager(subManager);
         socialAPIRef.current = api;
         subscriptionManagerRef.current = subManager;
 
@@ -119,9 +125,10 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
         );
 
         // Load initial data
-        await loadAllData(api);
+        await loadAllData(api, token);
 
       } catch (err) {
+        if (loadTokenRef.current !== token) return;
         console.error('Error initializing social features:', err);
         setError('Błąd inicjalizacji funkcji społecznościowych');
         setLoading(false);
@@ -140,7 +147,7 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
   // 📊 DATA LOADING
   // ===============================================
 
-  const loadAllData = async (api: SocialAPI) => {
+  const loadAllData = async (api: SocialAPI, token = loadTokenRef.current) => {
     try {
       const [
         followersData,
@@ -160,6 +167,8 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
         api.getNotificationsSummary()
       ]);
 
+      if (loadTokenRef.current !== token) return;
+
       setFollowers(followersData);
       setFollowing(followingData);
       setFriends(friendsData);
@@ -168,9 +177,10 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
       setFriendsStats(friendsStatsData);
       setNotificationsSummary(notificationsSummaryData);
       setUnreadCount(notificationsSummaryData.unread);
-      
+
       setLoading(false);
     } catch (err) {
+      if (loadTokenRef.current !== token) return;
       console.error('Error loading social data:', err);
       setError('Błąd wczytywania danych społecznościowych');
       setLoading(false);
@@ -426,6 +436,9 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
     const api = createSocialAPI(userAddress);
     socialAPIRef.current = api;
 
+    // Po zmianie adresu (albo odmontowaniu) stara odpowiedz nie moze nadpisac stanu.
+    let cancelled = false;
+
     const loadNotifications = async () => {
       try {
         setLoading(true);
@@ -435,11 +448,13 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
           api.getNotifications(20),
           api.getUnreadNotificationsCount()
         ]);
+        if (cancelled) return;
 
         setNotifications(notificationsData);
         setUnreadCount(unreadCountData);
         setLoading(false);
       } catch (err) {
+        if (cancelled) return;
         console.error('Error loading notifications:', err);
         setError('Błąd wczytywania powiadomień');
         setLoading(false);
@@ -447,6 +462,8 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
     };
 
     loadNotifications();
+
+    return () => { cancelled = true; };
   }, [userAddress]);
 
   const markAsRead = useCallback(async (notificationId: string): Promise<boolean> => {
@@ -571,15 +588,20 @@ export const useRelationship = (
     const api = createSocialAPI(currentUserAddress);
     socialAPIRef.current = api;
 
+    // Odpowiedz dla poprzedniej pary adresow nie moze wygrac z biezaca.
+    let cancelled = false;
+
     const loadRelationship = async () => {
       try {
         setLoading(true);
         setError(null);
 
         const relationshipData = await api.getRelationshipWith(targetUserAddress);
+        if (cancelled) return;
         setRelationship(relationshipData);
         setLoading(false);
       } catch (err) {
+        if (cancelled) return;
         console.error('Error loading relationship:', err);
         setError('Błąd wczytywania relacji');
         setLoading(false);
@@ -587,6 +609,8 @@ export const useRelationship = (
     };
 
     loadRelationship();
+
+    return () => { cancelled = true; };
   }, [currentUserAddress, targetUserAddress]);
 
   const follow = useCallback(async (): Promise<boolean> => {

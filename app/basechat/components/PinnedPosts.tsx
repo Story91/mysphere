@@ -39,23 +39,29 @@ function PinnedPosts({
     }
   }, [onUserNamesUpdate]);
 
-  const loadPinnedPosts = useCallback(async () => {
+  const loadPinnedPosts = useCallback(async (isCancelled?: () => boolean) => {
     try {
       setIsLoading(true);
       const pinnedPosts = await fetchPinnedPosts();
+      if (isCancelled?.()) return;
       setPinnedPosts(pinnedPosts);
-      
+
       // 🚀 POBIERZ NAZWY UŻYTKOWNIKÓW dla pinned posts
       await fetchPinnedPostsUserNames(pinnedPosts);
     } catch (error) {
+      if (isCancelled?.()) return;
       console.error('❌ PinnedPosts: Błąd podczas ładowania przypiętych postów:', error);
     } finally {
-      setIsLoading(false);
+      if (!isCancelled?.()) setIsLoading(false);
     }
   }, [fetchPinnedPostsUserNames]);
 
   useEffect(() => {
-    loadPinnedPosts();
+    // Bez tego odpowiedz Firestore wracajaca po odmontowaniu (albo po zmianie
+    // portfela) wpisywala do stanu nieaktualna liste.
+    let cancelled = false;
+    loadPinnedPosts(() => cancelled);
+    return () => { cancelled = true; };
   }, [address, loadPinnedPosts]);
 
   const handleRefreshPinnedPosts = useCallback(async (newPosts?: ExtendedPost[]) => {
@@ -94,15 +100,17 @@ function PinnedPosts({
       <div className="flex items-center justify-between mb-4 px-1">
         <div className="flex items-center space-x-2">
           <div className="w-6 h-6 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center shadow-lg">
-            <svg 
-              className="w-4 h-4 text-white drop-shadow-md"
+            <svg
+              className="w-4 h-4 text-white"
               fill="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
             </svg>
           </div>
-          <h2 className="text-lg font-bold bg-gradient-to-r from-yellow-600 to-orange-600 text-transparent bg-clip-text">
+          {/* Gradient tekstowy (bg-clip-text) dawal czarne prostokaty na Androidzie. */}
+          <h2 className="text-lg font-bold text-orange-600 dark:text-orange-400">
             Pinned Posts
           </h2>
           <div className="text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded-full font-medium">
