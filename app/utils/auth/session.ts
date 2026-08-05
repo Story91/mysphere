@@ -23,19 +23,29 @@ export const SESSION_COOKIE = 'mysphere_session';
 /** Nazwa cookie z jednorazowym nonce uzywanym w wiadomosci SIWE. */
 export const NONCE_COOKIE = 'mysphere_nonce';
 
-/** Czas zycia sesji w sekundach (7 dni). */
 /**
- * Zywotnosc sesji: 2 godziny, odnawiana przy aktywnosci (patrz
- * shouldRollSession + GET /api/auth/session).
+ * Zywotnosc sesji: 7 dni, odnawiana przy aktywnosci (patrz shouldRollSession
+ * + GET /api/auth/session).
  *
- * Dlaczego tak krotko: sesja jest BEZSTANOWA, wiec nie da sie jej uniewaznic
- * zdalnie - jedyne co dziala to skasowanie cookie w tej konkretnej przegladarce.
- * Przy 7 dniach cookie przezywalo odlaczenie portfela i na wspoldzielonym
- * urzadzeniu pozwalaloby dzialac w cudzym imieniu przez tydzien. Rollowanie
- * sprawia, ze aktywny uzytkownik nie odczuwa krotkiego TTL, a porzucona sesja
- * wygasa w godziny, nie w dni.
+ * BYLO 2 GODZINY I BYL TO BLAD PROJEKTOWY. Rozumowanie brzmialo: sesja jest
+ * BEZSTANOWA, wiec nie da sie jej uniewaznic zdalnie, a skradzione cookie
+ * dziala do konca TTL - im krocej, tym lepiej. Poprawne co do zasady, bledne
+ * co do proporcji. Skutek w praktyce: uzytkownik, ktory podpisal portfel rano,
+ * po poludniu dostawal to samo pytanie od nowa. Prosba o podpis pojawiajaca sie
+ * co dwie godziny uczy klikac "podpisz" bez czytania - czyli produkuje dokladnie
+ * ten nawyk, przed ktorym ta aplikacja ma chronic. Zaoszczedzilismy na ryzyku
+ * kradziezy cookie, placac gorsza moneta.
+ *
+ * Co ta sesja w ogole daje: potwierdzenie, ze adres nalezy do tej przegladarki.
+ * Otwiera odczyt kupionej tresci premium i przypisanie postow do autora.
+ * NIE porusza zadnych srodkow - kazda platnosc wymaga osobnego podpisu
+ * transakcji w portfelu. Skradzione cookie pozwala czytac cudza platna tresc,
+ * nie wydac cudzych pieniedzy. Przy tej stawce tydzien jest wlasciwa miara.
+ *
+ * Rollowanie sprawia, ze aktywny uzytkownik nie podpisuje sie ponownie NIGDY,
+ * a porzucona sesja wygasa w tydzien.
  */
-export const SESSION_TTL_SECONDS = 60 * 60 * 2;
+export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 /**
  * Sesje odnawiamy, gdy zuzyla juz polowe swojego zycia. Nie przy kazdym
