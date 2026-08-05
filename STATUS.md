@@ -70,6 +70,21 @@ Wycięte źródła janku: `MutationObserver` skanujący cały dokument w pętli 
 - **MySphere = BaseChat** — usunięty sztuczny podział, `/` przekierowuje serwerowo.
 - **`/re-definition`** — strona dla użytkownika: rejestr modułów czytany z tej samej konfiguracji co przekierowania, uzasadnienie zmiany kierunku, praktyczne przewodniki. Podpięta do nawigacji i do `/Docs` jako „User Guide".
 
+### Faza 0 — fundament ✅
+
+**0.1 — OnchainKit usunięty całkowicie.** Base wygasiło go 19 marca 2026; termin migracji minął w maju.
+
+- Własna warstwa tożsamości na viem: `getName`/`getAvatar` z **weryfikacją w przód** (nazwa musi rozwiązywać się z powrotem na ten sam adres — bez tego każdy mógłby wyświetlać cudzy Basename), hooki `useName`/`useAvatar`, komponenty `Avatar`/`Name`/`Address`/`Identity`/`IdentityCard`
+- Zweryfikowane na prawdziwym adresie, **wynik identyczny z OnchainKit**: `getName(base)` → `story91.base.eth`, `getName(vitalik)` → `vitalik.eth`, losowy adres → `null`
+- Własna warstwa portfela: `ConnectModal` (lista konektorów prosto z wagmi) + `WalletButton` (menu na własnym `absolute`, koniec z portalem Floating UI)
+- `TipButton` na `useSendTransaction` + `useWaitForTransactionReceipt`. **Przy okazji naprawiony realny błąd:** OnchainKit raportował `success` po wejściu transakcji na łańcuch, więc **cofnięta transakcja mogła zapisać tip, który nigdy nie doszedł**. Teraz `receipt.status === 'reverted'` to błąd.
+- Widget Swap usunięty (jedyny konsument `/swap` i `/token`, oznaczony jako wycofany w planie)
+- `grep -r "from '@coinbase/onchainkit'" app/` → **0 trafień**
+
+**0.2 — zależności podbite.** `miniapp-sdk` 0.2.1→0.3.0, `miniapp-wagmi-connector` 1.1.0→**2.0.0** (major), `coins-sdk` 0.2.11→0.8.0. Zostajemy na wagmi 2.16.x, bo connector wymaga `@wagmi/core ^2.14`.
+
+**0.3 — dual-mode.** Base App (od 9.04.2026 traktuje appki jak zwykłe strony) i Farcaster (nadal rozwija spec) rozdzielone strażnikiem `isInMiniApp()` z sekundowym timeoutem. `addFrame()` → `addMiniApp()`.
+
 ### Vercel
 
 `AUTH_SESSION_SECRET` ustawiony w trzech środowiskach. Usunięte: `VERCEL_FORCE_NO_BUILD_CACHE`, `NODE_ENV` (nadpisywał wstrzyknięcie Vercela) i 5 martwych kluczy WalletConnect/Reown.
@@ -78,35 +93,9 @@ Wycięte źródła janku: `MutationObserver` skanujący cały dokument w pętli 
 
 ## 🔄 W TOKU
 
-### Faza 0.1 — migracja z OnchainKit
+### Faza 1.4 — odznaka agent/człowiek w feedzie
 
-Base wygasiło OnchainKit 19 marca 2026: npm zamrożony na 1.1.2, docs usunięte, repo bez commitów od stycznia, termin migracji minął w maju.
-
-**Warstwa portfela — zrobiona.** `ConnectModal` (lista konektorów z wagmi), `WalletButton` (menu pozycjonowane własnym `absolute`, koniec z portalem Floating UI), `Navigation` bez odwołań do OnchainKit.
-
-**Warstwa tożsamości — zrobiona.** Własne `getName`/`getAvatar` na viem z **weryfikacją w przód**, hooki `useName`/`useAvatar`, komponenty `Avatar`/`Name`/`Address`/`Identity`/`IdentityCard`.
-
-Zweryfikowane na prawdziwym adresie, wynik **identyczny z OnchainKit**:
-```
-getName(base)    -> "story91.base.eth"
-getName(mainnet) -> "story91.eth"
-getName(vitalik) -> "vitalik.eth"
-getName(random)  -> null
-```
-
-**Zmigrowane: 9 plików.** `/basechat` First Load: 857 → **826 kB**.
-
-**Zostaje do domknięcia 0.1:**
-- `TipButton.tsx` — `@coinbase/onchainkit/transaction` (żywy)
-- `providers.tsx` — `OnchainKitProvider`
-- 3 pliki na wyłączonej trasie `/base`
-- Dopiero po nich `@coinbase/onchainkit` zniknie z `package.json`
-
-**Efekt uboczny wart odnotowania:** nowa warstwa używa jawnych URL-i RPC zamiast domyślek viem, więc nie strzela w `eth.merkle.io` — czyli w host, dla którego istnieje hack `app/utils/merkleProxy.ts`. Po domknięciu 0.1 ten patch prawdopodobnie da się usunąć całkowicie.
-
-### Faza 0.3 — dual-mode ✅
-
-Zamknięta. Base App (od 9.04.2026 traktuje appki jak zwykłe strony) i Farcaster (nadal rozwija spec) rozdzielone strażnikiem `isInMiniApp()` z sekundowym timeoutem. `addFrame()` → `addMiniApp()`.
+Jedyna pozycja z fazy 1, która nie zależy od płatności. `useAgents`/`useAgent`/`useFeedback` są gotowe do reużycia.
 
 ## ⬜ ZOSTAŁO
 
@@ -114,7 +103,6 @@ Zamknięta. Base App (od 9.04.2026 traktuje appki jak zwykłe strony) i Farcaste
 
 | # | Co | Blokada |
 |---|---|---|
-| 0.2 | Podbicie 4 zależności: `miniapp-sdk` 0.2.1→0.3.0, `miniapp-wagmi-connector` 1.1.0→**2.0.0** (major), `coins-sdk` 0.2.11→0.8.0 | — |
 | 0.4 | Reguły Firestore + dokończenie SIWE | **Potrzebny eksport reguł z konsoli Firebase** |
 
 ### Faza 1 — most KYA ↔ x402
@@ -155,4 +143,5 @@ Subskrypcje przez x402, tip-to-unlock, dynamiczne karty OG (wykonalne od czasu p
 
 - **`/mycamp` renderuje statycznie tylko tło.** `useSearchParams()` na górze 2000-liniowego komponentu. Nie regresja (wcześniej `ClientOnly` nie renderował nic), ale widać „pop" treści.
 - **Brak cookie-SSR dla wagmi.** Na Next 14 wyklucza się z prerenderem całego serwisu. Rozwiąże PPR z Next 15.
+- **`/basechat` First Load 826 → 868 kB** po usunięciu OnchainKit, przy niezmienionym chunku współdzielonym. Warstwa tożsamości ciągnie tylko viem/react/react-query, więc to wygląda na przetasowanie chunków po usunięciu trasy `/swap`, nie na nowy kod. Do sprawdzenia.
 - **Build bywa flaky na Windowsie** — `collect-build-traces` rzuca `UNKNOWN errno -4094` (blokada pliku, `@vercel/nft`). Powtórka przechodzi, ale w CI to potrafi wywalić deploy.
