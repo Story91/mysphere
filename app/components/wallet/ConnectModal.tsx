@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useConnect, type Connector } from 'wagmi';
 
 /**
@@ -13,6 +14,14 @@ import { useConnect, type Connector } from 'wagmi';
  * Lista portfeli bierze sie WPROST z konektorow zarejestrowanych w wagmi
  * (app/providers.tsx), wiec nie ma tu zadnej osobnej listy do utrzymania -
  * dodanie konektora w configu automatycznie pokazuje go tutaj.
+ *
+ * RENDEROWANY PRZEZ PORTAL DO document.body - to nie jest ozdobnik.
+ * WalletButton siedzi w <header>, ktory ma `backdrop-blur-xl`. Wlasciwosc
+ * `backdrop-filter` tworzy BLOK ZAWIERAJACY dla potomkow z `position: fixed`
+ * oraz wlasny kontekst stackingu. Bez portalu `fixed inset-0` pozycjonowalo sie
+ * wzgledem headera (modal ladowal na srodku jego obszaru zamiast ekranu),
+ * a `z-[10000]` bylo uwiezione wewnatrz `z-50` headera, wiec modal chowal sie
+ * pod nawigacja.
  */
 
 /** Etykiety i ikony per id konektora. Nieznane id dostaje nazwe z wagmi. */
@@ -49,7 +58,11 @@ export default function ConnectModal({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  // Portal montujemy dopiero po stronie klienta - document nie istnieje na serwerze.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!isOpen || !mounted) return null;
 
   const handleConnect = (connector: Connector) => {
     // Wywolanie MUSI zostac w handlerze klikniecia - popup keys.coinbase.com
@@ -62,7 +75,7 @@ export default function ConnectModal({
     );
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
       role="dialog"
@@ -128,6 +141,7 @@ export default function ConnectModal({
           </p>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
