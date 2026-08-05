@@ -1,0 +1,8 @@
+{
+  "name": "@registrai/kya",
+  "version": "0.1.0",
+  "description": "Vendored KYA (Know Your Agent) client — local replacement for the unpublished @registrai/kya npm package. API surface reconstructed from docs/KYA.md.",
+  "license": "MIT",
+  "main": "index.js",
+  "types": "index.d.ts"
+}
