@@ -4,10 +4,7 @@ import { Space_Grotesk, Outfit } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { headers } from 'next/headers';
-import { cookieToInitialState } from 'wagmi';
 import AppShell from './components/AppShell';
-import { wagmiConfig } from './providers';
 
 // next/font hostuje fonty same-origin i wstrzykuje preload - zamiast
 // render-blokujacego @import z fonts.googleapis.com wewnatrz globals.css.
@@ -77,11 +74,6 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Stan wagmi odczytany z cookie JUZ NA SERWERZE. Bez tego kazde wejscie
-  // renderowalo sie jako "niezalogowany", a portfel pojawial sie dopiero po
-  // hydracji i reconnectcie - stad mignienie przy kazdym przeladowaniu.
-  const wagmiInitialState = cookieToInitialState(wagmiConfig, headers().get('cookie'));
-
   return (
     <html lang="pl" className={`${bodyFont.variable} ${headingFont.variable}`}>
       <head>
@@ -91,7 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="/vendor/onchainkit.css" />
       </head>
       <body className="min-h-screen bg-white">
-        <AppShell wagmiInitialState={wagmiInitialState}>{children}</AppShell>
+        <AppShell>{children}</AppShell>
 
         <Analytics />
         <SpeedInsights />

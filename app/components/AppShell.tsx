@@ -28,14 +28,7 @@ import { installMerkleProxy } from '../utils/merkleProxy';
  * hydracji. Poszczegolne komponenty czytajace window/localStorage maja same
  * uzywac <ClientOnly>, zamiast wstrzymywac cala aplikacje.
  */
-export default function AppShell({
-  children,
-  wagmiInitialState,
-}: {
-  children: React.ReactNode;
-  /** Stan wagmi z cookie, odczytany w serwerowym layoucie. */
-  wagmiInitialState?: any;
-}) {
+export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isHomepage = pathname === '/';
 
@@ -45,7 +38,7 @@ export default function AppShell({
 
   return (
     <ThemeProvider>
-      <Providers initialState={wagmiInitialState}>
+      <Providers>
         {!isHomepage && <Navigation />}
         <main className="w-full">{children}</main>
 

@@ -113,10 +113,17 @@ const COMMON_CONNECTORS = [
   safe(),
 ] as const;
 
-// Stan wagmi trzymany w COOKIE, nie w localStorage.
-// Dzieki temu serwer widzi go przy renderze (cookieToInitialState w layoucie)
-// i strona nie miga stanem "niezalogowany" przy kazdym wejsciu, czekajac az
-// klient odczyta localStorage i wykona reconnect.
+// Stan wagmi trzymany w COOKIE, nie w localStorage, oraz ssr: true.
+//
+// CELOWO BEZ cookieToInitialState w root layoucie. Odczyt naglowkow/cookie
+// w root layoucie opt-outuje z prerenderu KAZDA trase w aplikacji - zmierzone:
+// 46 stron statycznych spadlo do 2, a nawet whitepaper (czysty tekst)
+// uruchamialby funkcje serwerowa przy kazdym zadaniu. Na Next 14 nie da sie
+// miec obu naraz; rozwiazalby to PPR z Next 15.
+//
+// Co zostaje: cookieStorage daje trwalosc stanu miedzy przeladowaniami,
+// a ssr: true chroni przed rozjazdem hydracji. Czego nie ma: serwer nie zna
+// adresu przy renderze, wiec pierwszy paint jest "niezalogowany".
 const SSR_STORAGE = {
   ssr: true,
   storage: createStorage({ storage: cookieStorage }),
