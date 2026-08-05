@@ -18,20 +18,38 @@ Wniosek nie brzmi „social umarł". Brzmi: **social sam w sobie przestał być 
 
 ---
 
+## ⚠️ KOREKTA — KYA jako usługa nie istnieje
+
+Pierwsza wersja tego dokumentu opierała się na założeniu, że MySphere „już wie, jak weryfikować agenta". **To było nieprawdziwe.** Sprawdzone 5 sierpnia 2026:
+
+```
+kya-api.registr.ai      →  NXDOMAIN (brak rekordu DNS, nie "chwilowo offline")
+registr.ai              →  brak odpowiedzi
+@registrai/kya          →  wycofany z npm
+registrai-web.pages.dev →  żyje, ale produkt spivotował na oracle i atestacje
+                           — o KYA nie ma tam ani słowa
+```
+
+`vendor/kya/index.js` sam to przyznaje w nagłówku: to **rekonstrukcja API z `docs/KYA.md`**, napisana po to, żeby aplikacja się budowała. `app/MyAgents/hooks/useAgents.ts` czyta wyłącznie z KYA i nie ma własnego magazynu — czyli cały moduł agentów prezentuje dane z usługi, która nie istnieje.
+
+Wniosek nie brzmi „teza upadła". Brzmi: **MySphere nie może konsumować cudzego rejestru zaufania, więc musi nim być.**
+
 ## Co MySphere ma, czego nie ma nikt inny
 
 Nie feed. Feedów są dziesiątki.
 
-**KYA — zweryfikowana tożsamość agenta AI — połączona z x402, czyli możliwością zapłacenia mu i przez niego.** To jest jedyne miejsce, gdzie zaufanie do agenta i płatność za jego pracę spotykają się w jednym przepływie. I trafia dokładnie w to, co Base nazwało swoim priorytetem („agents").
+**Kompletne UI rejestru agentów, model reputacji i warstwa płatności — bez źródła danych.** `/MyAgents` ma listę, reputację, feedback i progi zaufania (`minScore 50`, `minFeedback 3`). Firestore już obsługuje graf społecznościowy, tipy i posty. Brakującym elementem jest wyłącznie magazyn agentów — a to jest do zbudowania, nie do wynajęcia.
+
+Różnica strategiczna jest realna: wynajmowanie warstwy zaufania czyni Was zależnymi od cudzego uptime'u, czego właśnie doświadczyliście. Posiadanie jej czyni z Was to, czego szukają inni. I nadal trafia dokładnie w to, co Base nazwało priorytetem na 2026 („agents").
 
 Co z tego realnie istnieje w kodzie dzisiaj:
 
 | Element | Stan |
 |---|---|
-| Klient KYA (`vendor/kya`, `lib/kya.ts`) | działa, zvendorowany |
-| Rejestr agentów (`/MyAgents`) + reputacja, feedback, trust badge | **działa**, hooki `useAgents`/`useAgent`/`useFeedback` gotowe do reużycia |
-| Endpointy x402 (`/api/myclaw/*`) | szkielet + cennik; **egzekwowania płatności brak** |
-| Certyfikacja agenta (`/api/myclaw/certify`) | zwraca `passed: true` bezwarunkowo, bez kontraktu |
+| Klient KYA (`vendor/kya`, `lib/kya.ts`) | **martwy — API nie istnieje** (rekonstrukcja z docs) |
+| Rejestr agentów (`/MyAgents`) + reputacja, feedback, trust badge | UI i hooki **gotowe**, ale bez źródła danych |
+| Endpointy x402 (`/api/myclaw/*`) | ✅ **x402 v2 wpięty**, egzekwowanie po ustawieniu `X402_PAY_TO_ADDRESS` |
+| Certyfikacja agenta (`/api/myclaw/certify`) | ✅ **realna** — 8 pytań/dyscyplinę, próg 70%. Brak limitu podejść i mintu SBT |
 | Graf społecznościowy + tipy (`saveTip`) | działa |
 | Feed, posty multi-chain, przypięcia płatne | działa |
 
@@ -71,7 +89,7 @@ To jest produkt. Reszta była przygotowaniem.
 | 1.1 | **x402 v2 w projekcie** — `@x402/next` 2.21.0, sieci w CAIP-2 (`eip155:8453`), nagłówki `PAYMENT-SIGNATURE`, plik `proxy.ts` | Pakiety, do których odwołuje się dziś kod (`x402-next`), to martwa gałąź v1 |
 | 1.2 | **Realna certyfikacja agenta** — weryfikacja ukończenia lekcji, test, dopiero potem wynik | Dziś `passed: true` dla każdego. Bez tego włączenie płatności = sprzedawanie certyfikatu za nic |
 | 1.3 | **Egzekwowanie płatności** na lekcjach, wyzwaniach i certyfikacji | Wymaga 1.1 i 1.2. Dopiero teraz to jest „przełącznik" |
-| 1.4 | **Odznaka agent/człowiek + trust score KYA w feedzie** | `useAgents` gotowe. Najtańszy sposób, żeby teza była widoczna od pierwszego ekranu |
+| 1.4 | ✅ **Odznaka agent/człowiek w feedzie** — zbudowana, 1 zapytanie na feed. **Nie pokaże nic, dopóki nie ma rejestru** |
 | 1.5 | **„Wynajmij agenta" w feedzie** — zlecenie i płatność x402 bez wychodzenia z czatu | Wymaga 1.1 i 0.4 |
 
 ### Faza 2 — pieniądz w social, ale nie spekulacja
@@ -106,6 +124,7 @@ W fazie 1 kolejność też jest wymuszona: **1.1 → 1.2 → 1.3**. Odwrócenie 
 
 ## Otwarte pytania do właściciela
 
+0. **NAJWAŻNIEJSZE: budujemy własny rejestr agentów, czy szukamy innego dostawcy?** KYA nie istnieje. Własny rejestr na Firestore reużywa całe istniejące UI i model reputacji — brakuje tylko magazynu. Docelowo dałoby się go zakotwiczyć onchain. To decyzja produktowa, która determinuje sens całej fazy 1.
 1. **Reguły Firestore** — potrzebny eksport z konsoli. Bez tego 0.4 stoi, a razem z nim cała faza 1.
 2. **Czy MyClaw Academy zostaje?** Jeśli tezą są agenty, to akademia ucząca agentów ma sens. Ale wymaga zbudowania realnej certyfikacji od zera (1.2). Alternatywa: wyciąć i skupić się na rejestrze + wynajmie.
 3. **`NEXT_PUBLIC_COINBASE_PRIVATE_KEY`** wciąż w env Vercela — 0 użyć w kodzie, ale publiczny prefiks. Do rotacji i usunięcia.

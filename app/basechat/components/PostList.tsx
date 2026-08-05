@@ -2449,6 +2449,23 @@ function PostList({
           )}
         </div>
 
+        {/* Link do udostepnialnej trasy posta. Do tej pory posty nie mialy
+            wlasnych URL-i - caly feed to jedna strona - wiec nie bylo czego
+            wkleic. /post/[id] ma pelne metadane i wlasna karte OG. */}
+        <div className="mt-2">
+          <a
+            href={`/post/${post.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-gray-500 transition-colors hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Share
+          </a>
+        </div>
+
         {/* Tip Stats - Always under action buttons for better layout */}
         <div className="mt-2">
           <TipStats
