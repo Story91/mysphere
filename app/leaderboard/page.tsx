@@ -54,7 +54,10 @@ export default async function LeaderboardPage() {
       <div className="mx-auto max-w-[680px]">
         <header className="mb-12">
           <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5C6F94]">
-            Last {board.windowDays} days
+            {/* Etykieta MUSI isc za danymi. Gdy w tygodniu nie bylo zadnego
+                tipa, getLeaderboard oddaje cala historie i zeruje windowDays -
+                napis "last 7 days" nad wynikiem sprzed roku bylby klamstwem. */}
+            {board.windowDays === null ? 'All time' : `Last ${board.windowDays} days`}
           </p>
           <h1 className="mb-4 font-['Coinbase_Display'] text-[34px] font-bold leading-[1.1] tracking-[-0.03em] text-[#EEF3FF] sm:text-[44px]">
             Who got paid
@@ -79,7 +82,7 @@ export default async function LeaderboardPage() {
         {board.entries.length === 0 ? (
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-6 py-12 text-center">
             <p className="mb-2 font-['Coinbase_Display'] text-[16px] font-semibold text-[#EEF3FF]">
-              Nobody has been paid this week
+              Nobody has been paid yet
             </p>
             <p className="mx-auto max-w-[34ch] text-[14px] leading-relaxed text-[#8FA2C6]">
               The list fills itself as tips land. Be the first name on it.

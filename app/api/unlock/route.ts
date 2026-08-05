@@ -103,11 +103,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to read post' }, { status: 500 });
   }
 
-  const premiumContent = postData.premiumContent;
   const unlockPrice = postData.unlockPrice;
   const creatorAddress = postData.author;
 
-  if (typeof premiumContent !== 'string' || premiumContent.trim() === '') {
+  // UWAGA - tego nie wolno oprzec na polu `premiumContent` dokumentu posta.
+  // Od przeniesienia tresci do kolekcji `premiumContent` trasa /api/premium
+  // KASUJE to pole (FieldValue.delete()), wiec kazdy post utworzony po tej
+  // zmianie mial je puste. Warunek na nim odrzucal wiec platnosc juz PO
+  // wyslaniu transakcji: uzytkownik placil na lancuchu, dostawal 400 i zaden
+  // rekord odblokowania nie powstawal - pieniadze wychodzily, dostep nie.
+  //
+  // Znacznikiem platnej czesci jest `hasPremium`; pole inline zostaje wylacznie
+  // dla postow sprzed przenosin (dokladnie ta sama para warunkow, co w
+  // hasPremiumContent() uzywanym przez feed).
+  const hasPaidPart =
+    postData.hasPremium === true ||
+    (typeof postData.premiumContent === 'string' && postData.premiumContent.trim() !== '');
+
+  if (!hasPaidPart) {
     return NextResponse.json({ error: 'This post has no premium content' }, { status: 400 });
   }
   if (!isValidAmount(unlockPrice)) {

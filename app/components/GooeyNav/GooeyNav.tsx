@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
 import React, { useState, useMemo } from 'react';
 import './GooeyNav.css';
 
@@ -67,18 +67,21 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
       {/* grid-cols-7: siedem sieci w rzedzie (doszla Robinhood Chain) */}
       <div className="flex items-center justify-center gap-2 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-7 lg:gap-2 scrollbar-hide gooey-nav">
         {items.map((item, index) => {
+          // Gradient wypelnienia bierze sie z pozycji AKTYWNEJ (gradientFrom/To
+          // wyzej); per-pozycja potrzebny jest juz tylko kolor obramowania.
           const itemColor = item.color || '#3b82f6';
-          const itemRgb = hexToRgb(itemColor);
-          const itemLightenedRgb = lightenColor(itemRgb, 0.3);
-          const itemGradientFrom = `rgb(${itemRgb[0]}, ${itemRgb[1]}, ${itemRgb[2]})`;
-          const itemGradientTo = `rgb(${itemLightenedRgb[0]}, ${itemLightenedRgb[1]}, ${itemLightenedRgb[2]})`;
-          
+
           return (
             <motion.button
               key={index}
+              type="button"
               onClick={item.onClick}
               onHoverStart={() => setHoveredIndex(index)}
               onHoverEnd={() => setHoveredIndex(null)}
+              // Ponizej progu `sm` etykieta jest ukryta (display:none), wiec bez
+              // tego przycisk sieci nie ma na telefonie zadnej nazwy dostepnej.
+              aria-label={item.label}
+              aria-pressed={!!item.isActive}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               className={`
@@ -94,7 +97,7 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
             >
               {/* Background for non-active items */}
               {!item.isActive && (
-                <div className="absolute inset-0 rounded-2xl bg-gray-100 dark:bg-gray-700" />
+                <div aria-hidden="true" className="absolute inset-0 rounded-2xl bg-gray-100 dark:bg-gray-700" />
               )}
               
               {/* Icon */}

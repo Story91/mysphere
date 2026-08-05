@@ -1,7 +1,6 @@
 import 'server-only';
-import { getApps, initializeApp, cert, type App } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import type { App } from 'firebase-admin/app';
+import type { Firestore } from 'firebase-admin/firestore';
 
 /**
  * Mintowanie tokenow Firebase po weryfikacji SIWE.
@@ -23,10 +22,49 @@ import { getFirestore, type Firestore } from 'firebase-admin/firestore';
  *
  * KLUCZ USLUGOWY czytany jest z GOOGLE_CREDENTIALS w pamieci - nigdy nie
  * ladujemy go na dysk.
+ *
+ * ===========================================================================
+ * DLACZEGO firebase-admin JEST LADOWANY LENIWIE, A NIE ZWYKLYM IMPORTEM
+ * ===========================================================================
+ * Objaw z produkcji (5 sierpnia 2026): trasy /api/auth/verify, /api/auth/session
+ * i /api/premium zwracaly 500 w postaci strony HTML, a /api/auth/nonce - jedyna
+ * z tej grupy nieimportujaca tego pliku - dzialala. HTML zamiast JSON-a znaczy,
+ * ze modul wybuchal PRZY LADOWANIU, zanim handler wystartowal. Dowod dodatkowy:
+ * GET /api/auth/verify zwracal lokalnie 405 (modul zaladowany, brak eksportu
+ * GET), a na produkcji 500. Ten sam build uruchomiony lokalnie przez `next start`
+ * dzialal bez zarzutu, wiec przyczyna byla srodowiskowa, nie w kodzie.
+ *
+ * Sprawdzone i WYKLUCZONE: reczne externals wypychajace gcp-metadata poza slad
+ * plikow (@vercel/nft zawiera komplet w obu wariantach konfiguracji), brak
+ * pakietu `server-only` (Next dostarcza wlasny shim), wersja Node (engines
+ * podbite do >=22, Vercel raportuje uzycie 24.x), reguly Firestore (admin SDK
+ * omija je z definicji), brak pakietu w package-lock (jest).
+ *
+ * Statyczny import sprawial, ze awaria POBOCZNEJ integracji kasowala
+ * uwierzytelnienie - a weryfikacja podpisu SIWE nie potrzebuje firebase-admin
+ * do niczego. Leniwy import odwraca zaleznosc: gdy pakiet sie nie zaladuje,
+ * dzieje sie dokladnie to, co ten modul robi od poczatku przy braku
+ * konfiguracji - logowanie przechodzi, sesja powstaje, a zapisy do Firestore
+ * zostaja anonimowe. Degradacja zamiast piecsetki.
+ *
+ * To jest naprawa ODPORNOSCIOWA, nie usuniecie przyczyny. Przyczyna nadal
+ * czeka na log runtime'u z Vercela - patrz AUDYT.md, sekcja 2b.
  */
 
-let cachedApp: App | null = null;
-let warnedMissing = false;
+/** Stan ladowania modulu. `failed` zapamietuje, ze nie ma po co probowac znowu. */
+type AdminState = { app: App | null; failed: boolean };
+
+let cached: AdminState | null = null;
+let inFlight: Promise<AdminState> | null = null;
+let warned = false;
+
+/** Ostrzegamy RAZ na proces - inaczej kazde zadanie zasmieca logi. */
+function warnOnce(message: string, error?: unknown) {
+  if (warned) return;
+  warned = true;
+  if (error) console.error(message, error);
+  else console.warn(message);
+}
 
 /** Parsuje konto uslugowe z env. Zwraca null, gdy nieskonfigurowane. */
 function readServiceAccount(): Record<string, string> | null {
@@ -44,54 +82,57 @@ function readServiceAccount(): Record<string, string> | null {
   }
 }
 
-function getAdminApp(): App | null {
-  if (cachedApp) return cachedApp;
+/**
+ * Laduje firebase-admin i inicjuje aplikacje. KAZDY etap moze zawiesc i kazdy
+ * zawodzi cicho, oddajac `app: null`.
+ *
+ * `inFlight` chroni przed wyscigiem: dwa rownolegle zadania na zimnej instancji
+ * inaczej wywolalyby initializeApp dwa razy.
+ */
+async function loadAdminApp(): Promise<AdminState> {
+  if (cached) return cached;
+  if (inFlight) return inFlight;
 
-  const existing = getApps();
-  if (existing.length > 0) {
-    cachedApp = existing[0];
-    return cachedApp;
-  }
-
-  const serviceAccount = readServiceAccount();
-  if (!serviceAccount) {
-    if (!warnedMissing) {
-      warnedMissing = true;
-      console.warn(
+  inFlight = (async (): Promise<AdminState> => {
+    const serviceAccount = readServiceAccount();
+    if (!serviceAccount) {
+      warnOnce(
         '[firebaseAdmin] GOOGLE_CREDENTIALS nie jest ustawione albo nie jest kontem uslugowym. ' +
           'Tokeny Firebase nie beda mintowane - logowanie SIWE zadziala, ale zapisy do Firestore ' +
           'pozostana anonimowe.'
       );
+      return { app: null, failed: true };
     }
-    return null;
-  }
 
-  // cert() i initializeApp() POTRAFIA RZUCIC - np. gdy klucz w GOOGLE_CREDENTIALS
-  // jest obciety albo ma zle znaki nowej linii. Wczesniej to wywolanie stalo poza
-  // jakimkolwiek try, wiec wyjatek leciał przez mintFirebaseToken az do wolajacego
-  // i przewracal cala trase uwierzytelnienia zamiast tylko wylaczyc tokeny
-  // Firebase. Blad konfiguracji jednej rzeczy nie moze kasowac logowania.
-  try {
-    cachedApp = initializeApp({
-      credential: cert({
-        projectId: serviceAccount.project_id,
-        clientEmail: serviceAccount.client_email,
-        // Klucze w env maja czesto zescapowane znaki nowej linii.
-        privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
-      }),
-    });
-    return cachedApp;
-  } catch (error) {
-    if (!warnedMissing) {
-      warnedMissing = true;
-      console.error(
-        '[firebaseAdmin] Nie udalo sie zainicjowac konta uslugowego. Tokeny Firebase ' +
-          'nie beda mintowane, ale logowanie SIWE dziala dalej. Blad:',
+    try {
+      const { getApps, initializeApp, cert } = await import('firebase-admin/app');
+
+      const existing = getApps();
+      if (existing.length > 0) return { app: existing[0], failed: false };
+
+      const app = initializeApp({
+        credential: cert({
+          projectId: serviceAccount.project_id,
+          clientEmail: serviceAccount.client_email,
+          // Klucze w env maja czesto zescapowane znaki nowej linii.
+          privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
+        }),
+      });
+
+      return { app, failed: false };
+    } catch (error) {
+      warnOnce(
+        '[firebaseAdmin] Nie udalo sie zaladowac firebase-admin ani zainicjowac konta ' +
+          'uslugowego. Tokeny Firebase nie beda mintowane, ale logowanie SIWE dziala dalej. Blad:',
         error
       );
+      return { app: null, failed: true };
     }
-    return null;
-  }
+  })();
+
+  cached = await inFlight;
+  inFlight = null;
+  return cached;
 }
 
 /**
@@ -106,13 +147,15 @@ function getAdminApp(): App | null {
  *
  * KAZDE uzycie tej funkcji musi samo sprawdzic, czy wolajacy ma prawo do danych
  * - tutaj nie ma zadnej bramki. Zwraca null, gdy konto uslugowe nie jest
- * skonfigurowane; wolajacy ma wtedy zdecydowac, czy to blad, czy degradacja.
+ * skonfigurowane albo pakiet sie nie zaladowal; wolajacy ma wtedy zdecydowac,
+ * czy to blad, czy degradacja.
  */
-export function getAdminDb(): Firestore | null {
-  const app = getAdminApp();
+export async function getAdminDb(): Promise<Firestore | null> {
+  const { app } = await loadAdminApp();
   if (!app) return null;
 
   try {
+    const { getFirestore } = await import('firebase-admin/firestore');
     return getFirestore(app);
   } catch (error) {
     console.error('[firebaseAdmin] Nie udalo sie otworzyc Firestore:', error);
@@ -126,15 +169,16 @@ export function getAdminDb(): Firestore | null {
  * WOLAJ WYLACZNIE po udanej weryfikacji podpisu SIWE. Ta funkcja nie sprawdza
  * niczego - mintuje token dla adresu, ktory dostanie.
  *
- * Zwraca null, gdy konto uslugowe nie jest skonfigurowane. To jest celowe:
- * brak tokenu ma degradowac logowanie do dzisiejszego zachowania, a nie
- * wywalac uwierzytelnienie.
+ * Zwraca null, gdy konto uslugowe nie jest skonfigurowane albo pakiet sie nie
+ * zaladowal. To jest celowe: brak tokenu ma degradowac logowanie do
+ * dzisiejszego zachowania, a nie wywalac uwierzytelnienie.
  */
 export async function mintFirebaseToken(address: string): Promise<string | null> {
-  const app = getAdminApp();
+  const { app } = await loadAdminApp();
   if (!app) return null;
 
   try {
+    const { getAuth } = await import('firebase-admin/auth');
     // uid = adres w lowercase, zeby regula mogla porownywac go wprost
     // z polami dokumentow, ktore tez trzymamy w lowercase.
     return await getAuth(app).createCustomToken(address.toLowerCase(), {

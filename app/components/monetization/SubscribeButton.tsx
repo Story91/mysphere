@@ -92,13 +92,24 @@ export default function SubscribeButton({
 
   const { phase, error, txHash, isBusy, isOnBase, switchToBase, pay, reset } = usePaymentFlow(recordSubscription);
 
-  const isSelf = !!address && address.toLowerCase() === creatorAddress.toLowerCase();
-  if (!isConnected || isSelf) return null;
-
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setIsOpen(false);
     reset();
-  };
+  }, [reset]);
+
+  // Escape zamyka modal. Dotad jedynym wyjsciem byla mysz - klawiatura zostawala
+  // uwieziona w oknie, ktore prosi o pieniadze.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, closeModal]);
+
+  const isSelf = !!address && address.toLowerCase() === creatorAddress.toLowerCase();
+  if (!isConnected || isSelf) return null;
 
   return (
     <>
@@ -107,9 +118,12 @@ export default function SubscribeButton({
         onClick={() => setIsOpen(true)}
         className={`flex items-center space-x-1 hover:text-purple-500 active:text-purple-600 transition-colors touch-manipulation ${className}`}
         title={isSupported ? 'You are supporting this creator' : 'Support this creator for a fixed period'}
+        // Ponizej progu `md` w przycisku jest samo emoji, ktore czytnik ekranu
+        // przeczytalby jako "fioletowe serce".
+        aria-label={isSupported ? 'Supporting this creator' : 'Support this creator'}
       >
-        <span className="md:hidden text-sm">{isSupported ? '💜' : '🤝'}</span>
-        <svg className="hidden md:block w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <span className="md:hidden text-sm" aria-hidden="true">{isSupported ? '💜' : '🤝'}</span>
+        <svg aria-hidden="true" className="hidden md:block w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -123,8 +137,22 @@ export default function SubscribeButton({
       {isOpen &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overscroll-contain">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Support ${displayName}`}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overscroll-contain"
+          >
+            {/* Tlo zamyka klikiem, ale nie jest przystankiem Taba ani wpisem
+                w drzewie dostepnosci - te sama akcje ma przycisk zamkniecia
+                i klawisz Escape. */}
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-hidden="true"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={closeModal}
+            />
 
             <div
               className="relative w-full max-w-sm mx-auto bg-gradient-to-br from-gray-900 via-black to-purple-900 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-5 max-h-[90vh] overflow-y-auto"
@@ -140,9 +168,10 @@ export default function SubscribeButton({
                 <button
                   type="button"
                   onClick={closeModal}
+                  aria-label="Close"
                   className="text-purple-300 hover:text-purple-100 transition-colors bg-white/10 rounded-full p-2 border border-purple-400/30"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -216,13 +245,13 @@ export default function SubscribeButton({
               </div>
 
               {phase === 'error' && error && (
-                <div className="mb-3 p-3 rounded-xl bg-red-500/15 border border-red-400/50 text-red-200 text-sm">
+                <div role="alert" className="mb-3 p-3 rounded-xl bg-red-500/15 border border-red-400/50 text-red-200 text-sm">
                   {error}
                 </div>
               )}
 
               {phase === 'success' && (
-                <div className="mb-3 p-3 rounded-xl bg-green-500/20 border border-green-400/50 text-green-200 text-sm text-center">
+                <div role="status" className="mb-3 p-3 rounded-xl bg-green-500/20 border border-green-400/50 text-green-200 text-sm text-center">
                   ✅ Support recorded
                 </div>
               )}

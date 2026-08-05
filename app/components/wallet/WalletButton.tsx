@@ -23,6 +23,8 @@ import { useFundingUrl } from '../Navigation/useFundingUrl';
  * wyrzucaly je na dol strony. Tutaj kontener jest nasz, wiec problem nie wraca.
  */
 
+const MENU_ID = 'wallet-menu';
+
 const ROW = [
   'flex items-center gap-3 w-full px-4 py-2.5',
   'text-[13px] font-medium text-[#C7D4EE]',
@@ -68,6 +70,7 @@ export default function WalletButton() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Klikniecie poza menu i Escape zamykaja je.
   useEffect(() => {
@@ -76,7 +79,12 @@ export default function WalletButton() {
       if (!containerRef.current?.contains(e.target as Node)) setIsMenuOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsMenuOpen(false);
+      if (e.key !== 'Escape') return;
+      setIsMenuOpen(false);
+      // Escape musi oddac fokus przyciskowi, ktory menu otworzyl. Bez tego
+      // fokus zostaje na zniknietym elemencie i klawiatura zaczyna od poczatku
+      // dokumentu.
+      triggerRef.current?.focus();
     };
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('touchstart', onPointerDown);
@@ -105,11 +113,17 @@ export default function WalletButton() {
 
   return (
     <div ref={containerRef} className="relative">
+      {/* Etykieta jest wymuszona, bo ponizej progu `sm` przycisk ma w srodku
+          wylacznie awatar (nazwa jest ukryta) - bez niej przycisk nie ma zadnej
+          nazwy dostepnej. */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setIsMenuOpen((open) => !open)}
         aria-expanded={isMenuOpen}
-        aria-haspopup="menu"
+        aria-haspopup="true"
+        aria-controls={MENU_ID}
+        aria-label="Wallet menu"
         className="flex items-center gap-2 rounded-xl bg-[#0052FF] p-2 text-white transition-colors hover:bg-[#0052FF]/90"
       >
         <Avatar address={address} className="h-6 w-6" />
@@ -118,7 +132,7 @@ export default function WalletButton() {
 
       {isMenuOpen && (
         <div
-          role="menu"
+          id={MENU_ID}
           className="absolute right-0 top-full z-[9999] mt-2 w-[300px] max-[360px]:w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-white/10 bg-[#0A1024]/95 shadow-[0_24px_64px_-16px_rgba(0,0,0,0.75)] backdrop-blur-xl"
         >
           {/* Blok tozsamosci czytany jak karta profilu - to apka spolecznosciowa,

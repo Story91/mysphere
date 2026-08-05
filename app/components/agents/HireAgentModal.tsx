@@ -35,7 +35,7 @@ export default function HireAgentModal({
   const [amount, setAmount] = useState<string>(PRESET_AMOUNTS[1]);
   const [brief, setBrief] = useState('');
 
-  const { sendTransaction, data: txHash, error: sendError, reset } = useSendTransaction();
+  const { sendTransaction, data: txHash, error: sendError, isPending, reset } = useSendTransaction();
   const { data: receipt, isLoading: isConfirming } = useWaitForTransactionReceipt({
     hash: txHash,
     query: { enabled: !!txHash },
@@ -74,7 +74,10 @@ export default function HireAgentModal({
 
   const payTo = agent.ownerAddress as `0x${string}` | undefined;
   const score = typeof agent.score === 'number' ? agent.score : null;
-  const isBusy = !!txHash && isConfirming;
+  // `isPending` to czas miedzy klikiem a odpowiedzia portfela. Bez niego
+  // przycisk zostawal aktywny, kiedy okno portfela bylo juz otwarte - a kazde
+  // kolejne klikniecie to osobna proba platnosci.
+  const isBusy = isPending || (!!txHash && isConfirming);
 
   return (
     <div

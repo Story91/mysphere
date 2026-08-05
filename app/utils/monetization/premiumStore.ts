@@ -36,9 +36,14 @@ export interface PremiumContentRecord {
   updatedAt: number;
 }
 
-/** Czy magazyn w ogole dziala. Bez konta uslugowego nie da sie nic zapisac. */
-export function isPremiumStoreAvailable(): boolean {
-  return getAdminDb() !== null;
+/**
+ * Czy magazyn w ogole dziala. Bez konta uslugowego nie da sie nic zapisac.
+ *
+ * Asynchroniczne, bo firebase-admin laduje sie leniwie - patrz komentarz w
+ * app/utils/auth/firebaseAdmin.ts.
+ */
+export async function isPremiumStoreAvailable(): Promise<boolean> {
+  return (await getAdminDb()) !== null;
 }
 
 /**
@@ -54,7 +59,7 @@ export async function savePremiumContent(input: {
   author: string;
   content: string;
 }): Promise<boolean> {
-  const db = getAdminDb();
+  const db = await getAdminDb();
   if (!db) return false;
 
   const now = Date.now();
@@ -88,7 +93,7 @@ export async function readPremiumContent(
   postId: string,
   legacyInlineContent?: unknown
 ): Promise<string | null> {
-  const db = getAdminDb();
+  const db = await getAdminDb();
 
   if (db) {
     try {
@@ -110,7 +115,7 @@ export async function readPremiumContent(
 
 /** Kto moze nadpisac tresc premium tego posta. */
 export async function getPremiumContentAuthor(postId: string): Promise<string | null> {
-  const db = getAdminDb();
+  const db = await getAdminDb();
   if (!db) return null;
 
   try {

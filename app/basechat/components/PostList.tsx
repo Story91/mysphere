@@ -41,10 +41,8 @@ import { useFeedUnlocks, useFeedSubscriptions } from '../../components/monetizat
 import { hasPremiumContent } from '../../utils/monetization/types';
 
 // Import Zora SDK functions and types
-import { getProfileBalances } from '@zoralabs/coins-sdk';
 import { getCachedCoin } from '../../utils/zoraSdk';
-import { parseEther, parseUnits, formatEther, formatUnits, createPublicClient, http } from 'viem'; // Import viem utils
-import { Address as ViemAddress } from 'viem';
+import { formatUnits } from 'viem';
 import TradeCoinModal from './TradeCoinModal';
 import { CreatorCoinData } from '../../utils/creatorCoin';
 
@@ -63,7 +61,7 @@ const ERC20_BALANCE_ABI = [
 import { useSocialActions } from '../friendsystem/hooks';
 
 // Import icons
-import { Users, Coins, ShoppingCart, Tag, ExternalLink, X } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 
 // Import shadcn components
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -199,6 +197,183 @@ const extractHashtags = (text: string): string[] => {
   return hashtags;
 };
 
+// ===== ODZNAKI SIECI =====
+// Jedno zrodlo prawdy dla odznak sieci. Wczesniej kazda siec byla wypisana
+// recznie w trzech miejscach (naglowek posta, komentarz, odpowiedz), wiec
+// dodanie kolejnej sieci oznaczalo edycje w kilkudziesieciu miejscach.
+// Teraz to jeden wpis w NETWORK_BADGES.
+type NetworkBadgeSize = 'post' | 'comment' | 'reply';
+
+interface NetworkBadgeDef {
+  /** Tekst alternatywny ikony */
+  alt: string;
+  /** Tlo pigulki */
+  chipClass: string;
+  /** Ikona jako obrazek... */
+  src?: string;
+  /** ...albo jako wektor inline (Camp Network) */
+  renderSvg?: (className: string) => JSX.Element;
+  /** Rozmiar ikony osobno dla kazdego z trzech miejsc renderowania */
+  iconClass: Record<NetworkBadgeSize, string>;
+  /** Ikona na bialym kolku (World Chain - logo jest jednokolorowe) */
+  onWhiteCircle?: boolean;
+  /** Podpis - renderowany wylacznie w naglowku posta, tak jak dotychczas */
+  label?: { text: string; className: string };
+}
+
+const renderCampIcon = (className: string) => (
+  <svg
+    className={className}
+    viewBox="0 0 600 600"
+    xmlns="http://www.w3.org/2000/svg"
+    role="img"
+    aria-label="Camp Network"
+  >
+    <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
+    <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
+    <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
+    <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
+  </svg>
+);
+
+const NETWORK_BADGES: Record<string, NetworkBadgeDef> = {
+  basecamp: {
+    alt: 'Camp Network',
+    chipClass: 'bg-orange-50/30 dark:bg-orange-900/20',
+    renderSvg: renderCampIcon,
+    iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
+    label: { text: 'Camp Network', className: 'text-orange-600' },
+  },
+  base: {
+    alt: 'Base',
+    chipClass: 'bg-blue-50/30 dark:bg-blue-900/20',
+    src: '/logotypy/Base_lockup_2color.png',
+    iconClass: { post: 'h-3', comment: 'h-3', reply: 'h-2.5' },
+  },
+  linea: {
+    alt: 'Linea',
+    chipClass: 'bg-cyan-50/30 dark:bg-cyan-900/20',
+    src: '/Logomark Blue BG.svg',
+    iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
+    label: { text: 'Linea', className: 'text-cyan-600' },
+  },
+  celo: {
+    alt: 'Celo',
+    chipClass: 'bg-green-50/30 dark:bg-green-900/20',
+    src: '/logotypy/ENL3ZjX9OnprxVs5u8A81khADqA.webp',
+    iconClass: { post: 'h-5', comment: 'h-4', reply: 'h-3' },
+  },
+  ethereum: {
+    alt: 'Ethereum',
+    chipClass: 'bg-blue-50/30 dark:bg-blue-900/20',
+    src: '/ethlogo.png',
+    iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
+    label: { text: 'ETH', className: 'text-blue-600' },
+  },
+  worldchain: {
+    alt: 'World Chain',
+    chipClass: 'bg-purple-50/30 dark:bg-purple-900/20',
+    src: '/logotypy/logo.svg',
+    iconClass: { post: 'h-3', comment: 'h-2.5', reply: 'h-2' },
+    onWhiteCircle: true,
+  },
+  robinhood: {
+    alt: 'Robinhood Chain',
+    chipClass: 'bg-green-50/30 dark:bg-green-900/20',
+    src: '/logotypy/robinhood.svg',
+    iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
+    label: { text: 'RH', className: 'text-[#00C805]' },
+  },
+};
+
+const NetworkBadge = ({ network, size }: { network?: string | null; size: NetworkBadgeSize }) => {
+  const def = network ? NETWORK_BADGES[network] : undefined;
+  if (!def) return null;
+
+  const iconClass = def.iconClass[size];
+  const icon = def.renderSvg
+    ? def.renderSvg(iconClass)
+    : <img src={def.src} alt={def.alt} className={iconClass} />;
+
+  return (
+    <div className={`flex items-center py-0.5 rounded-full shadow-sm ${size === 'reply' ? 'ml-1.5 px-1.5' : 'ml-2 px-2'} ${def.chipClass}`}>
+      {def.onWhiteCircle
+        ? <div className="bg-white rounded-full p-0.5 flex items-center justify-center">{icon}</div>
+        : icon}
+      {size === 'post' && def.label && (
+        <span className={`ml-1 text-xs font-bold ${def.label.className}`}>{def.label.text}</span>
+      )}
+    </div>
+  );
+};
+
+// ===== SIEC POSTA / KOMENTARZA =====
+// Ten sam lancuch if-ow byl wczesniej przepisany osobno w handleAddComment
+// i w handleAddReply - rozjechanie sie ich znaczylo cicho zla odznake.
+type PostNetwork = 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
+
+const resolvePostNetwork = (chainId: number): PostNetwork | undefined => {
+  if (chainId === base.id || chainId === baseSepolia.id) return 'base';
+  if (chainId === BASECAMP_CHAIN_ID) return 'basecamp';
+  if (chainId === LINEA_CHAIN_ID) return 'linea';
+  if (chainId === CELO_CHAIN_ID) return 'celo';
+  if (chainId === ETHEREUM_CHAIN_ID) return 'ethereum';
+  if (chainId === WORLD_CHAIN_ID) return 'worldchain';
+  if (chainId === ROBINHOOD_CHAIN_ID) return 'robinhood';
+  return undefined;
+};
+
+// Przycisk komentarza zalezy od sieci, na ktorej stoi PORTFEL (nie od sieci posta).
+// Base i sieci nieznane trafiaja na ten sam, domyslny przycisk.
+const COMMENT_BUTTON_BY_CHAIN: Record<number, typeof CommentTransactionButton> = {
+  [BASECAMP_CHAIN_ID]: CommentTransactionButtonBaseCamp,
+  [CELO_CHAIN_ID]: CommentTransactionButtonCelo,
+  [ETHEREUM_CHAIN_ID]: CommentTransactionButtonEthereum,
+  [WORLD_CHAIN_ID]: CommentTransactionButtonWorldChain,
+  [LINEA_CHAIN_ID]: CommentTransactionButtonLinea,
+  [ROBINHOOD_CHAIN_ID]: CommentTransactionButtonRobinhood,
+};
+
+// ===== EKSPLORATORY =====
+// Sieci bez `tokenUrl` nie maja wlasnej strony tokena - tak jak dotychczas
+// laduja na Basescanie.
+const BASESCAN = {
+  name: 'Basescan',
+  txUrl: 'https://basescan.org/tx/',
+  tokenUrl: 'https://basescan.org/token/',
+};
+
+const EXPLORERS: Record<string, { name: string; txUrl: string; tokenUrl?: string }> = {
+  basecamp: {
+    name: 'Camp Network Explorer',
+    txUrl: 'https://camp.cloud.blockscout.com/tx/',
+    tokenUrl: 'https://camp.cloud.blockscout.com/token/',
+  },
+  celo: {
+    name: 'Celo Explorer',
+    txUrl: 'https://explorer.celo.org/tx/',
+    tokenUrl: 'https://explorer.celo.org/token/',
+  },
+  ethereum: {
+    name: 'Etherscan',
+    txUrl: 'https://etherscan.io/tx/',
+    tokenUrl: 'https://etherscan.io/token/',
+  },
+  worldchain: {
+    name: 'Worldscan',
+    txUrl: 'https://worldscan.org/tx/',
+    tokenUrl: 'https://worldscan.org/token/',
+  },
+  linea: { name: 'Lineascan', txUrl: 'https://lineascan.build/tx/' },
+  robinhood: { name: 'Robinhood Explorer', txUrl: 'https://robinhoodchain.blockscout.com/tx/' },
+};
+
+const getTxExplorer = (network?: string) => (network && EXPLORERS[network]) || BASESCAN;
+const getTokenExplorer = (network?: string) => {
+  const explorer = network ? EXPLORERS[network] : undefined;
+  return explorer?.tokenUrl ? explorer : BASESCAN;
+};
+
 function PostList({
   showOnlyUserPosts = false,
   searchTerm = '',
@@ -233,7 +408,6 @@ function PostList({
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const [expandedTextPosts, setExpandedTextPosts] = useState<{[key: string]: boolean}>({});
   const [hasMorePosts, setHasMorePosts] = useState(true);
-  const [lastPostRef, setLastPostRef] = useState<QueryDocumentSnapshot | null>(null);
   const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
   const [postTokenData, setPostTokenData] = useState<{[postId: string]: ZoraCoinData}>({});
   const [isLoadingTokenData, setIsLoadingTokenData] = useState<{[postId: string]: boolean}>({});
@@ -245,12 +419,8 @@ function PostList({
   const INITIAL_COMMENTS_COUNT = 5;
   const LOAD_MORE_COMMENTS_COUNT = 3;
   
-  // States for transaction modal
-  const [transactionModalOpen, setTransactionModalOpen] = useState(false);
-  const [transactionType, setTransactionType] = useState<'buy' | 'sell'>('buy');
-  const [transactionAmount, setTransactionAmount] = useState('0.01');
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [isTransacting, setIsTransacting] = useState(false);
+  // Handel odbywa sie w TradeCoinModal - stan starego, wlasnego modalu
+  // transakcji zostal usuniety razem z nim.
   const [internalPosts, setInternalPosts] = useState<ExtendedPost[]>(posts);
   
   // States for TradeCoinModal
@@ -328,9 +498,23 @@ function PostList({
 
   // 🎵 Stan odtwarzacza mieszka w audioPlayerStore (poza Reactem) - patrz PostAudioPlayer.
   useEffect(() => stopAudio, []);
+
+  // Powiekszony obraz zamykal sie tylko klinieciem w tlo - z klawiatury nie
+  // bylo jak z niego wyjsc.
+  useEffect(() => {
+    if (!enlargedImage) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setEnlargedImage(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [enlargedImage]);
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const networkChainId = useChainId();
+  // Jeden wybor przycisku komentarza dla calego feedu - wczesniej ta sama
+  // siedmiostopniowa drabinka ternarna byla przepisana dwa razy.
+  const ChainCommentButton = COMMENT_BUTTON_BY_CHAIN[networkChainId] || CommentTransactionButton;
 
   useEffect(() => {
     const handleNewPost = (event: Event) => {
@@ -369,12 +553,6 @@ function PostList({
       ...prev,
       [postId]: currentVisible + LOAD_MORE_COMMENTS_COUNT
     }));
-  };
-
-  const fetchAndUpdateSinglePost = async (postId: string) => {
-    if (onRefreshPosts) {
-      await onRefreshPosts();
-    }
   };
 
   const handleDeletePost = async (postId: string) => {
@@ -543,23 +721,7 @@ function PostList({
     if (!address) return;
     
     try {
-      // Określ network na podstawie networkChainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | undefined = undefined;
-      if (networkChainId === base.id || networkChainId === baseSepolia.id) {
-        network = 'base';
-      } else if (networkChainId === BASECAMP_CHAIN_ID) {
-        network = 'basecamp';
-      } else if (networkChainId === LINEA_CHAIN_ID) {
-        network = 'linea';
-      } else if (networkChainId === CELO_CHAIN_ID) {
-        network = 'celo';
-      } else if (networkChainId === ETHEREUM_CHAIN_ID) {
-        network = 'ethereum';
-      } else if (networkChainId === WORLD_CHAIN_ID) {
-        network = 'worldchain';
-      } else if (networkChainId === ROBINHOOD_CHAIN_ID) {
-        network = 'robinhood';
-      }
+      const network = resolvePostNetwork(networkChainId);
 
       const newComment: Comment = {
         id: `temp-${Date.now()}`, // Tymczasowe ID
@@ -855,23 +1017,7 @@ function PostList({
     if (!address || !replyContent.trim()) return;
     
     try {
-      // Określ network na podstawie networkChainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | undefined = undefined;
-      if (networkChainId === base.id || networkChainId === baseSepolia.id) {
-        network = 'base';
-      } else if (networkChainId === BASECAMP_CHAIN_ID) {
-        network = 'basecamp';
-      } else if (networkChainId === LINEA_CHAIN_ID) {
-        network = 'linea';
-      } else if (networkChainId === CELO_CHAIN_ID) {
-        network = 'celo';
-      } else if (networkChainId === ETHEREUM_CHAIN_ID) {
-        network = 'ethereum';
-      } else if (networkChainId === WORLD_CHAIN_ID) {
-        network = 'worldchain';
-      } else if (networkChainId === ROBINHOOD_CHAIN_ID) {
-        network = 'robinhood';
-      }
+      const network = resolvePostNetwork(networkChainId);
 
       // Dodajemy odpowiedź z poprawnie ustawionym polem replyTo
       const newReply = await addCommentReply(postId, commentId, {
@@ -1247,9 +1393,6 @@ function PostList({
   // Trading functions removed - now handled by direct links to Zora.co in the UI
 
   const renderComments = (post: ExtendedPost) => {
-    // Check if post is from BaseCamp network
-    const isBaseCampPost = post.network === 'basecamp';
-    
     // Split comments into main comments and replies
     const comments = post.comments || [];
     
@@ -1283,64 +1426,13 @@ function PostList({
             />
           
             <div className="flex justify-end mt-2">
-            {/* Show comment button based on user's connected network chainId instead of post network */}
-            {networkChainId === BASECAMP_CHAIN_ID ? (
-              <CommentTransactionButtonBaseCamp
-                content={newComments[post.id] || ''}
-                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                disabled={!newComments[post.id]?.trim()}
-                onCommentAdded={onCommentAdded}
-              />
-            ) : networkChainId === CELO_CHAIN_ID ? (
-              <CommentTransactionButtonCelo
-                content={newComments[post.id] || ''}
-                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                disabled={!newComments[post.id]?.trim()}
-                onCommentAdded={onCommentAdded}
-              />
-            ) : networkChainId === ETHEREUM_CHAIN_ID ? (
-              <CommentTransactionButtonEthereum
-                content={newComments[post.id] || ''}
-                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                disabled={!newComments[post.id]?.trim()}
-                onCommentAdded={onCommentAdded}
-              />
-            ) : networkChainId === WORLD_CHAIN_ID ? (
-              <CommentTransactionButtonWorldChain
-                content={newComments[post.id] || ''}
-                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                disabled={!newComments[post.id]?.trim()}
-                onCommentAdded={onCommentAdded}
-              />
-            ) : networkChainId === LINEA_CHAIN_ID ? (
-              <CommentTransactionButtonLinea
-                content={newComments[post.id] || ''}
-                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                disabled={!newComments[post.id]?.trim()}
-                onCommentAdded={onCommentAdded}
-              />
-            ) : networkChainId === ROBINHOOD_CHAIN_ID ? (
-              <CommentTransactionButtonRobinhood
-                content={newComments[post.id] || ''}
-                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                disabled={!newComments[post.id]?.trim()}
-                onCommentAdded={onCommentAdded}
-              />
-            ) : (networkChainId === base.id || networkChainId === baseSepolia.id) ? (
-              <CommentTransactionButton
-                content={newComments[post.id] || ''}
-                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                disabled={!newComments[post.id]?.trim()}
-                onCommentAdded={onCommentAdded}
-              />
-            ) : (
-              <CommentTransactionButton
-                content={newComments[post.id] || ''}
-                onTransactionSuccess={(txHash) => handleAddComment(post.id, txHash)}
-                disabled={!newComments[post.id]?.trim()}
-                onCommentAdded={onCommentAdded}
-              />
-            )}
+            {/* Przycisk zalezy od sieci PORTFELA, nie od sieci posta - patrz COMMENT_BUTTON_BY_CHAIN */}
+            <ChainCommentButton
+              content={newComments[post.id] || ''}
+              onTransactionSuccess={(txHash: string) => handleAddComment(post.id, txHash)}
+              disabled={!newComments[post.id]?.trim()}
+              onCommentAdded={onCommentAdded}
+            />
           </div>
         </div>
 
@@ -1369,83 +1461,8 @@ function PostList({
                         {formatTimestamp(comment.timestamp)}
                       </span>
                       
-                      {/* Network badges for comments */}
-                      {comment.network === 'basecamp' && (
-                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-orange-50/30 dark:bg-orange-900/20 shadow-sm">
-                          <svg 
-                            className="w-3 h-3 drop-shadow-md"
-                            viewBox="0 0 600 600"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
-                            <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
-                            <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
-                            <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
-                          </svg>
-                        </div>
-                      )}
-                      
-                      {comment.network === 'base' && (
-                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
-                          <img 
-                            src="/logotypy/Base_lockup_2color.png"
-                            alt="Base"
-                            className="h-3 drop-shadow-md"
-                          />
-                        </div>
-                      )}
-                      
-                      {comment.network === 'linea' && (
-                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-cyan-50/30 dark:bg-cyan-900/20 shadow-sm">
-                          <img 
-                            src="/Logomark Blue BG.svg"
-                            alt="Linea"
-                            className="w-3 h-3 drop-shadow-md"
-                          />
-                        </div>
-                      )}
-                      
-                      {comment.network === 'celo' && (
-                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
-                          <img 
-                            src="/logotypy/ENL3ZjX9OnprxVs5u8A81khADqA.webp"
-                            alt="Celo"
-                            className="h-4 drop-shadow-md"
-                          />
-                        </div>
-                      )}
-                      
-                      {comment.network === 'ethereum' && (
-                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
-                          <img 
-                            src="/ethlogo.png"
-                            alt="Ethereum"
-                            className="w-3 h-3 drop-shadow-md"
-                          />
-                        </div>
-                      )}
-                      
-                      {comment.network === 'worldchain' && (
-                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
-                          <div className="bg-white rounded-full p-0.5 flex items-center justify-center drop-shadow-md">
-                            <img 
-                              src="/logotypy/logo.svg"
-                              alt="World Chain"
-                              className="h-2.5 drop-shadow-md"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {comment.network === 'robinhood' && (
-                        <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
-                          <img
-                            src="/logotypy/robinhood.svg"
-                            alt="Robinhood Chain"
-                            className="w-3 h-3 drop-shadow-md"
-                          />
-                        </div>
-                      )}
+                      {/* Odznaka sieci komentarza */}
+                      <NetworkBadge network={comment.network} size="comment" />
                     </div>
                     {editingComment && editingComment.commentId === comment.id ? (
                       <div className="mt-1">
@@ -1489,8 +1506,10 @@ function PostList({
                             setEditedCommentContent(comment.content);
                           }}
                           className="text-gray-400 hover:text-blue-500"
+                          aria-label="Edit comment"
+                          title="Edit comment"
                         >
-                          <svg className="w-4 h-4 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                         </button>
@@ -1498,8 +1517,10 @@ function PostList({
                       <button
                         onClick={() => handleDeleteComment(post.id, comment.id)}
                         className="text-gray-400 hover:text-red-500"
+                        aria-label="Delete comment"
+                        title="Delete comment"
                       >
-                        <svg className="w-4 h-4 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
@@ -1546,55 +1567,11 @@ function PostList({
                       rows={2}
                     />
                     <div className="flex justify-end mt-1 space-x-2">
-                      {networkChainId === BASECAMP_CHAIN_ID ? (
-                        <CommentTransactionButtonBaseCamp 
-                          content={replyContent} 
-                          disabled={!replyContent.trim()} 
-                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
-                        />
-                      ) : networkChainId === CELO_CHAIN_ID ? (
-                        <CommentTransactionButtonCelo
-                          content={replyContent} 
-                          disabled={!replyContent.trim()} 
-                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
-                        />
-                      ) : networkChainId === ETHEREUM_CHAIN_ID ? (
-                        <CommentTransactionButtonEthereum
-                          content={replyContent} 
-                          disabled={!replyContent.trim()} 
-                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
-                        />
-                      ) : networkChainId === WORLD_CHAIN_ID ? (
-                        <CommentTransactionButtonWorldChain
-                          content={replyContent} 
-                          disabled={!replyContent.trim()} 
-                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
-                        />
-                      ) : networkChainId === LINEA_CHAIN_ID ? (
-                        <CommentTransactionButtonLinea
-                          content={replyContent} 
-                          disabled={!replyContent.trim()} 
-                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
-                        />
-                      ) : networkChainId === ROBINHOOD_CHAIN_ID ? (
-                        <CommentTransactionButtonRobinhood
-                          content={replyContent} 
-                          disabled={!replyContent.trim()} 
-                          onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
-                        />
-                      ) : (networkChainId === base.id || networkChainId === baseSepolia.id) ? (
-                      <CommentTransactionButton 
-                        content={replyContent} 
-                        disabled={!replyContent.trim()} 
-                        onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
+                      <ChainCommentButton
+                        content={replyContent}
+                        disabled={!replyContent.trim()}
+                        onTransactionSuccess={(txHash: string) => handleAddReply(post.id, comment.id, txHash)}
                       />
-                      ) : (
-                      <CommentTransactionButton 
-                        content={replyContent} 
-                        disabled={!replyContent.trim()} 
-                        onTransactionSuccess={(txHash) => handleAddReply(post.id, comment.id, txHash)}
-                      />
-                      )}
                     </div>
                   </div>
                 )}
@@ -1625,83 +1602,8 @@ function PostList({
                                 {formatTimestamp(reply.timestamp)}
                               </span>
                               
-                              {/* Network badges for replies */}
-                              {reply.network === 'basecamp' && (
-                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-orange-50/30 dark:bg-orange-900/20 shadow-sm">
-                                  <svg 
-                                    className="w-2.5 h-2.5 drop-shadow-md"
-                                    viewBox="0 0 600 600"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                  >
-                                    <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
-                                    <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
-                                    <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
-                                    <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
-                                  </svg>
-                                </div>
-                              )}
-                              
-                              {reply.network === 'base' && (
-                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
-                                  <img 
-                                    src="/logotypy/Base_lockup_2color.png"
-                                    alt="Base"
-                                    className="h-2.5 drop-shadow-md"
-                                  />
-                                </div>
-                              )}
-                              
-                              {reply.network === 'linea' && (
-                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-cyan-50/30 dark:bg-cyan-900/20 shadow-sm">
-                                  <img 
-                                    src="/Logomark Blue BG.svg"
-                                    alt="Linea"
-                                    className="w-2.5 h-2.5 drop-shadow-md"
-                                  />
-                                </div>
-                              )}
-                              
-                              {reply.network === 'celo' && (
-                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
-                                  <img 
-                                    src="/logotypy/ENL3ZjX9OnprxVs5u8A81khADqA.webp"
-                                    alt="Celo"
-                                    className="h-3 drop-shadow-md"
-                                  />
-                                </div>
-                              )}
-                              
-                              {reply.network === 'ethereum' && (
-                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
-                                  <img 
-                                    src="/ethlogo.png"
-                                    alt="Ethereum"
-                                    className="w-2.5 h-2.5 drop-shadow-md"
-                                  />
-                                </div>
-                              )}
-                              
-                              {reply.network === 'worldchain' && (
-                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
-                                  <div className="bg-white rounded-full p-0.5 flex items-center justify-center drop-shadow-md">
-                                    <img 
-                                      src="/logotypy/logo.svg"
-                                      alt="World Chain"
-                                      className="h-2 drop-shadow-md"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-
-                              {reply.network === 'robinhood' && (
-                                <div className="flex items-center ml-1.5 px-1.5 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
-                                  <img
-                                    src="/logotypy/robinhood.svg"
-                                    alt="Robinhood Chain"
-                                    className="w-2.5 h-2.5 drop-shadow-md"
-                                  />
-                                </div>
-                              )}
+                              {/* Odznaka sieci odpowiedzi */}
+                              <NetworkBadge network={reply.network} size="reply" />
                             </div>
                             <div className="text-xs text-gray-800 dark:text-gray-200 mt-0.5 whitespace-pre-wrap">
                               {reply.content}
@@ -1731,8 +1633,10 @@ function PostList({
                                 <button
                                   onClick={() => handleDeleteComment(post.id, reply.id)}
                                   className="flex items-center hover:text-red-500"
+                                  aria-label="Delete reply"
+                                  title="Delete reply"
                                 >
-                                  <svg className="w-3 h-3 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-3 h-3 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
                                 </button>
@@ -1777,7 +1681,8 @@ function PostList({
     const isTextExpanded = expandedTextPosts[post.id] || false;
     const zoraData = postTokenData[post.id];
     const isLoadingData = isLoadingTokenData[post.id];
-    const isBaseCampPost = post.network === 'basecamp';
+    // Hashtagi wyliczane raz - wczesniej ten sam parser leciał dwa razy na post
+    const hashtags = extractHashtags(post.content);
 
     return (
       <div key={`post-${post.id}`} className={`bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 border relative ${
@@ -1812,131 +1717,48 @@ function PostList({
               {/* Przypięcie - żółta gwiazdka */}
               {post.isPinned && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-yellow-50/50 dark:bg-yellow-900/20 shadow-sm">
-                  <svg 
-                    className="w-4 h-4 text-yellow-500 drop-shadow-md"
+                  <svg
+                    className="w-4 h-4 text-yellow-500"
                     fill="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                   </svg>
-                  <span className="ml-1 text-xs bg-gradient-to-r from-yellow-600 to-orange-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Pinned</span>
+                  <span className="ml-1 text-xs text-yellow-600 font-bold">Pinned</span>
                 </div>
               )}
               
-              {/* BaseCamp badge */}
-              {isBaseCampPost && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-orange-50/30 dark:bg-orange-900/20 shadow-sm">
-                  <svg 
-                    className="w-4 h-4 drop-shadow-md"
-                    viewBox="0 0 600 600"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path d="M300 0C134.3 0 0 134.3 0 300s134.3 300 300 300 300-134.3 300-300S465.7 0 300 0z" fill="#000"/>
-                    <path d="M300 100c-110.5 0-200 89.5-200 200s89.5 200 200 200 200-89.5 200-200-89.5-200-200-200z" fill="#fff"/>
-                    <path d="M330 190c0 0-30 40-10 80 20 40 20 90-20 120 0 0 70-30 70-100 0-70-40-100-40-100z" fill="#FF6B00"/>
-                    <path d="M270 230c0 0-20 30-10 60 10 30 10 60-30 80 0 0 60-10 60-60 0-50-20-80-20-80z" fill="#FF6B00"/>
-                  </svg>
-                  <span className="ml-1 text-xs bg-gradient-to-r from-orange-600 to-yellow-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Camp Network</span>
-                </div>
-              )}
-              
-              {/* Base network badge */}
-              {post.network === 'base' && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
-                  <img 
-                    src="/logotypy/Base_lockup_2color.png"
-                    alt="Base"
-                    className="h-3 drop-shadow-md"
-                  />
-                </div>
-              )}
-              
-              {/* Linea network badge */}
-              {post.network === 'linea' && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-cyan-50/30 dark:bg-cyan-900/20 shadow-sm">
-                  <img 
-                    src="/Logomark Blue BG.svg"
-                    alt="Linea"
-                    className="w-4 h-4 drop-shadow-md"
-                  />
-                  <span className="ml-1 text-xs bg-gradient-to-r from-cyan-600 to-blue-500 text-transparent bg-clip-text font-bold drop-shadow-sm">Linea</span>
-                </div>
-              )}
-
-              {/* Celo network badge */}
-              {post.network === 'celo' && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
-                  <img 
-                    src="/logotypy/ENL3ZjX9OnprxVs5u8A81khADqA.webp"
-                    alt="Celo"
-                    className="h-5 drop-shadow-md"
-                  />
-                </div>
-              )}
-
-              {/* Ethereum network badge */}
-              {post.network === 'ethereum' && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-blue-50/30 dark:bg-blue-900/20 shadow-sm">
-                  <img 
-                    src="/ethlogo.png"
-                    alt="Ethereum"
-                    className="w-4 h-4 drop-shadow-md"
-                  />
-                  <span className="ml-1 text-xs bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text font-bold drop-shadow-sm">ETH</span>
-                </div>
-              )}
-
-              {/* World Chain network badge */}
-              {post.network === 'worldchain' && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
-                  <div className="bg-white rounded-full p-0.5 flex items-center justify-center drop-shadow-md">
-                    <img 
-                      src="/logotypy/logo.svg"
-                      alt="World Chain"
-                      className="h-3 drop-shadow-md"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Robinhood Chain network badge */}
-              {post.network === 'robinhood' && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-green-50/30 dark:bg-green-900/20 shadow-sm">
-                  <img
-                    src="/logotypy/robinhood.svg"
-                    alt="Robinhood Chain"
-                    className="w-4 h-4 drop-shadow-md"
-                  />
-                  <span className="ml-1 text-xs text-[#00C805] font-bold drop-shadow-sm">RH</span>
-                </div>
-              )}
+              {/* Odznaka sieci posta - jedna definicja na siec, patrz NETWORK_BADGES */}
+              <NetworkBadge network={post.network} size="post" />
 
               {/* AI Generated badge */}
               {post.isAIGenerated && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-green-900/20 dark:to-emerald-900/20 shadow-sm">
                   <svg
-                    className="w-4 h-4 drop-shadow-md text-green-600 dark:text-green-400"
+                    className="w-4 h-4 text-green-600 dark:text-green-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9" />
                   </svg>
-                  <span className="ml-1 text-xs bg-gradient-to-r from-green-600 to-emerald-500 text-transparent bg-clip-text font-bold drop-shadow-sm">AI</span>
+                  <span className="ml-1 text-xs text-green-600 dark:text-green-400 font-bold">AI</span>
                 </div>
               )}
 
               {/* Zora logo and badge */}
               {post.zoraCoinAddress && (
                 <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
-                  <img 
+                  <img
                     src="/android-chrome-512x512.png"
                     alt="Sphere Token"
-                    className="w-5 h-5 drop-shadow-md"
+                    className="w-5 h-5"
                     title="This post is a Sphere token"
                   />
-                  <span className="ml-1 text-sm bg-gradient-to-r from-purple-600 to-blue-500 text-transparent bg-clip-text font-bold drop-shadow-sm">PostCoin</span>
+                  <span className="ml-1 text-sm text-purple-600 font-bold">PostCoin</span>
                 </div>
               )}
             </div>
@@ -1982,20 +1804,15 @@ function PostList({
           )}
           
           {/* Pasek hashtagów - wyświetla wszystkie hashtagi, nawet te niewidoczne */}
-          {extractHashtags(post.content).length > 0 && (
+          {hashtags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
-              {extractHashtags(post.content).map((tag, i) => (
-                <a 
-                  key={i}
-                  href="#" 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Można dodać funkcjonalność filtrowania po hashtagach
-                  }}
-                  className="inline-block px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400 text-xs font-medium rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/30 transition-colors"
+              {hashtags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-block px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400 text-xs font-medium rounded-full"
                 >
                   {tag}
-                </a>
+                </span>
               ))}
             </div>
           )}
@@ -2019,14 +1836,28 @@ function PostList({
 
         {/* Media (obrazek lub wideo) */}
         {(post.image || post.video) && (
-          <div 
-            className="my-3 cursor-pointer" 
+          <div
+            className="my-3 cursor-pointer"
             onClick={() => {
               const mediaUrl = post.image || post.video;
               if (mediaUrl) {
                 setEnlargedImage(mediaUrl);
               }
             }}
+            {...(post.image && !post.video
+              // Klawiatura tylko dla obrazka. Wideo ma wlasne kontrolki, ktore
+              // same lapia Enter/Spacje - rola "button" na kontenerze by je zjadla.
+              ? {
+                  role: 'button' as const,
+                  tabIndex: 0,
+                  'aria-label': 'Enlarge image',
+                  onKeyDown: (e: React.KeyboardEvent) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    setEnlargedImage(post.image as string);
+                  },
+                }
+              : {})}
           >
             {/* Kontener rezerwuje miejsce zanim media sie zaladuja - bez tego kazdy
                 obraz w feedzie przesuwal wszystko ponizej (CLS). images.unoptimized
@@ -2272,34 +2103,14 @@ function PostList({
                         </a>
                       )}
                       
-                      <a 
-                        href={`${
-                          post.network === 'basecamp' 
-                            ? 'https://camp.cloud.blockscout.com/token/' 
-                            : post.network === 'celo'
-                            ? 'https://explorer.celo.org/token/'
-                            : post.network === 'ethereum'
-                            ? 'https://etherscan.io/token/'
-                            : post.network === 'worldchain'
-                            ? 'https://worldscan.org/token/'
-                            : 'https://basescan.org/token/'
-                        }${post.zoraCoinAddress}`}
+                      <a
+                        href={`${getTokenExplorer(post.network).tokenUrl}${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                       >
-                        View on {
-                          post.network === 'basecamp' 
-                            ? 'Camp Network Explorer' 
-                            : post.network === 'celo'
-                            ? 'Celo Explorer'
-                            : post.network === 'ethereum'
-                            ? 'Etherscan'
-                            : post.network === 'worldchain'
-                            ? 'Worldscan'
-                            : 'Basescan'
-                        }
-                        <ExternalLink className="w-3 h-3" />
+                        View on {getTokenExplorer(post.network).name}
+                        <ExternalLink className="w-3 h-3" aria-hidden="true" />
                       </a>
                       
                       <a 
@@ -2366,8 +2177,10 @@ function PostList({
             onClick={() => handleToggleLike(post.id)}
             className={`flex items-center space-x-1 hover:text-pink-500 transition-colors ${isLiked ? 'text-pink-500' : ''}`}
             disabled={!isConnected}
+            aria-pressed={!!isLiked}
+            aria-label={`${isLiked ? 'Unlike' : 'Like'} post (${post.likes || 0})`}
           >
-            <svg className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
             <span className="text-xs">{post.likes || 0}</span>
@@ -2376,8 +2189,10 @@ function PostList({
           <button
             onClick={() => setExpandedComments(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
             className="flex items-center space-x-1 hover:text-blue-500 transition-colors"
+            aria-expanded={!!expandedComments[post.id]}
+            aria-label={`Comments (${commentCount})`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
             <span className="text-xs">{commentCount}</span>
@@ -2456,21 +2271,7 @@ function PostList({
 
           {post.txHash && (
             <a
-              href={`${
-                post.network === 'basecamp' 
-                  ? 'https://camp.cloud.blockscout.com/tx/' 
-                  : post.network === 'celo'
-                  ? 'https://explorer.celo.org/tx/'
-                  : post.network === 'ethereum'
-                  ? 'https://etherscan.io/tx/'
-                  : post.network === 'worldchain'
-                  ? 'https://worldscan.org/tx/'
-                  : post.network === 'linea'
-                  ? 'https://lineascan.build/tx/'
-                  : post.network === 'robinhood'
-                  ? 'https://robinhoodchain.blockscout.com/tx/'
-                  : 'https://basescan.org/tx/'
-              }${post.txHash}`}
+              href={`${getTxExplorer(post.network).txUrl}${post.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center space-x-1 text-gray-900 dark:text-gray-200 hover:text-blue-500"
@@ -2494,18 +2295,29 @@ function PostList({
               }}
               className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors ml-auto p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
               title="Delete post (Admin)"
+              aria-label="Delete post (Admin)"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
           )}
 
+          {/* Menu bylo wczesniej ZAGNIEZDZONE w przycisku - przycisk w przycisku
+              to niepoprawny HTML (React ostrzega, hydracja potrafi to przestawic).
+              Teraz menu jest rodzenstwem przycisku, a `group` siedzi na otoczce,
+              wiec hover dziala dokladnie tak samo. */}
           {(canEdit || (canDelete && post.author === address)) && (
-            <div className="relative ml-auto">
-              <button className="hover:text-gray-700 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 group">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
-                <div className="absolute right-0 bottom-full mb-1 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 border border-gray-100 dark:border-gray-600 pointer-events-none group-hover:pointer-events-auto">
+            <div className="relative ml-auto group">
+              <button
+                type="button"
+                className="hover:text-gray-700 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                aria-label="Post options"
+                title="Post options"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+              </button>
+              <div className="absolute right-0 bottom-full mb-1 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 z-10 border border-gray-100 dark:border-gray-600 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
                 {canEdit && (
                   <button
                     onClick={() => { setEditingPost(post.id); setEditedContent(post.content); }}
@@ -2535,8 +2347,7 @@ function PostList({
                     Delete
                   </button>
                 )}
-                </div>
-              </button>
+              </div>
             </div>
           )}
         </div>
@@ -2704,9 +2515,10 @@ function PostList({
               className="object-contain max-h-[90vh]"
               onClick={(e) => e.stopPropagation()}
             />
-            <button 
+            <button
               className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70"
               onClick={() => setEnlargedImage(null)}
+              aria-label="Close image"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

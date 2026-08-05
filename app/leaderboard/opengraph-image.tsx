@@ -62,7 +62,7 @@ export default async function Image() {
       >
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', fontSize: 22, letterSpacing: 5, color: '#5C6F94' }}>
-            MYSPHERE · LAST {board.windowDays} DAYS
+            MYSPHERE · {board.windowDays === null ? 'ALL TIME' : `LAST ${board.windowDays} DAYS`}
           </div>
           <div
             style={{

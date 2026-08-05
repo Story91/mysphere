@@ -11,9 +11,8 @@ import {
   useSendTransaction,
   useWaitForTransactionReceipt,
 } from 'wagmi';
-import { parseEther, parseUnits, formatEther, formatUnits, encodeFunctionData } from 'viem';
+import { parseEther, parseUnits, formatUnits, encodeFunctionData } from 'viem';
 import { toast } from 'react-hot-toast';
-import { base } from 'wagmi/chains';
 import { saveTip } from '../../utils/firebase';
 // Base Pay imports
 import { pay, getPaymentStatus } from '@base-org/account';
@@ -21,8 +20,6 @@ import { BasePayButton } from '@base-org/account-ui/react';
 import {
   TipToken,
   TipNetwork,
-  NetworkConfig,
-  TokenConfig,
   NETWORKS,
   TOKENS,
   getNetworkByChainId,
@@ -30,7 +27,6 @@ import {
   getDefaultTokenForNetwork,
   getQuickAmounts,
   getExplorerTxLink,
-  chainIdToNetwork,
   ERC20_TRANSFER_ABI,
   ALL_NETWORKS,
 } from './TipNetworkConfig';
@@ -40,6 +36,23 @@ interface TipButtonProps {
   postId: string;
   className?: string;
 }
+
+// Tla kafelkow sieci i tokenow - stale, wiec nie ma powodu budowac ich
+// od nowa przy kazdym renderze wewnatrz map().
+// Sieci spoza mapy (celo, linea, robinhood) dostaja domyslne 'bg-white/10'.
+const NETWORK_BG_COLORS: Record<string, string> = {
+  base: 'bg-white',
+  ethereum: 'bg-white',
+  world: 'bg-black',
+  camp: 'bg-white',
+};
+
+// Sieci, ktorych logo wypelnia caly kafelek
+const NETWORK_FULL_IMAGE = new Set(['linea', 'celo']);
+
+const TOKEN_BG_COLORS: Record<string, string> = {
+  CAMP: 'bg-white',
+};
 
 export default function TipButton({ recipientAddress, postId, className = '' }: TipButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -338,9 +351,10 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
         className={`flex items-center space-x-1 hover:text-green-500 active:text-green-600 transition-colors touch-manipulation ${className}`}
         disabled={isTransacting}
         title="Send tip"
+        aria-label="Send tip"
       >
-        <span className="md:hidden text-sm">💲</span>
-        <svg className="hidden md:block w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <span className="md:hidden text-sm" aria-hidden="true">💲</span>
+        <svg className="hidden md:block w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
         </svg>
         <span className="hidden md:inline text-xs">Tip</span>
@@ -352,17 +366,11 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => { setIsOpen(false); setTipSaved(false); }}
           ></div>
-          
-          {/* Ukryj domyślny "View Transaction" link z OnchainKit */}
-          <style>{`
-            .tip-modal-container [data-testid="ockTransactionStatus_Action"],
-            .tip-modal-container a[href*="basescan.org"],
-            .tip-modal-container a[href*="explorer"] {
-              display: none !important;
-            }
-          `}</style>
-          <div 
-            className="tip-modal-container relative w-full max-w-sm mx-auto bg-gradient-to-br from-gray-900 via-black to-blue-900 backdrop-blur-xl rounded-2xl shadow-2xl border border-blue-500/30 p-5 overflow-hidden max-h-[90vh] overflow-y-auto"
+
+          {/* Reguly ukrywajace linki OnchainKit zniknely razem z OnchainKit -
+              transakcja idzie teraz przez czyste wagmi, w modalu nie ma czego chowac. */}
+          <div
+            className="relative w-full max-w-sm mx-auto bg-gradient-to-br from-gray-900 via-black to-blue-900 backdrop-blur-xl rounded-2xl shadow-2xl border border-blue-500/30 p-5 overflow-hidden max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Glow effects */}
@@ -379,8 +387,9 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 <button
                   onClick={() => { setIsOpen(false); setTipSaved(false); }}
                   className="text-blue-300 hover:text-blue-100 transition-colors bg-white/10 rounded-full p-2 border border-blue-400/30"
+                  aria-label="Close tip dialog"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -391,20 +400,10 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 <label className="block text-sm font-medium text-blue-200 mb-2">Network</label>
                 <div className="grid grid-cols-6 gap-2">
                   {ALL_NETWORKS.map((network) => {
-                    // Kolory tła dla każdej sieci - wypełniają cały przycisk
-                    const bgColors: Record<string, string> = {
-                      base: 'bg-white',
-                      ethereum: 'bg-white',
-                      celo: '', // Celo używa obrazka jako całego tła
-                      world: 'bg-black',
-                      linea: '', // Linea używa obrazka jako całego tła
-                      camp: 'bg-white',
-                    };
-                    // Sieci które używają pełnego obrazka jako tła
-                    const useFullImage = network.id === 'linea' || network.id === 'celo';
-                    const iconSize = 'w-6 h-6';
-                    const bgColor = bgColors[network.id] || 'bg-white/10';
-                    
+                    // Linea i Celo maja logo, ktore wypelnia caly kafelek
+                    const useFullImage = NETWORK_FULL_IMAGE.has(network.id);
+                    const bgColor = NETWORK_BG_COLORS[network.id] || 'bg-white/10';
+
                     return (
                       <button
                         key={network.id}
@@ -415,6 +414,8 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                             : 'ring-1 ring-white/20 hover:ring-white/40'
                         }`}
                         title={network.name}
+                        aria-label={network.name}
+                        aria-pressed={selectedNetwork === network.id}
                       >
                         {useFullImage && network.iconUrl ? (
                           <img 
@@ -425,8 +426,8 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                         ) : network.iconUrl ? (
                           <img 
                             src={network.iconUrl} 
-                            alt={network.name} 
-                            className={`${iconSize} object-contain`}
+                            alt={network.name}
+                            className="w-6 h-6 object-contain"
                           />
                         ) : (
                           <span className="text-lg">{network.icon}</span>
@@ -445,12 +446,8 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 <label className="block text-sm font-medium text-blue-200 mb-2">Token</label>
                 <div className="flex gap-2">
                   {availableTokens.map((token) => {
-                    // Specjalne tło dla avatara tokena
-                    const tokenBgColors: Record<string, string> = {
-                      CAMP: 'bg-white',
-                    };
-                    const tokenBg = tokenBgColors[token.symbol] || '';
-                    
+                    const tokenBg = TOKEN_BG_COLORS[token.symbol] || '';
+
                     // Na Base używamy niebieskiego kwadratu zamiast ETH logo
                     const isBaseETH = selectedNetwork === 'base' && token.symbol === 'ETH';
                     const tokenIconUrl = isBaseETH ? '/logotypy/Base_square_blue.png' : token.iconUrl;
@@ -467,6 +464,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                             ? 'bg-blue-500/30 border-blue-400/60 shadow-[0_0_15px_rgba(59,130,246,0.4)]'
                             : 'bg-white/10 border-white/20 hover:bg-white/20'
                         }`}
+                        aria-pressed={selectedToken === token.symbol}
                       >
                         {tokenIconUrl ? (
                           <div className={`w-5 h-5 rounded-md flex items-center justify-center overflow-hidden ${tokenBg} ${isBaseETH ? 'ring-1 ring-white' : ''}`}>

@@ -21,7 +21,9 @@ export default function GlassIcons({ items, className = '' }: GlassIconsProps) {
       {items.map((item, index) => (
         <motion.button
           key={index}
+          type="button"
           onClick={item.onClick}
+          aria-pressed={!!item.isActive}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           className={`
@@ -35,10 +37,10 @@ export default function GlassIcons({ items, className = '' }: GlassIconsProps) {
           `}
         >
           {/* Glass effect overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          
+          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
           {/* Icon */}
-          <div className={`relative z-10 ${item.isActive ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+          <div aria-hidden="true" className={`relative z-10 ${item.isActive ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
             {item.icon}
           </div>
           
