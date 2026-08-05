@@ -509,7 +509,18 @@ function PostList({
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [enlargedImage]);
-  const publicClient = usePublicClient();
+  /**
+   * Klient PRZYPIETY DO BASE, nie do aktualnie podlaczonej sieci.
+   *
+   * Jedyne, co przez niego czytamy, to salda monet Zora (`zoraCoinAddress`),
+   * a te kontrakty istnieja WYLACZNIE na Base. Wczesniej stalo tu
+   * `usePublicClient()` bez argumentu, czyli klient sieci, na ktorej akurat
+   * siedzi portfel - wiec gdy uzytkownik byl na Ethereum, `balanceOf` szlo pod
+   * adres, pod ktorym na mainnecie nic nie ma, i wracalo puste `0x`. W konsoli
+   * dawalo to serie ContractFunctionZeroDataError ("returned no data"), a w UI
+   * ciche zero zamiast salda.
+   */
+  const publicClient = usePublicClient({ chainId: base.id });
   const { data: walletClient } = useWalletClient();
   const networkChainId = useChainId();
   // Jeden wybor przycisku komentarza dla calego feedu - wczesniej ta sama
