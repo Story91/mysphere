@@ -91,11 +91,24 @@ Wycięte źródła janku: `MutationObserver` skanujący cały dokument w pętli 
 
 ---
 
+## 🔴 ZNALEZISKO, KTÓRE ZMIENIA PLAN
+
+**KYA jako usługa nie istnieje.** Sprawdzone 5 sierpnia 2026:
+
+```
+kya-api.registr.ai      →  NXDOMAIN (brak rekordu DNS)
+registr.ai              →  brak odpowiedzi
+@registrai/kya          →  wycofany z npm
+registrai-web.pages.dev →  żyje, ale spivotowało na oracle i atestacje
+```
+
+`vendor/kya/index.js` sam przyznaje w nagłówku, że jest **rekonstrukcją z `docs/KYA.md`**. `app/MyAgents/hooks/useAgents.ts` czyta wyłącznie z KYA i nie ma własnego magazynu.
+
+Konsekwencja: odznaka agenta jest zbudowana i poprawna, ale **nie pokaże niczego, dopóki nie ma rejestru**. Szczegóły i propozycja kierunku w [`REDEFINICJA.md`](REDEFINICJA.md), pytanie 0.
+
 ## 🔄 W TOKU
 
-### Faza 1.4 — odznaka agent/człowiek w feedzie
-
-Jedyna pozycja z fazy 1, która nie zależy od płatności. `useAgents`/`useAgent`/`useFeedback` są gotowe do reużycia.
+Nic. Wszystkie zadania niewymagające decyzji właściciela są zamknięte.
 
 ## ⬜ ZOSTAŁO
 
@@ -105,28 +118,35 @@ Jedyna pozycja z fazy 1, która nie zależy od płatności. `useAgents`/`useAgen
 |---|---|---|
 | 0.4 | Reguły Firestore + dokończenie SIWE | **Potrzebny eksport reguł z konsoli Firebase** |
 
-### Faza 1 — most KYA ↔ x402
+### Faza 1 — most agenty ↔ x402
 
-Kolejność wymuszona: **1.1 → 1.2 → 1.3**. Odwrócenie oznacza pobieranie pieniędzy za endpoint, który każdemu przyznaje certyfikat.
+| # | Co | Stan |
+|---|---|---|
+| 1.1 | x402 **v2** (`@x402/next` 2.21.0, CAIP-2, `PAYMENT-SIGNATURE`) | ✅ |
+| 1.2 | Realna certyfikacja — 8 pytań/dyscyplinę, próg 70% | ✅ |
+| 1.3 | Egzekwowanie płatności | ✅ kod gotowy, **czeka na `X402_PAY_TO_ADDRESS`** |
+| 1.4 | Odznaka agent/człowiek w feedzie | ✅ kod gotowy, **czeka na rejestr agentów** |
+| 1.5 | „Wynajmij agenta" w feedzie | ⬜ zablokowane przez 0.4 i decyzję o rejestrze |
 
-| # | Co |
-|---|---|
-| 1.1 | x402 **v2** — `@x402/next` 2.21.0. Pakiety w komentarzach kodu (`x402-next`) to martwa gałąź v1 |
-| 1.2 | Realna certyfikacja agenta — dziś `certify` zwraca `passed: true` bezwarunkowo, bez kontraktu |
-| 1.3 | Egzekwowanie płatności (wymaga 1.1 i 1.2) |
-| 1.4 | Odznaka agent/człowiek + trust score KYA w feedzie — **można równolegle**, `useAgents` gotowe |
-| 1.5 | „Wynajmij agenta" w feedzie |
+**Dziury w certyfikacji, świadomie zostawione i opisane w odpowiedzi endpointu:** brak magazynu postępów per agent, więc nie ma limitu podejść — agent może powtarzać ten sam stały zestaw 8 pytań do skutku. `certificateId` to paragon off-chain, nie dowód; mint SBT niepodpięty.
 
 ### Faza 2 — pieniądz w social
 
-Subskrypcje przez x402, tip-to-unlock, dynamiczne karty OG (wykonalne od czasu przejścia na serwerowy layout).
+| Co | Stan |
+|---|---|
+| Dynamiczne karty OG per post (`/post/[id]` + `opengraph-image`) | ✅ |
+| Link „Share" w feedzie | ✅ |
+| Subskrypcje przez x402 | ⬜ |
+| Tip-to-unlock | ⬜ |
 
 ### Poza kodem — wymaga właściciela
 
 1. **Eksport reguł Firestore** — blokuje 0.4, a przez to całą fazę 1.
 2. **`NEXT_PUBLIC_COINBASE_PRIVATE_KEY`** — 0 użyć w kodzie, ale publiczny prefiks i 548 dni w env. Do rotacji i usunięcia.
 3. **Automatyczny deploy z GitHuba nie działa od 166 dni.** Repo podłączone, ale nic się nie buduje. Do sprawdzenia: Settings → Git → Ignored Build Step / Production Branch. Do tego czasu każdy release wymaga ręcznego `vercel --prod`.
-4. **Decyzja: MyClaw Academy zostaje czy wypada?** Jeśli tezą są agenty, akademia ma sens — ale wymaga zbudowania certyfikacji od zera.
+4. **NAJWAŻNIEJSZE: budujemy własny rejestr agentów, czy szukamy innego dostawcy?** KYA nie istnieje. Własny rejestr na Firestore reużywa całe istniejące UI i model reputacji. Ta decyzja determinuje sens fazy 1.
+5. **`X402_PAY_TO_ADDRESS`** — bez niego płatności MyClaw nie są egzekwowane (endpointy działają za darmo). Przed produkcją: realny handshake 402 na Base Sepolia, bo `@x402/next` deklaruje peer `next >= 16.2.6`, a jesteśmy na 14.2.35.
+6. **MyClaw Academy zostaje?** Certyfikacja jest już realna, więc akademia ma sens — ale dziury wyżej trzeba domknąć.
 
 ### Świadomie odrzucone
 
