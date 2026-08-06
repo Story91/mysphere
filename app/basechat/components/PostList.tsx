@@ -780,21 +780,26 @@ function PostList({
     try {
       const network = resolvePostNetwork(networkChainId);
 
-      const newComment: Comment = {
-        id: `temp-${Date.now()}`, // Tymczasowe ID
+      const draft = {
         postId: postId,
         author: address,
         content: newComments[postId],
         timestamp: Date.now(),
         txHash: txHash,
         likes: 0,
-        likedBy: [],
-        mentions: [],
+        likedBy: [] as string[],
+        mentions: [] as string[],
         network: network // Dodajemy network komentarza
       };
-      
-      await addComment(postId, newComment);
-      
+
+      // Prawdziwe ID z Firestore, nie `temp-...`. Bez tego swiezo dodanego
+      // komentarza nie dalo sie polubic ani usunac az do odswiezenia feedu -
+      // obie operacje szly pod dokument, ktory nie istnieje, i konczyly sie
+      // komunikatem o awarii, mimo ze zapis sie powiodl.
+      const commentId = await addComment(postId, draft);
+
+      const newComment: Comment = { ...draft, id: commentId };
+
       setNewComments(prev => ({
         ...prev,
         [postId]: ''
@@ -969,10 +974,10 @@ function PostList({
   const handleDeleteComment = async (postId: string, commentId: string) => {
     if (!address) return;
 
-    // Komentarz dodany przed chwila ma jeszcze identyfikator `temp-...` (wlasciwe
-    // ID nadaje Firestore, lokalna kopia go nie dostaje). Usuwanie takiego wpisu
-    // szlo pod nieistniejacy dokument i konczylo sie komunikatem o awarii oraz
-    // pelnym odswiezeniem feedu.
+    // Zabezpieczenie dla komentarzy zapisanych w localStorage ZANIM `addComment`
+    // zaczelo zwracac ID z Firestore. Takie wpisy maja `temp-...`, usuwanie szlo
+    // pod nieistniejacy dokument i konczylo sie komunikatem o awarii oraz pelnym
+    // odswiezeniem feedu. Nowe komentarze dostaja prawdziwe ID od razu.
     if (commentId.startsWith('temp-')) {
       notify.info('This comment is still being saved. Give it a second.');
       return;
@@ -1029,10 +1034,12 @@ function PostList({
    *    komunikat "Failed to like comment" pojawial sie takze wtedy, gdy zapis
    *    sie powiodl, a wywrocilo sie samo odswiezanie.
    *
-   * 3. Komentarz dodany przed chwila ma jeszcze identyfikator `temp-...`
-   *    (addComment nadaje wlasciwe ID dopiero po stronie Firestore, a lokalna
-   *    kopia nigdy go nie dostaje). Polubienie takiego komentarza szlo pod
-   *    nieistniejacy wpis i konczylo sie komunikatem o awarii.
+   * 3. Komentarz dodany przed chwila mial identyfikator `temp-...`, bo
+   *    `addComment` nie zwracalo ID nadanego przez Firestore. Polubienie takiego
+   *    komentarza szlo pod nieistniejacy wpis i konczylo sie komunikatem o
+   *    awarii. ZRODLO juz naprawione - `addComment` zwraca prawdziwe ID - wiec
+   *    ponizszy warunek jest teraz tylko zabezpieczeniem dla wpisow zapisanych
+   *    w localStorage PRZED ta zmiana.
    *
    * === JAK JEST TERAZ ===
    * Zmiana lokalnie, cofniecie WYLACZNIE tego jednego komentarza przy bledzie,

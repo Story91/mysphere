@@ -844,7 +844,18 @@ export const addComment = async (postId: string, comment: {
   mentions: string[];
   txHash?: string | null;
   network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
-}): Promise<void> => {
+  /**
+   * ZWRACA ID UTWORZONEGO KOMENTARZA.
+   *
+   * Wczesniej bylo `Promise<void>`, wiec wolajacy nie mial jak poznac
+   * identyfikatora i wstawial do listy komentarz z ID "temp-...". Skutek widzial
+   * uzytkownik: swiezo dodanego komentarza NIE DALO SIE polubic ani usunac, bo
+   * obie operacje szly pod dokument `comments/temp-123`, ktory nie istnieje -
+   * i konczyly sie falszywym komunikatem o awarii plus pelnym odswiezeniem feedu.
+   *
+   * Zmiana jest CZYSTO DODAJACA: kto ignorowal wynik, dziala dalej bez zmian.
+   */
+}): Promise<string> => {
   // Pobierz nazwę autora komentarza
   const authorName = await getUserName(comment.author);
   
@@ -889,6 +900,10 @@ export const addComment = async (postId: string, comment: {
       lastActive: serverTimestamp()
     });
   }
+
+  // Zwracamy ID nawet gdy post zniknal miedzy zapisem komentarza a odczytem -
+  // dokument w kolekcji `comments` juz powstal i ma ten identyfikator.
+  return commentDoc.id;
 };
 
 // Funkcja do pobierania profilu użytkownika
