@@ -10,8 +10,25 @@ a nie istniala: *"You set all three, fund it once in USDC"*.
 `funding: 'on-resolve'`, czyli autor placi dopiero przy przyjeciu odpowiedzi,
 albo nie placi wcale.
 
-**Nic nie jest wdrozone.** Ten plik opisuje kod, ktory lezy w repo i sie
-kompiluje. Zadnej sieci, zadnego adresu, zadnej transakcji.
+## Stan wdrozenia
+
+| | |
+|---|---|
+| **Base Sepolia (84532)** | `0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6` |
+| blok | 45141319 |
+| transakcja | `0xda4602608629843df3c0f3b9cb413407efcec2bddcac38aa7d1d345118642a5f` |
+| token | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (USDC, 6 miejsc) |
+| oplata | 2,5% (`FEE_BPS = 250`, limit 500) |
+| zrodlo | **zweryfikowane na Basescanie** |
+
+**Mainnet: NIE wdrozony.** Skrypt wdrozeniowy odmawia wejscia na mainnet bez
+`ASK_ESCROW_CONFIRM_MAINNET=yes` - kontrakt jest niezmienny, wiec pomylka
+sieci kosztuje wdrozenie od nowa.
+
+> **Odbiorca oplaty na testnecie to ten sam goracy klucz, ktory wdrazal**
+> (`ADMIN_PRIVATE_KEY`). Na testnecie jest to bez znaczenia; przy mainnecie
+> nalezy podac osobny adres przez `ASK_ESCROW_FEE_RECIPIENT` - skrypt wymaga
+> go teraz jawnie i odmawia, gdy zmienna jest pusta.
 
 ---
 
@@ -207,16 +224,30 @@ oddala), a dostarczenie robi `claimFor()`. To mocniejsza obietnica niz dzisiejsz
 - Niezmienniki ksiegowe sprawdzone symulacja (20 000 losowych przebiegow):
   - `totalLiabilities == suma(claimable) + suma(budzetow otwartych Askow)`
   - dla kazdego klucza **suma wyplat == `seats * perAnswer`**, obiema sciezkami
-- **Brak testow jednostkowych na lancuchu.** Przed jakimkolwiek deployem:
-  mock USDC z **6 miejscami**, petla na 20 miejsc, fuzzing niezmiennika
-  `balanceOf(this) >= totalLiabilities`, potem **base-sepolia** - nigdy przez
-  portfel admina.
+- **Testy jednostkowe: 9, wszystkie przechodza** (`test/AskEscrow.test.ts`,
+  `npx hardhat test`). Mock USDC ma **6 miejsc dziesietnych** - test na tokenie
+  z 18 przepuscilby blad mnoznika o bilion.
 
-### Uwaga konfiguracyjna (nie zmieniona - do decyzji wlasciciela repo)
+  Pierwsze dwa testy odtwarzaja **atak znaleziony w przegladzie
+  adwersarialnym**, nie sciezke szczesliwa: `resolve()` sprawdzalo wylacznie
+  gorna granice czasu, wiec autor mogl oproznic escrow w tym samym bloku,
+  w ktorym go zalozyl, za zerowa oplate - po przeczytaniu naplywajacych
+  odpowiedzi. Zamkniete dwiema polowami naraz: przed terminem wolno zamknac
+  Aska tylko wypelniajac KAZDE miejsce, a oplata leci od zwrotu takze przy
+  rozstrzygnieciu (wczesniej tylko przy wygasnieciu, wiec wycofanie pieniedzy
+  przez resolve bylo zawsze tansze).
 
-`hardhat.config.ts` ma `paths.sources: "./camp-contract"`, wiec
-**`npx hardhat compile` NIE widzi katalogu `contracts/`**. Zeby wlaczyc ten
-kontrakt do buildu, trzeba albo przestawic `paths.sources` na `"./contracts"`
-(wtedy wypadaja kontrakty Campa), albo przeniesc pliki do jednego drzewa.
-Konfiguracji **nie ruszalem** - kompilacje kontrolna zrobilem, wolajac
-zbuforowany binarny solc 0.8.20 bezposrednio.
+- **Zgodnosc wdrozonego kodu z testowanym** potwierdzona dwoma niezaleznymi
+  sposobami: zuzycie gazu przy wdrozeniu (922 219) zgodzilo sie z pomiarem
+  z testow (922 207) co do dwunastu jednostek, a `verifyAskEscrow.js`
+  porownuje bytecode z lancucha z lokalnym artefaktem (2,51% roznicy = sloty
+  `immutable`).
+
+### Konfiguracja hardhata (zalatwione)
+
+`paths.sources` wskazywalo na `./camp-contract`, wiec `npx hardhat compile`
+**nie widzialo katalogu `contracts/`** - tego kontraktu nie dalo sie
+skompilowac ani przetestowac standardowa komenda. Cztery kontrakty Campa
+przeniesione do `contracts/`, `sources` przestawione. Skrypty wdrozeniowe
+wolaja `getContractFactory` po NAZWIE, nie po sciezce, wiec przeniesienie
+ich nie dotknelo.

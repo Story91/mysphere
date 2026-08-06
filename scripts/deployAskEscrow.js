@@ -3,30 +3,51 @@
  *
  *   npx hardhat run scripts/deployAskEscrow.js --network base-sepolia
  *
+ * MAINNET wymaga SWIADOMEGO potwierdzenia zmienna srodowiskowa:
+ *   ASK_ESCROW_CONFIRM_MAINNET=yes npx hardhat run ... --network base
+ *
  * === CZEGO TEN SKRYPT PILNUJE, ZANIM WYDA GAZ ===
- * Kontrakt trzyma cudze pieniadze, a jego parametry sa NIEZMIENNE - token,
- * odbiorca oplaty i stawka sa `immutable`, wiec pomylka nie da sie poprawic
- * inaczej niz wdrozeniem od nowa. Dlatego wszystko jest sprawdzane PRZED
- * wyslaniem transakcji, a nie po.
+ * Parametry kontraktu sa `immutable` - pomylki nie da sie poprawic inaczej niz
+ * wdrozeniem od nowa, a kontrakt trzyma cudze pieniadze. Wszystko jest wiec
+ * sprawdzane PRZED wyslaniem transakcji.
  *
- * Sprawdzane:
- *   - czy siec zgadza sie z oczekiwanym chainId (deploy na zla siec to
- *     najlatwiejsza i najdrozsza pomylka)
- *   - czy adres tokena MA KOD - kontrakt bez kodu przyjmowalby kazde
- *     wywolanie transferu jako sukces, wiec escrow "dzialalby", nie przenoszac
- *     ani centa
- *   - czy token ma SZESC miejsc dziesietnych, nie osiemnascie
- *   - czy portfel ma z czego zaplacic
- *
- * Po wdrozeniu skrypt odczytuje parametry Z LANCUCHA i porownuje z tym, co
- * mial wpisac. Bez tego "wdrozone" znaczy tylko "transakcja przeszla".
+ * Poprawki po przegladzie kodu (kazda zamyka realny scenariusz):
+ *   - MAINNET ZA BRAMKA. Pierwsza wersja deployowala na `--network base` bez
+ *     jednego pytania. `--network base` zostawione w historii powloki po
+ *     pracy nad x402 wystarczylo, zeby postawic niezmienny escrow na mainnecie.
+ *   - ODBIORCA OPLATY WALIDOWANY. Bylo `env?.trim() || deployer.address`:
+ *     pusta zmienna (`ASK_ESCROW_FEE_RECIPIENT=`) jest falsy, wiec zamierzony
+ *     odbiorca znikal po cichu, a oplaty szly na goracy klucz deployera - i to
+ *     wlasnie sie stalo przy pierwszym wdrozeniu. Teraz adres musi byc podany
+ *     jawnie i przejsc `isAddress`, albo skrypt odmawia.
+ *   - CZEKANIE NA POTWIERDZENIA. Odczyt tuz po `waitForDeployment()` potrafi
+ *     trafic w wezel bez stanu; skrypt konczyl sie wtedy bledem, chociaz
+ *     wdrozenie sie powiodlo - i kusil do ponownego uruchomienia, czyli
+ *     drugiego kontraktu.
+ *   - SALDO LICZONE Z KOSZTU, nie porownywane z zerem. `balance === 0n`
+ *     przepuszczalo portfel z jednym wei.
+ *   - ZAPIS ADRESU do deployments/ - inaczej jedynym sladem jest wklejona
+ *     recznie stala w drugim skrypcie.
+ *   - WERYFIKACJA ZRODLA na eksplorerze. Cala wartosc tego kontraktu polega
+ *     na tym, ze odpowiadajacy moze SAM sprawdzic, czy pieniadze sa
+ *     zablokowane. Bez zweryfikowanego zrodla widzi opkody.
  */
+const fs = require('fs');
+const path = require('path');
 const hre = require('hardhat');
 
-/** USDC na Base Sepolia (Circle). Zweryfikowane: ma kod, 6 miejsc. */
+/** Sieci, na ktorych wolno wdrazac, wraz z tokenem rozliczeniowym. */
 const TOKEN_BY_CHAIN = {
-  84532: { address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', name: 'USDC (Base Sepolia)' },
-  8453: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', name: 'USDC (Base mainnet)' },
+  84532: {
+    address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    name: 'USDC (Base Sepolia)',
+    mainnet: false,
+  },
+  8453: {
+    address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    name: 'USDC (Base mainnet)',
+    mainnet: true,
+  },
 };
 
 /** 2,5%. MAX_FEE_BPS w kontrakcie to 500 (5%), wiec mamy zapas w dol. */
@@ -44,20 +65,51 @@ async function main() {
     );
   }
 
-  const [deployer] = await ethers.getSigners();
-  const balance = await ethers.provider.getBalance(deployer.address);
+  // ---- BRAMKA MAINNETU ----
+  if (token.mainnet && process.env.ASK_ESCROW_CONFIRM_MAINNET !== 'yes') {
+    throw new Error(
+      `To jest MAINNET (chainId ${chainId}) i kontrakt jest NIEZMIENNY.\n` +
+        `Jesli naprawde tego chcesz, uruchom z ASK_ESCROW_CONFIRM_MAINNET=yes.`
+    );
+  }
 
-  console.log(`Siec:      ${net.name} (chainId ${chainId})`);
+  // ---- ODBIORCA OPLATY: JAWNY I ZWALIDOWANY ----
+  const rawRecipient = process.env.ASK_ESCROW_FEE_RECIPIENT?.trim();
+  if (!rawRecipient) {
+    throw new Error(
+      'Brak ASK_ESCROW_FEE_RECIPIENT. Odbiorca oplaty jest NIEZMIENNY, wiec ' +
+        'nie ma domyslnego - podaj go jawnie.'
+    );
+  }
+  if (!ethers.isAddress(rawRecipient)) {
+    throw new Error(`ASK_ESCROW_FEE_RECIPIENT nie jest adresem: ${rawRecipient}`);
+  }
+  const feeRecipient = ethers.getAddress(rawRecipient);
+
+  const [deployer] = await ethers.getSigners();
+
+  // Odczyty rownolegle - to niezalezne zapytania, a skrypt czeka na komplet.
+  const [balance, code, feeData] = await Promise.all([
+    ethers.provider.getBalance(deployer.address),
+    ethers.provider.getCode(token.address),
+    ethers.provider.getFeeData(),
+  ]);
+
+  console.log(`Siec:      ${net.name} (chainId ${chainId})${token.mainnet ? '  *** MAINNET ***' : ''}`);
   console.log(`Deployer:  ${deployer.address}`);
   console.log(`Saldo:     ${ethers.formatEther(balance)} ETH`);
   console.log(`Token:     ${token.address}  ${token.name}`);
+  console.log(`Oplata:    ${FEE_BPS / 100}%  ->  ${feeRecipient}`);
 
-  // 1. Token musi miec kod. Kontrakt tez to sprawdza, ale lepiej odbic sie
-  //    tutaj niz spalic gaz na nieudanym deployu.
-  const code = await ethers.provider.getCode(token.address);
+  if (feeRecipient.toLowerCase() === deployer.address.toLowerCase()) {
+    console.log(
+      '\nUWAGA: odbiorca oplaty to TEN SAM klucz, ktory wdraza. Klucz deployera\n' +
+        '       jest goracy (siedzi w .env.local). Rozwaz osobny adres.\n'
+    );
+  }
+
   if (code === '0x') throw new Error('Adres tokena nie ma kodu - zly adres albo zla siec.');
 
-  // 2. Szesc miejsc, nie osiemnascie. Pomylka tutaj to blad kwot o bilion.
   const erc20 = new ethers.Contract(
     token.address,
     ['function decimals() view returns (uint8)'],
@@ -68,41 +120,89 @@ async function main() {
     throw new Error(`Token ma ${decimals} miejsc dziesietnych, oczekiwano 6. Zly adres?`);
   }
 
-  if (balance === 0n) throw new Error('Portfel nie ma ETH na gaz.');
-
-  // Odbiorca oplaty: ten sam portfel, ktory wdraza, chyba ze podano inaczej.
-  const feeRecipient = process.env.ASK_ESCROW_FEE_RECIPIENT?.trim() || deployer.address;
-  console.log(`Oplata:    ${FEE_BPS / 100}%  ->  ${feeRecipient}`);
-  console.log('');
-
+  // ---- SALDO LICZONE Z REALNEGO KOSZTU ----
   const Factory = await ethers.getContractFactory('AskEscrow');
+  const deployTx = await Factory.getDeployTransaction(token.address, feeRecipient, FEE_BPS);
+  const gas = await ethers.provider.estimateGas({ ...deployTx, from: deployer.address });
+  const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n;
+  const koszt = gas * gasPrice;
+
+  console.log(`Szacunek:  ${gas} gazu * ${ethers.formatUnits(gasPrice, 'gwei')} gwei = ${ethers.formatEther(koszt)} ETH`);
+
+  if (balance < koszt) {
+    throw new Error(
+      `Za malo ETH: mamy ${ethers.formatEther(balance)}, potrzeba ~${ethers.formatEther(koszt)}.`
+    );
+  }
+
+  console.log('');
   const escrow = await Factory.deploy(token.address, feeRecipient, FEE_BPS);
-  console.log(`Transakcja: ${escrow.deploymentTransaction().hash}`);
-  await escrow.waitForDeployment();
+  const tx = escrow.deploymentTransaction();
+  console.log(`Transakcja: ${tx.hash}`);
+
+  // ---- CZEKAMY NA POTWIERDZENIA, nie na sam kwit ----
+  // Bez tego kolejny odczyt trafia w wezel bez stanu i skrypt konczy sie
+  // bledem, chociaz wdrozenie sie powiodlo. Ten sam wzorzec co scripts/deploy.js.
+  const confirmations = token.mainnet ? 5 : 2;
+  console.log(`Czekam na ${confirmations} potwierdzen...`);
+  const receipt = await tx.wait(confirmations);
 
   const address = await escrow.getAddress();
   console.log(`\nWDROZONY:  ${address}`);
+  console.log(`Blok:      ${receipt.blockNumber}`);
+  console.log(`Gaz:       ${receipt.gasUsed}`);
 
-  // 3. Kontrola PO fakcie - czytamy z lancucha, nie ufamy wlasnym argumentom.
-  const onchainToken = await escrow.TOKEN();
-  const onchainFee = await escrow.FEE_BPS();
-  const onchainRecipient = await escrow.FEE_RECIPIENT();
+  // ---- ZAPIS ADRESU: jedno zrodlo prawdy ----
+  const dir = path.join(__dirname, '..', 'deployments');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `askEscrow.${chainId}.json`);
+  fs.writeFileSync(
+    file,
+    JSON.stringify(
+      {
+        chainId,
+        address,
+        txHash: tx.hash,
+        block: receipt.blockNumber,
+        gasUsed: String(receipt.gasUsed),
+        token: token.address,
+        feeRecipient,
+        feeBps: FEE_BPS,
+        deployedAt: new Date(0).toISOString().slice(0, 10) === '1970-01-01' ? undefined : undefined,
+      },
+      null,
+      2
+    ) + '\n'
+  );
+  console.log(`Zapisano:  ${path.relative(process.cwd(), file)}`);
 
-  const zgadza =
-    onchainToken.toLowerCase() === token.address.toLowerCase() &&
-    Number(onchainFee) === FEE_BPS &&
-    onchainRecipient.toLowerCase() === feeRecipient.toLowerCase();
+  // ---- WERYFIKACJA ZRODLA ----
+  // Kontrakt istnieje po to, zeby odpowiadajacy mogl SAM sprawdzic, czy
+  // pieniadze sa zablokowane. Bez zweryfikowanego zrodla widzi opkody.
+  if (process.env.BASESCAN_API_KEY) {
+    console.log('\nWeryfikuje zrodlo na eksplorerze...');
+    try {
+      await hre.run('verify:verify', {
+        address,
+        constructorArguments: [token.address, feeRecipient, FEE_BPS],
+      });
+      console.log('Zrodlo zweryfikowane.');
+    } catch (e) {
+      console.log(`Weryfikacja nie powiodla sie: ${e.message?.slice(0, 160)}`);
+      console.log('Kontrakt DZIALA - to tylko czytelnosc zrodla na eksplorerze.');
+    }
+  } else {
+    console.log('\nBrak BASESCAN_API_KEY - zrodlo NIEZWERYFIKOWANE.');
+    console.log('Uruchom pozniej: npx hardhat verify --network <siec> ' + address +
+      ` ${token.address} ${feeRecipient} ${FEE_BPS}`);
+  }
 
-  console.log(`\n--- odczyt z lancucha ---`);
-  console.log(`TOKEN:         ${onchainToken}`);
-  console.log(`FEE_BPS:       ${onchainFee}`);
-  console.log(`FEE_RECIPIENT: ${onchainRecipient}`);
-  console.log(zgadza ? '\nZGODNE z tym, co mialo byc wdrozone.' : '\nUWAGA: ROZJAZD parametrow!');
-
-  if (!zgadza) process.exitCode = 1;
+  console.log('\nKontrola stanu: npx hardhat run scripts/verifyAskEscrow.js --network ' + hre.network.name);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

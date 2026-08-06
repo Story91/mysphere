@@ -104,41 +104,22 @@ const config = {
     }
   },
   etherscan: {
-    apiKey: {
-      "base-sepolia": process.env.BASESCAN_API_KEY || "",
-      base: process.env.BASESCAN_API_KEY || "",
-      "base-goerli": process.env.BASESCAN_API_KEY || "",
-      linea: "HSHV72NNW6KVQA88YB5BFSZHTVPFWC2GJU",
-      "camp": "empty",
-      // Blockscout nie sprawdza klucza, ale hardhat-verify wymaga wpisu.
-      robinhood: "empty",
-      robinhoodTestnet: "empty"
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY || process.env.BASESCAN_API_KEY || "",
+    // Etherscan V2 rozlicza JEDNYM kluczem etherscan.io dla wszystkich
+    // lancuchow, a hardhat-verify sam buduje adres z chainId. Byla tu mapa
+    // klucz-per-siec (V1) i wpisy customChains z adresami api.basescan.org -
+    // przez to `hardhat verify` odbijalo sie najpierw komunikatem
+    // "deprecated V1 endpoint", a po podmianie adresow na V2 gubilo parametr
+    // chainid, bo biblioteka doklada wlasna sciezke i ucina query string.
+    //
+    // Wpisy Blockscouta (camp, robinhood) zostaja w customChains - one nie sa
+    // Etherscanem i maja wlasne adresy. Klucz ignoruja.
     customChains: [
-      {
-        network: "base-sepolia",
-        chainId: 84532,
-        urls: {
-          apiURL: "https://api-sepolia.basescan.org/api",
-          browserURL: "https://sepolia.basescan.org"
-        }
-      },
-      {
-        network: "base",
-        chainId: 8453,
-        urls: {
-          apiURL: "https://api.basescan.org/api",
-          browserURL: "https://basescan.org"
-        }
-      },
-      {
-        network: "base-goerli",
-        chainId: 84531,
-        urls: {
-          apiURL: "https://api-goerli.basescan.org/api",
-          browserURL: "https://goerli.basescan.org"
-        }
-      },
+      // Etherscan V2: JEDEN endpoint dla wszystkich lancuchow, chainId
+      // w zapytaniu. Bylo tu `api-sepolia.basescan.org/api` i `api.basescan.org/api`
+      // (V1), przez co `hardhat verify` odbijalo sie komunikatem "You are using
+      // a deprecated V1 endpoint". Wpis `linea` nizej byl juz zmigrowany -
+      // te dwa zostaly w tyle.
       {
         network: "linea",
         chainId: 59144,
@@ -185,7 +166,14 @@ const config = {
     currency: "USD"
   },
   sourcify: {
-    enabled: true
+    // WYLACZONE swiadomie. Sourcify ma API v1 w zaplanowanym wylaczeniu
+    // (brownout do 2027-01-08) i odpowiada 503 na kazde zadanie. Przy
+    // wlaczonym Sourcify `hardhat verify` konczy sie bledem TAKZE wtedy, gdy
+    // weryfikacja na Etherscanie sie POWIODLA - a wtedy nikt nie czyta wyzej
+    // i udane wdrozenie wyglada na zepsute.
+    //
+    // Wlaczyc z powrotem, gdy hardhat-verify bedzie umial API v2 Sourcify.
+    enabled: false
   }
 };
 

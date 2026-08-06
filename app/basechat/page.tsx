@@ -67,6 +67,7 @@ import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 import GooeyNav from '../components/GooeyNav/GooeyNav';
 import SoftFeedMobile from './soft/SoftFeedMobile';
 import { NameWithSuffix } from '../utils/nameSuffix';
+import { getGlobalStats } from '../utils/stats/globalStats';
 import SoftSectionList from './soft/SoftSectionList';
 import SoftTrendsPanel from './soft/SoftTrendsPanel';
 import SoftProfileHeader from './soft/SoftProfileHeader';
@@ -463,10 +464,22 @@ function BaseChatContent() {
   const [postPreviewVideo, setPostPreviewVideo] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
-         const [totalUsers, setTotalUsers] = useState(175708);
-    const [totalLikes, setTotalLikes] = useState(18817);
-    const [totalPosts, setTotalPosts] = useState(239961);
-    const [totalComments, setTotalComments] = useState(10972);
+  /**
+   * Liczniki startuja z `null`, nie z liczba.
+   *
+   * Byly tu wartosci poczatkowe 175708 / 18817 / 239961 / 10972 - czyli
+   * wymyslone liczby POKAZYWANE, zanim cokolwiek sie wczytalo. Przy pustym
+   * odczycie zostawaly na ekranie i nikt nie mial jak odroznic "policzone" od
+   * "wpisane". `null` renderuje sie jako kreska i takiej pomylki nie da sie
+   * zrobic.
+   */
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [totalLikes, setTotalLikes] = useState<number | null>(null);
+  const [totalPosts, setTotalPosts] = useState<number | null>(null);
+  const [totalComments, setTotalComments] = useState<number | null>(null);
+  const [totalTips, setTotalTips] = useState<number | null>(null);
+  /** Kiedy policzono liczby wyzej. 0 = nie wiadomo. */
+  const [statsMeasuredAt, setStatsMeasuredAt] = useState<number>(0);
   const [expandedUsersList, setExpandedUsersList] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -1522,41 +1535,47 @@ function BaseChatContent() {
 
 
   // ⚠️ OPTIMIZED - 12h cache per user for global stats using same system as main page
+  /**
+   * Globalne liczniki - JEDEN odczyt prawdziwego dokumentu.
+   *
+   * === CO TU BYLO ===
+   * Ta funkcja nie czytala NICZEGO. Zwracala liczby wpisane na sztywno
+   * (userCount: 175708, postsCount: 239961, ...) i mnozyla kazda przez losowy
+   * wspolczynnik +/-1% z komentarzem "dla realizmu" - czyli licznik zmienial
+   * sie na oczach czytelnika przy kazdym wejsciu, zeby wygladac na zywy,
+   * bedac wymyslonym.
+   *
+   * Zmierzone tego samego dnia na produkcyjnej bazie: 184 064 uzytkownikow
+   * (na ekranie 175 708), 263 613 postow (239 961), 13 492 komentarze
+   * (10 972). Na produkcie o sprawdzalnych liczbach pierwsze cztery liczby
+   * na ekranie byly nabite.
+   *
+   * Teraz czytamy jeden dokument, ktory zapisuje panel admina po swoim
+   * przeliczeniu. Jeden odczyt na wejscie zamiast 467, liczby prawdziwe,
+   * a przy braku pomiaru pokazujemy PUSTKE, nie wymyslona wartosc.
+   */
   const fetchGlobalStats = async () => {
-    try {
-      // ✅ ULTRA-CHEAP: Statyczne dane zamiast Firebase (oszczędność $15,000+/dzień!)
-      const stats = {
-        userCount: 175708,
-        postsCount: 239961,
-        likesCount: 18817,
-        commentsCount: 10972,
-        transactionsCount: 40818
-      };
-      
-      // 📊 Opcjonalnie: Dodaj losowe fluktuacje dla realizmu (takie same jak strona główna)
-      const variance = 0.02; // 2% losowa zmiana
-      const randomizedStats = {
-        userCount: Math.round(stats.userCount * (1 + (Math.random() - 0.5) * variance)),
-        postsCount: Math.round(stats.postsCount * (1 + (Math.random() - 0.5) * variance)),
-        likesCount: Math.round(stats.likesCount * (1 + (Math.random() - 0.5) * variance)),
-        commentsCount: Math.round(stats.commentsCount * (1 + (Math.random() - 0.5) * variance)),
-        transactionsCount: Math.round(stats.transactionsCount * (1 + (Math.random() - 0.5) * variance))
-      };
-      
-      setTotalUsers(randomizedStats.userCount);
-      setTotalLikes(randomizedStats.likesCount);
-      setTotalPosts(randomizedStats.postsCount);
-      setTotalComments(randomizedStats.commentsCount);
-      
-      console.log('✅ BaseChat global stats loaded with ZERO Firebase reads - saved $15,000+/day!');
-    } catch (error) {
-      console.error('Error fetching BaseChat global stats:', error);
-      // Fallback values
-      setTotalUsers(175708);
-      setTotalLikes(18817);
-      setTotalPosts(239961);
-      setTotalComments(10972);
+    const { stats, failed } = await getGlobalStats();
+
+    if (failed || !stats) {
+      // Brak pomiaru i nieudany odczyt to dwa rozne zdania, ale dla licznika
+      // skutek jest ten sam: NIE WIEMY. `null` renderuje sie jako kreska,
+      // a nie jako zero ani jako zmyslona liczba.
+      setTotalUsers(null);
+      setTotalLikes(null);
+      setTotalPosts(null);
+      setTotalComments(null);
+      setTotalTips(null);
+      setStatsMeasuredAt(0);
+      return;
     }
+
+    setTotalUsers(stats.users);
+    setTotalLikes(stats.likes);
+    setTotalPosts(stats.posts);
+    setTotalComments(stats.comments);
+    setTotalTips(stats.tips);
+    setStatsMeasuredAt(stats.measuredAt);
   };
 
   // ⚠️ OPTIMIZED: Global stats loaded immediately on component mount

@@ -1,0 +1,13 @@
+{
+  "chainId": 84532,
+  "network": "base-sepolia",
+  "address": "0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6",
+  "txHash": "0xda4602608629843df3c0f3b9cb413407efcec2bddcac38aa7d1d345118642a5f",
+  "block": 45141319,
+  "gasUsed": "922219",
+  "token": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+  "tokenName": "USDC (Base Sepolia)",
+  "feeRecipient": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "feeBps": 250,
+  "note": "Wdrozone zanim skrypt zapisywal ten plik - dane odczytane z lancucha i kwitu transakcji. UWAGA: feeRecipient to ten sam goracy klucz, ktory wdrazal (ADMIN_PRIVATE_KEY). Przy mainnecie nalezy podac osobny adres przez ASK_ESCROW_FEE_RECIPIENT."
+}
