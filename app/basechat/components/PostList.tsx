@@ -1714,12 +1714,12 @@ function PostList({
           ? 'border-soft-accent shadow-float'
           : 'border-soft-line shadow-card'
       }`}>
-        {/* Gradient overlay dla przypięć */}
+        {/* Gradient overlay dla przypięć.
+            Przezroczystosc przez `opacity`, nie przez modyfikator `/50` przy
+            kolorze - tokeny soft-* to `var(--...)`, a Tailwind 3 nie potrafi
+            doliczyc alfy do wartosci, ktorej nie umie sparsowac, i cicho
+            zwraca kolor w pelnej mocy. */}
         {post.isPinned && (
-          {/* Przezroczystosc przez `opacity`, nie przez modyfikator `/50` przy
-              kolorze - tokeny soft-* to `var(--...)`, a Tailwind 3 nie potrafi
-              doliczyc alfy do wartosci, ktorej nie umie sparsowac, i cicho
-              zwraca kolor w pelnej mocy. */}
           <div className="absolute inset-0 bg-gradient-to-r from-soft-accent-soft via-transparent to-soft-accent-soft rounded-card pointer-events-none opacity-40" />
         )}
         <div className="relative z-10">
@@ -2531,22 +2531,23 @@ function PostList({
         </div>
       )}
 
+      {/* rgba to --soft-ink (#2E2A44) przy 85%. Modyfikator alfy (bg-soft-ink/85)
+          nie dziala na tokenach zapisanych jako var() - patrz komentarz przy
+          nakladce przypiecia wyzej. */}
       {enlargedImage && (
-        <div 
-          // rgba to --soft-ink (#2E2A44) przy 85% - modyfikator alfy nie dziala
-          // na tokenach zapisanych jako var(), patrz komentarz przy przypieciu.
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(46,42,68,0.85)]"
           onClick={() => setEnlargedImage(null)}
         >
           <div className="relative max-w-4xl max-h-[90vh] overflow-auto">
             <img 
               src={enlargedImage} 
-              alt="Enlarged post image" 
-              className="object-contain max-h-[90vh]"
+              alt="Enlarged post image"
+              className="object-contain max-h-[90vh] rounded-card"
               onClick={(e) => e.stopPropagation()}
             />
             <button
-              className="absolute top-4 right-4 text-white bg-soft-ink/60 rounded-pill p-2 transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="absolute top-4 right-4 text-white bg-[rgba(46,42,68,0.7)] rounded-pill p-2 transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               onClick={() => setEnlargedImage(null)}
               aria-label="Close image"
             >

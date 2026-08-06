@@ -89,18 +89,18 @@ export default function HireAgentModal({
       <button
         type="button"
         aria-label="Close"
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-soft-ink/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-[380px] overflow-hidden rounded-2xl border border-white/10 bg-[#0A1024]/95 shadow-[0_24px_64px_-16px_rgba(0,0,0,0.75)] backdrop-blur-xl">
-        <div className="border-b border-white/[0.08] px-5 py-4">
-          <h2 className="font-['Coinbase_Display'] text-[15px] font-semibold text-[#EEF3FF]">
+      <div className="relative w-full max-w-[380px] overflow-hidden rounded-card border border-soft-line bg-soft-surface font-soft shadow-float">
+        <div className="border-b border-soft-line px-5 py-4">
+          <h2 className="font-soft-display text-[16px] font-semibold text-soft-ink">
             Hire this agent
           </h2>
-          <p className="mt-1 text-[12px] text-[#93A5C9]">
+          <p className="mt-1 text-[12px] text-soft-ink-muted">
             {agent.masterAgentId}
-            {score !== null && <span className="text-[#5C6F94]"> · trust {score}</span>}
+            {score !== null && <span className="text-soft-ink-soft"> · trust {score}</span>}
           </p>
         </div>
 
@@ -108,7 +108,7 @@ export default function HireAgentModal({
           <div>
             <label
               htmlFor="hire-brief"
-              className="mb-1.5 block text-[12px] font-medium text-[#C7D4EE]"
+              className="mb-1.5 block text-[12px] font-semibold text-soft-ink"
             >
               What do you need?
             </label>
@@ -118,22 +118,22 @@ export default function HireAgentModal({
               onChange={(e) => setBrief(e.target.value)}
               rows={3}
               placeholder="Describe the task in one or two sentences."
-              className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-[#EEF3FF] outline-none placeholder:text-[#5C6F94] focus:border-[#0052FF]"
+              className="w-full resize-none rounded-2xl border border-soft-line bg-soft-sunken px-3 py-2 text-[13px] text-soft-ink outline-none transition-[border-color] duration-[--dur-press] ease-out-strong placeholder:text-soft-ink-soft focus:border-soft-primary focus-visible:ring-2 focus-visible:ring-soft-primary"
             />
           </div>
 
           <div>
-            <span className="mb-1.5 block text-[12px] font-medium text-[#C7D4EE]">Budget</span>
+            <span className="mb-1.5 block text-[12px] font-semibold text-soft-ink">Budget</span>
             <div className="flex gap-2">
               {PRESET_AMOUNTS.map((preset) => (
                 <button
                   key={preset}
                   type="button"
                   onClick={() => setAmount(preset)}
-                  className={`flex-1 rounded-xl border px-3 py-2 text-[13px] tabular-nums transition-colors ${
+                  className={`flex-1 rounded-pill border px-3 py-2 font-soft-display text-[13px] font-semibold tabular-nums transition-[background-color,border-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                     amount === preset
-                      ? 'border-[#0052FF] bg-[#0052FF]/15 text-[#EEF3FF]'
-                      : 'border-white/10 text-[#93A5C9] hover:border-white/20'
+                      ? 'border-soft-primary bg-soft-sunken text-soft-primary-deep'
+                      : 'border-soft-line text-soft-ink-muted hover:border-soft-line-strong'
                   }`}
                 >
                   {preset} ETH
@@ -143,7 +143,7 @@ export default function HireAgentModal({
           </div>
 
           {!payTo && (
-            <p className="text-[12px] text-[#FF8A8A]">
+            <p className="text-[12px] text-red-700">
               This agent has no payout address, so it cannot be hired yet.
             </p>
           )}
@@ -155,7 +155,7 @@ export default function HireAgentModal({
               if (!payTo) return;
               sendTransaction({ to: payTo, value: parseEther(amount) });
             }}
-            className="w-full rounded-xl bg-[#0052FF] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#0052FF]/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-pill bg-soft-primary px-4 py-2.5 text-[13px] font-semibold text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
           >
             {!isConnected
               ? 'Connect a wallet first'
@@ -166,7 +166,7 @@ export default function HireAgentModal({
 
           {/* Uczciwie o tym, czym to jest: platnosc bezposrednia do agenta,
               bez escrow i bez gwarancji wykonania. Nie udajemy inaczej. */}
-          <p className="text-[11px] leading-relaxed text-[#5C6F94]">
+          <p className="text-[11px] leading-relaxed text-soft-ink-soft">
             Payment goes straight to the agent&apos;s address. There is no escrow and no
             automatic refund — hire agents whose reputation you can see.
           </p>

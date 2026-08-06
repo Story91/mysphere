@@ -116,7 +116,7 @@ export default function SubscribeButton({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className={`flex items-center space-x-1 hover:text-purple-500 active:text-purple-600 transition-colors touch-manipulation ${className}`}
+        className={`flex items-center space-x-1 rounded-pill transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary touch-manipulation ${className}`}
         title={isSupported ? 'You are supporting this creator' : 'Support this creator for a fixed period'}
         // Ponizej progu `md` w przycisku jest samo emoji, ktore czytnik ekranu
         // przeczytalby jako "fioletowe serce".
@@ -150,18 +150,20 @@ export default function SubscribeButton({
               type="button"
               tabIndex={-1}
               aria-hidden="true"
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-soft-ink/50 backdrop-blur-sm"
               onClick={closeModal}
             />
 
             <div
-              className="relative w-full max-w-sm mx-auto bg-gradient-to-br from-gray-900 via-black to-purple-900 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-500/30 p-5 max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-sm mx-auto bg-soft-surface rounded-card shadow-float border border-soft-line font-soft p-5 max-h-[90vh] overflow-y-auto"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-light text-white">
+                <h3 className="font-soft-display text-lg font-semibold text-soft-ink">
                   🤝{' '}
-                  <span className="bg-gradient-to-r from-purple-400 to-pink-400 text-transparent bg-clip-text">
+                  {/* Nazwa na plaskim kolorze, nie na gradiencie z bg-clip-text:
+                      ta technika potrafi wyrenderowac czarny prostokat na Androidzie. */}
+                  <span className="text-soft-primary-deep">
                     Support {displayName}
                   </span>
                 </h3>
@@ -169,7 +171,7 @@ export default function SubscribeButton({
                   type="button"
                   onClick={closeModal}
                   aria-label="Close"
-                  className="text-purple-300 hover:text-purple-100 transition-colors bg-white/10 rounded-full p-2 border border-purple-400/30"
+                  className="text-soft-ink-muted hover:text-soft-ink bg-soft-sunken rounded-pill p-2 border border-soft-line transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
                 >
                   <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -178,7 +180,7 @@ export default function SubscribeButton({
               </div>
 
               {activeUntil && activeUntil > Date.now() && (
-                <div className="mb-4 p-3 rounded-xl bg-purple-500/20 border border-purple-400/50 text-purple-100 text-sm">
+                <div className="mb-4 p-3 rounded-card bg-soft-sunken border border-soft-line text-soft-ink text-sm">
                   You already support this creator until <strong>{formatDate(activeUntil)}</strong>. Paying again adds
                   more days on top.
                 </div>
@@ -186,26 +188,26 @@ export default function SubscribeButton({
 
               {/* Poziom wsparcia */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-purple-200 mb-2">Level</label>
+                <label className="block font-soft-display text-sm font-semibold text-soft-ink mb-2">Level</label>
                 <div className="space-y-2">
                   {SUBSCRIPTION_TIERS.map(option => (
                     <button
                       key={option.id}
                       type="button"
                       onClick={() => setTier(option.id)}
-                      className={`w-full text-left px-3 py-2 rounded-xl border transition-all ${
+                      className={`w-full text-left px-3 py-2 rounded-card border transition-[background-color,border-color,box-shadow,transform] duration-[--dur-press] ease-out-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                         tier === option.id
-                          ? 'bg-purple-500/30 border-purple-400/60 shadow-[0_0_15px_rgba(168,85,247,0.35)]'
-                          : 'bg-white/10 border-white/20 hover:bg-white/20'
+                          ? 'bg-soft-sunken border-soft-primary shadow-chip'
+                          : 'bg-soft-surface border-soft-line hover:border-soft-line-strong'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-purple-100">{option.label}</span>
-                        <span className="text-sm text-purple-200">
+                        <span className="text-sm font-semibold text-soft-ink">{option.label}</span>
+                        <span className="font-soft-display text-sm tabular-nums text-soft-ink-muted">
                           ${option.pricePerPeriod} / {SUBSCRIPTION_PERIOD_DAYS} days
                         </span>
                       </div>
-                      <div className="text-xs text-purple-300/70">{option.description}</div>
+                      <div className="text-xs text-soft-ink-soft">{option.description}</div>
                     </button>
                   ))}
                 </div>
@@ -213,17 +215,17 @@ export default function SubscribeButton({
 
               {/* Dlugosc wsparcia */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-purple-200 mb-2">How long</label>
+                <label className="block font-soft-display text-sm font-semibold text-soft-ink mb-2">How long</label>
                 <div className="flex gap-2">
                   {SUBSCRIPTION_PERIOD_CHOICES.map(choice => (
                     <button
                       key={choice}
                       type="button"
                       onClick={() => setPeriods(choice)}
-                      className={`flex-1 px-2 py-2 text-sm rounded-xl border transition-all text-purple-100 ${
+                      className={`flex-1 px-2 py-2 font-soft-display text-sm font-semibold tabular-nums rounded-pill border transition-[background-color,border-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                         periods === choice
-                          ? 'bg-purple-500/30 border-purple-400/60'
-                          : 'bg-white/10 border-purple-400/30 hover:bg-purple-500/20'
+                          ? 'bg-soft-sunken border-soft-primary text-soft-primary-deep'
+                          : 'bg-soft-surface border-soft-line text-soft-ink-muted hover:border-soft-line-strong'
                       }`}
                     >
                       {choice * SUBSCRIPTION_PERIOD_DAYS} days
@@ -233,7 +235,7 @@ export default function SubscribeButton({
               </div>
 
               {/* JAWNE postawienie sprawy: to nie jest odnawialna subskrypcja. */}
-              <div className="mb-4 p-3 rounded-xl bg-white/5 border border-white/15 text-xs text-purple-200/90 space-y-1">
+              <div className="mb-4 p-3 rounded-card bg-soft-sunken border border-soft-line text-xs text-soft-ink-muted space-y-1">
                 <div>
                   You pay <strong>{amount} USDC once</strong> and support {displayName} for <strong>{days} days</strong>
                   .
@@ -245,13 +247,13 @@ export default function SubscribeButton({
               </div>
 
               {phase === 'error' && error && (
-                <div role="alert" className="mb-3 p-3 rounded-xl bg-red-500/15 border border-red-400/50 text-red-200 text-sm">
+                <div role="alert" className="mb-3 p-3 rounded-card bg-red-500/10 border border-red-400/50 text-red-700 text-sm">
                   {error}
                 </div>
               )}
 
               {phase === 'success' && (
-                <div role="status" className="mb-3 p-3 rounded-xl bg-green-500/20 border border-green-400/50 text-green-200 text-sm text-center">
+                <div role="status" className="mb-3 p-3 rounded-card bg-soft-accent-soft border border-soft-accent/60 text-soft-accent-deep text-sm text-center">
                   ✅ Support recorded
                 </div>
               )}
@@ -260,7 +262,7 @@ export default function SubscribeButton({
                 <button
                   type="button"
                   onClick={switchToBase}
-                  className="w-full px-6 py-3 text-base font-medium rounded-xl bg-orange-500 hover:bg-orange-600 text-white transition-colors"
+                  className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-accent-deep text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:brightness-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
                 >
                   Switch to Base
                 </button>
@@ -269,7 +271,7 @@ export default function SubscribeButton({
                   type="button"
                   onClick={() => pay({ to: creatorAddress, amount, token: 'USDC' })}
                   disabled={isBusy}
-                  className="w-full px-6 py-3 text-base font-medium rounded-xl bg-[#0052FF] text-white transition-colors hover:bg-[#0052FF]/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-primary text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
                 >
                   {phase === 'signing'
                     ? 'Confirm in wallet...'
@@ -286,7 +288,7 @@ export default function SubscribeButton({
                   href={getExplorerTxLink('base', txHash)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-3 block text-center text-xs text-blue-300 hover:underline"
+                  className="mt-3 block rounded-pill text-center text-xs font-semibold text-soft-primary-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
                   View transaction
                 </a>

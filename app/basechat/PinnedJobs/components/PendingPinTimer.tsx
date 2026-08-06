@@ -60,15 +60,15 @@ export default function PendingPinTimer({
   };
 
   const getTimerColor = () => {
-    if (isExpired) return 'text-red-600 dark:text-red-400';
-    if (timeLeft < 2 * 60 * 1000) return 'text-orange-600 dark:text-orange-400'; // < 2 minutes
-    return 'text-blue-600 dark:text-blue-400';
+    if (isExpired) return 'text-red-700';
+    if (timeLeft < 2 * 60 * 1000) return 'text-soft-accent-deep'; // < 2 minutes
+    return 'text-soft-primary-deep';
   };
 
   const getProgressColor = () => {
-    if (isExpired) return 'bg-red-500';
-    if (timeLeft < 2 * 60 * 1000) return 'bg-orange-500'; // < 2 minutes
-    return 'bg-blue-500';
+    if (isExpired) return 'bg-red-600';
+    if (timeLeft < 2 * 60 * 1000) return 'bg-soft-accent'; // < 2 minutes
+    return 'bg-soft-primary';
   };
 
   const getProgress = () => {
@@ -78,12 +78,12 @@ export default function PendingPinTimer({
   };
 
   return (
-    <div className={`flex items-center justify-between p-3 bg-gradient-to-r from-blue-50/80 to-purple-50/80 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50 ${className}`}>
+    <div className={`flex items-center justify-between p-3 bg-soft-surface rounded-card border-2 border-soft-line-strong font-soft ${className}`}>
       <div className="flex items-center space-x-3 flex-1">
         {/* Animated pending icon */}
         <div className="relative">
-          <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-pulse" />
-          <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
+          <Clock className="w-4 h-4 text-soft-primary-deep animate-pulse" />
+          <div className="absolute -top-1 -right-1 w-2 h-2 bg-soft-primary rounded-full animate-ping"></div>
         </div>
         
         <div className="flex-1">
@@ -95,14 +95,14 @@ export default function PendingPinTimer({
           </div>
           
           {/* Progress bar */}
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-            <div 
-              className={`h-1.5 rounded-full transition-all duration-1000 ${getProgressColor()}`}
+          <div className="w-full bg-soft-sunken rounded-pill h-1.5">
+            <div
+              className={`h-1.5 rounded-pill transition-[width] duration-1000 ease-out-strong ${getProgressColor()}`}
               style={{ width: `${getProgress()}%` }}
             ></div>
           </div>
-          
-          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+
+          <div className="text-xs text-soft-ink-muted mt-1">
             Purchasing: {getDurationLabel(duration)} pin
           </div>
         </div>
@@ -114,14 +114,14 @@ export default function PendingPinTimer({
           href={`${PAID_PIN_CONTRACT_CONFIG.blockExplorer}/tx/${txHash}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center space-x-1 px-2 py-1 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded text-xs transition-all transform hover:scale-105"
+          className="flex items-center space-x-1 px-2.5 py-1 bg-soft-sunken hover:bg-soft-line text-soft-ink border border-soft-line rounded-pill text-xs font-semibold transition-[background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
         >
           <ExternalLink className="w-3 h-3" />
           <span>TX</span>
         </a>
         
         {/* Pin type indicator */}
-        <div className="px-1.5 py-0.5 bg-gradient-to-r from-blue-400 to-purple-500 text-white text-xs font-bold rounded-full">
+        <div className="px-2 py-0.5 bg-soft-sunken text-soft-primary-deep font-soft-display text-xs font-bold rounded-pill">
           PENDING
         </div>
       </div>

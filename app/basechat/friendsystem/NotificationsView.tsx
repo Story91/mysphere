@@ -67,24 +67,21 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const getNotificationColor = (type: NotificationType) => {
     switch (type) {
       case 'LIKE':
-        return 'text-red-500';
+        return 'text-red-600';
       case 'COMMENT':
-        return 'text-blue-500';
       case 'FOLLOW':
-        return 'text-purple-500';
+        return 'text-soft-primary-deep';
       case 'FRIEND_REQUEST':
       case 'FRIEND_REQUEST_ACCEPTED':
-        return 'text-green-500';
+        return 'text-soft-primary-deep';
       case 'TIP_RECEIVED':
-        return 'text-yellow-500';
       case 'POST_PINNED':
-        return 'text-indigo-500';
       case 'ACHIEVEMENT':
-        return 'text-orange-500';
+        return 'text-soft-accent-deep';
       case 'SYSTEM':
-        return 'text-gray-500';
+        return 'text-soft-ink-soft';
       default:
-        return 'text-gray-500';
+        return 'text-soft-ink-soft';
     }
   };
 

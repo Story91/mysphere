@@ -111,23 +111,23 @@ export default function ExtendPinModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full max-h-95vh overflow-y-auto">
+    <div className="fixed inset-0 bg-soft-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-soft-surface rounded-card shadow-float max-w-md w-full max-h-95vh overflow-y-auto font-soft">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-soft-line">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-soft-primary rounded-pill flex items-center justify-center">
               <Plus className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Extend Pin</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Add more time to your pin</p>
+              <h2 className="font-soft-display text-xl font-bold text-soft-ink">Extend Pin</h2>
+              <p className="text-sm text-soft-ink-muted">Add more time to your pin</p>
             </div>
           </div>
           <button
             onClick={onClose}
             aria-label="Close extend pin dialog"
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            className="rounded-pill p-1 text-soft-ink-soft transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <X className="w-6 h-6" />
           </button>
@@ -135,15 +135,15 @@ export default function ExtendPinModal({
 
         {/* Current Status */}
         {currentExpiresAt && (
-          <div className="p-6 bg-blue-50 dark:bg-blue-900/20 border-b border-gray-200 dark:border-gray-700">
+          <div className="p-6 bg-soft-sunken border-b border-soft-line">
             <div className="flex items-center space-x-3 mb-2">
-              <Clock className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-blue-900 dark:text-blue-300">Current Pin Status</h3>
+              <Clock className="w-5 h-5 text-soft-primary-deep" />
+              <h3 className="font-soft-display font-semibold text-soft-ink">Current Pin Status</h3>
             </div>
-            <p className="text-sm text-blue-700 dark:text-blue-400">
+            <p className="text-sm text-soft-ink-muted">
               {formatTimeRemaining()}
             </p>
-            <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">
+            <p className="text-xs text-soft-ink-soft mt-1">
               Expires: {new Date(currentExpiresAt).toLocaleString()}
             </p>
           </div>
@@ -151,7 +151,7 @@ export default function ExtendPinModal({
 
         {/* Duration Selection */}
         <div className="p-6">
-          <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
+          <h3 className="font-soft-display font-semibold text-soft-ink mb-4">
             Select Additional Time
           </h3>
           
@@ -164,27 +164,27 @@ export default function ExtendPinModal({
                  <button
                    key={option.duration}
                    onClick={() => setSelectedDuration(option.duration)}
-                   className={`relative p-4 rounded-lg border-2 transition-all ${
+                   className={`relative p-4 rounded-card border-2 transition-[background-color,border-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                      isSelected
-                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                       : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                       ? 'border-soft-primary bg-soft-sunken'
+                       : 'border-soft-line hover:border-soft-line-strong'
                    }`}
                  >
                    {option.popular && (
-                     <div className="absolute -top-2 -right-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+                     <div className="absolute -top-2 -right-2 bg-soft-accent text-soft-ink font-soft-display text-xs px-2 py-1 rounded-pill font-bold">
                        POPULAR
                      </div>
                    )}
                    
                    <div className="text-center">
                      <div className="text-2xl mb-2">{option.icon}</div>
-                     <div className="font-semibold text-gray-900 dark:text-white">
+                     <div className="font-soft-display font-semibold text-soft-ink">
                        {option.label}
                      </div>
-                     <div className="text-sm text-gray-600 dark:text-gray-400">
+                     <div className="font-soft-display text-sm tabular-nums text-soft-ink-muted">
                        {price.ethAmount} ETH
                      </div>
-                     <div className="text-xs text-gray-500 dark:text-gray-500">
+                     <div className="font-soft-display text-xs tabular-nums text-soft-ink-soft">
                        ${price.usdAmount}
                      </div>
                    </div>
@@ -195,11 +195,11 @@ export default function ExtendPinModal({
 
           {/* New Expiration Preview */}
           {currentExpiresAt && (
-            <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <h4 className="font-semibold text-green-900 dark:text-green-300 mb-2">
+            <div className="mt-6 p-4 bg-soft-accent-soft rounded-card">
+              <h4 className="font-soft-display font-semibold text-soft-accent-deep mb-2">
                 New Expiration Time
               </h4>
-              <p className="text-sm text-green-700 dark:text-green-400">
+              <p className="text-sm text-soft-accent-deep">
                 {calculateNewExpirationTime()}
               </p>
             </div>
@@ -207,18 +207,18 @@ export default function ExtendPinModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="p-6 border-t border-soft-line">
           <div className="flex flex-col space-y-4">
             {/* Payment Summary */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="font-medium text-gray-900 dark:text-white">
+            <div className="flex items-center justify-between p-3 bg-soft-sunken rounded-card">
+              <span className="font-semibold text-soft-ink">
                 Extension Cost:
               </span>
               <div className="text-right">
-                <div className="font-bold text-lg text-gray-900 dark:text-white">
+                <div className="font-soft-display font-bold text-lg tabular-nums text-soft-ink">
                   {selectedPrice.ethAmount} ETH
                 </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="font-soft-display text-sm tabular-nums text-soft-ink-muted">
                   ≈ ${selectedPrice.usdAmount}
                 </div>
               </div>
@@ -228,7 +228,7 @@ export default function ExtendPinModal({
             <div className="flex space-x-3">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex-1 px-4 py-3 font-semibold border border-soft-line text-soft-ink-muted rounded-pill transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
               >
                 Cancel
               </button>
@@ -236,10 +236,10 @@ export default function ExtendPinModal({
               <button
                 onClick={handleExtendPin}
                 disabled={isExtending || !address}
-                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+                className={`flex-1 px-4 py-3 rounded-pill font-semibold transition-[background-color,box-shadow,transform] duration-[--dur-press] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                   isExtending || !address
-                    ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                    ? 'bg-soft-sunken text-soft-ink-soft cursor-not-allowed'
+                    : 'bg-soft-primary hover:bg-soft-primary-deep text-white shadow-chip hover:shadow-float active:scale-[0.97]'
                 }`}
               >
                 {isExtending ? (

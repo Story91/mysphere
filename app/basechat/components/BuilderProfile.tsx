@@ -1053,23 +1053,23 @@ export default function BuilderProfile({
       
       {/* User Info Section */}
       <div className="p-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 mb-6 p-8 lg:p-12 relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-slate-50/80 to-blue-50/60 border border-white/60 backdrop-blur-2xl shadow-2xl">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 mb-6 p-8 lg:p-12 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
           {/* Premium białe i niebieskie efekty świetlne */}
-          <div className="absolute -top-8 -right-8 w-40 h-40 bg-gradient-to-br from-blue-200/30 to-indigo-300/20 rounded-full filter blur-3xl animate-pulse"></div>
-          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-gradient-to-tr from-white/40 to-blue-100/30 rounded-full filter blur-2xl"></div>
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent"></div>
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent"></div>
-          
+          <div className="absolute -top-8 -right-8 w-40 h-40 bg-soft-primary/10 rounded-full filter blur-3xl"></div>
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-soft-accent-soft/50 rounded-full filter blur-2xl"></div>
+          <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-soft-line"></div>
+
           {/* Efekt premium szkła z białymi refleksami */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-blue-50/30 backdrop-blur-xl"></div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent"></div>
+          <div className="absolute inset-0 bg-transparent"></div>
+          <div className="absolute inset-0 bg-transparent"></div>
           
           <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 w-full">
           <div className="flex flex-col items-center lg:items-start">
             <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden flex-shrink-0 relative group">
               {/* Premium ramka z białym gradientem */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white via-blue-100 to-blue-200 p-1 shadow-2xl">
-                <div className="w-full h-full rounded-full overflow-hidden bg-white">
+              <div className="absolute inset-0 rounded-full bg-soft-sunken p-1 shadow-card">
+                <div className="w-full h-full rounded-full overflow-hidden bg-soft-surface">
                   {profile.avatar ? (
                     <img 
                       src={profile.avatar} 
@@ -1083,37 +1083,37 @@ export default function BuilderProfile({
               </div>
               
               {/* Premium efekty świetlne */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 via-transparent to-blue-300/20 opacity-70"></div>
-              <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-blue-200/20 to-transparent filter blur-lg opacity-60 group-hover:opacity-80 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 rounded-full bg-transparent"></div>
+              <div className="absolute -inset-2 rounded-full bg-soft-primary/10 filter blur-lg opacity-60 group-hover:opacity-80 transition-opacity duration-[--dur-dropdown] ease-out-strong"></div>
             </div>
             
             {/* Nazwa użytkownika pod avatarem */}
-            <div className={`mt-3 text-lg lg:text-xl font-semibold text-center lg:text-left ${
-              isVitalik 
-                ? "bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-transparent bg-clip-text"
-                : ""
+            <div className={`mt-3 text-lg lg:text-xl font-soft-display font-bold text-center lg:text-left ${
+              isVitalik
+                ? "text-soft-accent-deep"
+                : "text-soft-ink"
             }`}>
               {profile.name.endsWith('.base.eth') ? (
-                <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-transparent bg-clip-text font-medium">{profile.name}</span>
+                <span className="text-soft-primary-deep font-semibold">{profile.name}</span>
               ) : profile.name.endsWith('.sphere') ? (
                 <>
-                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.sphere', '')}</span>
-                  <span className="text-blue-500">.sphere</span>
+                  <span className="text-soft-ink">{profile.name.replace('.sphere', '')}</span>
+                  <span className="text-soft-primary-deep">.sphere</span>
                 </>
               ) : profile.name.endsWith('.camper') ? (
                 <>
-                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.camper', '')}</span>
-                  <span className="text-orange-500">.camper🏕️</span>
+                  <span className="text-soft-ink">{profile.name.replace('.camper', '')}</span>
+                  <span className="text-soft-accent-deep">.camper🏕️</span>
                 </>
               ) : profile.name.endsWith('.celo') ? (
                 <>
-                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.celo', '')}</span>
-                  <span className="!text-yellow-500">.celo</span>
+                  <span className="text-soft-ink">{profile.name.replace('.celo', '')}</span>
+                  <span className="!text-soft-accent-deep">.celo</span>
                 </>
               ) : profile.name.endsWith('.world') ? (
                 <>
-                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.world', '')}</span>
-                  <span className="text-green-500">.world</span>
+                  <span className="text-soft-ink">{profile.name.replace('.world', '')}</span>
+                  <span className="text-soft-info">.world</span>
                 </>
               ) : (
                 <>
@@ -1134,7 +1134,7 @@ export default function BuilderProfile({
             {/* Badge dla Vitalika */}
             {isVitalik && (
               <div className="mt-1 flex justify-center lg:justify-start">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-yellow-500 text-white text-xs font-medium">
+                <span className="inline-flex items-center px-3 py-0.5 rounded-pill bg-soft-accent-deep text-white text-xs font-semibold shadow-chip">
                   Ethereum Founder
                 </span>
               </div>
@@ -1144,10 +1144,11 @@ export default function BuilderProfile({
             <div className="mt-3 lg:mt-4 w-full lg:w-auto flex flex-col items-center lg:items-start space-y-3">
               <button
                 onClick={copyAddressToClipboard}
-                className="flex items-center text-xs text-slate-600 hover:text-blue-600 bg-gradient-to-r from-white to-blue-50 hover:from-blue-50 hover:to-blue-100 px-3 py-1.5 rounded-lg border border-blue-200/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 w-fit"
+                aria-label="Copy wallet address"
+                className="flex items-center text-xs text-soft-ink-muted hover:text-soft-primary-deep bg-soft-sunken hover:bg-soft-line px-3 py-1.5 rounded-pill border border-soft-line shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary w-fit"
               >
-                <span className="mr-2 font-mono text-slate-700">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <span className="mr-2 font-mono tabular-nums text-soft-ink">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </button>
@@ -1160,10 +1161,10 @@ export default function BuilderProfile({
                   href={`/u/${profile.address}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center text-xs text-blue-700 hover:text-blue-800 bg-gradient-to-r from-blue-50 to-white hover:from-blue-100 hover:to-blue-50 px-3 py-1.5 rounded-lg border border-blue-200/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 w-fit"
+                  className="flex items-center text-xs text-soft-primary-deep hover:bg-soft-line bg-soft-sunken px-3 py-1.5 rounded-pill border border-soft-line shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary w-fit"
                 >
-                  <span className="mr-1.5 font-medium">Public profile</span>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <span className="mr-1.5 font-semibold">Public profile</span>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                 </a>
@@ -1171,9 +1172,9 @@ export default function BuilderProfile({
                   onClick={copyPublicProfileLink}
                   title="Copy profile link"
                   aria-label="Copy profile link"
-                  className="flex items-center justify-center h-[30px] w-[30px] text-slate-600 hover:text-blue-600 bg-white hover:bg-blue-50 rounded-lg border border-blue-200/50 shadow-sm hover:shadow-md transition-all duration-300"
+                  className="flex items-center justify-center h-[30px] w-[30px] text-soft-ink-muted hover:text-soft-primary-deep bg-soft-surface hover:bg-soft-sunken rounded-pill border border-soft-line shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
                   </svg>
                 </button>
@@ -1200,9 +1201,9 @@ export default function BuilderProfile({
                 <div className="flex flex-col space-y-4 lg:space-y-5">
                   {/* Creator Earnings - Rozciągnięty na całą szerokość */}
                   {(tipStats && tipStats.tipCount > 0) ? (
-                    <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-6 py-4 shadow-md backdrop-blur-sm hover:scale-[1.02] hover:shadow-lg transition-all duration-300 relative w-full">
+                    <div className="bg-soft-surface border border-soft-line rounded-card px-6 py-4 shadow-card transition-shadow duration-[--dur-press] ease-out-strong relative w-full">
                       {/* Golden glow effect */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-100/30 to-amber-200/30 rounded-xl opacity-50"></div>
+                      <div className="absolute inset-0 bg-soft-accent-soft/30 rounded-card opacity-50"></div>
                       
                       <div className="relative flex items-center justify-between">
                         {/* Left side - Title and icon */}
@@ -1212,7 +1213,7 @@ export default function BuilderProfile({
                             alt="MySphere" 
                             className="w-4 h-4 object-contain"
                           />
-                          <span className="text-sm font-bold text-amber-700">Creator Earnings</span>
+                          <span className="text-xs font-semibold uppercase tracking-wider text-soft-ink-faint">Creator Earnings</span>
                         </div>
                         
                         {/* Right side - ETH, USDC and CAMP values with proper icons */}
@@ -1223,7 +1224,7 @@ export default function BuilderProfile({
                                 <img src="/brand-kit/base/logo/in-product/Base_Network_Logo.svg" alt="Base" className="w-4 h-4 z-10" />
                                 <img src="/icons/eth.svg" alt="ETH" className="w-4 h-4" />
                               </div>
-                              <span className="text-sm font-semibold text-amber-700">
+                              <span className="text-sm font-semibold text-soft-accent-deep font-soft-display tabular-nums">
                                 {tipStats.ethReceived.toFixed(4)}
                               </span>
                             </div>
@@ -1231,7 +1232,7 @@ export default function BuilderProfile({
                           {tipStats.usdcReceived > 0 && (
                             <div className="flex items-center space-x-1.5">
                               <img src="/icons/usdc.svg" alt="USDC" className="w-4 h-4" />
-                              <span className="text-sm font-semibold text-amber-700">
+                              <span className="text-sm font-semibold text-soft-accent-deep font-soft-display tabular-nums">
                                 {tipStats.usdcReceived.toFixed(2)}
                               </span>
                             </div>
@@ -1239,7 +1240,7 @@ export default function BuilderProfile({
                           {/* CAMP token support - ODBLOKOWANY */}
                           <div className="flex items-center space-x-1.5">
                             <img src="/Camp.png" alt="CAMP" className="w-4 h-4" />
-                            <span className="text-sm font-semibold text-amber-700">
+                            <span className="text-sm font-semibold text-soft-accent-deep font-soft-display tabular-nums">
                               0.00
                             </span>
                           </div>
@@ -1247,9 +1248,9 @@ export default function BuilderProfile({
                       </div>
                     </div>
                   ) : loadingTipStats ? (
-                    <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-6 py-4 shadow-md backdrop-blur-sm w-full">
+                    <div className="bg-soft-surface border border-soft-line rounded-card px-6 py-4 shadow-card w-full">
                       <div className="flex items-center justify-center space-x-2">
-                        <div className="animate-pulse bg-amber-200 rounded px-3 py-2 text-sm">
+                        <div className="animate-pulse bg-soft-sunken text-soft-ink-faint rounded-pill px-3 py-2 text-sm">
                           Loading earnings...
                         </div>
                       </div>
@@ -1265,33 +1266,33 @@ export default function BuilderProfile({
                   {/* Separator gradientowy przed social stats */}
                   {(followStats || friendsStats) && (
                     <>
-                      <div className="w-full h-px bg-gradient-to-r from-transparent via-purple-300/60 to-transparent my-3"></div>
+                      <div className="w-full h-px bg-soft-line my-3"></div>
                       <div className="flex items-center flex-wrap gap-3 lg:gap-4 text-xs">
                         {followStats && (
                         <>
-                          <div className="flex items-center space-x-1 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
-                            <svg className="w-3 h-3 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="flex items-center space-x-1 bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                            <svg className="w-3 h-3 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <span className="text-purple-800 font-semibold">{followStats.followers}</span>
-                            <span className="text-purple-700 text-xs font-medium">followers</span>
+                            <span className="text-soft-ink font-soft-display font-bold tabular-nums">{followStats.followers}</span>
+                            <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">followers</span>
                           </div>
-                          <div className="flex items-center space-x-1 bg-gradient-to-r from-blue-50 to-cyan-100 border border-cyan-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
-                            <svg className="w-3 h-3 text-cyan-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="flex items-center space-x-1 bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                            <svg className="w-3 h-3 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <span className="text-cyan-800 font-semibold">{followStats.following}</span>
-                            <span className="text-cyan-700 text-xs font-medium">following</span>
+                            <span className="text-soft-ink font-soft-display font-bold tabular-nums">{followStats.following}</span>
+                            <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">following</span>
                           </div>
                         </>
                         )}
                         {friendsStats && (
-                          <div className="flex items-center space-x-1 bg-gradient-to-r from-green-50 to-emerald-100 border border-green-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
-                            <svg className="w-3 h-3 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="flex items-center space-x-1 bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                            <svg className="w-3 h-3 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                             </svg>
-                            <span className="text-green-800 font-semibold">{friendsStats.totalFriends}</span>
-                            <span className="text-green-700 text-xs font-medium">friends</span>
+                            <span className="text-soft-ink font-soft-display font-bold tabular-nums">{friendsStats.totalFriends}</span>
+                            <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">friends</span>
                           </div>
                         )}
                       </div>
@@ -1301,12 +1302,13 @@ export default function BuilderProfile({
                   {/* Referral System Button - only for own profile */}
                   {currentUserAddress === userAddress && (
                     <>
-                      <div className="w-full h-px bg-gradient-to-r from-transparent via-green-300/60 to-transparent my-3"></div>
+                      <div className="w-full h-px bg-soft-line my-3"></div>
                       <button
                         onClick={() => setShowReferralDashboard(!showReferralDashboard)}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                        aria-expanded={showReferralDashboard}
+                        className="flex items-center space-x-2 px-4 py-2 rounded-pill text-sm font-semibold bg-soft-primary text-white hover:bg-soft-primary-deep transition-colors duration-[--dur-press] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M4.5 12a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z" />
                         </svg>
                         <span>Referral System</span>
@@ -2405,20 +2407,20 @@ export default function BuilderProfile({
         )}
         
         {/* BaseChatPoints - Zunifikowana sekcja z kafelkami */}
-        <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-2xl p-6 relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
-          
+        <div className="mb-6 bg-soft-sunken rounded-card p-6 relative overflow-hidden shadow-card">
+          <div className="absolute top-0 left-0 w-full h-1 bg-soft-primary"></div>
+
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-light text-gray-900 dark:text-gray-100 flex items-center">
+            <h2 className="text-2xl font-soft-display font-bold text-soft-ink flex items-center">
               Sphere Points
-              <div className="ml-2 text-3xl animate-bounce">⚡</div>
+              <div className="ml-2 text-3xl">⚡</div>
             </h2>
-            
+
             {/* Total Score - zawsze widoczny */}
-            <div className="flex items-center bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 p-0.5 rounded-xl">
-              <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-xl flex items-center">
-                <span className="text-gray-600 dark:text-gray-400 text-sm mr-2">Total Score:</span>
-                <div className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text animate-pulse">
+            <div className="flex items-center bg-soft-primary p-0.5 rounded-card">
+              <div className="bg-soft-surface px-4 py-2 rounded-card flex items-center">
+                <span className="text-soft-ink-faint text-xs uppercase tracking-wider font-semibold mr-2">Total Score:</span>
+                <div className="text-2xl font-soft-display font-bold tabular-nums text-soft-primary-deep">
                   {profile.baseChatPoints?.totalPoints || Math.round(((profile.postCount || 0) * 5 + (profile.likesReceived || 0)) * 1.25)}
                 </div>
                 <div className="ml-2 text-lg">✨</div>
@@ -2428,43 +2430,43 @@ export default function BuilderProfile({
 
           {/* Lista punktów */}
           <div className="space-y-2 mb-6">
-            <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-              <span className="text-gray-600 dark:text-gray-400 flex items-center">
+            <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+              <span className="text-soft-ink-muted flex items-center">
                 <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                 Posts ({profile.postCount || 0})
               </span>
-              <span className="text-blue-500 font-semibold">
+              <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                 {profile.baseChatPoints?.postPoints || (profile.postCount || 0) * 5} points
               </span>
             </div>
             
-            <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-              <span className="text-gray-600 dark:text-gray-400 flex items-center">
+            <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+              <span className="text-soft-ink-muted flex items-center">
                 <svg className="w-5 h-5 mr-2 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 Likes Received ({profile.likesReceived || 0})
               </span>
-              <span className="text-pink-500 font-semibold">
+              <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                 {profile.baseChatPoints?.likePoints || profile.likesReceived || 0} points
               </span>
             </div>
           </div>
 
           {/* Szczegóły punktów - zawsze widoczne */}
-          <div className="mt-4 space-y-3 border-t border-gray-200 dark:border-gray-600 pt-4">
-              <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                <span className="text-gray-600 dark:text-gray-400 flex items-center">
+          <div className="mt-4 space-y-3 border-t border-soft-line pt-4">
+              <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                <span className="text-soft-ink-muted flex items-center">
                   <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   Activity Bonus
                 </span>
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-400">+25%</span>
-                  <span className="text-purple-500 font-semibold">
+                  <span className="text-xs text-soft-ink-faint tabular-nums">+25%</span>
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     {profile.baseChatPoints?.activityBonus || Math.round(((profile.postCount || 0) * 5 + (profile.likesReceived || 0)) * 0.25)}
                   </span>
                 </div>
@@ -2472,60 +2474,60 @@ export default function BuilderProfile({
 
               {/* Domain Bonuses */}
               {(profile.baseChatPoints?.baseNameBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🌐</span>
                     Base Name Bonus
                   </span>
-                  <span className="text-blue-500 font-semibold">
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.baseNameBonus || 0}
                   </span>
                   </div>
               )}
 
               {(profile.baseChatPoints?.sphereBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🌐</span>
                     .sphere Bonus
                   </span>
-                  <span className="text-blue-500 font-semibold">
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.sphereBonus || 0}
                   </span>
                   </div>
               )}
 
               {(profile.baseChatPoints?.camperBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🏕️</span>
                     .camper Bonus
                   </span>
-                  <span className="text-orange-500 font-semibold">
+                  <span className="text-soft-accent-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.camperBonus || 0}
                   </span>
                 </div>
               )}
 
               {(profile.baseChatPoints?.celoBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">💛</span>
                     .celo Bonus
                   </span>
-                  <span className="text-yellow-500 font-semibold">
+                  <span className="text-soft-accent-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.celoBonus || 0}
                   </span>
               </div>
               )}
 
               {(profile.baseChatPoints?.worldBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🌍</span>
                     .world Bonus
                   </span>
-                  <span className="text-green-500 font-semibold">
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.worldBonus || 0}
                   </span>
             </div>
@@ -2533,12 +2535,12 @@ export default function BuilderProfile({
 
               {/* Referral Points */}
               {(profile.baseChatPoints?.referralPoints || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">👥</span>
                     Referral Points
                   </span>
-                  <span className="text-purple-500 font-semibold">
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.referralPoints || 0}
                   </span>
                 </div>
