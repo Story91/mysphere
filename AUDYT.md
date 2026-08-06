@@ -283,16 +283,52 @@ Link czytający zostaje na **wyszukiwarce eksploratora**, bo starych rekordów
 to nie naprawia: one nadal trzymają hash userOp, a z samych 32 bajtów nie da
 się rozpoznać rodzaju. Wyszukiwarka przyjmuje jedno i drugie.
 
-> **Do decyzji właściciela — dwie rzeczy, których nie zrobię sam:**
->
-> 1. **Przepisanie 17 istniejących rekordów** na prawdziwe hashe. Resolver
->    działa i sprawdziłem go na wszystkich siedemnastu, więc migracja jest
->    gotowa do uruchomienia. To zapis do produkcyjnej bazy — czekam na wyraźną
->    zgodę. Dziś ratuje je wyszukiwarka eksploratora, ale to obejście.
-> 2. **Test end-to-end nowej ścieżki zapisu** wymaga wysłania prawdziwej
->    płatności przez Base Pay. Logika jest sprawdzona na produkcyjnych danych,
->    ale sam przelew przez nią nie przeszedł — a funduszy nie wydaję bez zgody
->    na konkretną operację.
+### Migracja WYKONANA — 6 sierpnia, za zgodą właściciela
+
+`scripts/migrate-userop-hashes.mjs --apply` przepisał **17 rekordów**
+z hasha userOp na hash prawdziwej transakcji. Wynik: 17 zapisanych,
+**0 błędów, 0 nierozwiązanych**, 171 pominiętych (pusty hash albo inna sieć).
+
+Ponowne uruchomienie podglądu pokazuje **17 „już poprawne, 0 do naprawy"** —
+migracja jest idempotentna, więc da się ją bezpiecznie puścić drugi raz.
+
+Poprawność jest z konstrukcji, nie z założenia: skrypt weryfikował każdy nowy
+hash na łańcuchu **przed** zapisem (zasada 4), a starą wartość zachował
+w `txHashLegacyUserOp`, więc zmiana pozostaje odwracalna.
+
+Link czytający zostaje na wyszukiwarce eksploratora mimo czystych danych.
+Powód: gdyby bundler milczał przy zapisie nowego tipa, rekord znów dostanie
+hash userOp — a twarde `/tx/` złamałoby się wtedy po cichu, dokładnie tak jak
+wcześniej. Jeden przeskok więcej jest tańszy niż powrót tej samej wady.
+
+> **Zostaje jedno, czego nie zrobię sam:** test end-to-end nowej ścieżki zapisu
+> wymaga wysłania prawdziwej płatności przez Base Pay. Logika jest sprawdzona
+> na produkcyjnych danych (17/17), ale sam przelew przez nią nie przeszedł —
+> a funduszy nie wydaję bez zgody na konkretną operację.
+
+### Admin przeniesiony na `0xD4885A…030e` — 6 sierpnia, decyzja właściciela
+
+Bramą uprawnień (kasowanie cudzych postów i komentarzy, przypinanie, panel
+`/admin`, moderacja, ręczny cleanup przypięć) był nadal **stary** portfel
+`0xF1fa2002…1Dfd`, mimo że admin produktu zmienił się przy okazji wdrożenia
+kontraktów. Adres siedział w **trzech niezależnych kopiach** — `firebase.ts`,
+`friends/config.ts` (z komentarzem „kopiowane z głównego") i wewnątrz funkcji
+w `/api/cleanup-expired-pins`. Zmiana w jednym miejscu zostawiłaby dwa
+pozostałe przy starym właścicielu, w tym trasę API, gdzie nikt by tego nie
+zauważył. Dziś jedno źródło, dwa pozostałe importują.
+
+**Ze starego portfela nie da się już moderować** — to było świadome.
+
+`MYSPHERE_ADDRESS` w `PaidPinModal.tsx` **celowo zostaje** przy starej
+wartości: to odbiorca płatności za przypięte posty, nie brama uprawnień.
+„Kto może moderować" i „na jakie konto wpływają pieniądze" to dwie osobne
+decyzje, a właściciel podjął tylko pierwszą. Powód zapisany w kodzie, żeby
+nikt nie wyrównał tego odruchowo „dla spójności".
+
+**Zamknięte jako fałszywy alarm:** `ADMIN_API_KEY` w `/api/basemorning/stats`
+nie jest dziurą — warunek `!adminKey || adminKey !== ADMIN_KEY` przechwytuje
+brak klucza, zanim dojdzie do porównania, więc `undefined === undefined` nie
+zachodzi. Trasa zamyka się bezpiecznie w każdym przypadku.
 
 ### Znalezione przy tej samej okazji
 

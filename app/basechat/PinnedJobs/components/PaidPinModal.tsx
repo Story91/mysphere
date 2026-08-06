@@ -17,7 +17,18 @@ import { BasePayButton } from '@base-org/account-ui/react';
 // Smart Contract Integration
 import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI, toContractDuration } from '../config/contractConfig';
 
-// MySphere wallet address for Base Pay payments
+/**
+ * ODBIORCA PIENIEDZY za przypiete posty (Base Pay). To NIE jest brama
+ * uprawnien i celowo NIE jest tym samym co ADMIN_ADDRESS.
+ *
+ * Do 6 sierpnia 2026 obie wartosci byly identyczne. Uprawnienia admina
+ * przeniesiono wtedy na 0xD4885A...030e, a ten adres zostal - bo "kto moze
+ * moderowac" i "na jakie konto wplywaja platnosci" to dwie osobne decyzje
+ * i wlasciciel podjal tylko pierwsza.
+ *
+ * NIE ZMIENIAJ tego "dla spojnosci" z ADMIN_ADDRESS. Zmiana tej stalej
+ * przekierowuje prawdziwe pieniadze na inny portfel i wymaga osobnej decyzji.
+ */
 const MYSPHERE_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd';
 
 // Pin jest kupowany i rozliczany wylacznie na Base Mainnet.
