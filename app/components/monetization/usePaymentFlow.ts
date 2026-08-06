@@ -83,6 +83,16 @@ export function usePaymentFlow(onConfirmed: (txHash: `0x${string}`) => Promise<v
   // Straznik przed podwojnym zapisem tej samej transakcji.
   const handledTxRef = useRef<string | null>(null);
 
+  /**
+   * Faza widziana natychmiast, bez czekania na render.
+   *
+   * `disabled={isBusy}` na przycisku dziala dopiero po przerysowaniu, a `pay`
+   * mozna wywolac takze poza klikiem. Ref jest jedynym straznikiem, ktory
+   * zdazy: druga proba zaplaty nie ma prawa wyslac drugiej transakcji.
+   */
+  const phaseRef = useRef<PaymentPhase>('idle');
+  phaseRef.current = phase;
+
   const { sendTransaction, data: txHash, error: sendError, reset: resetSend } = useSendTransaction();
   const {
     data: receipt,
@@ -162,6 +172,7 @@ export function usePaymentFlow(onConfirmed: (txHash: `0x${string}`) => Promise<v
 
   const reset = useCallback(() => {
     handledTxRef.current = null;
+    phaseRef.current = 'idle';
     setError(null);
     setPhase('idle');
     resetSend();
@@ -169,6 +180,13 @@ export function usePaymentFlow(onConfirmed: (txHash: `0x${string}`) => Promise<v
 
   const pay = useCallback(
     (params: PayParams) => {
+      // Platnosc juz trwa - drugie wywolanie nie moze wyslac drugiej transakcji.
+      const busyNow =
+        phaseRef.current === 'signing' ||
+        phaseRef.current === 'confirming' ||
+        phaseRef.current === 'recording';
+      if (busyNow) return;
+
       if (!address) {
         setError('Connect your wallet first');
         setPhase('error');
@@ -183,6 +201,9 @@ export function usePaymentFlow(onConfirmed: (txHash: `0x${string}`) => Promise<v
       const tokenConfig = TOKENS[params.token];
       handledTxRef.current = null;
       setError(null);
+      // Ref ustawiamy RECZNIE i od razu: `setPhase` zadziala dopiero przy
+      // kolejnym renderze, a drugie klikniecie moze przyjsc wczesniej.
+      phaseRef.current = 'signing';
       setPhase('signing');
 
       try {

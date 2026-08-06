@@ -108,9 +108,16 @@ export default function SessionPrompt() {
         toast.success('Wallet confirmed — your posts and tips are now recorded as yours.', {
           duration: 5000,
         });
-        // Sukces sam usuwa pasek (isAuthenticated), wiec chowamy tylko po to,
-        // zeby nie mrugnal miedzy odpowiedzia serwera a przeliczeniem stanu.
-        hide();
+        // Pasek chowamy TYLKO w stanie lokalnym, zeby nie mrugnal miedzy
+        // odpowiedzia serwera a przeliczeniem `isAuthenticated`.
+        //
+        // NIE wolamy tu hide(): ono zapisuje do localStorage znacznik "ten
+        // uzytkownik odmowil, nie pytaj przez 7 dni". Udany podpis zapisywany
+        // jako odmowa znaczyl, ze gdy sesja wygasnie albo uzytkownik sie
+        // wyloguje, prosba o potwierdzenie NIE wroci przez tydzien - a bez niej
+        // Firestore znowu widzi go jako anonima. Sukces i odmowa nie moga
+        // zostawiac tego samego sladu.
+        setDismissed(true);
       }
     } finally {
       setIsSigning(false);

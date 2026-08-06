@@ -203,7 +203,10 @@ export default function ProfileSocials({ address, initialLinks, onSave, lazyLoad
           {hasLoaded ? (
             <div className="flex flex-col items-center w-full">
               <div className="flex justify-center items-center gap-10 my-2">
-                {/* X / Twitter */}
+                {/* X / Twitter.
+                    Zaslepka (brak linku) na obcym profilu jest tylko ikona -
+                    bez `disabled` byla focusowalna i klikalna, a klikniecie
+                    nie robilo nic. To samo dotyczy Warpcasta i Discorda. */}
                 {links.twitter ? (
                   <a href={`https://x.com/${links.twitter}`} target="_blank" rel="noopener noreferrer" aria-label={`X: ${links.twitter}`} className="text-soft-ink-muted hover:text-soft-primary-deep rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary">
                     <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -211,9 +214,6 @@ export default function ProfileSocials({ address, initialLinks, onSave, lazyLoad
                     </svg>
                   </a>
                 ) : (
-                  {/* Dla obcego profilu ta ikona jest tylko zaslepka - bez
-                      `disabled` byla focusowalna i klikalna, a klikniecie nie
-                      robilo nic. */}
                   <button
                     type="button"
                     onClick={() => isOwner && setIsEditing(true)}

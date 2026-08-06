@@ -474,10 +474,36 @@ function PostList({
   const [postTipStats, setPostTipStats] = useState<{ [postId: string]: PostTipStats }>({});
   const [tipStatsLoading, setTipStatsLoading] = useState(true);
 
+  /**
+   * SAM SKLAD feedu, nie jego zawartosc.
+   *
+   * Efekty ponizej wisialy na `internalPosts`, czyli na TOZSAMOSCI tablicy.
+   * Kazda optymistyczna zmiana (polubienie posta, polubienie komentarza) tworzy
+   * nowa tablice, wiec jedno klikniecie serduszka kasowalo `postTipStats`,
+   * podnosilo `tipStatsLoading` i przelaczalo pasek napiwkow POD KAZDYM postem
+   * w stan "Loading...", a do tego wysylalo zbiorcze zapytanie o napiwki dla
+   * calego feedu od nowa. To samo dotyczylo odznak agentow i tresci premium.
+   *
+   * Klucz z identyfikatorow zmienia sie dopiero wtedy, gdy postow faktycznie
+   * przybywa albo ubywa - a tylko wtedy te dane trzeba pobrac ponownie.
+   */
+  const postIdsKey = React.useMemo(
+    () => (internalPosts || []).map(p => p.id).filter(Boolean).join(','),
+    [internalPosts]
+  );
+  const authorsKey = React.useMemo(
+    () => Array.from(new Set((internalPosts || []).map(p => p.author).filter(Boolean))).join(','),
+    [internalPosts]
+  );
+  const premiumPostIdsKey = React.useMemo(
+    () => (internalPosts || []).filter(p => hasPremiumContent(p)).map(p => p.id).filter(Boolean).join(','),
+    [internalPosts]
+  );
+
   useEffect(() => {
     // Zrodlem jest internalPosts, nie prop `posts` - to z internalPosts renderuje
     // sie lista i to tam trafiaja posty dodane optymistycznie (event 'post-created').
-    const ids = (internalPosts || []).map(p => p.id).filter(Boolean) as string[];
+    const ids = postIdsKey ? postIdsKey.split(',') : [];
 
     if (ids.length === 0) {
       // Bez tego flaga zostawala na `true` i TipStats krecil spinner w nieskonczonosc.
@@ -494,14 +520,14 @@ function PostList({
       .finally(() => { if (!cancelled) setTipStatsLoading(false); });
 
     return () => { cancelled = true; };
-  }, [internalPosts]);
+  }, [postIdsKey]);
 
   // Odznaka agenta - ten sam wzorzec, co statystyki tipow wyzej: unikalne
   // adresy autorow zbierane RAZ dla calego feedu i jedno zapytanie zbiorcze,
   // zamiast odpytywania KYA przy kazdym poscie. Szczegoly w useAgentLookup.ts.
   const authorAddressesForAgents = React.useMemo(
-    () => Array.from(new Set((internalPosts || []).map(p => p.author).filter(Boolean))),
-    [internalPosts]
+    () => (authorsKey ? authorsKey.split(',') : []),
+    [authorsKey]
   );
   const { getAgent: getAgentInfo, loading: agentLookupLoading } = useAgentLookup(authorAddressesForAgents);
 
@@ -510,8 +536,8 @@ function PostList({
   // feed bez takich postow (czyli caly dzisiejszy stan bazy) nie robi zadnego
   // dodatkowego zapytania. Wsparcia - jedno zapytanie na 30 unikalnych autorow.
   const premiumPostIds = React.useMemo(
-    () => (internalPosts || []).filter(p => hasPremiumContent(p)).map(p => p.id).filter(Boolean),
-    [internalPosts]
+    () => (premiumPostIdsKey ? premiumPostIdsKey.split(',') : []),
+    [premiumPostIdsKey]
   );
   const { unlockedPostIds, markUnlocked } = useFeedUnlocks(address, premiumPostIds);
   const { subscribedCreators, markSubscribed } = useFeedSubscriptions(address, authorAddressesForAgents);

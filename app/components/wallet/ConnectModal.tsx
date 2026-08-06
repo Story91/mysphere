@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useConnect, type Connector } from 'wagmi';
+import { isUserRejection } from '../../utils/auth/useSiweAuth';
 
 /**
  * Wybor portfela. Zastepuje modal z <ConnectWallet> OnchainKit.
@@ -266,7 +267,14 @@ export default function ConnectModal({
           })}
         </div>
 
-        {error && (
+        {/* Odmowa w portfelu NIE jest bledem. Zamkniecie okna portfela albo
+            klikniecie "Cancel" konczy mutacje `connect` bledem
+            UserRejectedRequestError, a ten blok wypisywal go tak samo jak awarie
+            - czerwonym paskiem "User rejected the request." Uzytkownik dostawal
+            komunikat o bledzie za to, ze zrobil dokladnie to, co chcial zrobic.
+            Lista portfeli zostaje otwarta i aktywna, wiec moze po prostu wybrac
+            inny albo zamknac modal. */}
+        {error && !isUserRejection(error) && (
           <p role="alert" className="border-t border-soft-line bg-soft-accent-soft px-5 py-3 font-soft text-[12px] font-semibold text-soft-accent-deep">
             {error.message.slice(0, 140)}
           </p>
