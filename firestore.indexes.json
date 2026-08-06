@@ -1,19 +1,25 @@
 {
   "comment": [
-    "Indeksy zlozone Firestore.",
+    "PELNY obraz indeksow zlozonych Firestore - nie lista dopisywanych.",
     "",
-    "Firestore tworzy indeksy pojedynczych pol sam, ale zapytanie laczace",
-    "`where` po jednym polu z `orderBy` po INNYM wymaga indeksu zlozonego -",
-    "i bez niego zwraca blad, nie pusta liste.",
+    "=== PRZECZYTAJ, ZANIM COKOLWIEK STAD USUNIESZ ===",
+    "`firebase deploy --only firestore:indexes` traktuje ten plik jako STAN",
+    "DOCELOWY. Wszystko, czego tu nie ma, a istnieje w projekcie, zostaje",
+    "zgloszone do SKASOWANIA - CLI pyta 'Would you like to delete these",
+    "indexes?' i latwo odpowiedziec odruchowo.",
     "",
-    "Tak wlasnie padalo /asks: getOpenAsks() robi",
-    "  where('status','==','open') + orderBy('createdAt','desc')",
-    "wiec kazde wejscie konczylo sie komunikatem",
-    "  'Open asks could not be loaded. This is a failed read, not an empty list.'",
-    "Komunikat byl poprawny - brakowalo indeksu, ktory go usuwa.",
+    "Pierwsza wersja tego pliku miala WYLACZNIE cztery indeksy dla Askow.",
+    "Przy pierwszym wdrozeniu Firebase wypisal 20 istniejacych indeksow jako",
+    "'nie ma ich w twoim pliku' i zaproponowal ich usuniecie. Skasowanie ich",
+    "wywalilo by bledem: komentarze pod postami, zaproszenia do znajomych,",
+    "przypiete posty, powiadomienia, czaty i marketplace - czyli dokladnie ta",
+    "sama awaria, przez ktora nie dzialalo /asks.",
     "",
-    "Wdrozenie: firebase deploy --only firestore:indexes",
-    "(firebase.json wskazuje na ten plik)"
+    "Dwadziescia ponizszych spisano z wyjscia tamtego wdrozenia. Kazde",
+    "obsluguje zapytanie, ktore dzis dziala. NIE USUWAJ ich, dopoki nie",
+    "sprawdzisz, ze zadne zapytanie ich nie potrzebuje.",
+    "",
+    "Wdrozenie: firebase deploy --only firestore:indexes"
   ],
   "indexes": [
     {
@@ -46,6 +52,180 @@
       "fields": [
         { "fieldPath": "author", "order": "ASCENDING" },
         { "fieldPath": "accepted", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "author", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "author", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "network", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isPinned", "order": "ASCENDING" },
+        { "fieldPath": "pinnedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isPaidPin", "order": "ASCENDING" },
+        { "fieldPath": "pinExpiresAt", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "postId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "friendRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "to", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "friendRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "from", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "friendRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "receiverId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "sentAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "friendRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "senderId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "sentAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "friendRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "senderId", "order": "ASCENDING" },
+        { "fieldPath": "sentAt", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "read", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "chats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "participants", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "lastMessageTime", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "usernames",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isBaseName", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "paidPins",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "authorizedQuotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "submittedBy", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "authorizedQuotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "authorizedQuotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "marketplaceListings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "listedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "marketplaceAuctions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "endTime", "order": "ASCENDING" }
       ]
     }
   ],
