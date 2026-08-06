@@ -30,6 +30,7 @@ import {
   ERC20_TRANSFER_ABI,
   ALL_NETWORKS,
 } from './TipNetworkConfig';
+import { resolveUserOpToTxHash } from '../../utils/tips/resolveUserOp';
 
 interface TipButtonProps {
   recipientAddress: string;
@@ -682,13 +683,22 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                                   // ponizej - platnosc sie udala, a uzytkownik
                                   // zobaczylby komunikat o bledzie sprawdzania statusu.
                                   try {
+                                    // `id` z Base Pay to hash userOp, a nie
+                                    // transakcji - pod /tx/ w eksploratorze go
+                                    // nie ma. Zapisanie go do `txHash` sprawialo,
+                                    // ze dowod platnosci na stronie Paid
+                                    // prowadzil do pustej strony. Pytamy bundlera
+                                    // o prawdziwy hash; gdy nie odpowie, zapisujemy
+                                    // to co mamy - tip jest wazniejszy niz link.
+                                    const realTxHash = await resolveUserOpToTxHash(id);
+
                                     await saveTip({
                                       senderAddress: address!,
                                       recipientAddress,
                                       amount: tipAmount,
                                       token: 'USDC',
                                       postId,
-                                      txHash: id,
+                                      txHash: realTxHash ?? id,
                                       network: 'base'
                                     });
                                   } catch (saveError) {

@@ -253,10 +253,33 @@ najpoważniejsza możliwa wada — i taka, której żaden typecheck nie wykryje.
 Przyczyna: płatności przez Base Pay zapisują to, co zwraca `pay()`, a
 dokumentacja SDK opisuje tę wartość jako *„Transaction ID (userOp hash)"*.
 userOp to zlecenie ERC-4337 — leży w jakiejś transakcji, ale ma własny hash
-i pod `/tx/` go nie ma. Z samych 32 bajtów nie da się rozpoznać, który to
-rodzaj, więc link idzie teraz przez **wyszukiwarkę eksploratora**, która
-przyjmuje jedno i drugie. Puste hashe to zaszłość po ścieżce OnchainKit;
+i pod `/tx/` go nie ma. Puste hashe to osobna zaszłość po ścieżce OnchainKit;
 obecna ścieżka wagmi zawsze podaje `receipt.transactionHash`.
+
+**Rozwiązane u źródła, nie obejściem.** Bundler zna powiązanie userOp →
+transakcja i oddaje je przez `eth_getUserOperationReceipt`. Sam SDK to woła
+w `getPaymentStatus()`, ma `receipt.transactionHash` w ręku — i go wyrzuca,
+bo jego typ zwrotny nie ma takiego pola. Pytamy o to samo i zatrzymujemy wynik
+(`app/utils/tips/resolveUserOp.ts`), więc **nowe tipy zapisują od razu
+prawdziwy hash transakcji.** Sprawdzone na żywo:
+
+| userOp | transakcja | blok |
+|---|---|---|
+| `0x0230ff…` | `0xa8af69…` | `0x22fb95c` |
+| `0xdb6d5a…` | `0xf1f8a2…` | `0x2036390` |
+
+Oba potwierdzone przez `eth_getTransactionByHash` na Base mainnet. Gdyby
+bundler kiedyś przestał odpowiadać, zapis wraca do hasha userOp — degradacja
+do stanu sprzed zmiany, nigdy utrata tipa.
+
+Link czytający zostaje na **wyszukiwarce eksploratora**, bo starych rekordów
+to nie naprawia: one nadal trzymają hash userOp, a z samych 32 bajtów nie da
+się rozpoznać rodzaju. Wyszukiwarka przyjmuje jedno i drugie.
+
+> **Do decyzji właściciela:** mam działający resolver, więc dałoby się
+> jednorazowo przepisać istniejące rekordy na prawdziwe hashe. To zapis do
+> produkcyjnej bazy, więc czekam na wyraźną zgodę — nie robię tego z własnej
+> inicjatywy.
 
 ### Znalezione przy tej samej okazji
 
