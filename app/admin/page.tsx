@@ -448,8 +448,8 @@ export default function AdminPanel() {
           <h3 className="text-lg font-semibold text-green-400 mb-2">🎉 Krytyczna Optymalizacja Kosztów Firebase Zakończona!</h3>
           <div className="text-sm text-green-300 space-y-1">
             <p>✅ <strong>refreshAllPosts():</strong> TOP 50 użytkowników zamiast wszystkich (95% redukcja)</p>
-            <p>✅ <strong>Admin Statistics:</strong> Całkowicie wyłączony (3000+ reads)</p>
-            <p>✅ <strong>Admin UserManagement:</strong> Całkowicie wyłączony (3000+ reads)</p>
+            <p>✅ <strong>Admin Statistics:</strong> Działa na agregacjach — ~467 odczytów zamiast ~461 000 (getCountFromServer liczy po stronie Firestore, 1 odczyt / 1000 wpisów)</p>
+            <p>✅ <strong>Admin UserManagement:</strong> Działa na odczytach punktowych — szukanie po adresie to 2 odczyty, lista nigdy nie jest ładowana w całości</p>
             <p>✅ <strong>BaseChat global stats:</strong> Używa systemu strony głównej (pełne dane + cache 12h per user)</p>
             <p>✅ <strong>Main page getGlobalStats():</strong> Cache 12h per user + pełne dane (6000+ reads → 0.2/user/12h)</p>
             <p>✅ <strong>MyCamp Platform Distribution:</strong> Sekcja usunięta (dodatkowe oszczędności)</p>

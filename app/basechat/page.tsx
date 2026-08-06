@@ -459,14 +459,12 @@ function BaseChatContent() {
   const [postPreviewImage, setPostPreviewImage] = useState<string | null>(null);
   const [postPreviewVideo, setPostPreviewVideo] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const [trendingTags, setTrendingTags] = useState<{tag: string, count: number}[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
          const [totalUsers, setTotalUsers] = useState(175708);
     const [totalLikes, setTotalLikes] = useState(18817);
     const [totalPosts, setTotalPosts] = useState(239961);
     const [totalComments, setTotalComments] = useState(10972);
   const [expandedUsersList, setExpandedUsersList] = useState(false);
-  const [expandedTagsList, setExpandedTagsList] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   const [customName, setCustomName] = useState('');
@@ -1500,12 +1498,6 @@ function BaseChatContent() {
   }, []);
 
   // 🚀 ZOPTYMALIZOWANA funkcja getActiveUsers została przeniesiona za deklaracje zmiennych stanu
-
-  // Dodaj useEffect do aktualizacji trendujących tagów
-  useEffect(() => {
-    const trending = getTrendingTags(posts);
-    setTrendingTags(trending);
-  }, [posts]);
 
   // useEffect do ustawienia isMounted i wczytania cache'u.
   // Sprzatanie nie ustawia juz isMounted na false - to zapis do stanu
@@ -3775,129 +3767,22 @@ function BaseChatContent() {
                 onOpenUser={(userAddress) => handleViewBuilderProfile(userAddress)}
               />
 
-              {/* Global Statistics */}
-              <div className="mb-4 hidden lg:block">
-                <h2 className="text-lg font-semibold mb-3 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
-                    Global Statistics
-                    <div className="ml-2 text-2xl">🔥</div>
-                </h2>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                    <div className="text-green-500 text-2xl font-bold">{totalUsers}</div>
-                    <div className="text-sm text-gray-500">Users</div>
-                  </div>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                    <div className="text-pink-500 text-2xl font-bold">{totalLikes}</div>
-                    <div className="text-sm text-gray-500">Likes</div>
-                  </div>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                    <div className="text-blue-500 text-2xl font-bold">{totalPosts}</div>
-                    <div className="text-sm text-gray-500">Posts</div>
-                  </div>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                    <div className="text-purple-500 text-2xl font-bold">{totalComments}</div>
-                    <div className="text-sm text-gray-500">Comments</div>
-                  </div>
-                </div>
-              </div>
+              {/* ===== USUNIETE Z PRAWEGO PANELU =====
+                  1. "Global Statistics" - te SAME cztery liczby (Users, Likes,
+                     Posts, Comments) renderowal juz SoftTrendsPanel wyzej.
+                     Na desktopie stały wiec dwa razy pod soba, w dwoch roznych
+                     stylach: raz w kierunku Soft Social, raz w starych szarych
+                     kaflach z gradientowym naglowkiem. To nie byla nadmiarowa
+                     informacja, tylko ta sama informacja dwa razy.
 
+                  2. "Trending Hashtags" - decyzja produktowa wlasciciela.
 
-
-              {/* Most Active Users */}
-              <div className="mb-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-lg font-semibold mb-0 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
-                    Most Active Users
-                    <div className="ml-2 text-2xl">👥</div>
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    {address && address.toLowerCase() === ADMIN_ADDRESS.toLowerCase() && (
-                      <button 
-                        onClick={handleClearNamesCache}
-                        className="text-xs text-orange-500 hover:text-orange-700 flex items-center"
-                        title="Clear user names cache to see updated names (Admin only)"
-                      >
-                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Clear Cache
-                      </button>
-                    )}
-                  <button 
-                    onClick={handleManualRefresh} 
-                    disabled={!canManuallyRefresh}
-                    className={`text-xs ${canManuallyRefresh ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 cursor-not-allowed'} flex items-center`}
-                  >
-                    <RefreshCw className={`w-3 h-3 mr-1 ${isLoadingUsers ? 'animate-spin' : ''}`} />
-                    {isLoadingUsers ? 'Refreshing...' : 'Refresh'}
-                  </button>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  {renderUserList()}
-                  <div className="mt-4">
-                    <div className="flex justify-center items-center gap-1 mb-3">
-                      <div className="bg-gray-100 dark:bg-gray-700 rounded-full p-1 flex items-center">
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                          disabled={currentPage === 1}
-                          className="px-3 py-1 text-[11px] bg-gray-800 dark:bg-gray-600 text-white rounded-l-full disabled:opacity-50"
-                        >
-                          Prev
-                        </button>
-                        <span className="text-[11px] text-gray-600 dark:text-gray-300 px-3">
-                          {currentPage}/{totalUsersPages}
-                        </span>
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalUsersPages))}
-                          disabled={currentPage >= totalUsersPages}
-                          className="px-3 py-1 text-[11px] bg-gray-800 dark:bg-gray-600 text-white rounded-r-full disabled:opacity-50"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Trending Hashtags */}
-              <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
-                    Trending Hashtags
-                    <div className="ml-2 text-2xl">🔥</div>
-                  </h2>
-                  {trendingTags.length > 5 && (
-                    <button
-                      onClick={() => setExpandedTagsList(!expandedTagsList)}
-                      className="text-sm text-blue-500 hover:text-blue-600 transition-colors"
-                    >
-                      {expandedTagsList ? 'Show Less' : 'Show More'}
-                </button>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  {trendingTags
-                    .slice(0, expandedTagsList ? undefined : 5)
-                    .map(({ tag, count }) => (
-                      <div
-                        key={tag} 
-                        className="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-all duration-300 group"
-                      >
-                        <span className="text-blue-500 hover:text-blue-600 cursor-pointer flex items-center group-hover:translate-x-1 transition-transform">
-                          <span className="text-sm mr-2">#</span>
-                          {tag}
-                        </span>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-500">{count}</span>
-                          <span className="text-xs text-gray-400">posts</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
+                  Liczniki (totalUsers, totalLikes...) zostaja - zasilaja
+                  SoftTrendsPanel. Za to `trendingTags` i `expandedTagsList`
+                  poszly razem z widokiem: sprawdzilem i po usunieciu tego
+                  bloku NIC ich juz nie czytalo, a `getTrendingTags(posts)`
+                  przemiatal cala liste postow przy KAZDEJ jej zmianie, zeby
+                  policzyc hashtagi dla nikogo. */}
               {/* Yaps Stats Widget - ukryty, gdy /yapscan jest wylaczony
                   (config/routeStatus.js). Bez tego kafelek prowadzilby
                   w przekierowanie z powrotem na /basechat. */}
