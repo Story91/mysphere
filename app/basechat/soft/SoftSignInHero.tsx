@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { SOFT_NETWORKS } from './SoftStoryRail';
 
 /**
@@ -143,20 +144,36 @@ export default function SoftSignInHero({
         </span>
       </div>
 
+      {/* ===== NARRACJA WZIETA Z /re-definition, NIE WYMYSLONA TUTAJ =====
+          Wczesniej staly tu slowa "Post, tip & connect onchain" - opis, ktory
+          pasuje do kazdego produktu spolecznosciowego z portfelem i do
+          zadnego w szczegolnosci.
+
+          Manifest na /re-definition otwiera sie znacznikiem "$0.00 - what a
+          like is worth" i zdaniem "A like costs nothing to give, so a thousand
+          of them prove nothing". To jest teza calego produktu i ona ma stac
+          na wejsciu, bo tylko ona odroznia to miejsce od reszty.
+
+          Druga linijka bierze "$340 - the only score that costs money" oraz
+          "A receipt spreads. A screenshot does not." - czyli mowi, co wchodzi
+          w miejsce lajka.
+
+          Gdy zmieni sie manifest, ten tekst ma sie zmienic razem z nim. */}
       <h1
         className="soft-hero-rise mb-3 font-soft-display text-[26px] font-bold leading-[1.15] text-white sm:text-[30px]"
         style={{ ['--rise-delay' as string]: '60ms' }}
       >
-        Post, tip &amp; connect
+        A like is worth $0.00.
         <br />
-        onchain
+        A payment is not.
       </h1>
 
       <p
-        className="soft-hero-rise mx-auto mb-7 max-w-[34ch] text-[13.5px] font-semibold leading-[1.5] text-white/80"
+        className="soft-hero-rise mx-auto mb-7 max-w-[36ch] text-[13.5px] font-semibold leading-[1.55] text-white/80"
         style={{ ['--rise-delay' as string]: '120ms' }}
       >
-        Every tip here is a settled payment with a transaction hash anyone can check.
+        Here the only score is one that cost somebody money — and every tip settles onchain
+        with a hash anyone can open.
       </p>
 
       {/* Wezly na kole sa dla oka. Czytnik ekranu dostaje te sama liste
@@ -188,6 +205,19 @@ export default function SoftSignInHero({
           Use another wallet
         </button>
       </div>
+
+      {/* Naglowek stawia mocna teze, wiec musi byc gdzie ja sprawdzic. To
+          jedyne wyjscie z tego ekranu poza logowaniem - celowo ciche, zeby
+          nie konkurowalo z przyciskami, i celowo obecne, bo twierdzenie bez
+          uzasadnienia jest sloganem. `Link`, a nie `onClick` - to nawigacja,
+          wiec ma dzialac srodkowym przyciskiem myszy i w nowej karcie. */}
+      <Link
+        href="/re-definition"
+        className="soft-hero-rise mt-5 inline-block text-[12.5px] font-semibold text-white/70 underline decoration-white/30 underline-offset-4 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+        style={{ ['--rise-delay' as string]: '240ms' }}
+      >
+        Why a like is worth nothing here
+      </Link>
 
       {signedInAs && (
         <p className="mt-5 text-[12.5px] font-semibold text-white/90">Signed in as {signedInAs}</p>
