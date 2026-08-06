@@ -2948,36 +2948,36 @@ function BaseChatContent() {
               </div>
             </div>
 
-            {/* ===== MOBILNY FEED - kierunek Soft Social =====
-                 Zastepuje WYGLAD srodkowego panelu ponizej progu `lg` i nic
-                 wiecej. Desktop idzie stara sciezka bez jednej zmienionej linii,
-                 a cala logika - postowanie na osmiu lancuchach, platnosci,
-                 znajomi, powiadomienia - zostaje tam, gdzie byla. Granica jest
-                 ostra: ten komponent dostaje gotowe dane i oddaje zdarzenia
-                 w gore, wiec zmiana wygladu nie dotyka kodu platnosci. */}
-            <div className={activeMobilePanel === 'main' ? 'block w-full lg:hidden' : 'hidden'}>
-              <SoftFeedMobile
-                posts={posts as any}
-                currentAddress={address}
-                avatarUrl={userProfile?.avatar}
-                activeFeed={activeFeed}
-                onFeedChange={(id) => setActiveFeed(id as 'forYou' | 'following' | 'baseName')}
-                onOpenComposer={() => {
-                  // Przewijamy do PRAWDZIWEGO kompozytora zamiast budowac drugi.
-                  // Druga implementacja pisania postu bylaby drugim miejscem,
-                  // w ktorym trzeba naprawiac ten sam blad.
-                  const composer = document.querySelector('textarea');
-                  composer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  (composer as HTMLTextAreaElement | null)?.focus();
-                }}
-                isLoading={isLoadingPosts}
-              />
-            </div>
-
-            {/* Middle panel (Feed) - od progu `lg` w gore */}
-            <div className={`flex-1 p-4 overflow-y-auto ${
-              activeMobilePanel === 'main' ? 'hidden lg:block w-full' : 'hidden lg:block'
+            {/* Middle panel (Feed) */}
+            <div className={`flex-1 overflow-y-auto p-4 max-lg:bg-soft-bg ${
+              activeMobilePanel === 'main' ? 'block w-full' : 'hidden lg:block'
             }`}>
+              {/* ===== OPRAWA MOBILNA - kierunek Soft Social =====
+                  Wymienia WYLACZNIE oprawe feedu ponizej progu `lg`: tlo, pasek
+                  sieci jako "stories", zakladki-pigulki i zwiniety kompozytor.
+                  LISTA POSTOW ZOSTAJE TA SAMA - to jest poprawka po realnej
+                  regresji, ktora sam wprowadzilem: podmiana kart postow na
+                  wlasne zabrala na telefonie tipy, przypinanie, przyciski
+                  transakcji per siec, tresc premium, odznaki agentow i muzyke.
+                  Wyglad wolno wymieniac tylko tam, gdzie nic za soba nie ciagnie. */}
+              <div className="lg:hidden">
+                <SoftFeedMobile
+                  currentAddress={address}
+                  avatarUrl={userProfile?.avatar}
+                  activeFeed={activeFeed}
+                  onFeedChange={(id) => setActiveFeed(id as 'forYou' | 'following' | 'baseName')}
+                  onOpenComposer={() => {
+                    // Przewijamy do PRAWDZIWEGO kompozytora zamiast budowac drugi.
+                    // Druga implementacja pisania postu bylaby drugim miejscem,
+                    // w ktorym trzeba naprawiac ten sam blad - a ten formularz
+                    // obsluguje osiem lancuchow i tresc premium.
+                    const composer = document.querySelector('textarea');
+                    composer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    (composer as HTMLTextAreaElement | null)?.focus();
+                  }}
+                />
+              </div>
+
               {/* Post switcher and network selection - only for logged in users */}
               {isConnected && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4">
