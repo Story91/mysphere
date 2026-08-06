@@ -31,6 +31,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { HTTPFacilitatorClient, x402ResourceServer } from '@x402/core/server';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
 import { paymentProxy } from '@x402/next';
+// Uwierzytelnienie facilitatora Coinbase. Bez tego mainnet Base jest
+// nieosiagalny - patrz buildFacilitator() nizej.
+import { createFacilitatorConfig } from '@coinbase/x402';
 import {
   ASK_POST_DESCRIPTION,
   getAskNetwork,
@@ -64,14 +67,56 @@ const NO_STORE = { 'Cache-Control': 'no-store, private' } as const;
  */
 let cached: { key: string; run: (request: NextRequest) => Promise<NextResponse> } | null = null;
 
+/**
+ * Konfiguracja facilitatora dla WYBRANEJ sieci.
+ *
+ * === TRZY SCIEZKI, KAZDA Z INNEGO POWODU ===
+ *
+ * 1. CDP (Base mainnet). Facilitator Coinbase WYMAGA UWIERZYTELNIENIA - samo
+ *    wskazanie adresu nie wystarczy, `GET /supported` bez klucza zwraca
+ *    "Unauthorized" (sprawdzone). `createFacilitatorConfig` z @coinbase/x402
+ *    dokłada `createAuthHeaders`, ktore podpisuja kazde zadanie kluczem CDP.
+ *    Wlacza sie SAMO, gdy siec to eip155:8453 i oba klucze sa w env.
+ *
+ * 2. Wlasny adres z X402_FACILITATOR_URL - tak wpina sie VLED dla Robinhood
+ *    Chain (eip155:4663, USDG, gasless). Ten nie wymaga klucza.
+ *
+ * 3. Brak konfiguracji - biblioteka bierze publiczny facilitator x402.org,
+ *    ktory dla EVM obsluguje wylacznie Base Sepolia.
+ *
+ * Gdy siec to mainnet Base, a kluczy CDP NIE MA, swiadomie NIE cofamy sie po
+ * cichu do publicznego facilitatora: on tej sieci nie obsluguje, wiec kazde
+ * zadanie skonczyloby sie bledem facilitatora zamiast uczciwym 402. Lepiej
+ * niech konfiguracja zawiedzie glosno.
+ */
+const CDP_NETWORKS = new Set(['eip155:8453']);
+
+function buildFacilitator(network: string) {
+  const url = getFacilitatorUrl();
+  if (url) return new HTTPFacilitatorClient({ url });
+
+  if (CDP_NETWORKS.has(network)) {
+    const id = process.env.CDP_API_KEY_ID?.trim();
+    const secret = process.env.CDP_API_KEY_SECRET?.trim();
+    if (id && secret) {
+      return new HTTPFacilitatorClient(createFacilitatorConfig(id, secret));
+    }
+  }
+
+  return new HTTPFacilitatorClient();
+}
+
 function getProxy(network: string, price: string) {
-  const key = `${network}|${price}|${getFacilitatorUrl() ?? ''}`;
+  // Klucz cache'a niesie takze OBECNOSC kluczy CDP: gdyby zostaly dodane bez
+  // restartu, ciepla instancja trzymalaby facilitator bez uwierzytelnienia.
+  const hasCdp = Boolean(process.env.CDP_API_KEY_ID && process.env.CDP_API_KEY_SECRET);
+  const key = `${network}|${price}|${getFacilitatorUrl() ?? ''}|${hasCdp}`;
   if (cached && cached.key === key) return cached.run;
 
-  const facilitatorUrl = getFacilitatorUrl();
-  const server = new x402ResourceServer(
-    new HTTPFacilitatorClient(facilitatorUrl ? { url: facilitatorUrl } : undefined)
-  ).register(network as `${string}:${string}`, new ExactEvmScheme());
+  const server = new x402ResourceServer(buildFacilitator(network)).register(
+    network as `${string}:${string}`,
+    new ExactEvmScheme()
+  );
 
   const run = paymentProxy(
     {

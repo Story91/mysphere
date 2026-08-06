@@ -17,7 +17,18 @@ import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getM
 const ADMIN_BASENAME = "story91.base.eth";
 
 export default function AdminPanel() {
-  const { address, isConnected } = useAccount();
+  // `status`, nie samo `isConnected`.
+  //
+  // Po wejsciu na strone wagmi najpierw odtwarza konektor z pamieci i przez
+  // ten czas raportuje `isConnected: false`. Efekt sprawdzajacy admina odpalal
+  // sie WLASNIE wtedy, ustawial `isAdmin: false`, a render robil
+  // `router.push('/')` - czyli wyrzucalo z panelu, ZANIM portfel zdazyl sie
+  // zglosic. Nie dalo sie wejsc zadnym portfelem, takze wlasciwym.
+  //
+  // 'connecting' i 'reconnecting' znacza "jeszcze nie wiem" i musza czekac,
+  // a nie liczyc sie jako odmowa.
+  const { address, isConnected, status: accountStatus } = useAccount();
+  const isSettling = accountStatus === 'connecting' || accountStatus === 'reconnecting';
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -40,8 +51,12 @@ export default function AdminPanel() {
 
   useEffect(() => {
     const checkAdminStatus = async () => {
+      // Portfel jeszcze sie odtwarza - to nie jest odmowa, tylko brak
+      // odpowiedzi. Wychodzimy BEZ gaszenia `loading`, zeby render nie
+      // podjal decyzji na niepelnych danych.
+      if (isSettling) return;
+
       if (!isConnected || !address) {
-        console.log('Brak zalogowanego adresu');
         setLoading(false);
         setIsAdmin(false);
         return;
@@ -68,7 +83,7 @@ export default function AdminPanel() {
     };
 
     checkAdminStatus();
-  }, [address, isConnected]);
+  }, [address, isConnected, isSettling]);
 
   // ⚡ OPTIMIZED: Smart auto-loading przy wejściu na Global Stats (tylko jeśli brak danych)
   useEffect(() => {
@@ -427,14 +442,52 @@ export default function AdminPanel() {
     );
   }
 
-  if (!isConnected) {
-    router.push('/');
-    return null;
-  }
+  // ===== ZAMIAST CICHEGO WYRZUCENIA: POWIEDZ, O CO CHODZI =====
+  //
+  // Bylo tu `router.push('/')` w obu przypadkach. Skutek dla czlowieka:
+  // wpisujesz /admin, przez ulamek sekundy widzisz spinner i ladujesz na
+  // stronie glownej bez slowa wyjasnienia. Wygladalo to jak "nie ma takiej
+  // strony" - i dokladnie tak zostalo zgloszone.
+  //
+  // Przekierowanie kasuje tez adres z paska, wiec po podlaczeniu portfela nie
+  // ma juz dokad wrocic. Teraz strona zostaje i mowi, czego brakuje.
+  if (!isConnected || !isAdmin) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-[520px] items-center px-5">
+        <div className="w-full rounded-card bg-soft-surface p-8 shadow-card">
+          <h1 className="mb-2 font-soft-display text-[22px] font-bold text-soft-ink">
+            Panel administratora
+          </h1>
 
-  if (!isAdmin) {
-    router.push('/');
-    return null;
+          {!isConnected ? (
+            <p className="font-soft text-[14px] leading-relaxed text-soft-ink-muted">
+              Podłącz portfel administratora, żeby wejść. Przycisk połączenia jest
+              w nawigacji na górze.
+            </p>
+          ) : (
+            <>
+              <p className="mb-3 font-soft text-[14px] leading-relaxed text-soft-ink-muted">
+                Ten portfel nie ma uprawnień administratora.
+              </p>
+              {/* Pokazujemy PODLACZONY adres, a nie oczekiwany. Wypisanie
+                  adresu admina na publicznej stronie ulatwialoby celowanie
+                  w niego, a i tak nie pomaga temu, kto go nie ma. */}
+              <p className="font-mono text-[12px] text-soft-ink-faint">
+                Podłączony: {address}
+              </p>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => router.push('/basechat')}
+            className="mt-6 rounded-pill bg-soft-primary px-5 py-2.5 font-soft text-[13.5px] font-bold text-white transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          >
+            Wróć do feedu
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
