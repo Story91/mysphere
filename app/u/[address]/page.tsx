@@ -173,8 +173,13 @@ export default async function ProfilePage({ params }: Props) {
           </h2>
 
           {profile.recentPosts.length === 0 ? (
+            /* "Nic nie napisal" to twierdzenie o czlowieku. Nie stawiamy go w
+               momencie, w ktorym odczyt sie wywrocil - wtedy mowimy prawde
+               o sobie, nie nieprawde o nim. */
             <p className="border-t border-white/[0.07] pt-6 text-[14px] text-[#5C6F94]">
-              Nothing posted yet.
+              {profile.partial
+                ? 'Posts could not be loaded right now. Try again in a moment.'
+                : 'Nothing posted yet.'}
             </p>
           ) : (
             <div>
