@@ -691,6 +691,20 @@ interface FetchPostsParams {
   startAfter?: QueryDocumentSnapshot | null;
   orderBy?: 'newest' | 'oldest';
   authorFilter?: string | null;
+  /**
+   * Lista autorow - feed obserwowanych.
+   *
+   * Do tej pory zakladka "Follows" przekazywala `authorFilter: address`, czyli
+   * WLASNY adres uzytkownika, i pokazywala jego wlasne posty. Etykieta mowila
+   * "Follows", tresc byla "moje" - a caly graf obserwowanych nie mial zadnego
+   * wplywu na feed.
+   *
+   * LIMIT: Firestore przyjmuje w `in` najwyzej 30 wartosci. Kto obserwuje
+   * wiecej, dostaje 30 pierwszych z listy - wolajacy MA o tym powiedziec,
+   * zamiast po cichu ucinac. Cicha wersja tego ograniczenia bylaby feedem,
+   * ktory gubi ludzi bez podania powodu.
+   */
+  authorsIn?: string[] | null;
   tagFilter?: string | null;
   searchTerm?: string | null;
   networkFilter?: 'base' | 'basecamp' | null; // Add network filter parameter
@@ -709,6 +723,7 @@ export const fetchPosts = async ({
   startAfter = null, 
   orderBy = 'newest',
   authorFilter = null,
+  authorsIn = null,
   tagFilter = null,
   searchTerm = null,
   networkFilter = null // Default to null (no filtering)
@@ -728,7 +743,13 @@ export const fetchPosts = async ({
     if (authorFilter) {
       queryConstraints.push(where('author', '==', authorFilter));
     }
-    
+
+    // Feed obserwowanych. `in` ma twardy limit 30 wartosci - wiecej Firestore
+    // odrzuca bledem, nie obcieciem, wiec tniemy sami i to jawnie.
+    if (authorsIn && authorsIn.length > 0) {
+      queryConstraints.push(where('author', 'in', authorsIn.slice(0, 30)));
+    }
+
     if (tagFilter) {
       queryConstraints.push(where('tags', 'array-contains', tagFilter));
     }
@@ -3874,6 +3895,49 @@ export const saveTip = async (tip: Omit<Tip, 'id' | 'timestamp'>): Promise<strin
     
     const docRef = await addDoc(collection(db, 'tips'), tipData);
     console.log('✅ Tip zapisany:', docRef.id); // sam identyfikator - bez adresow i kwot w konsoli
+
+    /**
+     * ODBIORCA DOWIADUJE SIE, ZE DOSTAL PIENIADZE.
+     *
+     * === CO BYLO ===
+     * `saveTip` konczylo sie na `return docRef.id`. Funkcja
+     * `notifyTipReceived` istniala od dawna w app/utils/friends/notifications.ts
+     * i nie miala ANI JEDNEGO wywolania w calym repo.
+     *
+     * Skutek: 188 rozliczonych napiwkow, ZERO powiadomionych odbiorcow. Ktos
+     * wysylal komus prawdziwe pieniadze, a tamten nie mial jak sie o tym
+     * dowiedziec inaczej niz przypadkiem, przegladajac wlasny profil.
+     *
+     * Na produkcie, ktorego cala teza brzmi "tu pieniadze chodza miedzy
+     * ludzmi", jedyne zdarzenie warte powiadomienia bylo jedynym, ktore
+     * powiadomienia nie wysylalo. Przy 14 aktywnych tygodniowo to nie jest
+     * drobiazg - to brak jedynego powodu, zeby wrocic.
+     *
+     * === DLACZEGO NIE PRZERYWA ZAPISU ===
+     * Powiadomienie jest SKUTKIEM UBOCZNYM. Napiwek juz sie rozliczyl na
+     * lancuchu i zapisal w bazie; blad przy powiadamianiu nie moze cofnac ani
+     * jednego, ani drugiego, ani pokazac uzytkownikowi bledu przy udanej
+     * platnosci. Stad `.catch` zamiast `await` w glownym torze.
+     */
+    // Import DYNAMICZNY, nie statyczny: ten plik importuje pol aplikacji,
+    // wiec wiazanie go na sztywno z modulem powiadomien tylko po to, zeby
+    // wyslac jedno powiadomienie, dokladaloby go do kazdego bundle'a, ktory
+    // dotyka Firestore. Przy okazji odpada ryzyko cyklu importow.
+    void (async () => {
+      try {
+        const { notifyTipReceived } = await import('./friends/notifications');
+        await notifyTipReceived(
+          tip.recipientAddress,
+          tip.senderAddress,
+          String(tip.amount),
+          tip.token,
+          tip.postId
+        );
+      } catch (notifyError) {
+        console.warn('⚠️ Nie udalo sie powiadomic o tipie:', notifyError);
+      }
+    })();
+
     return docRef.id;
   } catch (error) {
     console.error('❌ Błąd zapisywania tipu:', error);

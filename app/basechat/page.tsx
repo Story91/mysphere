@@ -514,6 +514,47 @@ function BaseChatContent() {
   const [mobileNetwork, setMobileNetwork] = useState<string | null>(null);
 
   /**
+   * Adresy, ktore ten uzytkownik OBSERWUJE.
+   *
+   * === CO BYLO ===
+   * Zakladka "Follows" przekazywala do fetchPosts `authorFilter: address`,
+   * czyli WLASNY adres - i pokazywala wlasne posty. Komentarz przy drugim
+   * wywolaniu sam sie do tego przyznawal ("Pobierz tylko posty uzytkownika").
+   * Etykieta mowila "Follows", tresc byla "moje", a caly graf obserwowanych
+   * nie mial na feed zadnego wplywu.
+   *
+   * `null` znaczy "jeszcze nie wiem", pusta tablica - "nikogo nie obserwuje".
+   * To dwa rozne stany i feed ma je rozroznic: przy `null` nie ma sensu
+   * pytac o posty, bo nie wiadomo czyje.
+   */
+  const [followingIds, setFollowingIds] = useState<string[] | null>(null);
+
+  // Lista obserwowanych wczytywana TYLKO wtedy, gdy zakladka jej potrzebuje.
+  // Bezwarunkowe pobieranie kosztowaloby odczyt u kazdego, kto nigdy nie
+  // zajrzy do "Follows".
+  useEffect(() => {
+    if (activeFeed !== 'following' || !address) return;
+    let anulowane = false;
+
+    (async () => {
+      try {
+        const { fetchFollowingIdSet } = await import('../utils/friends/follows');
+        const zbior = await fetchFollowingIdSet(address);
+        if (!anulowane) setFollowingIds(Array.from(zbior));
+      } catch (blad) {
+        console.error('[feed] Nie udalo sie wczytac obserwowanych:', blad);
+        // NIE ustawiamy pustej tablicy: pusta znaczy "nikogo nie obserwuje",
+        // a to zupelnie inne zdanie niz "nie udalo sie sprawdzic".
+        if (!anulowane) setFollowingIds(null);
+      }
+    })();
+
+    return () => {
+      anulowane = true;
+    };
+  }, [activeFeed, address]);
+
+  /**
    * Czy na TELEFONIE rozwiniety jest kompozytor.
    *
    * Wczesniej telefon pokazywal naraz: pasek sieci na gorze, zwinieta pigulke
@@ -799,7 +840,12 @@ function BaseChatContent() {
         } else {
           fetchedResult = await fetchPosts({
             userId: address,
-            ...(activeFeed === 'following' ? { authorFilter: address } : {})
+            // Posty OBSERWOWANYCH, nie wlasne. `followingIds` null znaczy
+            // "jeszcze nie wiem" - wtedy nie zawezamy niczym, zamiast
+            // pokazywac cudzy albo wlasny feed pod ta etykieta.
+            ...(activeFeed === 'following' && followingIds?.length
+              ? { authorsIn: followingIds }
+              : {})
           });
         }
 
@@ -876,7 +922,9 @@ function BaseChatContent() {
           console.log(`🔥 Refresh fetching fresh posts from Firebase for: ${cacheKey}`);
         const { posts: refreshedPosts } = await fetchPosts({ 
             userId: address,
-            ...(activeFeed === 'following' ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
+            ...(activeFeed === 'following' && followingIds?.length
+              ? { authorsIn: followingIds }
+              : {})
         });
           
           // 💾 Zapisz do cache'a dla przyszłych użyć
