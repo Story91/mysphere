@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { collection, query, where, getCountFromServer, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, getCountFromServer, Timestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 
 /**
@@ -71,6 +71,21 @@ async function countWhere(
   return snapshot.data().count;
 }
 
+/**
+ * Ile dokumentów w kolekcji MA dane pole.
+ *
+ * `orderBy(pole)` pomija dokumenty, w których tego pola nie ma - to nie jest
+ * dziwactwo, tylko definicja indeksu. Dzięki temu policzenie z `orderBy` mówi
+ * dokładnie tyle: ilu wpisów w ogóle dotyczą zapytania zakresowe po tym polu.
+ * Bez tej liczby każde „aktywni” jest zaniżone o nieznaną wartość.
+ */
+async function countWithField(collectionName: string, field: string): Promise<number> {
+  const snapshot = await getCountFromServer(
+    query(collection(db, collectionName), orderBy(field))
+  );
+  return snapshot.data().count;
+}
+
 function formatAge(ms: number): string {
   const mins = Math.round(ms / 60000);
   if (mins < 1) return 'przed chwilą';
@@ -108,27 +123,62 @@ export default function Statistics() {
       startOfToday.setHours(0, 0, 0, 0);
 
       // Wszystko równolegle - to niezależne zapytania, a panel czeka na komplet.
-      const [users, active24h, active7d, posts, postsToday, comments, tips] =
-        await Promise.all([
-          countWhere('users'),
-          countWhere('users', 'lastActive', since24h),
-          countWhere('users', 'lastActive', since7d),
-          countWhere('posts'),
-          countWhere('posts', 'timestamp', startOfToday.getTime()),
-          countWhere('comments'),
-          countWhere('tips'),
-        ]);
+      const [
+        users,
+        withLastActive,
+        active24h,
+        active7d,
+        active30d,
+        active365d,
+        posts,
+        postsToday,
+        posts30d,
+        comments,
+        tips,
+      ] = await Promise.all([
+        countWhere('users'),
+        // Dokumenty BEZ pola `lastActive` sa dla zapytania zakresowego
+        // niewidoczne, wiec bez tej liczby kazde "aktywni" jest zanizone o
+        // nieznana wartosc. orderBy pomija dokumenty bez pola, czyli count
+        // z orderBy = ile dokumentow to pole w ogole ma.
+        countWithField('users', 'lastActive'),
+        countWhere('users', 'lastActive', since24h),
+        countWhere('users', 'lastActive', since7d),
+        countWhere('users', 'lastActive', Date.now() - 30 * DAY),
+        countWhere('users', 'lastActive', Date.now() - 365 * DAY),
+        countWhere('posts'),
+        countWhere('posts', 'timestamp', startOfToday.getTime()),
+        countWhere('posts', 'timestamp', Date.now() - 30 * DAY),
+        countWhere('comments'),
+        countWhere('tips'),
+      ]);
+
+      const bezPola = users - withLastActive;
 
       const metrics: Metric[] = [
-        { key: 'users', label: 'Użytkownicy', value: users },
+        { key: 'users', label: 'Konta razem', value: users },
         {
           key: 'active24h',
           label: 'Aktywni 24 h',
-          hint: 'wg pola lastActive',
+          hint: 'wg lastActive',
           value: active24h,
         },
         { key: 'active7d', label: 'Aktywni 7 dni', value: active7d },
-        { key: 'posts', label: 'Posty', value: posts },
+        { key: 'active30d', label: 'Aktywni 30 dni', value: active30d },
+        {
+          key: 'active365d',
+          label: 'Aktywni 12 mies.',
+          hint: 'porównaj z 30 dniami',
+          value: active365d,
+        },
+        {
+          key: 'noLastActive',
+          label: 'Bez pola lastActive',
+          hint: 'niewidoczni w oknach wyżej',
+          value: bezPola,
+        },
+        { key: 'posts', label: 'Posty razem', value: posts },
+        { key: 'posts30d', label: 'Posty 30 dni', value: posts30d },
         { key: 'postsToday', label: 'Posty dzisiaj', value: postsToday },
         { key: 'comments', label: 'Komentarze', value: comments },
         { key: 'tips', label: 'Tipy', value: tips },
@@ -223,9 +273,16 @@ export default function Statistics() {
           </p>
           <p>
             <strong>„Aktywni” liczone są po polu <code>lastActive</code></strong>, które
-            aplikacja zapisuje jako znacznik serwerowy. Konta, które nie były aktywne od
-            czasu wprowadzenia tego pola, nie wejdą do tej liczby — to zaniżenie, nie
-            zawyżenie.
+            aplikacja zapisuje jako znacznik serwerowy. Konta bez tego pola są dla takiego
+            zapytania niewidoczne — dlatego stoi tu osobny kafelek „Bez pola lastActive”.
+            Każde „aktywni” jest zaniżone najwyżej o tę liczbę, nigdy zawyżone.
+          </p>
+          <p>
+            Okna 30-dniowe i 12-miesięczne stoją obok siebie celowo. Jedna liczba
+            aktywnych nic nie znaczy — dopiero <strong>stosunek rocznego okna do
+            miesięcznego</strong> pokazuje, czy produkt rośnie, stoi, czy się wykrusza.
+            Ten sam powód dla „Posty 30 dni” obok „Posty razem”: łączna suma rośnie
+            zawsze i sama w sobie nie mówi nic o dziś.
           </p>
           <p>
             Nic nie odświeża się samo i nic nie liczy się w tle. Ostatni wynik siedzi
