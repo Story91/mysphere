@@ -74,7 +74,8 @@ function timeAgo(ms: number): string {
 }
 
 export default async function PaidPage() {
-  const [board, payments] = await Promise.all([getLeaderboard(20), getSettledPayments(24)]);
+  const [board, tape] = await Promise.all([getLeaderboard(20), getSettledPayments(24)]);
+  const { payments, failed: tapeFailed } = tape;
 
   const addresses = Array.from(
     new Set(
@@ -115,12 +116,18 @@ export default async function PaidPage() {
         {/* ===== TASMA ===== */}
         <section className="mb-12">
           {payments.length === 0 ? (
+            /* Awaria odczytu i pusta tasma wygladaly wczesniej identycznie.
+               Na stronie, ktora obiecuje sprawdzalne liczby, zapewnienie
+               "nic jeszcze nie wplynelo" wypowiedziane po nieudanym odczycie
+               jest po prostu nieprawda - wiec mowimy, co sie naprawde stalo. */
             <div className="rounded-card bg-soft-surface p-8 text-center shadow-card">
               <p className="mb-1 font-soft-display text-[15px] font-bold text-soft-ink">
-                Nothing has settled yet
+                {tapeFailed ? 'The tape could not be loaded' : 'Nothing has settled yet'}
               </p>
               <p className="font-soft text-[13px] text-soft-ink-soft">
-                The first payment starts this tape.
+                {tapeFailed
+                  ? 'Payments are still onchain — this page just could not read them. Try again in a moment.'
+                  : 'The first payment starts this tape.'}
               </p>
             </div>
           ) : (
@@ -217,10 +224,12 @@ export default async function PaidPage() {
           {board.entries.length === 0 ? (
             <div className="rounded-card bg-soft-surface p-8 text-center shadow-card">
               <p className="mb-1 font-soft-display text-[15px] font-bold text-soft-ink">
-                Nobody has been paid yet
+                {board.failed ? 'The ranking could not be loaded' : 'Nobody has been paid yet'}
               </p>
               <p className="mx-auto max-w-[34ch] font-soft text-[13px] text-soft-ink-soft">
-                Be the first name here.
+                {board.failed
+                  ? 'This is a read error on our side, not an empty ledger.'
+                  : 'Be the first name here.'}
               </p>
             </div>
           ) : (
