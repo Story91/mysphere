@@ -35,6 +35,7 @@ import {
   ASK_POST_DESCRIPTION,
   getAskNetwork,
   getAskPostPrice,
+  getAskCurrencySymbol,
   getFacilitatorUrl,
   getPayToAddress,
 } from './app/api/asks/pricing';
@@ -105,7 +106,9 @@ function getProxy(network: string, price: string) {
             error: 'Payment required to post an Ask.',
             code: 'payment_required',
             price,
-            currency: 'USDC',
+            // Symbol z konfiguracji sieci, nie wpisany na sztywno: na
+            // Robinhood Chain rozliczamy w USDG, nie w USDC.
+            currency: getAskCurrencySymbol(),
             network,
             scheme: 'exact',
             howTo:
