@@ -66,6 +66,7 @@ import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 // Sam komponent zostaje w repo nietkniety.
 import GooeyNav from '../components/GooeyNav/GooeyNav';
 import SoftFeedMobile from './soft/SoftFeedMobile';
+import { NameWithSuffix } from '../utils/nameSuffix';
 import SoftSectionList from './soft/SoftSectionList';
 import SoftTrendsPanel from './soft/SoftTrendsPanel';
 import SoftProfileHeader from './soft/SoftProfileHeader';
@@ -636,29 +637,13 @@ function BaseChatContent() {
             }}
           >
             <span className={`${hasBaseName ? 'username-gradient' : 'text-gray-900 dark:text-white'} text-base`}>
-              {userName.endsWith('.sphere') ? (
-                <>
-                  <span className="text-gray-900 dark:text-white">{userName.replace('.sphere', '')}</span>
-                  <span className="text-blue-500">.sphere</span>
-                </>
-              ) : userName.endsWith('.camper') ? (
-                <>
-                  <span className="text-gray-900 dark:text-white">{userName.replace('.camper', '')}</span>
-                  <span className="text-orange-500">.camper🏕️</span>
-                </>
-              ) : userName.endsWith('.celo') ? (
-                <>
-                  <span className="text-gray-900 dark:text-white">{userName.replace('.celo', '')}</span>
-                  <span className="!text-yellow-500">.celo</span>
-                </>
-              ) : userName.endsWith('.world') ? (
-                <>
-                  <span className="text-gray-900 dark:text-white">{userName.replace('.world', '')}</span>
-                  <span className="text-green-500">.world</span>
-                </>
-              ) : (
-                userName
-              )}
+              {/* Koncowka trzyma kolor swojej sieci. Bylo tu piec galezi
+                  `endsWith(...)` z kolorami wpisanymi recznie - w tym
+                  `!text-yellow-500` dla `.celo`, czyli zolty na bialym,
+                  praktycznie nieczytelny. Lista koncowek zyje teraz w
+                  app/utils/nameSuffix.tsx, wiec Trends i to miejsce nie
+                  moga sie juz rozjechac. */}
+              <NameWithSuffix name={userName} className="text-gray-900 dark:text-white" />
             </span>
             {/* Base logo removed as requested */}
             {/* Podpowiedź nad nazwą zamiast pod nią */}
@@ -3387,7 +3372,20 @@ function BaseChatContent() {
                   wlasne zabrala na telefonie tipy, przypinanie, przyciski
                   transakcji per siec, tresc premium, odznaki agentow i muzyke.
                   Wyglad wolno wymieniac tylko tam, gdzie nic za soba nie ciagnie. */}
-              <div className="lg:hidden">
+              {/* TYLKO NA FEEDZIE.
+                  Pasek sieci, zakladki "All Posts / Follows / Basenames"
+                  i pigulka "What's happening onchain?" to oprawa LISTY POSTOW.
+                  Renderowaly sie jednak nad KAZDYM widokiem srodkowej kolumny:
+                  wchodzisz w Powiadomienia albo Discover i dostajesz nad nimi
+                  trzy filtry feedu oraz zaproszenie do napisania posta - w
+                  miejscu, gdzie zaden post nie powstanie i nic sie nie
+                  odfiltruje. Zakladki byly przy tym CZYNNE, wiec klikniecie
+                  "Follows" na ekranie powiadomien przelaczalo niewidoczny feed
+                  pod spodem.
+
+                  `activeMainPanel === 'feed'` to ta sama galaz, ktora nizej
+                  renderuje liste postow - oprawa i tresc wlaczaja sie razem. */}
+              <div className={activeMainPanel === 'feed' ? 'lg:hidden' : 'hidden'}>
                 <SoftFeedMobile
                   currentAddress={address}
                   avatarUrl={userProfile?.avatar}

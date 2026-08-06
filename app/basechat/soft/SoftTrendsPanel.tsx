@@ -1,6 +1,7 @@
 'use client';
 
 import { Avatar } from '../../components/identity';
+import { NameWithSuffix } from '../../utils/nameSuffix';
 
 /**
  * Panel Trends - cztery liczby i ranking najaktywniejszych.
@@ -174,9 +175,14 @@ export default function SoftTrendsPanel({
                     />
                   </span>
 
-                  <span className="min-w-0 flex-1 truncate font-soft text-[13.5px] font-semibold text-soft-ink">
-                    {user.name}
-                  </span>
+                  {/* Koncowka trzyma kolor swojej sieci - patrz
+                      app/utils/nameSuffix.tsx. Wczesniej caly napis byl
+                      jednolity, wiec .sphere, .camper, .celo i .world
+                      wygladaly identycznie. */}
+                  <NameWithSuffix
+                    name={user.name}
+                    className="min-w-0 flex-1 truncate font-soft text-[13.5px] font-semibold text-soft-ink"
+                  />
                   <span className="flex-none rounded-pill bg-soft-sunken px-2.5 py-1 font-soft-display text-[12px] font-bold tabular-nums text-soft-primary-deep">
                     {user.points.toLocaleString('en-US')}
                   </span>
