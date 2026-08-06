@@ -1,7 +1,13 @@
 'use client';
 
 /**
- * Panel Trends na telefonie - wg lewego panelu z pierwszego zrzutu.
+ * Panel Trends - cztery liczby i ranking najaktywniejszych.
+ *
+ * GDZIE STOI. Na telefonie: cala zawartosc zakladki "Trends". Na desktopie:
+ * dolna czesc jedynej kolumny bocznej, pod profilem. Byl tu wczesniej
+ * `lg:hidden` - i przez to desktop, po usunieciu starego bloku "Global
+ * Statistics", nie pokazywal juz ZADNYCH statystyk. Te same dane maja byc
+ * widoczne na obu szerokosciach; roznica ma byc w oprawie, nie w tresci.
  *
  * CZTERY KAFLE, CZTERY KOLORY. To jedyne miejsce w aplikacji, gdzie kolor jest
  * przypisany do kategorii, a nie do znaczenia - i jest to swiadomy wyjatek.
@@ -43,8 +49,8 @@ export default function SoftTrendsPanel({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 font-soft lg:hidden">
-      <h2 className="font-soft-display text-[24px] font-bold text-soft-ink">Trends</h2>
+    <div className="flex flex-col gap-4 font-soft">
+      <h2 className="font-soft-display text-[24px] font-bold text-soft-ink lg:text-[18px]">Trends</h2>
 
       <div className="grid grid-cols-2 gap-2.5">
         {stats.map((stat) => (
@@ -86,7 +92,15 @@ export default function SoftTrendsPanel({
                 >
                   <span
                     className="flex h-6 w-6 flex-none items-center justify-center rounded-full font-soft-display text-[11px] font-bold text-white"
-                    style={{ background: MEDAL[index] ?? 'var(--soft-line-strong)' }}
+                    /* rgb(var(...)), nie samo var(...). Tokeny kolorow w tym
+                       repo trzymaja TROJKE KANALOW ("185 177 216"), a nie
+                       gotowy kolor - taki jest warunek dzialania modyfikatorow
+                       przezroczystosci Tailwinda. Wstawione wprost do
+                       `background` dawalo `background: 185 177 216`, czyli CSS
+                       nieprawidlowy i po cichu pomijany: kolko traci tlo, a
+                       numer pozycji jest bialy, wiec od CZWARTEGO miejsca w dol
+                       znikal calkowicie. */
+                    style={{ background: MEDAL[index] ?? 'rgb(var(--soft-line-strong))' }}
                   >
                     {index + 1}
                   </span>

@@ -61,7 +61,9 @@ import ProfileCard from './components/ProfileCard';
 import PinnedPosts from './components/PinnedPosts';
 import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
-import GlassIcons from '../components/GlassIcons/GlassIcons';
+// GlassIcons juz tu nie wchodzi - nawigacja desktopu idzie przez
+// SoftSectionList (patrz komentarz przy liscie w kolumnie bocznej).
+// Sam komponent zostaje w repo nietkniety.
 import GooeyNav from '../components/GooeyNav/GooeyNav';
 import SoftFeedMobile from './soft/SoftFeedMobile';
 import SoftSectionList from './soft/SoftSectionList';
@@ -2356,21 +2358,25 @@ function BaseChatContent() {
         )}
         
         <div className="min-h-screen relative">
-          {/* Prosty gradient w tle zamiast skomplikowanych efektów */}
-          <div className="fixed inset-0 bg-[#050B20] z-0">
-            {/* Usuwamy wszystkie skomplikowane tła i efekty */}
-            <div className="fixed inset-0 bg-gradient-to-b from-[#050B20] via-[#071030] to-[#050B20] z-0"></div>
-          </div>
+          {/* ===== TLO STRONY - kierunek Soft Social =====
+              Bylo tu prawie czarne #050B20 z gradientem. Na telefonie feed
+              chodzil juz na jasnym `bg-soft-bg` (klasa max-lg: nizej), wiec ta
+              sama aplikacja miala dwa rozne swiaty w zaleznosci od szerokosci
+              ekranu - a na desktopie biale karty swiecily na czerni jak
+              prostokaty podswietlone od tylu. Jedno tlo na obu szerokosciach.
+              Ekran powitalny (SoftSignInHero) byl juz jasny, wiec dopiero
+              teraz reszta strony do niego pasuje. */}
+          <div className="fixed inset-0 bg-soft-bg z-0" />
 
           {/* Dodajemy klasę reduce-animation do elementów z animacjami dla urządzeń Apple */}
           <div className={`relative z-10 ${isAppleDevice ? 'reduce-animation' : ''}`}>
             {/* Widgets */}
             <div className="w-full space-y-1">
-              <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
-                <gecko-coin-price-marquee-widget 
-                  locale="en" 
+              <div className="w-full bg-soft-surface border-b border-soft-line py-1">
+                <gecko-coin-price-marquee-widget
+                  locale="en"
                   outlined="true"
-                  coin-ids="bitcoin,ethereum,binancecoin,ripple,cardano,solana,polkadot,dogecoin" 
+                  coin-ids="bitcoin,ethereum,binancecoin,ripple,cardano,solana,polkadot,dogecoin"
                   initial-currency="usd"
                 />
               </div>
@@ -2386,12 +2392,40 @@ function BaseChatContent() {
               */}
             </div>
 
-            {/* Main content with panels */}
+            {/* ===== UKLAD DESKTOP: DWIE KOLUMNY, NIE TRZY =====
+                Bylo: panel lewy 380px | feed | panel prawy 380px.
+
+                Prawa kolumna nie miala CO pokazywac na desktopie: jedyny
+                komponent w niej, SoftTrendsPanel, byl `lg:hidden`, "Global
+                Statistics" i "Trending Hashtags" zniknely w poprzednim kroku,
+                a kafelek YapScan chowa sie sam, bo /yapscan jest wylaczone
+                w config/routeStatus.js. Zostawalo 380px bialej pustki
+                dosunietej do prawej krawedzi - i zaden desktopowy uzytkownik
+                nie widzial juz ZADNYCH statystyk. `lg:hidden` z Trends poszlo
+                (patrz SoftTrendsPanel), a panel wrocil - w tej kolumnie.
+
+                Teraz jedna kolumna boczna trzyma wszystko, co nie jest feedem
+                (nawigacja, profil, Trends, ranking polecen), a feed dostaje
+                cala reszte szerokosci i wlasna miare czytania. Zawartosc
+                obu paneli zmiescila sie w jednej bez straty - nic nie
+                wypadlo, patrz komentarze przy przeniesionych blokach.
+
+                NA TELEFONIE NIC SIE NIE ZMIENIA W NAWIGACJI: trzy zakladki na
+                dole dalej prowadza do trzech osobnych ekranow. Ten sam
+                kontener obsluguje teraz dwie z nich ('left' i 'right'), a o
+                tym, ktora tresc widac, decyduja dwa opakowania nizej. */}
             <div className="flex h-screen overflow-hidden">
-              {/* Left panel (Profile & Stats) */}
+              {/* Kolumna boczna: nawigacja + profil + Trends */}
               <div className={`${
-                activeMobilePanel === 'left' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
-              } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4 mobile-scroll-container`}
+                activeMobilePanel === 'left' || activeMobilePanel === 'right'
+                  ? 'fixed inset-0 z-30 pt-[120px] pb-24'
+                  : 'hidden'
+              } ${
+                /* Niezalogowany desktop: kolumna schodzi z drogi, zeby ekran
+                   powitalny byl jedyna rzecza na ekranie. Na telefonie zostaje
+                   - stamtad prowadza do niej zakladki na dole. */
+                isConnected ? 'lg:block' : 'lg:hidden'
+              } lg:relative lg:w-[352px] xl:w-[380px] lg:flex-none lg:pt-6 lg:pb-24 lg:border-r lg:border-soft-line bg-soft-bg overflow-y-auto p-4 lg:px-5 mobile-scroll-container`}
                                  style={{
                    WebkitOverflowScrolling: 'touch',
                    overscrollBehavior: 'contain'
@@ -2404,6 +2438,132 @@ function BaseChatContent() {
                    <div className="absolute right-0 top-0 w-8 h-full pointer-events-auto"
                         style={{ touchAction: 'pan-y' }}></div>
                  </div>
+
+              {/* ===== PROFIL I NAWIGACJA =====
+                  Na telefonie to zawartosc zakladki "Profile". Na desktopie -
+                  gorna czesc jedynej kolumny bocznej. Opakowanie chowa ja
+                  tylko wtedy, gdy telefon stoi na zakladce "Trends". */}
+              <div className={activeMobilePanel === 'right' ? 'hidden lg:block' : ''}>
+
+                {/* ===== NAWIGACJA NA DESKTOPIE =====
+                    Te szesc pozycji stalo dotad NAD FEEDEM jako siatka
+                    <GlassIcons/>. Handlery sa przeniesione JEDEN DO JEDNEGO,
+                    razem z warunkiem `isConnected` i z galezia `address ? ...`,
+                    ktora dokladala trzy ostatnie pozycje tylko po podlaczeniu
+                    portfela.
+
+                    Dlaczego inna oprawa, skoro zasada brzmi "przemalowac, nie
+                    podmieniac": GlassIcons rysuje sie w siatce `lg:grid-cols-6`
+                    i zaklada CIEMNE tlo (kafle `bg-white/10`, tekst
+                    `text-gray-700`, aktywny gradient niebiesko-fioletowy).
+                    W kolumnie 352px to sie nie miesci, a na jasnym tle aktywny
+                    kafel schodzi ponizej czytelnego kontrastu. Zamiast tego
+                    ta sama lista, ktora telefon ma juz dzis - jedna nawigacja
+                    na obu szerokosciach zamiast dwoch roznych.
+
+                    NIC NIE UBYLO: szesc akcji = szesc akcji, ta sama tresc
+                    etykiet, to samo `isActive`. */}
+                {isConnected && (
+                  <SoftSectionList
+                    className="mb-6 hidden lg:flex"
+                    ariaLabel="Browse"
+                    variant="compact"
+                    sections={[
+                      {
+                        id: 'desktop-feed',
+                        label: 'All Posts',
+                        description: 'Everything, newest first',
+                        icon: <LayoutGrid className="w-5 h-5" />,
+                        isActive: activeMainPanel === 'feed',
+                        onSelect: () => {
+                          setSelectedTag('');
+                          setSelectedAuthor('');
+                          setActiveMainPanel('feed');
+                          clearViewParams();
+                        },
+                      },
+                      {
+                        id: 'desktop-profile',
+                        label: 'My Profile',
+                        description: 'Your builder profile',
+                        icon: <UserCircle className="w-5 h-5" />,
+                        isActive: activeMainPanel === 'builders',
+                        onSelect: () => {
+                          if (address) {
+                            handleViewBuilderProfile(address);
+                            clearViewParams();
+                          } else {
+                            toast.error('Connect your wallet to view builder profiles');
+                          }
+                        },
+                      },
+                      {
+                        id: 'desktop-myfeed',
+                        label: showMyFeed ? 'All Posts' : 'My Feed',
+                        description: 'Only your own posts',
+                        icon: <Rss className="w-5 h-5" />,
+                        isActive: showMyFeed,
+                        onSelect: () => {
+                          setShowMyFeed(!showMyFeed);
+                          clearViewParams();
+                          if (isConnected && address) {
+                            const loadPosts = async () => {
+                              try {
+                                setIsLoadingPosts(true);
+                                const { posts: fetchedPosts } = await fetchPosts({
+                                  userId: address,
+                                  ...(!showMyFeed ? { authorFilter: address } : {})
+                                });
+                                setPosts(fetchedPosts);
+                              } catch (error) {
+                                console.error('Error fetching posts:', error);
+                              } finally {
+                                setIsLoadingPosts(false);
+                              }
+                            };
+                            loadPosts();
+                          }
+                        },
+                      },
+                      ...(address ? [
+                        {
+                          id: 'desktop-following',
+                          label: 'Follows',
+                          description: 'Only people you follow',
+                          icon: <Eye className="w-5 h-5" />,
+                          isActive: activeMainPanel === 'following',
+                          onSelect: () => {
+                            setActiveMainPanel('following');
+                            clearViewParams();
+                          },
+                        },
+                        {
+                          id: 'desktop-friends',
+                          label: 'Friends',
+                          description: 'People you both follow',
+                          icon: <Users className="w-5 h-5" />,
+                          isActive: activeMainPanel === 'friends',
+                          onSelect: () => {
+                            setActiveMainPanel('friends');
+                            clearViewParams();
+                          },
+                        },
+                        {
+                          id: 'desktop-discover',
+                          label: 'Discover',
+                          description: 'Find people to follow',
+                          icon: <Compass className="w-5 h-5" />,
+                          isActive: activeMainPanel === 'discover',
+                          onSelect: () => {
+                            setActiveMainPanel('discover');
+                            clearViewParams();
+                          },
+                        }
+                      ] : [])
+                    ]}
+                  />
+                )}
+
                 <div className="mb-8">
                   {isConnected ? (
                     <div className="space-y-4">
@@ -2421,6 +2581,7 @@ function BaseChatContent() {
                           Na desktopie nic sie nie zmienia - tam jest miejsce
                           w bok i rzad kafli nikomu nie przeszkadza. */}
                       <SoftSectionList
+                        className="mb-4 lg:hidden"
                         sections={[
                           {
                             id: 'feed',
@@ -2440,7 +2601,11 @@ function BaseChatContent() {
                             id: 'following',
                             label: 'Follows',
                             description: 'Only people you follow',
-                            icon: <Rss className="w-5 h-5" />,
+                            // Ikony sa teraz TAKIE SAME jak w liscie desktopowej
+                            // nizej. Wczesniej Rss oznaczalo tu "Follows",
+                            // a na desktopie "My Feed" - ten sam znak dwie
+                            // rozne rzeczy, w zaleznosci od szerokosci ekranu.
+                            icon: <Eye className="w-5 h-5" />,
                             isActive: activeMainPanel === 'following',
                             onSelect: () => {
                               setActiveMainPanel('following');
@@ -2462,7 +2627,7 @@ function BaseChatContent() {
                             id: 'discover',
                             label: 'Discover',
                             description: 'Find people to follow',
-                            icon: <Eye className="w-5 h-5" />,
+                            icon: <Compass className="w-5 h-5" />,
                             isActive: activeMainPanel === 'discover',
                             onSelect: () => {
                               setActiveMainPanel('discover');
@@ -2878,7 +3043,7 @@ function BaseChatContent() {
                       {/* YapYap Integration - moved outside About Me */}
                       {address && (
                         <div className="mb-4">
-                          <div className="bg-white dark:bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                          <div className="rounded-card bg-soft-surface p-4 shadow-card">
                             <YapsMetrics address={address} />
                             <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-center">
                               <div className="flex items-center">
@@ -2896,15 +3061,13 @@ function BaseChatContent() {
                         </div>
                       )}
 
-                      {/* Bio Section - Moved and restyled */}
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
+                      {/* Bio. Naglowek byl tekstem z gradientem (bg-clip-text)
+                          i ikona-dekoracja obok - jedno i drugie to sygnal
+                          "wygenerowane", a nie hierarchia. Teraz zwykly
+                          naglowek w kroju naglowkowym. */}
+                      <div className="mt-4 rounded-card bg-soft-surface p-4 shadow-card">
                         <div className="flex justify-between items-center mb-3">
-                          <div className="flex items-center space-x-2">
-                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                            <div className="text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">About Me</div>
-                          </div>
+                          <h3 className="font-soft-display text-[15px] font-bold text-soft-ink">About Me</h3>
                           <button
                             onClick={async () => {
                               if (!address) return;
@@ -2932,7 +3095,7 @@ function BaseChatContent() {
                                 setUserProfile(prev => ({ ...prev, bio: newBio }));
                               }
                             }}
-                            className="flex items-center space-x-1 text-sm text-blue-500 hover:text-blue-600 transition-colors duration-200"
+                            className="flex items-center space-x-1 rounded-pill px-2 py-1 font-soft text-[13px] font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -2940,15 +3103,10 @@ function BaseChatContent() {
                             <span>Edit</span>
                           </button>
                         </div>
-                        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
-                          <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                            {userProfile.bio || 
-                              <span className="text-gray-400 italic flex items-center justify-center space-x-2">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>Click Edit to add your bio</span>
-                              </span>
+                        <div className="rounded-[14px] bg-soft-sunken p-4">
+                          <div className="font-soft text-[13.5px] leading-relaxed text-soft-ink-muted">
+                            {userProfile.bio ||
+                              <span className="text-soft-ink-soft">Nothing here yet - use Edit to add your bio.</span>
                             }
                           </div>
                         </div>
@@ -3025,7 +3183,7 @@ function BaseChatContent() {
 
                     {/* YapYap Integration */}
                     <div className="mb-4">
-                      <div className="bg-white dark:bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                      <div className="rounded-card bg-soft-surface p-4 shadow-card">
                         <YapsMetrics address={''} />
                         <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-center">
                           <div className="flex items-center">
@@ -3042,26 +3200,21 @@ function BaseChatContent() {
                       </div>
                     </div>
 
-                    {/* Bio Section */}
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center space-x-2">
-                          <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                          <div className="text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">About Me</div>
-                        </div>
-                        <button className="flex items-center space-x-1 text-sm text-blue-500 hover:text-blue-600 transition-colors duration-200">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          <span>Edit</span>
-                        </button>
-                      </div>
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
-                        <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                          Building the future of DeFi on Base 🚀 Love Web3, NFTs, and innovative blockchain solutions. Always learning, always building! 💙
-                        </div>
+                    {/* Bio - widok bez podlaczonego portfela.
+                        BYLO TU ZMYSLONE BIO ("Building the future of DeFi on
+                        Base... Always learning, always building!") wpisane na
+                        sztywno w kod. Widzial je kazdy niezalogowany gosc, przy
+                        awatarze-duchu i adresie 0x0000...0000 - czyli produkt,
+                        ktorego cala teza brzmi "te dane sa sprawdzalne",
+                        otwieral sie wymyslonym cudzym zyciorysem.
+                        Teraz honest empty state: nie ma danych, bo nie ma
+                        jeszcze uzytkownika, i tak to pisze. */}
+                    <div className="mt-4 rounded-card bg-soft-surface p-4 shadow-card">
+                      <h3 className="mb-3 font-soft-display text-[15px] font-bold text-soft-ink">About Me</h3>
+                      <div className="rounded-[14px] bg-soft-sunken p-4">
+                        <p className="font-soft text-[13.5px] leading-relaxed text-soft-ink-soft">
+                          Sign in to write your bio.
+                        </p>
                       </div>
                     </div>
 
@@ -3096,13 +3249,85 @@ function BaseChatContent() {
                     </div>
                   </div>
           )}
+                </div>
+              </div>
+
+              {/* ===== TRENDS - PRZENIESIONE Z PRAWEGO PANELU =====
+                  Ten sam <SoftTrendsPanel/> z tymi samymi propsami i ten sam
+                  kafelek YapScan. Nie ma tu drugiego zrodla liczb ani drugiego
+                  komponentu - blok zostal przeniesiony, nie odtworzony.
+
+                  NA TELEFONIE: zakladka "Trends" na dole dalej otwiera dokladnie
+                  to i tylko to (blok wyzej jest wtedy schowany), wiec trzy
+                  zakladki nadal prowadza do trzech roznych ekranow.
+                  NA DESKTOPIE: siedzi pod profilem w tej samej kolumnie,
+                  oddzielony linia - dlatego przestal byc potrzebny osobny
+                  panel po prawej. */}
+              <div
+                className={`${
+                  activeMobilePanel === 'right' ? 'block' : 'hidden lg:block'
+                } lg:mt-8 lg:border-t lg:border-soft-line lg:pt-6`}
+              >
+                <SoftTrendsPanel
+                  stats={[
+                    { label: 'Users', value: String(totalUsers), tone: 'purple' },
+                    { label: 'Likes', value: String(totalLikes), tone: 'amber' },
+                    { label: 'Posts', value: String(totalPosts), tone: 'green' },
+                    { label: 'Comments', value: String(totalComments), tone: 'pink' },
+                  ]}
+                  activeUsers={(activeUsers || []).slice(0, 5).map((user: any) => ({
+                    address: user.address,
+                    name: user.name || `${String(user.address).slice(0, 6)}…${String(user.address).slice(-4)}`,
+                    points: user.totalPoints ?? user.points ?? 0,
+                  }))}
+                  onOpenUser={(userAddress) => handleViewBuilderProfile(userAddress)}
+                />
+
+                {/* ===== USUNIETE Z PRAWEGO PANELU (poprzedni krok, opis zostaje) =====
+                    1. "Global Statistics" - te SAME cztery liczby (Users, Likes,
+                       Posts, Comments) renderowal juz SoftTrendsPanel wyzej.
+                       Stały wiec dwa razy pod soba, w dwoch roznych stylach.
+                       To nie byla nadmiarowa informacja, tylko ta sama
+                       informacja dwa razy.
+
+                    2. "Trending Hashtags" - decyzja produktowa wlasciciela.
+
+                    Liczniki (totalUsers, totalLikes...) zostaja - zasilaja
+                    SoftTrendsPanel. Za to `trendingTags` i `expandedTagsList`
+                    poszly razem z widokiem: po usunieciu tamtego bloku NIC ich
+                    juz nie czytalo, a `getTrendingTags(posts)` przemiatal cala
+                    liste postow przy KAZDEJ jej zmianie, zeby policzyc hashtagi
+                    dla nikogo. */}
+                {/* Yaps Stats Widget - ukryty, gdy /yapscan jest wylaczony
+                    (config/routeStatus.js). Bez tego kafelek prowadzilby
+                    w przekierowanie z powrotem na /basechat. */}
+                <div className={`mt-4 ${isRouteDisabled('/yapscan') ? 'hidden' : ''}`}>
+                  <a
+                    href="/yapscan"
+                    className="flex items-center justify-between rounded-card bg-soft-surface p-4 shadow-card transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  >
+                    <span className="font-soft-display text-[15px] font-bold text-soft-ink">YapScan</span>
+                    <svg className="h-4 w-4 text-soft-primary" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
+                  </a>
+                </div>
               </div>
             </div>
 
-            {/* Middle panel (Feed) */}
-            <div className={`flex-1 overflow-y-auto p-4 max-lg:bg-soft-bg ${
+            {/* ===== KOLUMNA GLOWNA: SAM FEED =====
+                Stala tu wczesniej nawigacja (szesc kafli GlassIcons) nad
+                trescia. Poszla do kolumny bocznej - zostal kompozytor i lista
+                postow, czyli to, po co ludzie tu wchodza.
+
+                MIARA CZYTANIA. Kolumna bierze cala wolna szerokosc, ale tresc
+                w srodku konczy sie na 640px i stoi na srodku. Bez tego na
+                szerokim monitorze linia tekstu w poscie ciagnela sie przez
+                cala reszte ekranu i oko gubilo poczatek nastepnej. */}
+            <div className={`flex-1 overflow-y-auto bg-soft-bg p-4 lg:px-8 lg:pt-6 lg:pb-24 ${
               activeMobilePanel === 'main' ? 'block w-full' : 'hidden lg:block'
             }`}>
+              <div className="mx-auto w-full max-w-[640px]">
               {/* ===== OPRAWA MOBILNA - kierunek Soft Social =====
                   Wymienia WYLACZNIE oprawe feedu ponizej progu `lg`: tlo, pasek
                   sieci jako "stories", zakladki-pigulki i zwiniety kompozytor.
@@ -3131,109 +3356,30 @@ function BaseChatContent() {
                 />
               </div>
 
-              {/* Post switcher and network selection - only for logged in users.
-                  UKRYTE NA TELEFONIE (`hidden lg:block`): te same funkcje sa tam
-                  podane inaczej - zakladki feedu w pasku Soft Social nad tym
-                  blokiem, a przelacznik widokow (My Profile / Friends / Follows /
-                  Discover) przeniesiony do panelu Profil, tak jak robi to Twitter.
-                  Zostawienie obu naraz dawalo na telefonie DWA rzedy niemal
-                  identycznych filtrow jeden nad drugim. */}
-              {isConnected && (
-              <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4">
-                <div className="flex flex-col gap-3">
-                  {/* Main filters row - Glass Icons */}
-                  <div className="relative">
-                    <GlassIcons
-                      items={[
-                        {
-                          icon: <LayoutGrid className="w-5 h-5" />,
-                          label: 'All Posts',
-                          onClick: () => {
-                            setSelectedTag('');
-                            setSelectedAuthor('');
-                            setActiveMainPanel('feed');
-                            clearViewParams();
-                          },
-                          isActive: activeMainPanel === 'feed'
-                        },
-                        {
-                          icon: <UserCircle className="w-5 h-5" />,
-                          label: 'My Profile',
-                          onClick: () => {
-                            if (address) {
-                              handleViewBuilderProfile(address);
-                              clearViewParams();
-                            } else {
-                              toast.error('Connect your wallet to view builder profiles');
-                            }
-                          },
-                          isActive: activeMainPanel === 'builders'
-                        },
-                        {
-                          icon: <Rss className="w-5 h-5" />,
-                          label: showMyFeed ? 'All Posts' : 'My Feed',
-                          onClick: () => {
-                            setShowMyFeed(!showMyFeed);
-                            clearViewParams();
-                            if (isConnected && address) {
-                              const loadPosts = async () => {
-                                try {
-                                  setIsLoadingPosts(true);
-                                  const { posts: fetchedPosts } = await fetchPosts({ 
-                                    userId: address,
-                                    ...(!showMyFeed ? { authorFilter: address } : {})
-                                  });
-                                  setPosts(fetchedPosts);
-                                } catch (error) {
-                                  console.error('Error fetching posts:', error);
-                                } finally {
-                                  setIsLoadingPosts(false);
-                                }
-                              };
-                              loadPosts();
-                            }
-                          },
-                          isActive: showMyFeed
-                        },
-                        ...(address ? [
-                          {
-                            icon: <Eye className="w-5 h-5" />,
-                            label: 'Follows',
-                            onClick: () => {
-                              setActiveMainPanel('following');
-                              clearViewParams();
-                            },
-                            isActive: activeMainPanel === 'following'
-                          },
-                          {
-                            icon: <Users className="w-5 h-5" />,
-                            label: 'Friends',
-                            onClick: () => {
-                              setActiveMainPanel('friends');
-                              clearViewParams();
-                            },
-                            isActive: activeMainPanel === 'friends'
-                          },
-                          {
-                            icon: <Compass className="w-5 h-5" />,
-                            label: 'Discover',
-                            onClick: () => {
-                              setActiveMainPanel('discover');
-                              clearViewParams();
-                            },
-                            isActive: activeMainPanel === 'discover'
-                          }
-                        ] : [])
-                      ]}
-                    />
-                  </div>
-                 </div>
-              </div>
-              )}
+              {/* ===== NAWIGACJA WYPROWADZONA Z FEEDU =====
+                  Staly tu kafle "All Posts / My Profile / My Feed / Follows /
+                  Friends / Discover" (GlassIcons). Cztery z szesciu w ogole
+                  nie sa feedem, tylko osobnymi widokami - a mimo to zajmowaly
+                  pierwszy ekran nad trescia, po ktora ludzie tu przychodza.
 
-              {/* Network Filter tabs - Gooey Nav */}
+                  Te same szesc akcji, z handlerami przepisanymi jeden do
+                  jednego (razem z warunkiem `isConnected` i z galezia
+                  `...(address ? [...])`, ktora dokladala trzy ostatnie pozycje
+                  dopiero po podlaczeniu portfela), stoi teraz na gorze kolumny
+                  bocznej - w tej samej liscie SoftSectionList, ktora telefon ma
+                  juz dzis. Jedna nawigacja na obu szerokosciach zamiast dwoch
+                  roznych. Szczegoly przy samej liscie. */}
+
+              {/* Wybor sieci. To NIE jest filtr feedu - steruje tym, ktory
+                  kompozytor sie pokazuje i na ktorym lancuchu wyladuje post.
+                  Dlatego zostaje w kolumnie glownej, tuz nad kompozytorem,
+                  a nie w kolumnie bocznej. Podpis dodany, bo sam rzad logotypow
+                  nie mowil, co robi klikniecie. */}
               {isConnected && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4 border border-gray-200 dark:border-gray-700">
+              <div className="mb-4 rounded-card bg-soft-surface p-3 shadow-card">
+                <div className="mb-2 px-1 font-soft text-[11.5px] font-bold uppercase tracking-[0.08em] text-soft-ink-faint">
+                  Network
+                </div>
                 <GooeyNav
                   items={[
                     {
@@ -3341,7 +3487,7 @@ function BaseChatContent() {
 
               {/* Main content switcher based on activeMainPanel (Przełącznik głównej zawartości) */}
               {activeMainPanel === 'builders' ? (
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden border border-blue-100 dark:border-blue-900">
+                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
                   {/* Builder Profile Content */}
                   {selectedBuilderProfile ? (
                     <BuilderProfile 
@@ -3369,7 +3515,7 @@ function BaseChatContent() {
                 </div>
               ) : activeMainPanel === 'following' ? (
                 /* 👥 FOLLOWING VIEW (Widok obserwowanych) */
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
                   <FollowingView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -3377,7 +3523,7 @@ function BaseChatContent() {
                 </div>
               ) : activeMainPanel === 'friends' ? (
                 /* 🤝 FRIENDS VIEW (Widok znajomych) */
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
                   <FriendsView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -3385,7 +3531,7 @@ function BaseChatContent() {
                 </div>
               ) : activeMainPanel === 'discover' ? (
                 /* 🔍 DISCOVER VIEW (Widok odkrywania) */
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
                   <DiscoverView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -3393,7 +3539,7 @@ function BaseChatContent() {
                 </div>
               ) : activeMainPanel === 'notifications' ? (
                 /* 🔔 NOTIFICATIONS VIEW (Widok powiadomień) */
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
                   <NotificationsView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -3405,7 +3551,7 @@ function BaseChatContent() {
                   {isConnected ? (
                     <>
                       {canCreatePosts ? (
-                        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow mb-6">
+                        <div className="rounded-card bg-soft-surface p-4 shadow-card mb-6">
                           {/* Show Base post form conditionally */}
                           {activePostingNetwork === 'base' && (
                             <>
@@ -3423,10 +3569,23 @@ function BaseChatContent() {
                               <textarea
                                 value={newPost}
                                 onChange={(e) => setNewPost(e.target.value)}
-                                placeholder="Add any photo, first letters of your post will be a $ticker, and launch your PostCoin or just Post your thoughts onchain."
-                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                placeholder="What's happening onchain?"
+                                className="w-full resize-none rounded-card bg-soft-sunken px-4 py-3 font-soft text-[14px] text-soft-ink placeholder-soft-ink-soft focus:outline-none focus:ring-2 focus:ring-soft-primary"
                                 rows={3}
                               />
+
+                              {/* Ta sama informacja, ktora byla wczesniej
+                                  UPCHNIETA W PLACEHOLDER ("Add any photo, first
+                                  letters of your post will be a $ticker, and
+                                  launch your PostCoin or just Post your thoughts
+                                  onchain."). Placeholder znika w chwili, gdy
+                                  zaczynasz pisac - czyli zasada dzialania
+                                  $tickera znikala dokladnie wtedy, kiedy byla
+                                  potrzebna. Nic nie ubylo, tresc stoi na stale
+                                  pod polem. */}
+                              <p className="mt-2 font-soft text-[12px] text-soft-ink-soft">
+                                First letters of your post become the $ticker of your PostCoin.
+                              </p>
 
                               <PremiumComposer
                                 value={premium}
@@ -3741,67 +3900,14 @@ function BaseChatContent() {
                   )}
                 </>
               )}
-            </div>
-
-            {/* Right panel (Trends & Global Statistics) */}
-            <div className={`${
-              activeMobilePanel === 'right' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
-            } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-soft-bg lg:bg-soft-surface overflow-y-auto p-4`}>
-              {/* ===== TRENDS NA TELEFONIE - kierunek Soft Social =====
-                  Cztery kafle statystyk i ranking w nowym wygladzie. Stary blok
-                  ponizej dostal `hidden lg:block`, wiec DESKTOP IDZIE STARA
-                  SCIEZKA bez zmian - te same dane, ten sam kod, inna oprawa
-                  tylko tam, gdzie ekran jest waski. */}
-              <SoftTrendsPanel
-                stats={[
-                  { label: 'Users', value: String(totalUsers), tone: 'purple' },
-                  { label: 'Likes', value: String(totalLikes), tone: 'amber' },
-                  { label: 'Posts', value: String(totalPosts), tone: 'green' },
-                  { label: 'Comments', value: String(totalComments), tone: 'pink' },
-                ]}
-                activeUsers={(activeUsers || []).slice(0, 5).map((user: any) => ({
-                  address: user.address,
-                  name: user.name || `${String(user.address).slice(0, 6)}…${String(user.address).slice(-4)}`,
-                  points: user.totalPoints ?? user.points ?? 0,
-                }))}
-                onOpenUser={(userAddress) => handleViewBuilderProfile(userAddress)}
-              />
-
-              {/* ===== USUNIETE Z PRAWEGO PANELU =====
-                  1. "Global Statistics" - te SAME cztery liczby (Users, Likes,
-                     Posts, Comments) renderowal juz SoftTrendsPanel wyzej.
-                     Na desktopie stały wiec dwa razy pod soba, w dwoch roznych
-                     stylach: raz w kierunku Soft Social, raz w starych szarych
-                     kaflach z gradientowym naglowkiem. To nie byla nadmiarowa
-                     informacja, tylko ta sama informacja dwa razy.
-
-                  2. "Trending Hashtags" - decyzja produktowa wlasciciela.
-
-                  Liczniki (totalUsers, totalLikes...) zostaja - zasilaja
-                  SoftTrendsPanel. Za to `trendingTags` i `expandedTagsList`
-                  poszly razem z widokiem: sprawdzilem i po usunieciu tego
-                  bloku NIC ich juz nie czytalo, a `getTrendingTags(posts)`
-                  przemiatal cala liste postow przy KAZDEJ jej zmianie, zeby
-                  policzyc hashtagi dla nikogo. */}
-              {/* Yaps Stats Widget - ukryty, gdy /yapscan jest wylaczony
-                  (config/routeStatus.js). Bez tego kafelek prowadzilby
-                  w przekierowanie z powrotem na /basechat. */}
-              <div className={`mb-4 ${isRouteDisabled('/yapscan') ? 'hidden' : ''}`}>
-                <a 
-                  href="/yapscan" 
-                  className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-600 font-medium">YapScan</span>
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                  </div>
-                </a>
               </div>
             </div>
-              </div>
+
+              {/* Panel prawy zostal scalony z kolumna boczna - jego zawartosc
+                  (SoftTrendsPanel + kafelek YapScan) stoi teraz pod profilem,
+                  patrz komentarz "TRENDS - PRZENIESIONE Z PRAWEGO PANELU". */}
             </div>
+          </div>
           </div>
 
       {/* Animowany modal */}
@@ -3876,59 +3982,66 @@ function BaseChatContent() {
       </div>
 
 
-      {/* Mobile footer */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-t border-[#0052FF]/20 z-40">
+      {/* ===== PASEK ZAKLADEK NA TELEFONIE =====
+          Ten sam mechanizm co dotad: trzy przyciski ustawiaja activeMobilePanel
+          na 'left' | 'main' | 'right'. Zmieniona jest wylacznie oprawa.
+
+          Co bylo nie tak: pasek stal na polprzezroczystym niebieskim
+          (#0052FF/10), a NIEAKTYWNE ikony dostawaly kolor #172554 - prawie
+          czarny granat. Na jasnym tle strony ikona nieaktywna byla ciemniejsza
+          niz aktywna, wiec pasek pokazywal odwrotnie, gdzie sie stoi. Do tego
+          podpisy szly w #60A5FA na jasnym tle, czyli na granicy czytelnosci.
+
+          Teraz: bialy pasek, aktywna zakladka w fiolecie interfejsu i na
+          podkladce, nieaktywne w spokojnym szarofiolecie. Doszlo aria-current,
+          bo dotad czytnik ekranu nie mial skad wiedziec, ktora zakladka jest
+          otwarta. */}
+      <nav
+        aria-label="Sections"
+        className="fixed bottom-0 left-0 right-0 lg:hidden bg-soft-surface/95 backdrop-blur-xl border-t border-soft-line z-40"
+      >
         <div className="flex items-center justify-around p-4">
           <button
             onClick={() => setActiveMobilePanel('left')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${
-              activeMobilePanel === 'left' 
-                ? 'bg-blue-500/10 text-[#0052FF] font-medium' 
-                : 'text-gray-100 hover:bg-blue-500/5'
-            }`}
+            aria-current={activeMobilePanel === 'left' ? 'page' : undefined}
+            className="flex flex-col items-center rounded-card p-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            <div className={`p-1 rounded-full ${activeMobilePanel === 'left' ? 'bg-blue-500/20' : ''}`}>
-              <UserIcon 
-                className="w-6 h-6" 
-                color={activeMobilePanel === 'left' ? '#0052FF' : '#172554'} 
+            <div className={`p-1 rounded-full ${activeMobilePanel === 'left' ? 'bg-soft-sunken' : ''}`}>
+              <UserIcon
+                className="w-6 h-6"
+                color={activeMobilePanel === 'left' ? '#7C6BDA' : '#8D86AB'}
               />
             </div>
-            <span className={`text-xs mt-1 font-medium ${activeMobilePanel === 'left' ? 'text-[#0052FF]' : 'text-[#60A5FA]'}`}>Profile</span>
+            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'left' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Profile</span>
           </button>
           <button
             onClick={() => setActiveMobilePanel('main')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${
-              activeMobilePanel === 'main' 
-                ? 'bg-blue-500/10 text-[#0052FF] font-medium' 
-                : 'text-gray-100 hover:bg-blue-500/5'
-            }`}
+            aria-current={activeMobilePanel === 'main' ? 'page' : undefined}
+            className="flex flex-col items-center rounded-card p-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            <div className={`p-1 rounded-full ${activeMobilePanel === 'main' ? 'bg-blue-500/20' : ''}`}>
-              <HomeIcon 
-                className="w-6 h-6" 
-                color={activeMobilePanel === 'main' ? '#0052FF' : '#172554'} 
+            <div className={`p-1 rounded-full ${activeMobilePanel === 'main' ? 'bg-soft-sunken' : ''}`}>
+              <HomeIcon
+                className="w-6 h-6"
+                color={activeMobilePanel === 'main' ? '#7C6BDA' : '#8D86AB'}
               />
             </div>
-            <span className={`text-xs mt-1 font-medium ${activeMobilePanel === 'main' ? 'text-[#0052FF]' : 'text-[#60A5FA]'}`}>Feed</span>
+            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'main' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Feed</span>
           </button>
           <button
             onClick={() => setActiveMobilePanel('right')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${
-              activeMobilePanel === 'right' 
-                ? 'bg-blue-500/10 text-[#0052FF] font-medium' 
-                : 'text-gray-100 hover:bg-blue-500/5'
-            }`}
+            aria-current={activeMobilePanel === 'right' ? 'page' : undefined}
+            className="flex flex-col items-center rounded-card p-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            <div className={`p-1 rounded-full ${activeMobilePanel === 'right' ? 'bg-blue-500/20' : ''}`}>
-              <ChartBarIcon 
-                className="w-6 h-6" 
-                color={activeMobilePanel === 'right' ? '#0052FF' : '#172554'} 
+            <div className={`p-1 rounded-full ${activeMobilePanel === 'right' ? 'bg-soft-sunken' : ''}`}>
+              <ChartBarIcon
+                className="w-6 h-6"
+                color={activeMobilePanel === 'right' ? '#7C6BDA' : '#8D86AB'}
               />
             </div>
-            <span className={`text-xs mt-1 font-medium ${activeMobilePanel === 'right' ? 'text-[#0052FF]' : 'text-[#60A5FA]'}`}>Trends</span>
+            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'right' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Trends</span>
           </button>
         </div>
-      </div>
+      </nav>
 
       {/* Padding for mobile footer */}
       <div className="h-20 lg:h-0" />
