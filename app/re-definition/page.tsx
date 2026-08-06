@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { DISABLED_ROUTES } from '@/config/routeStatus';
 
 export const metadata: Metadata = {
-  title: 'Re-Definition — money buys judgment on MySphere',
+  // Marke dokłada template z layoutu - patrz komentarz w app/leaderboard/page.tsx.
+  title: 'Re-Definition — money buys judgment',
   description:
     'MySphere is becoming the first feed where the buyer can be a machine, the worker is a human, and reputation is minted only by settled payments. Here is how an Ask works.',
   openGraph: {

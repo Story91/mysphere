@@ -38,7 +38,9 @@ export const runtime = 'nodejs';
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: 'Paid — money moving on MySphere',
+  // Bez marki: dokłada ja `title.template` z layoutu glownego ('%s · MySphere').
+  // Zostawiona tutaj dawala 'Paid — money moving on MySphere · MySphere'.
+  title: 'Paid — money moving',
   description:
     'A public timeline of settled payments between people. Every line carries a transaction anyone can open and check. No points, no activity score.',
   openGraph: {

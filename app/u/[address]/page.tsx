@@ -33,7 +33,8 @@ async function resolveDisplayName(address: string, storedName?: string) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const profile = await getProfile(params.address);
-  if (!profile) return { title: 'Profile not found — MySphere' };
+  // Marke dokłada `title.template` z layoutu glownego.
+  if (!profile) return { title: 'Profile not found' };
 
   const name = await resolveDisplayName(profile.address, profile.storedName);
   const tipLine = summarizeTips(profile.tips.received);
@@ -43,7 +44,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     : `${profile.postCount} posts and ${profile.likesReceived} likes on MySphere.`;
 
   return {
-    title: `${name} — MySphere`,
+    title: name,
     description,
     openGraph: { title: `${name} on MySphere`, description, type: 'profile' },
     alternates: { canonical: `https://mysphere.fun/u/${profile.address}` },

@@ -28,7 +28,17 @@ import type { Metadata } from 'next';
  */
 
 const ASKS_DESCRIPTION =
-  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed until the author resolves, and the author pays only for the ones they accept.';
+  // NIE obiecujemy przyjmowania odpowiedzi ani rozstrzygania.
+  //
+  // Poprzednie zdanie konczylo sie na "the author pays only for the ones they
+  // accept" - i to bylo nieprawda. Sprawdzone w kodzie: `acceptAnswer`
+  // i `resolveAsk` nie maja ANI JEDNEGO wywolania w calym repo, nie ma trasy
+  // API do rozstrzygania, a AskCard renderuje przycisk "Answer" jako null,
+  // bo nikt nie podaje mu handlera.
+  //
+  // Zapieczetowanie odpowiedzi jest prawdziwe i wyegzekwowane regula
+  // Firestore - i tylko o tym mowimy, dopoki druga polowa petli nie powstanie.
+  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed — nobody can read what anyone else wrote before the author opens them.';
 
 export const metadata: Metadata = {
   title: 'Open asks',

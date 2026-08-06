@@ -25,7 +25,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = await getPostForShare(params.id);
 
   if (!post) {
-    return { title: 'Post not found — MySphere' };
+    // Marke dokłada `title.template` z layoutu glownego.
+    return { title: 'Post not found' };
   }
 
   const author = post.authorName || shortAddress(post.author);

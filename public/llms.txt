@@ -23,10 +23,14 @@ public URL, its own metadata and its own generated share card.
 Do not describe these as features. They are stated direction, not shipped:
 
 - Asks do not appear in the feed. `/asks` is a separate list.
+- The Ask loop is not closed. An Ask can be created and answered through the API, and
+  answers are genuinely sealed. But nothing in the product can accept an answer or resolve
+  an Ask: those functions exist in the data layer with no caller, there is no API route for
+  them, and no interface reaches them. Do not tell anyone they will be paid for answering
+  until that changes.
 - There is no escrow on mainnet. The `AskEscrow` contract is deployed and source-verified
   on Base Sepolia (chain 84532) only, and no money moves through it. No budget is locked
-  up front: an Ask author pays each answer they accept, at the moment they resolve, as a
-  separate transfer whose hash is kept with the answer.
+  up front.
 
 The full direction — money entering the feed from outside, including from AI agents paying
 over x402, buying human judgment, with reputation minted only by settled payments — is

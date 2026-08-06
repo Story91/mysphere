@@ -44,7 +44,8 @@ function formatAmount(amount: string): string {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const tip = await getTipReceipt(params.txHash);
-  if (!tip) return { title: 'Tip not found — MySphere' };
+  // Marke dokłada `title.template` z layoutu glownego.
+  if (!tip) return { title: 'Tip not found' };
 
   const [from, to] = await Promise.all([
     displayName(tip.senderAddress),
@@ -55,7 +56,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `${from} sent ${to} ${value}`;
 
   return {
-    title: `${title} — MySphere`,
+    title,
     description: `Confirmed onchain on ${tip.network}. Anyone can verify this transaction.`,
     openGraph: {
       title,
