@@ -10,21 +10,26 @@ import { getName } from '../utils/identity/getName';
 import { shortAddress } from '../utils/posts/getPostForShare';
 
 /**
- * Paid - dwie rzeczy na jednym ekranie, celowo obok siebie.
+ * PAID - publiczna os czasu rozliczonych platnosci.
  *
- * 1. OS CZASU ROZLICZONYCH PLATNOSCI. To jest kanal, ktorego nie ma zaden inny
- *    produkt spolecznosciowy: publiczna, przegladalna lista przelewow miedzy
- *    ludzmi, gdzie kazda pozycja niesie hash transakcji i kazdy moze ja
- *    sprawdzic u zrodla. Feed postow ma dzis kazdy. Feed PIENIEDZY miedzy
- *    obcymi ludzmi, z dowodem przy kazdej pozycji, nie ma nikt.
+ * === DLACZEGO TA STRONA WYGLADA JAK PARAGON ===
+ * Kazdy produkt spolecznosciowy ma feed tego, co ludzie POWIEDZIELI. Zaden nie
+ * ma feedu tego, co ludzie sobie ZAPLACILI. Skoro to jedyna rzecz tutaj, ktorej
+ * nie ma nigdzie indziej, nie moze wygladac jak kolejna lista w kartach.
  *
- * 2. RANKING. Suma zamiast strumienia - kto uzbieral najwiecej w oknie.
+ * Formy szukalem we WLASNYM swiecie tematu - i tym przedmiotem jest rolka
+ * paragonowa: ciagly pas papieru, ktory przyrasta od gory, z perforacja po
+ * bokach i oderwana krawedzia. Paragon to jedyny obiekt codzienny, ktorego cala
+ * funkcja polega na tym, ze potwierdza przeplyw pieniedzy i da sie go komus
+ * pokazac. Dokladnie to robi ta strona.
  *
- * Roznica miedzy nimi jest calym sensem tego podzialu: strumien odpowiada na
- * pytanie "czy tu w ogole cos zyje", ranking na "komu ufac". Pierwsze przyciaga,
- * drugie zatrzymuje.
+ * Kwoty ida monospace'em i sa wyrownane do prawej, jak na kazdym paragonie -
+ * dzieki temu rzad wielkosci widac bez czytania cyfr.
  *
- * Kierunek wizualny: Soft Social (projekt wlasciciela, wariant 1b).
+ * === DWIE SEKCJE, DWA PYTANIA ===
+ * Tasma odpowiada na "czy tu w ogole cos zyje". Ranking na "komu ufac".
+ * Pierwsze przyciaga, drugie zatrzymuje.
+ *
  * Komponent SERWEROWY, rewalidacja co godzine.
  */
 
@@ -34,7 +39,7 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: 'Paid — money moving on MySphere',
   description:
-    'A public timeline of settled payments between people. Every line carries a transaction anyone can verify. No points, no activity score.',
+    'A public timeline of settled payments between people. Every line carries a transaction anyone can open and check. No points, no activity score.',
   openGraph: {
     title: 'Paid — the only feed where the timeline is money',
     description: 'Settled payments between people, each one verifiable onchain.',
@@ -44,20 +49,6 @@ export const metadata: Metadata = {
 };
 
 const MEDALS = ['#F5A73B', '#B9B1D8', '#C98B5A'];
-
-/** Krotki, ludzki zapis wieku wpisu. Bez bibliotek - to jeden format. */
-function timeAgo(ms: number): string {
-  if (!ms) return '';
-  const diff = Date.now() - ms;
-  const mins = Math.round(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
 
 const EXPLORERS: Record<string, string> = {
   base: 'https://basescan.org/tx/',
@@ -69,16 +60,28 @@ const EXPLORERS: Record<string, string> = {
   basecamp: 'https://camp.cloud.blockscout.com/tx/',
 };
 
+/** Krotki, ludzki zapis wieku wpisu. Bez bibliotek - to jeden format. */
+function timeAgo(ms: number): string {
+  if (!ms) return '';
+  const mins = Math.round((Date.now() - ms) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default async function PaidPage() {
   const [board, payments] = await Promise.all([getLeaderboard(20), getSettledPayments(24)]);
 
-  // Nazwy rozwiazujemy raz, dla wszystkich adresow z obu sekcji naraz -
-  // ten sam adres pojawia sie zwykle i w rankingu, i w strumieniu.
   const addresses = Array.from(
-    new Set([
-      ...board.entries.map((e) => e.address),
-      ...payments.flatMap((p) => [p.from, p.to]),
-    ].filter(Boolean).map((a) => a.toLowerCase()))
+    new Set(
+      [...board.entries.map((e) => e.address), ...payments.flatMap((p) => [p.from, p.to])]
+        .filter(Boolean)
+        .map((a) => a.toLowerCase())
+    )
   );
 
   const nameEntries = await Promise.all(
@@ -94,103 +97,122 @@ export default async function PaidPage() {
 
   return (
     <main className="min-h-screen bg-soft-bg px-4 py-10 font-soft sm:px-6">
-      <div className="mx-auto max-w-[640px]">
+      <div className="mx-auto max-w-[620px]">
         <header className="mb-8">
           <p className="mb-3 font-soft text-[11px] font-bold uppercase tracking-[0.16em] text-soft-primary-deep">
             {board.windowDays === null ? 'All time' : `Last ${board.windowDays} days`}
           </p>
-          <h1 className="mb-3 font-soft-display text-[34px] font-bold leading-[1.1] text-soft-ink sm:text-[42px]">
+          <h1 className="mb-3 font-soft-display text-[36px] font-bold leading-[1.05] text-soft-ink sm:text-[46px]">
             Money moving
           </h1>
-          <p className="max-w-[46ch] font-soft text-[14.5px] leading-[1.6] text-soft-ink-muted">
-            Every line below is a settled payment between two people, with a transaction anyone can
-            open and check. There are no points here and no way onto this page that does not involve
-            money actually moving.
+          <p className="max-w-[44ch] font-soft text-[14.5px] leading-[1.6] text-soft-ink-muted">
+            Every line below is a payment that actually settled between two people. Open any of them
+            and check it against the chain. There is no way onto this page that does not involve
+            money moving.
           </p>
-
-          {board.totalTips > 0 && (
-            <div className="mt-6 inline-flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-card bg-soft-surface px-4 py-3 shadow-card">
-              <span className="font-soft-display text-[20px] font-bold tabular-nums text-soft-accent-deep">
-                {totalLine}
-              </span>
-              <span className="font-soft text-[13px] text-soft-ink-soft">
-                across {board.totalTips} {board.totalTips === 1 ? 'payment' : 'payments'}
-              </span>
-            </div>
-          )}
         </header>
 
-        {/* ---------------- OS CZASU ---------------- */}
-        <section className="mb-10">
-          <h2 className="mb-3 font-soft-display text-[16px] font-bold text-soft-ink">
-            As it lands
-          </h2>
-
+        {/* ===== TASMA ===== */}
+        <section className="mb-12">
           {payments.length === 0 ? (
-            <p className="rounded-card bg-soft-surface p-6 text-center font-soft text-[13.5px] text-soft-ink-soft shadow-card">
-              Nothing has settled yet. The first payment starts this list.
-            </p>
+            <div className="rounded-card bg-soft-surface p-8 text-center shadow-card">
+              <p className="mb-1 font-soft-display text-[15px] font-bold text-soft-ink">
+                Nothing has settled yet
+              </p>
+              <p className="font-soft text-[13px] text-soft-ink-soft">
+                The first payment starts this tape.
+              </p>
+            </div>
           ) : (
-            <ol className="flex flex-col gap-2.5">
-              {payments.map((payment) => (
-                <li
-                  key={payment.txHash}
-                  className="flex items-center gap-3 rounded-card bg-soft-surface p-3.5 shadow-card"
-                >
-                  {/* Kwota jest pierwsza i najmocniejsza - to jedyny powod,
-                      dla ktorego ktokolwiek patrzy na te liste. */}
-                  <span className="flex-none rounded-pill bg-soft-accent-soft px-3 py-1.5 font-soft-display text-[14px] font-bold tabular-nums text-soft-accent-deep">
-                    {formatAmount(payment.amount)} {payment.token}
-                  </span>
+            <div className="shadow-card">
+              <div className="receipt-tear-top" aria-hidden="true" />
 
-                  <span className="min-w-0 flex-1 font-soft text-[13px] leading-tight">
-                    <Link
-                      href={`/u/${payment.from}`}
-                      className="font-semibold text-soft-ink hover:text-soft-primary-deep"
-                    >
-                      {nameOf(payment.from)}
-                    </Link>
-                    <span className="mx-1.5 text-soft-ink-faint" aria-label="paid">
-                      →
-                    </span>
-                    <Link
-                      href={`/u/${payment.to}`}
-                      className="font-semibold text-soft-ink hover:text-soft-primary-deep"
-                    >
-                      {nameOf(payment.to)}
-                    </Link>
-                    <span className="block text-[11.5px] text-soft-ink-faint">
-                      {timeAgo(payment.timestamp)}
-                    </span>
-                  </span>
+              <div className="receipt-tape px-5 pb-2 pt-1">
+                {/* Naglowek paragonu. Sumy stoja na gorze, bo to pierwsza rzecz,
+                    ktora czyta sie na kazdym paragonie. */}
+                <div className="border-b border-dashed border-soft-line py-4 text-center">
+                  <p className="font-soft text-[10.5px] font-bold uppercase tracking-[0.22em] text-soft-ink-faint">
+                    Settled onchain
+                  </p>
+                  <p className="mt-2 font-mono text-[22px] font-bold tabular-nums text-soft-accent-deep">
+                    {totalLine || '—'}
+                  </p>
+                  <p className="mt-1 font-soft text-[12px] text-soft-ink-soft">
+                    {board.totalTips} {board.totalTips === 1 ? 'payment' : 'payments'}
+                  </p>
+                </div>
 
-                  <a
-                    href={`${EXPLORERS[payment.network] ?? EXPLORERS.base}${payment.txHash}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open this transaction in the explorer"
-                    title="Verify onchain"
-                    className="flex-none rounded-pill p-2 text-soft-line-strong transition-colors duration-[--dur-press] hover:text-soft-primary focus-visible:ring-2 focus-visible:ring-soft-primary"
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                </li>
-              ))}
-            </ol>
+                <ol>
+                  {payments.map((payment, index) => (
+                    <li
+                      key={payment.txHash}
+                      className={`receipt-row relative border-b border-dashed border-soft-line/70 py-3 last:border-b-0 ${
+                        index === 0 ? 'receipt-fresh' : ''
+                      }`}
+                      style={{ animationDelay: `${Math.min(index * 45, 540)}ms` }}
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="min-w-0 flex-1 font-soft text-[13px] leading-tight">
+                          <Link
+                            href={`/u/${payment.from}`}
+                            className="font-semibold text-soft-ink hover:text-soft-primary-deep"
+                          >
+                            {nameOf(payment.from)}
+                          </Link>
+                          <span className="mx-1.5 text-soft-ink-faint" aria-label="paid">
+                            →
+                          </span>
+                          <Link
+                            href={`/u/${payment.to}`}
+                            className="font-semibold text-soft-ink hover:text-soft-primary-deep"
+                          >
+                            {nameOf(payment.to)}
+                          </Link>
+                        </span>
+
+                        {/* Monospace i wyrownanie do prawej - jak na kazdym
+                            paragonie. Rzad wielkosci widac bez czytania cyfr. */}
+                        <span className="shrink-0 font-mono text-[14px] font-bold tabular-nums text-soft-accent-deep">
+                          {formatAmount(payment.amount)} {payment.token}
+                        </span>
+                      </div>
+
+                      <div className="mt-1 flex items-center justify-between gap-3">
+                        <span className="font-soft text-[11px] text-soft-ink-faint">
+                          {timeAgo(payment.timestamp)} · {payment.network}
+                        </span>
+                        <a
+                          href={`${EXPLORERS[payment.network] ?? EXPLORERS.base}${payment.txHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Verify onchain"
+                          className="font-mono text-[10.5px] text-soft-ink-faint underline decoration-dotted underline-offset-2 transition-colors duration-[--dur-press] hover:text-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        >
+                          {payment.txHash.slice(0, 10)}…
+                        </a>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <div className="receipt-tear-bottom" aria-hidden="true" />
+            </div>
           )}
 
-          <p className="mt-3 font-soft text-[11.5px] leading-relaxed text-soft-ink-faint">
-            Nothing here is self-reported. Open any transaction and check it against the chain.
+          <p className="mt-3 px-1 font-soft text-[11.5px] leading-relaxed text-soft-ink-faint">
+            Nothing here is self-reported. Every hash opens the transaction in a block explorer.
           </p>
         </section>
 
-        {/* ---------------- RANKING ---------------- */}
+        {/* ===== RANKING ===== */}
         <section>
-          <h2 className="mb-3 font-soft-display text-[16px] font-bold text-soft-ink">
+          <h2 className="mb-1 font-soft-display text-[20px] font-bold text-soft-ink">
             Who got paid most
           </h2>
+          <p className="mb-4 font-soft text-[13px] text-soft-ink-soft">
+            The tape says whether anything is happening. This says who to trust.
+          </p>
 
           {board.entries.length === 0 ? (
             <div className="rounded-card bg-soft-surface p-8 text-center shadow-card">
@@ -198,7 +220,7 @@ export default async function PaidPage() {
                 Nobody has been paid yet
               </p>
               <p className="mx-auto max-w-[34ch] font-soft text-[13px] text-soft-ink-soft">
-                The list fills itself as payments land. Be the first name on it.
+                Be the first name here.
               </p>
             </div>
           ) : (
@@ -210,8 +232,8 @@ export default async function PaidPage() {
                     className="flex items-center gap-3 rounded-card bg-soft-surface p-3.5 shadow-card transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.99]"
                   >
                     <span
-                      className="w-6 flex-none text-right font-soft-display text-[15px] font-bold tabular-nums"
-                      style={{ color: MEDALS[index] ?? 'var(--soft-line-strong)' }}
+                      className="flex h-7 w-7 flex-none items-center justify-center rounded-full font-soft-display text-[12px] font-bold text-white"
+                      style={{ background: MEDALS[index] ?? 'var(--soft-line-strong)' }}
                     >
                       {index + 1}
                     </span>
@@ -226,7 +248,7 @@ export default async function PaidPage() {
                       </span>
                     </span>
 
-                    <span className="flex-none font-soft-display text-[14px] font-bold tabular-nums text-soft-accent-deep">
+                    <span className="flex-none font-mono text-[13.5px] font-bold tabular-nums text-soft-accent-deep">
                       {formatReceived(entry.received)}
                     </span>
                   </Link>
@@ -237,14 +259,14 @@ export default async function PaidPage() {
 
           <p className="mt-4 font-soft text-[11.5px] leading-relaxed text-soft-ink-faint">
             Amounts are summed within each token. ETH is not added to USDC — that would be a number
-            nobody could check. Rank goes by the largest single-token total.
+            nobody could check.
           </p>
         </section>
 
         <div className="mt-10 flex flex-wrap gap-2.5">
           <Link
             href="/basechat"
-            className="rounded-pill bg-soft-primary px-5 py-3 font-soft text-[14px] font-bold text-white shadow-[0_4px_12px_rgba(124,107,218,0.3)] transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97]"
+            className="rounded-pill bg-soft-primary px-5 py-3 font-soft text-[14px] font-bold text-white shadow-chip transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97]"
           >
             Open the feed
           </Link>

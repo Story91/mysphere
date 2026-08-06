@@ -39,14 +39,24 @@ export const metadata: Metadata = {
  * opisuja te sama kwote w kolejnych stanach - zero (reputacja za darmo),
  * stawka, 402 (zadanie zaplaty), rozliczona suma.
  */
+/**
+ * Znacznik sekcji jest KWOTA, nie numerem - i siedzi jako stacja na kregoslupie
+ * biegnacym przez cala strone.
+ *
+ * Numer 01/02/03 nie niesie tu zadnej informacji: kolejne sekcje nie sa krokami
+ * procesu, tylko STANAMI TEJ SAMEJ KWOTY - zero (reputacja za darmo), stawka,
+ * 402 (zadanie zaplaty), rozliczona suma. Kwota niesie cala teze strony, numer
+ * nie niosl by nic.
+ */
 function Marker({ amount, label }: { amount: string; label: string }) {
   return (
-    <div className="mb-7 flex items-baseline gap-3">
-      <span className="font-soft-display text-[13px] font-semibold tabular-nums text-soft-accent-deep">
+    <div className="spine-marker mb-7 flex items-baseline gap-3 py-1">
+      <span className="-ml-[26px] flex h-3 w-3 shrink-0 items-center justify-center rounded-full border-2 border-soft-accent bg-soft-bg" aria-hidden="true" />
+      <span className="font-soft-display text-[14px] font-bold tabular-nums text-soft-accent-deep">
         {amount}
       </span>
-      <span className="h-px flex-1 bg-gradient-to-r from-[#00E28A]/40 to-transparent" />
-      <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-soft-ink-faint">
+      <span className="h-px flex-1 bg-gradient-to-r from-soft-line to-transparent" />
+      <span className="font-soft text-[10px] font-bold uppercase tracking-[0.2em] text-soft-ink-faint">
         {label}
       </span>
     </div>
@@ -282,7 +292,18 @@ export default function ReDefinitionPage() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-[720px] px-5 sm:px-8">
+      {/* KREGOSLUP KWOT. Pionowa linia laczaca znaczniki sekcji, ktora rysuje
+          sie w miare przewijania - czytelnik widzi, ile drogi kwota juz
+          przebyla. To JEDYNA animacja sterowana pozycja na tej stronie; reszta
+          jest nieruchoma, bo to strona do czytania, a ruch obok tekstu
+          konkuruje z kazdym zdaniem.
+
+          Zrobiona przez `animation-timeline: view()`, czyli bez jednej linii
+          JavaScriptu. Gdzie przegladarka tego nie ma, linia jest po prostu
+          narysowana w calosci - strona nie traci niczego poza efektem. */}
+      <div className="relative mx-auto max-w-[720px] px-5 pl-10 sm:px-8 sm:pl-12">
+        <span className="spine-track" aria-hidden="true" />
+        <span className="spine-fill" aria-hidden="true" />
         {/* ---------------- $0.00 ---------------- */}
         <section className="py-16">
           <Marker amount="$0.00" label="what a like is worth" />
