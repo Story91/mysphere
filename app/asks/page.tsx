@@ -93,9 +93,18 @@ export default function AsksPage() {
             An Ask is a question with a budget, a number of seats and a deadline. Answers stay
             sealed until the author resolves — you see how many arrived, never what they say.
           </p>
+          {/* NIE obiecujemy przyjmowania odpowiedzi ani wyplaty.
+              Stalo tu "The author pays each answer they accept, at the moment
+              they resolve" - i to bylo nieprawda. `acceptAnswer` i `resolveAsk`
+              nie maja ani jednego wywolania w repo, nie ma trasy API do
+              rozstrzygania, a przycisk "Answer" na karcie renderuje sie jako
+              null, bo nikt nie podaje handlera.
+
+              Ten sam tekst byl w metadanych i tam juz poprawiony - to druga
+              kopia, widoczna na stronie. */}
           <p className="text-[12.5px] leading-[1.6] text-soft-ink-faint">
-            No budget is locked up front. The author pays each answer they accept, at the moment
-            they resolve.{' '}
+            Being built: an Ask can be created and answered over the API today, but nothing
+            in the product can accept an answer or resolve an Ask yet.{' '}
             <Link
               href="/re-definition#ask"
               className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
