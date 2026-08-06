@@ -22,6 +22,12 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
+import { withX402 } from '@x402/next';
+import { HTTPFacilitatorClient, x402ResourceServer } from '@x402/core/server';
+import { ExactEvmScheme } from '@x402/evm/exact/server';
+// Uwierzytelnienie facilitatora Coinbase. Tu, w trasie na runtime nodejs,
+// CDP SDK ma wszystkie API, ktorych brakowalo mu w Edge.
+import { createFacilitatorConfig } from '@coinbase/x402';
 import { createAsk, getOpenAsks } from '../../utils/asks/asks';
 import {
   ASK_DURATIONS,
@@ -38,8 +44,50 @@ import {
   MAX_QUESTION_LENGTH,
   getAskNetwork,
   getAskPostPrice,
+  getAskPrice,
+  getPayToAddress,
   isAskPaymentEnforced,
 } from './pricing';
+
+/**
+ * Serwer zasobu x402 dla tej trasy.
+ *
+ * Trzy sciezki facilitatora, kazda z innego powodu:
+ *   1. wlasny adres z X402_FACILITATOR_URL - tak wpina sie VLED dla Robinhood
+ *      Chain (eip155:4663, USDG, gasless); nie wymaga klucza
+ *   2. CDP z kluczami, gdy siec to Base mainnet - ten facilitator WYMAGA
+ *      uwierzytelnienia, samo wskazanie adresu nie wystarczy
+ *   3. brak konfiguracji - publiczny facilitator x402.org, ktory dla EVM
+ *      obsluguje wylacznie Base Sepolia
+ *
+ * Gdy siec to mainnet Base, a kluczy CDP nie ma, swiadomie NIE cofamy sie po
+ * cichu do publicznego facilitatora: on tej sieci nie obsluguje, wiec zadanie
+ * skonczyloby sie jego bledem zamiast uczciwym 402.
+ */
+const CDP_NETWORKS = new Set(['eip155:8453']);
+
+function buildAskResourceServer() {
+  const network = getAskNetwork();
+  const url = process.env.X402_FACILITATOR_URL?.trim();
+
+  let client;
+  if (url) {
+    client = new HTTPFacilitatorClient({ url });
+  } else if (CDP_NETWORKS.has(network)) {
+    const id = process.env.CDP_API_KEY_ID?.trim();
+    const secret = process.env.CDP_API_KEY_SECRET?.trim();
+    client = id && secret
+      ? new HTTPFacilitatorClient(createFacilitatorConfig(id, secret))
+      : new HTTPFacilitatorClient();
+  } else {
+    client = new HTTPFacilitatorClient();
+  }
+
+  return new x402ResourceServer(client).register(
+    network as `${string}:${string}`,
+    new ExactEvmScheme()
+  );
+}
 
 // getSessionFromCookies uzywa node:crypto, ktorego nie ma na Edge.
 export const runtime = 'nodejs';
@@ -137,7 +185,10 @@ interface CreateBody {
 
 const ALLOWED_DURATIONS = new Set<number>(ASK_DURATIONS.map((duration) => duration.ms));
 
-export async function POST(request: NextRequest) {
+// Zwracany typ podany JAWNIE. Bez tego TypeScript wnioskuje go z pierwszej
+// galezi unii (odpowiedz bledu) i withX402 odrzuca handler, ktory potrafi
+// zwrocic takze utworzonego Aska.
+async function handlePost(request: NextRequest): Promise<NextResponse<unknown>> {
   // Do tego miejsca zadanie dochodzi tylko przez middleware, czyli albo z
   // rozliczona platnoscia x402, albo wcale. Tozsamosc jest osobna sprawa:
   // platnosc mowi ZE zaplacono, nie KTO zaklada Aska.
@@ -248,3 +299,50 @@ export async function POST(request: NextRequest) {
     { status: 201, headers: NO_STORE_PRIVATE }
   );
 }
+
+/**
+ * ===== EGZEKWOWANIE PLATNOSCI: W TRASIE, NIE W MIDDLEWARE =====
+ *
+ * Bylo w `middleware.ts` i to byl blad, ktory WYWROCIL WDROZENIE NA VERCELU:
+ *
+ *   The Edge Function "middleware" is referencing unsupported modules:
+ *     - @x402/extensions/bazaar
+ *
+ * Middleware Next.js 14 chodzi wylacznie w Edge Runtime, a stos x402 razem
+ * z @coinbase/x402 ciagnie CDP SDK, ktore stoi na `axios` i `jose` - te
+ * uzywaja `setImmediate`, `process.nextTick`, `CompressionStream`. W Edge tych
+ * API nie ma. Build przechodzil, wdrozenie padalo dopiero na koncu.
+ *
+ * `withX402` owija HANDLER TRASY, a trasa ma `runtime = 'nodejs'` - wiec
+ * wszystkie te API sa dostepne i problem znika u korzenia, zamiast byc
+ * obchodzony konfiguracja webpacka.
+ *
+ * === TO NAPRAWIA TAKZE DRUGA WADE ===
+ * `paymentProxy` w middleware rozliczal platnosc na `NextResponse.next()`,
+ * czyli ZANIM handler w ogole wystartowal. Gdyby zapis Aska padl po
+ * zaksiegowaniu, pieniadze bylyby pobrane, a Aska by nie bylo.
+ *
+ * `withX402` rozlicza dopiero przy statusie < 400. Walidacja i zapis dzieja
+ * sie PRZED rozliczeniem, wiec agent nie placi za blad walidacyjny ani za
+ * nieudany zapis.
+ */
+export const POST = withX402(
+  handlePost,
+  {
+    accepts: {
+      scheme: 'exact',
+      network: getAskNetwork(),
+      // Adres odbiorcy rozwiazywany PER ZADANIE, nie zapamietany przy
+      // ladowaniu modulu - patrz pricing.ts i AUDYT.md par. 2.
+      payTo: () => {
+        const payTo = getPayToAddress();
+        if (!payTo) throw new Error('X402_PAY_TO_ADDRESS is not configured');
+        return payTo;
+      },
+      price: getAskPrice(),
+    },
+    description: ASK_POST_DESCRIPTION,
+    mimeType: 'application/json',
+  },
+  buildAskResourceServer()
+);

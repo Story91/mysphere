@@ -41,7 +41,12 @@ const config = {
     }
   },
   paths: {
-    sources: "./camp-contract",
+    // Jedno drzewo kontraktow. Wczesniej wskazywalo na ./camp-contract, wiec
+    // `npx hardhat compile` NIE WIDZIALO ./contracts - AskEscrow.sol nie dalo
+    // sie skompilowac ani przetestowac standardowa komenda. Pliki Campa
+    // przeniesione tutaj; skrypty wdrozeniowe wolaja getContractFactory po
+    // NAZWIE, nie po sciezce, wiec przeniesienie ich nie dotyka.
+    sources: "./contracts",
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts"

@@ -12,21 +12,47 @@ import { NameWithSuffix } from '../../utils/nameSuffix';
  * Statistics", nie pokazywal juz ZADNYCH statystyk. Te same dane maja byc
  * widoczne na obu szerokosciach; roznica ma byc w oprawie, nie w tresci.
  *
- * CZTERY KAFLE, CZTERY KOLORY. To jedyne miejsce w aplikacji, gdzie kolor jest
+ * SZESC KAFLI, SZESC KOLOROW. To jedyne miejsce w aplikacji, gdzie kolor jest
  * przypisany do kategorii, a nie do znaczenia - i jest to swiadomy wyjatek.
- * Cztery liczby o tej samej wadze, ustawione w kwadrat, bez rozroznienia
- * czytaja sie jak tabela; z rozroznieniem kazda ma wlasne miejsce w pamieci
- * i wzrok wraca do wlasciwej bez czytania podpisu.
+ * Liczby o tej samej wadze, ustawione w siatke, bez rozroznienia czytaja sie
+ * jak tabela; z rozroznieniem kazda ma wlasne miejsce w pamieci i wzrok wraca
+ * do wlasciwej bez czytania podpisu.
  *
- * Odcienie sa PRZYGASZONE (tla ~8% nasycenia), zeby kwadrat nie konkurowal
- * z pomaranczem, ktory w tej aplikacji znaczy pieniadze.
+ * Odcienie sa PRZYGASZONE, zeby siatka nie konkurowala z pomaranczem, ktory
+ * w tej aplikacji znaczy pieniadze.
+ *
+ * JEDEN WYJATEK OD "POMARANCZ TO PIENIADZE": kafel Tips. On WLASNIE liczy
+ * pieniadze - rozliczone platnosci - wiec jest jedynym miejscem w tej siatce,
+ * gdzie akcent jest uzyty zgodnie z regula, a nie wbrew niej. Zeby nie mylil
+ * sie z cieplym "amber" innej kategorii, dostaje MOCNIEJSZE tlo
+ * (soft-accent-soft zamiast wygaszonego) i cienki pierscien w kolorze akcentu.
+ *
+ * DWIE KOLUMNY, NIE TRZY. Szesc kafli kusi, zeby ustawic je 3x2 - i na
+ * telefonie 320px to jest pulapka: kafel ma wtedy 89px, czyli 57px tresci po
+ * odjeciu oddechu, a "184K" w rozmiarze 26px potrzebuje 62px. Zeby trojka
+ * weszla, trzeba zmniejszyc liczbe i skrocic podpisy do skrotow - czyli
+ * dokladnie zamienic panel w sciane cyfr, ktorej nikt nie czyta. Dwie kolumny
+ * trzymaja pelne slowa i pelny rozmiar liczby na kazdej szerokosci: i na
+ * telefonie, i w kolumnie bocznej 352px, gdzie miejsca jest jeszcze mniej.
+ *
+ * CZEGO TU NIE MA I DLACZEGO: "Networks". Da sie policzyc (SOFT_NETWORKS ma
+ * SIEDEM pozycji), ale ta liczba nigdy sie nie zmienia. Kafel, ktory zawsze
+ * pokazuje to samo, po drugiej wizycie przestaje byc czytany - i zabiera uwage
+ * pozostalym pieciu, ktore naprawde sie ruszaja. Stala nalezy do opisu
+ * produktu, nie do panelu o nazwie Trends.
  *
  * RANKING pokazuje pozycje numerem w kolku, nie samym porzadkiem na liscie -
  * przy przewijaniu widac wtedy, na ktorym miejscu sie jest, bez liczenia
  * wierszy od gory.
  */
 
-export type SoftTrendStat = { label: string; value: string; tone: 'purple' | 'amber' | 'green' | 'pink' };
+/**
+ * `money` jest zarezerwowane dla kafla Tips i wstawia je ten komponent, nie
+ * wywolanie - regula "pomarancz znaczy pieniadze" nalezy do panelu, a nie do
+ * tego, kto go uzywa.
+ */
+export type SoftTrendTone = 'purple' | 'amber' | 'green' | 'pink' | 'blue' | 'teal' | 'money';
+export type SoftTrendStat = { label: string; value: string; tone: SoftTrendTone };
 export type SoftActiveUser = {
   address: string;
   name: string;
@@ -54,16 +80,36 @@ function compact(value: string): string {
 }
 
 const TONE = {
-  purple: { bg: 'bg-[#EEE9FB]', text: 'text-soft-primary-deep' },
-  amber: { bg: 'bg-[#FDF0DC]', text: 'text-soft-accent-deep' },
-  green: { bg: 'bg-[#E4F5EA]', text: 'text-[#15803D]' },
-  pink: { bg: 'bg-[#FCE7F0]', text: 'text-[#BE185D]' },
+  purple: { bg: 'bg-[#EEE9FB]', text: 'text-soft-primary-deep', ring: '' },
+  amber: { bg: 'bg-[#FDF0DC]', text: 'text-soft-accent-deep', ring: '' },
+  green: { bg: 'bg-[#E4F5EA]', text: 'text-[#15803D]', ring: '' },
+  pink: { bg: 'bg-[#FCE7F0]', text: 'text-[#BE185D]', ring: '' },
+  blue: { bg: 'bg-[#E7EEFA]', text: 'text-[#1D4ED8]', ring: '' },
+  teal: { bg: 'bg-[#DEF1EC]', text: 'text-[#0F766E]', ring: '' },
+  // Pieniadze. Mocniejsze tlo niz `amber` i pierscien - patrz naglowek pliku.
+  money: { bg: 'bg-soft-accent-soft', text: 'text-soft-accent-deep', ring: 'ring-1 ring-inset ring-soft-accent/40' },
 } as const;
+
+/**
+ * Znak "nie wiem". `null` z gory znaczy NIEUDANY ODCZYT, a nie zero - to dwie
+ * rozne rzeczy i tak samo rozroznia je warstwa danych (`failed` w
+ * getLeaderboard i getOpenAsks). Zero na kaflu Tips to zdanie o swiecie
+ * ("nikomu jeszcze nie zaplacono"); kreska to zdanie o nas.
+ *
+ * compact() przepuszcza ten znak bez zmian, bo Number('—') nie jest liczba.
+ */
+const UNKNOWN = '—';
+
+function toTileValue(input: string | number | null): string {
+  return input === null ? UNKNOWN : String(input);
+}
 
 const MEDAL = ['#F5A73B', '#B9B1D8', '#C98B5A'];
 
 export default function SoftTrendsPanel({
   stats,
+  tips,
+  openAsks,
   activeUsers,
   onOpenUser,
   onSeeAll,
@@ -74,6 +120,25 @@ export default function SoftTrendsPanel({
   children,
 }: {
   stats: SoftTrendStat[];
+  /**
+   * Liczba rozliczonych platnosci - `totalTips` z getLeaderboard()
+   * (app/utils/tips/getLeaderboard.ts). Jedyna liczba w tej siatce, ktora
+   * dotyczy pieniedzy, wiec jedyna, ktora dostaje pomarancz.
+   *
+   * `undefined` = jeszcze niepodpiete, kafel w ogole nie powstaje (siatka
+   * zostaje taka, jaka byla). `null` = odczyt sie nie udal, kafel pokazuje
+   * kreske. Liczba = liczba.
+   */
+  tips?: string | number | null;
+  /**
+   * Liczba OTWARTYCH Askow - `asks.length` z getOpenAsks()
+   * (app/utils/asks/asks.ts). Uwaga przy podpinaniu: ta funkcja ma domyslny
+   * limit 20 dokumentow, wiec bez podniesienia `max` kafel utknie na 20.
+   *
+   * Podpis brzmi "Open Asks", a nie "Asks", bo liczone sa wylacznie te ze
+   * `status === 'open'` - i tylko one da sie jeszcze zgarnac.
+   */
+  openAsks?: string | number | null;
   activeUsers: SoftActiveUser[];
   onOpenUser?: (address: string) => void;
   onSeeAll?: () => void;
@@ -89,16 +154,30 @@ export default function SoftTrendsPanel({
   // innego, a medale trafialyby na miejsca 11-13.
   const offset = page && page > 1 ? (page - 1) * 10 : 0;
   const showPager = Boolean(page && totalPages && totalPages > 1 && onPageChange);
+
+  // Kafle skladaja sie z tego, co przyszlo w `stats`, plus dwa liczone gdzie
+  // indziej. Tips i Asks nie ida przez `stats`, bo maja WLASNE zrodla (kolekcje
+  // `tips` i `asks`) i wlasny stan "nie udalo sie odczytac" - a tone dla
+  // pieniedzy ustala ten plik, nie wywolanie.
+  const tiles: SoftTrendStat[] = [
+    ...stats,
+    ...(tips !== undefined ? [{ label: 'Tips', value: toTileValue(tips), tone: 'money' as const }] : []),
+    ...(openAsks !== undefined
+      ? [{ label: 'Open Asks', value: toTileValue(openAsks), tone: 'teal' as const }]
+      : []),
+  ];
+
   return (
     <div className="flex flex-col gap-4 font-soft">
       <h2 className="font-soft-display text-[24px] font-bold text-soft-ink lg:text-[18px]">Trends</h2>
 
+      {/* Dwie kolumny na kazdej szerokosci - uzasadnienie w naglowku pliku. */}
       <div className="grid grid-cols-2 gap-2.5">
-        {stats.map((stat) => (
-          <div key={stat.label} className={`rounded-card px-4 py-3.5 ${TONE[stat.tone].bg}`}>
+        {tiles.map((stat) => (
+          <div key={stat.label} className={`rounded-card px-4 py-3.5 ${TONE[stat.tone].bg} ${TONE[stat.tone].ring}`}>
             {/* Skrot na wierzchu, pelna liczba w `title` - patrz compact(). */}
             <div
-              title={stat.value}
+              title={stat.value === UNKNOWN ? 'Not available right now' : stat.value}
               className={`font-soft-display text-[26px] font-bold leading-none tabular-nums ${TONE[stat.tone].text}`}
             >
               {compact(stat.value)}

@@ -15,13 +15,14 @@ import {
 import { db } from '../firebase';
 import { toMillis } from '../firestoreTime';
 import {
+  ASKS_COLLECTION,
+  ASK_ANSWERS_COLLECTION,
   type Ask,
   type AskAnswer,
   type ResolveRate,
-  computeResolveRate,
-  isExpired,
   perAnswerFor,
 } from './types';
+import { getAskAuthorStats } from './userStats';
 
 /**
  * Warstwa danych Aska.
@@ -46,8 +47,10 @@ import {
  * do tamtej kolekcji nie ma dostepu ani do zapisu, ani do odczytu.
  */
 
-const ASKS = 'asks';
-const ASK_ANSWERS = 'askAnswers';
+// Nazwy kolekcji stoja w types.ts - czyta je stamtad takze czytnik statystyk
+// (userStats.ts), zeby obie warstwy nie mogly sie rozjechac.
+const ASKS = ASKS_COLLECTION;
+const ASK_ANSWERS = ASK_ANSWERS_COLLECTION;
 
 /** Mapowanie dokumentu na Aska. Znaczniki przez toMillis - patrz firestoreTime. */
 function toAsk(id: string, data: Record<string, any>): Ask {
@@ -171,6 +174,11 @@ export async function getAnswerMeta(askId: string): Promise<AskAnswer[]> {
       content: null, // zapieczetowane - tresc wydaje wylacznie trasa serwerowa
       accepted: Boolean(data.accepted),
       payoutTxHash: typeof data.payoutTxHash === 'string' ? data.payoutTxHash : null,
+      // Kwota zapisana w chwili przyjecia. `null` znaczy "nie wiadomo ile",
+      // a nie "zero" - patrz komentarz przy tych polach w types.ts.
+      payoutAmount: typeof data.payoutAmount === 'number' ? data.payoutAmount : null,
+      payoutToken: typeof data.payoutToken === 'string' ? data.payoutToken : null,
+      payoutNetwork: typeof data.payoutNetwork === 'string' ? data.payoutNetwork : null,
     };
   });
 }
@@ -188,24 +196,66 @@ export async function hasAnswered(askId: string, author: string): Promise<boolea
   return !snapshot.empty;
 }
 
+/** Ile i w czym wyplacono za jedna przyjeta odpowiedz. */
+export type AnswerPayout = {
+  amount: number;
+  token: string;
+  network: string;
+};
+
 /**
  * Oznacza odpowiedz jako przyjeta i zapisuje DOWOD wyplaty.
  *
  * `payoutTxHash` jest WYMAGANY. Bez niego "przyjeta" jest samym slowem, a caly
  * produkt stoi na tym, ze kwoty da sie sprawdzic. Wolane dopiero PO tym, jak
  * przelew wszedl na lancuch - nigdy przed.
+ *
+ * === CO DOPISUJE POZA HASHEM I PO CO ===
+ * Razem z przyjeciem zapisujemy KWOTE, TOKEN i SIEC wyplaty. Bez tego statystyki
+ * odpowiadajacego ("ile zarobil, per token") wymagalyby doczytania Aska do
+ * kazdej przyjetej odpowiedzi - zlaczenia, ktorego koszt rosnie z liczba
+ * przyjec. Drugi powod jest wazniejszy: zapisana stawka jest TA, ktora
+ * obowiazywala przy przyjeciu, i zostaje przy odpowiedzi na stale.
+ *
+ * `payout` wolno pominac - wtedy funkcja doczytuje Aska sama (jeden odczyt) i
+ * bierze stawke z niego. Wolajacy, ktory Aska juz ma w rece (a musi go miec,
+ * zeby wiedziec, ile przelac), oszczedza ten odczyt, podajac wartosci wprost.
+ *
+ * Gdy odczyt Aska sie nie uda, przyjecie i tak zostaje zapisane: przelew juz
+ * poszedl na lancuch i odmowa zapisu byla by strata dowodu. Odpowiedz ladzie
+ * wtedy w `acceptedWithoutAmount` - "nie wiadomo ile", nie "zero".
  */
 export async function acceptAnswer(
   askId: string,
   answerId: string,
-  payoutTxHash: string
+  payoutTxHash: string,
+  payout?: AnswerPayout
 ): Promise<void> {
   if (!payoutTxHash) throw new Error('acceptAnswer wymaga hasha wyplaty');
+
+  let recorded: AnswerPayout | null = payout ?? null;
+  if (!recorded) {
+    try {
+      const ask = await getAsk(askId);
+      if (ask) recorded = { amount: ask.perAnswer, token: ask.token, network: ask.network };
+    } catch (error) {
+      console.error('[asks] Nie udalo sie odczytac stawki Aska przy przyjmowaniu:', error);
+    }
+  }
 
   await updateDoc(doc(db, ASK_ANSWERS, answerId), {
     accepted: true,
     payoutTxHash,
     acceptedAt: serverTimestamp(),
+    // Zapisujemy tylko wtedy, gdy naprawde wiemy ile. Zero udawaloby wyplate,
+    // ktorej wysokosci nie znamy.
+    ...(recorded && recorded.amount > 0
+      ? {
+          payoutAmount: recorded.amount,
+          payoutToken: recorded.token,
+          payoutNetwork: recorded.network,
+        }
+      : {}),
   });
 
   await updateDoc(doc(db, ASKS, askId), {
@@ -227,32 +277,20 @@ export async function resolveAsk(askId: string): Promise<void> {
  * Liczymy TYLKO Aski, ktorych termin juz minal - wciaz otwarty Ask nie jest
  * ani rozstrzygniety, ani porzucony, wiec wliczanie go zanizaloby wskaznik
  * kazdemu, kto wlasnie cos zalozyl.
+ *
+ * === DLACZEGO TO DELEGUJE ===
+ * `resolve rate` to jedna liczba z tego samego zapytania, z ktorego biora sie
+ * pelne statystyki autora (userStats.ts). Dwie kopie tego liczenia to dwa
+ * miejsca, w ktorych "porzucony" moze zaczac znaczyc co innego - a ta liczba
+ * stoi publicznie na kazdej karcie Aska. Koszt bez zmian: to wciaz jedno
+ * zapytanie po `author`, ograniczone tym samym limitem co dotad.
  */
 export async function getResolveRate(author: string): Promise<ResolveRate> {
-  try {
-    const snapshot = await getDocs(
-      query(collection(db, ASKS), where('author', '==', author), fsLimit(200))
-    );
+  const { stats } = await getAskAuthorStats(author);
 
-    let settled = 0;
-    let resolved = 0;
-    const now = Date.now();
+  // `null` znaczy "nie wiem", a nie "zero" - zero bylby zarzutem wobec
+  // czlowieka, postawionym w chwili, gdy nie udalo sie tego sprawdzic.
+  if (!stats) return { settled: 0, resolved: 0, rate: null };
 
-    for (const entry of snapshot.docs) {
-      const ask = toAsk(entry.id, entry.data());
-      if (ask.status === 'resolved') {
-        settled++;
-        resolved++;
-      } else if (ask.status === 'expired' || isExpired(ask, now)) {
-        settled++;
-      }
-    }
-
-    return computeResolveRate(settled, resolved);
-  } catch (error) {
-    console.error('[asks] Odczyt resolve rate nie powiodl sie:', error);
-    // `null` znaczy "nie wiem", a nie "zero" - zero bylby zarzutem wobec
-    // czlowieka, postawionym w chwili, gdy nie udalo sie tego sprawdzic.
-    return { settled: 0, resolved: 0, rate: null };
-  }
+  return stats.resolveRate;
 }

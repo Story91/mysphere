@@ -238,6 +238,12 @@ contract AskEscrow {
     error MissingAnswerRef();
     error ResolveWindowClosed();
     error TooEarly();
+    /**
+     * Przed terminem wolno zamknac Aska tylko wypelniajac KAZDE miejsce.
+     * Inaczej autor odzyskiwalby niewykorzystane miejsca w dowolnej chwili -
+     * takze po przeczytaniu naplywajacych odpowiedzi. Patrz resolve().
+     */
+    error EarlyResolveMustFillSeats();
     error NothingToClaim();
     error TransferFailed();
     error Reentrancy();
@@ -443,6 +449,35 @@ contract AskEscrow {
         // Okno laski - patrz RESOLVE_GRACE.
         if (block.timestamp > uint256(e.deadline) + RESOLVE_GRACE) revert ResolveWindowClosed();
 
+        // ==============================================================
+        // DOLNA GRANICA CZASU - LUKA KRYTYCZNA, ZNALEZIONA W PRZEGLADZIE
+        // ==============================================================
+        // Wczesniej sprawdzana byla WYLACZNIE granica gorna. `resolve` dalo sie
+        // wolac w dowolnej chwili od sfinansowania - takze w tym samym bloku.
+        //
+        // Atak, ktory to otwieralo:
+        //   1. autor finansuje Aska na 5 miejsc, 10 USDC
+        //   2. odpowiadajacy czytaja escrowFor() -> "otwarty, 5 miejsc, 10 USDC"
+        //      i zaczynaja pisac. TO JEST CALA ICH OCHRONA.
+        //   3. autor czyta naplywajace odpowiedzi poza lancuchem
+        //   4. w dowolnej sekundzie wola resolve z JEDNYM zwyciezca (wlasny
+        //      drugi portfel) - reszta miejsc wraca do niego, oplaty ZERO,
+        //      bo oplate liczyl tylko settleExpired
+        //   5. autor ma z powrotem prawie caly budzet, praca wykonana za darmo
+        //
+        // Regula, ktora to zamyka: PRZED terminem wolno zamknac Aska tylko
+        // WYPELNIAJAC KAZDE MIEJSCE. Nic nie wraca do autora, wiec nie ma czego
+        // odzyskac wczesniej. Po terminie wolno rozstrzygnac czesciowo - wtedy
+        // reszta wraca, ale MINUS OPLATA, dokladnie jak przy wygasnieciu
+        // (patrz nizej).
+        //
+        // Dlaczego nie zakaz calkowity przed terminem: Ask z trzema miejscami,
+        // ktory dostal trzy dobre odpowiedzi w godzine, ma prawo zamknac sie od
+        // razu. To jest przypadek uczciwy i nikogo nie krzywdzi - wszyscy
+        // dostaja swoje.
+        bool beforeDeadline = block.timestamp < uint256(e.deadline);
+        if (beforeDeadline && n != seats) revert EarlyResolveMustFillSeats();
+
         uint256 perAnswer = e.perAnswer;
 
         // Zamkniecie PRZED jakimkolwiek ksiegowaniem. Nawet bez wywolan
@@ -489,14 +524,40 @@ contract AskEscrow {
         // Dzieki temu odpowiadajacy, ktory nigdy nie odbierze swojego salda,
         // nie blokuje zwrotu autorowi ani o minute.
         uint256 refund = (seats - n) * perAnswer;
+        uint256 fee;
+
         if (refund != 0) {
-            claimable[msg.sender] += refund;
+            // ==========================================================
+            // OPLATA TAKZE PRZY ROZSTRZYGNIECIU - DRUGA POLOWA NAPRAWY
+            // ==========================================================
+            // Wczesniej oplate liczyl WYLACZNIE settleExpired. Skutek: zwrot
+            // przez resolve byl zawsze tanszy niz przez wygasniecie, wiec
+            // wycofanie pieniedzy z feedu bylo oplacalne, a manifest obiecuje
+            // odwrotnie: "unclaimed seats return to you, MINUS FEE".
+            //
+            // Sama dolna granica czasu tego nie zamykala: po terminie autor
+            // dalej moglby rozstrzygnac jednym zwyciezca i odzyskac reszte za
+            // darmo, podczas gdy milczenie kosztowaloby go oplate. Placilo sie
+            // wiec przyjac jedna odpowiedz zamiast zadnej - i na tym skonczyc.
+            //
+            // Teraz obie drogi odzyskania pieniedzy kosztuja tyle samo, wiec
+            // wybor miedzy nimi przestaje byc decyzja finansowa.
+            //
+            // Autor dostaje RESZTE, nie druga niezalezna dzielna - dzieki temu
+            // suma zawsze schodzi sie do budzetu co do jednostki, niezaleznie
+            // od zaokraglenia w dol.
+            fee = (refund * FEE_BPS) / 10_000;
+            if (fee != 0) {
+                claimable[FEE_RECIPIENT] += fee;
+            }
+            claimable[msg.sender] += refund - fee;
         }
 
         // totalLiabilities sie NIE ZMIENIA: pieniadze zmienily wlasciciela,
-        // a nie ilosc. Suma przypisan to dokladnie seats * perAnswer.
+        // a nie ilosc. Suma przypisan to dokladnie seats * perAnswer:
+        // n * perAnswer dla zwyciezcow + (refund - fee) dla autora + fee.
 
-        emit AskResolved(key, msg.sender, uint32(n), refund);
+        emit AskResolved(key, msg.sender, uint32(n), refund - fee);
     }
 
     // ------------------------------------------------------------------
