@@ -57,6 +57,22 @@ export default function ConnectModal({
   const { connectors, connect, status, error, variables } = useConnect();
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * onClose przychodzi z gory jako inline `() => setIsModalOpen(false)`, czyli
+   * ma NOWA TOZSAMOSC przy kazdym renderze rodzica. Trzymany wprost w
+   * zaleznosciach efektu ponizej powodowal, ze pulapka fokusu rozbierala sie
+   * i skladala od nowa przy kazdym renderze WalletButton/MockFeed - a dzieje
+   * sie to w trakcie laczenia (useAccount przechodzi przez 'connecting',
+   * dochodzi saldo z useBalance). Skutek: sprzatanie efektu oddawalo fokus
+   * przyciskowi POD modalem, a nowy przebieg wrzucal go z powrotem na "Close".
+   * Uzytkownik klawiatury tracil miejsce w liscie portfeli w polowie laczenia.
+   * Ref odcina tozsamosc funkcji od cyklu zycia efektu.
+   */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   // Portal montujemy dopiero po stronie klienta - document nie istnieje na serwerze.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -85,7 +101,7 @@ export default function ConnectModal({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -127,7 +143,7 @@ export default function ConnectModal({
       document.body.style.overflow = prevOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [isOpen, mounted, onClose]);
+  }, [isOpen, mounted]);
 
   if (!isOpen || !mounted) return null;
 

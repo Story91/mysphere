@@ -389,6 +389,11 @@ export default function BuilderProfile({
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [newBio, setNewBio] = useState(profile.bio || '');
   const [isSaving, setIsSaving] = useState(false);
+  // Zapisane bio nie wraca do `profile` (rodzic trzyma je w swoim stanie i nie
+  // ma dla niego zadnego callbacku). Bez tej nakladki po udanym zapisie sekcja
+  // "About" pokazywala STARY tekst az do ponownego wejscia w profil.
+  const [savedBioOverride, setSavedBioOverride] = useState<string | null>(null);
+  const displayedBio = savedBioOverride ?? profile.bio;
   
   
   // Tip Stats state
@@ -467,11 +472,15 @@ export default function BuilderProfile({
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [checkingFollowStatus, setCheckingFollowStatus] = useState(true);
+  // "Add Friend" nie mial zadnej blokady na czas zapytania - kazde kolejne
+  // klikniecie wysylalo nastepne zaproszenie i nastepny toast "Sending...".
+  const [sendingFriendRequest, setSendingFriendRequest] = useState(false);
   
   // Zresetuj stan edycji bio kiedy zmienia się profil
   useEffect(() => {
     setNewBio(profile.bio || '');
     setIsEditingBio(false);
+    setSavedBioOverride(null);
   }, [profile]);
   
   // Initialize referral stats
@@ -580,11 +589,13 @@ export default function BuilderProfile({
   };
 
   const handleSendFriendRequest = async () => {
+    if (sendingFriendRequest) return;
+
     if (!currentUserAddress) {
       toast.error('Please connect your wallet first!');
       return;
     }
-    
+
     // Check if trying to send request to yourself
     if (currentUserAddress === userAddress) {
       toast.error('🚫 Cannot send friend request to yourself!', {
@@ -594,11 +605,13 @@ export default function BuilderProfile({
       return;
     }
     
+    setSendingFriendRequest(true);
+
     // Show loading toast
     const loadingToast = toast.loading('Sending friend request...', {
       position: 'top-right',
     });
-    
+
     try {
       const result = await sendFriendRequestDirect(currentUserAddress!, userAddress, 'Hello! Let\'s be friends! 🤝');
       
@@ -641,6 +654,8 @@ export default function BuilderProfile({
         duration: 4000,
         position: 'top-right',
       });
+    } finally {
+      setSendingFriendRequest(false);
     }
   };
 
@@ -988,11 +1003,15 @@ export default function BuilderProfile({
       }
 
       if (newBio.length <= 90) {
-        await updateDoc(userRef, { 
+        await updateDoc(userRef, {
           bio: newBio,
           lastBioUpdate: serverTimestamp()
         });
-        
+
+        // Pokaz to, co naprawde zostalo zapisane - inaczej po zamknieciu
+        // edytora wraca stara tresc z propsa `profile`.
+        setSavedBioOverride(newBio);
+
         // Zamknij tryb edycji
         setIsEditingBio(false);
       } else {
@@ -2353,7 +2372,9 @@ export default function BuilderProfile({
                       <button
                         onClick={() => {
                           setIsEditingBio(false);
-                          setNewBio(profile.bio || '');
+                          // displayedBio, nie profile.bio - po wczesniejszym
+                          // zapisie props jest juz nieaktualny.
+                          setNewBio(displayedBio || '');
                         }}
                         className="px-3 py-1.5 bg-soft-surface text-soft-ink-muted border border-soft-line rounded-pill text-xs font-semibold hover:bg-soft-line transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         disabled={isSaving}
@@ -2372,7 +2393,7 @@ export default function BuilderProfile({
                 </div>
               ) : (
                 <div className="text-soft-ink-muted leading-relaxed">
-                  {profile.bio ||
+                  {displayedBio ||
                     <span className="text-soft-ink-faint italic">
                       {currentUserAddress === userAddress ? 
                         "Click Edit to add your bio" : 

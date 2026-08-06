@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { toast } from 'react-hot-toast';
 import { db } from '../../utils/firebase';
 import Image from 'next/image';
 
@@ -80,8 +81,8 @@ export default function ProfileSocials({ address, initialLinks, onSave, lazyLoad
   }, [address, lazyLoad]);
 
   const handleSave = async () => {
-    if (!address || !isOwner) return;
-    
+    if (!address || !isOwner || isSubmitting) return;
+
     setIsSubmitting(true);
     try {
       const userRef = doc(db, 'users', address);
@@ -96,7 +97,11 @@ export default function ProfileSocials({ address, initialLinks, onSave, lazyLoad
         onSave(links);
       }
     } catch (error) {
+      // Nieudany zapis konczyl sie samym console.error: napis wracal z
+      // "Saving..." na "Save" i wygladal identycznie jak sukces, tylko
+      // formularz zostawal otwarty.
       console.error('Error saving social links:', error);
+      toast.error('Could not save your links. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -206,8 +211,13 @@ export default function ProfileSocials({ address, initialLinks, onSave, lazyLoad
                     </svg>
                   </a>
                 ) : (
-                  <button 
+                  {/* Dla obcego profilu ta ikona jest tylko zaslepka - bez
+                      `disabled` byla focusowalna i klikalna, a klikniecie nie
+                      robilo nic. */}
+                  <button
+                    type="button"
                     onClick={() => isOwner && setIsEditing(true)}
+                    disabled={!isOwner}
                     aria-label={isOwner ? 'Add X link' : 'No X link'}
                     className={`text-soft-line-strong rounded-pill transition-colors duration-[--dur-press] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${isOwner ? 'hover:text-soft-primary-deep cursor-pointer active:scale-[0.97]' : ''}`}
                   >
@@ -230,8 +240,10 @@ export default function ProfileSocials({ address, initialLinks, onSave, lazyLoad
                     </div>
                   </a>
                 ) : (
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => isOwner && setIsEditing(true)}
+                    disabled={!isOwner}
                     aria-label={isOwner ? 'Add Warpcast link' : 'No Warpcast link'}
                     className={`rounded-pill focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${isOwner ? 'cursor-pointer active:scale-[0.97]' : ''}`}
                   >
@@ -263,8 +275,10 @@ export default function ProfileSocials({ address, initialLinks, onSave, lazyLoad
                     </div>
                   </div>
                 ) : (
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => isOwner && setIsEditing(true)}
+                    disabled={!isOwner}
                     aria-label={isOwner ? 'Add Discord username' : 'No Discord username'}
                     className={`text-soft-line-strong rounded-pill transition-colors duration-[--dur-press] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${isOwner ? 'hover:text-soft-primary-deep cursor-pointer active:scale-[0.97]' : ''}`}
                   >

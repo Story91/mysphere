@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PostingNetwork } from '../hooks/useAIGenerator';
 import { Badge } from '@/components/ui/badge';
@@ -139,6 +140,22 @@ export default function AIPostGenerator({
   };
 
   const networkStyles = getNetworkGradient(activeNetwork);
+
+  // Modal dal sie zamknac tylko mysza (tlo albo krzyzyk). Escape jest tu
+  // jedynym wyjsciem dla kogos, kto wlasnie pisze w textarea.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   return (
     <AnimatePresence>
@@ -303,8 +320,12 @@ export default function AIPostGenerator({
 
 
 
+              {/* Przycisk bez tekstu i bez aria-label byl dla czytnika ekranu
+                  bezimienny ("button"). */}
               <button
+                type="button"
                 onClick={onClose}
+                aria-label="Close AI post generator"
                 className={`absolute top-0 right-0 transition-colors ${
                   activeNetwork === 'base'
                     ? 'text-soft-ink-muted hover:text-soft-ink'
@@ -430,7 +451,9 @@ export default function AIPostGenerator({
                     ? 'bg-white/90 border-soft-line-strong/20'
                     : 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-white/10'
                 }`}>
-                <p className={`text-sm text-center ${
+                {/* Bylo <p> z <div> w srodku - przegladarka zamyka wtedy
+                    akapit przed divem i uklad rozjezdza sie w HTML z serwera. */}
+                <div className={`text-sm text-center ${
                   activeNetwork === 'base'
                     ? 'text-soft-ink-muted'
                     : activeNetwork === 'linea'
@@ -448,7 +471,7 @@ export default function AIPostGenerator({
                       HACK GPT-5 + WebSearch Content Creator
                     </span>
                   </div>
-                </p>
+                </div>
               </div>
             )}
           </motion.div>

@@ -16,7 +16,7 @@
  * lancuchu. Cofnieta transakcja nie zapisuje niczego.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAccount } from 'wagmi';
 import { toast } from 'react-hot-toast';
@@ -65,16 +65,29 @@ export default function SubscribeButton({
   const amount = getSubscriptionPrice(tier, periods);
   const displayName = creatorName || `${creatorAddress.slice(0, 6)}...${creatorAddress.slice(-4)}`;
 
+  /**
+   * Co uzytkownik faktycznie oplacil - zamrozone w chwili wyslania transakcji.
+   *
+   * Bez tego zmiana poziomu albo dlugosci wsparcia w trakcie potwierdzania
+   * transakcji zmieniala tresc zgloszenia wysylanego PO potwierdzeniu:
+   * portfel placil za "Supporter / 30 dni", a serwer dostawal "Patron / 90 dni".
+   * Serwer liczy cene sam z (tier, periods) i porownuje ja z kwota na lancuchu,
+   * wiec konczylo sie to odrzuceniem 402 - pieniadze wyszly, wsparcie nie
+   * zostalo zapisane.
+   */
+  const paidOrderRef = useRef<{ tier: SubscriptionTierId; periods: number; days: number } | null>(null);
+
   const recordSubscription = useCallback(
     async (txHash: `0x${string}`) => {
+      const order = paidOrderRef.current ?? { tier, periods, days };
       const response = await fetch('/api/unlock/subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subscriberAddress: address,
           creatorAddress,
-          tier,
-          periods,
+          tier: order.tier,
+          periods: order.periods,
           txHash,
         }),
       });
@@ -82,7 +95,7 @@ export default function SubscribeButton({
       if (!response.ok) {
         throw new Error(data?.error || 'Support could not be recorded');
       }
-      const newExpiresAt = data?.subscription?.expiresAt ?? Date.now() + days * 24 * 60 * 60 * 1000;
+      const newExpiresAt = data?.subscription?.expiresAt ?? Date.now() + order.days * 24 * 60 * 60 * 1000;
       setActiveUntil(newExpiresAt);
       onSubscribed?.(creatorAddress, newExpiresAt);
       toast.success(`You are supporting ${displayName} until ${formatDate(newExpiresAt)}`);
@@ -91,6 +104,12 @@ export default function SubscribeButton({
   );
 
   const { phase, error, txHash, isBusy, isOnBase, switchToBase, pay, reset } = usePaymentFlow(recordSubscription);
+
+  /** Zamraza zamowienie i dopiero potem wysyla platnosc. */
+  const payForCurrentSelection = useCallback(() => {
+    paidOrderRef.current = { tier, periods, days };
+    pay({ to: creatorAddress, amount, token: 'USDC' });
+  }, [tier, periods, days, pay, creatorAddress, amount]);
 
   const closeModal = useCallback(() => {
     setIsOpen(false);
@@ -269,7 +288,7 @@ export default function SubscribeButton({
               ) : (
                 <button
                   type="button"
-                  onClick={() => pay({ to: creatorAddress, amount, token: 'USDC' })}
+                  onClick={payForCurrentSelection}
                   disabled={isBusy}
                   className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-primary text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
                 >
@@ -283,7 +302,8 @@ export default function SubscribeButton({
                 </button>
               )}
 
-              {txHash && phase !== 'error' && (
+              {/* Link takze przy bledzie - patrz komentarz w PremiumGate. */}
+              {txHash && (
                 <a
                   href={getExplorerTxLink('base', txHash)}
                   target="_blank"

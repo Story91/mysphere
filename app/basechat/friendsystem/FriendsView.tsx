@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { FriendWithStatus, FriendRequest } from '../../utils/friends';
 import { useSocial } from './hooks';
 
@@ -81,9 +82,14 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
       if (result.success) {
         setFriendRequests(prev => prev.filter(req => req.id !== requestId));
         await refreshData();
+      } else {
+        // Odmowa serwera nie moze konczyc sie cisza: przed poprawka spinner
+        // gasl, zaproszenie zostawalo na liscie i nic tego nie tlumaczylo.
+        toast.error(result.error || 'Could not process this request. Please try again.');
       }
     } catch (error) {
       console.error('Error responding to friend request:', error);
+      toast.error('Could not process this request. Please try again.');
     } finally {
       setLoadingAction(null);
     }
@@ -290,16 +296,21 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
                     </div>
 
                     <div className="flex items-center space-x-2">
+                      {/* Blokada obejmuje CALA liste, nie tylko klikniety
+                          wiersz: respondToRequest i tak odrzuca rownolegle
+                          wywolania, wiec wczesniej klikniecie "Accept" w innym
+                          wierszu w trakcie trwajacego zapytania nie robilo nic
+                          i nic tego nie sygnalizowalo. */}
                       <button
                         onClick={() => handleAcceptRequest(request.id!)}
-                        disabled={loadingAction === request.id}
+                        disabled={loadingAction !== null}
                         className="px-4 py-2 text-sm font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:active:scale-100"
                       >
                         Accept
                       </button>
                       <button
                         onClick={() => handleRejectRequest(request.id!)}
-                        disabled={loadingAction === request.id}
+                        disabled={loadingAction !== null}
                         className="px-4 py-2 text-sm font-semibold border border-soft-line text-soft-ink-muted rounded-pill transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:active:scale-100"
                       >
                         Reject

@@ -104,7 +104,17 @@ export default function ChainCreatePost({
   };
 
   const handleTransactionSuccess = async (txHash: string) => {
-    if (!address) return;
+    if (!address) {
+      // Transakcja JUZ poszla na lancuch i uzytkownik zaplacil za gaz. Ciche
+      // `return` zostawialo go z przekonaniem, ze post zostal zapisany, choc
+      // do bazy nie trafialo nic i nie bylo o tym slowa.
+      toast.error(
+        `Post was published on-chain but your wallet disconnected before we could save it. ` +
+          `Keep this transaction: ${txHash}`,
+        { duration: 10000 }
+      );
+      return;
+    }
 
     setIsSaving(true);
     const toastId = toast.loading(`Saving your ${composer.savingLabel} post...`);

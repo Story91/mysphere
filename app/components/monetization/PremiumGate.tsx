@@ -257,7 +257,10 @@ export default function PremiumGate({
         </div>
       )}
 
-      {txHash && phase !== 'error' && (
+      {/* Link pokazujemy TAKZE przy bledzie. Jesli hash w ogole istnieje, to
+          transakcja zostala wyslana - a wlasnie wtedy, gdy cos poszlo nie tak,
+          uzytkownik najbardziej potrzebuje dowodu, co sie z nia stalo. */}
+      {txHash && (
         <a
           href={getExplorerTxLink('base', txHash)}
           target="_blank"

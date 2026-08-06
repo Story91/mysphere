@@ -84,7 +84,11 @@ export function usePaymentFlow(onConfirmed: (txHash: `0x${string}`) => Promise<v
   const handledTxRef = useRef<string | null>(null);
 
   const { sendTransaction, data: txHash, error: sendError, reset: resetSend } = useSendTransaction();
-  const { data: receipt, isLoading: isWaitingForReceipt } = useWaitForTransactionReceipt({
+  const {
+    data: receipt,
+    isLoading: isWaitingForReceipt,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({
     hash: txHash,
     query: { enabled: !!txHash },
   });
@@ -128,6 +132,27 @@ export function usePaymentFlow(onConfirmed: (txHash: `0x${string}`) => Promise<v
     setPhase('error');
     resetSend();
   }, [sendError, resetSend]);
+
+  /**
+   * Paragonu nie da sie pobrac - padl RPC, uzytkownik stracil siec, minal limit
+   * czasu hooka. Bez tej sciezki `phase` zostawalo na 'confirming' NA ZAWSZE:
+   * przycisk byl zablokowany napisem "Waiting for confirmation..." az do
+   * przeladowania strony, mimo ze aplikacja juz niczego nie sprawdzala.
+   *
+   * Transakcja mogla przy tym przejsc, wiec komunikat nie moze twierdzic, ze
+   * platnosc sie nie udala - musi wskazac hash i eksplorator.
+   */
+  useEffect(() => {
+    if (!receiptError || !txHash) return;
+    if (handledTxRef.current === txHash) return;
+    handledTxRef.current = txHash;
+
+    setError(
+      'We lost track of the transaction before it was confirmed. It may still go through - ' +
+        'check it in the explorer before paying again.'
+    );
+    setPhase('error');
+  }, [receiptError, txHash]);
 
   const isOnBase = chainId === MONETIZATION_CHAIN_ID;
 

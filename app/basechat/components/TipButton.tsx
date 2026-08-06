@@ -54,6 +54,24 @@ const TOKEN_BG_COLORS: Record<string, string> = {
   CAMP: 'bg-white',
 };
 
+/**
+ * Odmowa podpisu w portfelu (EIP-1193, kod 4001) to DECYZJA uzytkownika, nie awaria.
+ * Wczesniej konczyla sie czerwonym "Tip failed: User rejected the request..." -
+ * czyli aplikacja krzyczala bledem o tym, ze ktos rozmyslil sie i kliknal "Odrzuc".
+ */
+const isUserRejection = (err: any): boolean => {
+  if (!err) return false;
+  const code = err.code ?? err.cause?.code;
+  if (code === 4001 || code === 'ACTION_REJECTED') return true;
+  const message = `${err.shortMessage || ''} ${err.name || ''} ${err.message || ''}`.toLowerCase();
+  return (
+    message.includes('user rejected') ||
+    message.includes('user denied') ||
+    message.includes('userrejected') ||
+    message.includes('rejected the request')
+  );
+};
+
 export default function TipButton({ recipientAddress, postId, className = '' }: TipButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [tipAmount, setTipAmount] = useState('0.001');
@@ -93,6 +111,19 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
     }
   }, [selectedNetwork, selectedToken]);
   
+  // Modal dalo sie zamknac tylko klikiem w tlo albo krzyzykiem - z klawiatury nie
+  // bylo z niego wyjscia.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setIsOpen(false);
+      setTipSaved(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen]);
+
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -278,6 +309,18 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
 
   useEffect(() => {
     if (!sendError) return;
+
+    // Uzytkownik odrzucil podpis w portfelu - sprzatamy stan i milkniemy.
+    // Czerwony komunikat o "nieudanym napiwku" bylby klamstwem: nic sie nie
+    // zepsulo, po prostu nie doszlo do wyslania.
+    if (isUserRejection(sendError)) {
+      toast.dismiss();
+      setIsTransacting(false);
+      setTipSaved(false);
+      resetSend();
+      return;
+    }
+
     handleTransactionStatus({
       statusName: 'error',
       statusData: { message: sendError.message },
@@ -329,12 +372,22 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
     return formatBalance(tokenBalance, selectedTokenConfig.decimals, tokenLoading);
   };
 
+  // Saldo, ktore dopiero sie laduje, to NIE jest "brak srodkow". Wczesniej przez
+  // pierwsze sekundy po otwarciu modalu przycisk mowil "Insufficient ETH", nawet
+  // gdy uzytkownik mial pelny portfel.
+  const isBalanceLoading = selectedTokenConfig.isNative ? nativeLoading : tokenLoading;
+  // Pusty albo niepoprawny wpis to nie jest kwota do wyslania - trzymane osobno,
+  // bo NaN w porownaniach cicho wychodzi na "false" i przepuszczal klikniecie.
+  const parsedTipAmount = parseFloat(tipAmount);
+  const hasValidAmount = Number.isFinite(parsedTipAmount) && parsedTipAmount > 0;
+
   const hasInsufficientBalance = () => {
-    const amount = parseFloat(tipAmount);
+    if (!hasValidAmount) return false;
+    if (isBalanceLoading) return false;
     const balance = selectedTokenConfig.isNative ? nativeBalance : tokenBalance;
     if (!balance) return true;
     const balanceValue = parseFloat(formatUnits(balance.value, selectedTokenConfig.decimals));
-    return balanceValue < amount;
+    return balanceValue < parsedTipAmount;
   };
 
   if (!isConnected || isSelfTip) {
@@ -573,7 +626,10 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                         ...('data' in call ? { data: call.data } : {}),
                       });
                     }}
-                    disabled={hasInsufficientBalance() || parseFloat(tipAmount) <= 0 || isTransacting}
+                    // `parseFloat('') <= 0` to `NaN <= 0`, czyli `false` - przycisk
+                    // z pustym polem kwoty byl WLACZONY, a klikniecie nie robilo nic
+                    // (getCalls() zwracalo pusta tablice i handler cicho wychodzil).
+                    disabled={!hasValidAmount || isBalanceLoading || hasInsufficientBalance() || isTransacting}
                     className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-primary text-white shadow-chip transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {hasInsufficientBalance()
@@ -605,56 +661,88 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                                     (paymentResult as any)?.transactionId || 
                                     paymentResult;
                           
+                          // Odpytywanie nie moze trwac w nieskonczonosc - platnosc,
+                          // ktora nigdy nie wychodzi ze stanu "pending", zostawiala
+                          // modal na zawsze w "Processing...".
+                          const MAX_STATUS_POLLS = 60; // ~2 minuty co 2 sekundy
+                          let statusPolls = 0;
+
                           const pollStatus = async () => {
                             try {
-                              const { status } = await getPaymentStatus({ 
+                              const { status } = await getPaymentStatus({
                                 id,
                                 testnet: false
                               });
-                              
+
                               if (status === 'completed') {
                                 // Guard against duplicate saves
                                 if (!tipSaved) {
                                   setTipSaved(true);
-                                  await saveTip({
-                                    senderAddress: address!,
-                                    recipientAddress,
-                                    amount: tipAmount,
-                                    token: 'USDC',
-                                    postId,
-                                    txHash: id,
-                                    network: 'base'
-                                  });
+                                  // Nieudany zapis do bazy NIE moze wpasc do catch
+                                  // ponizej - platnosc sie udala, a uzytkownik
+                                  // zobaczylby komunikat o bledzie sprawdzania statusu.
+                                  try {
+                                    await saveTip({
+                                      senderAddress: address!,
+                                      recipientAddress,
+                                      amount: tipAmount,
+                                      token: 'USDC',
+                                      postId,
+                                      txHash: id,
+                                      network: 'base'
+                                    });
+                                  } catch (saveError) {
+                                    console.error('Error saving tip:', saveError);
+                                    toast.error('Tip sent but failed to save to database');
+                                  }
                                 }
-                                
+
                                 toast.success('Tip sent via Base Pay! 🎉');
                                 setTransactionSuccess(true);
                                 setIsTransacting(false);
-                                
+
                                 setTimeout(() => {
                                   setIsOpen(false);
                                   setTransactionSuccess(false);
                                   setTipSaved(false);
                                 }, 2000);
-                              } else if (status === 'failed') {
-                                throw new Error('Payment failed');
-                              } else {
-                                setTimeout(pollStatus, 2000);
+                                return;
                               }
+
+                              if (status === 'failed') {
+                                // To platnosc sie nie powiodla, a nie sprawdzanie jej
+                                // statusu. Wczesniej `throw` wpadal do catch ponizej
+                                // i pokazywal komunikat o NIEWLASCIWEJ przyczynie.
+                                toast.error('Base Pay payment failed');
+                                setIsTransacting(false);
+                                setTipSaved(false);
+                                return;
+                              }
+
+                              statusPolls += 1;
+                              if (statusPolls >= MAX_STATUS_POLLS) {
+                                toast.error('Base Pay is taking longer than expected - check your wallet for the final status');
+                                setIsTransacting(false);
+                                return;
+                              }
+
+                              setTimeout(pollStatus, 2000);
                             } catch (error) {
                               console.error('Error checking payment status:', error);
                               toast.error('Failed to verify payment status');
                               setIsTransacting(false);
                             }
                           };
-                          
+
                           setTimeout(pollStatus, 1000);
-                          
+
                         } catch (error) {
                           console.error('Base Pay error:', error);
+                          setIsTransacting(false);
+                          // Rezygnacja z platnosci w portfelu to nie awaria - patrz isUserRejection.
+                          if (isUserRejection(error)) return;
                           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                           toast.error(`Base Pay failed: ${errorMessage}`);
-                          setIsTransacting(false);
                         }
                       }}
                     />

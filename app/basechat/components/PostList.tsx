@@ -942,7 +942,16 @@ function PostList({
 
   const handleDeleteComment = async (postId: string, commentId: string) => {
     if (!address) return;
-    
+
+    // Komentarz dodany przed chwila ma jeszcze identyfikator `temp-...` (wlasciwe
+    // ID nadaje Firestore, lokalna kopia go nie dostaje). Usuwanie takiego wpisu
+    // szlo pod nieistniejacy dokument i konczylo sie komunikatem o awarii oraz
+    // pelnym odswiezeniem feedu.
+    if (commentId.startsWith('temp-')) {
+      notify.info('This comment is still being saved. Give it a second.');
+      return;
+    }
+
     try {
       if (confirm('Are you sure you want to delete this comment?')) {
         // ✅ OPTIMISTIC UPDATE: Usuń komentarz z UI natychmiast
@@ -978,55 +987,93 @@ function PostList({
     }
   };
 
+  /**
+   * Polubienie komentarza albo odpowiedzi.
+   *
+   * === CO TU BYLO ZLE ===
+   * Dokladnie ten sam zestaw bledow, ktory naprawiono wyzej przy polubieniu posta:
+   *
+   * 1. Optymistyczna zmiana szla przez `onRefreshPosts(updatedPosts)`, czyli przez
+   *    rodzica, ktory na czas swojego dzialania podnosi flage ladowania CALEGO
+   *    feedu. Klikniecie serduszka pod jednym komentarzem ruszalo cala liste.
+   *
+   * 2. Przy bledzie nie bylo wycofania tej jednej zmiany, tylko `onRefreshPosts()`
+   *    bez argumentow - pelne odswiezenie listy, a przy pustym cache ponowny
+   *    odczyt calego feedu z Firestore za jedno nieudane klikniecie. Do tego
+   *    komunikat "Failed to like comment" pojawial sie takze wtedy, gdy zapis
+   *    sie powiodl, a wywrocilo sie samo odswiezanie.
+   *
+   * 3. Komentarz dodany przed chwila ma jeszcze identyfikator `temp-...`
+   *    (addComment nadaje wlasciwe ID dopiero po stronie Firestore, a lokalna
+   *    kopia nigdy go nie dostaje). Polubienie takiego komentarza szlo pod
+   *    nieistniejacy wpis i konczylo sie komunikatem o awarii.
+   *
+   * === JAK JEST TERAZ ===
+   * Zmiana lokalnie, cofniecie WYLACZNIE tego jednego komentarza przy bledzie,
+   * ta sama zmiana w zapisanych listach (zero odczytow) i osobny, prawdziwy
+   * komunikat dla komentarza, ktory dopiero sie zapisuje.
+   */
   const handleToggleCommentLike = async (postId: string, commentId: string) => {
-    if (!address) return;
-    
+    if (!address) {
+      notify.info('Connect your wallet to like comments');
+      return;
+    }
+
+    const post = internalPosts.find(p => p.id === postId);
+    const comment = post?.comments?.find(c => c.id === commentId);
+    if (!post || !comment) return;
+
+    // Post albo komentarz czekajacy na zapis w Firestore nie ma jeszcze czego polubic.
+    if (postId.startsWith('temp-') || commentId.startsWith('temp-')) {
+      notify.info('This comment is still being saved. Give it a second.');
+      return;
+    }
+
+    const wasLiked = !!comment.likedBy?.includes(address);
+
+    // Jedna funkcja uzywana i do stanu widoku, i do zapisanych list - dzieki temu
+    // nie da sie ich rozjechac.
+    const applyCommentLike = (liked: boolean) => (entry: ExtendedPost): ExtendedPost => {
+      if (entry.id !== postId) return entry;
+      return {
+        ...entry,
+        comments: (entry.comments || []).map(c =>
+          c.id !== commentId
+            ? c
+            : {
+                ...c,
+                likes: Math.max(0, (c.likes || 0) + (liked ? 1 : -1)),
+                likedBy: liked
+                  ? [...(c.likedBy || []), address]
+                  : (c.likedBy || []).filter(id => id !== address),
+              }
+        ),
+      };
+    };
+
+    const applyLocally = (liked: boolean) =>
+      setInternalPosts(current => current.map(applyCommentLike(liked)));
+
+    // 1. Natychmiastowa reakcja w UI.
+    applyLocally(!wasLiked);
+
     try {
-      // Znajdź post i komentarz
-      const postIndex = internalPosts.findIndex(p => p.id === postId);
-      if (postIndex === -1) return;
-      
-      const post = internalPosts[postIndex];
-      const comments = post.comments || [];
-      const commentIndex = comments.findIndex(c => c.id === commentId);
-      if (commentIndex === -1) return;
-      
-      const comment = comments[commentIndex];
-      const isLiked = comment.likedBy?.includes(address);
-      
-      // Utwórz kopię postów, aby nie modyfikować bezpośrednio stanu
-      const updatedPosts = [...internalPosts];
-      
-      // Zaktualizuj komentarze dla posta
-      const updatedComments = [...comments];
-      updatedComments[commentIndex] = {
-        ...comment,
-        likes: (comment.likes || 0) + (isLiked ? -1 : 1),
-        likedBy: isLiked 
-          ? (comment.likedBy || []).filter(id => id !== address)
-          : [...(comment.likedBy || []), address]
-      };
-      
-      // Zaktualizuj post
-      updatedPosts[postIndex] = {
-        ...post,
-        comments: updatedComments
-      };
-      
-      // Zaktualizuj stan bez pełnego odświeżenia
-      if (onRefreshPosts) {
-        await onRefreshPosts(updatedPosts);
-      }
-      
-      // Wykonaj rzeczywiste żądanie do serwera w tle
+      // 2. Zapis. Dopiero jego niepowodzenie jest bledem polubienia.
       await toggleCommentLike(postId, commentId, address);
+
+      // 3. Ta sama zmiana na ZAPISANYCH listach - bez tego serduszko wracaloby do
+      //    poprzedniego stanu po przejsciu na inna zakladke i powrocie, bo widok
+      //    odtwarza sie z localStorage.
+      patchPostInCache?.(postId, applyCommentLike(!wasLiked));
     } catch (error) {
       console.error('Error toggling comment like:', error);
-      toast.error('Failed to like comment');
-      // W przypadku błędu, przywróć poprzedni stan
-      if (onRefreshPosts) {
-        await onRefreshPosts();
-      }
+      // 4. Cofamy TYLKO ten komentarz - reszta listy zostaje nietknieta.
+      applyLocally(wasLiked);
+      notify.error(
+        error instanceof Error && /not found|nie istnieje/i.test(error.message)
+          ? 'That comment no longer exists'
+          : 'Could not save your like'
+      );
     }
   };
 
@@ -1182,8 +1229,15 @@ function PostList({
   // ❌ USUNIĘTO DRUGI INFINITE SCROLL obserwator - oszczędność Firebase reads/writes
 
   const loadMorePosts = async () => {
-    if (!hasMorePosts || isLoadingMore || !address) return;
-    
+    if (!hasMorePosts || isLoadingMore) return;
+
+    // Bez adresu fetchPosts nie ma po co isc do Firestore, ale wczesniej przycisk
+    // po prostu MILCZAL - klikniecie nie robilo nic i nie mowilo dlaczego.
+    if (!address) {
+      notify.info('Connect your wallet to load more posts');
+      return;
+    }
+
     try {
       setIsLoadingMore(true);
       
@@ -1357,13 +1411,19 @@ function PostList({
   }, [internalPosts.length, postTokenData]); // Zmienione zależności
 
   useEffect(() => {
+    // Bez tej flagi zmiana adresu (albo listy postow) w trakcie odczytu sald
+    // konczyla sie wpisaniem do stanu odpowiedzi POPRZEDNIEGO portfela - kto
+    // pierwszy wrocil z lancucha, ten wygrywal - oraz zgaszeniem wskaznika
+    // ladowania nalezacego do juz nieaktualnego zapytania.
+    let cancelled = false;
+
     // Fetch user token balances directly from blockchain (most reliable)
     const fetchUserBalances = async () => {
       if (!address || !publicClient) return;
-      
+
       try {
         setIsLoadingBalances(true);
-        
+
         // Get all unique token addresses from posts
         const tokenAddresses = [...new Set(
           internalPosts
@@ -1405,15 +1465,17 @@ function PostList({
           })
         );
         
-        setUserTokenBalances(freshBalances);
+        if (!cancelled) setUserTokenBalances(freshBalances);
       } catch (error) {
         console.error('Error fetching user balances:', error);
       } finally {
-        setIsLoadingBalances(false);
+        if (!cancelled) setIsLoadingBalances(false);
       }
     };
-    
+
     fetchUserBalances();
+
+    return () => { cancelled = true; };
   }, [address, internalPosts, publicClient]);
 
   // Function to refresh balances after trade - fetches directly from blockchain
@@ -2348,6 +2410,25 @@ function PostList({
             className="text-soft-ink-muted"
           />
 
+          {/* Udostepnianie STOI W PASKU AKCJI, obok polubienia i tipa.
+              Wczesniej bylo w osobnym rzedzie pod postem - czyli w miejscu,
+              w ktorym nikt nie szuka akcji, bo wszystkie pozostale sa tutaj.
+              Prowadzi do /post/[id]: strony z pelnymi metadanymi, wlasna karta
+              OG i natywnym arkuszem udostepniania systemu. */}
+          <a
+            href={`/post/${post.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open this post on its own page to share it"
+            title="Share"
+            className="flex items-center gap-1.5 rounded-pill px-2.5 py-1.5 font-soft text-[12.5px] font-semibold text-soft-ink-muted transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.94] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Share
+          </a>
+
           {/* 🤝 Wsparcie tworcy na okres - platnosc Z GORY, bez odnawiania.
               Stan bierze sie ze zbiorczego sprawdzenia dla calego feedu. */}
           <SubscribeButton
@@ -2377,11 +2458,10 @@ function PostList({
           {/* 🗑️ ADMIN DELETE BUTTON - Dedykowana ikonka dla admina */}
           {address && isUserAdmin(address) && post.author !== address && (
             <button
-              onClick={() => {
-                if (confirm('Are you sure you want to delete this post?')) {
-                  handleDeletePost(post.id);
-                }
-              }}
+              // handleDeletePost sam pyta o potwierdzenie - drugie `confirm` tutaj
+              // oznaczalo, ze admin musial potwierdzic usuniecie DWA razy, a klikniecie
+              // "Anuluj" w drugim okienku wygladalo, jakby przycisk nie zadzialal.
+              onClick={() => handleDeletePost(post.id)}
               className="text-red-600 hover:text-red-700 ml-auto p-1 rounded-pill hover:bg-red-50 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               title="Delete post (Admin)"
               aria-label="Delete post (Admin)"
@@ -2443,22 +2523,10 @@ function PostList({
           )}
         </div>
 
-        {/* Link do udostepnialnej trasy posta. Do tej pory posty nie mialy
-            wlasnych URL-i - caly feed to jedna strona - wiec nie bylo czego
-            wkleic. /post/[id] ma pelne metadane i wlasna karte OG. */}
-        <div className="mt-2">
-          <a
-            href={`/post/${post.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-pill px-1 py-0.5 font-soft text-xs font-semibold text-soft-ink-soft transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Share
-          </a>
-        </div>
+        {/* Udostepnianie przeniesione DO PASKA AKCJI obok polubienia i tipa -
+            wczesniej stalo w osobnym rzedzie pod postem, czyli w miejscu,
+            w ktorym nikt nie szuka akcji. Otwiera /post/[id]: strone z pelnymi
+            metadanymi, wlasna karta OG i natywnym arkuszem udostepniania. */}
 
         {/* Tip Stats - Always under action buttons for better layout */}
         <div className="mt-2">

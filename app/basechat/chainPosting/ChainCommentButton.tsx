@@ -91,8 +91,19 @@ export default function ChainCommentButton({
           toast.success(`Switched to ${config.networkLabel}`);
         } catch (switchError) {
           console.error('Failed to switch network:', switchError);
-          toast.error(`Please switch to ${config.networkLabel} manually`);
-          setDeniedMessage('Request denied.');
+          // Odmowa przelaczenia sieci w portfelu to decyzja uzytkownika, nie
+          // awaria - przycisk postu (ChainPostButton) rozroznial to od dawna,
+          // ten pokazywal czerwony toast takze wtedy.
+          const switchInfo = describeWalletError(switchError, {
+            network: config.networkLabel,
+            gasSymbol: config.chain.nativeCurrency.symbol,
+          });
+          if (switchInfo.isFailure) {
+            toast.error(`Please switch to ${config.networkLabel} manually`);
+          } else {
+            toast(switchInfo.message);
+          }
+          setDeniedMessage(switchInfo.isFailure ? 'Request denied.' : switchInfo.message);
           return;
         }
       }
@@ -132,7 +143,9 @@ export default function ChainCommentButton({
           await onCommentAdded();
         }
       } else {
-        toast.success('Comment transaction confirmed! Click to save your comment.');
+        // "confirmed" bylo nieprawda: mamy dopiero hash z portfela, nikt nie
+        // czekal na paragon. Transakcja moze sie jeszcze cofnac.
+        toast.success('Comment transaction sent! Click to save your comment.');
         onTransactionSuccess(txHash);
       }
     } catch (error) {
