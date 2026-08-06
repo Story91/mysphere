@@ -67,6 +67,11 @@ export async function getTipReceipt(rawTxHash: string): Promise<TipReceipt | nul
     };
   } catch (error) {
     console.error('[getTipReceipt] Nie udalo sie odczytac tipa:', error);
-    return null;
+    // Ten sam powod co w getPostForShare: `null` konczy sie tu przez
+    // notFound() czterysta czwórką, czyli oswiadczeniem, ze paragon nie
+    // istnieje. Paragon to dowod, ktory ktos komus wyslal - nie moze znikac
+    // dlatego, ze akurat nie dalo sie go odczytac. 500 znaczy "sprobuj
+    // pozniej" i jest tu jedyna prawdziwa odpowiedzia.
+    throw error;
   }
 }
