@@ -809,9 +809,31 @@ function BaseChatContent() {
   // Dodaj nowy stan isLoadingPosts do głównego komponentu, niedaleko innych deklaracji stanów
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
 
+  /**
+   * ODCZYT PADL to NIE jest to samo, co "nie ma postow".
+   *
+   * Dotad `catch` konczyl sie na console.error: stan zostawal pusty,
+   * `isLoadingPosts` schodzilo do false i PostList pokazywal "No posts found".
+   * Awaria Firestore wygladala wiec dokladnie tak samo jak pusty feed - a to
+   * dwa rozne zdania i dwie rozne reakcje po drugiej stronie ekranu.
+   */
+  const [postsError, setPostsError] = useState<string | null>(null);
+  // Podbicie licznika odpala efekt ponizej jeszcze raz - to cale "Try again".
+  const [feedReloadNonce, setFeedReloadNonce] = useState(0);
+
   // Zmodyfikuj useEffect, który pobiera posty, aby obsługiwał stan ładowania
   useEffect(() => {
-    if (!isConnected || !address) return;
+    // CZYTANIE JEST DARMOWE.
+    //
+    // Stalo tu `if (!isConnected || !address) return;`, wiec niezalogowany
+    // gosc nie pobieral ANI JEDNEGO posta. Ta bramka niczego nie chronila:
+    // te same posty sa jawne pod /post/[id] i /u/[address] - komponenty
+    // serwerowe, publiczne, w sitemapie. Chowalismy przed gosciem tresc,
+    // ktora sami publikujemy gdzie indziej, i placilismy za to wyjsciem
+    // kazdego, kto trafil tu z linku.
+    //
+    // ZAPIS SIE NIE ZMIENIA: kompozytor stoi dalej za `isConnected`, a lajki,
+    // komentarze, tipy i przypinanie maja wlasne bramki w PostList.
 
     // Straznik wyscigu: przelaczenie zakladki feedu albo zmiana portfela w trakcie
     // pobierania konczyla sie tym, ze wolniejsza, JUZ NIEAKTUALNA odpowiedz
@@ -822,8 +844,12 @@ function BaseChatContent() {
     const loadPosts = async () => {
       try {
         setIsLoadingPosts(true);
+        setPostsError(null);
 
-        const cacheKey = `${activeFeed}_${address}`;
+        // Gosc ma WLASNY klucz cache'u zamiast `..._undefined`. Sama mechanika
+        // cache'u (TTL, zapis, czyszczenie) zostaje nietknieta - zmienia sie
+        // tylko to, jak powstaje klucz.
+        const cacheKey = `${activeFeed}_${address ?? 'guest'}`;
 
         const cachedPosts = getCachedPosts(cacheKey);
         if (cachedPosts) {
@@ -856,6 +882,10 @@ function BaseChatContent() {
 
       } catch (error) {
         console.error('Error fetching posts:', error);
+        if (!cancelled) {
+          // Zapisujemy fakt awarii, zeby nizej nie udawac pustego feedu.
+          setPostsError('feed-read-failed');
+        }
       } finally {
         if (!cancelled) {
           setIsLoadingPosts(false);
@@ -868,7 +898,7 @@ function BaseChatContent() {
     return () => {
       cancelled = true;
     };
-  }, [isConnected, address, activeFeed]);
+  }, [isConnected, address, activeFeed, feedReloadNonce]);
 
   // Handle URL params for navigation (Obsługa parametrów URL do nawigacji)
   useEffect(() => {
@@ -896,21 +926,59 @@ function BaseChatContent() {
           const existingIds = new Set(currentPosts.map(p => p.id));
           const hasExistingIds = newPosts.some(p => existingIds.has(p.id));
           
-          if (hasExistingIds) {
+          const wynik = hasExistingIds
             // To jest optymistyczny update - całkowicie zastąp posty
-            return newPosts;
-          } else {
+            ? newPosts
             // To są nowe posty z infinite scroll - dodaj je do istniejących
-            const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
-            return [...currentPosts, ...uniqueNewPosts];
+            : [...currentPosts, ...newPosts.filter(p => !existingIds.has(p.id))];
+
+          /**
+           * ZAPIS DO CACHE'U - BEZ TEGO KOMENTARZ ZNIKAL PO ODSWIEZENIU.
+           *
+           * === OBJAW ===
+           * "na feedzie lajki i komentarze nie zapisuja sie jak odswieze
+           * strone albo przejde gdzies indziej, odswiezaja sie odrazu jak
+           * przejde na my feed".
+           *
+           * === PRZYCZYNA ===
+           * Ta galaz aktualizowala WYLACZNIE stan Reacta. Do localStorage
+           * pisaly tylko sciezki pobierajace z Firestore (`setCachedPosts`
+           * po `fetchPosts`). Czyli: dodajesz komentarz, widzisz go, bo stan
+           * sie zmienil - odswiezasz strone, a `getCachedPosts` oddaje wpis
+           * SPRZED komentarza i komentarz "znika".
+           *
+           * Dane w Firestore byly przez caly czas poprawne - dlatego wejscie
+           * w "My Feed" pokazywalo je natychmiast: tamten widok ma inny klucz
+           * cache'a, wiec trafial w pustke i szedl po swieze dane.
+           *
+           * === DLACZEGO TU, A NIE W KAZDYM HANDLERZE ===
+           * Lajki laty juz `patchPostInCache`, ale komentarze, edycje i
+           * kasowanie ida wlasnie tedy. Zapis w JEDNYM miejscu obejmuje kazda
+           * optymistyczna zmiane naraz - i kazda przyszla, ktora ktos tu doda,
+           * nie pamietajac o cache'u.
+           *
+           * Piszemy tylko przy optymistycznym update (`hasExistingIds`).
+           * Doklejanie stron z infinite scrolla do cache'u rozdymaloby go
+           * bez granicy - a te posty i tak przyjda z Firestore przy nastepnym
+           * wejsciu.
+           */
+          if (hasExistingIds) {
+            setCachedPosts(`${activeFeed}_${address ?? 'guest'}`, wynik);
           }
+
+          return wynik;
         });
       } else {
         // ✅ OPTYMALIZACJA: Przypadek 2 - tylko gdy rzeczywiście potrzebujemy odświeżenia
         // Większość wywołań będzie używać optimistic update (newPosts)
         
         // 🎯 Unikalna kombinacja dla cache'a (adres + tryb)
-        const cacheKey = `${activeFeed}_${address}`;
+        // Ten sam ksztalt klucza co przy wczytywaniu (linia ~852). Bylo tu
+        // `${address}` bez zapasowej wartosci, wiec bez portfela wychodzil
+        // klucz `forYou_undefined`, podczas gdy wczytywanie pisalo do
+        // `forYou_guest`. Dwa klucze na te sama liste znaczyly, ze odswiezenie
+        // nigdy nie trafialo w to, co przed chwila zapisano.
+        const cacheKey = `${activeFeed}_${address ?? 'guest'}`;
         
         // 🚀 Sprawdź cache najpierw
         const cachedPosts = getCachedPosts(cacheKey);
@@ -2504,9 +2572,13 @@ function BaseChatContent() {
                   ? 'fixed inset-0 z-30 pt-[120px] pb-24'
                   : 'hidden'
               } ${
-                /* Niezalogowany desktop: kolumna schodzi z drogi, zeby ekran
-                   powitalny byl jedyna rzecza na ekranie. Na telefonie zostaje
-                   - stamtad prowadza do niej zakladki na dole. */
+                /* Niezalogowany desktop: kolumna schodzi z drogi i cala szerokosc
+                   bierze kolumna glowna - a tam stoi teraz ekran powitalny NAD
+                   feedem, nie zamiast niego. Kolumna boczna bez portfela ma do
+                   pokazania wylacznie kartke-zaslepke ("MySphere User",
+                   0x0000...0000, awatar-duch), wiec jej powrot niczego by nie
+                   dolozyl. Na telefonie zostaje - stamtad prowadza do niej
+                   zakladki na dole. */
                 isConnected ? 'lg:block' : 'lg:hidden'
               } lg:relative lg:w-[352px] xl:w-[380px] lg:flex-none lg:pt-6 lg:pb-24 lg:border-r lg:border-soft-line bg-soft-bg overflow-y-auto p-4 lg:px-5 mobile-scroll-container`}
                                  style={{
@@ -3431,6 +3503,39 @@ function BaseChatContent() {
             <div className={`flex-1 overflow-y-auto bg-soft-bg p-4 lg:px-8 lg:pt-6 lg:pb-24 ${
               activeMobilePanel === 'main' ? 'block w-full' : 'hidden lg:block'
             }`}>
+              {/* ===== EKRAN POWITALNY: NAD FEEDEM I POZA JEGO KOLUMNA =====
+                  DWIE rzeczy zalatwione w jednym miejscu.
+
+                  1. NAD FEEDEM, A NIE ZAMIAST NIEGO. Wczesniej gosc dostawal
+                     TYLKO ten ekran: `{isConnected ? (kompozytor + PostList) :
+                     (<MockFeed/>)}` konczylo sprawe i lista postow w ogole sie
+                     nie renderowala. Bramka niczego przy tym nie chronila - te
+                     same posty sa jawne pod /post/[id] i /u/[address]. Teraz to
+                     samo zaproszenie (ten SAM komponent, te same przyciski)
+                     stoi nad feedem, a feed leci dla wszystkich.
+
+                  2. PELNA SZEROKOSC NA DESKTOPIE. Blok stal wewnatrz
+                     `max-w-[640px]`, wiec na szerokim ekranie byl waska kartka
+                     z pustym lawendowym tlem po obu stronach - wygladal jak
+                     zagubione okno dialogowe, a nie jak ekran powitalny
+                     produktu. Wyszedl WYZEJ, obok tamtej kolumny: bierze cala
+                     szerokosc kolumny glownej (kolumna boczna dla goscia jest
+                     `lg:hidden`, wiec to praktycznie caly ekran), a feed pod
+                     nim zostaje w swojej 640-pikselowej mierze czytania.
+
+                  BEZ `w-screen` I UJEMNYCH MARGINESOW - 100vw liczy sie razem
+                  z paskiem przewijania i dokladalo poziomy scroll. To zwykly
+                  blok w kontenerze, ktory juz ma cala szerokosc.
+
+                  NA TELEFONIE NIC SIE NIE ZMIENIA: ponizej 640px tamta kolumna
+                  i tak niczego nie zwezala, a padding `p-4` jest ten sam - to
+                  ten sam ekran co przedtem, w tym samym miejscu. */}
+              {!isConnected && (
+                <div className="mb-6">
+                  <MockFeed />
+                </div>
+              )}
+
               <div className="mx-auto w-full max-w-[640px]">
               {/* ===== OPRAWA MOBILNA - kierunek Soft Social =====
                   Wymienia WYLACZNIE oprawe feedu ponizej progu `lg`: tlo, pasek
@@ -3675,8 +3780,17 @@ function BaseChatContent() {
                 </div>
               ) : (
                 <>
-                  {/* New post creation */}
-                  {isConnected ? (
+                  {/* New post creation.
+
+                      Ekranu powitalnego NIE MA juz w tej galezi - wyszedl
+                      o poziom wyzej, nad cala kolumne feedu (szukaj
+                      "EKRAN POWITALNY: NAD FEEDEM I POZA JEGO KOLUMNA"),
+                      zeby na desktopie zajmowal pelna szerokosc zamiast stac
+                      jako waska kartka w srodku 640-pikselowej kolumny.
+
+                      Tutaj zostal sam kompozytor - dalej za `isConnected`,
+                      bo czytanie jest darmowe, a pisanie nie. */}
+                  {isConnected && (
                     <>
                       {canCreatePosts ? (
                         /* Na telefonie zwiniety, dopoki ktos nie tknie plusa w
@@ -3991,18 +4105,50 @@ function BaseChatContent() {
                           </div>
                     </div>
                   )}
+                    </>
+                  )}
 
-                      {/* Pinned Posts Section - ukryj w trybie My Feed */}
-                      {!showMyFeed && (
-                      <PinnedPosts
-                        displayUserName={displayUserName}
-                        userNames={userNames}
-                          onUserNamesUpdate={handleUserNamesUpdate}
-                      />
-                      )}
+                  {/* Pinned Posts Section - ukryj w trybie My Feed */}
+                  {!showMyFeed && (
+                    <PinnedPosts
+                      displayUserName={displayUserName}
+                      userNames={userNames}
+                      onUserNamesUpdate={handleUserNamesUpdate}
+                    />
+                  )}
 
-                      {/* Tutaj zastępuję kod wyświetlający posty komponentem PostList */}
-                      <PostList 
+                  {/* ===== ODCZYT PADL != PUSTY FEED =====
+                      PostList na pustej liscie pisze "No posts found". Gdy
+                      Firestore nie odpowiedzial, to zdanie jest nieprawda -
+                      posty sa, tylko ich nie dostalismy. Dlatego awaria ma
+                      wlasny komunikat i wlasne wyjscie, zamiast podszywac sie
+                      pod pusty feed. */}
+                  {postsError && posts.length === 0 && !isLoadingPosts ? (
+                    <div
+                      role="alert"
+                      className="rounded-card bg-soft-surface p-6 sm:p-8 shadow-card text-center"
+                    >
+                      <svg className="mx-auto mb-4 h-10 w-10 text-soft-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      </svg>
+                      <h3 className="font-soft-display text-lg font-bold text-soft-ink mb-2">
+                        Couldn&apos;t load the feed
+                      </h3>
+                      <p className="font-soft text-soft-ink-muted leading-[1.55] mb-4">
+                        The posts are there, we just didn&apos;t get them. Check your
+                        connection and try again.
+                      </p>
+                      <button
+                        onClick={() => setFeedReloadNonce((value) => value + 1)}
+                        className="rounded-pill bg-soft-primary px-5 py-2 font-soft text-[14px] font-bold text-white transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                  <>
+                  {/* Tutaj zastępuję kod wyświetlający posty komponentem PostList */}
+                  <PostList
 
                         sortOrder={sortOrder}
                         selectedTag={selectedTag}
@@ -4027,11 +4173,7 @@ function BaseChatContent() {
                         pendingPins={pendingPins} // Przekaż pending pins state
                         onPinPending={handlePinPending} // Przekaż pending pin handler
                       />
-                                </>
-                              ) : (
-                                <div>
-                                  <MockFeed />
-                    </div>
+                  </>
                   )}
                 </>
               )}

@@ -76,11 +76,30 @@ export default function SoftSignInHero({
   signedInAs?: string | null;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-card bg-gradient-to-b from-[#8E7BE8] via-[#7C6BDA] to-[#6656BE] px-6 py-10 text-center font-soft">
+    <section className="relative overflow-hidden rounded-card bg-gradient-to-b from-[#8E7BE8] via-[#7C6BDA] to-[#6656BE] px-6 py-10 text-center font-soft lg:px-12 lg:py-14 lg:text-left">
+      {/* ===== UKLAD NA DESKTOPIE: OBOK SIEBIE, NIE POD SOBA =====
+          Ten ekran renderuje sie teraz na PELNEJ szerokosci kolumny glownej
+          (patrz basechat/page.tsx, "EKRAN POWITALNY: NAD FEEDEM I POZA JEGO
+          KOLUMNA"), a nie w waskiej kartce w srodku feedu.
+
+          Sam gradient rozciagniety na cala szerokosc nie wystarczy: pionowy
+          stos "obrazek - naglowek - przyciski" na szerokim ekranie robi kolumne
+          tresci szeroka na 236px w pasie szerokim na 1400px, czyli zamienia
+          jeden problem z pustka na drugi. Dlatego powyzej `lg` scena rozliczen
+          idzie w lewo, a tekst i przyciski w prawo, oba w pionie wysrodkowane.
+
+          PONIZEJ `lg` NIE ZMIENIA SIE NIC: bez `lg:flex` ten kontener jest
+          zwyklym blokiem, wiec telefon dostaje ten sam wysrodkowany stos co
+          dotad, z tymi samymi rozmiarami.
+
+          Wewnetrzna miara 1080px nie jest oprawa ekranu (gradient idzie od
+          krawedzi do krawedzi), tylko dlugoscia linii tekstu - bez niej
+          naglowek na monitorze 2560px rozjezdza sie na pol ekranu. */}
+      <div className="lg:mx-auto lg:flex lg:w-full lg:max-w-[1080px] lg:items-center lg:gap-16">
       {/* ===== ROZLICZENIE ===== */}
       <div
         aria-hidden="true"
-        className="soft-settle-stage soft-hero-rise relative mx-auto mb-7 h-[200px] w-[200px] sm:h-[236px] sm:w-[236px]"
+        className="soft-settle-stage soft-hero-rise relative mx-auto mb-7 h-[200px] w-[200px] sm:h-[236px] sm:w-[236px] lg:mb-0 lg:flex-none"
       >
         {/* Okrag sadzajacy wezly na jednym promieniu. Ledwo widoczny - ma
             trzymac uklad, a nie rywalizowac z przewodami. */}
@@ -159,8 +178,11 @@ export default function SoftSignInHero({
           w miejsce lajka.
 
           Gdy zmieni sie manifest, ten tekst ma sie zmienic razem z nim. */}
+      {/* Prawa kolumna na desktopie; na telefonie zwykly blok, wiec stos
+          zostaje dokladnie taki, jaki byl. */}
+      <div className="lg:min-w-0 lg:flex-1">
       <h1
-        className="soft-hero-rise mb-3 font-soft-display text-[26px] font-bold leading-[1.15] text-white sm:text-[30px]"
+        className="soft-hero-rise mb-3 font-soft-display text-[26px] font-bold leading-[1.15] text-white sm:text-[30px] lg:text-[38px]"
         style={{ ['--rise-delay' as string]: '60ms' }}
       >
         A like is worth $0.00.
@@ -169,7 +191,7 @@ export default function SoftSignInHero({
       </h1>
 
       <p
-        className="soft-hero-rise mx-auto mb-7 max-w-[36ch] text-[13.5px] font-semibold leading-[1.55] text-white/80"
+        className="soft-hero-rise mx-auto mb-7 max-w-[36ch] text-[13.5px] font-semibold leading-[1.55] text-white/80 lg:mx-0 lg:max-w-[46ch] lg:text-[14.5px]"
         style={{ ['--rise-delay' as string]: '120ms' }}
       >
         Here the only score is one that cost somebody money — and every tip settles onchain
@@ -184,7 +206,7 @@ export default function SoftSignInHero({
       </p>
 
       <div
-        className="soft-hero-rise mx-auto flex max-w-[320px] flex-col gap-2.5"
+        className="soft-hero-rise mx-auto flex max-w-[320px] flex-col gap-2.5 lg:mx-0 lg:max-w-none lg:flex-row lg:flex-wrap lg:justify-start"
         style={{ ['--rise-delay' as string]: '180ms' }}
       >
         <button
@@ -228,6 +250,8 @@ export default function SoftSignInHero({
           {statusMessage}
         </p>
       )}
+      </div>
+      </div>
     </section>
   );
 }
