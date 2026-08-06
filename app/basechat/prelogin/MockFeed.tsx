@@ -1,70 +1,32 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import MockPost from './MockPost';
 import { createBaseAccountSDK } from '@base-org/account';
 import { useAccount, useConnect } from 'wagmi';
 import { useSiweAuth, fetchSiweNonce, isUserRejection } from '../../utils/auth/useSiweAuth';
 import ConnectModal from '../../components/wallet/ConnectModal';
 import SoftSignInHero from '../soft/SoftSignInHero';
 
-const mockPostsData = [
-  {
-    userName: 'onchain-dev.base.eth',
-    userHandle: '@onchaindev',
-    network: 'Base' as const,
-    content: 'Just deployed a new smart contract on Base. The developer experience is getting smoother every day! #L2 #ETH',
-    avatar: 'https://i.pravatar.cc/40?u=onchaindev',
-    timestamp: '5m ago',
-    likes: 12,
-    comments: 3,
-    tips: 1,
-  },
-  {
-    userName: 'BasedAndBuilt.sphere',
-    userHandle: '@basedandbuilt',
-    network: 'Base' as const,
-    content: 'Base is now 10x faster. Flashblocks are live on Base, speeding up effective block times from 2 seconds to 200 milliseconds and making it the fastest EVM chain today.',
-    avatar: 'https://i.pravatar.cc/40?u=basedandbuilt',
-    timestamp: '16m ago',
-    likes: 25,
-    comments: 7,
-    tips: 5,
-  },
-  {
-    userName: 'WAGMI.camper',
-    userHandle: '@wagmi',
-    network: 'Camp Network' as const,
-    content: 'Love the community focus on Camp Network. It really feels like we are all building this together. 🏕️ #WAGMI',
-    avatar: 'https://i.pravatar.cc/40?u=wagmi',
-    timestamp: '28m ago',
-    likes: 18,
-    comments: 4,
-    tips: 2,
-  },
-  {
-    userName: 'DefiDegen.sphere',
-    userHandle: '@defidegen',
-    network: 'Base' as const,
-    content: 'Exploring some new DeFi protocols on Base. The low transaction fees make it so much easier to experiment.',
-    avatar: 'https://i.pravatar.cc/40?u=defidegen',
-    timestamp: '45m ago',
-    likes: 8,
-    comments: 1,
-    tips: 0,
-  },
-  {
-    userName: 'CreatorDAO',
-    userHandle: '@creatordao',
-    network: 'Camp Network' as const,
-    content: 'The creator economy on Camp Network is about to take off. The tools and support for creators are top-notch.',
-    avatar: 'https://i.pravatar.cc/40?u=creatordao',
-    timestamp: '1h ago',
-    likes: 31,
-    comments: 11,
-    tips: 8,
-  },
-];
+/**
+ * === DLACZEGO NIE MA TU JUZ ZMYSLONYCH POSTOW ===
+ * Staly tutaj trzy wpisy z wymyslonymi ludzmi (onchain-dev.base.eth,
+ * BasedAndBuilt.sphere, WAGMI.camper), awatarami z pravatar.cc i wymyslonymi
+ * liczbami lajkow, komentarzy i tipow. Widzial je KAZDY niezalogowany gosc -
+ * byly wiec pierwsza rzecza, jaka nowa osoba widziala z tego produktu.
+ *
+ * Produkt, ktorego cala teza brzmi "te liczby sa sprawdzalne i nie da sie
+ * ich nabic", otwieral sie nieprawdziwymi liczbami przy nieistniejacych
+ * ludziach. Zaden argument o konwersji tego nie odrabia: jesli pierwsze
+ * dane, ktore ktos widzi, sa zmyslone, obietnica sprawdzalnosci jest pusta,
+ * zanim ktokolwiek zdazy ja przeczytac.
+ *
+ * Ekran powitalny to teraz sam SoftSignInHero - znak marki, orbita, oferta,
+ * znaki sieci i dwa przyciski. Nic wiecej i nic udawanego.
+ *
+ * Gdyby kiedys mialo tu stac cos ponizej, niech to beda PRAWDZIWE ostatnie
+ * posty albo prawdziwe rozliczone platnosci (te drugie sa juz policzone na
+ * /leaderboard) - nie rekwizyty.
+ */
 
 /** Skrocony adres do wyswietlenia, np. 0x1234...cdef. */
 const shortenAddress = (value: string) => `${value.slice(0, 6)}...${value.slice(-4)}`;
@@ -236,9 +198,6 @@ const MockFeed = () => {
 
       <ConnectModal isOpen={isWalletModalOpen} onClose={() => setIsWalletModalOpen(false)} />
 
-      {mockPostsData.map((post, index) => (
-        <MockPost key={index} {...post} />
-      ))}
     </div>
   );
 };
