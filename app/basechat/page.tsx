@@ -497,6 +497,30 @@ function BaseChatContent() {
    * wejsciu ukrywalby posty z siedmiu pozostalych sieci bez informacji dlaczego.
    */
   const [mobileNetwork, setMobileNetwork] = useState<string | null>(null);
+
+  /**
+   * Czy na TELEFONIE rozwiniety jest kompozytor.
+   *
+   * Wczesniej telefon pokazywal naraz: pasek sieci na gorze, zwinieta pigulke
+   * "What's happening onchain?" z plusem, PONIZEJ drugi wybor sieci i PONIZEJ
+   * pelny kompozytor z tym samym napisem. Czyli dwa pytania "co slychac?" i
+   * dwa rzedy logotypow sieci na jednym ekranie, zanim pojawil sie pierwszy
+   * post.
+   *
+   * Te dwa wybory sieci NIE sa tym samym: pasek na gorze filtruje feed, a ten
+   * pod spodem decyduje, na ktory lancuch POLECI POST. Wygladaly jednak
+   * identycznie, wiec czytaly sie jak pomylka. Wybor lancucha docelowego
+   * nalezy do kompozytora i teraz jest w srodku - widoczny dopiero wtedy, gdy
+   * ktos faktycznie pisze.
+   *
+   * Rozwijamy TEN SAM, JEDYNY kompozytor - nie budujemy drugiego. Drugi
+   * formularz pisania postu bylby drugim miejscem, w ktorym trzeba naprawiac
+   * ten sam blad, a ten obsluguje siedem lancuchow, tresc premium, PostCoin,
+   * zalaczniki i muzyke.
+   *
+   * Na DESKTOPIE bez zmian - tam nie ma pigulki i kompozytor stoi otwarty.
+   */
+  const [mobileComposerOpen, setMobileComposerOpen] = useState(false);
   
   // Hook do sprawdzania BaseName
   const { data: baseName } = useName(
@@ -3344,14 +3368,21 @@ function BaseChatContent() {
                   activeNetwork={mobileNetwork}
                   onNetworkChange={setMobileNetwork}
                   onFeedChange={(id) => setActiveFeed(id as 'forYou' | 'following' | 'baseName')}
+                  composerOpen={mobileComposerOpen}
                   onOpenComposer={() => {
-                    // Przewijamy do PRAWDZIWEGO kompozytora zamiast budowac drugi.
+                    // Rozwijamy PRAWDZIWY kompozytor zamiast budowac drugi.
                     // Druga implementacja pisania postu bylaby drugim miejscem,
                     // w ktorym trzeba naprawiac ten sam blad - a ten formularz
-                    // obsluguje osiem lancuchow i tresc premium.
-                    const composer = document.querySelector('textarea');
-                    composer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    (composer as HTMLTextAreaElement | null)?.focus();
+                    // obsluguje siedem lancuchow, tresc premium, PostCoin,
+                    // zalaczniki i muzyke.
+                    setMobileComposerOpen(true);
+                    // Focus dopiero po tym, jak React wstawi rozwiniety blok do
+                    // drzewa - inaczej szukamy pola, ktorego jeszcze nie ma.
+                    requestAnimationFrame(() => {
+                      const composer = document.querySelector('textarea');
+                      composer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      (composer as HTMLTextAreaElement | null)?.focus();
+                    });
                   }}
                 />
               </div>
@@ -3376,7 +3407,11 @@ function BaseChatContent() {
                   a nie w kolumnie bocznej. Podpis dodany, bo sam rzad logotypow
                   nie mowil, co robi klikniecie. */}
               {isConnected && (
-              <div className="mb-4 rounded-card bg-soft-surface p-3 shadow-card">
+              <div
+                className={`mb-4 rounded-card bg-soft-surface p-3 shadow-card lg:block ${
+                  mobileComposerOpen ? '' : 'hidden'
+                }`}
+              >
                 <div className="mb-2 px-1 font-soft text-[11.5px] font-bold uppercase tracking-[0.08em] text-soft-ink-faint">
                   Network
                 </div>
@@ -3551,7 +3586,14 @@ function BaseChatContent() {
                   {isConnected ? (
                     <>
                       {canCreatePosts ? (
-                        <div className="rounded-card bg-soft-surface p-4 shadow-card mb-6">
+                        /* Na telefonie zwiniety, dopoki ktos nie tknie plusa w
+                           pigulce - patrz `mobileComposerOpen`. Na desktopie
+                           (`lg:block`) stoi otwarty jak dotad. */
+                        <div
+                          className={`rounded-card bg-soft-surface p-4 shadow-card mb-6 lg:block ${
+                            mobileComposerOpen ? '' : 'hidden'
+                          }`}
+                        >
                           {/* Show Base post form conditionally */}
                           {activePostingNetwork === 'base' && (
                             <>

@@ -48,6 +48,7 @@ export default function SoftFeedMobile({
   activeFeed,
   onFeedChange,
   onOpenComposer,
+  composerOpen = false,
   activeNetwork,
   onNetworkChange,
 }: {
@@ -56,6 +57,14 @@ export default function SoftFeedMobile({
   activeFeed: string;
   onFeedChange: (id: string) => void;
   onOpenComposer: () => void;
+  /**
+   * Czy pelny kompozytor jest juz rozwiniety. Gdy tak - pigulka znika, bo
+   * inaczej napis "What's happening onchain?" stalby na ekranie DWA RAZY:
+   * raz jako zaproszenie, raz jako placeholder pola, ktore wlasnie sie
+   * otworzylo. Domyslnie `false`, wiec ekrany, ktore tego nie podaja,
+   * zachowuja sie jak dotad.
+   */
+  composerOpen?: boolean;
   /** Podany tylko wtedy, gdy lista postow potrafi juz filtrowac po sieci. */
   activeNetwork?: string | null;
   onNetworkChange?: (id: string | null) => void;
@@ -69,7 +78,7 @@ export default function SoftFeedMobile({
 
       <SoftTabs tabs={TABS} activeTab={activeFeed} onSelect={onFeedChange} />
 
-      {currentAddress && (
+      {currentAddress && !composerOpen && (
         <div className="px-4 pb-1">
           <SoftComposerPill avatarUrl={avatarUrl} onOpen={onOpenComposer} />
         </div>
