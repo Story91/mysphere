@@ -117,7 +117,7 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-gray-900 dark:text-white truncate">
+              <span className="font-bold text-soft-ink dark:text-white truncate">
                 {creatorCoin.symbol}
               </span>
               {creatorCoin.priceUSD && (
@@ -126,7 +126,7 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-xs text-soft-ink-soft dark:text-soft-ink-faint truncate">
               {creatorCoin.name}
             </p>
           </div>
@@ -136,24 +136,24 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-purple-200/50 dark:border-purple-700/30">
           {creatorCoin.marketCap && (
             <div className="text-center">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Market Cap</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              <p className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">Market Cap</p>
+              <p className="text-sm font-semibold text-soft-ink dark:text-white">
                 ${Number(creatorCoin.marketCap).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </div>
           )}
           {creatorCoin.volume24h && (
             <div className="text-center">
-              <p className="text-xs text-gray-500 dark:text-gray-400">24h Vol</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              <p className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">24h Vol</p>
+              <p className="text-sm font-semibold text-soft-ink dark:text-white">
                 ${Number(creatorCoin.volume24h).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </div>
           )}
           {creatorCoin.uniqueHolders !== undefined && (
             <div className="text-center">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Holders</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              <p className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">Holders</p>
+              <p className="text-sm font-semibold text-soft-ink dark:text-white">
                 {creatorCoin.uniqueHolders.toLocaleString()}
               </p>
             </div>
@@ -183,7 +183,7 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
         {/* User Balance */}
         {currentUserAddress && parseFloat(userBalance) > 0 && (
           <div className="mt-2 text-center">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+            <span className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">
               Your balance: <span className="font-medium text-purple-600 dark:text-purple-400">{parseFloat(userBalance).toFixed(4)} {creatorCoin.symbol}</span>
             </span>
           </div>

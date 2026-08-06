@@ -196,7 +196,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     href={receiptLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium text-blue-500 underline hover:text-blue-700"
+                    className="font-semibold text-white underline underline-offset-2 hover:opacity-80 transition-opacity duration-[--dur-press] ease-out-strong"
                   >
                     Open receipt
                   </a>
@@ -206,7 +206,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                       navigator.clipboard.writeText(`${window.location.origin}${receiptLink}`);
                       toast.success('Receipt link copied');
                     }}
-                    className="text-blue-500 underline hover:text-blue-700"
+                    className="text-white underline underline-offset-2 hover:opacity-80 transition-opacity duration-[--dur-press] ease-out-strong"
                   >
                     Copy link
                   </button>
@@ -214,7 +214,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     href={explorerLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-gray-400 underline hover:text-gray-200"
+                    className="text-white/80 underline underline-offset-2 hover:text-white transition-colors duration-[--dur-press] ease-out-strong"
                   >
                     {selectedNetworkConfig?.name}
                   </a>

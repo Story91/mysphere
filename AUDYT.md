@@ -175,6 +175,65 @@ kwadrat z kreską), nie logo. Zastąpiony przez `/robin.webp`, atrapa skasowana.
 Selektor sieci pokazuje teraz same znaki bez podpisów — siedem nazw rozciągało
 rząd na całą szerokość kompozytora.
 
+## 2c. Kierunek wizualny Soft Social (5–6 sierpnia 2026)
+
+Projekt właściciela z Claude Design (wariant **1b Soft Social**) wdrożony w kodzie.
+Tokeny **wyciągnięte z pliku projektu**, nie dobrane na oko — każda wartość tam
+występuje i policzyłem wystąpienia: fiolet `#7C6BDA` (23), tusz `#2E2A44` (19),
+lawenda `#EEE9FB` (15), pomarańcz `#F5A73B` (9), cień kart (8).
+
+**Fundament:** 16 zmiennych kolorów + 3 cienie (wszystkie **fioletowe**, nie
+czarne — czarny na lawendzie wygląda jak brud), Baloo 2 + Nunito przez
+`next/font`, mapowanie w Tailwindzie (`bg-soft-surface`, `rounded-card`,
+`shadow-card`, `font-soft-display`).
+
+**Warstwa ruchu** (ze skilla `emil-design-eng`): mocniejsze krzywe zamiast
+wbudowanych, cztery czasy 140–280 ms, **`ease-in` celowo nieobecny** — zaczyna
+wolno, czyli opóźnia ruch dokładnie wtedy, gdy użytkownik patrzy najuważniej.
+`prefers-reduced-motion` zeruje ruch, zostawiając kolor i przezroczystość.
+
+**Wdrożone:** `/basechat` (mobile: pasek sieci jako „stories", zakładki-pigułki,
+zwinięty kompozytor; desktop: przemalowana karta postu, nawigacja, panele boczne),
+`/leaderboard`, `/re-definition`, `/basechat/soft`.
+
+### ZASADA, KTÓRA MUSI ZOSTAĆ
+
+**Przemalowujemy, nigdy nie podmieniamy.**
+
+Wyszła z realnej regresji: podmieniłem na telefonie karty postów na własne,
+ładniejsze — i feed stracił naraz tipy, przypinanie, przyciski transakcji per
+sieć, treść premium, odznaki agentów i muzykę. Zgłoszenie brzmiało „zniknęło
+dużo ikonek" i było trafne co do joty.
+
+Wygląd wolno wymieniać tam, gdzie **nic za sobą nie ciągnie**: tło, pasek sieci,
+zakładki, pigułka kompozytora. Karta postu ma logikę sześciu funkcji naraz —
+przepisanie jej wyglądu musi iść **razem** z przeniesieniem tych funkcji, a nie
+zamiast nich. Weryfikacja po przemalowaniu: liczba handlerów przed i po
+(`PostList`: 26 → 26).
+
+## 2d. Wiralowy kąsek: oś czasu pieniędzy
+
+Każdy produkt społecznościowy ma feed tego, co ludzie **powiedzieli**. Żaden nie
+ma feedu tego, co ludzie sobie **zapłacili**.
+
+`/leaderboard` (Paid) ma dwie sekcje odpowiadające na różne pytania:
+**„As it lands"** — strumień przelewów w kolejności, w jakiej wpadały, każdy
+z hashem i linkiem do eksploratora (*„czy tu coś żyje"*); **„Who got paid most"**
+— suma w oknie (*„komu ufać"*). Pozycja bez hasha jest odfiltrowana — bez dowodu
+ta linia nie ma po co istnieć.
+
+Nie da się tego skopiować bez przeniesienia płatności na łańcuch.
+
+### Naprawione przy okazji
+
+- **Most Active pokazywało 12 osób** — nie było ich 12, tyle pobieraliśmy
+  (`1 × pageSize` = 10 + 20% zapasu). Funkcja raportowała przy tym `totalPages: 5`
+  i `totalUsers: 50`, mając w ręku 12 rekordów.
+- **Sesja SIWE żyła 2 godziny** — prośba o podpis co dwie godziny uczy klikać
+  „podpisz" bez czytania. Teraz 7 dni z rollowaniem.
+- **Sekcje przeniesione do Profilu** (wzorem Twittera) — cztery z pięciu pozycji
+  na feedzie to wcale nie feed, tylko osobne widoki.
+
 ## 2b. NIEROZWIĄZANE — logowanie SIWE nie działa na produkcji
 
 **Objaw:** na `mysphere.fun` trasy `/api/auth/verify/`, `/api/auth/session/` i
