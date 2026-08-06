@@ -68,6 +68,7 @@ import GooeyNav from '../components/GooeyNav/GooeyNav';
 import SoftFeedMobile from './soft/SoftFeedMobile';
 import { NameWithSuffix } from '../utils/nameSuffix';
 import { getGlobalStats } from '../utils/stats/globalStats';
+import Link from 'next/link';
 import SoftSectionList from './soft/SoftSectionList';
 import SoftTrendsPanel from './soft/SoftTrendsPanel';
 import SoftProfileHeader from './soft/SoftProfileHeader';
@@ -4126,6 +4127,52 @@ function BaseChatContent() {
             </div>
             <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'right' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Trends</span>
           </button>
+
+          {/* ===== CZWARTA POZYCJA: ASKS =====
+              Powstala strona /asks, trasy API, karta i kompozytor - i NIC do
+              nich nie prowadzilo. Na telefonie w ogole nie bylo drogi: dolny
+              pasek mial trzy przyciski i zaden nie wychodzil poza feed.
+
+              To NIE jest `SoftDock`, tylko recznie napisany <nav> - i wlasnie
+              dlatego czwarty przycisk dodany kiedys do SoftDock nie pojawil sie
+              w produkcji. SoftDock uzywa tylko trasa prototypowa /basechat/soft.
+
+              Dlaczego Asks, a nie Follows (pierwotny pomysl): Ask ma byc
+              JEDNOSTKA tego produktu, a nie widokiem pobocznym. Follows
+              prowadzi do tresci, ktora i tak jest w feedzie pod zakladka;
+              Asks prowadzi do jedynej rzeczy, ktorej nie da sie zobaczyc
+              nigdzie indziej.
+
+              To <Link>, nie przycisk panelu: Asks to osobna trasa, wiec ma
+              dzialac srodkowym przyciskiem myszy i w nowej karcie.
+
+              Piatej pozycji nie dokladamy - przy 320px piec etykiet nie miesci
+              sie bez zawijania. */}
+          <Link
+            href="/asks"
+            aria-label="Asks"
+            className="flex flex-col items-center rounded-card p-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          >
+            <div className="p-1 rounded-full">
+              {/* Znak zapytania w kolku - Ask to pytanie z kwota. Wektor,
+                  nie emoji: emoji renderuje sie inaczej na kazdym systemie. */}
+              <svg
+                className="w-6 h-6"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#8D86AB"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.6.2-.9.7-.9 1.3v.3" />
+                <path d="M12 16.5h.01" />
+              </svg>
+            </div>
+            <span className="mt-1 font-soft text-[11.5px] font-bold text-soft-ink-soft">Asks</span>
+          </Link>
         </div>
       </nav>
 

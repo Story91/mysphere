@@ -142,6 +142,18 @@ export default function Navigation() {
     // MySphere === BaseChat. `/` to tylko przekierowanie na /basechat
     // (obsluzone serwerowo w next.config.js), wiec kierujemy tu wprost.
     { href: '/basechat', label: 'MySphere' },
+    // Asks stoja TUZ ZA feedem, przed reszta.
+    //
+    // Powstala strona /asks, trasy API, karta i kompozytor - i NIC do nich nie
+    // prowadzilo. Do /asks dalo sie dojsc wylacznie wpisujac adres recznie,
+    // wiec z punktu widzenia kazdego uzytkownika ta funkcja nie istniala.
+    // Zgloszenie brzmialo: "nie widac strony ASK ani nic co wdrozylismy, skad
+    // oni maja wiedziec co robic".
+    //
+    // Miejsce w kolejnosci nie jest przypadkowe: Ask ma byc jednostka tego
+    // produktu, wiec nie moze stac za czterema modulami, z ktorych wiekszosc
+    // jest dzis wylaczona.
+    { href: '/asks', label: 'Asks' },
     { href: '/base', label: 'MyBase' },
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },

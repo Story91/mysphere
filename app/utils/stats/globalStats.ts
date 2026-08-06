@@ -42,11 +42,19 @@ const STATS_DOC = 'globalStats';
 const STATS_ID = 'current';
 
 export type GlobalStats = {
-  users: number;
-  posts: number;
-  likes: number;
-  comments: number;
-  tips: number;
+  /**
+   * `null` znaczy "nie zmierzono", NIE "zero".
+   *
+   * Pole moze byc puste, bo pomiar bywa czesciowy: dobowy limit zapytan
+   * agregujacych w Firestore potrafi sie skonczyc w polowie liczenia. Zapisanie
+   * wtedy zera zamienioloby brak wiedzy w twierdzenie - a to dokladnie ten blad,
+   * ktory ten plik naprawia.
+   */
+  users: number | null;
+  posts: number | null;
+  likes: number | null;
+  comments: number | null;
+  tips: number | null;
   /** Kiedy policzono. 0 = nie wiadomo. */
   measuredAt: number;
 };
@@ -61,9 +69,11 @@ export type GlobalStatsResult = {
   failed: boolean;
 };
 
-function toNumber(value: unknown): number {
+/** Brak pola albo wartosc bez sensu daje `null`, nigdy zero. */
+function toCount(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
   const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? n : 0;
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 /** Jeden odczyt. Nigdy nie zmysla liczb - brak danych zwraca `null`. */
@@ -75,11 +85,11 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
     const data = snapshot.data();
     return {
       stats: {
-        users: toNumber(data.users),
-        posts: toNumber(data.posts),
-        likes: toNumber(data.likes),
-        comments: toNumber(data.comments),
-        tips: toNumber(data.tips),
+        users: toCount(data.users),
+        posts: toCount(data.posts),
+        likes: toCount(data.likes),
+        comments: toCount(data.comments),
+        tips: toCount(data.tips),
         measuredAt: toMillis(data.measuredAt),
       },
       failed: false,
