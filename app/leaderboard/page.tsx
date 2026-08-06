@@ -244,7 +244,11 @@ export default async function PaidPage() {
                   >
                     <span
                       className="flex h-7 w-7 flex-none items-center justify-center rounded-full font-soft-display text-[12px] font-bold text-white"
-                      style={{ background: MEDALS[index] ?? 'var(--soft-line-strong)' }}
+                      /* rgb(var(...)), nie samo var(...) - patrz SoftTrendsPanel.
+                         Tokeny trzymaja trojke kanalow, wiec `background:
+                         var(--soft-line-strong)` bylo nieprawidlowym CSS-em
+                         i znikalo po cichu razem z numerem pozycji. */
+                      style={{ background: MEDALS[index] ?? 'rgb(var(--soft-line-strong))' }}
                     >
                       {index + 1}
                     </span>

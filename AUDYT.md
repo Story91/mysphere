@@ -91,11 +91,18 @@ od 17 stycznia 2025 — **19 miesięcy**. Reguły zaostrzone i opublikowane 5 si
 
 ### Sieci i infrastruktura
 
-- **Robinhood Chain (ósma sieć).** `eth_chainId` → `0x1237` = 4663, potwierdzony na
+- **Robinhood Chain (siódma sieć).** `eth_chainId` → `0x1237` = 4663, potwierdzony na
   żywym RPC przed napisaniem configu. Testnet 46630. **Token natywny: ETH** (18
   miejsc). To **L2 Arbitrum, którego rodzicem jest Ethereum mainnet, nie Base** —
   ETH bridguje się przez `portal.arbitrum.io/bridge`. Gaz ~0,02 gwei.
   Tipy działają od razu (transfer natywny), postowanie czeka na kontrakt.
+  > **Poprawka policzalna, 6 sierpnia.** Ten dokument mówił wcześniej „ósma
+  > sieć", a ja powtarzałem tę liczbę dalej. Sprawdzone w kodzie: `NETWORKS`
+  > w `TipNetworkConfig.ts` i `SOFT_NETWORKS` mają po **siedem** wpisów —
+  > base, camp, celo, ethereum, linea, robinhood, world. Ósemka brała się
+  > z liczenia `camp` i `basecamp` jako dwóch sieci, a to ten sam łańcuch pod
+  > dwiema nazwami — dokładnie ten alias, przez który `as TipNetwork` groziło
+  > błędem 500 (patrz §2e).
 - **OnchainKit usunięty całkowicie** (Base wygasiło go 19 marca 2026). Własna
   warstwa tożsamości na viem z weryfikacją w przód: nazwa musi rozwiązywać się
   z powrotem na ten sam adres, inaczej każdy wyświetlałby cudzy Basename.

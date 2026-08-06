@@ -1,7 +1,15 @@
 'use client';
 
+import { Avatar } from '../../components/identity';
+
 /**
- * Panel Trends na telefonie - wg lewego panelu z pierwszego zrzutu.
+ * Panel Trends - cztery liczby i ranking najaktywniejszych.
+ *
+ * GDZIE STOI. Na telefonie: cala zawartosc zakladki "Trends". Na desktopie:
+ * dolna czesc jedynej kolumny bocznej, pod profilem. Byl tu wczesniej
+ * `lg:hidden` - i przez to desktop, po usunieciu starego bloku "Global
+ * Statistics", nie pokazywal juz ZADNYCH statystyk. Te same dane maja byc
+ * widoczne na obu szerokosciach; roznica ma byc w oprawie, nie w tresci.
  *
  * CZTERY KAFLE, CZTERY KOLORY. To jedyne miejsce w aplikacji, gdzie kolor jest
  * przypisany do kategorii, a nie do znaczenia - i jest to swiadomy wyjatek.
@@ -18,7 +26,31 @@
  */
 
 export type SoftTrendStat = { label: string; value: string; tone: 'purple' | 'amber' | 'green' | 'pink' };
-export type SoftActiveUser = { address: string; name: string; points: number };
+export type SoftActiveUser = {
+  address: string;
+  name: string;
+  points: number;
+  /** Awatar zapisany u nas. Uzywany DOPIERO, gdy nie ma awatara z ENS/Basename. */
+  avatar?: string | null;
+};
+
+/**
+ * Skrocony zapis duzej liczby: 184064 -> "184K".
+ *
+ * Kafle maja 4 znaki szerokosci uzytecznej i staly obok siebie w kwadracie.
+ * "184064" wchodzilo w nie na styk i psulo rowna siatke, a przy 2,6 mln
+ * rozpychalo kafel. Pelna wartosc zostaje w `title`, wiec nic nie ginie -
+ * schodzi tylko z pierwszego planu, gdzie i tak nikt nie czyta szesciu cyfr.
+ *
+ * Ponizej 10 000 pokazujemy dokladnie: tam kazda cyfra jeszcze cos znaczy.
+ */
+function compact(value: string): string {
+  const n = Number(value.replace(/\s/g, ''));
+  if (!Number.isFinite(n)) return value;
+  if (n < 10_000) return n.toLocaleString('en-US');
+  if (n < 1_000_000) return `${Math.round(n / 100) / 10}K`.replace('.0K', 'K');
+  return `${Math.round(n / 100_000) / 10}M`.replace('.0M', 'M');
+}
 
 const TONE = {
   purple: { bg: 'bg-[#EEE9FB]', text: 'text-soft-primary-deep' },
@@ -34,25 +66,45 @@ export default function SoftTrendsPanel({
   activeUsers,
   onOpenUser,
   onSeeAll,
+  page,
+  totalPages,
+  onPageChange,
+  isLoadingPage = false,
   children,
 }: {
   stats: SoftTrendStat[];
   activeUsers: SoftActiveUser[];
   onOpenUser?: (address: string) => void;
   onSeeAll?: () => void;
+  /** Numer biezacej strony rankingu (1-indeks). Bez niego stopka nie powstaje. */
+  page?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
+  isLoadingPage?: boolean;
   children?: React.ReactNode;
 }) {
+  // Numeracja ma byc CIAGLA przez wszystkie strony: druga strona zaczyna sie
+  // od 11, a nie znowu od 1. Inaczej "top 10" na kazdej stronie znaczy co
+  // innego, a medale trafialyby na miejsca 11-13.
+  const offset = page && page > 1 ? (page - 1) * 10 : 0;
+  const showPager = Boolean(page && totalPages && totalPages > 1 && onPageChange);
   return (
-    <div className="flex flex-col gap-4 font-soft lg:hidden">
-      <h2 className="font-soft-display text-[24px] font-bold text-soft-ink">Trends</h2>
+    <div className="flex flex-col gap-4 font-soft">
+      <h2 className="font-soft-display text-[24px] font-bold text-soft-ink lg:text-[18px]">Trends</h2>
 
       <div className="grid grid-cols-2 gap-2.5">
         {stats.map((stat) => (
-          <div key={stat.label} className={`rounded-card p-4 ${TONE[stat.tone].bg}`}>
-            <div className={`font-soft-display text-[22px] font-bold tabular-nums ${TONE[stat.tone].text}`}>
-              {stat.value}
+          <div key={stat.label} className={`rounded-card px-4 py-3.5 ${TONE[stat.tone].bg}`}>
+            {/* Skrot na wierzchu, pelna liczba w `title` - patrz compact(). */}
+            <div
+              title={stat.value}
+              className={`font-soft-display text-[26px] font-bold leading-none tabular-nums ${TONE[stat.tone].text}`}
+            >
+              {compact(stat.value)}
             </div>
-            <div className="font-soft text-[12px] font-semibold text-soft-ink-soft">{stat.label}</div>
+            <div className="mt-1.5 font-soft text-[11.5px] font-semibold uppercase tracking-[0.06em] text-soft-ink-soft">
+              {stat.label}
+            </div>
           </div>
         ))}
       </div>
@@ -86,10 +138,42 @@ export default function SoftTrendsPanel({
                 >
                   <span
                     className="flex h-6 w-6 flex-none items-center justify-center rounded-full font-soft-display text-[11px] font-bold text-white"
-                    style={{ background: MEDAL[index] ?? 'var(--soft-line-strong)' }}
+                    /* rgb(var(...)), nie samo var(...). Tokeny kolorow w tym
+                       repo trzymaja TROJKE KANALOW ("185 177 216"), a nie
+                       gotowy kolor - taki jest warunek dzialania modyfikatorow
+                       przezroczystosci Tailwinda. Wstawione wprost do
+                       `background` dawalo `background: 185 177 216`, czyli CSS
+                       nieprawidlowy i po cichu pomijany: kolko traci tlo, a
+                       numer pozycji jest bialy, wiec od CZWARTEGO miejsca w dol
+                       znikal calkowicie. */
+                    style={{ background: MEDAL[offset + index] ?? 'rgb(var(--soft-line-strong))' }}
                   >
-                    {index + 1}
+                    {offset + index + 1}
                   </span>
+
+                  {/* Awatar: NAJPIERW z ENS/Basename, dopiero potem nasz.
+                      <Avatar> sam rozwiazuje nazwe i obrazek z lancucha, a
+                      `defaultComponent` wchodzi wylacznie wtedy, gdy tam nic
+                      nie ma. Czyli dokladnie "ich ENS albo nasze profilowe,
+                      zaleznie co maja" - bez zgadywania po naszej stronie. */}
+                  <span className="h-7 w-7 flex-none overflow-hidden rounded-full bg-soft-sunken">
+                    <Avatar
+                      address={user.address as `0x${string}`}
+                      className="h-7 w-7"
+                      defaultComponent={
+                        user.avatar ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={user.avatar}
+                            alt=""
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : undefined
+                      }
+                    />
+                  </span>
+
                   <span className="min-w-0 flex-1 truncate font-soft text-[13.5px] font-semibold text-soft-ink">
                     {user.name}
                   </span>
@@ -100,6 +184,39 @@ export default function SoftTrendsPanel({
               </li>
             ))}
           </ol>
+        )}
+
+        {/* Stopka stronicowania. Powstaje TYLKO wtedy, gdy jest wiecej niz
+            jedna strona - pojedyncza strona z napisem "1 / 1" i dwoma
+            wygaszonymi strzalkami to obietnica nawigacji, ktorej nie ma.
+
+            Liczba stron idzie z tego, ile danych FAKTYCZNIE przyszlo, a nie
+            ze stalej: ta lista raz juz oglaszala 5 stron i 50 osob, majac
+            w reku 12 rekordow. */}
+        {showPager && (
+          <div className="mt-3 flex items-center justify-between border-t border-soft-line pt-3">
+            <button
+              type="button"
+              disabled={page! <= 1 || isLoadingPage}
+              onClick={() => onPageChange!(page! - 1)}
+              className="rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:text-soft-ink-faint disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            >
+              ← Prev
+            </button>
+
+            <span className="font-soft text-[12px] font-semibold tabular-nums text-soft-ink-soft">
+              {isLoadingPage ? 'Loading…' : `${page} / ${totalPages}`}
+            </span>
+
+            <button
+              type="button"
+              disabled={page! >= totalPages! || isLoadingPage}
+              onClick={() => onPageChange!(page! + 1)}
+              className="rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:text-soft-ink-faint disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            >
+              Next →
+            </button>
+          </div>
         )}
       </section>
 

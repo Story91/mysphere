@@ -210,7 +210,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
           network: selectedNetwork
         });
         
-        toast.success(`Tip sent successfully! 🎉`, { duration: 3000 });
+        toast.success('Tip sent successfully', { duration: 3000 });
         
         if (txHash) {
           const explorerLink = getExplorerTxLink(selectedNetwork, txHash);
@@ -402,16 +402,18 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
           setIsOpen(!isOpen);
           setTransactionSuccess(false);
         }}
-        className={`flex items-center space-x-1 rounded-pill hover:text-soft-accent-deep transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary touch-manipulation ${className}`}
+        className={`flex items-center gap-1.5 rounded-pill font-soft transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-accent-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary touch-manipulation ${className}`}
         disabled={isTransacting}
         title="Send tip"
         aria-label="Send tip"
       >
-        <span className="md:hidden text-sm" aria-hidden="true">💲</span>
-        <svg className="hidden md:block w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        {/* Ta sama ikona wektorowa na kazdej szerokosci. Wczesniej telefon
+            dostawal emoji 💲, a desktop wektor - czyli DWA rozne przyciski
+            w zaleznosci od ekranu. */}
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
         </svg>
-        <span className="hidden md:inline text-xs">Tip</span>
+        <span className="hidden md:inline text-[12.5px] font-semibold">Tip</span>
       </button>
 
       {isOpen && createPortal(
@@ -427,16 +429,15 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
             className="relative w-full max-w-sm mx-auto bg-soft-surface rounded-card shadow-float border border-soft-line p-5 overflow-hidden max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Glow effects */}
+            {/* Jedna, ciepla poswiata w rogu. Druga (fioletowa) i pusty
+                `bg-transparent` nic nie wnosily poza trzema warstwami do zlozenia. */}
             <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-accent-soft/70 rounded-full filter blur-2xl"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-primary/10 rounded-full filter blur-xl"></div>
-            <div className="absolute inset-0 bg-transparent rounded-card"></div>
-            
+
             <div className="relative z-10">
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-soft-display font-bold text-soft-ink">
-                  💰 <span className="text-soft-primary-deep">Tip Creator</span>
+                  Tip creator
                 </h3>
                 <button
                   onClick={() => { setIsOpen(false); setTipSaved(false); }}
@@ -451,7 +452,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
 
               {/* Network Selection - Icons Grid */}
               <div className="mb-4">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-soft-ink-faint mb-2">Network</label>
+                <label className="block font-soft text-[11px] font-bold uppercase tracking-wider text-soft-ink-soft mb-2">Network</label>
                 <div className="grid grid-cols-6 gap-2">
                   {ALL_NETWORKS.map((network) => {
                     // Linea i Celo maja logo, ktore wypelnia caly kafelek
@@ -490,14 +491,14 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     );
                   })}
                   </div>
-                <div className="text-xs text-soft-ink-soft mt-1 text-center">
+                <div className="font-soft text-xs text-soft-ink-soft mt-2">
                   {selectedNetworkConfig?.name}
                 </div>
               </div>
 
               {/* Token Selection - Icons */}
               <div className="mb-4">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-soft-ink-faint mb-2">Token</label>
+                <label className="block font-soft text-[11px] font-bold uppercase tracking-wider text-soft-ink-soft mb-2">Token</label>
                 <div className="flex gap-2">
                   {availableTokens.map((token) => {
                     const tokenBg = TOKEN_BG_COLORS[token.symbol] || '';
@@ -531,7 +532,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                         ) : (
                           <span className="text-lg">{token.icon}</span>
                         )}
-                        <span className={`text-sm font-semibold ${selectedToken === token.symbol ? 'text-soft-primary-deep' : 'text-soft-ink-muted'}`}>{token.symbol}</span>
+                        <span className={`font-soft text-sm font-semibold ${selectedToken === token.symbol ? 'text-soft-primary-deep' : 'text-soft-ink-muted'}`}>{token.symbol}</span>
                   </button>
                     );
                   })}
@@ -540,9 +541,11 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
 
               {/* Network mismatch warning */}
               {!isCorrectNetwork && (
-                <div className="mb-4 p-3 bg-soft-accent-soft border border-soft-accent rounded-card text-soft-accent-deep text-sm">
+                <div className="mb-4 p-3 bg-soft-accent-soft rounded-card text-soft-accent-deep font-soft text-sm">
                   <div className="flex items-center gap-2">
-                    <span>⚠️</span>
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.5M12 16h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
                     <span>Switch to {selectedNetworkConfig?.name} to send tip</span>
                   </div>
                 </div>
@@ -550,7 +553,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
 
               {/* Amount Input */}
               <div className="mb-3">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-soft-ink-faint mb-2">Amount</label>
+                <label className="block font-soft text-[11px] font-bold uppercase tracking-wider text-soft-ink-soft mb-2">Amount</label>
                 <input
                   type="number"
                   value={tipAmount}
@@ -582,23 +585,31 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
               </div>
 
               {/* Balance Display */}
-              <div className="mb-4 text-sm text-soft-ink-muted">
+              <div className="mb-4 font-soft text-sm text-soft-ink-soft">
                 <span>Balance: <span className="font-soft-display font-semibold tabular-nums text-soft-ink">{getCurrentBalance()}</span> {selectedToken}</span>
               </div>
 
               {/* Transaction states */}
+                {/* Postep to komunikat INTERFEJSU, wiec bierze kolor interfejsu.
+                    `soft-accent` zostaje przy kwocie - to jedyna rzecz w tym
+                    oknie, ktorej nie da sie nabic. */}
                 {isTransacting && !transactionSuccess && (
-                <div className="mb-4 p-3 bg-soft-accent-soft border border-soft-accent rounded-card text-soft-accent-deep text-sm text-center">
+                <div className="mb-4 p-3 bg-soft-sunken rounded-card text-soft-primary-deep font-soft text-sm text-center">
                   <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-soft-accent-deep border-t-transparent"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>
                     <span>Processing...</span>
                   </div>
                   </div>
                 )}
-                
+
                 {transactionSuccess && (
-                <div className="mb-4 p-3 bg-soft-info-soft border border-soft-line rounded-card text-soft-info text-sm text-center">
-                  <span>✅ Tip sent successfully!</span>
+                <div className="mb-4 p-3 bg-soft-info-soft rounded-card text-soft-info font-soft text-sm">
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Tip sent successfully</span>
+                  </div>
                   </div>
                 )}
                 
@@ -607,7 +618,9 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 {!isCorrectNetwork ? (
                   <button
                     onClick={ensureCorrectNetwork}
-                    className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-accent-deep hover:bg-soft-accent text-white shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                    // Zmiana sieci to czynnosc interfejsu, a nie kwota - stad
+                    // `soft-primary`. Pomaranczowy zostaje przy pieniadzach.
+                    className="w-full px-6 py-3 font-soft text-base font-bold rounded-pill bg-soft-primary hover:bg-soft-primary-deep text-white shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     Switch to {selectedNetworkConfig?.name}
                   </button>
@@ -631,7 +644,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     // z pustym polem kwoty byl WLACZONY, a klikniecie nie robilo nic
                     // (getCalls() zwracalo pusta tablice i handler cicho wychodzil).
                     disabled={!hasValidAmount || isBalanceLoading || hasInsufficientBalance() || isTransacting}
-                    className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-primary text-white shadow-chip transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full px-6 py-3 font-soft text-base font-bold rounded-pill bg-soft-primary text-white shadow-chip transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {hasInsufficientBalance()
                       ? `Insufficient ${selectedToken}`
@@ -644,7 +657,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 {/* Base Pay Button - tylko dla USDC na Base */}
                 {selectedNetwork === 'base' && selectedToken === 'USDC' && isCorrectNetwork && (
                   <div className="text-center mt-3">
-                    <div className="text-xs text-soft-ink-soft mb-2">Or pay with Base Pay:</div>
+                    <div className="font-soft text-xs text-soft-ink-soft mb-2">Or pay with Base Pay</div>
                     <BasePayButton
                       colorScheme="dark"
                       onClick={async () => {
@@ -707,7 +720,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                                   }
                                 }
 
-                                toast.success('Tip sent via Base Pay! 🎉');
+                                toast.success('Tip sent via Base Pay');
                                 setTransactionSuccess(true);
                                 setIsTransacting(false);
 

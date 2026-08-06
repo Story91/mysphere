@@ -314,13 +314,16 @@ const NetworkBadge = ({ network, size }: { network?: string | null; size: Networ
     ? def.renderSvg(iconClass)
     : <img src={def.src} alt={def.alt} className={iconClass} />;
 
+  // W naglowku posta odznaka stoi w linii metadanych, ktora ma wlasny `gap` -
+  // wlasny `ml-2` dokladalby tam drugi odstep. Komentarz i odpowiedz zostaja
+  // bez zmian, bo tam odznaka nadal dokleja sie do tekstu obok.
   return (
-    <div className={`flex items-center py-0.5 rounded-pill ${size === 'reply' ? 'ml-1.5 px-1.5' : 'ml-2 px-2'} ${def.chipClass}`}>
+    <div className={`flex items-center py-0.5 rounded-pill ${size === 'reply' ? 'ml-1.5 px-1.5' : size === 'comment' ? 'ml-2 px-2' : 'px-1.5'} ${def.chipClass}`}>
       {def.onWhiteCircle
         ? <div className="bg-soft-surface rounded-full p-0.5 flex items-center justify-center">{icon}</div>
         : icon}
       {size === 'post' && def.label && (
-        <span className={`ml-1 font-soft text-xs font-bold ${def.label.className}`}>{def.label.text}</span>
+        <span className={`ml-1 font-soft text-[11.5px] font-semibold ${def.label.className}`}>{def.label.text}</span>
       )}
     </div>
   );
@@ -1591,7 +1594,7 @@ function PostList({
     const hasMoreComments = mainComments.length > visibleCount;
     
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="p-4 bg-soft-sunken rounded-card">
             <textarea
               value={newComments[post.id] || ''}
@@ -1627,10 +1630,10 @@ function PostList({
                 )}
               </div>
               <div className="ml-3 flex-1 min-w-0">
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-col">
-                    <div className="flex items-center">
-                      <span className="font-soft-display font-bold text-soft-ink">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-col min-w-0">
+                    <div className="flex items-center min-w-0">
+                      <span className="min-w-0 overflow-hidden font-soft-display font-semibold text-soft-ink">
                         {displayUserName(comment.author, `comment-${comment.id}`, false)}
                       </span>
                       <span className="font-soft text-xs text-soft-ink-faint ml-2">
@@ -1667,7 +1670,7 @@ function PostList({
                         </div>
                       </div>
                     ) : (
-                      <div className="font-soft text-sm leading-[1.55] text-soft-ink-muted mt-1 whitespace-pre-wrap">
+                      <div className="font-soft text-sm leading-[1.55] text-soft-ink mt-1 whitespace-pre-wrap break-words">
                         {comment.content}
                       </div>
                     )}
@@ -1773,7 +1776,7 @@ function PostList({
                           </div>
                           <div className="ml-2 flex-1">
                             <div className="flex items-center">
-                              <span className="font-soft-display font-bold text-soft-ink text-xs">
+                              <span className="min-w-0 overflow-hidden font-soft-display font-semibold text-soft-ink text-xs">
                                 {displayUserName(reply.author, `reply-${comment.id}-${replyIndex}`, false)}
                               </span>
                               <span className="font-soft text-[10px] text-soft-ink-faint ml-1.5">
@@ -1783,7 +1786,7 @@ function PostList({
                               {/* Odznaka sieci odpowiedzi */}
                               <NetworkBadge network={reply.network} size="reply" />
                             </div>
-                            <div className="font-soft text-xs leading-[1.55] text-soft-ink-muted mt-0.5 whitespace-pre-wrap">
+                            <div className="font-soft text-xs leading-[1.55] text-soft-ink mt-0.5 whitespace-pre-wrap break-words">
                               {reply.content}
                             </div>
                             {/* Dodajemy przycisk lajkowania i usuwania odpowiedzi */}
@@ -1864,63 +1867,62 @@ function PostList({
     // Hashtagi wyliczane raz - wczesniej ten sam parser leciał dwa razy na post
     const hashtags = extractHashtags(post.content);
 
+    // Obramowanie karty jest TAKIE SAMO dla przypietych i zwyklych postow.
+    // Dziesiec kart pod soba ma czytac sie jak jedna lista, a nie jak zbior
+    // ramek o roznej sile - wyroznienie przypiecia niesie pasek i pigulka
+    // nizej, nie caly kontur.
     return (
-      <div key={`post-${post.id}`} className={`bg-soft-surface font-soft rounded-card p-4 mb-4 border relative ${
-        post.isPinned
-          ? 'border-soft-accent shadow-float'
-          : 'border-soft-line shadow-card'
-      }`}>
-        {/* Gradient overlay dla przypięć.
-            Przezroczystosc przez `opacity`, nie przez modyfikator `/50` przy
-            kolorze - tokeny soft-* to `var(--...)`, a Tailwind 3 nie potrafi
-            doliczyc alfy do wartosci, ktorej nie umie sparsowac, i cicho
-            zwraca kolor w pelnej mocy. */}
+      <div key={`post-${post.id}`} className="bg-soft-surface font-soft rounded-card p-4 border border-soft-line shadow-card relative">
+        {/* Przypiecie: waski pasek przy krawedzi zamiast gradientu przez cala
+            karte. Poprzednia wersja kladla ciepla plame POD trescia posta, czyli
+            obnizala kontrast dokladnie tam, gdzie jest najwazniejszy. */}
         {post.isPinned && (
-          <div className="absolute inset-0 bg-gradient-to-r from-soft-accent-soft via-transparent to-soft-accent-soft rounded-card pointer-events-none opacity-40" />
+          <div className="absolute left-0 top-6 bottom-6 w-1 rounded-pill bg-soft-accent pointer-events-none" aria-hidden="true" />
         )}
         <div className="relative z-10">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0">
-              {userNames[post.author]?.avatar ? (
-                <img
-                  src={userNames[post.author].avatar}
-                  alt="Profile"
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              ) : (
-                <CoinbaseAvatar address={post.author as `0x${string}`} className="w-8 h-8 rounded-full" />
-              )}
-            </div>
-            <div className="flex items-center font-soft-display font-bold text-soft-ink">
-              {displayUserName(post.author, `post-author-${post.id}`, false)}
+        {/* Naglowek: DWA POZIOMY zamiast jednego rzedu.
+            Wczesniej nazwa, cztery odznaki i data staly w jednej linii, wszystko
+            pogrubione i tej samej wielkosci - oko nie mialo za co zlapac. Teraz
+            nazwa jest sama w pierwszej linii, a cala reszta (czas, siec, AI,
+            PostCoin) schodzi do cichszej linii metadanych pod spodem.
+            `min-w-0` + `overflow-hidden` na kolumnie: dlugie nazwy i adresy
+            przycinaja sie zamiast rozpychac karte przy 320px. */}
+        <div className="flex items-start gap-2.5 mb-2.5">
+          <div className="flex-shrink-0">
+            {userNames[post.author]?.avatar ? (
+              <img
+                src={userNames[post.author].avatar}
+                alt="Profile"
+                className="w-9 h-9 rounded-full object-cover"
+              />
+            ) : (
+              <CoinbaseAvatar address={post.author as `0x${string}`} className="w-9 h-9 rounded-full" />
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 min-w-0 font-soft-display font-semibold text-soft-ink leading-tight">
+              <span className="min-w-0 overflow-hidden">
+                {displayUserName(post.author, `post-author-${post.id}`, false)}
+              </span>
 
               {/* Agent AI zweryfikowany w KYA. Czlowiek nie dostaje odznaki. */}
               <AgentBadge agent={getAgentInfo(post.author)} loading={agentLookupLoading} />
+            </div>
 
-              {/* Przypięcie - żółta gwiazdka */}
-              {post.isPinned && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-pill bg-soft-accent-soft">
-                  <svg
-                    className="w-4 h-4 text-soft-accent-deep"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                  </svg>
-                  <span className="ml-1 font-soft text-xs text-soft-accent-deep font-bold">Pinned</span>
-                </div>
-              )}
-              
+            {/* Linia metadanych - drugi plan. Zawija sie zamiast rozpychac karte. */}
+            <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 font-soft text-[11.5px] text-soft-ink-soft">
+              <span className="tabular-nums">{postDate}</span>
+              {post.lastEdited && <span>&middot; edited</span>}
+
               {/* Odznaka sieci posta - jedna definicja na siec, patrz NETWORK_BADGES */}
               <NetworkBadge network={post.network} size="post" />
 
               {/* AI Generated badge */}
               {post.isAIGenerated && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-pill bg-soft-sunken">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill bg-soft-sunken text-soft-ink-muted font-semibold">
                   <svg
-                    className="w-4 h-4 text-soft-primary-deep"
+                    className="w-3 h-3"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1929,39 +1931,55 @@ function PostList({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9" />
                   </svg>
-                  <span className="ml-1 font-soft text-xs text-soft-primary-deep font-bold">AI</span>
-                </div>
+                  AI
+                </span>
               )}
 
               {/* Zora logo and badge */}
               {post.zoraCoinAddress && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-pill bg-soft-sunken">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill bg-soft-sunken text-soft-ink-muted font-semibold">
                   <img
                     src="/android-chrome-512x512.png"
                     alt="Sphere Token"
-                    className="w-5 h-5"
+                    className="w-3.5 h-3.5"
                     title="This post is a Sphere token"
                   />
-                  <span className="ml-1 font-soft text-sm text-soft-primary-deep font-bold">PostCoin</span>
-                </div>
+                  PostCoin
+                </span>
               )}
             </div>
           </div>
-          <div className="font-soft text-xs text-soft-ink-faint">
-            {postDate}
-            {post.lastEdited && <span className="italic"> (edited)</span>}
-          </div>
+
+          {/* Przypięcie - jedyna odznaka, ktora zostaje mocna, bo przypiecie jest
+              platne. Stoi w rogu, wiec nie miesza sie z metadanymi. */}
+          {post.isPinned && (
+            <div className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-pill bg-soft-accent-soft">
+              <svg
+                className="w-3.5 h-3.5 text-soft-accent-deep"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+              <span className="font-soft text-[11.5px] text-soft-accent-deep font-semibold">Pinned</span>
+            </div>
+          )}
         </div>
 
+        {/* Tresc: NAJCIEMNIEJSZY tekst w karcie. Wczesniej byla `text-soft-ink-muted`,
+            czyli jasniejsza niz nazwa autora i hashtagi - hierarchia stala na glowie.
+            Klasy `prose` nie robily tu nic (wtyczka typography nie jest wpieta),
+            wiec zniknely. */}
         <div className="mb-3">
-          <div className={`prose prose-sm max-w-none whitespace-pre-wrap break-words font-soft text-[14.5px] leading-[1.55] text-soft-ink-muted ${!isTextExpanded && post.content.length > 500 ? 'max-h-52 overflow-hidden relative' : ''}`}>
+          <div className={`max-w-none whitespace-pre-wrap break-words font-soft text-[15px] leading-[1.6] text-soft-ink ${!isTextExpanded && post.content.length > 500 ? 'max-h-52 overflow-hidden relative' : ''}`}>
             {post.content.split('\n').map((paragraph, index) => (
               paragraph.trim() ? (
-                <p key={index} className="mb-2 break-words whitespace-normal overflow-wrap-anywhere">
+                <p key={index} className="mb-2 last:mb-0 break-words whitespace-normal overflow-wrap-anywhere">
                   {paragraph.split(/(\s+)/).map((part, partIndex) => {
                     if (part.startsWith('#')) {
                       return (
-                        <span key={partIndex} className="text-soft-primary-deep font-semibold hover:underline">
+                        <span key={partIndex} className="text-soft-primary-deep hover:underline">
                           {part}
                         </span>
                       );
@@ -1981,19 +1999,22 @@ function PostList({
           {post.content.length > 500 && (
             <button
               onClick={() => setExpandedTextPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
-              className="font-soft text-soft-primary-deep text-xs font-semibold mt-1 rounded-pill hover:underline transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="font-soft text-soft-primary-deep text-[12.5px] font-semibold mt-1.5 rounded-pill hover:underline transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               {isTextExpanded ? 'Show less' : 'Show more'}
             </button>
           )}
           
-          {/* Pasek hashtagów - wyświetla wszystkie hashtagi, nawet te niewidoczne */}
+          {/* Pasek hashtagów - wyświetla wszystkie hashtagi, nawet te niewidoczne.
+              Ten sam tekst stoi juz w tresci powyzej, wiec pigulki sa CICHE:
+              powtorzenie w tym samym, mocnym kolorze robilo z konca kazdej karty
+              drugi, konkurencyjny akapit. */}
           {hashtags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
               {hashtags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-block px-2.5 py-0.5 bg-soft-sunken text-soft-primary-deep font-soft text-xs font-semibold rounded-pill"
+                  className="inline-block max-w-full truncate px-2 py-0.5 bg-soft-sunken text-soft-ink-soft font-soft text-[11.5px] font-medium rounded-pill"
                 >
                   {tag}
                 </span>
@@ -2109,15 +2130,19 @@ function PostList({
                           ${formatNumberWithSuffix(zoraData.priceUSD)}
                         </Badge>
                       )}
+                      {/* Kierunek zmiany niesie sam KOLOR TEKSTU. Wczesniej doszedl
+                          do tego jaskrawy kontur, przez co zmiana ceny krzyczala
+                          glosniej niz kwota tipa - jedyna liczba w karcie, ktorej
+                          nie da sie nabic. */}
                       {zoraData?.priceChange24h !== undefined && (
-                        <Badge 
+                        <Badge
                           variant="outline"
-                          className={`rounded-pill font-soft-display text-xs font-bold tabular-nums ${
+                          className={`rounded-pill border-0 bg-transparent px-0 font-soft-display text-xs font-bold tabular-nums ${
                             zoraData.priceChange24h > 0
-                              ? 'border-green-600 text-green-700'
+                              ? 'text-green-700'
                               : zoraData.priceChange24h < 0
-                                ? 'border-red-600 text-red-700'
-                                : 'border-soft-line text-soft-ink-muted'
+                                ? 'text-red-700'
+                                : 'text-soft-ink-soft'
                           }`}
                         >
                           {zoraData.priceChange24h > 0 ? '↑' : zoraData.priceChange24h < 0 ? '↓' : ''}
@@ -2143,15 +2168,15 @@ function PostList({
                   <>
                     {/* Token Stats Grid */}
                     <div className="grid grid-cols-3 gap-3 mb-4">
-                      <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
-                        <CardContent className="p-3 text-center">
-                          <div className="font-soft text-xs text-soft-ink-soft mb-1">Holders</div>
+                      <Card className="rounded-2xl border-0 bg-soft-surface shadow-none">
+                        <CardContent className="p-3">
+                          <div className="font-soft text-[11px] text-soft-ink-soft mb-0.5">Holders</div>
                           <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">{zoraData?.uniqueHolders || '0'}</div>
                         </CardContent>
                       </Card>
-                      <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
-                        <CardContent className="p-3 text-center">
-                          <div className="font-soft text-xs text-soft-ink-soft mb-1">Supply</div>
+                      <Card className="rounded-2xl border-0 bg-soft-surface shadow-none">
+                        <CardContent className="p-3">
+                          <div className="font-soft text-[11px] text-soft-ink-soft mb-0.5">Supply</div>
                           <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">
                             {zoraData?.totalSupply 
                               ? formatNumberWithSuffix(parseFloat(zoraData.totalSupply))
@@ -2159,9 +2184,9 @@ function PostList({
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
-                        <CardContent className="p-3 text-center">
-                          <div className="font-soft text-xs text-soft-ink-soft mb-1">Your Balance</div>
+                      <Card className="rounded-2xl border-0 bg-soft-surface shadow-none">
+                        <CardContent className="p-3">
+                          <div className="font-soft text-[11px] text-soft-ink-soft mb-0.5">Your Balance</div>
                           <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">
                             {isLoadingBalances 
                               ? '...' 
@@ -2187,9 +2212,9 @@ function PostList({
                     {(zoraData?.marketCap || zoraData?.volume24h) && (
                       <div className="grid grid-cols-2 gap-3 mb-4">
                         {zoraData?.marketCap && (
-                          <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
-                            <CardContent className="p-3 text-center">
-                              <div className="font-soft text-xs text-soft-ink-soft mb-1">Market Cap</div>
+                          <Card className="rounded-2xl border-0 bg-soft-surface shadow-none">
+                            <CardContent className="p-3">
+                              <div className="font-soft text-[11px] text-soft-ink-soft mb-0.5">Market Cap</div>
                               <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">
                                 ${formatNumberWithSuffix(zoraData.marketCap)}
                               </div>
@@ -2197,9 +2222,9 @@ function PostList({
                           </Card>
                         )}
                         {zoraData?.volume24h && (
-                          <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
-                            <CardContent className="p-3 text-center">
-                              <div className="font-soft text-xs text-soft-ink-soft mb-1">24h Volume</div>
+                          <Card className="rounded-2xl border-0 bg-soft-surface shadow-none">
+                            <CardContent className="p-3">
+                              <div className="font-soft text-[11px] text-soft-ink-soft mb-0.5">24h Volume</div>
                               <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">
                                 ${formatNumberWithSuffix(zoraData.volume24h)}
                               </div>
@@ -2272,15 +2297,17 @@ function PostList({
                       </div>
                     )}
                     
-                    {/* External Links */}
-                    <div className="flex flex-wrap items-center justify-center gap-4 pt-3 border-t border-soft-line">
+                    {/* External Links - wyrownane do lewej, jak reszta karty.
+                        Wysrodkowany rzad czterech linkow czytal sie jak stopka
+                        strony, a nie jak dodatek do panelu tokena. */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-soft-line">
                       {post.zoraCoinAddress && userTokenBalances[post.zoraCoinAddress.toLowerCase()] && 
                        parseFloat(userTokenBalances[post.zoraCoinAddress.toLowerCase()]) > 0 && (
                         <a 
                           href={`https://zora.co/profile/${address}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-soft text-xs font-semibold text-soft-primary-deep hover:text-soft-ink flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                          className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         >
                           View your tokens
                           <ExternalLink className="w-3 h-3" />
@@ -2291,7 +2318,7 @@ function PostList({
                         href={`${getTokenExplorer(post.network).tokenUrl}${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-soft text-xs font-semibold text-soft-ink-soft hover:text-soft-ink flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         View on {getTokenExplorer(post.network).name}
                         <ExternalLink className="w-3 h-3" aria-hidden="true" />
@@ -2301,7 +2328,7 @@ function PostList({
                         href={`https://zora.co/coin/base:${post.zoraCoinAddress}?referrer=0xf1fa20027b6202bc18e4454149c85cb01dc91dfd`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-soft text-xs font-semibold text-soft-primary-deep hover:text-soft-ink flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         View on Zora
                         <ExternalLink className="w-3 h-3" />
@@ -2311,7 +2338,7 @@ function PostList({
                         href={`https://dexscreener.com/base/${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-soft text-xs font-semibold text-soft-primary-deep hover:text-soft-ink flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         View on DexScreener
                         <ExternalLink className="w-3 h-3" />
@@ -2356,10 +2383,17 @@ function PostList({
           </div>
         )}
 
-        <div className="flex items-center space-x-4 font-soft text-soft-ink-muted mt-3 pt-3 border-t border-soft-line">
+        {/* Pasek akcji: CICHY, dopoki sie w niego nie celuje.
+            Wszystkie pozycje maja teraz ten sam kolor spoczynkowy (ink-soft),
+            ten sam skok na hover (tlo sunken + primary) i te sama wysokosc
+            klikalnego pola. Wczesniej mieszaly sie tu trzy wagi i pelny,
+            fioletowy przycisk "Follow" - w kazdej karcie w feedzie.
+            `flex-wrap`: przy 320px pasek schodzi do drugiej linii zamiast
+            rozpychac karte w bok. */}
+        <div className="flex flex-wrap items-center gap-x-0.5 gap-y-1 font-soft text-soft-ink-soft mt-3 pt-2.5 border-t border-soft-line">
           <button
             onClick={() => handleToggleLike(post.id)}
-            className={`flex items-center space-x-1 rounded-pill px-1 py-0.5 transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 ${isLiked ? 'text-soft-primary-deep' : ''}`}
+            className={`flex items-center gap-1.5 rounded-pill px-2 py-1.5 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 ${isLiked ? 'text-soft-primary-deep' : ''}`}
             disabled={!isConnected}
             aria-pressed={!!isLiked}
             aria-label={`${isLiked ? 'Unlike' : 'Like'} post (${post.likes || 0})`}
@@ -2367,19 +2401,19 @@ function PostList({
             <svg className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
-            <span className="text-xs font-semibold tabular-nums">{post.likes || 0}</span>
+            <span className="text-[12.5px] font-semibold tabular-nums">{post.likes || 0}</span>
           </button>
 
           <button
             onClick={() => setExpandedComments(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
-            className="flex items-center space-x-1 rounded-pill px-1 py-0.5 transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex items-center gap-1.5 rounded-pill px-2 py-1.5 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             aria-expanded={!!expandedComments[post.id]}
             aria-label={`Comments (${commentCount})`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <span className="text-xs font-semibold tabular-nums">{commentCount}</span>
+            <span className="text-[12.5px] font-semibold tabular-nums">{commentCount}</span>
           </button>
 
           {/* FOLLOW BUTTON - Show only if not author and user is connected */}
@@ -2394,27 +2428,27 @@ function PostList({
                 }
               }}
               disabled={followLoading[post.author]}
-              className={`flex items-center space-x-1 font-soft text-xs font-bold px-2.5 py-1 rounded-pill transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+              className={`flex items-center gap-1.5 font-soft text-[12.5px] font-semibold px-2 py-1.5 rounded-pill transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 followingStatus[post.author]
-                  ? 'bg-soft-sunken text-soft-primary-deep hover:bg-soft-line'
-                  : 'bg-soft-primary text-white hover:bg-soft-primary-deep'
+                  ? 'text-soft-ink-soft'
+                  : 'text-soft-primary-deep'
               } ${followLoading[post.author] ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {followLoading[post.author] ? (
                 <>
-                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
                   <span>Loading...</span>
                 </>
               ) : followingStatus[post.author] ? (
                 <>
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                   </svg>
                   <span>Following</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                   <span>Follow</span>
@@ -2440,7 +2474,7 @@ function PostList({
           <TipButton
             recipientAddress={post.author}
             postId={post.id}
-            className="text-soft-ink-muted"
+            className="px-2 py-1.5 text-soft-ink-soft hover:bg-soft-sunken"
           />
 
           {/* Udostepnianie STOI W PASKU AKCJI, obok polubienia i tipa.
@@ -2454,7 +2488,7 @@ function PostList({
             rel="noopener noreferrer"
             aria-label="Open this post on its own page to share it"
             title="Share"
-            className="flex items-center gap-1.5 rounded-pill px-2.5 py-1.5 font-soft text-[12.5px] font-semibold text-soft-ink-muted transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.94] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex items-center gap-1.5 rounded-pill px-2 py-1.5 font-soft text-[12.5px] font-semibold text-soft-ink-soft transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13" strokeLinecap="round" strokeLinejoin="round" />
@@ -2469,7 +2503,7 @@ function PostList({
             creatorName={userNames[post.author]?.name}
             isSupported={subscribedCreators.has((post.author || '').toLowerCase())}
             onSubscribed={markSubscribed}
-            className="text-soft-ink-muted"
+            className="px-2 py-1.5 text-soft-ink-soft hover:bg-soft-sunken"
           />
 
           {post.txHash && (
@@ -2477,14 +2511,14 @@ function PostList({
               href={`${getTxExplorer(post.network).txUrl}${post.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center space-x-1 rounded-pill px-1 py-0.5 text-soft-ink-muted transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="flex items-center gap-1.5 rounded-pill px-2 py-1.5 text-soft-ink-soft transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               title="View Transaction"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               {/* Tekst tylko na desktop */}
-              <span className="hidden md:inline text-xs font-semibold">Transaction</span>
+              <span className="hidden md:inline text-[12.5px] font-semibold">Transaction</span>
             </a>
           )}
 
@@ -2495,7 +2529,10 @@ function PostList({
               // oznaczalo, ze admin musial potwierdzic usuniecie DWA razy, a klikniecie
               // "Anuluj" w drugim okienku wygladalo, jakby przycisk nie zadzialal.
               onClick={() => handleDeletePost(post.id)}
-              className="text-red-600 hover:text-red-700 ml-auto p-1 rounded-pill hover:bg-red-50 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              // Czerwien pojawia sie DOPIERO pod kursorem. Stala, czerwona ikona
+              // w kazdej karcie widzianej przez admina byla trzecim mocnym kolorem
+              // w pasku, w ktorym reszta jest szara.
+              className="text-soft-ink-soft hover:text-red-600 ml-auto p-1.5 rounded-pill hover:bg-red-50 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               title="Delete post (Admin)"
               aria-label="Delete post (Admin)"
             >
@@ -2513,7 +2550,7 @@ function PostList({
             <div className="relative ml-auto group">
               <button
                 type="button"
-                className="text-soft-ink-soft hover:text-soft-ink p-1 rounded-pill hover:bg-soft-sunken transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="text-soft-ink-soft hover:text-soft-ink p-1.5 rounded-pill hover:bg-soft-sunken transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 aria-label="Post options"
                 title="Post options"
               >
@@ -2533,13 +2570,18 @@ function PostList({
                 {address && isUserAdmin(address) && (
                   <button
                     onClick={() => post.isPinned ? handleUnpinPost(post.id) : handlePinPost(post.id)}
-                    className={`block w-full text-left px-4 py-2 font-soft text-xs font-semibold hover:bg-soft-sunken transition-[color,background-color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                    className={`flex w-full items-center gap-2 px-4 py-2 text-left font-soft text-xs font-semibold hover:bg-soft-sunken transition-[color,background-color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                       post.isPinned
                         ? 'text-soft-accent-deep'
                         : 'text-soft-ink-muted hover:text-soft-ink'
                     }`}
                   >
-                    {post.isPinned ? '📌 Unpin' : '📌 Pin'}
+                    {/* Ikona wektorowa zamiast emoji 📌 - emoji renderuje sie inaczej
+                        na kazdym systemie i nie da sie go dopasowac do reszty menu. */}
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 3l6 6-3 1-4 4-1 5-2 2-3-3-5 5 5-5-3-3 2-2 5-1 4-4 1-3z" />
+                    </svg>
+                    {post.isPinned ? 'Unpin' : 'Pin'}
                   </button>
                 )}
                 {/* ✅ TYLKO AUTOR może usuwać przez menu (admin ma dedykowaną ikonkę) */}
@@ -2561,8 +2603,10 @@ function PostList({
             w ktorym nikt nie szuka akcji. Otwiera /post/[id]: strone z pelnymi
             metadanymi, wlasna karta OG i natywnym arkuszem udostepniania. */}
 
-        {/* Tip Stats - Always under action buttons for better layout */}
-        <div className="mt-2">
+        {/* Tip Stats - Always under action buttons for better layout.
+            Kwota tipa to jedyna liczba w karcie, ktorej nie da sie nabic - i
+            jedyne miejsce, ktore dostaje `soft-accent`. */}
+        <div className="mt-1.5">
           <TipStats
             postId={post.id}
             presetPostStats={postTipStats[post.id] ?? null}
@@ -2608,11 +2652,11 @@ function PostList({
 
   if (isLoading && internalPosts.length === 0) {
     return (
-      <div className="animate-pulse space-y-4">
+      <div className="animate-pulse space-y-3">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="bg-soft-surface rounded-card p-4 shadow-card">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-soft-sunken rounded-full"></div>
+          <div key={i} className="bg-soft-surface rounded-card border border-soft-line p-4 shadow-card">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 bg-soft-sunken rounded-full"></div>
               <div className="flex-1">
                 <div className="h-4 bg-soft-sunken rounded-pill w-1/4 mb-2"></div>
                 <div className="h-3 bg-soft-sunken rounded-pill w-1/6"></div>
@@ -2632,7 +2676,11 @@ function PostList({
   if (internalPosts.length === 0 && !isLoading) {
     return (
       <div className="bg-soft-surface rounded-card p-8 shadow-card text-center">
-        <div className="text-4xl mb-4">📭</div>
+        {/* Ikona wektorowa zamiast emoji - emoji jako ikona wyglada na wstawke,
+            a nie na czesc interfejsu. */}
+        <svg className="mx-auto mb-4 h-10 w-10 text-soft-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0l-2.4 6A2 2 0 0115.7 21H8.3a2 2 0 01-1.9-1.4L4 13m16 0h-5l-1 2h-4l-1-2H4" />
+        </svg>
         <h3 className="font-soft-display text-lg font-bold text-soft-ink mb-2">No posts found</h3>
         <p className="font-soft text-soft-ink-muted leading-[1.55]">
           {showOnlyUserPosts 
@@ -2644,7 +2692,10 @@ function PostList({
   }
 
   return (
-    <div className="space-y-6">
+    // Karty nie maja juz wlasnego `mb-4` - odstep na liscie jest JEDEN i stoi
+    // tutaj. Wczesniej margines karty sumowal sie z odstepem listy, przez co
+    // miedzy postami bylo 40px pustki.
+    <div className="space-y-3">
       {displayedPosts.map(post => (
         <React.Fragment key={`post-fragment-${post.id}`}>
           {renderPost(post)}
@@ -2659,24 +2710,18 @@ function PostList({
               <div className="bg-soft-sunken h-10 rounded-pill"></div>
             </div>
           ) : hasMorePosts ? (
-            <button 
+            // Jeden przycisk, jeden cien, zero ozdob. Poprzednia wersja miala
+            // emoji, pulsujaca kropke, dwie nakladki i cien "float" zarezerwowany
+            // dla elementow unoszacych sie NAD trescia (menu, modale).
+            <button
               onClick={loadMorePosts}
-              className="group relative px-8 py-4 bg-soft-primary text-white rounded-pill font-soft font-bold transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary shadow-chip"
-              style={{
-                boxShadow: 'var(--soft-shadow-float)'
-              }}
+              className="px-6 py-3 bg-soft-primary text-white rounded-pill font-soft text-sm font-bold shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
-              <div className="absolute inset-0 rounded-pill bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out-strong"></div>
-              <div className="absolute inset-0 rounded-pill ring-1 ring-inset ring-white/20"></div>
-              <div className="relative flex items-center space-x-2">
-                <span className="text-lg">📚</span>
-                <span>Load More Posts</span>
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse group-hover:animate-bounce"></div>
-              </div>
+              Load more posts
             </button>
           ) : internalPosts.length > 0 ? (
             <div className="text-center p-4">
-              <div className="font-soft text-soft-ink-muted text-sm mb-2">🎉 You've reached the end!</div>
+              <div className="font-soft text-soft-ink-muted text-sm mb-1">You&apos;ve reached the end</div>
               <div className="font-soft text-soft-ink-faint text-xs">All posts have been loaded</div>
             </div>
           ) : null}
@@ -2686,7 +2731,9 @@ function PostList({
       {/* Informacja o limicie wyświetlania */}
       {!disableInfiniteScroll && displayLimit >= MAX_DISPLAY_LIMIT && internalPosts.length > MAX_DISPLAY_LIMIT && (
         <div className="text-center p-4">
-          <div className="font-soft text-soft-accent-deep text-sm font-semibold mb-2">📊 Display limit reached</div>
+          {/* Limit wyswietlania to komunikat interfejsu, a nie kwota - stad
+              `soft-ink`, a nie zarezerwowany dla pieniedzy `soft-accent`. */}
+          <div className="font-soft text-soft-ink text-sm font-semibold mb-1">Display limit reached</div>
           <div className="font-soft text-soft-ink-faint text-xs">
             Showing {MAX_DISPLAY_LIMIT} most recent posts for performance
           </div>

@@ -14,7 +14,11 @@ interface RecentTipsProps {
 // Komponent ikony tokena
 const TokenIcon = ({ token }: { token: TipToken }) => {
   const tokenConfig = TOKENS[token];
-  if (!tokenConfig) return <span>💰</span>;
+  // Nieznany token: neutralny krazek zamiast emoji 💰. Emoji rysuje sie w innym
+  // stylu na kazdym systemie i wybija sie z rzedu prawdziwych logotypow.
+  if (!tokenConfig) {
+    return <span className="inline-block w-3.5 h-3.5 rounded-full bg-soft-line" aria-hidden="true" />;
+  }
 
   if (tokenConfig.iconUrl) {
     return (
@@ -58,7 +62,9 @@ const mapNetworkId = (network: string): TipNetwork => {
 const NetworkIcon = ({ network }: { network: TipNetworkType }) => {
   const networkId = mapNetworkId(network);
   const networkConfig = NETWORKS[networkId];
-  if (!networkConfig) return <span>🔵</span>;
+  if (!networkConfig) {
+    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-soft-line" aria-hidden="true" />;
+  }
   
   if (networkConfig.iconUrl) {
     return (
@@ -151,9 +157,9 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
           <div className="animate-pulse bg-soft-sunken rounded-pill w-4 h-4"></div>
           <div className="animate-pulse bg-soft-sunken rounded-pill w-20 h-4"></div>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-1">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="animate-pulse bg-soft-sunken rounded-card p-2 h-12"></div>
+            <div key={i} className="animate-pulse bg-soft-sunken rounded-2xl h-12"></div>
           ))}
         </div>
       </div>
@@ -163,12 +169,11 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
   if (loadFailed || tips.length === 0) {
     return (
       <div className={`bg-soft-surface rounded-card p-4 shadow-card ${className}`}>
-        <div className="flex items-center space-x-2 mb-3">
-          <span className="text-lg">🎯</span>
-          <h3 className="font-soft-display font-semibold text-soft-ink">Recent Tips</h3>
-        </div>
-        <div className="text-center py-4">
-          <span className="text-soft-ink-soft text-sm">
+        <h3 className="font-soft-display font-semibold text-soft-ink mb-3">Recent tips</h3>
+        <div className="py-4">
+          {/* Rozroznienie zostaje: "nie udalo sie wczytac" to co innego niz
+              "nie ma jeszcze napiwkow". */}
+          <span className="font-soft text-soft-ink-soft text-sm">
             {loadFailed ? "Couldn't load recent tips" : 'No tips received yet'}
           </span>
         </div>
@@ -178,31 +183,35 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
 
   return (
     <div className={`bg-soft-surface rounded-card p-4 shadow-card ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          <span className="text-lg">🎯</span>
-          <h3 className="font-soft-display font-semibold text-soft-ink">Recent Tips</h3>
+      {/* Emoji 🎯 zniknelo z naglowka - nie znaczylo nic, a rysowalo sie w innym
+          stylu na kazdym systemie. Liczba napiwkow niesie te sama informacje. */}
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <h3 className="font-soft-display font-semibold text-soft-ink truncate">Recent tips</h3>
           <span className="text-sm text-soft-ink-faint font-soft-display tabular-nums">
-            ({tips.length})
+            {tips.length}
           </span>
         </div>
         {tips.length > 3 && (
           <button
             onClick={() => setShowAll(!showAll)}
             aria-expanded={showAll}
-            className="text-xs font-semibold text-soft-primary-deep bg-soft-sunken rounded-pill px-3 py-1.5 transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex-shrink-0 font-soft text-xs font-semibold text-soft-primary-deep rounded-pill px-2.5 py-1.5 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            {showAll ? 'Show Less' : 'Show All'}
+            {showAll ? 'Show less' : 'Show all'}
           </button>
         )}
       </div>
       
-      <div className="space-y-3">
+      {/* Wiersze bez wlasnej ramki i wlasnego cienia. Kafelek z cieniem, w nim
+          trzy mniejsze kafelki z cieniami - to byly trzy poziomy uniesienia
+          na przestrzeni 150 pikseli. */}
+      <div className="space-y-1">
         {displayedTips.map((tip) => (
-          <div key={tip.id} className="flex items-center justify-between p-3 bg-soft-surface border border-soft-line rounded-card shadow-chip">
-            <div className="flex items-center space-x-3">
+          <div key={tip.id} className="flex items-center justify-between gap-3 p-2 rounded-2xl hover:bg-soft-sunken transition-colors duration-[--dur-press] ease-out-strong">
+            <div className="flex items-center gap-3 min-w-0">
               {/* Token + Network Icon */}
-              <div className="w-8 h-8 bg-soft-accent-soft rounded-full flex items-center justify-center relative">
+              <div className="flex-shrink-0 w-8 h-8 bg-soft-sunken rounded-full flex items-center justify-center relative">
                 <span className="text-sm">
                   <TokenIcon token={tip.token as TipToken} />
                 </span>
@@ -211,19 +220,20 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
                   <NetworkIcon network={tip.network} />
                 </span>
               </div>
-              <div className="flex-1">
-                <div className="text-sm font-semibold text-soft-ink">
+              <div className="min-w-0">
+                <div className="font-soft text-sm font-semibold text-soft-ink truncate">
                   {getSenderName(tip.senderAddress)}
                 </div>
-                <div className="text-xs text-soft-ink-faint">
+                <div className="font-soft text-[11.5px] text-soft-ink-soft">
                   {formatTimestamp(tip.timestamp)}
                 </div>
               </div>
             </div>
-            
-            <div className="flex items-center space-x-2">
+
+            <div className="flex flex-shrink-0 items-center space-x-2">
               <div className="text-right">
-                <div className="text-sm font-semibold text-soft-accent-deep font-soft-display tabular-nums flex items-center gap-1">
+                {/* Kwota - jedyne miejsce w kafelku z `soft-accent`. */}
+                <div className="text-sm font-bold text-soft-accent-deep font-soft-display tabular-nums flex items-center justify-end gap-1">
                   <TokenIcon token={tip.token as TipToken} />
                   <span>{formatTokenAmount(parseFloat(tip.amount), tip.token as TipToken)}</span>
                 </div>
@@ -235,7 +245,7 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
                     href={`/tip/${tip.txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-semibold text-soft-primary-deep hover:text-soft-ink rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center space-x-1"
+                    className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-end space-x-1"
                   >
                     <span>Receipt</span>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

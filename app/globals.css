@@ -589,3 +589,137 @@ h1, h2, h3, h4, h5, h6 {
 @media (prefers-reduced-motion: reduce) {
   .spine-fill { animation: none; transform: scaleY(1); }
 }
+
+/* ===========================================================================
+   ROZLICZENIE - element sygnaturowy ekranu powitalnego
+   ===========================================================================
+   (app/basechat/soft/SoftSignInHero.tsx)
+
+   Znak marki w srodku, wokol niego wszystkie sieci z konfiguracji, a od kazdej
+   sieci biegnie do srodka przewod. Po przewodach jedza pomaranczowe monety -
+   JEDNA NARAZ - i znikaja pod znakiem marki, gdy obwodka blysnie. To jest cala
+   teza produktu w jednym obrazku: pieniadz dociera tu z lancuchow i sie
+   rozlicza.
+
+   SKAD SIE BIERZE "JEDNA NARAZ" BEZ ZADNEGO JAVASCRIPTU. Wszystkie monety maja
+   ten sam, dlugi cykl (7 x 1600 ms = 11200 ms), w ktorym RUCH zajmuje tylko
+   pierwsze 10% - reszta to przezroczystosc. Komponent podaje kazdemu
+   przewodowi ujemne opoznienie o wielokrotnosc 1600 ms, wiec kazdy startuje
+   w innym miejscu tego samego cyklu i okienka ruchu nigdy sie nie nakladaja.
+   Zaden timer, zaden stan, zero pracy na glownym watku.
+
+   DLACZEGO PRZEJAZD JEST `linear`, A BLYSK NIE. Przejazd to ruch ciagly po
+   torze - easing zamienilby go w szarpanie. Blysk rozliczenia jest ZDARZENIEM
+   (cos wlasnie doszlo), wiec dostaje --ease-out-strong: mocno na starcie,
+   wyhamowanie na koncu.
+
+   Animowane sa wylacznie `transform` i `opacity`, wiec calosc idzie po stronie
+   kompozytora - zadnego przeliczania ukladu przy 60 klatkach na sekunde.
+   =========================================================================== */
+
+/* Dlugosc przewodu = promien kola wezlow. Trzymana jako zmienna, bo korzystaja
+   z niej i szerokosc przewodu, i droga monety - musza byc tej samej dlugosci
+   co do piksela, inaczej moneta startuje obok znaku sieci. */
+.soft-settle-stage {
+  --rail-len: 80px;
+}
+@media (min-width: 640px) {
+  .soft-settle-stage {
+    --rail-len: 94px;
+  }
+}
+
+/* Ramie przewodu. Wysokosc 0 i transform-origin na lewej krawedzi, wiec obrot
+   odbywa sie dokladnie wokol srodka sceny. */
+.soft-wire {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--rail-len);
+  height: 0;
+  transform-origin: left center;
+}
+
+/* Sam przewod. Przerywany, bo to tor platnosci, a nie krawedz elementu -
+   ciagla linia czytalaby sie jak ramka ukladu. */
+.soft-wire-line {
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 100%;
+  height: 0;
+  border-top: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* Moneta. Ujemne marginesy sadzaja ja na osi przewodu raz na zawsze, dzieki
+   czemu w klatkach zostaje sam translateX - bez mieszania z translate(-50%). */
+.soft-wire-coin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 999px;
+  background: rgb(var(--soft-accent));
+  box-shadow: 0 0 0 3px rgba(245, 167, 59, 0.22);
+  opacity: 0;
+  animation: soft-wire-send 11200ms linear infinite;
+}
+
+@keyframes soft-wire-send {
+  0%    { opacity: 0; transform: translateX(var(--rail-len)) scale(0.5); }
+  1.6%  { opacity: 1; transform: translateX(calc(var(--rail-len) * 0.86)) scale(1); }
+  8.4%  { opacity: 1; transform: translateX(calc(var(--rail-len) * 0.16)) scale(1); }
+  10%   { opacity: 0; transform: translateX(0) scale(0.5); }
+  100%  { opacity: 0; transform: translateX(0) scale(0.5); }
+}
+
+/* Blysk rozliczenia. Okres 1600 ms = odstep miedzy przyjazdami, opoznienie
+   1120 ms = czas przejazdu, wiec obwodka zapala sie w tej samej klatce,
+   w ktorej moneta wchodzi pod znak marki. Skala konczy sie na 1.08 - wiecej
+   robi z tego falowanie, ktore przestaje znaczyc "rozliczone". */
+.soft-settle-ring {
+  opacity: 0;
+  animation: soft-settle-flash 1600ms var(--ease-out-strong) 1120ms infinite;
+}
+
+@keyframes soft-settle-flash {
+  0%   { opacity: 0.9; transform: translate(-50%, -50%) scale(1); }
+  60%  { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
+}
+
+/* Wejscie ekranu: scena, naglowek, zdanie i przyciski wchodza kaskada co 60 ms.
+   Odstep jest KROTKI celowo - dluzszy kaze czekac na przycisk, po ktory sie
+   przyszlo. Po ostatnim elemencie nie rusza sie juz nic poza rozliczeniem. */
+.soft-hero-rise {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: soft-hero-rise-in 380ms var(--ease-out-strong) var(--rise-delay, 0ms) forwards;
+}
+
+@keyframes soft-hero-rise-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Ograniczony ruch: zatrzymujemy WSZYSTKO, ale nic nie znika. Monety zostaja
+   zaparkowane na przewodach, obwodka rozliczenia zostaje widoczna, kaskada
+   wejscia oddaje gotowy uklad. Obrazek mowi to samo zdanie - tylko go nie
+   odgrywa. Gdyby monety znikaly, ekran stracilby swoja jedyna teze. */
+@media (prefers-reduced-motion: reduce) {
+  .soft-wire-coin {
+    animation: none;
+    opacity: 1;
+    transform: translateX(calc(var(--rail-len) * 0.55));
+  }
+  .soft-settle-ring {
+    animation: none;
+    opacity: 0.45;
+  }
+  .soft-hero-rise {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

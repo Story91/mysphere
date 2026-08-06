@@ -48,6 +48,7 @@ export default function SoftFeedMobile({
   activeFeed,
   onFeedChange,
   onOpenComposer,
+  composerOpen = false,
   activeNetwork,
   onNetworkChange,
 }: {
@@ -56,10 +57,30 @@ export default function SoftFeedMobile({
   activeFeed: string;
   onFeedChange: (id: string) => void;
   onOpenComposer: () => void;
+  /**
+   * Czy pelny kompozytor jest juz rozwiniety. Gdy tak - pigulka znika, bo
+   * inaczej napis "What's happening onchain?" stalby na ekranie DWA RAZY:
+   * raz jako zaproszenie, raz jako placeholder pola, ktore wlasnie sie
+   * otworzylo. Domyslnie `false`, wiec ekrany, ktore tego nie podaja,
+   * zachowuja sie jak dotad.
+   */
+  composerOpen?: boolean;
   /** Podany tylko wtedy, gdy lista postow potrafi juz filtrowac po sieci. */
   activeNetwork?: string | null;
   onNetworkChange?: (id: string | null) => void;
 }) {
+  // BEZ PORTFELA NIE MA CZEGO FILTROWAC.
+  //
+  // Ekran powitalny zajmuje na telefonie caly widok - nie ma pod nim feedu,
+  // bo zmyslone posty zostaly stamtad usuniete. Mimo to nad bohaterem stal
+  // pasek siedmiu sieci i zakladki "All Posts / Follows / Basenames": trzy
+  // filtry do treski, ktorej nie widac, i dwa rzedy interfejsu przed pierwszym
+  // zdaniem produktu. Pierwsza rzecz na ekranie ma mowic, czym to jest, a nie
+  // oferowac sortowanie pustki.
+  //
+  // Po zalogowaniu wszystko wraca bez zmian.
+  if (!currentAddress) return null;
+
   return (
     <div className="-mx-4 mb-3 bg-soft-bg font-soft">
       <SoftStoryRail
@@ -69,7 +90,7 @@ export default function SoftFeedMobile({
 
       <SoftTabs tabs={TABS} activeTab={activeFeed} onSelect={onFeedChange} />
 
-      {currentAddress && (
+      {currentAddress && !composerOpen && (
         <div className="px-4 pb-1">
           <SoftComposerPill avatarUrl={avatarUrl} onOpen={onOpenComposer} />
         </div>
