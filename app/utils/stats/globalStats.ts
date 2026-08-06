@@ -53,6 +53,20 @@ export type GlobalStats = {
   users: number | null;
   posts: number | null;
   likes: number | null;
+  /**
+   * Lajki policzone PRZYROSTOWO, od momentu wlaczenia licznika.
+   *
+   * Osobne pole od `likes` celowo. `likes` to pelna suma z agregacji;
+   * `likesSince` to liczba narastajaca od wlaczenia licznika i NIE OBEJMUJE
+   * lajkow wczesniejszych. Wrzucenie obu do jednego pola dawaloby liczbe,
+   * o ktorej nikt nie wie, czy jest calkowita - a interfejs ma to powiedziec.
+   *
+   * Powstalo, bo agregacje w tym projekcie zwracaja RESOURCE_EXHAUSTED nawet
+   * dla pustej kolekcji, wiec `sum(posts.likes)` jest dzis niewykonalne.
+   */
+  likesSince?: number | null;
+  /** Od kiedy liczy `likesSince`. 0 = nie wiadomo. */
+  likesSinceStartedAt?: number;
   comments: number | null;
   tips: number | null;
   /** Kiedy policzono. 0 = nie wiadomo. */
@@ -88,6 +102,8 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
         users: toCount(data.users),
         posts: toCount(data.posts),
         likes: toCount(data.likes),
+        likesSince: toCount(data.likesSince),
+        likesSinceStartedAt: toMillis(data.likesSinceStartedAt),
         comments: toCount(data.comments),
         tips: toCount(data.tips),
         measuredAt: toMillis(data.measuredAt),

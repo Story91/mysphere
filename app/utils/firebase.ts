@@ -386,6 +386,45 @@ export const toggleLike = async (postId: string, userId: string): Promise<boolea
       }
     }
 
+    /**
+     * GLOBALNY LICZNIK LAJKOW - jeden zapis, zero agregacji.
+     *
+     * === DLACZEGO NIE LICZYMY TEGO NA ZADANIE ===
+     * Lajki nie maja wlasnej kolekcji - siedza jako pole `likes` na postach,
+     * wiec ich policzenie to SUMA po 263 613 dokumentach. Jedyna tania droga
+     * to `getAggregateFromServer(sum('likes'))`.
+     *
+     * A agregacje w tym projekcie NIE DZIALAJA. Zmierzone: `count()` zwraca
+     * RESOURCE_EXHAUSTED nawet dla kolekcji z ZEREM dokumentow, podczas gdy
+     * zwykle `getDocs` odpowiada normalnie. Czyli wyczerpany jest limit
+     * LICZBY ZAPYTAN agregujacych, nie ilosci danych - i nie odnowil sie przez
+     * kilkanascie godzin.
+     *
+     * Licznik przyrostowy uniezaleznia te liczbe od tamtego limitu na zawsze:
+     * jeden `increment` przy lajku zamiast sumowania cwiercmiliona dokumentow
+     * przy kazdym pytaniu.
+     *
+     * === CZEGO TA LICZBA NIE OBEJMUJE ===
+     * Lajkow sprzed wprowadzenia licznika. Dlatego `globalStats` trzyma je
+     * w polu `likesSince`, a nie `likes` - interfejs ma powiedziec, od kiedy
+     * liczy, zamiast podawac niepelna sume jako calosc. Gdy limit agregacji
+     * wroci, jednorazowa suma uzupelni stan poczatkowy.
+     *
+     * Zapis NIE MOZE wywrocic lajka - lajk juz sie zapisal w transakcji wyzej.
+     */
+    void (async () => {
+      try {
+        const { doc: fsDoc, setDoc: fsSetDoc, increment: fsIncrement } = await import('firebase/firestore');
+        await fsSetDoc(
+          fsDoc(db, 'globalStats', 'current'),
+          { likesSince: fsIncrement(outcome.isLiked ? -1 : 1) },
+          { merge: true }
+        );
+      } catch (counterError) {
+        console.warn('⚠️ Nie udalo sie zaktualizowac licznika lajkow:', counterError);
+      }
+    })();
+
     return !outcome.isLiked; // true jesli dodano lajka, false jesli usunieto
   } catch (error) {
     console.error('Error toggling like:', error);
