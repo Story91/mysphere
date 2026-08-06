@@ -213,10 +213,29 @@ export type SettledPaymentsResult = {
   failed: boolean;
 };
 
+/**
+ * Ile dokumentow pobrac na jedna pozycje, ktora ma sie wyswietlic.
+ *
+ * DLACZEGO W OGOLE NADMIAR: pozycja bez hasha transakcji jest tu odrzucana,
+ * bo bez dowodu nie ma po co istniec. Zmierzone na produkcyjnej kolekcji
+ * `tips`: 44 z 50 najnowszych wpisow ma PUSTY `txHash`. Przy pobieraniu
+ * dokladnie `max` dokumentow i filtrowaniu ICH DOPIERO POTEM tasma wychodzila
+ * pusta, a ranking tuz pod nia pokazywal tych samych ludzi - dwa sprzeczne
+ * komunikaty na jednym ekranie.
+ *
+ * Mnoznik jest ograniczony z gory (FETCH_CAP), zeby nie zamienic tego w
+ * skanowanie calej kolekcji, gdy weryfikowalnych platnosci naprawde brak.
+ */
+const SETTLED_OVERFETCH = 8;
+
 export async function getSettledPayments(max = 30): Promise<SettledPaymentsResult> {
   try {
     const snapshot = await getDocs(
-      query(collection(getDb(), 'tips'), orderBy('timestamp', 'desc'), limit(max))
+      query(
+        collection(getDb(), 'tips'),
+        orderBy('timestamp', 'desc'),
+        limit(Math.min(max * SETTLED_OVERFETCH, FETCH_CAP))
+      )
     );
 
     const payments = snapshot.docs
@@ -240,7 +259,10 @@ export async function getSettledPayments(max = 30): Promise<SettledPaymentsResul
         };
       })
       // Bez hasha nie ma dowodu, a bez dowodu ta pozycja nie ma po co istniec.
-      .filter((payment) => payment.txHash && payment.amount > 0);
+      .filter((payment) => payment.txHash && payment.amount > 0)
+      // Przycinamy DOPIERO po filtrze - inaczej nadmiar pobrany wyzej nic by
+      // nie dal.
+      .slice(0, max);
 
     return { payments, failed: false };
   } catch (error) {

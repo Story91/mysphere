@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { getTipReceipt } from '../../utils/tips/getTipReceipt';
 import { getName } from '../../utils/identity/getName';
 import { shortAddress } from '../../utils/posts/getPostForShare';
-import { getExplorerTxLink, type TipNetwork } from '../../basechat/components/TipNetworkConfig';
+import { getProofLink, resolveTipNetwork } from '../../basechat/components/TipNetworkConfig';
 
 /**
  * Paragon za tipa - publiczna, udostepnialna trasa.
@@ -75,7 +75,11 @@ export default async function TipReceiptPage({ params }: Props) {
     displayName(tip.recipientAddress),
   ]);
 
-  const explorer = getExplorerTxLink(tip.network as TipNetwork, tip.txHash);
+  // resolveTipNetwork zamiast `as TipNetwork`: rzutowanie przepuszczalo nazwy
+  // zapisane w bazie ('worldchain', 'basecamp'), ktorych NETWORKS nie zna -
+  // a odczyt `.explorerUrl` z undefined wywracal ten komponent serwerowy
+  // calym bledem 500. getProofLink zamiast getExplorerTxLink - powod tam.
+  const explorer = getProofLink(resolveTipNetwork(tip.network), tip.txHash);
   const sentAt = tip.timestamp > 0 ? new Date(tip.timestamp) : null;
 
   return (

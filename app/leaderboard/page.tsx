@@ -8,6 +8,7 @@ import {
 } from '../utils/tips/getLeaderboard';
 import { getName } from '../utils/identity/getName';
 import { shortAddress } from '../utils/posts/getPostForShare';
+import { getProofLink, resolveTipNetwork } from '../basechat/components/TipNetworkConfig';
 
 /**
  * PAID - publiczna os czasu rozliczonych platnosci.
@@ -50,15 +51,16 @@ export const metadata: Metadata = {
 
 const MEDALS = ['#F5A73B', '#B9B1D8', '#C98B5A'];
 
-const EXPLORERS: Record<string, string> = {
-  base: 'https://basescan.org/tx/',
-  linea: 'https://lineascan.build/tx/',
-  celo: 'https://celoscan.io/tx/',
-  ethereum: 'https://etherscan.io/tx/',
-  worldchain: 'https://worldscan.org/tx/',
-  robinhood: 'https://robinhoodchain.blockscout.com/tx/',
-  basecamp: 'https://camp.cloud.blockscout.com/tx/',
-};
+/**
+ * Wczesniej stala tu wlasna mapa adresow eksplorerow - druga kopia tego, co
+ * juz jest w TipNetworkConfig, i to z bledem: basecamp wskazywal na
+ * `camp.cloud.blockscout.com`, podczas gdy konfiguracja mowi `basecamp.cloud`.
+ * Jedno zrodlo prawdy usuwa cala klase takich rozjazdow.
+ *
+ * getProofLink, a nie getExplorerTxLink - powod w TipNetworkConfig.ts.
+ */
+const proofLink = (network: string, hash: string) =>
+  getProofLink(resolveTipNetwork(network), hash);
 
 /** Krotki, ludzki zapis wieku wpisu. Bez bibliotek - to jeden format. */
 function timeAgo(ms: number): string {
@@ -189,7 +191,7 @@ export default async function PaidPage() {
                           {timeAgo(payment.timestamp)} · {payment.network}
                         </span>
                         <a
-                          href={`${EXPLORERS[payment.network] ?? EXPLORERS.base}${payment.txHash}`}
+                          href={proofLink(payment.network, payment.txHash)}
                           target="_blank"
                           rel="noreferrer"
                           title="Verify onchain"
