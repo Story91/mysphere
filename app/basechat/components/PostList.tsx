@@ -2536,7 +2536,7 @@ function PostList({
           nakladce przypiecia wyzej. */}
       {enlargedImage && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(46,42,68,0.85)]"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/85"
           onClick={() => setEnlargedImage(null)}
         >
           <div className="relative max-w-4xl max-h-[90vh] overflow-auto">
@@ -2547,7 +2547,7 @@ function PostList({
               onClick={(e) => e.stopPropagation()}
             />
             <button
-              className="absolute top-4 right-4 text-white bg-[rgba(46,42,68,0.7)] rounded-pill p-2 transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="absolute top-4 right-4 text-white bg-soft-ink/70 rounded-pill p-2 transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               onClick={() => setEnlargedImage(null)}
               aria-label="Close image"
             >

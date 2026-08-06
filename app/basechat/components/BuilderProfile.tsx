@@ -1028,25 +1028,25 @@ export default function BuilderProfile({
   };
 
   return (
-    <div className="font-['Coinbase_Display']">
+    <div className="font-soft">
       {/* Builder Panel Header with Back Button - nowoczesny gradient */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-700 p-5 relative overflow-hidden">
+      <div className="bg-soft-primary-deep p-5 relative overflow-hidden">
         {/* Dodajemy efekt połysku */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-30"></div>
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-400 rounded-full filter blur-3xl opacity-20"></div>
-        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-400 rounded-full filter blur-3xl opacity-10"></div>
-        
+        <div className="absolute top-0 left-0 right-0 h-px bg-white opacity-20"></div>
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-soft-primary rounded-full filter blur-3xl opacity-30"></div>
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-soft-primary rounded-full filter blur-3xl opacity-20"></div>
+
         <div className="flex items-center justify-between relative z-10">
-          <button 
+          <button
             onClick={onBackToFeed}
-            className="flex items-center text-white bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 transition-all duration-300 hover:bg-white/20 hover:scale-105 border border-white/10"
+            className="flex items-center text-white bg-white/15 rounded-pill px-4 py-2 font-semibold transition-colors duration-[--dur-press] ease-out-strong hover:bg-white/25 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white border border-white/20"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Back to Feed
           </button>
-          <div className="text-xl font-light text-white font-['Coinbase_Display']">Builder Profile</div>
+          <div className="text-xl font-soft-display font-bold text-white">Builder Profile</div>
           <div className="w-24"></div> {/* Placeholder dla wyrównania */}
         </div>
       </div>
@@ -1322,22 +1322,22 @@ export default function BuilderProfile({
                   {/* Separator gradientowy przed action buttons */}
                   {currentUserAddress !== userAddress && (
                     <>
-                      <div className="w-full h-px bg-gradient-to-r from-transparent via-indigo-300/60 to-transparent my-3"></div>
+                      <div className="w-full h-px bg-soft-line my-3"></div>
                       <div className="flex items-center flex-wrap gap-3 lg:gap-4">
                       {/* Follow Button (Przycisk obserwowania) */}
                       {!checkingFollowStatus && (
                         <button
                           onClick={isFollowing ? handleUnfollowUser : handleFollowUser}
                           disabled={followLoading}
-                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 shadow-sm backdrop-blur-sm border hover:scale-105 ${
+                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold transition-colors duration-[--dur-press] ease-out-strong shadow-chip border active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                             isFollowing
-                              ? 'bg-gradient-to-r from-white to-indigo-50 border-indigo-200/50 text-indigo-700 hover:from-indigo-50 hover:to-indigo-100'
-                              : 'bg-gradient-to-r from-indigo-500 to-blue-600 border-indigo-400/50 text-white hover:from-indigo-600 hover:to-blue-700 shadow-lg'
+                              ? 'bg-soft-sunken border-soft-line text-soft-primary-deep hover:bg-soft-line'
+                              : 'bg-soft-primary border-soft-primary text-white hover:bg-soft-primary-deep'
                           } ${followLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {followLoading ? (
                             <>
-                              <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                              <div className="w-3 h-3 border-2 border-soft-ink-soft border-t-transparent rounded-full animate-spin"></div>
                               <span>Loading...</span>
                             </>
                           ) : isFollowing ? (
@@ -1361,20 +1361,20 @@ export default function BuilderProfile({
                       {/* Friend Request Button (Przycisk zaproszenia do znajomych) */}
                       <button
                         onClick={handleSendFriendRequest}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-r from-emerald-500 to-green-600 border border-emerald-400/50 text-white hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-sm backdrop-blur-sm hover:scale-105 shadow-lg"
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold bg-soft-accent-deep border border-soft-accent-deep text-white hover:bg-soft-accent transition-colors duration-[--dur-press] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                         </svg>
                         <span>Add Friend</span>
                       </button>
 
                       {/* Tip Button */}
-                      <div className="bg-gradient-to-r from-white to-yellow-50 border border-yellow-200/50 rounded-lg shadow-sm backdrop-blur-sm hover:scale-105 transition-all duration-300">
+                      <div className="bg-soft-sunken border border-soft-line rounded-pill shadow-chip transition-colors duration-[--dur-press] ease-out-strong">
                         <TipButton
                           recipientAddress={userAddress}
                           postId={`profile-${userAddress}`}
-                          className="text-yellow-600 hover:text-yellow-700 p-2 transition-colors"
+                          className="text-soft-accent-deep p-2"
                         />
                       </div>
                       </div>
@@ -1399,64 +1399,64 @@ export default function BuilderProfile({
           
         {/* Talent Protocol Builder Score */}
         {(talentScore || talentProfile || loadingTalentData) && (
-          <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 via-black to-gray-800 border border-gray-700/50 backdrop-blur-xl shadow-2xl">
+          <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Neonowa poświata */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-green-400/30 rounded-full filter blur-2xl animate-pulse"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-emerald-400/20 rounded-full filter blur-xl"></div>
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-green-400/50 to-transparent"></div>
-            
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full filter blur-xl"></div>
+            <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
+
             {/* Efekt szkła */}
-            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
-            
+            <div className="absolute inset-0 bg-transparent"></div>
+
             <div className="relative z-10 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-green-400/20 to-emerald-500/20 backdrop-blur-sm border border-green-400/30 mr-4 shadow-lg">
-                    <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-soft-sunken border border-soft-line mr-4 shadow-chip">
+                    <svg className="w-6 h-6 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-light text-xl text-white">Talent Protocol</h3>
-                    <p className="text-sm text-green-400/80">Builder Reputation</p>
+                    <h3 className="font-soft-display font-bold text-xl text-soft-ink">Talent Protocol</h3>
+                    <p className="text-sm text-soft-ink-muted">Builder Reputation</p>
                   </div>
                 </div>
-                
+
                 {talentProfile?.human_checkmark && (
-                  <div className="flex items-center bg-green-400/10 backdrop-blur-sm border border-green-400/30 px-3 py-1.5 rounded-full">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                    <svg className="w-4 h-4 text-soft-primary-deep mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-xs text-green-400 font-medium">Human Verified</span>
+                    <span className="text-xs text-soft-primary-deep font-semibold">Human Verified</span>
                   </div>
                 )}
               </div>
               
               {loadingTalentData ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-green-400/30 border-t-green-400"></div>
-                  <span className="ml-4 text-green-400/80">Loading Builder Score...</span>
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-soft-line border-t-soft-primary"></div>
+                  <span className="ml-4 text-soft-ink-muted">Loading Builder Score...</span>
                 </div>
               ) : (talentScore && (talentScore.score !== undefined || talentScore.percentile !== undefined)) ? (
                 <div className="text-center">
                   {/* Builder Score z neonową poświatą */}
                   <div className="relative inline-block mb-2">
-                    <div className="text-6xl font-light text-green-400 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)] relative z-10">
+                    <div className="text-6xl font-soft-display font-bold tabular-nums text-soft-primary-deep relative z-10">
                       {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
                     </div>
                     {/* Dodatkowa neonowa poświata */}
-                    <div className="absolute inset-0 text-6xl font-light text-green-400 blur-md opacity-40">
+                    <div className="absolute inset-0 text-6xl font-soft-display font-bold tabular-nums text-soft-primary blur-md opacity-20">
                       {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
                     </div>
                   </div>
-                  
-                  <div className="text-lg text-gray-300 font-light mb-4">Builder Score</div>
+
+                  <div className="text-xs uppercase tracking-wider font-semibold text-soft-ink-faint mb-4">Builder Score</div>
                   
                   {/* Percentile - jeśli dostępny */}
                   {(talentScore.percentile !== undefined && talentScore.percentile !== null) && (
                     <div className="flex items-center justify-center">
-                      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2">
-                        <span className="text-green-400 text-sm font-medium">
+                      <div className="bg-soft-sunken border border-soft-line rounded-pill px-4 py-2 shadow-chip">
+                        <span className="text-soft-primary-deep text-sm font-semibold tabular-nums">
                           Top {100 - talentScore.percentile}% Builder
                         </span>
                       </div>
@@ -1465,13 +1465,13 @@ export default function BuilderProfile({
                 </div>
               ) : talentProfile ? (
                 <div className="text-center py-6">
-                  <div className="text-gray-400 text-sm">
+                  <div className="text-soft-ink-soft text-sm">
                     Profile found but Builder Score not available
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <div className="text-gray-400 text-sm">
+                  <div className="text-soft-ink-soft text-sm">
                     No Talent Protocol data available
                   </div>
                 </div>
@@ -1482,43 +1482,43 @@ export default function BuilderProfile({
 
         {/* Twitter Profile Section */}
         {(twitterUser || loadingTwitterData) && (
-          <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-900 via-blue-800 to-blue-900 border border-sky-700/50 backdrop-blur-xl shadow-2xl">
+          <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Twitter blue poświata */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-sky-400/30 rounded-full filter blur-2xl animate-pulse"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-blue-400/20 rounded-full filter blur-xl"></div>
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-sky-400/50 to-transparent"></div>
-            
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full filter blur-xl"></div>
+            <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
+
             {/* Efekt szkła */}
-            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
-            
+            <div className="absolute inset-0 bg-transparent"></div>
+
             <div className="relative z-10 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-sky-400/20 to-blue-500/20 backdrop-blur-sm border border-sky-400/30 mr-4 shadow-lg">
-                    <svg className="w-6 h-6 text-sky-400" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-soft-sunken border border-soft-line mr-4 shadow-chip">
+                    <svg className="w-6 h-6 text-soft-primary-deep" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-light text-xl text-white">Twitter Profile</h3>
-                    <p className="text-sm text-sky-400/80">Social Activity</p>
+                    <h3 className="font-soft-display font-bold text-xl text-soft-ink">Twitter Profile</h3>
+                    <p className="text-sm text-soft-ink-muted">Social Activity</p>
                   </div>
                 </div>
-                
+
                 {twitterUser?.isVerified && (
-                  <div className="flex items-center bg-sky-400/10 backdrop-blur-sm border border-sky-400/30 px-3 py-1.5 rounded-full">
-                    <svg className="w-4 h-4 text-sky-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                    <svg className="w-4 h-4 text-soft-primary-deep mr-2" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span className="text-xs text-sky-400 font-medium">Verified</span>
+                    <span className="text-xs text-soft-primary-deep font-semibold">Verified</span>
                   </div>
                 )}
               </div>
               
               {loadingTwitterData ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-sky-400/30 border-t-sky-400"></div>
-                  <span className="ml-4 text-sky-400/80">Loading Twitter data...</span>
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-soft-line border-t-soft-primary"></div>
+                  <span className="ml-4 text-soft-ink-muted">Loading Twitter data...</span>
                 </div>
               ) : twitterUser ? (
                 <div>
@@ -1527,7 +1527,7 @@ export default function BuilderProfile({
                     <img
                       src={twitterUser.profilePictureUrl}
                       alt={`${twitterUser.displayName} avatar`}
-                      className="w-16 h-16 rounded-full border-2 border-sky-400/30"
+                      className="w-16 h-16 rounded-full border-2 border-soft-line"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
@@ -1535,22 +1535,22 @@ export default function BuilderProfile({
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-2">
-                        <h4 className="text-lg font-medium text-white truncate">{twitterUser.displayName}</h4>
+                        <h4 className="text-lg font-soft-display font-bold text-soft-ink truncate">{twitterUser.displayName}</h4>
                         <a
                           href={`https://x.com/${twitterUser.userHandle}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sky-400 hover:text-sky-300 text-sm font-mono bg-sky-400/10 px-2 py-1 rounded transition-colors"
+                          className="text-soft-primary-deep hover:bg-soft-line text-sm font-mono bg-soft-sunken px-2 py-1 rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         >
                           @{twitterUser.userHandle}
                         </a>
                       </div>
                       {twitterUser.profileBio && (
-                        <p className="text-gray-300 text-sm leading-relaxed mb-3">{twitterUser.profileBio}</p>
+                        <p className="text-soft-ink-muted text-sm leading-relaxed mb-3">{twitterUser.profileBio}</p>
                       )}
                       {twitterUser.location && (
-                        <div className="flex items-center text-gray-400 text-sm mb-3">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex items-center text-soft-ink-soft text-sm mb-3">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
@@ -1562,17 +1562,17 @@ export default function BuilderProfile({
 
                   {/* Twitter Stats */}
                   <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-sky-400 text-2xl font-light">{twitterUser.followerCount.toLocaleString()}</div>
-                      <div className="text-gray-300 text-sm">Followers</div>
+                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
+                      <div className="text-soft-ink text-2xl font-soft-display font-bold tabular-nums">{twitterUser.followerCount.toLocaleString()}</div>
+                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Followers</div>
                     </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-sky-400 text-2xl font-light">{twitterUser.followingCount.toLocaleString()}</div>
-                      <div className="text-gray-300 text-sm">Following</div>
+                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
+                      <div className="text-soft-ink text-2xl font-soft-display font-bold tabular-nums">{twitterUser.followingCount.toLocaleString()}</div>
+                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Following</div>
                     </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-sky-400 text-2xl font-light">{twitterUser.likeCount.toLocaleString()}</div>
-                      <div className="text-gray-300 text-sm">Likes</div>
+                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
+                      <div className="text-soft-ink text-2xl font-soft-display font-bold tabular-nums">{twitterUser.likeCount.toLocaleString()}</div>
+                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Likes</div>
                     </div>
                   </div>
 
@@ -1581,9 +1581,10 @@ export default function BuilderProfile({
                     <>
                       <button
                         onClick={() => setIsTwitterSectionExpanded(!isTwitterSectionExpanded)}
-                        className="w-full flex items-center justify-center text-sky-400 hover:text-sky-300 transition-colors duration-300 border-t border-sky-700/30 pt-4"
+                        aria-expanded={isTwitterSectionExpanded}
+                        className="w-full flex items-center justify-center text-soft-primary-deep hover:text-soft-ink transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-t border-soft-line pt-4"
                       >
-                        <span className="text-sm font-medium mr-2">
+                        <span className="text-sm font-semibold mr-2">
                           {isTwitterSectionExpanded ? 'Hide Recent Tweets' : `Show Recent Tweets (${twitterTweets.length})`}
                         </span>
                         {isTwitterSectionExpanded ? (
@@ -1597,9 +1598,9 @@ export default function BuilderProfile({
                       {isTwitterSectionExpanded && (
                         <div className="mt-4 space-y-3 max-h-96 overflow-y-auto">
                           {twitterTweets.slice(0, 5).map((tweet) => (
-                            <div key={tweet.id} className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                              <p className="text-gray-200 text-sm leading-relaxed mb-3">{tweet.tweetText}</p>
-                              <div className="flex items-center justify-between text-xs text-gray-400">
+                            <div key={tweet.id} className="bg-soft-surface rounded-card p-4 border border-soft-line shadow-chip">
+                              <p className="text-soft-ink-muted text-sm leading-relaxed mb-3">{tweet.tweetText}</p>
+                              <div className="flex items-center justify-between text-xs text-soft-ink-faint tabular-nums">
                                 <span>{new Date(tweet.tweetTimestamp).toLocaleDateString()}</span>
                                 <div className="flex items-center space-x-4">
                                   <span className="flex items-center">
@@ -1631,7 +1632,7 @@ export default function BuilderProfile({
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <div className="text-gray-400 text-sm">
+                  <div className="text-soft-ink-soft text-sm">
                     No Twitter data available for this wallet address
                   </div>
                 </div>
@@ -1642,36 +1643,36 @@ export default function BuilderProfile({
 
         {/* Spotify Profile Section */}
         {(spotifyUserData || loadingSpotifyData) && (
-          <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-900 via-emerald-800 to-green-900 border border-green-700/50 backdrop-blur-xl shadow-2xl">
+          <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Spotify green poświata */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-green-400/30 rounded-full filter blur-2xl animate-pulse"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-emerald-400/20 rounded-full filter blur-xl"></div>
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-green-400/50 to-transparent"></div>
-            
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full filter blur-xl"></div>
+            <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
+
             {/* Efekt szkła */}
-            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
-            
+            <div className="absolute inset-0 bg-transparent"></div>
+
             <div className="relative z-10 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-green-400/20 to-emerald-500/20 backdrop-blur-sm border border-green-400/30 mr-4 shadow-lg">
-                    <svg className="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-soft-sunken border border-soft-line mr-4 shadow-chip">
+                    <svg className="w-6 h-6 text-soft-primary-deep" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-light text-xl text-white">Spotify Profile</h3>
-                    <p className="text-sm text-green-400/80">Music Activity</p>
+                    <h3 className="font-soft-display font-bold text-xl text-soft-ink">Spotify Profile</h3>
+                    <p className="text-sm text-soft-ink-muted">Music Activity</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-2">
                   {spotifyUserData?.dataSource === 'spotify' && (
-                    <div className="flex items-center bg-green-400/10 backdrop-blur-sm border border-green-400/30 px-3 py-1.5 rounded-full">
-                      <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                      <svg className="w-4 h-4 text-soft-primary-deep mr-2" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                       </svg>
-                      <span className="text-xs text-green-400 font-medium">Connected</span>
+                      <span className="text-xs text-soft-primary-deep font-semibold">Connected</span>
                     </div>
                   )}
                   
@@ -1679,14 +1680,16 @@ export default function BuilderProfile({
                   <button
                     onClick={refreshSpotifyData}
                     disabled={loadingSpotifyData}
-                    className="flex items-center justify-center w-8 h-8 rounded-full bg-green-400/10 backdrop-blur-sm border border-green-400/30 hover:bg-green-400/20 hover:border-green-400/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-soft-sunken border border-soft-line hover:bg-soft-line transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:cursor-not-allowed group"
                     title="Refresh Spotify Data"
+                    aria-label="Refresh Spotify Data"
                   >
-                    <svg 
-                      className={`w-4 h-4 text-green-400 group-hover:text-green-300 transition-transform duration-200 ${loadingSpotifyData ? 'animate-spin' : 'group-hover:rotate-180'}`} 
-                      fill="none" 
-                      stroke="currentColor" 
+                    <svg
+                      className={`w-4 h-4 text-soft-primary-deep transition-transform duration-[--dur-dropdown] ease-out-strong ${loadingSpotifyData ? 'animate-spin' : 'group-hover:rotate-180'}`}
+                      fill="none"
+                      stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
@@ -1696,8 +1699,8 @@ export default function BuilderProfile({
               
               {loadingSpotifyData ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-green-400/30 border-t-green-400"></div>
-                  <span className="ml-4 text-green-400/80">Loading Spotify data...</span>
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-soft-line border-t-soft-primary"></div>
+                  <span className="ml-4 text-soft-ink-muted">Loading Spotify data...</span>
                 </div>
               ) : spotifyUserData ? (
                 <div>
@@ -1707,7 +1710,7 @@ export default function BuilderProfile({
                       <img
                         src={spotifyUserData.user.images[0].url}
                         alt={`${spotifyUserData.user.display_name} avatar`}
-                        className="w-16 h-16 rounded-full border-2 border-green-400/30"
+                        className="w-16 h-16 rounded-full border-2 border-soft-line"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
@@ -1716,16 +1719,16 @@ export default function BuilderProfile({
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-2">
-                        <h4 className="text-lg font-medium text-white truncate">{spotifyUserData.user.display_name}</h4>
+                        <h4 className="text-lg font-soft-display font-bold text-soft-ink truncate">{spotifyUserData.user.display_name}</h4>
                         {spotifyUserData.user.external_urls?.spotify && (
                           <a
                             href={spotifyUserData.user.external_urls.spotify}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-green-400 hover:text-green-300 text-sm font-mono bg-green-400/10 px-2 py-1 rounded transition-all duration-300 hover:scale-105 hover:bg-green-400/20 flex items-center"
+                            className="text-soft-primary-deep hover:bg-soft-line text-sm font-mono bg-soft-sunken px-2 py-1 rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center"
                             title="Open Spotify Profile"
                           >
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
                             </svg>
                             Open Profile
@@ -1733,75 +1736,75 @@ export default function BuilderProfile({
                         )}
                       </div>
                       {!spotifyUserData.hasContent && (
-                        <div className="flex items-center text-blue-400 text-xs mb-3 bg-blue-400/10 px-2 py-1 rounded">
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex items-center text-soft-info text-xs mb-3 bg-soft-info-soft px-2 py-1 rounded-pill">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                           </svg>
                           Spotify connected • Start saving tracks to see activity
                         </div>
                       )}
-                      <div className="flex items-center text-gray-400 text-sm mb-3">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex items-center text-soft-ink-soft text-sm mb-3">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        {(spotifyUserData.user.followers || 0).toLocaleString()} followers
+                        <span className="font-soft-display font-semibold tabular-nums mr-1">{(spotifyUserData.user.followers || 0).toLocaleString()}</span> followers
                       </div>
                     </div>
                   </div>
 
                   {/* Spotify Analytics Stats */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.totalSavedTracks || 0}</div>
-                      <div className="text-gray-300 text-xs">Saved Tracks</div>
+                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
+                      <div className="text-soft-ink text-xl font-soft-display font-bold tabular-nums">{spotifyUserData.analytics?.totalSavedTracks || 0}</div>
+                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Saved Tracks</div>
                     </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.totalSavedAlbums || 0}</div>
-                      <div className="text-gray-300 text-xs">Albums</div>
+                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
+                      <div className="text-soft-ink text-xl font-soft-display font-bold tabular-nums">{spotifyUserData.analytics?.totalSavedAlbums || 0}</div>
+                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Albums</div>
                     </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.totalSavedPlaylists || 0}</div>
-                      <div className="text-gray-300 text-xs">Playlists</div>
+                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
+                      <div className="text-soft-ink text-xl font-soft-display font-bold tabular-nums">{spotifyUserData.analytics?.totalSavedPlaylists || 0}</div>
+                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Playlists</div>
                     </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.listeningDiversity || 0}%</div>
-                      <div className="text-gray-300 text-xs">Diversity</div>
+                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
+                      <div className="text-soft-ink text-xl font-soft-display font-bold tabular-nums">{spotifyUserData.analytics?.listeningDiversity || 0}%</div>
+                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Diversity</div>
                     </div>
                   </div>
 
                   {/* Music Matching Profile */}
                   {(spotifyUserData.profile?.topGenres?.length > 0 || spotifyUserData.profile?.topArtists?.length > 0) && (
-                    <div className="mt-4 p-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
+                    <div className="mt-4 p-4 bg-soft-sunken rounded-card border border-soft-line">
                       <div className="flex items-center mb-3">
-                        <svg className="w-5 h-5 text-green-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-soft-primary-deep mr-2" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.58L19 8l-9 9z"/>
                         </svg>
-                        <h4 className="text-green-300 text-sm font-medium">Music Matching Profile</h4>
-                        <span className="ml-2 text-xs text-gray-400">• User compatibility data</span>
+                        <h4 className="text-soft-ink text-sm font-soft-display font-bold">Music Matching Profile</h4>
+                        <span className="ml-2 text-xs text-soft-ink-faint">• User compatibility data</span>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Top Genres */}
                         {spotifyUserData.profile.topGenres.length > 0 && (
-                          <div className="bg-white/5 rounded-lg p-3">
+                          <div className="bg-soft-surface rounded-card p-3 shadow-card">
                             <div className="flex items-center mb-2">
-                              <svg className="w-4 h-4 text-green-400 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 text-soft-primary-deep mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
                               </svg>
-                              <span className="text-green-300 text-xs font-medium">Top Genres</span>
-                              <span className="ml-1 text-xs text-gray-400">({spotifyUserData.profile.topGenres.length})</span>
+                              <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Top Genres</span>
+                              <span className="ml-1 text-xs text-soft-ink-faint tabular-nums">({spotifyUserData.profile.topGenres.length})</span>
                             </div>
                             <div className="flex flex-wrap gap-1">
                               {spotifyUserData.profile.topGenres.slice(0, 6).map((genre, index) => (
                                 <span 
                                   key={index}
-                                  className="px-2 py-1 bg-green-400/10 text-green-300 text-xs rounded-full border border-green-400/20"
+                                  className="px-2 py-1 bg-soft-sunken text-soft-ink-muted text-xs rounded-pill border border-soft-line"
                                 >
                                   {genre}
                                 </span>
                               ))}
                               {spotifyUserData.profile.topGenres.length > 6 && (
-                                <span className="px-2 py-1 bg-green-400/5 text-green-400 text-xs rounded-full border border-green-400/10">
+                                <span className="px-2 py-1 bg-soft-sunken text-soft-ink-faint text-xs rounded-pill border border-soft-line tabular-nums">
                                   +{spotifyUserData.profile.topGenres.length - 6} more
                                 </span>
                               )}
@@ -1811,25 +1814,25 @@ export default function BuilderProfile({
 
                         {/* Top Artists */}
                         {spotifyUserData.profile.topArtists.length > 0 && (
-                          <div className="bg-white/5 rounded-lg p-3">
+                          <div className="bg-soft-surface rounded-card p-3 shadow-card">
                             <div className="flex items-center mb-2">
-                              <svg className="w-4 h-4 text-green-400 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 text-soft-primary-deep mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                               </svg>
-                              <span className="text-green-300 text-xs font-medium">Top Artists</span>
-                              <span className="ml-1 text-xs text-gray-400">({spotifyUserData.profile.topArtists.length})</span>
+                              <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Top Artists</span>
+                              <span className="ml-1 text-xs text-soft-ink-faint tabular-nums">({spotifyUserData.profile.topArtists.length})</span>
                             </div>
                             <div className="flex flex-wrap gap-1">
                               {spotifyUserData.profile.topArtists.slice(0, 4).map((artist, index) => (
                                 <span 
                                   key={index}
-                                  className="px-2 py-1 bg-green-400/10 text-green-300 text-xs rounded-full border border-green-400/20"
+                                  className="px-2 py-1 bg-soft-sunken text-soft-ink-muted text-xs rounded-pill border border-soft-line"
                                 >
                                   {artist}
                                 </span>
                               ))}
                               {spotifyUserData.profile.topArtists.length > 4 && (
-                                <span className="px-2 py-1 bg-green-400/5 text-green-400 text-xs rounded-full border border-green-400/10">
+                                <span className="px-2 py-1 bg-soft-sunken text-soft-ink-faint text-xs rounded-pill border border-soft-line tabular-nums">
                                   +{spotifyUserData.profile.topArtists.length - 4} more
                                 </span>
                               )}
@@ -1845,7 +1848,7 @@ export default function BuilderProfile({
                     <>
                       <button
                         onClick={() => setIsSpotifySectionExpanded(!isSpotifySectionExpanded)}
-                        className="w-full flex items-center justify-center text-green-400 hover:text-green-300 transition-colors duration-300 border-t border-green-700/30 pt-4"
+                        className="w-full flex items-center justify-center text-soft-primary-deep hover:text-soft-ink transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-t border-soft-line pt-4"
                       >
                         <span className="text-sm font-medium mr-2">
                           {isSpotifySectionExpanded ? 'Hide Music Details' : `Show Recent Music (${Math.max(spotifyUserData.profile?.savedTracks?.length || 0, spotifyUserData.profile?.playedTracks?.length || 0)})`}
@@ -1863,12 +1866,12 @@ export default function BuilderProfile({
                           {/* Recently Played Tracks */}
                           {spotifyUserData.profile?.playedTracks?.length > 0 && (
                             <div>
-                              <h5 className="text-green-300 text-sm font-medium mb-3">Recently Played</h5>
+                              <h5 className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider mb-3">Recently Played</h5>
                               <div className="space-y-2">
                                 {(spotifyUserData.profile?.playedTracks || []).slice(0, 3).map((item, index) => (
                                   <div 
                                     key={index} 
-                                    className="relative overflow-hidden rounded-lg p-3 hover:scale-[1.02] hover:shadow-2xl hover:shadow-black/30 origin-left transition-all duration-300"
+                                    className="relative overflow-hidden rounded-card p-3 hover:scale-[1.02] hover:shadow-float origin-left transition-[transform,box-shadow] duration-[--dur-dropdown] ease-out-strong"
                                     style={{
                                       backgroundImage: item?.track?.album?.images?.[0]?.url 
                                         ? `url(${item.track.album.images[0].url})` 
@@ -1882,7 +1885,7 @@ export default function BuilderProfile({
                                     <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
                                       item?.track?.album?.images?.[0]?.url 
                                         ? 'bg-black/40' 
-                                        : 'bg-gradient-to-br from-green-900/30 to-emerald-800/30'
+                                        : 'bg-soft-ink/90'
                                     }`}></div>
                                     
                                     {/* Content Container */}
@@ -1900,7 +1903,7 @@ export default function BuilderProfile({
                                             <img
                                               src={item.track.album.images[0].url}
                                               alt={item.track.album.name}
-                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-lg transition-all duration-200"
+                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow duration-[--dur-press] ease-out-strong"
                                             />
                                           </a>
                                           
@@ -2026,7 +2029,7 @@ export default function BuilderProfile({
                                           <div className="mt-2 flex items-center gap-2">
                                             {/* Mini Progress Bar */}
                                             <div className="flex-1 flex items-center gap-2">
-                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(currentTime)}</span>
+                                              <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(currentTime)}</span>
                                               <div 
                                                 className="flex-1 h-0.5 bg-green-400/20 rounded-full cursor-pointer"
                                                 onClick={(e) => {
@@ -2036,16 +2039,16 @@ export default function BuilderProfile({
                                                 }}
                                               >
                                                 <div 
-                                                  className="h-full bg-green-400 rounded-full transition-all"
+                                                  className="h-full bg-soft-accent rounded-full transition-[width] duration-[--dur-press] ease-out-strong"
                                                   style={{ width: `${(currentTime / duration) * 100}%` }}
                                                 ></div>
                                               </div>
-                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(duration)}</span>
+                                              <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(duration)}</span>
                                             </div>
                                             
                                             {/* Mini Volume */}
                                             <div className="flex items-center gap-1">
-                                              <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                                              <svg className="w-3 h-3 text-white/80" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
                                               </svg>
                                               <input
@@ -2075,12 +2078,12 @@ export default function BuilderProfile({
                           {/* Saved Tracks */}
                           {spotifyUserData.profile?.savedTracks?.length > 0 && (
                             <div>
-                              <h5 className="text-green-300 text-sm font-medium mb-3">Saved Tracks</h5>
+                              <h5 className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider mb-3">Saved Tracks</h5>
                               <div className="space-y-2">
                                 {(spotifyUserData.profile?.savedTracks || []).slice(0, 3).map((item, index) => (
                                   <div 
                                     key={index} 
-                                    className="relative overflow-hidden rounded-lg p-3 hover:scale-[1.02] hover:shadow-2xl hover:shadow-black/30 origin-left transition-all duration-300"
+                                    className="relative overflow-hidden rounded-card p-3 hover:scale-[1.02] hover:shadow-float origin-left transition-[transform,box-shadow] duration-[--dur-dropdown] ease-out-strong"
                                     style={{
                                       backgroundImage: item?.track?.album?.images?.[0]?.url 
                                         ? `url(${item.track.album.images[0].url})` 
@@ -2094,7 +2097,7 @@ export default function BuilderProfile({
                                     <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
                                       item?.track?.album?.images?.[0]?.url 
                                         ? 'bg-black/40' 
-                                        : 'bg-gradient-to-br from-green-900/30 to-emerald-800/30'
+                                        : 'bg-soft-ink/90'
                                     }`}></div>
                                     
                                     {/* Content Container */}
@@ -2112,7 +2115,7 @@ export default function BuilderProfile({
                                             <img
                                               src={item.track.album.images[0].url}
                                               alt={item.track.album.name}
-                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-lg transition-all duration-200"
+                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow duration-[--dur-press] ease-out-strong"
                                             />
                                           </a>
                                           
@@ -2238,7 +2241,7 @@ export default function BuilderProfile({
                                           <div className="mt-2 flex items-center gap-2">
                                             {/* Mini Progress Bar */}
                                             <div className="flex-1 flex items-center gap-2">
-                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(currentTime)}</span>
+                                              <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(currentTime)}</span>
                                               <div 
                                                 className="flex-1 h-0.5 bg-green-400/20 rounded-full cursor-pointer"
                                                 onClick={(e) => {
@@ -2248,16 +2251,16 @@ export default function BuilderProfile({
                                                 }}
                                               >
                                                 <div 
-                                                  className="h-full bg-green-400 rounded-full transition-all"
+                                                  className="h-full bg-soft-accent rounded-full transition-[width] duration-[--dur-press] ease-out-strong"
                                                   style={{ width: `${(currentTime / duration) * 100}%` }}
                                                 ></div>
                                               </div>
-                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(duration)}</span>
+                                              <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(duration)}</span>
                                             </div>
                                             
                                             {/* Mini Volume */}
                                             <div className="flex items-center gap-1">
-                                              <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                                              <svg className="w-3 h-3 text-white/80" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
                                               </svg>
                                               <input
@@ -2290,7 +2293,7 @@ export default function BuilderProfile({
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <div className="text-gray-400 text-sm">
+                  <div className="text-soft-ink-soft text-sm">
                     No Spotify data available for this wallet address
                   </div>
                 </div>
@@ -2300,38 +2303,38 @@ export default function BuilderProfile({
         )}
         
         {/* Bio Section */}
-        <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl">
+        <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
           {/* Niebieska poświata */}
-          <div className="absolute -top-6 -right-6 w-24 h-24 bg-blue-300/20 rounded-full filter blur-2xl"></div>
-          <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-blue-400/15 rounded-full filter blur-xl"></div>
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent"></div>
-          
+          <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
+          <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full filter blur-xl"></div>
+          <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
+
           {/* Efekt szkła */}
-          <div className="absolute inset-0 bg-white/30 backdrop-blur-sm"></div>
-          
+          <div className="absolute inset-0 bg-transparent"></div>
+
           <div className="relative z-10 p-6">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-500/20 backdrop-blur-sm border border-blue-400/30 mr-3 shadow-lg">
-                  <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-soft-sunken border border-soft-line mr-3 shadow-chip">
+                  <svg className="w-5 h-5 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
-                <h3 className="font-light text-xl text-blue-900">About</h3>
+                <h3 className="font-soft-display font-bold text-xl text-soft-ink">About</h3>
               </div>
               {currentUserAddress === userAddress && !isEditingBio && (
                 <button
                   onClick={() => setIsEditingBio(true)}
-                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center bg-blue-100/50 backdrop-blur-sm border border-blue-300/30 px-3 py-1.5 rounded-full transition-all duration-300 hover:scale-105"
+                  className="text-xs font-semibold text-soft-primary-deep hover:bg-soft-line flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                   <span>Edit</span>
                 </button>
               )}
             </div>
-            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-5 border border-blue-200/30">
+            <div className="bg-soft-sunken rounded-card p-5 border border-soft-line">
               {isEditingBio ? (
                 <div>
                   <textarea
@@ -2339,11 +2342,11 @@ export default function BuilderProfile({
                     onChange={(e) => setNewBio(e.target.value)}
                     maxLength={90}
                     placeholder="Write something about yourself..."
-                    className="w-full bg-white border border-blue-200 rounded-lg p-3 text-blue-900 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+                    className="w-full bg-soft-surface border border-soft-line rounded-card p-3 text-soft-ink placeholder:text-soft-ink-faint transition-colors duration-[--dur-press] ease-out-strong focus:outline-none focus:ring-2 focus:ring-soft-primary focus:border-soft-primary"
                     rows={3}
                   />
                   <div className="flex justify-between items-center mt-2">
-                    <div className="text-xs text-blue-600">
+                    <div className="text-xs text-soft-ink-faint tabular-nums">
                       {newBio.length}/90 characters
                     </div>
                     <div className="flex space-x-2">
@@ -2352,7 +2355,7 @@ export default function BuilderProfile({
                           setIsEditingBio(false);
                           setNewBio(profile.bio || '');
                         }}
-                        className="px-3 py-1.5 bg-white/80 text-blue-700 border border-blue-200 rounded-lg text-xs hover:bg-blue-50 transition-colors"
+                        className="px-3 py-1.5 bg-soft-surface text-soft-ink-muted border border-soft-line rounded-pill text-xs font-semibold hover:bg-soft-line transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         disabled={isSaving}
                       >
                         Cancel
@@ -2360,7 +2363,7 @@ export default function BuilderProfile({
                       <button
                         onClick={handleSaveBio}
                         disabled={isSaving}
-                        className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1.5 bg-soft-primary text-white rounded-pill text-xs font-semibold shadow-chip hover:bg-soft-primary-deep transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSaving ? 'Saving...' : 'Save'}
                       </button>
@@ -2368,9 +2371,9 @@ export default function BuilderProfile({
                   </div>
                 </div>
               ) : (
-                <div className="text-blue-800 leading-relaxed font-light">
-                  {profile.bio || 
-                    <span className="text-blue-400 italic">
+                <div className="text-soft-ink-muted leading-relaxed">
+                  {profile.bio ||
+                    <span className="text-soft-ink-faint italic">
                       {currentUserAddress === userAddress ? 
                         "Click Edit to add your bio" : 
                         "This builder hasn't added a bio yet"}
@@ -2384,13 +2387,13 @@ export default function BuilderProfile({
         
         {/* Vitalik Buterin Info - Tylko dla profilu Vitalika */}
         {isVitalik && (
-          <div className="mb-6 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-2xl shadow-sm p-6 border border-yellow-200 relative overflow-hidden">
+          <div className="mb-6 bg-soft-surface rounded-card shadow-card p-6 border border-soft-line relative overflow-hidden">
             {/* Efekt świecenia */}
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-yellow-200 rounded-full filter blur-3xl opacity-30"></div>
-            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-yellow-400 rounded-full filter blur-3xl opacity-20"></div>
-            
-            <div className="text-black relative z-10">
-              <h3 className="font-medium text-xl mb-3">About Vitalik Buterin</h3>
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-soft-accent-soft rounded-full filter blur-3xl opacity-40"></div>
+            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-soft-primary/10 rounded-full filter blur-3xl opacity-30"></div>
+
+            <div className="text-soft-ink-muted relative z-10">
+              <h3 className="font-soft-display font-bold text-xl mb-3 text-soft-ink">About Vitalik Buterin</h3>
               <div className="space-y-2 text-sm">
                 <p className="leading-relaxed">
                   Vitalik Buterin is the co-founder of Ethereum, a decentralized, open-source blockchain platform that enables smart contracts and decentralized applications (dApps). He proposed Ethereum in a white paper in late 2013 when he was just 19 years old.
@@ -2432,7 +2435,7 @@ export default function BuilderProfile({
           <div className="space-y-2 mb-6">
             <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
               <span className="text-soft-ink-muted flex items-center">
-                <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 mr-2 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                 Posts ({profile.postCount || 0})
@@ -2444,7 +2447,7 @@ export default function BuilderProfile({
             
             <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
               <span className="text-soft-ink-muted flex items-center">
-                <svg className="w-5 h-5 mr-2 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 mr-2 text-soft-accent-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 Likes Received ({profile.likesReceived || 0})
@@ -2459,7 +2462,7 @@ export default function BuilderProfile({
           <div className="mt-4 space-y-3 border-t border-soft-line pt-4">
               <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
                 <span className="text-soft-ink-muted flex items-center">
-                  <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 mr-2 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   Activity Bonus

@@ -23,31 +23,31 @@
 :root {
   /* Powierzchnie. Tlo jest lawendowe, nie biale - biel zostaje dla kart,
      zeby karta odcinala sie sama, bez ramki. */
-  --soft-bg: #f1edfa;
-  --soft-surface: #ffffff;
-  --soft-surface-sunken: #eee9fb;
+  --soft-bg: 241 237 250; /* #f1edfa */
+  --soft-surface: 255 255 255; /* #ffffff */
+  --soft-surface-sunken: 238 233 251; /* #eee9fb */
 
   /* Tekst - cztery stopnie, od naglowka do znaku wodnego. */
-  --soft-ink: #2e2a44;
-  --soft-ink-muted: #6b6486;
-  --soft-ink-soft: #8d86ab;
-  --soft-ink-faint: #a29bc0;
+  --soft-ink: 46 42 68; /* #2e2a44 */
+  --soft-ink-muted: 107 100 134; /* #6b6486 */
+  --soft-ink-soft: 141 134 171; /* #8d86ab */
+  --soft-ink-faint: 162 155 192; /* #a29bc0 */
 
   /* Fiolet marki. `deep` na tekst na jasnym tle - `primary` nie ma tam
      kontrastu 4.5:1. */
-  --soft-primary: #7c6bda;
-  --soft-primary-deep: #5f4ec2;
-  --soft-line: #d6cdf2;
-  --soft-line-strong: #b9b1d8;
+  --soft-primary: 124 107 218; /* #7c6bda */
+  --soft-primary-deep: 95 78 194; /* #5f4ec2 */
+  --soft-line: 214 205 242; /* #d6cdf2 */
+  --soft-line-strong: 185 177 216; /* #b9b1d8 */
 
   /* Pomaranczowy akcent. `deep` na tekst, `soft` na tlo pigulki. */
-  --soft-accent: #f5a73b;
-  --soft-accent-soft: #fde4cc;
-  --soft-accent-deep: #c2410c;
+  --soft-accent: 245 167 59; /* #f5a73b */
+  --soft-accent-soft: 253 228 204; /* #fde4cc */
+  --soft-accent-deep: 194 65 12; /* #c2410c */
 
   /* Blekit informacyjny - linki i odznaki neutralne. */
-  --soft-info: #2465d6;
-  --soft-info-soft: #d9ebff;
+  --soft-info: 36 101 214; /* #2465d6 */
+  --soft-info-soft: 217 235 255; /* #d9ebff */
 
   /* Cienie. Wszystkie fioletowe, nie czarne - czarny cien na lawendzie
      wyglada jak brud. */
