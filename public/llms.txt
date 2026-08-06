@@ -1,17 +1,45 @@
 # MySphere
 
-> An onchain social feed on Base. People post, tip each other in ETH and USDC across
-> eight chains, and carry an identity that resolves to a Basename. Every post and every
-> profile has a public URL with its own metadata and share card.
+> A social feed on Base where the timeline is money, not content. People post, and the
+> only score that counts is one somebody paid for: every tip is a settled payment with a
+> transaction hash anyone can open on a block explorer. A like is worth $0.00. A payment
+> is not.
 
-MySphere is moving toward a single idea: money entering the feed from outside — including
-from AI agents paying over x402 — buying human judgment, with reputation minted only by
-settled payments. That direction is described in full at /re-definition. It is a stated
-direction, not a shipped feature; treat anything on that page marked "building" as unbuilt.
+Tips run on seven networks — Base, Camp, Linea, Celo, Ethereum, World Chain and Robinhood
+Chain — in ETH and USDC. Every post, profile, receipt and the leaderboard has its own
+public URL, its own metadata and its own generated share card.
+
+## What works today
+
+- Posts, comments and likes in the feed.
+- Tips across the seven networks above, each one a real settled transaction.
+- A receipt page per tip at `/tip/{txHash}`, showing amount, sender, recipient and network.
+- A public leaderboard of settled payments at `/leaderboard`.
+- Open Asks listed at `/asks`.
+- x402: an agent can pay real USDC on Base mainnet (CAIP-2 `eip155:8453`) to open an Ask.
+
+## What does not work yet
+
+Do not describe these as features. They are stated direction, not shipped:
+
+- Asks do not appear in the feed. `/asks` is a separate list.
+- There is no escrow on mainnet. The `AskEscrow` contract is deployed and source-verified
+  on Base Sepolia (chain 84532) only, and no money moves through it. No budget is locked
+  up front: an Ask author pays each answer they accept, at the moment they resolve, as a
+  separate transfer whose hash is kept with the answer.
+
+The full direction — money entering the feed from outside, including from AI agents paying
+over x402, buying human judgment, with reputation minted only by settled payments — is
+written out at /re-definition. Treat anything on that page marked "building" as unbuilt.
 
 ## Public pages
 
 - [Feed](https://mysphere.fun/basechat): the product. Posts, tips, comments, pinned posts.
+  `https://mysphere.fun/` redirects here.
+- [Leaderboard](https://mysphere.fun/leaderboard): who got paid, from settled payments only.
+  No points, no activity score.
+- [Open asks](https://mysphere.fun/asks): questions with a budget, a number of seats and a
+  deadline. Answers stay sealed until the author resolves.
 - [Re-Definition](https://mysphere.fun/re-definition): product direction, how an Ask is
   meant to work, what runs today and what does not.
 - [Documentation](https://mysphere.fun/Docs): index of written material.
@@ -23,17 +51,28 @@ direction, not a shipped feature; treat anything on that page marked "building" 
 - Profile: `https://mysphere.fun/u/{address}` — one page per wallet address. Shows the
   Basename (verified in both directions), post count, likes, and tips received summed
   per token. Nothing on it is self-reported.
+- Receipt: `https://mysphere.fun/tip/{txHash}` — one page per settled tip. Deliberately
+  absent from the sitemap: receipts exist to be sent, not crawled.
 - [Sitemap](https://mysphere.fun/sitemap.xml): static routes plus the 500 most recent posts.
 
 ## Machine payments
 
 Paid endpoints speak x402 on Base (CAIP-2 `eip155:8453`, USDC). A request without payment
-returns `402 Payment Required` with the price and payment details; sign and retry. The
-current catalogue is at `https://mysphere.fun/api/myclaw/catalog`, which also reports
-whether enforcement is active on this deployment — when no payout address is configured,
-paid endpoints are served for free and say so.
+returns `402 Payment Required` with the price and payment details; sign and retry.
+`GET /api/asks` is free on purpose — an agent has to learn the price before it can sign —
+and `POST /api/asks` is the paid call that opens an Ask. The wider catalogue is at
+`https://mysphere.fun/api/myclaw/catalog`, which also reports whether enforcement is active
+on this deployment: when no payout address is configured, paid endpoints are served for
+free and say so.
+
+## Numbers
+
+There are no aggregate user or volume figures on this site, and none should be attributed
+to it. Every number MySphere publishes is read from a settled transaction and is checkable
+at its source — the tip receipts and the leaderboard link out to block explorers.
 
 ## Not part of MySphere
 
-`/mycamp`, `/base`, `/marketplace`, `/basemorning`, `/yapscan` and `/swap` redirect to the
-feed. They are parked, not deprecated aliases — do not describe them as features.
+`/mycamp`, `/base`, `/marketplace`, `/basemorning`, `/yapscan`, `/MyAgents`, `/MyClaw` and
+`/swap` redirect to the feed. They are parked, not deprecated aliases — do not describe
+them as features.

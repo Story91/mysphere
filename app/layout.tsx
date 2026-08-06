@@ -60,9 +60,17 @@ const APP_URL = 'https://mysphere.fun';
 // Miniapp embed. `fc:miniapp` to aktualny tag; `fc:frame` zostawiony dla
 // wstecznej zgodnosci ze starszymi klientami. W obu `version` musi byc
 // stringiem "1" - "next" jest przestarzale i klienci je odrzucaja.
+//
+// imageUrl wskazuje na app/miniapp-image/route.tsx, a NIE na karte OG.
+// Powod: embed miniappki wymaga proporcji 3:2, a karta OG ma 1200x630 (1.91:1);
+// klient przycinalby ja do kwadratowszego kadru i zjadal lewa krawedz, czyli
+// krecoslup i poczatki obu zdan. Wczesniej lezalo tu /SphereWhite.png, przez co
+// Base App i klienci Farcastera pokazywali statyczne logo zamiast karty.
+// Slash na koncu jest konieczny: projekt ma `trailingSlash: true`, wiec adres
+// bez niego dostaje 308 i nie kazdy klient podglądu za nim pojdzie.
 const MINIAPP_EMBED = JSON.stringify({
   version: '1',
-  imageUrl: `${APP_URL}/SphereWhite.png`,
+  imageUrl: `${APP_URL}/miniapp-image/`,
   button: {
     title: 'Tip Creators',
     action: {
@@ -75,8 +83,37 @@ const MINIAPP_EMBED = JSON.stringify({
   },
 });
 
+/**
+ * === TYTUL I OPIS NIOSA TEZE, NIE KATEGORIE ===
+ * Stalo tu: "The onchain social Dapp on Base. Build, grow, and own your digital
+ * Sphere." - zdanie prawdziwe i zupelnie puste, bo pasuje do kazdego produktu
+ * spolecznosciowego z portfelem. Nie mowilo ani co tu sie robi, ani czym to
+ * miejsce rozni sie od pozostalych.
+ *
+ * Teza MySphere jest jedna: OSIA CZASU SA PIENIADZE, nie tresc. Kazdy napiwek
+ * to rozliczona platnosc z hashem, ktory kazdy moze otworzyc. Opis mowi wiec
+ * dokladnie to i tylko to, co dziala DZIS: posty, napiwki w ETH i USDC na
+ * siedmiu sieciach, rozliczenie z hashem. Zadnego escrow, zadnych Askow
+ * w feedzie, zadnej liczby uzytkownikow.
+ *
+ * Liczba sieci wzieta z app/basechat/soft/SoftStoryRail.tsx (SOFT_NETWORKS):
+ * Base, Camp, Linea, Celo, Ethereum, World, Robinhood. SIEDEM. Jesli ta lista
+ * urosnie, to zdanie trzeba poprawic recznie - dlatego stoi tu ta notka.
+ */
 const APP_DESCRIPTION =
-  'The onchain social Dapp on Base. Build, grow, and own your digital Sphere.';
+  'A social feed where money is the timeline. Post, tip in ETH or USDC across seven networks, and every tip settles onchain with a hash anyone can open.';
+
+/**
+ * Jeden tytul dla <title>, og:title i twitter:title.
+ *
+ * DLACZEGO NIE POWTARZA ZDAN Z KARTY. Karta obrazka niesie juz "A like is worth
+ * $0.00. A payment is not.", a X pokazuje pod obrazkiem dokladnie jeden pasek
+ * tekstu - powtorzenie tych samych slow zmarnowaloby go w calosci. Tytul mowi
+ * wiec to, czego na obrazku NIE MA: czym to jest (social na Base) i czym w tym
+ * miejscu mierzy sie pozycje (rozliczonymi platnosciami). Obrazek i tytul
+ * skladaja sie na jedno zdanie, zamiast mowic je dwa razy.
+ */
+const SOCIAL_TITLE = 'MySphere - social on Base, scored by settled payments';
 
 /**
  * Metadane generowane po stronie SERWERA.
@@ -90,7 +127,14 @@ export const metadata: Metadata = {
   // ostrzezenie przy kazdym buildzie ("metadataBase property in metadata export
   // is not set"), a podglady linkow dostaja wtedy wzgledne, nieklikalne URL-e.
   metadataBase: new URL(APP_URL),
-  title: 'MySphere.fun',
+  // `template` doklada marke do tytulow podstron, wiec podstrona pisze u siebie
+  // samo "Open asks", a nie "Open asks - MySphere". `default` obowiazuje tam,
+  // gdzie nikt tytulu nie ustawil - czyli m.in. na /basechat, ktore jest
+  // komponentem klienckim i wlasnych metadanych wyeksportowac nie moze.
+  title: {
+    default: SOCIAL_TITLE,
+    template: '%s · MySphere',
+  },
   description: APP_DESCRIPTION,
   manifest: '/manifest.json',
   // Uwaga: to jest layout GLOWNY - kazde pole dziedzicza wszystkie podstrony,
@@ -100,15 +144,35 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'MySphere',
-    title: 'MySphere - Social on Base',
+    title: SOCIAL_TITLE,
     description: APP_DESCRIPTION,
-    images: [{ url: '/SphereWhite.png', width: 640, height: 360, alt: 'MySphere' }],
+    // BRAK `images` JEST TU CELOWY - nie zapomnieniem.
+    // Obrazek podglądu daje plikowa konwencja: app/opengraph-image.tsx.
+    // Wpisana tutaj tablica `images` wygralaby z plikiem dla CALEGO serwisu,
+    // wiec generowana karta nigdy by sie nie pokazala - a trasy z wlasna karta
+    // (/leaderboard, /post, /tip, /u) straciłyby swoje. Poprzednio stalo tu
+    // /SphereWhite.png, czyli statyczne logo 15 kB przykrywalo wszystkie cztery.
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MySphere - Social on Base',
+    title: SOCIAL_TITLE,
     description: APP_DESCRIPTION,
-    images: ['/SphereWhite.png'],
+    // === DLACZEGO NIE MA TU `images` ANI PLIKU app/twitter-image.tsx ===
+    // Kuszace bylo dolozyc app/twitter-image.tsx dla pewnosci, ze `twitter:image`
+    // jest wypisane wprost. Napisane, ZMIERZONE W HTML-u i WYCOFANE: plik
+    // twitter-image w korzeniu dziedziczy KAZDA podstrona, a cztery trasy
+    // z wlasna karta maja tylko `opengraph-image`, nie `twitter-image`.
+    // Skutek byl taki, ze /leaderboard oddawalo `twitter:image` wskazujacy na
+    // karte strony glownej - ranking wrzucony na X pokazywalby teze produktu
+    // zamiast nazwisk i kwot. To samo spotkaloby paragony i profile.
+    //
+    // Bez tego pliku Next wyprowadza `twitter:image` z `opengraph-image` TEJ
+    // SAMEJ trasy, wiec kazda dostaje swoja wlasna karte. Zmierzone:
+    //   /            -> twitter:image = /opengraph-image
+    //   /leaderboard -> twitter:image = /leaderboard/opengraph-image
+    // Usuniecie `images: ['/SphereWhite.png']`, ktore stalo tu wczesniej, jest
+    // przy okazji NAPRAWA: statyczne logo przykrywalo dotad wszystkie cztery
+    // karty danych w podgladach na X.
   },
   icons: {
     icon: [

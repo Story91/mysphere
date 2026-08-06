@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import MobileBottomNav from '../components/MobileBottomNav';
 import AskCard from '../basechat/components/AskCard';
 import { getOpenAsks, getResolveRate } from '../utils/asks/asks';
 import type { Ask, ResolveRate } from '../utils/asks/types';
@@ -145,6 +146,11 @@ export default function AsksPage() {
           </div>
         )}
       </div>
+      {/* Wyjscie z tej strony na telefonie. Dolny pasek feedu jest jego
+          wewnetrznym przelacznikiem paneli i tu nie dziala - bez tego /asks
+          bylo na telefonie slepym zaulkiem: gorna belka chowa sie pod
+          hamburgerem, wiec droga powrotna istniala, ale nie bylo jej widac. */}
+      <MobileBottomNav />
     </main>
   );
 }

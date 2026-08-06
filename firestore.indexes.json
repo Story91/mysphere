@@ -1,0 +1,53 @@
+{
+  "comment": [
+    "Indeksy zlozone Firestore.",
+    "",
+    "Firestore tworzy indeksy pojedynczych pol sam, ale zapytanie laczace",
+    "`where` po jednym polu z `orderBy` po INNYM wymaga indeksu zlozonego -",
+    "i bez niego zwraca blad, nie pusta liste.",
+    "",
+    "Tak wlasnie padalo /asks: getOpenAsks() robi",
+    "  where('status','==','open') + orderBy('createdAt','desc')",
+    "wiec kazde wejscie konczylo sie komunikatem",
+    "  'Open asks could not be loaded. This is a failed read, not an empty list.'",
+    "Komunikat byl poprawny - brakowalo indeksu, ktory go usuwa.",
+    "",
+    "Wdrozenie: firebase deploy --only firestore:indexes",
+    "(firebase.json wskazuje na ten plik)"
+  ],
+  "indexes": [
+    {
+      "collectionGroup": "asks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "asks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "author", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "askAnswers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "askId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "askAnswers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "author", "order": "ASCENDING" },
+        { "fieldPath": "accepted", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
