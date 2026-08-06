@@ -1,6 +1,6 @@
 # MySphere — gdzie jesteśmy i co robimy
 
-**Ostatnia aktualizacja: 5 sierpnia 2026.**
+**Ostatnia aktualizacja: 6 sierpnia 2026.**
 
 To jest JEDYNY dokument, który trzeba przeczytać, żeby wiedzieć, na czym stoimy.
 Powstał 4 sierpnia jako audyt wejściowy (8 równoległych agentów) i został przepisany
@@ -233,6 +233,58 @@ Nie da się tego skopiować bez przeniesienia płatności na łańcuch.
   „podpisz" bez czytania. Teraz 7 dni z rollowaniem.
 - **Sekcje przeniesione do Profilu** (wzorem Twittera) — cztery z pięciu pozycji
   na feedzie to wcale nie feed, tylko osobne widoki.
+
+## 2e. Test na żywym środowisku, 6 sierpnia — dowód płatności nie istniał
+
+Do tej pory strona Paid była sprawdzana buildem i typami. Build nie mówi nic
+o tym, czy dane są prawdziwe. Uruchomiłem produkcyjny serwer i **odpytałem
+łańcuch o hashe zapisane w bazie**. To zmieniło obraz.
+
+| Sprawdzone | Wynik |
+|---|---|
+| `eth_getTransactionByHash` na Base mainnet, 17 hashy o poprawnym formacie | **17 × `null`** |
+| te same hashe na Base Sepolia, Ethereum, Optimism, Arbitrum | nigdzie ich nie ma |
+| 50 najnowszych dokumentów w kolekcji `tips` | **44 ma pusty `txHash`** |
+
+Wniosek: **każdy link „verify onchain" prowadził do pustej strony.** Na stronie,
+której cała teza brzmi *„każda pozycja ma dowód, który możesz sprawdzić"*, to
+najpoważniejsza możliwa wada — i taka, której żaden typecheck nie wykryje.
+
+Przyczyna: płatności przez Base Pay zapisują to, co zwraca `pay()`, a
+dokumentacja SDK opisuje tę wartość jako *„Transaction ID (userOp hash)"*.
+userOp to zlecenie ERC-4337 — leży w jakiejś transakcji, ale ma własny hash
+i pod `/tx/` go nie ma. Z samych 32 bajtów nie da się rozpoznać, który to
+rodzaj, więc link idzie teraz przez **wyszukiwarkę eksploratora**, która
+przyjmuje jedno i drugie. Puste hashe to zaszłość po ścieżce OnchainKit;
+obecna ścieżka wagmi zawsze podaje `receipt.transactionHash`.
+
+### Znalezione przy tej samej okazji
+
+- **`/Docs` i `/docs` to była nieskończona pętla przekierowań.** Reguła
+  `/docs → /Docs` zapętlała się z kanonizacją `trailingSlash`, bo matcher reguł
+  ignoruje wielkość liter: `/Docs → /Docs/ → /Docs → …`. curl przerywał po 12
+  skokach, przeglądarka pokazywała `ERR_TOO_MANY_REDIRECTS`. **Cała
+  dokumentacja z whitepaperem była nieosiągalna** — także lokalnie, więc
+  poprzedni komentarz w `next.config.js` obwiniający Vercela był błędną
+  diagnozą. Reguła usunięta jako szkodliwa i zbędna.
+- **Taśma była pusta, gdy ranking pod nią pokazywał ludzi** — pobierała
+  dokładnie tyle dokumentów, ile chciała pokazać, i filtrowała je *dopiero
+  potem*. Dwa sprzeczne komunikaty na jednym ekranie.
+- **Awaria odczytu udawała pustkę.** `getLeaderboard` i `getSettledPayments`
+  zwracały pusty wynik zarówno przy braku danych, jak i przy błędzie — więc
+  strona ogłaszała „Nothing has settled yet" dokładnie wtedy, gdy nie udało się
+  tego sprawdzić. Obie zwracają teraz flagę `failed`.
+- **`as TipNetwork` groziło błędem 500.** W bazie żyją dwa słowniki nazw sieci
+  naraz (`worldchain` vs `world`, `basecamp` vs `camp`). Rzutowanie uciszało
+  TypeScript tam, gdzie ostrzegał słusznie: `NETWORKS['worldchain']` to
+  `undefined`, a odczyt `.explorerUrl` wywracał komponent serwerowy.
+- **Świeży komentarz miał ID `temp-…`**, bo `addComment` było `Promise<void>`.
+  Polubienie i usunięcie trafiały w nieistniejący dokument i kończyły się
+  komunikatem o awarii, choć zapis się powiódł.
+
+**Reguła, którą to zostawia:** *zielony build i zero błędów typów nie mówią nic
+o tym, czy dane są prawdziwe.* Trasy trzeba uruchomić, a twierdzenia o łańcuchu
+— sprawdzić na łańcuchu.
 
 ## 2b. NIEROZWIĄZANE — logowanie SIWE nie działa na produkcji
 
