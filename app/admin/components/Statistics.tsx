@@ -199,11 +199,29 @@ export default function Statistics() {
       }
     } catch (countError) {
       console.error('[Statistics] Liczenie nie powiodlo sie:', countError);
+
       // Awaria i zero to nie to samo zdanie - nie podmieniamy liczb na zera.
+      //
+      // `resource-exhausted` dostaje WLASNY komunikat, bo to jedyna przyczyna
+      // z tej listy, ktora MIJA SAMA i nie jest awaria niczego. Firestore ma
+      // osobny, dobowy limit na zapytania agregujace - niezalezny od limitu
+      // zwyklych odczytow, ktore w tym czasie dzialaja normalnie.
+      //
+      // Zmierzone: rano to samo zapytanie zwracalo 184 064 uzytkownikow,
+      // wieczorem `resource-exhausted`, a `getDocs` obok dzialal bez zarzutu.
+      // Ogolne "nie udalo sie policzyc" kazaloby szukac bledu tam, gdzie go
+      // nie ma.
+      const code = (countError as { code?: string } | null)?.code;
+      const exhausted =
+        code === 'resource-exhausted' ||
+        (countError instanceof Error && /resource-exhausted|quota/i.test(countError.message));
+
       setError(
-        countError instanceof Error
-          ? `Nie udało się policzyć: ${countError.message}`
-          : 'Nie udało się policzyć.'
+        exhausted
+          ? 'Wyczerpany dobowy limit zapytań agregujących w Firestore. To nie jest awaria — limit odnawia się sam, a zwykłe odczyty działają normalnie.'
+          : countError instanceof Error
+            ? `Nie udało się policzyć: ${countError.message}`
+            : 'Nie udało się policzyć.'
       );
     } finally {
       setIsCounting(false);
