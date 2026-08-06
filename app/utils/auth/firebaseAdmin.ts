@@ -74,11 +74,66 @@ function readServiceAccount(): Record<string, string> | null {
   try {
     // Wartosc bywa zapisana jako czysty JSON albo jako base64.
     const text = raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
-    const parsed = JSON.parse(text);
+    const parsed = parseServiceAccountJson(text);
     if (parsed?.type !== 'service_account' || !parsed?.private_key) return null;
     return parsed;
   } catch {
     return null;
+  }
+}
+
+/**
+ * JSON konta uslugowego, odporny na SUROWE ZNAKI NOWEJ LINII w `private_key`.
+ *
+ * === TO BYLA PRZYCZYNA ZRODLOWA, SZUKANA PRZEZ DWA DNI ===
+ * AUDYT.md par. 2b opisywal nierozwiazana awarie: na produkcji trasy
+ * importujace ten plik zwracaly 500, SIWE nie dzialalo, `request.auth`
+ * w regulach Firestore bylo zawsze `null`. Postawilem i obalilem cztery
+ * hipotezy (gcp-metadata w externals, brak `server-only`, wersja Node,
+ * reguly Firestore) i nie znalazlem powodu.
+ *
+ * Powod jest w PARSERZE PLIKU .env, nie w tym module:
+ *
+ *   GOOGLE_CREDENTIALS="{...\n...}"     <- PODWOJNE cudzyslowy
+ *
+ * Przy wartosci w podwojnych cudzyslowach dotenv (i @next/env) rozwija `\n`
+ * w PRAWDZIWY znak nowej linii - to udokumentowane zachowanie, przydatne dla
+ * kluczy PEM trzymanych w osobnej zmiennej. Tutaj jest zgubne: klucz siedzi
+ * WEWNATRZ JSON-a, wiec surowy znak nowej linii laduje w srodku literalu
+ * napisowego i `JSON.parse` konczy sie "Bad control character in string
+ * literal at position 158".
+ *
+ * Zmierzone na tym repo: `JSON.parse` wywala sie, `readServiceAccount()`
+ * zwraca null, `getAdminDb()` zwraca null - i cala reszta lancucha milknie.
+ * Modul zawodzil CICHO i wygladalo to jak brak konfiguracji, a nie jak blad.
+ *
+ * === DLACZEGO NAPRAWA JEST TUTAJ, A NIE W .env ===
+ * Poprawienie zmiennej (pojedyncze cudzyslowy albo base64) rozwiazuje objaw
+ * u jednej osoby, na jednej maszynie. Ten sam plik wklei sie kiedys do Vercela,
+ * do CI i na czyjs drugi komputer - i zaleznie od cudzyslowow zadziala albo
+ * nie, bez zadnego sygnalu. Modul ma przyjac obie postacie.
+ *
+ * === DLACZEGO PODMIANA JEST BEZPIECZNA ===
+ * W poprawnym JSON-ie surowy znak nowej linii NIE MOZE wystapic wewnatrz
+ * literalu napisowego - to jest wlasnie blad, ktory naprawiamy. Poza
+ * literalami jest tylko formatowaniem i podmiana na `\n` nic nie zmienia,
+ * bo i tak parsujemy wynik jako JSON. Probujemy tego DOPIERO po nieudanym
+ * pierwszym parsowaniu, wiec poprawne wartosci nie przechodza przez zadna
+ * transformacje.
+ */
+function parseServiceAccountJson(text: string): Record<string, any> | null {
+  try {
+    return JSON.parse(text);
+  } catch (firstError) {
+    // Druga proba: surowe znaki nowej linii i powrotu karetki z powrotem na
+    // sekwencje ucieczki. Ratuje wartosc rozwinieta przez parser .env.
+    try {
+      return JSON.parse(text.replace(/\r/g, '\\r').replace(/\n/g, '\\n'));
+    } catch {
+      // Zglaszamy PIERWSZY blad - opisuje prawdziwy ksztalt wartosci.
+      // Blad z proby naprawczej tylko myliby czytajacego log.
+      throw firstError;
+    }
   }
 }
 

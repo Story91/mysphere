@@ -365,12 +365,45 @@ zachodzi. Trasa zamyka się bezpiecznie w każdym przypadku.
 o tym, czy dane są prawdziwe.* Trasy trzeba uruchomić, a twierdzenia o łańcuchu
 — sprawdzić na łańcuchu.
 
-## 2b. NIEROZWIĄZANE — logowanie SIWE nie działa na produkcji
+## 2b. ROZWIĄZANE — przyczyna znaleziona 6 sierpnia wieczorem
 
-**Objaw:** na `mysphere.fun` trasy `/api/auth/verify/`, `/api/auth/session/` i
-`/api/premium/` zwracają **500 w postaci strony HTML**. `/api/auth/nonce/` — jedyna
-z nich nieimportująca `firebaseAdmin.ts` — zwraca 200. Użytkownik widzi
-„Server sign-in is not configured yet".
+> **Przyczyna: parser pliku `.env`, nie kod aplikacji.**
+>
+> `GOOGLE_CREDENTIALS` jest zapisane w **podwójnych cudzysłowach**:
+> `GOOGLE_CREDENTIALS="{…\n…}"`. Przy wartości w podwójnych cudzysłowach
+> dotenv i `@next/env` **rozwijają `\n` w prawdziwy znak nowej linii** — to
+> udokumentowane zachowanie, przydatne dla kluczy PEM trzymanych w osobnej
+> zmiennej. Tutaj jest zgubne: klucz siedzi **wewnątrz JSON-a**, więc surowy
+> znak nowej linii ląduje w środku literału napisowego.
+>
+> Zmierzone na tym repo: **28 znaków o kodzie 10** w wartości, `JSON.parse`
+> wywala się na pozycji 158 („Bad control character in string literal"),
+> `readServiceAccount()` zwraca `null`, `getAdminDb()` zwraca `null`. Cały
+> łańcuch milknie: brak `request.auth` w regułach, brak zapisu treści premium,
+> brak mintowania tokenów.
+>
+> Moduł zawodził **cicho** i wyglądało to jak brak konfiguracji, a nie jak
+> błąd — dlatego cztery hipotezy niżej były o niewłaściwym piętrze.
+>
+> **Naprawa jest w kodzie, nie w zmiennej** (`app/utils/auth/firebaseAdmin.ts`).
+> Poprawienie `.env.local` rozwiązuje objaw u jednej osoby na jednej maszynie;
+> ten sam plik trafi kiedyś do Vercela, do CI i na czyjś drugi komputer i —
+> zależnie od cudzysłowów — zadziała albo nie, bez żadnego sygnału. Moduł
+> przyjmuje teraz obie postacie: po nieudanym `JSON.parse` próbuje raz jeszcze
+> z surowymi znakami nowej linii zamienionymi z powrotem na sekwencje ucieczki.
+> Poprawne wartości nie przechodzą przez żadną transformację.
+>
+> Zweryfikowane na realnej wartości: `readServiceAccount()` zwraca konto
+> usługowe, `project_id` i `client_email` obecne, `private_key` z nagłówkiem
+> PEM i prawdziwymi znakami nowej linii.
+>
+> Znalazł to agent pracujący nad x402 — przy okazji, badając, czemu zapis
+> odpowiedzi do Aska zwraca 503.
+
+**Objaw (zapis historyczny):** na `mysphere.fun` trasy `/api/auth/verify/`,
+`/api/auth/session/` i `/api/premium/` zwracały **500 w postaci strony HTML**.
+`/api/auth/nonce/` — jedyna z nich nieimportująca `firebaseAdmin.ts` —
+zwracała 200. Użytkownik widział „Server sign-in is not configured yet".
 
 **Czego już nie jest to warte sprawdzania (sprawdzone, wykluczone):**
 

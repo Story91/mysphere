@@ -250,6 +250,134 @@ service cloud.firestore {
       // Kasowanie postepu = kasowanie limitu prob. Nigdy.
       allow delete: if false;
     }
+
+    // ========================================================================
+    // ASKI - pytanie z budzetem, liczba miejsc i terminem
+    // ========================================================================
+    // Samo pytanie jest JAWNE od poczatku. Zapieczetowane sa ODPOWIEDZI, i to
+    // one maja tu trzy osobne reguly (patrz dwie sekcje nizej).
+    //
+    // Najwazniejsze, czego te reguly pilnuja: `budget`, `seats` i `deadline` sa
+    // NIEZMIENNE po utworzeniu. Ask, ktoremu mozna obnizyc budzet albo cofnac
+    // termin po tym, jak ktos juz napisal odpowiedz, zamienia caly mechanizm w
+    // darmowa prace - a to jest dokladnie ryzyko, ktore Ask przenosi na
+    // piszacego (app/utils/asks/types.ts).
+    match /asks/{askId} {
+      function isAddr(v) {
+        return v is string && v.matches('^0x[0-9a-fA-F]{40}$');
+      }
+
+      // Feed czyta Aski tak samo jak posty.
+      allow read: if true;
+
+      allow create: if isAddr(request.resource.data.author)
+                    && request.resource.data.question is string
+                    && request.resource.data.question.size() > 0
+                    && request.resource.data.question.size() <= 500
+                    && request.resource.data.budget is number
+                    && request.resource.data.budget > 0
+                    && request.resource.data.seats is int
+                    && request.resource.data.seats >= 1
+                    && request.resource.data.seats <= 20
+                    && request.resource.data.perAnswer is number
+                    && request.resource.data.token is string
+                    && request.resource.data.network is string
+                    // Termin w przeszlosci daje Aska martwego w chwili narodzin.
+                    && request.resource.data.deadline is number
+                    && request.resource.data.deadline > request.time.toMillis()
+                    && request.resource.data.status == 'open'
+                    // `escrowed` nie istnieje - nie ma kontraktu, ktory by go
+                    // dotrzymal. Zapisanie tej wartosci byloby obietnica bez
+                    // pokrycia wypisana wprost w bazie.
+                    && request.resource.data.funding == 'on-resolve'
+                    && request.resource.data.answerCount == 0
+                    && request.resource.data.acceptedCount == 0;
+
+      allow update: if request.resource.data.author == resource.data.author
+                    && request.resource.data.question == resource.data.question
+                    && request.resource.data.budget == resource.data.budget
+                    && request.resource.data.seats == resource.data.seats
+                    && request.resource.data.deadline == resource.data.deadline
+                    && request.resource.data.funding == resource.data.funding
+                    // Liczniki tylko w gore i nigdy ponad liczbe miejsc.
+                    && request.resource.data.answerCount is number
+                    && request.resource.data.answerCount >= resource.data.answerCount
+                    && request.resource.data.acceptedCount is number
+                    && request.resource.data.acceptedCount >= resource.data.acceptedCount
+                    && request.resource.data.acceptedCount <= resource.data.seats
+                    // Rozstrzygniecie jest jednokierunkowe: Ask raz zamkniety
+                    // nie moze wrocic do `open`, bo `resolve rate` autora
+                    // przestalby cokolwiek znaczyc.
+                    && (resource.data.status != 'resolved'
+                        || request.resource.data.status == 'resolved');
+
+      // Skasowany Ask to skasowana historia rozstrzygalnosci.
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // METADANE ODPOWIEDZI - jawne jest TO, ZE ktos odpowiedzial
+    // ========================================================================
+    // Karta ma pokazywac "7 answers sealed until resolve", wiec liczba i autorzy
+    // sa publiczni. Sama tresc mieszka gdzie indziej (sekcja nizej).
+    //
+    // TWORZY JE WYLACZNIE SERWER (POST /api/asks/answers). Klient nie ma jak
+    // zapisac odpowiedzi poprawnie, bo tresc musi w tym samym kroku trafic do
+    // `askAnswerContent`, gdzie przegladarka nie siega. Dopuszczenie zapisu
+    // z klienta dawaloby metadane bez tresci - odpowiedz widoczna w liczniku
+    // i pusta przy rozstrzygnieciu.
+    match /askAnswers/{answerId} {
+      allow read: if true;
+
+      allow create, delete: if false;
+
+      // Jedyna zmiana dopuszczalna z przegladarki: przyjecie odpowiedzi wraz
+      // z DOWODEM wyplaty. Bez hasha "przyjeta" jest samym slowem, a caly
+      // produkt stoi na tym, ze kwoty da sie sprawdzic (patrz acceptAnswer).
+      allow update: if request.resource.data.askId == resource.data.askId
+                    && request.resource.data.author == resource.data.author
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && resource.data.accepted == false
+                    && request.resource.data.accepted == true
+                    && request.resource.data.payoutTxHash is string
+                    && request.resource.data.payoutTxHash.size() == 66;
+    }
+
+    // ========================================================================
+    // TRESC ODPOWIEDZI - przegladarka nie ma tu wstepu WCALE
+    // ========================================================================
+    // Druga kolekcja w tym pliku zamknieta calkowicie, z tego samego powodu co
+    // `premiumContent`: feed czyta Firestore klienckim SDK, wiec dopoki tresc
+    // siedzi w dokumencie odpowiedzi, kazdy widzi ja w ruchu sieciowym. Zaslona
+    // w UI to nie zapieczetowanie. Manifest obiecuje, ze odpowiedzi sa "sealed
+    // until you resolve: nobody can read what anyone else wrote, so nobody can
+    // rewrite it slightly and take a seat with it" - a tego nie da sie dotrzymac
+    // po stronie klienta.
+    //
+    // Czyta i pisze wylacznie serwer klientem administracyjnym (firebase-admin),
+    // ktory reguly omija z definicji. Wydaje ja GET /api/asks/{id}/answers po
+    // sprawdzeniu jednego z trzech warunkow: Ask jest `resolved`, pytajacy jest
+    // autorem Aska, albo pyta o wlasna odpowiedz.
+    //
+    // ---------------------------------------------------------------------
+    // UWAGA, KTORA MUSI TU STAC: `if false` DZIS NIE WYSTARCZA
+    // ---------------------------------------------------------------------
+    // Na koncu tego pliku stoi `match /{document=**} { allow read, write: if
+    // true; }`. Firestore przyznaje dostep, gdy pozwala JAKAKOLWIEK pasujaca
+    // regula, a rekursywny wildcard pasuje do KAZDEGO dokumentu w bazie -
+    // takze do `askAnswerContent` i do `premiumContent`. Naglowek tego pliku
+    // mowi, ze "sciezki sa rozlaczne"; z regula `{document=**}` rozlaczne nie
+    // sa. Dopoki tam stoi, obie te kolekcje sa czytelne dla przegladarki mimo
+    // `if false`.
+    //
+    // Zamkniecie wymaga zawezenia tamtej reguly do wyliczonej listy istniejacych
+    // kolekcji (posts, users, comments, likes, tips, ...), czyli zmiany, ktora
+    // dotyka calej dzialajacej aplikacji i nie miesci sie w tej zmianie. Do tego
+    // czasu jedyna realna bramka na tresci odpowiedzi jest trasa serwerowa.
+    match /askAnswerContent/{answerId} {
+      allow read, write: if false;
+    }
+
     // ========================================================================
     // ISTNIEJACE KOLEKCJE - NADAL OTWARTE
     // ========================================================================
