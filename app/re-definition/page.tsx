@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 // @ts-ignore - config CommonJS wspoldzielony z next.config.js
-import { isRouteDisabled } from '@/config/routeStatus';
+import { DISABLED_ROUTES } from '@/config/routeStatus';
 
 export const metadata: Metadata = {
   title: 'Re-Definition — money buys judgment on MySphere',
@@ -25,9 +25,14 @@ export const metadata: Metadata = {
  * byla i slusznie zostala zjechana). To jest manifest kierunku: jednostka
  * produktu przestaje byc post, a zaczyna byc post ze stawka.
  *
- * Sekcja "What runs today" nadal czyta `isRouteDisabled` z config/routeStatus.js,
- * czyli z DOKLADNIE tej samej listy, ktora generuje przekierowania w
- * next.config.js. Strona nie moze wiec sklamac o tym, co jest wlaczone.
+ * Sekcja "What runs today" bierze liczbe zaparkowanych modulow WPROST z
+ * `DISABLED_ROUTES` w config/routeStatus.js - z DOKLADNIE tej samej listy,
+ * ktora generuje przekierowania w next.config.js. Nie z wlasnej listy
+ * przefiltrowanej przez `isRouteDisabled()`, bo to nie jest czytanie zrodla
+ * prawdy: taka lista raz juz sie rozjechala i manifest podawal szesc zamiast
+ * osmiu. Sam opis modulow ponizej jest pisany recznie - gdy dojdzie kolejny
+ * wpis do DISABLED_ROUTES, liczba zaktualizuje sie sama, a wyliczenie w
+ * zdaniu trzeba dopisac.
  */
 
 /* ------------------------------------------------------------------ */
@@ -242,11 +247,18 @@ function CapabilityRow({ cap }: { cap: (typeof CAPABILITIES)[number] }) {
 /* ------------------------------------------------------------------ */
 
 export default function ReDefinitionPage() {
-  // Prawda o wylaczonych trasach bierze sie z konfiguracji przekierowan,
-  // nie z recznej listy - strona nie moze rozjechac sie z produkcja.
-  const parked = ['/mycamp', '/base', '/marketplace', '/basemorning', '/yapscan', '/swap'].filter(
-    (path) => isRouteDisabled(path)
-  ).length;
+  // Liczba WPROST z konfiguracji przekierowan.
+  //
+  // Wczesniej stala tu wlasna lista szesciu sciezek przefiltrowana przez
+  // isRouteDisabled - z komentarzem obiecujacym, ze strona "nie moze rozjechac
+  // sie z produkcja". Mogla i rozjechala sie: DISABLED_ROUTES ma osiem pozycji,
+  // bo doszly '/MyAgents' i '/MyClaw', a lista tutaj ich nie znala. Manifest
+  // podawal wiec liczbe mniejsza od prawdy - na stronie, ktorej cala teza brzmi
+  // "no promises, only state".
+  //
+  // Filtrowanie wlasnej listy przez isRouteDisabled() nie jest czytaniem
+  // zrodla prawdy. Czytaniem zrodla prawdy jest wziecie samego zrodla.
+  const parked = DISABLED_ROUTES.length;
 
   return (
     <main className="min-h-screen bg-soft-bg font-soft">
@@ -460,9 +472,10 @@ export default function ReDefinitionPage() {
           </div>
           <p className="mt-7 text-[14px] leading-[1.7] text-soft-ink-soft">
             {parked} older modules — the minting camp, the identity page, the marketplace, the
-            morning game, the attention scanner, the swap widget — are parked. They were surface
-            area, not a product. Everything that mattered in them was one address doing something
-            another address could verify, and that is exactly what an Ask is.
+            morning game, the attention scanner, the swap widget, the agent directory, the skills
+            catalogue — are parked. They were surface area, not a product. Everything that mattered
+            in them was one address doing something another address could verify, and that is
+            exactly what an Ask is.
           </p>
         </section>
 
