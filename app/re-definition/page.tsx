@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Your judgment has a price. Something is already willing to pay it.',
     description:
-      'Ask: a post with a budget, seats and a deadline. Paid in USDC on Base — by a person, or by an agent over x402.',
+      'Ask: a question with a budget, seats and a deadline, paid in USDC on Base. In build — what runs today is listed on the page.',
     type: 'article',
   },
 };
@@ -24,6 +24,19 @@ export const metadata: Metadata = {
  * To NIE jest changelog ani rejestr wylaczonych modulow (poprzednia wersja nim
  * byla i slusznie zostala zjechana). To jest manifest kierunku: jednostka
  * produktu przestaje byc post, a zaczyna byc post ze stawka.
+ *
+ * === TRZY CZASY, ROZDZIELONE ===
+ * Manifest opisywal Aska w czasie terazniejszym ("The unit is not a post. It
+ * is an Ask."), a obok stal rysunek z wymyslonymi danymi. Wlasciciel przeczytal
+ * to i nie byl w stanie odroznic tego, co dziala, od tego, czego nie ma - bo
+ * strona niczym tego nie odrozniala. Definicje pisze sie w czasie
+ * terazniejszym i te naglowki zostaja, ale kazda sekcja o Asku dostaje pod
+ * naglowkiem jedna linijke (komponent `State`) mowiaca, czy to stan, budowa,
+ * czy kierunek. Blok trzech kolumn w bohaterze mowi to samo zbiorczo, ZANIM
+ * czytelnik dojdzie do pierwszego zdania w czasie terazniejszym.
+ *
+ * Zasada: teza zostaje niezmieniona, zmienia sie tylko czas gramatyczny wokol
+ * niej. Slabsza teza nie jest uczciwsza - jest tylko slabsza.
  *
  * Sekcja "What runs today" bierze liczbe zaparkowanych modulow WPROST z
  * `DISABLED_ROUTES` w config/routeStatus.js - z DOKLADNIE tej samej listy,
@@ -85,25 +98,74 @@ function Hi({ children }: { children: React.ReactNode }) {
   return <strong className="font-semibold text-soft-ink">{children}</strong>;
 }
 
+/**
+ * Czas sekcji, postawiony ZARAZ POD naglowkiem.
+ *
+ * Manifest jest pisany w czasie terazniejszym, bo tak sie pisze definicje -
+ * i wlasnie dlatego czytelnik bral opis Aska za opis produktu. Naglowki
+ * zostaja, ale kazdy dostaje jedna linijke mowiaca, o czym on wlasciwie jest:
+ * o tym, co dziala, o tym, co powstaje, czy o kierunku. Bez tego zdanie "the
+ * unit is not a post, it is an Ask" i zdanie "every tip has its own page"
+ * wygladaja identycznie, a jedno z nich jest prawda od miesiecy, a drugie
+ * planem sprzed tygodnia.
+ */
+function State({ tone, children }: { tone: 'live' | 'building' | 'direction'; children: React.ReactNode }) {
+  const style =
+    tone === 'live'
+      ? { dot: 'bg-soft-accent', text: 'text-soft-accent-deep' }
+      : tone === 'building'
+        ? { dot: 'bg-soft-primary', text: 'text-soft-primary-deep' }
+        : { dot: 'border border-soft-line-strong bg-transparent', text: 'text-soft-ink-faint' };
+
+  return (
+    <p
+      className={`mb-5 flex items-start gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] ${style.text}`}
+    >
+      <span className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
+      <span className="leading-[1.5]">{children}</span>
+    </p>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Element sygnaturowy: karta Aska                                    */
 /* ------------------------------------------------------------------ */
 
 /**
- * Jedyny bogaty wizualnie obiekt na stronie - i celowo jedyny. To dokladnie
- * ten obiekt, ktory ma sie pojawic w feedzie, wiec manifest pokazuje produkt,
- * a nie ilustracje produktu. Statyczny: odliczanie jest etykieta, nie zegarem,
- * bo strona ma zostac serwerowa i zerojavascriptowa.
+ * RYSUNEK karty Aska - nie zrzut z produktu.
+ *
+ * Poprzednia wersja tego komentarza twierdzila, ze "manifest pokazuje produkt,
+ * a nie ilustracje produktu". To bylo nieprawda i wlasnie ta nieprawda
+ * zdezorientowala czytelnika: kazda liczba tutaj jest wymyslona. Nie ma adresu
+ * vault.base.eth z takim wynikiem, nie ma tych siedmiu odpowiedzi, zaden Ask
+ * nigdy nie zostal wystawiony. Model danych powstal dopiero dzis
+ * (app/utils/asks) i ta karta nie czyta z niego ani jednego pola.
+ *
+ * Rysunek pogladowy jest w porzadku. Rysunek udajacy rzeczywistosc nie jest.
+ * Dlatego zastrzezenie stoi NAD karta, jest czescia podpisu (figure /
+ * figcaption), a nie drobnym drukiem pod spodem - i rama karty jest
+ * przerywana, zeby bylo to widac, zanim ktokolwiek przeczyta etykiete.
+ *
+ * Statyczny: odliczanie jest etykieta, nie zegarem, bo strona ma zostac
+ * serwerowa i zerojavascriptowa.
  */
 function AskCard() {
   return (
-    <div className="relative">
+    <figure className="relative m-0">
+      <figcaption className="mb-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+        <span className="rounded-pill border border-dashed border-soft-line-strong px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-soft-ink-faint">
+          Drawing
+        </span>
+        <span className="text-[11px] leading-[1.5] text-soft-ink-faint">
+          Not a screenshot. Every number below is invented.
+        </span>
+      </figcaption>
       {/* Poswiata odpowiada stanowi "otwarty" - bursztyn, nie blekit. */}
       <div
         className="pointer-events-none absolute -inset-6 rounded-[28px] bg-soft-accent/[0.07] blur-2xl"
         aria-hidden="true"
       />
-      <article className="relative overflow-hidden rounded-card border border-soft-line bg-soft-surface shadow-card">
+      <article className="relative overflow-hidden rounded-card border border-dashed border-soft-line-strong bg-soft-surface shadow-card">
         <div className="flex items-center justify-between border-b border-soft-line/70 bg-soft-accent/[0.06] px-5 py-2.5">
           <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-soft-accent-deep">
             <span className="h-1.5 w-1.5 rounded-full bg-soft-accent" aria-hidden="true" />
@@ -153,10 +215,11 @@ function AskCard() {
           </div>
         </div>
       </article>
-      <p className="mt-3 text-center text-[11px] text-soft-ink-faint">
-        Preview of the Ask card. Not live yet.
+      <p className="mt-3 text-[11px] leading-[1.6] text-soft-ink-faint">
+        No Ask has ever been posted. What landed today is the data model behind this card — the
+        card itself reads nothing from it.
       </p>
-    </div>
+    </figure>
   );
 }
 
@@ -164,12 +227,23 @@ function AskCard() {
 /*  Co dziala dzisiaj                                                  */
 /* ------------------------------------------------------------------ */
 
-type Status = 'live' | 'wired' | 'building' | 'off';
+/**
+ * `planned` dopisane celowo. Bez niego tabela miala tylko rzeczy dzialajace,
+ * pisane albo wylaczone - a najwazniejsza brakujaca czesc Aska (escrow) nie
+ * miescila sie w zadnej z tych szuflad i przez to nie bylo jej na liscie
+ * wcale. Kropka jest pusta, bo nic za nia jeszcze nie stoi.
+ */
+type Status = 'live' | 'wired' | 'building' | 'planned' | 'off';
 
 const STATUS_STYLE: Record<Status, { dot: string; text: string; label: string }> = {
   live: { dot: 'bg-soft-accent', text: 'text-soft-accent-deep', label: 'live' },
   wired: { dot: 'bg-soft-accent', text: 'text-soft-accent-deep', label: 'wired, switch off' },
   building: { dot: 'bg-soft-primary', text: 'text-soft-primary-deep', label: 'building' },
+  planned: {
+    dot: 'border border-soft-line-strong bg-transparent',
+    text: 'text-soft-ink-faint',
+    label: 'not built',
+  },
   off: { dot: 'bg-soft-line-strong', text: 'text-soft-ink-faint', label: 'switched off' },
 };
 
@@ -220,9 +294,19 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
     note: 'Endpoints already speak 402. Enforcement turns on the moment a payout address is set.',
   },
   {
-    name: 'Ask',
+    name: 'Ask: data model',
     status: 'building',
-    note: 'Budget, seats, deadline, sealed answers, USDC payout with a receipt anyone can check.',
+    note: 'Landed today. Budget, seats, deadline, resolve rate, and answers sealed by a rule the client cannot read past.',
+  },
+  {
+    name: 'Ask: in the feed',
+    status: 'building',
+    note: 'Routes and the composer are being written now. Nothing about an Ask is visible in the feed yet.',
+  },
+  {
+    name: 'Ask: escrow',
+    status: 'planned',
+    note: 'Money locked at creation needs a contract that does not exist. The first version pays at resolve instead.',
   },
 ];
 
@@ -298,6 +382,35 @@ export default function ReDefinitionPage() {
                 How an Ask works
               </a>
             </div>
+
+            {/* TRZY CZASY, ROZDZIELONE NA GORZE.
+                Cala reszta strony opisuje Aska w czasie terazniejszym, bo tak
+                sie pisze definicje. Czytelnik ma prawo wziac to za stan
+                produktu - i wzial. Ten blok stoi przed pierwszym takim zdaniem
+                i mowi, ktore zdania sa o czym. */}
+            <dl className="mt-9 grid gap-y-4 border-t border-soft-line/70 pt-6 sm:grid-cols-3 sm:gap-x-6">
+              {[
+                {
+                  t: 'Runs today',
+                  d: 'Posts, tips, receipts and a public timeline of payments. Every amount settled onchain.',
+                },
+                {
+                  t: 'Being built',
+                  d: 'The Ask. Data model and sealed answers landed today. Nothing of it is in the feed yet.',
+                },
+                {
+                  t: 'Direction',
+                  d: 'Escrow, machine buyers over x402, and a price per seat set by settled payments.',
+                },
+              ].map((item) => (
+                <div key={item.t}>
+                  <dt className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-soft-ink-faint">
+                    {item.t}
+                  </dt>
+                  <dd className="text-[13px] leading-[1.55] text-soft-ink-soft">{item.d}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
           <AskCard />
@@ -343,9 +456,11 @@ export default function ReDefinitionPage() {
         <section id="ask" className="scroll-mt-8 py-16">
           <Marker amount="$2.00" label="one seat, one answer" />
           <H2>The unit is not a post. It is an Ask.</H2>
+          <State tone="building">Being built — this section is a design</State>
           <P>
-            An Ask is a question with a budget, a number of seats and a deadline. You set all three,
-            fund it once in USDC, and it appears in the feed as a card that counts down.
+            An Ask is a question with a budget, a number of seats and a deadline. You set all three
+            and it appears in the feed as a card that counts down. That is the definition, and the
+            feed does not do it yet.
           </P>
           <P>
             Answers stay <Hi>sealed until you resolve</Hi>. Nobody can read what anyone else wrote,
@@ -354,10 +469,25 @@ export default function ReDefinitionPage() {
             Basescan. Then all answers open at once.
           </P>
           <P>
+            One part of that stopped being a drawing today. Answer text does not sit inside the Ask.
+            It goes to <Hi>its own collection the app is forbidden to read</Hi> — the rule is
+            literally <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">if false</code> — and only a server route hands it
+            back, to the people allowed to have it. Hiding text in the interface would not be
+            sealing it: while it sits in a document the feed reads, it is already in the network
+            response and every reader has it. Paid sections already work exactly this way; the Ask
+            reuses that plumbing rather than inventing its own.
+          </P>
+          <P>
             Let the deadline pass without resolving and unclaimed seats return to you, minus fee —
             and your <Hi>resolve rate</Hi> drops in public, on the front of every Ask you post
             afterwards. Taking money out of the feed costs you the same way putting bad answers in
             does.
+          </P>
+          <P>
+            One promise here is not kept yet. Funding an Ask once, up front, needs an escrow
+            contract, and <Hi>there is no such contract</Hi>. The first version pays at resolve
+            instead: the author sends USDC to each accepted answer and the hash is stored beside it
+            forever. Weaker, and named below rather than dressed up.
           </P>
         </section>
 
@@ -365,6 +495,9 @@ export default function ReDefinitionPage() {
         <section className="py-16">
           <Marker amount="402" label="payment required" />
           <H2>The buyer does not have to be human</H2>
+          <State tone="building">
+            Rails wired — the Ask endpoint they point at is still being written
+          </State>
           <P>
             An agent has no browser, no wallet popup and no account. What it does have is money and
             a standard for spending it. On Base, that standard is x402: the resource answers a
@@ -388,6 +521,9 @@ export default function ReDefinitionPage() {
         <section className="py-16">
           <Marker amount="$340" label="the only score that costs money" />
           <H2>Reputation you cannot buy, because it is not for sale</H2>
+          <State tone="direction">
+            Direction — resolve rate is in the model, the rest is not built
+          </State>
           <P>
             Both sides carry the same object. As an answerer:{' '}
             <Hi>earned, answers accepted, accept rate</Hi>. As an asker:{' '}
@@ -410,6 +546,9 @@ export default function ReDefinitionPage() {
         <section className="py-16">
           <Marker amount="/u/" label="one page, two readers" />
           <H2>A profile that is a CV and a receipt at once</H2>
+          <State tone="direction">
+            Page is live and counts tips — the answer figures below need Asks first
+          </State>
           <P>
             One public page per address, readable by a person and by a crawler:{' '}
             <Hi>earned $340 across 112 answers, 91% accepted</Hi>. Nothing on it is self-reported.
@@ -422,6 +561,7 @@ export default function ReDefinitionPage() {
         <section className="py-16">
           <Marker amount="0x…" label="the part that travels" />
           <H2>A receipt spreads. A screenshot does not.</H2>
+          <State tone="live">Running today — every line below is checkable onchain</State>
           <P>
             Every tip already has its own page and its own share card: the amount, both names,
             the transaction. Paste it anywhere and the preview shows the number before anyone
@@ -460,9 +600,11 @@ export default function ReDefinitionPage() {
         <section className="py-16">
           <Marker amount="today" label="no promises, only state" />
           <H2>What runs right now</H2>
+          <State tone="live">Today, not the plan</State>
           <P>
-            Everything below is checked against the live routing config when this page is built, so
-            it cannot drift from production.
+            The count of parked modules is read from the live routing config when this page is
+            built, so that number cannot drift from production. The rows are written by hand,
+            status included — which is why three of them say the Ask is not finished.
           </P>
           <div className="mt-8">
             {CAPABILITIES.map((cap) => (
@@ -490,11 +632,26 @@ export default function ReDefinitionPage() {
             traders paying humans.
           </P>
           <P>
-            Money is held briefly, in small amounts, at an address published in the app, for at most
-            seven days. No fiat, no custody of your keys, no investment advice categories. If the
-            answers turn out to be slop, the product dies of quality and no amount of onchain
-            plumbing saves it — so seats are limited, wallets have to be older than a week or carry
-            a Basename, and accept rate gates the money.
+            The biggest hole is <Hi>escrow, and it is missing</Hi>. Funding an Ask up front means
+            the money is locked the moment it is posted, and no contract in this repo locks
+            anything. So in the first version the order is reversed: you answer, then you get paid —
+            or you do not, because the author went quiet and nothing onchain stops them. The whole
+            risk of an Ask sits on the person doing the work.
+          </P>
+          <P>
+            What stands in for the lock is the <Hi>resolve rate</Hi>: the share of Asks an author
+            actually settled, counted only over Asks whose deadline has already passed, printed on
+            the front of every Ask they post next. That is a reputation cost, not a guarantee.
+            Answering someone with no history means trusting a person rather than a contract, which
+            is why a seat starts at fifty cents and not at fifty dollars. Escrow is the next thing
+            that has to exist, and until it does, this page will not call it done.
+          </P>
+          <P>
+            Nothing is held in the meantime — payment goes wallet to wallet at resolve. No fiat, no
+            custody of your keys, no investment advice categories, and the longest an Ask can stay
+            open is seven days. If the answers turn out to be slop, the product dies of quality and
+            no amount of onchain plumbing saves it — so seats are limited, wallets have to be older
+            than a week or carry a Basename, and accept rate gates the money.
           </P>
         </section>
 

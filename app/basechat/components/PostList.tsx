@@ -329,6 +329,56 @@ const NetworkBadge = ({ network, size }: { network?: string | null; size: Networ
   );
 };
 
+// ===== PASEK AKCJI POD POSTEM =====
+// Jedna definicja rozmiaru dla KAZDEJ pozycji paska. Wczesniej mieszaly sie tu
+// trzy miary naraz i najlepiej bylo to widac na telefonie:
+//   - Share niosl napis na kazdej szerokosci, wiec byl dwa razy szerszy od reszty,
+//   - Tip i Support chowaly swoje napisy dopiero od `md`, czyli w innym miejscu,
+//   - Support ponizej `md` pokazywal emoji (💜/🤝) zamiast ikony wektorowej,
+//     a emoji ma inna wysokosc linii niz svg i podnosilo caly rzad.
+//
+// 16px na ikone to rozmiar, ktory kazdy wektor w tym pasku juz mial - zmienia sie
+// nie ikona, tylko pole wokol niej.
+const ACTION_ICON = 'w-4 h-4 flex-shrink-0';
+
+// 40x40 to minimum pola dotykowego. Ikona ma 16px, wiec bez `min-h`/`min-w`
+// przycisk mierzyl ~28px wysokosci - trafialo sie w niego kciukiem na wyczucie.
+const ACTION_ITEM =
+  'inline-flex items-center justify-center gap-1.5 min-h-[40px] min-w-[40px] px-2 rounded-pill font-soft text-[12.5px] font-semibold ' +
+  'transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong ' +
+  'hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] ' +
+  'outline-none focus-visible:ring-2 focus-visible:ring-soft-primary';
+
+// Ponizej `sm` zostaje sama ikona. Kazda pozycja ma `aria-label`, wiec czytnik
+// ekranu nie traci na tym nic - traci tylko szerokosc, ktorej na 320px nie ma.
+const ACTION_LABEL = 'hidden sm:inline';
+
+// TipButton i SubscribeButton mieszkaja w osobnych plikach i same decyduja
+// o swoim wnetrzu.
+//
+// Przez chwile dorownywalismy je STAD, selektorami potomnymi po ich strukturze
+// (`[&>span:last-child]:hidden`, `[&>svg]:block`, `[&>*+*]:!ml-0`). Dzialalo,
+// ale wiazalo wyglad calego paska z tym, ze pierwszym dzieckiem tamtych
+// przyciskow jest akurat `span` - czyli dowolna zmiana w ICH srodku psulaby
+// uklad TUTAJ, bez zadnego sygnalu.
+//
+// Prog zostal wiec ustawiony U ZRODLA: oba komponenty maja juz `hidden
+// sm:inline` na swoich napisach, ten sam co ACTION_LABEL wyzej. Zostaje
+// wylacznie wyrownanie pola dotykowego i rozmiaru ikony, ktore nie zaglada
+// w cudza strukture.
+const ACTION_ITEM_EXTERNAL =
+  `${ACTION_ITEM} text-soft-ink-soft hover:!text-soft-primary-deep`;
+
+// Support ma wlasny `space-x-1`; `gap` z ACTION_ITEM wystarcza, wiec zerujemy
+// odstep miedzy dziecmi. To jedyne, co jeszcze siega do srodka - i jest
+// niegrozne, bo dotyczy odstepu, nie widocznosci.
+const ACTION_ITEM_SUPPORT = `${ACTION_ITEM_EXTERNAL} [&>*+*]:!ml-0`;
+
+// Przypiecie za oplata zostaje pelnym, nazwanym przyciskiem - to jedyna pozycja
+// paska, ktora kosztuje, pojawia sie wylacznie pod wlasnym postem i bez napisu
+// bylaby zagadka (korona i dolar). Dorownujemy jej wysokosc i rozmiar ikon.
+const ACTION_ITEM_PAID = 'min-h-[40px] [&_svg]:w-4 [&_svg]:h-4';
+
 // ===== SIEC POSTA / KOMENTARZA =====
 // Ten sam lancuch if-ow byl wczesniej przepisany osobno w handleAddComment
 // i w handleAddReply - rozjechanie sie ich znaczylo cicho zla odznake.
@@ -1135,6 +1185,10 @@ function PostList({
     }
   };
 
+  // UWAGA: od czasu, gdy obserwowanie jest plusem na awatarze, feed sam z siebie
+  // NIE cofa obserwowania - `+` znika, kiedy juz obserwujesz, wiec nie ma tu czego
+  // klikac. Cofniecie zyje w BuilderProfile i w liscie Following. Handler zostaje
+  // nietkniety i gotowy, bo to logika, a nie warstwa wizualna.
   const handleUnfollowUser = async (targetUserAddress: string) => {
     if (!address || targetUserAddress === address) return;
     
@@ -1888,7 +1942,7 @@ function PostList({
             `min-w-0` + `overflow-hidden` na kolumnie: dlugie nazwy i adresy
             przycinaja sie zamiast rozpychac karte przy 320px. */}
         <div className="flex items-start gap-2.5 mb-2.5">
-          <div className="flex-shrink-0">
+          <div className="relative flex-shrink-0">
             {userNames[post.author]?.avatar ? (
               <img
                 src={userNames[post.author].avatar}
@@ -1897,6 +1951,37 @@ function PostList({
               />
             ) : (
               <CoinbaseAvatar address={post.author as `0x${string}`} className="w-9 h-9 rounded-full" />
+            )}
+
+            {/* Obserwowanie SIEDZI NA AWATARZE, a nie w pasku akcji.
+                Wczesniej byl to pelnowymiarowy przycisk z napisem "Follow" -
+                piata pozycja w rzedzie, ktory na telefonie i tak zawijal sie do
+                drugiej linii, i jedyna pozycja paska, ktora nie dotyczy POSTA,
+                tylko jego autora. Teraz stoi przy twarzy autora, czyli tam,
+                gdzie sie na niego patrzy, i zajmuje 18px zamiast ~90px.
+
+                Znika, gdy juz obserwujesz: `+` to gest DODANIA, nie przelacznik.
+                Cofniecie obserwowania zyje na profilu autora i w liscie Following.
+
+                `before:-inset-[11px]` daje 40x40 pola dotykowego wokol
+                18-pikselowego znaczka, nie powiekszajac tego, co widac. */}
+            {address && post.author !== address && !followingStatus[post.author] && (
+              <button
+                type="button"
+                onClick={() => handleFollowUser(post.author)}
+                disabled={followLoading[post.author]}
+                title="Follow"
+                aria-label={`Follow ${userNames[post.author]?.name || `${(post.author || '').slice(0, 6)}...${(post.author || '').slice(-4)}`}`}
+                className="absolute -bottom-0.5 -right-0.5 grid h-[18px] w-[18px] place-items-center rounded-full bg-soft-primary text-white ring-2 ring-soft-surface shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.9] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface disabled:opacity-60 before:absolute before:-inset-[11px] before:content-['']"
+              >
+                {followLoading[post.author] ? (
+                  <span className="block w-2.5 h-2.5 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
+                ) : (
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 5v14M5 12h14" />
+                  </svg>
+                )}
+              </button>
             )}
           </div>
 
@@ -2384,78 +2469,39 @@ function PostList({
         )}
 
         {/* Pasek akcji: CICHY, dopoki sie w niego nie celuje.
-            Wszystkie pozycje maja teraz ten sam kolor spoczynkowy (ink-soft),
-            ten sam skok na hover (tlo sunken + primary) i te sama wysokosc
-            klikalnego pola. Wczesniej mieszaly sie tu trzy wagi i pelny,
-            fioletowy przycisk "Follow" - w kazdej karcie w feedzie.
+            Wszystkie pozycje maja ten sam kolor spoczynkowy (ink-soft), ten sam
+            skok na hover (tlo sunken + primary), te sama ikone 16px i to samo
+            pole klikalne 40x40 - patrz ACTION_ITEM / ACTION_ICON u gory pliku.
+            Ponizej `sm` zostaja SAME IKONY; napisy wracaja od `sm` w gore.
+            "Follow" wyprowadzony stad na awatar autora.
             `flex-wrap`: przy 320px pasek schodzi do drugiej linii zamiast
             rozpychac karte w bok. */}
-        <div className="flex flex-wrap items-center gap-x-0.5 gap-y-1 font-soft text-soft-ink-soft mt-3 pt-2.5 border-t border-soft-line">
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-1 font-soft text-soft-ink-soft mt-3 pt-1.5 border-t border-soft-line">
           <button
             onClick={() => handleToggleLike(post.id)}
-            className={`flex items-center gap-1.5 rounded-pill px-2 py-1.5 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 ${isLiked ? 'text-soft-primary-deep' : ''}`}
+            className={`${ACTION_ITEM} disabled:opacity-50 ${isLiked ? 'text-soft-primary-deep' : ''}`}
             disabled={!isConnected}
             aria-pressed={!!isLiked}
             aria-label={`${isLiked ? 'Unlike' : 'Like'} post (${post.likes || 0})`}
           >
-            <svg className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg className={ACTION_ICON} fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
-            <span className="text-[12.5px] font-semibold tabular-nums">{post.likes || 0}</span>
+            {/* Licznik to nie napis, tylko tresc akcji - zostaje na kazdej szerokosci. */}
+            <span className="tabular-nums">{post.likes || 0}</span>
           </button>
 
           <button
             onClick={() => setExpandedComments(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
-            className="flex items-center gap-1.5 rounded-pill px-2 py-1.5 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className={ACTION_ITEM}
             aria-expanded={!!expandedComments[post.id]}
             aria-label={`Comments (${commentCount})`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg className={ACTION_ICON} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <span className="text-[12.5px] font-semibold tabular-nums">{commentCount}</span>
+            <span className="tabular-nums">{commentCount}</span>
           </button>
-
-          {/* FOLLOW BUTTON - Show only if not author and user is connected */}
-          {address && post.author !== address && (
-            <button
-              onClick={() => {
-                const isCurrentlyFollowing = followingStatus[post.author];
-                if (isCurrentlyFollowing) {
-                  handleUnfollowUser(post.author);
-                } else {
-                  handleFollowUser(post.author);
-                }
-              }}
-              disabled={followLoading[post.author]}
-              className={`flex items-center gap-1.5 font-soft text-[12.5px] font-semibold px-2 py-1.5 rounded-pill transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
-                followingStatus[post.author]
-                  ? 'text-soft-ink-soft'
-                  : 'text-soft-primary-deep'
-              } ${followLoading[post.author] ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {followLoading[post.author] ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                  <span>Loading...</span>
-                </>
-              ) : followingStatus[post.author] ? (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  <span>Following</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span>Follow</span>
-                </>
-              )}
-            </button>
-          )}
 
           {/* 💰 Paid Pin Button - Show for non-pinned posts */}
           <PaidPinButton
@@ -2463,6 +2509,7 @@ function PostList({
             postContent={post.content}
             authorAddress={post.author}
             isPinned={!!post.isPinned}
+            className={ACTION_ITEM_PAID}
             onPinSuccess={(txHash: string, duration: PinDuration) => {
               if (onPinPending) {
                 onPinPending(post.id, txHash, duration);
@@ -2474,7 +2521,7 @@ function PostList({
           <TipButton
             recipientAddress={post.author}
             postId={post.id}
-            className="px-2 py-1.5 text-soft-ink-soft hover:bg-soft-sunken"
+            className={ACTION_ITEM_EXTERNAL}
           />
 
           {/* Udostepnianie STOI W PASKU AKCJI, obok polubienia i tipa.
@@ -2488,12 +2535,14 @@ function PostList({
             rel="noopener noreferrer"
             aria-label="Open this post on its own page to share it"
             title="Share"
-            className="flex items-center gap-1.5 rounded-pill px-2 py-1.5 font-soft text-[12.5px] font-semibold text-soft-ink-soft transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className={ACTION_ITEM}
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <svg className={ACTION_ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Share
+            {/* Napis chowal sie tu jako JEDYNY nigdy - obok Tipa i Supportu,
+                ktore ponizej `sm` sa samymi ikonami, Share byl dwa razy szerszy. */}
+            <span className={ACTION_LABEL}>Share</span>
           </a>
 
           {/* 🤝 Wsparcie tworcy na okres - platnosc Z GORY, bez odnawiania.
@@ -2503,7 +2552,7 @@ function PostList({
             creatorName={userNames[post.author]?.name}
             isSupported={subscribedCreators.has((post.author || '').toLowerCase())}
             onSubscribed={markSubscribed}
-            className="px-2 py-1.5 text-soft-ink-soft hover:bg-soft-sunken"
+            className={ACTION_ITEM_SUPPORT}
           />
 
           {post.txHash && (
@@ -2511,14 +2560,16 @@ function PostList({
               href={`${getTxExplorer(post.network).txUrl}${post.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-pill px-2 py-1.5 text-soft-ink-soft transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className={ACTION_ITEM}
               title="View Transaction"
+              aria-label="View this post's transaction in the block explorer"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className={ACTION_ICON} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              {/* Tekst tylko na desktop */}
-              <span className="hidden md:inline text-[12.5px] font-semibold">Transaction</span>
+              {/* Napis wraca od `sm`, tak jak w kazdej innej pozycji paska -
+                  wczesniej ten jeden chowal sie dopiero od `md`. */}
+              <span className={ACTION_LABEL}>Transaction</span>
             </a>
           )}
 
@@ -2532,11 +2583,11 @@ function PostList({
               // Czerwien pojawia sie DOPIERO pod kursorem. Stala, czerwona ikona
               // w kazdej karcie widzianej przez admina byla trzecim mocnym kolorem
               // w pasku, w ktorym reszta jest szara.
-              className="text-soft-ink-soft hover:text-red-600 ml-auto p-1.5 rounded-pill hover:bg-red-50 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className={`${ACTION_ITEM} ml-auto hover:!text-red-600 hover:!bg-red-50`}
               title="Delete post (Admin)"
               aria-label="Delete post (Admin)"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className={ACTION_ICON} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
@@ -2550,11 +2601,11 @@ function PostList({
             <div className="relative ml-auto group">
               <button
                 type="button"
-                className="text-soft-ink-soft hover:text-soft-ink p-1.5 rounded-pill hover:bg-soft-sunken transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className={ACTION_ITEM}
                 aria-label="Post options"
                 title="Post options"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+                <svg className={ACTION_ICON} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
               </button>
               {/* Popover skaluje sie od SWOJEGO przycisku (origin-bottom-right),
                   nie od srodka - inaczej wyglada, jakby przylecial znikad. */}
