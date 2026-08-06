@@ -66,7 +66,7 @@ const worldChainEntry = {
   id: worldChain.id,
   name: 'World Chain',
   shortName: 'WORLD',
-  iconUrl: '/logotypy/logo-symbol.svg', // Ikona dla sieci World Chain
+  iconUrl: '/logotypy/world-symbol-dark.svg', // Ikona dla sieci World Chain
   color: '#8B5CF6',
   bgWhite: true, // Białe tło dla World Chain
 } as const;

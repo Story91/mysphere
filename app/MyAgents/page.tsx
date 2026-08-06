@@ -84,7 +84,7 @@ const CHAIN_LOGOS: { id: SupportedChain | "all"; label: string; src: string }[] 
   { id: "linea",      label: "Linea",       src: "/Logomark Blue BG.svg" },
   { id: "celo",       label: "Celo",        src: "/logotypy/AkeHh5LriDwrNIvVvUQ66wSHU.webp" },
   { id: "ethereum",   label: "Ethereum",    src: "/icons/eth.svg" },
-  { id: "worldchain", label: "World Chain", src: "/logotypy/logo-symbol.svg" },
+  { id: "worldchain", label: "World Chain", src: "/logotypy/world-symbol-dark.svg" },
 ];
 
 function AnimatedCounter({ target, duration = 1.5 }: { target: number; duration?: number }) {

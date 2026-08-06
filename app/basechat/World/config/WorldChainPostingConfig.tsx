@@ -12,7 +12,7 @@ import {
 
 function WorldChainLogo({ className }: { className: string }) {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/logotypy/logo-symbol.svg" alt="World Chain" className={className} />;
+  return <img src="/logotypy/world-symbol-dark.svg" alt="World Chain" className={className} />;
 }
 
 export const WORLD_CHAIN_POSTING: ChainWithComposer = {

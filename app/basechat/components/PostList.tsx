@@ -10,6 +10,7 @@ import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment,
   PostTipStats} from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-hot-toast';
+import { notify } from '../../utils/notify';
 // Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
 import { Avatar as CoinbaseAvatar } from '../../components/identity';
 import LinkPreview from './LinkPreview';
@@ -175,6 +176,12 @@ interface PostListProps {
   getCachedPosts?: (cacheKey: string) => ExtendedPost[] | null; // Funkcje cache'owania
   setCachedPosts?: (cacheKey: string, posts: ExtendedPost[]) => void;
   clearPostsCache?: () => void;
+  /**
+   * Nanosi zmiane na jeden post w zapisanych listach - ZERO odczytow Firestore.
+   * Bez tego polubienie znikaloby po przejsciu na inna zakladke i powrocie,
+   * bo widok odtwarza sie z localStorage.
+   */
+  patchPostInCache?: (postId: string, patch: (post: ExtendedPost) => ExtendedPost) => void;
   // Pending pins props
   pendingPins?: {[postId: string]: {
     txHash: string;
@@ -273,9 +280,12 @@ const NETWORK_BADGES: Record<string, NetworkBadgeDef> = {
   worldchain: {
     alt: 'World Chain',
     chipClass: 'bg-soft-sunken',
-    src: '/logotypy/logo.svg',
-    iconClass: { post: 'h-3', comment: 'h-2.5', reply: 'h-2' },
-    onWhiteCircle: true,
+    src: '/logotypy/world-symbol-dark.svg',
+    // Znak jest teraz CIEMNY, wiec bialy krazek pod nim jest zbedny - byl tam
+    // wylacznie po to, zeby bialy obrys mial sie na czym odcinac.
+    // Wymiary kwadratowe zamiast samej wysokosci: to symbol 1:1, a `h-3` bez
+    // szerokosci rozciagalo go wedlug proporcji poprzedniego pliku (lockup 4:1).
+    iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
   },
   robinhood: {
     alt: 'Robinhood Chain',
@@ -401,6 +411,7 @@ function PostList({
   getCachedPosts,
   setCachedPosts,
   clearPostsCache,
+  patchPostInCache,
   pendingPins = {},
   onPinPending
 }: PostListProps) {
@@ -790,43 +801,93 @@ function PostList({
     }
   };
 
+  /**
+   * Polubienie postu.
+   *
+   * === CO TU BYLO ZLE (zgloszone: "nie da sie lajkowac") ===
+   *
+   * 1. Optymistyczna zmiana szla przez `onRefreshPosts(updatedPosts)`, a ta
+   *    funkcja w page.tsx podnosi `isLoadingPosts` na czas swojego dzialania.
+   *    Klikniecie serduszka przelaczalo wiec CALY feed w stan ladowania -
+   *    lista mrugala szkieletami przy kazdym lajku.
+   *
+   * 2. `catch` obejmowal oba wywolania naraz, wiec blad odswiezania listy
+   *    wygladal identycznie jak odrzucony lajk: komunikat "Failed to like post"
+   *    plus cofniecie stanu, nawet gdy zapis sie powiodl.
+   *
+   * 3. NAJWAZNIEJSZE i moje wlasne przewinienie: `prependPostToCache` zapisuje
+   *    do localStorage post optymistyczny z identyfikatorem `temp-...`.
+   *    Jesli sesja skonczyla sie przed odpowiedzia Firestore, taki wpis
+   *    zostawal w cache na stale i wygladal jak zwykly post. Proba polubienia
+   *    szla wtedy pod `posts/temp-123`, dokument nie istnial, transakcja
+   *    rzucala - i uzytkownik dostawal komunikat o bledzie przy KAZDEJ probie.
+   *
+   * === JAK JEST TERAZ ===
+   * Stan zmieniamy lokalnie (bez przelaczania feedu w ladowanie), a przy bledzie
+   * cofamy WYLACZNIE ten jeden post. Post jeszcze niezapisany rozpoznajemy po
+   * identyfikatorze i mowimy o tym wprost, zamiast udawac awarie.
+   */
   const handleToggleLike = async (postId: string) => {
-    if (!address) return;
-    
+    if (!address) {
+      notify.info('Connect your wallet to like posts');
+      return;
+    }
+
+    const postIndex = internalPosts.findIndex(p => p.id === postId);
+    if (postIndex === -1) return;
+
+    // Post czekajacy na zapis w Firestore nie ma jeszcze czego polubic.
+    if (postId.startsWith('temp-')) {
+      notify.info('This post is still being saved. Give it a second.');
+      return;
+    }
+
+    const post = internalPosts[postIndex];
+    const wasLiked = !!post.likedBy?.includes(address);
+
+    const applyLike = (liked: boolean) =>
+      setInternalPosts(current =>
+        current.map(entry =>
+          entry.id !== postId
+            ? entry
+            : {
+                ...entry,
+                likes: Math.max(0, (entry.likes || 0) + (liked ? 1 : -1)),
+                likedBy: liked
+                  ? [...(entry.likedBy || []), address]
+                  : (entry.likedBy || []).filter(id => id !== address),
+              }
+        )
+      );
+
+    // 1. Natychmiastowa reakcja w UI.
+    applyLike(!wasLiked);
+
     try {
-      // Znajdź post w obecnej liście
-      const postIndex = internalPosts.findIndex(p => p.id === postId);
-      if (postIndex === -1) return;
-      
-      const post = internalPosts[postIndex];
-      const isLiked = post.likedBy?.includes(address);
-      
-      // Utwórz kopię postów, aby nie modyfikować bezpośrednio stanu
-      const updatedPosts = [...internalPosts];
-      
-      // Zaktualizuj konkretny post
-      updatedPosts[postIndex] = {
-        ...post,
-        likes: (post.likes || 0) + (isLiked ? -1 : 1),
-        likedBy: isLiked 
-          ? (post.likedBy || []).filter(id => id !== address)
-          : [...(post.likedBy || []), address]
-      };
-      
-      // Wywołaj onRefreshPosts z zaktualizowaną listą, ale zachowaj pozycję na liście
-      if (onRefreshPosts) {
-        await onRefreshPosts(updatedPosts);
-      }
-      
-      // Wykonaj rzeczywiste żądanie do serwera w tle
+      // 2. Zapis. Dopiero jego niepowodzenie jest bledem lajka.
       await toggleLike(postId, address);
+
+      // 3. Ta sama zmiana na ZAPISANYCH listach. Bez tego serduszko wracaloby
+      //    do poprzedniego stanu po przejsciu na inna zakladke i powrocie, bo
+      //    widok odtwarza sie z localStorage. Kosztuje ZERO odczytow -
+      //    alternatywa byloby skasowanie cache'u i pobranie calego feedu od
+      //    nowa za jedno klikniecie.
+      patchPostInCache?.(postId, (entry) => ({
+        ...entry,
+        likes: Math.max(0, (entry.likes || 0) + (wasLiked ? -1 : 1)),
+        likedBy: wasLiked
+          ? (entry.likedBy || []).filter((id) => id !== address)
+          : [...(entry.likedBy || []), address],
+      }));
     } catch (error) {
       console.error('Error toggling like:', error);
-      toast.error('Failed to like post');
-      // W przypadku błędu, przywróć poprzedni stan poprzez odświeżenie postów
-      if (onRefreshPosts) {
-        await onRefreshPosts();
-      }
+      // 3. Cofamy TYLKO ten post - reszta listy zostaje nietknieta.
+      applyLike(wasLiked);
+      notify.error(
+        error instanceof Error && error.message.includes('nie istnieje')
+          ? 'That post no longer exists'
+          : 'Could not save your like'
+      );
     }
   };
 
@@ -981,11 +1042,11 @@ function PostList({
         setFollowingStatus(prev => ({ ...prev, [targetUserAddress]: true }));
         toast.success('User followed successfully! (Użytkownik obserwowany!)');
       } else {
-        toast.error('Failed to follow user (Nie udało się obserwować użytkownika)');
+        notify.error('Could not follow this person');
       }
     } catch (error) {
       console.error('Error following user:', error);
-      toast.error('Failed to follow user (Nie udało się obserwować użytkownika)');
+      notify.error('Could not follow this person');
     } finally {
       setFollowLoading(prev => ({ ...prev, [targetUserAddress]: false }));
     }
@@ -1002,11 +1063,11 @@ function PostList({
         setFollowingStatus(prev => ({ ...prev, [targetUserAddress]: false }));
         toast.success('User unfollowed successfully! (Przestałeś obserwować użytkownika!)');
       } else {
-        toast.error('Failed to unfollow user (Nie udało się przestać obserwować użytkownika)');
+        notify.error('Could not unfollow this person');
       }
     } catch (error) {
       console.error('Error unfollowing user:', error);
-      toast.error('Failed to unfollow user (Nie udało się przestać obserwować użytkownika)');
+      notify.error('Could not unfollow this person');
     } finally {
       setFollowLoading(prev => ({ ...prev, [targetUserAddress]: false }));
     }

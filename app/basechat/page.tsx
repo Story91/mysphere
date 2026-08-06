@@ -273,6 +273,48 @@ const prependPostToCache = (post: ExtendedPost) => {
 };
 
 /**
+ * Nanosi zmiane na JEDEN post we wszystkich zapisanych listach.
+ *
+ * PO CO. Polubienie zmienia stan w pamieci, ale po przejsciu na inna zakladke
+ * i powrocie widok odtwarza sie z localStorage - czyli serduszko wracaloby do
+ * poprzedniego stanu, mimo ze zapis w Firestore sie powiodl. Alternatywa
+ * byloby skasowanie cache'u i ponowne pobranie CALEJ listy, czyli placenie
+ * odczytem calego feedu za jedno klikniecie.
+ *
+ * Ta funkcja kosztuje ZERO odczytow: post jest juz w pamieci, wiec nanosimy na
+ * niego dokladnie te zmiane, ktora zobaczyl uzytkownik.
+ *
+ * Znacznik waznosci cache'u zostaje nietkniety - polubienie nie jest powodem,
+ * zeby przedluzac waznosc reszty listy.
+ */
+const patchPostInCache = (postId: string, patch: (post: ExtendedPost) => ExtendedPost) => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('posts_') && !key.endsWith('_timestamp'))
+      .forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        try {
+          const cached = JSON.parse(raw);
+          if (!Array.isArray(cached)) return;
+          if (!cached.some((entry: ExtendedPost) => entry?.id === postId)) return;
+          localStorage.setItem(
+            key,
+            JSON.stringify(
+              cached.map((entry: ExtendedPost) => (entry?.id === postId ? patch(entry) : entry))
+            )
+          );
+        } catch {
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
+  } catch (error) {
+    console.error('Error patching post in cache:', error);
+  }
+};
+
+/**
  * Podmienia tymczasowe ID posta na prawdziwe, gdy Firestore je odda.
  *
  * Bez tego w cache zostawalby wpis z ID "temp-...", ktory po odswiezeniu
@@ -662,11 +704,11 @@ function BaseChatContent() {
           alert('🎉 Congratulations! You earned 1250 bonus points for choosing .world!');
         }
       } else {
-        alert('Wystąpił błąd podczas zapisywania nazwy. Spróbuj ponownie.');
+        toast.error('Could not save your name. Try again.');
       }
     } catch (error) {
       console.error('Error saving custom name:', error);
-      alert('Wystąpił błąd podczas zapisywania nazwy. Spróbuj ponownie.');
+      toast.error('Could not save your name. Try again.');
     }
   };
 
@@ -1695,7 +1737,7 @@ function BaseChatContent() {
       setShowModal(false);
     } catch (error) {
       console.error('Error updating avatar:', error);
-      setModalMessage('Wystąpił błąd podczas zapisywania zdjęcia. Spróbuj ponownie.');
+      setModalMessage('Could not save the image. Try again.');
       setModalType('error');
       setShowModal(true);
     } finally {
@@ -3230,7 +3272,7 @@ function BaseChatContent() {
                     {
                       icon: (
                         <img 
-                          src="/logotypy/logo-symbol.svg"
+                          src="/logotypy/world-symbol-dark.svg"
                           alt="World Chain"
                           className="w-5 h-5 rounded-none"
                         />
@@ -3650,6 +3692,7 @@ function BaseChatContent() {
                         getCachedPosts={getCachedPosts} // Przekaż funkcje cache'owania
                         setCachedPosts={setCachedPosts}
                         clearPostsCache={clearPostsCache}
+                        patchPostInCache={patchPostInCache}
                         pendingPins={pendingPins} // Przekaż pending pins state
                         onPinPending={handlePinPending} // Przekaż pending pin handler
                       />
