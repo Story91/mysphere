@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useConnect, type Connector } from 'wagmi';
+import { isUserRejection } from '../../utils/auth/useSiweAuth';
 
 /**
  * Wybor portfela. Zastepuje modal z <ConnectWallet> OnchainKit.
@@ -57,6 +58,22 @@ export default function ConnectModal({
   const { connectors, connect, status, error, variables } = useConnect();
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * onClose przychodzi z gory jako inline `() => setIsModalOpen(false)`, czyli
+   * ma NOWA TOZSAMOSC przy kazdym renderze rodzica. Trzymany wprost w
+   * zaleznosciach efektu ponizej powodowal, ze pulapka fokusu rozbierala sie
+   * i skladala od nowa przy kazdym renderze WalletButton/MockFeed - a dzieje
+   * sie to w trakcie laczenia (useAccount przechodzi przez 'connecting',
+   * dochodzi saldo z useBalance). Skutek: sprzatanie efektu oddawalo fokus
+   * przyciskowi POD modalem, a nowy przebieg wrzucal go z powrotem na "Close".
+   * Uzytkownik klawiatury tracil miejsce w liscie portfeli w polowie laczenia.
+   * Ref odcina tozsamosc funkcji od cyklu zycia efektu.
+   */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   // Portal montujemy dopiero po stronie klienta - document nie istnieje na serwerze.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -85,7 +102,7 @@ export default function ConnectModal({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -127,7 +144,7 @@ export default function ConnectModal({
       document.body.style.overflow = prevOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [isOpen, mounted, onClose]);
+  }, [isOpen, mounted]);
 
   if (!isOpen || !mounted) return null;
 
@@ -250,7 +267,14 @@ export default function ConnectModal({
           })}
         </div>
 
-        {error && (
+        {/* Odmowa w portfelu NIE jest bledem. Zamkniecie okna portfela albo
+            klikniecie "Cancel" konczy mutacje `connect` bledem
+            UserRejectedRequestError, a ten blok wypisywal go tak samo jak awarie
+            - czerwonym paskiem "User rejected the request." Uzytkownik dostawal
+            komunikat o bledzie za to, ze zrobil dokladnie to, co chcial zrobic.
+            Lista portfeli zostaje otwarta i aktywna, wiec moze po prostu wybrac
+            inny albo zamknac modal. */}
+        {error && !isUserRejection(error) && (
           <p role="alert" className="border-t border-soft-line bg-soft-accent-soft px-5 py-3 font-soft text-[12px] font-semibold text-soft-accent-deep">
             {error.message.slice(0, 140)}
           </p>

@@ -389,6 +389,11 @@ export default function BuilderProfile({
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [newBio, setNewBio] = useState(profile.bio || '');
   const [isSaving, setIsSaving] = useState(false);
+  // Zapisane bio nie wraca do `profile` (rodzic trzyma je w swoim stanie i nie
+  // ma dla niego zadnego callbacku). Bez tej nakladki po udanym zapisie sekcja
+  // "About" pokazywala STARY tekst az do ponownego wejscia w profil.
+  const [savedBioOverride, setSavedBioOverride] = useState<string | null>(null);
+  const displayedBio = savedBioOverride ?? profile.bio;
   
   
   // Tip Stats state
@@ -467,11 +472,15 @@ export default function BuilderProfile({
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [checkingFollowStatus, setCheckingFollowStatus] = useState(true);
+  // "Add Friend" nie mial zadnej blokady na czas zapytania - kazde kolejne
+  // klikniecie wysylalo nastepne zaproszenie i nastepny toast "Sending...".
+  const [sendingFriendRequest, setSendingFriendRequest] = useState(false);
   
   // Zresetuj stan edycji bio kiedy zmienia się profil
   useEffect(() => {
     setNewBio(profile.bio || '');
     setIsEditingBio(false);
+    setSavedBioOverride(null);
   }, [profile]);
   
   // Initialize referral stats
@@ -580,11 +589,13 @@ export default function BuilderProfile({
   };
 
   const handleSendFriendRequest = async () => {
+    if (sendingFriendRequest) return;
+
     if (!currentUserAddress) {
       toast.error('Please connect your wallet first!');
       return;
     }
-    
+
     // Check if trying to send request to yourself
     if (currentUserAddress === userAddress) {
       toast.error('🚫 Cannot send friend request to yourself!', {
@@ -594,11 +605,13 @@ export default function BuilderProfile({
       return;
     }
     
+    setSendingFriendRequest(true);
+
     // Show loading toast
     const loadingToast = toast.loading('Sending friend request...', {
       position: 'top-right',
     });
-    
+
     try {
       const result = await sendFriendRequestDirect(currentUserAddress!, userAddress, 'Hello! Let\'s be friends! 🤝');
       
@@ -641,6 +654,8 @@ export default function BuilderProfile({
         duration: 4000,
         position: 'top-right',
       });
+    } finally {
+      setSendingFriendRequest(false);
     }
   };
 
@@ -988,11 +1003,15 @@ export default function BuilderProfile({
       }
 
       if (newBio.length <= 90) {
-        await updateDoc(userRef, { 
+        await updateDoc(userRef, {
           bio: newBio,
           lastBioUpdate: serverTimestamp()
         });
-        
+
+        // Pokaz to, co naprawde zostalo zapisane - inaczej po zamknieciu
+        // edytora wraca stara tresc z propsa `profile`.
+        setSavedBioOverride(newBio);
+
         // Zamknij tryb edycji
         setIsEditingBio(false);
       } else {
@@ -1361,7 +1380,8 @@ export default function BuilderProfile({
                       {/* Friend Request Button (Przycisk zaproszenia do znajomych) */}
                       <button
                         onClick={handleSendFriendRequest}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold bg-soft-accent-deep border border-soft-accent-deep text-white hover:bg-soft-accent transition-colors duration-[--dur-press] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        disabled={sendingFriendRequest}
+                        className={`flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold bg-soft-accent-deep border border-soft-accent-deep text-white hover:bg-soft-accent transition-colors duration-[--dur-press] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${sendingFriendRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
@@ -1893,20 +1913,33 @@ export default function BuilderProfile({
                                     <div className="flex items-center space-x-3">
                                       {item?.track?.album?.images && item.track.album.images[0] && (
                                         <div className="relative group">
-                                          <a
-                                            href={item?.track?.album?.external_urls?.spotify || '#'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block hover:opacity-80 transition-opacity"
-                                            title={`View album: ${item?.track?.album?.name}`}
-                                          >
+                                          {/* Bez adresu albumu bylo tu <a href="#">:
+                                              link wygladal na dzialajacy, a
+                                              klikniecie tylko przeskakiwalo na
+                                              gore strony. Teraz okladka bez
+                                              adresu jest zwyklym obrazkiem. */}
+                                          {item?.track?.album?.external_urls?.spotify ? (
+                                            <a
+                                              href={item.track.album.external_urls.spotify}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="block hover:opacity-80 transition-opacity"
+                                              title={`View album: ${item?.track?.album?.name}`}
+                                            >
+                                              <img
+                                                src={item.track.album.images[0].url}
+                                                alt={item.track.album.name}
+                                                className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow duration-[--dur-press] ease-out-strong"
+                                              />
+                                            </a>
+                                          ) : (
                                             <img
                                               src={item.track.album.images[0].url}
                                               alt={item.track.album.name}
-                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow duration-[--dur-press] ease-out-strong"
+                                              className="w-12 h-12 rounded"
                                             />
-                                          </a>
-                                          
+                                          )}
+
                                           {/* Preview Overlay */}
                                           {item?.track?.preview_url && (
                                             <button
@@ -2030,12 +2063,38 @@ export default function BuilderProfile({
                                             {/* Mini Progress Bar */}
                                             <div className="flex-1 flex items-center gap-2">
                                               <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(currentTime)}</span>
-                                              <div 
+                                              {/* Byl to goly klikalny <div>: bez
+                                                  focusu i bez strzalek nie dalo
+                                                  sie przewinac podgladu z
+                                                  klawiatury. */}
+                                              <div
+                                                role="slider"
+                                                tabIndex={0}
+                                                aria-label="Seek preview"
+                                                aria-valuemin={0}
+                                                aria-valuemax={Math.round(duration)}
+                                                aria-valuenow={Math.round(currentTime)}
+                                                aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
                                                 className="flex-1 h-0.5 bg-green-400/20 rounded-full cursor-pointer"
                                                 onClick={(e) => {
                                                   const rect = e.currentTarget.getBoundingClientRect();
                                                   const percent = (e.clientX - rect.left) / rect.width;
                                                   seekToTime(percent * duration);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                                                    e.preventDefault();
+                                                    seekToTime(Math.min(duration, currentTime + 5));
+                                                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                                                    e.preventDefault();
+                                                    seekToTime(Math.max(0, currentTime - 5));
+                                                  } else if (e.key === 'Home') {
+                                                    e.preventDefault();
+                                                    seekToTime(0);
+                                                  } else if (e.key === 'End') {
+                                                    e.preventDefault();
+                                                    seekToTime(duration);
+                                                  }
                                                 }}
                                               >
                                                 <div 
@@ -2105,20 +2164,33 @@ export default function BuilderProfile({
                                     <div className="flex items-center space-x-3">
                                       {item?.track?.album?.images && item.track.album.images[0] && (
                                         <div className="relative group">
-                                          <a
-                                            href={item?.track?.album?.external_urls?.spotify || '#'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block hover:opacity-80 transition-opacity"
-                                            title={`View album: ${item?.track?.album?.name}`}
-                                          >
+                                          {/* Bez adresu albumu bylo tu <a href="#">:
+                                              link wygladal na dzialajacy, a
+                                              klikniecie tylko przeskakiwalo na
+                                              gore strony. Teraz okladka bez
+                                              adresu jest zwyklym obrazkiem. */}
+                                          {item?.track?.album?.external_urls?.spotify ? (
+                                            <a
+                                              href={item.track.album.external_urls.spotify}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="block hover:opacity-80 transition-opacity"
+                                              title={`View album: ${item?.track?.album?.name}`}
+                                            >
+                                              <img
+                                                src={item.track.album.images[0].url}
+                                                alt={item.track.album.name}
+                                                className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow duration-[--dur-press] ease-out-strong"
+                                              />
+                                            </a>
+                                          ) : (
                                             <img
                                               src={item.track.album.images[0].url}
                                               alt={item.track.album.name}
-                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow duration-[--dur-press] ease-out-strong"
+                                              className="w-12 h-12 rounded"
                                             />
-                                          </a>
-                                          
+                                          )}
+
                                           {/* Preview Overlay */}
                                           {item?.track?.preview_url && (
                                             <button
@@ -2242,12 +2314,38 @@ export default function BuilderProfile({
                                             {/* Mini Progress Bar */}
                                             <div className="flex-1 flex items-center gap-2">
                                               <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(currentTime)}</span>
-                                              <div 
+                                              {/* Byl to goly klikalny <div>: bez
+                                                  focusu i bez strzalek nie dalo
+                                                  sie przewinac podgladu z
+                                                  klawiatury. */}
+                                              <div
+                                                role="slider"
+                                                tabIndex={0}
+                                                aria-label="Seek preview"
+                                                aria-valuemin={0}
+                                                aria-valuemax={Math.round(duration)}
+                                                aria-valuenow={Math.round(currentTime)}
+                                                aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
                                                 className="flex-1 h-0.5 bg-green-400/20 rounded-full cursor-pointer"
                                                 onClick={(e) => {
                                                   const rect = e.currentTarget.getBoundingClientRect();
                                                   const percent = (e.clientX - rect.left) / rect.width;
                                                   seekToTime(percent * duration);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                                                    e.preventDefault();
+                                                    seekToTime(Math.min(duration, currentTime + 5));
+                                                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                                                    e.preventDefault();
+                                                    seekToTime(Math.max(0, currentTime - 5));
+                                                  } else if (e.key === 'Home') {
+                                                    e.preventDefault();
+                                                    seekToTime(0);
+                                                  } else if (e.key === 'End') {
+                                                    e.preventDefault();
+                                                    seekToTime(duration);
+                                                  }
                                                 }}
                                               >
                                                 <div 
@@ -2353,7 +2451,9 @@ export default function BuilderProfile({
                       <button
                         onClick={() => {
                           setIsEditingBio(false);
-                          setNewBio(profile.bio || '');
+                          // displayedBio, nie profile.bio - po wczesniejszym
+                          // zapisie props jest juz nieaktualny.
+                          setNewBio(displayedBio || '');
                         }}
                         className="px-3 py-1.5 bg-soft-surface text-soft-ink-muted border border-soft-line rounded-pill text-xs font-semibold hover:bg-soft-line transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         disabled={isSaving}
@@ -2372,7 +2472,7 @@ export default function BuilderProfile({
                 </div>
               ) : (
                 <div className="text-soft-ink-muted leading-relaxed">
-                  {profile.bio ||
+                  {displayedBio ||
                     <span className="text-soft-ink-faint italic">
                       {currentUserAddress === userAddress ? 
                         "Click Edit to add your bio" : 

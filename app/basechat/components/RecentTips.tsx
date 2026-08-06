@@ -31,9 +31,13 @@ const TokenIcon = ({ token }: { token: TipToken }) => {
 
 // Formatuje wartość tokena
 const formatTokenAmount = (amount: number, token: TipToken): string => {
+  // `parseFloat` na uszkodzonej kwocie z bazy daje NaN, a `NaN.toFixed()` wypisuje
+  // uzytkownikowi doslownie "NaN" jako wysokosc napiwku.
+  if (!Number.isFinite(amount)) return '0';
+
   const tokenConfig = TOKENS[token];
   if (!tokenConfig) return amount.toFixed(4);
-  
+
   if (tokenConfig.decimals === 6) {
     return amount.toFixed(2);
   }
@@ -74,6 +78,9 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
   const [senderNames, setSenderNames] = useState<{[key: string]: {name: string, avatar?: string}}>({});
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  // Nieudane pobranie konczylo sie stanem "No tips received yet" - komunikat
+  // o BRAKU napiwkow zamiast o tym, ze lista sie nie zaladowala.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     // Bez tej flagi zmiana `userAddress` w trakcie pobierania potrafila wpisac
@@ -83,22 +90,37 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
 
     const fetchRecentTips = async () => {
       setLoading(true);
-      try {
-        const recentTips = await getRecentTips(userAddress, limit);
-        if (cancelled) return;
-        setTips(recentTips);
+      setLoadFailed(false);
 
-        if (recentTips.length > 0) {
-          const senderAddresses = [...new Set(recentTips.map(tip => tip.senderAddress))];
-          const names = await getBulkUserNamesOptimized(senderAddresses);
-          if (cancelled) return;
-          setSenderNames(names);
-        }
+      let recentTips: Tip[];
+      try {
+        recentTips = await getRecentTips(userAddress, limit);
       } catch (error) {
         console.error('Error fetching recent tips:', error);
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoadFailed(true);
+          setLoading(false);
+        }
+        return;
       }
+
+      if (cancelled) return;
+      setTips(recentTips);
+
+      // Nazwy nadawcow to ozdoba - gdy ich pobranie padnie, lista napiwkow
+      // zostaje poprawna, a nadawcy pokazuja sie jako skrocone adresy. Dlatego
+      // ten blad NIE moze przelaczac calego kafelka w stan bledu.
+      if (recentTips.length > 0) {
+        try {
+          const senderAddresses = [...new Set(recentTips.map(tip => tip.senderAddress))];
+          const names = await getBulkUserNamesOptimized(senderAddresses);
+          if (!cancelled) setSenderNames(names);
+        } catch (error) {
+          console.error('Error fetching tip sender names:', error);
+        }
+      }
+
+      if (!cancelled) setLoading(false);
     };
 
     fetchRecentTips();
@@ -138,7 +160,7 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
     );
   }
 
-  if (tips.length === 0) {
+  if (loadFailed || tips.length === 0) {
     return (
       <div className={`bg-soft-surface rounded-card p-4 shadow-card ${className}`}>
         <div className="flex items-center space-x-2 mb-3">
@@ -146,7 +168,9 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
           <h3 className="font-soft-display font-semibold text-soft-ink">Recent Tips</h3>
         </div>
         <div className="text-center py-4">
-          <span className="text-soft-ink-soft text-sm">No tips received yet</span>
+          <span className="text-soft-ink-soft text-sm">
+            {loadFailed ? "Couldn't load recent tips" : 'No tips received yet'}
+          </span>
         </div>
       </div>
     );

@@ -166,119 +166,184 @@ async function readApiError(response: Response, fallback: string): Promise<strin
   return fallback;
 }
 
+/**
+ * ==========================================================================
+ * STAN SESJI JEST WSPOLNY DLA WSZYSTKICH INSTANCJI TEGO HOOKA
+ * ==========================================================================
+ * Hook jest wolany w co najmniej dwoch miejscach naraz: SessionPrompt
+ * (montowany globalnie w AppShell) i MockFeed (ekran przedlogowania). Kazda
+ * instancja miala WLASNY `useState` z adresem i WLASNE zapytanie do
+ * /api/auth/session, wiec stany rozjezdzaly sie natychmiast:
+ *
+ *  - uzytkownik podpisywal SIWE na ekranie przedlogowania (instancja MockFeed),
+ *    a instancja SessionPrompt nadal uwazala, ze sesji nie ma - i po 4 sekundach
+ *    wysuwala pasek "Confirm this wallet is yours" proszacy o DRUGI podpis
+ *    tej samej rzeczy,
+ *  - dwie instancje odpytywaly /api/auth/session i dwa razy wolaly
+ *    signInWithCustomToken na tym samym kliencie Firebase,
+ *  - obie instancje niezaleznie reagowaly na rozlaczenie portfela, wiec
+ *    /api/auth/logout leciało podwojnie.
+ *
+ * Dlatego adres sesji i faza startowa mieszkaja w module, a instancje tylko
+ * subskrybuja zmiany. Per-instancja zostaje wylacznie to, co naprawde jest
+ * lokalne: komunikat bledu i "czy TEN przycisk wlasnie podpisuje".
+ */
+interface SiweStore {
+  /** Adres potwierdzony przez serwer (lowercase) albo null. */
+  address: string | null;
+  /** Czy trwa pierwsze pytanie serwera "kim jestem?". */
+  isBootstrapping: boolean;
+}
+
+let store: SiweStore = { address: null, isBootstrapping: true };
+const listeners = new Set<() => void>();
+
+function publish(next: SiweStore) {
+  if (next.address === store.address && next.isBootstrapping === store.isBootstrapping) return;
+  store = next;
+  listeners.forEach((listener) => listener());
+}
+
+/**
+ * Logowanie do Firebase tokenem zmintowanym przez serwer po weryfikacji
+ * podpisu. Dopiero to sprawia, ze request.auth.uid w regulach Firestore JEST
+ * adresem portfela - bez tego reguly nie wiedza, kto pisze, i musialy zostac
+ * otwarte na oscież.
+ *
+ * Blad tutaj NIE przerywa logowania: sesja serwerowa i tak powstala, a zapisy
+ * do Firestore dzialaja dzis anonimowo.
+ */
+async function signInToFirebase(token: string): Promise<void> {
+  try {
+    const [{ signInWithCustomToken }, { auth }] = await Promise.all([
+      import('firebase/auth'),
+      import('../firebase'),
+    ]);
+    await signInWithCustomToken(auth, token);
+  } catch (firebaseError) {
+    console.warn('[useSiweAuth] Logowanie do Firebase nie powiodlo sie:', firebaseError);
+  }
+}
+
+/** Sesja Firebase musi zniknac razem z sesja serwerowa. */
+async function signOutOfFirebase(): Promise<void> {
+  try {
+    const [{ signOut: firebaseSignOut }, { auth }] = await Promise.all([
+      import('firebase/auth'),
+      import('../firebase'),
+    ]);
+    await firebaseSignOut(auth);
+  } catch (firebaseError) {
+    console.warn('[useSiweAuth] Wylogowanie z Firebase nie powiodlo sie:', firebaseError);
+  }
+}
+
+let bootstrapPromise: Promise<void> | null = null;
+
+/**
+ * Odtworzenie istniejacej sesji. Wolane przez KAZDA instancje, wykonywane RAZ
+ * na zaladowanie strony. Blad sieci/konfiguracji traktujemy jako "brak sesji" -
+ * failowanie zamkniete, ale ciche, bo uzytkownik na tym etapie o nic nie prosil.
+ */
+function bootstrapSession(): Promise<void> {
+  if (bootstrapPromise) return bootstrapPromise;
+
+  bootstrapPromise = (async () => {
+    try {
+      const response = await fetch('/api/auth/session', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      });
+
+      if (!response.ok) return;
+
+      const data = (await response.json()) as { address?: unknown; firebaseToken?: unknown };
+
+      if (typeof data.firebaseToken === 'string' && data.firebaseToken) {
+        await signInToFirebase(data.firebaseToken);
+      }
+
+      if (typeof data.address === 'string' && data.address.length > 0) {
+        publish({ address: data.address.toLowerCase(), isBootstrapping: false });
+      }
+    } catch {
+      // brak sesji / offline - nic nie pokazujemy
+    } finally {
+      publish({ address: store.address, isBootstrapping: false });
+    }
+  })();
+
+  return bootstrapPromise;
+}
+
+let signOutPromise: Promise<void> | null = null;
+
+/**
+ * Wylogowanie: cookie sesji + sesja Firebase.
+ *
+ * Adres kasujemy NATYCHMIAST, przed zapytaniem - dzieki temu rownolegle efekty
+ * (dwie instancje hooka reagujace na to samo rozlaczenie portfela) widza juz
+ * pusta sesje i nie wolaja tego drugi raz.
+ *
+ * Wylogowanie z Firebase jest POZA obsluga bledu zadania HTTP. Wczesniej
+ * siedzialo w tym samym `try`, wiec padniete /api/auth/logout (offline,
+ * 500) przeskakiwalo je calkowicie: UI pokazywal wylogowanie, a sesja Firebase
+ * zyla dalej i przegladarka nadal pisala do Firestore jako ten uzytkownik.
+ */
+function performSignOut(): Promise<void> {
+  if (signOutPromise) return signOutPromise;
+
+  publish({ address: null, isBootstrapping: false });
+
+  signOutPromise = (async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+      // Cookie i tak wygasnie; z punktu widzenia UI uzytkownik jest wylogowany.
+    }
+    await signOutOfFirebase();
+  })();
+
+  return signOutPromise.finally(() => {
+    signOutPromise = null;
+  });
+}
+
 export function useSiweAuth(): SiweAuthState {
   const { address: walletAddress, status: accountStatus } = useAccount();
   const { signMessageAsync } = useSignMessage();
 
-  const [address, setAddress] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [snapshot, setSnapshot] = useState<SiweStore>(store);
+  // "Czy TA instancja wlasnie podpisuje". Osobno od fazy startowej, bo
+  // SessionPrompt musi je od siebie odroznic (patrz isCheckingSession tam).
+  const [isSigning, setIsSigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Trzymamy aktualny adres sesji takze w refie, zeby efekt pilnujacy
-  // rozjazdu wagmi<->sesja nie musial miec go w zaleznosciach (i nie restartowal
-  // sie przy kazdej zmianie stanu).
-  const addressRef = useRef<string | null>(null);
   const isMountedRef = useRef(true);
   // Czy wagmi kiedykolwiek byl w stanie 'connected' w tym cyklu zycia.
   // Bez tego "jest rozlaczony" mylilby sie z "wlasnie sie rozlaczyl" i kasowal
   // sesje zalozona poza wagmi (np. przez Base Account SDK) albo tuz po starcie.
   const wasConnectedRef = useRef(false);
 
-  const setSessionAddress = useCallback((next: string | null) => {
-    addressRef.current = next;
-    setAddress(next);
-  }, []);
-
   useEffect(() => {
     isMountedRef.current = true;
+    const listener = () => setSnapshot(store);
+    listeners.add(listener);
+    // Stan mogl sie zmienic miedzy pierwszym renderem a subskrypcja.
+    listener();
+    void bootstrapSession();
+
     return () => {
       isMountedRef.current = false;
-    };
-  }, []);
-
-  // Odtworzenie istniejacej sesji przy montowaniu. Blad sieci/konfiguracji
-  // traktujemy jako "brak sesji" - to jest failowanie zamkniete, ale ciche,
-  // bo uzytkownik na tym etapie o nic nie prosil.
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const response = await fetch('/api/auth/session', {
-          method: 'GET',
-          credentials: 'include',
-          cache: 'no-store',
-        });
-
-        if (!response.ok) return;
-
-        const data = (await response.json()) as { address?: unknown; firebaseToken?: unknown };
-
-        // Logowanie do Firebase tokenem zmintowanym przez serwer po weryfikacji
-        // podpisu. Dopiero to sprawia, ze request.auth.uid w regulach Firestore
-        // JEST adresem portfela - bez tego reguly nie wiedza, kto pisze,
-        // i musialy zostac otwarte na oscież.
-        //
-        // Blad tutaj NIE przerywa logowania: sesja serwerowa i tak powstala,
-        // a zapisy do Firestore dzialaja dzis anonimowo. Zaostrzenie regul
-        // nastapi dopiero, gdy klienci beda sie logowac na stale.
-        if (typeof data.firebaseToken === 'string' && data.firebaseToken) {
-          try {
-            const [{ signInWithCustomToken }, { auth }] = await Promise.all([
-              import('firebase/auth'),
-              import('../firebase'),
-            ]);
-            await signInWithCustomToken(auth, data.firebaseToken);
-          } catch (firebaseError) {
-            console.warn('[useSiweAuth] Logowanie do Firebase nie powiodlo sie:', firebaseError);
-          }
-        }
-
-        if (cancelled || !isMountedRef.current) return;
-
-        if (typeof data.address === 'string' && data.address.length > 0) {
-          addressRef.current = data.address.toLowerCase();
-          setAddress(addressRef.current);
-        }
-      } catch {
-        // brak sesji / offline - nic nie pokazujemy
-      } finally {
-        if (!cancelled && isMountedRef.current) setIsLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
+      listeners.delete(listener);
     };
   }, []);
 
   const signOut = useCallback(async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-
-      // Sesja Firebase musi zniknac razem z sesja serwerowa - inaczej
-      // wylogowany uzytkownik nadal moglby pisac do Firestore jako on sam.
-      try {
-        const [{ signOut: firebaseSignOut }, { auth }] = await Promise.all([
-          import('firebase/auth'),
-          import('../firebase'),
-        ]);
-        await firebaseSignOut(auth);
-      } catch (firebaseError) {
-        console.warn('[useSiweAuth] Wylogowanie z Firebase nie powiodlo sie:', firebaseError);
-      }
-    } catch {
-      // Nawet gdy zadanie padnie, lokalny stan czyscimy - z punktu widzenia UI
-      // uzytkownik jest wylogowany, a cookie i tak wygasnie.
-    } finally {
-      if (isMountedRef.current) {
-        setSessionAddress(null);
-        setError(null);
-      } else {
-        addressRef.current = null;
-      }
-    }
-  }, [setSessionAddress]);
+    await performSignOut();
+    if (isMountedRef.current) setError(null);
+  }, []);
 
   const signIn = useCallback(
     async (options?: SignInOptions): Promise<boolean> => {
@@ -290,7 +355,7 @@ export function useSiweAuth(): SiweAuthState {
         return false;
       }
 
-      setIsLoading(true);
+      setIsSigning(true);
       setError(null);
 
       try {
@@ -340,24 +405,8 @@ export function useSiweAuth(): SiweAuthState {
 
         const data = (await response.json()) as { address?: unknown; firebaseToken?: unknown };
 
-        // Logowanie do Firebase tokenem zmintowanym przez serwer po weryfikacji
-        // podpisu. Dopiero to sprawia, ze request.auth.uid w regulach Firestore
-        // JEST adresem portfela - bez tego reguly nie wiedza, kto pisze,
-        // i musialy zostac otwarte na oscież.
-        //
-        // Blad tutaj NIE przerywa logowania: sesja serwerowa i tak powstala,
-        // a zapisy do Firestore dzialaja dzis anonimowo. Zaostrzenie regul
-        // nastapi dopiero, gdy klienci beda sie logowac na stale.
         if (typeof data.firebaseToken === 'string' && data.firebaseToken) {
-          try {
-            const [{ signInWithCustomToken }, { auth }] = await Promise.all([
-              import('firebase/auth'),
-              import('../firebase'),
-            ]);
-            await signInWithCustomToken(auth, data.firebaseToken);
-          } catch (firebaseError) {
-            console.warn('[useSiweAuth] Logowanie do Firebase nie powiodlo sie:', firebaseError);
-          }
+          await signInToFirebase(data.firebaseToken);
         }
 
         const verified =
@@ -365,8 +414,10 @@ export function useSiweAuth(): SiweAuthState {
             ? data.address.toLowerCase()
             : signerAddress.toLowerCase();
 
-        if (isMountedRef.current) setSessionAddress(verified);
-        else addressRef.current = verified;
+        // Adres trafia do wspolnego magazynu NIEZALEZNIE od tego, czy ta
+        // instancja jeszcze zyje - sesja powstala po stronie serwera, wiec
+        // pozostale instancje musza sie o tym dowiedziec.
+        publish({ address: verified, isBootstrapping: false });
 
         return true;
       } catch (caught) {
@@ -385,10 +436,10 @@ export function useSiweAuth(): SiweAuthState {
         }
         return false;
       } finally {
-        if (isMountedRef.current) setIsLoading(false);
+        if (isMountedRef.current) setIsSigning(false);
       }
     },
-    [walletAddress, signMessageAsync, setSessionAddress]
+    [walletAddress, signMessageAsync]
   );
 
   // Sesja serwerowa nie moze przezyc rozlaczenia portfela ani przepiecia konta.
@@ -399,23 +450,27 @@ export function useSiweAuth(): SiweAuthState {
     if (accountStatus === 'connected') {
       wasConnectedRef.current = true;
 
-      if (addressRef.current && walletAddress && walletAddress.toLowerCase() !== addressRef.current) {
+      // Czytamy `store`, a nie `snapshot`: gdy dwie instancje reaguja na to samo
+      // zdarzenie, druga ma juz zobaczyc skutek pierwszej. `snapshot.address`
+      // zostaje w zaleznosciach, zeby efekt wrocil, gdy sesja odtworzy sie PO
+      // podlaczeniu portfela (i okaze sie, ze dotyczy innego adresu).
+      if (store.address && walletAddress && walletAddress.toLowerCase() !== store.address) {
         // Uzytkownik przepial konto w portfelu - sesja dotyczy juz kogos innego.
-        void signOut();
+        void performSignOut();
       }
       return;
     }
 
     if (accountStatus === 'disconnected' && wasConnectedRef.current) {
       wasConnectedRef.current = false;
-      if (addressRef.current) void signOut();
+      if (store.address) void performSignOut();
     }
-  }, [accountStatus, walletAddress, address, signOut]);
+  }, [accountStatus, walletAddress, snapshot.address]);
 
   return {
-    address,
-    isLoading,
-    isAuthenticated: address !== null,
+    address: snapshot.address,
+    isLoading: snapshot.isBootstrapping || isSigning,
+    isAuthenticated: snapshot.address !== null,
     error,
     signIn,
     signOut,

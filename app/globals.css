@@ -455,3 +455,137 @@ h1, h2, h3, h4, h5, h6 {
   .soft-orbit,
   .soft-orbit-counter { animation: none; }
 }
+
+/* ===========================================================================
+   TASMA PARAGONOWA - element sygnaturowy strony Paid
+   ===========================================================================
+   Strona Paid jest publiczna osia czasu rozliczonych platnosci. Szukalem dla
+   niej formy z WLASNEGO swiata tematu, a nie kolejnej listy w kartach - i tym
+   przedmiotem jest rolka paragonowa: ciagly pas papieru, ktory przyrasta od
+   gory, z perforacja po bokach i oderwana krawedzia.
+
+   Perforacja jest zrobiona gradientem, nie obrazkiem - skaluje sie z dowolna
+   wysokoscia tasmy i nie kosztuje ani jednego zadania sieciowego.
+   =========================================================================== */
+.receipt-tape {
+  position: relative;
+  background: #fff;
+  /* Dziurki po obu stronach. Powtarzalny gradient radialny: kolko tla co 14px. */
+  background-image:
+    radial-gradient(circle at 7px 7px, rgb(var(--soft-bg)) 3.5px, transparent 3.6px),
+    radial-gradient(circle at calc(100% - 7px) 7px, rgb(var(--soft-bg)) 3.5px, transparent 3.6px);
+  background-size: 100% 14px, 100% 14px;
+  background-repeat: repeat-y, repeat-y;
+  background-position: left top, right top;
+}
+
+/* Oderwana krawedz. Trojkaty wyciete maska - papier nie konczy sie prosta
+   linia, bo nikt nie odrywa paragonu rownо. */
+.receipt-tear-top,
+.receipt-tear-bottom {
+  height: 10px;
+  background: #fff;
+  --tooth: 14px;
+}
+.receipt-tear-top {
+  -webkit-mask: conic-gradient(from -45deg at 50% 100%, #0000 90deg, #000 0) 50% / var(--tooth) 100% repeat-x;
+  mask: conic-gradient(from -45deg at 50% 100%, #0000 90deg, #000 0) 50% / var(--tooth) 100% repeat-x;
+}
+.receipt-tear-bottom {
+  -webkit-mask: conic-gradient(from 135deg at 50% 0, #0000 90deg, #000 0) 50% / var(--tooth) 100% repeat-x;
+  mask: conic-gradient(from 135deg at 50% 0, #0000 90deg, #000 0) 50% / var(--tooth) 100% repeat-x;
+}
+
+/* Wejscie wierszy tasmy: kaskada od gory, 45 ms odstepu.
+   Odstep jest KROTKI celowo - dluzszy zamienia kaskade w pokaz i kaze czekac
+   na tresc, po ktora sie przyszlo. Po ostatnim wierszu nic sie juz nie rusza. */
+.receipt-row {
+  opacity: 0;
+  transform: translateY(6px);
+  animation: receipt-row-in 320ms var(--ease-out-strong) forwards;
+}
+@keyframes receipt-row-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Najswiezsza platnosc dostaje jeden impuls obwodki - i tylko jeden.
+   Pulsowanie bez konca zamienia informacje w ozdobe i przestaje cokolwiek
+   znaczyc po trzeciej powtorce. */
+.receipt-fresh::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid rgb(var(--soft-accent));
+  opacity: 0;
+  animation: receipt-fresh-pulse 1400ms var(--ease-out-strong) 200ms 1;
+  pointer-events: none;
+}
+@keyframes receipt-fresh-pulse {
+  0%   { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.03); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .receipt-row { opacity: 1; transform: none; animation: none; }
+  .receipt-fresh::after { animation: none; opacity: 0; }
+}
+
+/* ===========================================================================
+   KREGOSLUP KWOT - element sygnaturowy strony Re-Definition
+   ===========================================================================
+   Manifest opisuje przeplyw JEDNEJ kwoty przez kolejne stany: zero (reputacja
+   za darmo) -> stawka -> 402 (zadanie zaplaty) -> rozliczona suma. Znaczniki
+   sekcji sa wiec KWOTAMI, nie numerami - numer 01/02/03 nie niesie tu zadnej
+   informacji, a kwota niesie cala teze.
+
+   Kregoslup to pionowa linia laczaca te znaczniki. Linia rysuje sie w miare
+   przewijania, wiec czytelnik widzi, ile drogi kwota juz przebyla. To jedyna
+   animacja na tej stronie sterowana pozycja - reszta jest nieruchoma, zeby
+   tekst dalo sie czytac.
+
+   `animation-timeline: view()` dziala natywnie w przegladarkach, ktore je maja;
+   gdzie indziej linia jest po prostu narysowana w calosci. Zaden JavaScript.
+   =========================================================================== */
+.spine-track {
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgb(var(--soft-line));
+}
+
+.spine-fill {
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(to bottom, rgb(var(--soft-primary)), rgb(var(--soft-accent)));
+  transform-origin: top;
+}
+
+@supports (animation-timeline: view()) {
+  .spine-fill {
+    transform: scaleY(0);
+    animation: spine-grow linear both;
+    animation-timeline: view();
+    animation-range: entry 20% cover 60%;
+  }
+  @keyframes spine-grow {
+    to { transform: scaleY(1); }
+  }
+}
+
+/* Znacznik kwoty siedzi NA linii, wiec musi miec tlo strony pod spodem -
+   inaczej linia przechodzi przez cyfry. */
+.spine-marker {
+  position: relative;
+  z-index: 1;
+  background: rgb(var(--soft-bg));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spine-fill { animation: none; transform: scaleY(1); }
+}

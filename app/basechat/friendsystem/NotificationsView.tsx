@@ -29,6 +29,22 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
   const [filterType, setFilterType] = useState<NotificationType | 'all'>('all');
   const [showOnlyUnread, setShowOnlyUnread] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
+
+  /**
+   * Przycisk byl podpiety wprost pod markAllNotificationsAsRead i zostawal
+   * aktywny na czas zapytania - dwa szybkie klikniecia wysylaly dwie serie
+   * zapisow do Firestore. Teraz drugie klikniecie nie ma czego wyslac.
+   */
+  const handleMarkAllAsRead = async () => {
+    if (markingAll) return;
+    setMarkingAll(true);
+    try {
+      await markAllNotificationsAsRead();
+    } finally {
+      setMarkingAll(false);
+    }
+  };
 
   // Filter notifications
   const filteredNotifications = notifications.filter(notification => {
@@ -181,8 +197,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           {/* Mark all as read button */}
           {unreadCount > 0 && (
             <button
-              onClick={markAllNotificationsAsRead}
-              className="px-4 py-2 font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+              onClick={handleMarkAllAsRead}
+              disabled={markingAll}
+              className="px-4 py-2 font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               Mark all as read
             </button>
@@ -277,14 +294,11 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
         </div>
       )}
 
-      {/* Load more notifications */}
-      {filteredNotifications.length > 0 && filteredNotifications.length % 20 === 0 && (
-        <div className="text-center">
-          <button className="px-6 py-3 font-soft font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2">
-            Load More
-          </button>
-        </div>
-      )}
+      {/* USUNIETO: przycisk "Load More". Nie mial onClick - a warunek
+          `% 20 === 0` trafial czesto (useSocial wczytuje dokladnie 20
+          powiadomien), wiec aktywny uzytkownik regularnie widzial przycisk,
+          ktory po kliknieciu nie robil nic. Doczytywanie kolejnej strony
+          wymaga kursora w useSocial - decyzja produktowa. */}
     </div>
   );
 };

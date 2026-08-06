@@ -115,15 +115,23 @@ const nextConfig = {
       // router.replace w useEffect - czyli pusty ekran, potem skok. Serwerowe
       // przekierowanie jest natychmiastowe i nie wymaga zaladowania JS-a.
       { source: '/', destination: '/basechat', permanent: false },
-      // Male litery -> kanoniczne /Docs. Wczesniej byl tu REWRITE
-      // ('/docs/:path*' -> '/Docs/:path*'), ktory na Vercelu najpewniej
-      // zapetlal sie sam na siebie: routing Vercela dopasowuje sciezki bez
-      // uwzgledniania wielkosci liter, wiec '/Docs/' trafialo we wlasne
-      // zrodlo rewrite'a i konczylo sie 404. Lokalny `next start` tego nie
-      // pokazywal, bo Next dopasowuje z uwzglednieniem wielkosci liter.
-      // Przekierowanie zamiast przepisania zrywa te petle.
-      { source: '/docs', destination: '/Docs', permanent: false },
-      { source: '/docs/:path*', destination: '/Docs/:path*', permanent: false },
+      // === NIE DODAWAJ TU REGULY /docs -> /Docs ===
+      // Byly tu kolejno rewrite i redirect z malych liter na kanoniczne /Docs.
+      // OBIE zapetlaly sie na smierc, bo matcher regul Next.js dopasowuje
+      // sciezke BEZ uwzgledniania wielkosci liter. Przy `trailingSlash: true`
+      // wygladalo to tak:
+      //
+      //   /Docs   --308 (kanonizacja slasha)-->  /Docs/
+      //   /Docs/  --307 (bo pasuje do '/docs')-->  /Docs
+      //   ...i tak w kolko
+      //
+      // Zmierzone: curl przerywal po 12 przekierowaniach, przegladarka
+      // pokazywala ERR_TOO_MANY_REDIRECTS. Cala dokumentacja razem z
+      // whitepaperem byla nieosiagalna - takze lokalnie, wiec poprzedni
+      // komentarz obwiniajacy Vercela byl bledna diagnoza.
+      //
+      // Regula jest nie tylko szkodliwa, ale i zbedna: skoro matcher ignoruje
+      // wielkosc liter, /docs/ i tak trafia w te sama trase co /Docs/.
       ...buildRedirects(),
       {
         source: '/:path*',

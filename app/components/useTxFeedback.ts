@@ -154,7 +154,17 @@ export function describeWalletError(error: unknown, context: WalletErrorContext 
   }
 
   // Rozjazd licznika transakcji - najczestszy powod "dziwnego" reverta.
-  if (/nonce too (high|low)|invalid nonce|nonce has already been used|nonce is too/.test(text)) {
+  //
+  // Dwa zapisy, bo viem PODMIENIA komunikat wezla na swoj: NonceTooLowError to
+  // "Nonce provided for the transaction (2) is lower than the current nonce of
+  // the account.", a surowe "nonce too low" zostaje juz tylko w `details`.
+  // Dopasowanie wylacznie do surowej wersji przepuszczalo blad jako 'unknown'
+  // wszedzie tam, gdzie `details` nie doszlo (np. po ponownym opakowaniu bledu).
+  if (
+    /nonce too (high|low)|invalid nonce|nonce has already been used|nonce is too/.test(text) ||
+    /nonce provided for the transaction/.test(text) ||
+    /transaction already imported|already known/.test(text)
+  ) {
     return {
       kind: 'nonce',
       message:
@@ -166,7 +176,12 @@ export function describeWalletError(error: unknown, context: WalletErrorContext 
   }
 
   // Brak srodkow na gaz - i to zawsze W TEJ konkretnej sieci.
-  if (/insufficient funds|gas required exceeds|exceeds the balance/.test(text)) {
+  // "total cost ... exceeds the balance of the account" to wlasna tresc
+  // InsufficientFundsError z viem; "insufficient funds" bywa juz tylko
+  // w `details` od wezla.
+  if (
+    /insufficient funds|gas required exceeds|exceeds the balance|does not have enough funds/.test(text)
+  ) {
     return {
       kind: 'insufficient-funds',
       message: `Not enough ${gasSymbol} on ${network} to pay for gas. Top up the wallet on that network and try again.`,

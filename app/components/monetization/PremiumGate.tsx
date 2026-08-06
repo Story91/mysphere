@@ -70,6 +70,24 @@ export default function PremiumGate({
   const isLoadingContent = unlocked && content === null && contentError === null;
 
   /**
+   * Post pod tym samym komponentem sie zmienil - wszystko, co dotyczylo
+   * poprzedniego, przestaje obowiazywac.
+   *
+   * Bez tego React, ktory przy przesortowaniu feedu potrafi uzyc tej samej
+   * instancji dla innego posta, pokazywal tresc premium POPRZEDNIEGO posta:
+   * `content` nie bylo `null`, wiec efekt pobierajacy z serwera nawet nie
+   * ruszal. `justUnlocked` przenosilo w ten sam sposob cudze odblokowanie.
+   *
+   * Efekt jest zadeklarowany PRZED pobieraniem celowo - najpierw czysci stan,
+   * a dopiero kolejny render odpala zapytanie o wlasciwy post.
+   */
+  useEffect(() => {
+    setContent(null);
+    setContentError(null);
+    setJustUnlocked(false);
+  }, [postId]);
+
+  /**
    * Pobranie tresci. Odpalane tylko wtedy, gdy klient ma POWODY sadzic, ze
    * uzytkownik ma prawo - ale to serwer jest tu rozstrzygajacy. 401 znaczy
    * "nie wiem, kim jestes": bez podpisanej sesji nie da sie odroznic
@@ -257,7 +275,10 @@ export default function PremiumGate({
         </div>
       )}
 
-      {txHash && phase !== 'error' && (
+      {/* Link pokazujemy TAKZE przy bledzie. Jesli hash w ogole istnieje, to
+          transakcja zostala wyslana - a wlasnie wtedy, gdy cos poszlo nie tak,
+          uzytkownik najbardziej potrzebuje dowodu, co sie z nia stalo. */}
+      {txHash && (
         <a
           href={getExplorerTxLink('base', txHash)}
           target="_blank"

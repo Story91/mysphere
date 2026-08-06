@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import MockPost from './MockPost';
 import { createBaseAccountSDK } from '@base-org/account';
 import { useAccount, useConnect } from 'wagmi';
@@ -85,7 +85,22 @@ const MockFeed = () => {
   // Pelna lista portfeli - ta sama, ktorej uzywa przycisk w nawigacji.
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
+  /**
+   * Blad polaczenia, ktory byl juz widoczny w chwili STARTU tej proby.
+   *
+   * Mutacja `connect` z useConnect zostaje w stanie 'error' po nieudanej
+   * probie i wychodzi z niego DOPIERO w kolejnym cyklu powiadomien
+   * react-query. Klikniecie "Continue with Base Account" po raz drugi
+   * ustawialo `pendingSiwe` i renderowalo sie ZANIM status zdazyl wrocic do
+   * 'pending' - efekt ponizej widzial wiec `connectStatus === 'error'` z
+   * POPRZEDNIEJ proby i natychmiast pisal "Wallet connection was interrupted",
+   * w momencie gdy okno portfela dopiero sie otwieralo. Porownanie tozsamosci
+   * bledu odroznia stary blad od nowego; sam status tego nie potrafi.
+   */
+  const staleConnectErrorRef = useRef<unknown>(null);
+
   const handleSignInWithBase = async () => {
+    staleConnectErrorRef.current = connectError;
     setIsBusy(true);
     setLocalError(null);
 
@@ -184,7 +199,8 @@ const MockFeed = () => {
     if (!pendingSiwe) return;
 
     // Uzytkownik zamknal modal konektora / polaczenie padlo.
-    if (connectStatus === 'error') {
+    // Tylko blad NOWSZY niz start tej proby - patrz staleConnectErrorRef.
+    if (connectStatus === 'error' && connectError !== staleConnectErrorRef.current) {
       setPendingSiwe(false);
       setIsBusy(false);
       if (!isUserRejection(connectError)) {

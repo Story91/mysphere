@@ -7,6 +7,7 @@ import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { X, Crown } from 'lucide-react';
+import { describeWalletError } from '../../../components/useTxFeedback';
 import { getAllDurations, calculateTotalCost, calculateExpirationTime } from '../utils/pinPricing';
 import { createPaidPin, canPinPost, PinDuration } from '../../../utils/firebase';
 // Base Pay imports
@@ -61,7 +62,17 @@ export default function PaidPinModal({
 
   // Paragon czytamy zawsze z Base - inaczej po recznej zmianie sieci w portfelu
   // czekalibysmy na potwierdzenie na lancuchu, na ktorym transakcji nie ma.
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+  //
+  // UWAGA: `isSuccess` z tego hooka znaczy "udalo sie POBRAC paragon", a nie
+  // "transakcja sie powiodla". Cofnieta transakcja tez ma paragon, tylko ze
+  // `status: 'reverted'` - i wlasnie dlatego pin byl zapisywany po transakcji,
+  // ktora nic nie zaplacila. O sukcesie decyduje `receipt.status`.
+  const {
+    data: receipt,
+    isLoading: isConfirming,
+    isError: isReceiptError,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({
     hash,
     chainId: PIN_CHAIN_ID,
   });
@@ -88,16 +99,47 @@ export default function PaidPinModal({
   }, [hash, isConfirming]);
 
   useEffect(() => {
-    if (!hash || !isConfirmed) return;
+    if (!hash || !receipt) return;
     if (recordedHashRef.current === hash) return;
     recordedHashRef.current = hash;
+
+    if (receipt.status !== 'success') {
+      // Transakcja weszla na lancuch i sie cofnela - nic nie zostalo zaplacone,
+      // wiec nic nie zapisujemy.
+      paidOrderRef.current = null;
+      toast.error(
+        `Transaction reverted on-chain - the post was not pinned and nothing was charged. Transaction: ${hash}`,
+        { id: hash, duration: 10000 }
+      );
+      setIsProcessing(false);
+      return;
+    }
 
     toast.success('Transaction successful! Your post will be pinned in ~5 minutes.', { id: hash, duration: 6000 });
     void recordPaidPin(hash, paidOrderRef.current);
     // recordPaidPin czyta wylacznie zamrozone zamowienie i propsy, wiec nie
     // potrzebuje byc zaleznoscia efektu.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hash, isConfirmed]);
+  }, [hash, receipt]);
+
+  /**
+   * Paragonu nie da sie pobrac (padl RPC, uzytkownik stracil siec). Bez tego
+   * `isProcessing` zostawalo prawda na zawsze, a przycisk pokazywal
+   * "Processing..." do przeladowania strony - mimo ze transakcja mogla sie
+   * juz dawno potwierdzic.
+   */
+  useEffect(() => {
+    if (!hash || !isReceiptError) return;
+    if (recordedHashRef.current === hash) return;
+    recordedHashRef.current = hash;
+
+    console.error('Failed to read pin transaction receipt:', receiptError);
+    toast.error(
+      `We lost track of your transaction before it was confirmed. Check it in the explorer and keep the hash: ${hash}`,
+      { id: hash, duration: 10000 }
+    );
+    setIsProcessing(false);
+  }, [hash, isReceiptError, receiptError]);
 
   /** Zapis pinu po potwierdzonej platnosci. Uzywa zamrozonego zamowienia. */
   const recordPaidPin = async (txHash: string, order: PinOrder | null) => {
@@ -191,7 +233,15 @@ export default function PaidPinModal({
     } catch (error) {
       paidOrderRef.current = null;
       console.error('Error initiating pin transaction:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to start transaction. Please try again.');
+      // Surowy `error.message` z viem to kilkanascie linii z docs URL i pelnymi
+      // argumentami wywolania. Odmowa podpisu nie jest awaria - nie pokazujemy
+      // jej na czerwono.
+      const info = describeWalletError(error, { network: 'Base', gasSymbol: 'ETH' });
+      if (info.isFailure) {
+        toast.error(info.message || 'Failed to start transaction. Please try again.');
+      } else {
+        toast(info.message);
+      }
       setIsProcessing(false);
     }
   };
@@ -206,15 +256,22 @@ export default function PaidPinModal({
       });
       if (!isMountedRef.current) return;
 
+      // `status` czytamy w try (blad sieci nie moze przerwac pilnowania
+      // oplaconej platnosci), ale decyzje podejmujemy JUZ POZA nim. Wczesniej
+      // `throw new Error('Payment failed')` stalo w srodku try i wpadalo we
+      // wlasny catch: odrzucona platnosc byla odpytywana dalej przez pelne
+      // piec minut i konczyla sie komunikatem "confirmation timed out",
+      // czyli nie ta przyczyna.
+      let status: string | undefined;
       try {
-        const { status } = await getPaymentStatus({ id: paymentId, testnet: false });
-        if (!isMountedRef.current) return;
-        if (status === 'completed') return;
-        if (status === 'failed') throw new Error('Payment failed');
+        ({ status } = await getPaymentStatus({ id: paymentId, testnet: false }));
       } catch (error) {
-        // Chwilowy blad sieci nie moze przerwac pilnowania oplaconej platnosci.
         console.error('Error checking payment status:', error);
       }
+
+      if (!isMountedRef.current) return;
+      if (status === 'completed') return;
+      if (status === 'failed') throw new Error('Payment was rejected by Base Pay');
     }
 
     throw new Error('Payment confirmation timed out');
@@ -316,6 +373,17 @@ export default function PaidPinModal({
     };
   }, [isOpen]);
 
+  // Escape zamyka okno. Dotad jedynym wyjsciem bylo klikniecie myszka w tlo albo
+  // w krzyzyk - klawiatura zostawala uwieziona w oknie proszacym o pieniadze.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return createPortal(
@@ -332,7 +400,10 @@ export default function PaidPinModal({
         bottom: 0
       }}
     >
-      <div 
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Pin your post"
         className="bg-soft-surface rounded-card shadow-float font-soft w-full max-w-[92vw] sm:max-w-md max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
         style={{ 

@@ -78,22 +78,29 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
 
   // Handle follow user
   const handleFollow = async (targetUserId: string) => {
+    if (loadingAction) return;
+
     setLoadingAction(targetUserId);
     setActionType('follow');
     try {
       const success = await followUser(targetUserId);
       if (success) {
         // Update local state to reflect the change
-        setSuggestedUsers(prev => 
-          prev.map(user => 
-            user.address === targetUserId 
+        setSuggestedUsers(prev =>
+          prev.map(user =>
+            user.address === targetUserId
               ? { ...user, isFollowing: true }
               : user
           )
         );
+      } else {
+        // Odrzucenie po stronie serwera bylo dotad calkowicie ciche: przycisk
+        // wracal do napisu "Follow" i nic nie tlumaczylo, dlaczego.
+        toast.error('Could not follow this user. Please try again.');
       }
     } catch (error) {
       console.error('Error following user:', error);
+      toast.error('Could not follow this user. Please try again.');
     } finally {
       setLoadingAction(null);
       setActionType(null);
@@ -102,6 +109,8 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
 
   // Handle send friend request
   const handleSendFriendRequest = async (targetUserId: string) => {
+    if (loadingAction) return;
+
     setLoadingAction(targetUserId);
     setActionType('friend');
     

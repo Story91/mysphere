@@ -1,5 +1,6 @@
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { getPublicDb as getDb } from '../publicFirestore';
+import { toMillis } from '../firestoreTime';
 
 /**
  * Ranking zarobkow z tipow za ostatnie 7 dni.
@@ -35,6 +36,13 @@ export type Leaderboard = {
   totalReceived: Record<string, number>;
   /** Ile dni obejmuje wynik. `null` = cala historia (fallback ponizej). */
   windowDays: number | null;
+  /**
+   * `true` = odczytu NIE udalo sie wykonac. Pusty ranking i nieudany odczyt
+   * daja te sama pusta liste, ale znacza cos zupelnie innego dla czytelnika:
+   * "nikomu jeszcze nie zaplacono" to twierdzenie o swiecie, a nie o naszej
+   * awarii. Patrz SettledPaymentsResult ponizej - ten sam powod.
+   */
+  failed: boolean;
 };
 
 const WINDOW_DAYS = 7;
@@ -61,6 +69,7 @@ export async function getLeaderboard(topN = 20): Promise<Leaderboard> {
     totalTips: 0,
     totalReceived: {},
     windowDays: WINDOW_DAYS,
+    failed: false,
   };
 
   const cutoff = Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -86,7 +95,7 @@ export async function getLeaderboard(topN = 20): Promise<Leaderboard> {
     }
   } catch (error) {
     console.error('[getLeaderboard] Odczyt tipow nie powiodl sie:', error);
-    return empty;
+    return { ...empty, failed: true };
   }
 
   const byAddress = new Map<
@@ -139,7 +148,7 @@ export async function getLeaderboard(topN = 20): Promise<Leaderboard> {
     .sort((a, b) => topAmount(b.received) - topAmount(a.received))
     .slice(0, topN);
 
-  return { entries, totalTips, totalReceived, windowDays };
+  return { entries, totalTips, totalReceived, windowDays, failed: false };
 }
 
 function topAmount(received: Record<string, number>): number {
@@ -190,13 +199,46 @@ export type SettledPayment = {
  * a to jest STRUMIEN (co wlasnie sie stalo). Ranking odpowiada na pytanie
  * "komu ufac", strumien na "czy tu w ogole cos zyje".
  */
-export async function getSettledPayments(max = 30): Promise<SettledPayment[]> {
+/**
+ * Wynik odczytu taśmy. `failed` odroznia AWARIE od PUSTKI.
+ *
+ * Wczesniej funkcja zwracala `[]` w obu przypadkach, wiec strona Paid mowila
+ * "Nothing has settled yet. The first payment starts this tape." takze wtedy,
+ * gdy po prostu nie udalo sie odczytac danych. To najgorszy mozliwy komunikat
+ * na stronie, ktorej cala teza brzmi "te liczby sa sprawdzalne" - zapewnia
+ * czlowieka o stanie swiata, ktorego wlasnie NIE udalo sie sprawdzic.
+ */
+export type SettledPaymentsResult = {
+  payments: SettledPayment[];
+  failed: boolean;
+};
+
+/**
+ * Ile dokumentow pobrac na jedna pozycje, ktora ma sie wyswietlic.
+ *
+ * DLACZEGO W OGOLE NADMIAR: pozycja bez hasha transakcji jest tu odrzucana,
+ * bo bez dowodu nie ma po co istniec. Zmierzone na produkcyjnej kolekcji
+ * `tips`: 44 z 50 najnowszych wpisow ma PUSTY `txHash`. Przy pobieraniu
+ * dokladnie `max` dokumentow i filtrowaniu ICH DOPIERO POTEM tasma wychodzila
+ * pusta, a ranking tuz pod nia pokazywal tych samych ludzi - dwa sprzeczne
+ * komunikaty na jednym ekranie.
+ *
+ * Mnoznik jest ograniczony z gory (FETCH_CAP), zeby nie zamienic tego w
+ * skanowanie calej kolekcji, gdy weryfikowalnych platnosci naprawde brak.
+ */
+const SETTLED_OVERFETCH = 8;
+
+export async function getSettledPayments(max = 30): Promise<SettledPaymentsResult> {
   try {
     const snapshot = await getDocs(
-      query(collection(getDb(), 'tips'), orderBy('timestamp', 'desc'), limit(max))
+      query(
+        collection(getDb(), 'tips'),
+        orderBy('timestamp', 'desc'),
+        limit(Math.min(max * SETTLED_OVERFETCH, FETCH_CAP))
+      )
     );
 
-    return snapshot.docs
+    const payments = snapshot.docs
       .map((entry) => {
         const tip = entry.data() as Record<string, any>;
         const amount = Number.parseFloat(String(tip.amount ?? '0'));
@@ -207,13 +249,24 @@ export async function getSettledPayments(max = 30): Promise<SettledPayment[]> {
           amount: Number.isFinite(amount) ? amount : 0,
           token: typeof tip.token === 'string' ? tip.token : 'ETH',
           network: typeof tip.network === 'string' ? tip.network : 'base',
-          timestamp: typeof tip.timestamp === 'number' ? tip.timestamp : 0,
+          // Kolekcja `tips` zbierala sie przez dlugi czas i trzyma znaczniki w
+          // kilku ksztaltach naraz (liczba ms, liczba sekund, Timestamp
+          // Firestore, ISO). Warunek `typeof === 'number'` zerowal wszystkie
+          // pozostale, a `timeAgo(0)` zwraca pusty string - wiec starsze
+          // platnosci wyswietlaly sie bez daty. toMillis() zna kazdy z tych
+          // ksztaltow (app/utils/firestoreTime.ts).
+          timestamp: toMillis(tip.timestamp),
         };
       })
       // Bez hasha nie ma dowodu, a bez dowodu ta pozycja nie ma po co istniec.
-      .filter((payment) => payment.txHash && payment.amount > 0);
+      .filter((payment) => payment.txHash && payment.amount > 0)
+      // Przycinamy DOPIERO po filtrze - inaczej nadmiar pobrany wyzej nic by
+      // nie dal.
+      .slice(0, max);
+
+    return { payments, failed: false };
   } catch (error) {
     console.error('[getSettledPayments] Odczyt nie powiodl sie:', error);
-    return [];
+    return { payments: [], failed: true };
   }
 }

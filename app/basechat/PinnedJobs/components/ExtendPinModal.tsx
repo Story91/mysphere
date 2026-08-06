@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
+import { describeWalletError } from '../../../components/useTxFeedback';
 import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI, toContractDuration } from '../config/contractConfig';
 import { calculateTotalCost, getDurationInMilliseconds } from '../utils/pinPricing';
 import { PinDuration } from '../../../utils/firebase';
@@ -66,15 +67,22 @@ export default function ExtendPinModal({
 
       onExtendSuccess?.(txHash, selectedDuration);
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Extension error:', error);
 
-      if (error?.message?.includes('user rejected')) {
-        toast.error('Transaction cancelled by user');
-      } else if (error?.message?.includes('insufficient funds')) {
-        toast.error('Insufficient funds for extension');
+      // Poprzednie dopasowanie szukalo `error.message.includes('user rejected')`.
+      // viem pisze "User rejected the request." z wielkiej litery, a kod 4001
+      // siedzi dopiero w `cause`, wiec ten warunek NIGDY nie byl prawdziwy:
+      // odmowa podpisu ladowala w galezi "Extension failed. Please try again."
+      // i wygladala jak awaria aplikacji. Tak samo bylo z brakiem srodkow.
+      const info = describeWalletError(error, {
+        network: 'Base',
+        gasSymbol: 'ETH',
+      });
+      if (info.isFailure) {
+        toast.error(info.message || 'Extension failed. Please try again.');
       } else {
-        toast.error('Extension failed. Please try again.');
+        toast(info.message);
       }
     } finally {
       setIsExtending(false);
@@ -108,11 +116,27 @@ export default function ExtendPinModal({
     }
   };
 
+  // Escape zamyka okno. Dotad wyjsciem byla tylko mysz - klawiatura zostawala
+  // uwieziona w oknie proszacym o pieniadze.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-soft-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-soft-surface rounded-card shadow-float max-w-md w-full max-h-95vh overflow-y-auto font-soft">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Extend pin"
+        className="bg-soft-surface rounded-card shadow-float max-w-md w-full max-h-95vh overflow-y-auto font-soft"
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-soft-line">
           <div className="flex items-center space-x-3">

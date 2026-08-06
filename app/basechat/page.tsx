@@ -65,6 +65,8 @@ import GlassIcons from '../components/GlassIcons/GlassIcons';
 import GooeyNav from '../components/GooeyNav/GooeyNav';
 import SoftFeedMobile from './soft/SoftFeedMobile';
 import SoftSectionList from './soft/SoftSectionList';
+import SoftTrendsPanel from './soft/SoftTrendsPanel';
+import SoftProfileHeader from './soft/SoftProfileHeader';
 const MusicSelector = dynamic(() => import('./components/MusicSelector'), { ssr: false });
 import SpotifyTrackCard from './components/SpotifyTrackCard';
 // Import Zora SDK functions
@@ -2478,6 +2480,33 @@ function BaseChatContent() {
                         ]}
                       />
 
+                      {/* ===== NAGLOWEK PROFILU NA TELEFONIE - Soft Social =====
+                          Ten sam motyw, co ekran startowy: fioletowy gradient
+                          i znak marki na okregu. Tozsamosc produktu wraca w tym
+                          samym miejscu, wiec profil czyta sie jak jego czesc,
+                          a nie jak osobny ekran.
+
+                          ProfileCard ponizej zostaje NIETKNIETY i widoczny od
+                          progu `lg` w gore - cala jego logika (tilt, edycja,
+                          linki spolecznosciowe) dziala dalej bez zmian. */}
+                      {address && (
+                        <SoftProfileHeader
+                          name={userProfile.name || 'MySphere User'}
+                          address={address}
+                          avatarUrl={userProfile.avatar}
+                          posts={userProfile.postCount || 0}
+                          likes={userProfile.likesReceived || 0}
+                          // Punkty licza sie z aktywnosci i zyja w userStats
+                          // pod adresem uzytkownika, nie w profilu.
+                          points={(address && userStats[address]?.totalPoints) || 0}
+                          onCopyAddress={() => {
+                            navigator.clipboard.writeText(address);
+                            toast.success('Address copied');
+                          }}
+                          onEdit={() => setIsEditingProfile(!isEditingProfile)}
+                        />
+                      )}
+
                       {/* ProfileCard at the top */}
                       {address && (
                         <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
@@ -3725,9 +3754,29 @@ function BaseChatContent() {
             {/* Right panel (Trends & Global Statistics) */}
             <div className={`${
               activeMobilePanel === 'right' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
-            } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4`}>
+            } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-soft-bg lg:bg-soft-surface overflow-y-auto p-4`}>
+              {/* ===== TRENDS NA TELEFONIE - kierunek Soft Social =====
+                  Cztery kafle statystyk i ranking w nowym wygladzie. Stary blok
+                  ponizej dostal `hidden lg:block`, wiec DESKTOP IDZIE STARA
+                  SCIEZKA bez zmian - te same dane, ten sam kod, inna oprawa
+                  tylko tam, gdzie ekran jest waski. */}
+              <SoftTrendsPanel
+                stats={[
+                  { label: 'Users', value: String(totalUsers), tone: 'purple' },
+                  { label: 'Likes', value: String(totalLikes), tone: 'amber' },
+                  { label: 'Posts', value: String(totalPosts), tone: 'green' },
+                  { label: 'Comments', value: String(totalComments), tone: 'pink' },
+                ]}
+                activeUsers={(activeUsers || []).slice(0, 5).map((user: any) => ({
+                  address: user.address,
+                  name: user.name || `${String(user.address).slice(0, 6)}…${String(user.address).slice(-4)}`,
+                  points: user.totalPoints ?? user.points ?? 0,
+                }))}
+                onOpenUser={(userAddress) => handleViewBuilderProfile(userAddress)}
+              />
+
               {/* Global Statistics */}
-              <div className="mb-4">
+              <div className="mb-4 hidden lg:block">
                 <h2 className="text-lg font-semibold mb-3 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
                     Global Statistics
                     <div className="ml-2 text-2xl">🔥</div>

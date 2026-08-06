@@ -152,11 +152,16 @@ export async function POST(request: NextRequest) {
     // i degraduje zachowanie do dzisiejszego, zamiast wywalac logowanie.
     const firebaseToken = await mintFirebaseToken(payload.address);
 
-    const response = NextResponse.json({
-      address: payload.address,
-      expiresAt,
-      firebaseToken,
-    });
+    const response = NextResponse.json(
+      {
+        address: payload.address,
+        expiresAt,
+        firebaseToken,
+      },
+      // Odpowiedz niesie poswiadczenie Firebase konkretnego czlowieka - nie
+      // moze wyladowac w zadnym cache po drodze.
+      { headers: { 'Cache-Control': 'no-store, private' } }
+    );
 
     // Nonce jest jednorazowy - po udanym uzyciu znika.
     response.cookies.set({

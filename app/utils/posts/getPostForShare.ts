@@ -47,7 +47,17 @@ export async function getPostForShare(postId: string): Promise<SharedPost | null
     };
   } catch (error) {
     console.error('[getPostForShare] Nie udalo sie odczytac posta:', error);
-    return null;
+    // RZUCAMY, nie zwracamy null.
+    //
+    // `null` znaczy tutaj "takiego posta nie ma" i strona zamienia go na
+    // notFound(), czyli 404. Dla przegladarki to drobna roznica, dla crawlera
+    // - oswiadczenie, ze zasob nie istnieje i mozna go usunac z indeksu.
+    // Przejsciowa awaria Firestore kasowalaby w ten sposob udostepnione posty
+    // z wyszukiwarek, a te strony istnieja WYLACZNIE po to, zeby dobrze
+    // wygladac po wklejeniu linku.
+    //
+    // Blad daje 500 - a 500 znaczy "sprobuj pozniej", czyli prawde.
+    throw error;
   }
 }
 
@@ -77,6 +87,13 @@ export async function getRecentPostRefs(
     });
   } catch (error) {
     console.error('[getRecentPostRefs] Nie udalo sie pobrac listy postow:', error);
+    // TUTAJ, inaczej niz w getPostForShare i getTipReceipt, pusta lista jest
+    // wlasciwa. Sitemapa to PODPOWIEDZ, a nie spis powszechny: brak adresu
+    // w sitemapie nie jest oswiadczeniem, ze ten adres nie istnieje, i nie
+    // powoduje usuniecia go z indeksu. Za to rzucenie wyjatkiem wywrocilby
+    // build (app/sitemap.ts jest generowany statycznie), czyli przejsciowa
+    // czkawka Firestore blokowalaby KAZDY deploy. Sitemapa bez czesci postow
+    // jest nieszkodliwa; zablokowany deploy nie jest.
     return [];
   }
 }

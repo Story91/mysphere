@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 // @ts-ignore - config CommonJS wspoldzielony z next.config.js
-import { isRouteDisabled } from '@/config/routeStatus';
+import { DISABLED_ROUTES } from '@/config/routeStatus';
 
 export const metadata: Metadata = {
   title: 'Re-Definition — money buys judgment on MySphere',
@@ -25,9 +25,14 @@ export const metadata: Metadata = {
  * byla i slusznie zostala zjechana). To jest manifest kierunku: jednostka
  * produktu przestaje byc post, a zaczyna byc post ze stawka.
  *
- * Sekcja "What runs today" nadal czyta `isRouteDisabled` z config/routeStatus.js,
- * czyli z DOKLADNIE tej samej listy, ktora generuje przekierowania w
- * next.config.js. Strona nie moze wiec sklamac o tym, co jest wlaczone.
+ * Sekcja "What runs today" bierze liczbe zaparkowanych modulow WPROST z
+ * `DISABLED_ROUTES` w config/routeStatus.js - z DOKLADNIE tej samej listy,
+ * ktora generuje przekierowania w next.config.js. Nie z wlasnej listy
+ * przefiltrowanej przez `isRouteDisabled()`, bo to nie jest czytanie zrodla
+ * prawdy: taka lista raz juz sie rozjechala i manifest podawal szesc zamiast
+ * osmiu. Sam opis modulow ponizej jest pisany recznie - gdy dojdzie kolejny
+ * wpis do DISABLED_ROUTES, liczba zaktualizuje sie sama, a wyliczenie w
+ * zdaniu trzeba dopisac.
  */
 
 /* ------------------------------------------------------------------ */
@@ -39,14 +44,24 @@ export const metadata: Metadata = {
  * opisuja te sama kwote w kolejnych stanach - zero (reputacja za darmo),
  * stawka, 402 (zadanie zaplaty), rozliczona suma.
  */
+/**
+ * Znacznik sekcji jest KWOTA, nie numerem - i siedzi jako stacja na kregoslupie
+ * biegnacym przez cala strone.
+ *
+ * Numer 01/02/03 nie niesie tu zadnej informacji: kolejne sekcje nie sa krokami
+ * procesu, tylko STANAMI TEJ SAMEJ KWOTY - zero (reputacja za darmo), stawka,
+ * 402 (zadanie zaplaty), rozliczona suma. Kwota niesie cala teze strony, numer
+ * nie niosl by nic.
+ */
 function Marker({ amount, label }: { amount: string; label: string }) {
   return (
-    <div className="mb-7 flex items-baseline gap-3">
-      <span className="font-soft-display text-[13px] font-semibold tabular-nums text-soft-accent-deep">
+    <div className="spine-marker mb-7 flex items-baseline gap-3 py-1">
+      <span className="-ml-[26px] flex h-3 w-3 shrink-0 items-center justify-center rounded-full border-2 border-soft-accent bg-soft-bg" aria-hidden="true" />
+      <span className="font-soft-display text-[14px] font-bold tabular-nums text-soft-accent-deep">
         {amount}
       </span>
-      <span className="h-px flex-1 bg-gradient-to-r from-[#00E28A]/40 to-transparent" />
-      <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-soft-ink-faint">
+      <span className="h-px flex-1 bg-gradient-to-r from-soft-line to-transparent" />
+      <span className="font-soft text-[10px] font-bold uppercase tracking-[0.2em] text-soft-ink-faint">
         {label}
       </span>
     </div>
@@ -232,11 +247,18 @@ function CapabilityRow({ cap }: { cap: (typeof CAPABILITIES)[number] }) {
 /* ------------------------------------------------------------------ */
 
 export default function ReDefinitionPage() {
-  // Prawda o wylaczonych trasach bierze sie z konfiguracji przekierowan,
-  // nie z recznej listy - strona nie moze rozjechac sie z produkcja.
-  const parked = ['/mycamp', '/base', '/marketplace', '/basemorning', '/yapscan', '/swap'].filter(
-    (path) => isRouteDisabled(path)
-  ).length;
+  // Liczba WPROST z konfiguracji przekierowan.
+  //
+  // Wczesniej stala tu wlasna lista szesciu sciezek przefiltrowana przez
+  // isRouteDisabled - z komentarzem obiecujacym, ze strona "nie moze rozjechac
+  // sie z produkcja". Mogla i rozjechala sie: DISABLED_ROUTES ma osiem pozycji,
+  // bo doszly '/MyAgents' i '/MyClaw', a lista tutaj ich nie znala. Manifest
+  // podawal wiec liczbe mniejsza od prawdy - na stronie, ktorej cala teza brzmi
+  // "no promises, only state".
+  //
+  // Filtrowanie wlasnej listy przez isRouteDisabled() nie jest czytaniem
+  // zrodla prawdy. Czytaniem zrodla prawdy jest wziecie samego zrodla.
+  const parked = DISABLED_ROUTES.length;
 
   return (
     <main className="min-h-screen bg-soft-bg font-soft">
@@ -282,7 +304,18 @@ export default function ReDefinitionPage() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-[720px] px-5 sm:px-8">
+      {/* KREGOSLUP KWOT. Pionowa linia laczaca znaczniki sekcji, ktora rysuje
+          sie w miare przewijania - czytelnik widzi, ile drogi kwota juz
+          przebyla. To JEDYNA animacja sterowana pozycja na tej stronie; reszta
+          jest nieruchoma, bo to strona do czytania, a ruch obok tekstu
+          konkuruje z kazdym zdaniem.
+
+          Zrobiona przez `animation-timeline: view()`, czyli bez jednej linii
+          JavaScriptu. Gdzie przegladarka tego nie ma, linia jest po prostu
+          narysowana w calosci - strona nie traci niczego poza efektem. */}
+      <div className="relative mx-auto max-w-[720px] px-5 pl-10 sm:px-8 sm:pl-12">
+        <span className="spine-track" aria-hidden="true" />
+        <span className="spine-fill" aria-hidden="true" />
         {/* ---------------- $0.00 ---------------- */}
         <section className="py-16">
           <Marker amount="$0.00" label="what a like is worth" />
@@ -439,9 +472,10 @@ export default function ReDefinitionPage() {
           </div>
           <p className="mt-7 text-[14px] leading-[1.7] text-soft-ink-soft">
             {parked} older modules — the minting camp, the identity page, the marketplace, the
-            morning game, the attention scanner, the swap widget — are parked. They were surface
-            area, not a product. Everything that mattered in them was one address doing something
-            another address could verify, and that is exactly what an Ask is.
+            morning game, the attention scanner, the swap widget, the agent directory, the skills
+            catalogue — are parked. They were surface area, not a product. Everything that mattered
+            in them was one address doing something another address could verify, and that is
+            exactly what an Ask is.
           </p>
         </section>
 

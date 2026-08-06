@@ -37,6 +37,22 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
     setError(null);
   }, [address]);
 
+  // Modal przykrywal cala strone, a jedynym wyjsciem byl krzyzyk w rogu -
+  // klawiatura nie miala jak go zamknac.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Pobierz dane Spotify gdy modal się otwiera
   useEffect(() => {
     if (!isOpen || !address || spotifyData) return;
@@ -328,7 +344,10 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
         {/* Footer */}
         <div className="p-4 border-t border-soft-line bg-soft-sunken">
           <div className="text-sm text-soft-ink-muted text-center space-y-1">
-            <div>💡 Click on a track to add it to your post</div>
+            {/* Karta utworu nie jest klikalna (SpotifyTrackCard nie przyjmuje
+                zadnego handlera wyboru) - dodaje wylacznie przycisk ➕. Stara
+                tresc obiecywala cos, czego nie da sie zrobic. */}
+            <div>💡 Click ➕ on a track to add it to your post</div>
             <div className="text-xs opacity-75">
               📊 Data cached for 30 minutes • Use refresh button for latest tracks
             </div>

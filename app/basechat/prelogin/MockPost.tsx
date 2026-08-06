@@ -22,15 +22,15 @@ const MockPost: React.FC<MockPostProps> = ({ userName, userHandle, network, cont
   const isWorldName = userName.endsWith('.world');
 
   const networkStyles = {
-    'Base': 'bg-blue-100 text-blue-800 border-blue-200',
-    'Camp Network': 'bg-orange-100 text-orange-800 border-orange-200',
+    'Base': 'bg-soft-sunken text-soft-primary-deep border-soft-line',
+    'Camp Network': 'bg-soft-accent-soft text-soft-accent-deep border-soft-accent/30',
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 w-full text-black">
+    <div className="bg-soft-surface rounded-card shadow-card p-4 w-full text-soft-ink">
       <div className="flex items-start space-x-3">
         {/* Avatar */}
-        <div className="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0">
+        <div className="w-10 h-10 rounded-full bg-soft-sunken flex-shrink-0">
           <img src={avatar} alt="avatar" className="w-full h-full rounded-full object-cover" />
         </div>
 
@@ -44,7 +44,7 @@ const MockPost: React.FC<MockPostProps> = ({ userName, userHandle, network, cont
                 isCamperName ? 'text-orange-600' :
                 isCeloName ? 'text-yellow-600' :
                 isWorldName ? 'text-green-600' :
-                'text-gray-800'
+                'text-soft-ink'
               }`}>
                 {userName}
               </span>
@@ -52,16 +52,16 @@ const MockPost: React.FC<MockPostProps> = ({ userName, userHandle, network, cont
                 {network}
               </span>
             </div>
-            <span className="text-xs text-gray-500">{timestamp}</span>
+            <span className="text-xs text-soft-ink-soft">{timestamp}</span>
           </div>
 
           {/* Post Content */}
-          <p className="text-gray-700 text-sm leading-relaxed">
+          <p className="text-soft-ink-muted text-sm leading-relaxed">
             {content}
           </p>
 
           {/* Actions */}
-          <div className="flex items-center space-x-4 mt-3 text-gray-500 text-xs">
+          <div className="flex items-center space-x-4 mt-3 text-soft-ink-soft text-xs">
             <span>🤍 {likes}</span>
             <span>💬 {comments}</span>
             <span>💰 Tip ({tips})</span>

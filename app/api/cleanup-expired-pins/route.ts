@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cleanupExpiredPaidPins } from '../../utils/firebase';
+import { cleanupExpiredPaidPins, ADMIN_ADDRESS } from '../../utils/firebase';
 
 /**
  * Cron job endpoint do automatycznego czyszczenia wygasłych paid pins
@@ -57,8 +57,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { adminAddress } = body;
 
-    // Sprawdź czy użytkownik jest adminem
-    const ADMIN_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd'.toLowerCase();
+    // Sprawdź czy użytkownik jest adminem.
+    //
+    // ADMIN_ADDRESS importowany, a nie wpisany tu drugi raz na sztywno. Byla
+    // tu wlasna kopia tego samego adresu - czyli miejsce, ktore przy zmianie
+    // admina zostaloby po cichu przy starym wlascicielu, i to akurat w trasie
+    // API, gdzie nikt by tego nie zauwazyl. Stala z firebase.ts jest juz
+    // znormalizowana do malych liter.
     if (!adminAddress || adminAddress.toLowerCase() !== ADMIN_ADDRESS) {
       return NextResponse.json(
         { error: 'Only admins can trigger manual cleanup' },

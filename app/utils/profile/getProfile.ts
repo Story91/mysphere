@@ -54,6 +54,14 @@ export type Profile = {
     /** Sumy per token - kwoty w roznych tokenach nie sa dodawalne. */
     received: Record<string, number>;
   };
+  /**
+   * `true` = przynajmniej jeden odczyt sie wywrocil, wiec liczby ponizej sa
+   * NIEPELNE. Strona ma wtedy powiedziec, ze czegos nie udalo sie wczytac,
+   * zamiast twierdzic "Nothing posted yet" o czlowieku, ktory mogl napisac
+   * dwiescie postow. Puste liczby to twierdzenie o swiecie i nie wolno go
+   * stawiac w momencie, w ktorym wlasnie nie udalo sie go sprawdzic.
+   */
+  partial: boolean;
   recentPosts: ProfilePost[];
 };
 
@@ -76,9 +84,21 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
 
   // Kazdy odczyt jest niezalezny - profil ma sie wyswietlic nawet wtedy, gdy
   // jedno zapytanie zawiedzie (np. brak indeksu na jakiejs kolekcji).
+  //
+  // `failed` liczy odczyty, ktore SIE WYWROCILY - w odroznieniu od tych, ktore
+  // po prostu nic nie znalazly. Bez tego rozroznienia awaria Firestore dawala
+  // ten sam wynik co nieistniejacy adres, a to konczylo sie realna szkoda:
+  // patrz `hasAnyTrace` na dole tej funkcji.
+  let failed = 0;
+  const onFail = (label: string) => (error: unknown) => {
+    failed++;
+    console.error(`[getProfile] Odczyt (${label}) nie powiodl sie:`, error);
+    return null;
+  };
+
   const [userDoc, postsSnapshot, receivedSnapshot, sentSnapshot] = await Promise.all([
     Promise.all(
-      variants.map((variant) => getDoc(doc(db, 'users', variant)).catch(() => null))
+      variants.map((variant) => getDoc(doc(db, 'users', variant)).catch(onFail('users')))
     ).then((docs) => docs.find((entry) => entry?.exists()) ?? null),
 
     getDocs(
@@ -88,17 +108,14 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
         orderBy('timestamp', 'desc'),
         limit(200)
       )
-    ).catch((error) => {
-      console.error('[getProfile] Odczyt postow nie powiodl sie:', error);
-      return null;
-    }),
+    ).catch(onFail('posts')),
 
     getDocs(
       query(collection(db, 'tips'), where('recipientAddress', 'in', variants))
-    ).catch(() => null),
+    ).catch(onFail('tips.received')),
 
     getDocs(query(collection(db, 'tips'), where('senderAddress', 'in', variants))).catch(
-      () => null
+      onFail('tips.sent')
     ),
   ]);
 
@@ -139,13 +156,22 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
 
   // Profil bez zadnego sladu w bazie nie istnieje - lepiej oddac 404 niz pusta
   // strone, ktora crawler zaindeksuje jako tresc.
+  //
+  // ALE: "nie znalazlem sladu" i "nie udalo mi sie sprawdzic" to nie to samo.
+  // Wczesniej dawaly ten sam wynik, wiec przejsciowa awaria Firestore znaczyla
+  // 404 na PUBLICZNYM PROFILU ISTNIEJACEGO CZLOWIEKA. Szkoda jest trwalsza niz
+  // sama awaria: 404 to dla crawlera oswiadczenie, ze strona nie istnieje, a
+  // ten profil ma jedno zadanie - dobrze wygladac po wklejeniu linku.
+  //
+  // Gdy ktorykolwiek odczyt sie wywrocil, wolimy oddac profil niepelny niz
+  // skasowac czlowieka z internetu na czas awarii.
   const hasAnyTrace =
     Boolean(userDoc) ||
     postDocs.length > 0 ||
     (receivedSnapshot?.size ?? 0) > 0 ||
     (sentSnapshot?.size ?? 0) > 0;
 
-  if (!hasAnyTrace) return null;
+  if (!hasAnyTrace && failed === 0) return null;
 
   return {
     address,
@@ -161,5 +187,6 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
       received,
     },
     recentPosts,
+    partial: failed > 0,
   };
 }

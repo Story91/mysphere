@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { UserWithFollowStatus } from '../../utils/friends';
 import { useSocial } from './hooks';
 
@@ -31,14 +32,20 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
 
   // Handle unfollow (Obsługa przestania obserwowania)
   const handleUnfollow = async (targetUserId: string) => {
+    if (loadingAction) return;
+
     setLoadingAction(targetUserId);
     try {
       const success = await unfollowUser(targetUserId);
+      // Bez tego nieudane odpiecie konczylo sie samym console.error: spinner
+      // gasl, wiersz zostawal na liscie i uzytkownik nie wiedzial, ze serwer
+      // odrzucil operacje.
       if (!success) {
-        console.error('Failed to unfollow user');
+        toast.error('Could not unfollow this user. Please try again.');
       }
     } catch (error) {
       console.error('Error unfollowing user:', error);
+      toast.error('Could not unfollow this user. Please try again.');
     } finally {
       setLoadingAction(null);
     }
@@ -230,14 +237,13 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
               ))}
             </div>
 
-            {/* Load more button */}
-            {currentList.length > 0 && currentList.length % 20 === 0 && (
-              <div className="text-center">
-                <button className="px-6 py-3 font-soft font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2">
-                  Load More {activeTab === 'following' ? 'Following' : 'Followers'}
-                </button>
-              </div>
-            )}
+            {/* USUNIETO: przycisk "Load More Following/Followers". Nie mial
+                zadnego onClick - klikniecie nie robilo nic, a wygladal na
+                dzialajacy. Dodatkowo warunek `% 20 === 0` prawie nigdy nie
+                zachodzil, bo useSocial wczytuje listy z limitem 50, wiec
+                przycisk pojawial sie tylko przy dokladnie 20 albo 40 wpisach.
+                Prawdziwe stronicowanie wymaga kursora w useSocial (hook nie
+                oddaje zadnego) - to decyzja produktowa, nie lokalna poprawka. */}
           </>
         );
       })()}

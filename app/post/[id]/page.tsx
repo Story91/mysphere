@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getPostForShare, shortAddress } from '../../utils/posts/getPostForShare';
+import Image from 'next/image';
+import { getPostForShare, getPostTipTotals, shortAddress } from '../../utils/posts/getPostForShare';
+import SharePostActions from './SharePostActions';
 
 /**
  * Udostepnialna trasa pojedynczego posta.
@@ -57,7 +59,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function PostPage({ params }: Props) {
-  const post = await getPostForShare(params.id);
+  // Tresc i sumy tipow rownolegle - to dwa niezalezne odczyty, a strona czeka
+  // na oba, wiec sekwencyjnie kosztowalyby dwa razy tyle czasu.
+  const [post, tipTotals] = await Promise.all([
+    getPostForShare(params.id),
+    getPostTipTotals(params.id),
+  ]);
   if (!post) notFound();
 
   const author = post.authorName || shortAddress(post.author);
@@ -69,48 +76,78 @@ export default async function PostPage({ params }: Props) {
       })
     : null;
 
+  const tipLine = Object.entries(tipTotals)
+    .filter(([, amount]) => amount > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([token, amount]) =>
+      `${amount >= 1 ? amount.toFixed(2).replace(/\.00$/, '') : amount.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} ${token}`
+    )
+    .join(' + ');
+
   return (
-    <main className="min-h-screen bg-[#0A1024] px-5 py-16 sm:px-8">
-      <article className="mx-auto max-w-[640px]">
-        <header className="mb-6 flex items-baseline justify-between gap-4">
-          <span className="font-['Coinbase_Display'] text-[15px] font-semibold text-[#EEF3FF]">
-            {author}
-          </span>
-          {posted && <span className="text-[12px] tabular-nums text-[#5C6F94]">{posted}</span>}
-        </header>
+    <main className="min-h-screen bg-soft-bg px-4 py-10 font-soft sm:px-6">
+      <div className="mx-auto max-w-[600px]">
+        {/* Pasek marki. Ta strona jest najczesciej PIERWSZYM, co ktos widzi
+            z MySphere - przychodzi z wklejonego linku, nie z aplikacji. Musi
+            wiec od razu powiedziec, gdzie jest, zanim przeczyta post. */}
+        <Link
+          href="/basechat"
+          className="mb-6 inline-flex items-center gap-2.5 rounded-pill bg-soft-surface px-3 py-2 shadow-card transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97]"
+        >
+          <Image src="/android-chrome-192x192.png" alt="" width={22} height={22} className="rounded-md" />
+          <span className="font-soft-display text-[13.5px] font-bold text-soft-ink">MySphere</span>
+        </Link>
 
-        <p className="whitespace-pre-wrap text-[17px] leading-relaxed text-[#C7D4EE]">
-          {post.content}
-        </p>
+        <article className="rounded-card bg-soft-surface p-5 shadow-card sm:p-6">
+          <header className="mb-4 flex items-center justify-between gap-4">
+            <Link
+              href={`/u/${post.author}`}
+              className="font-soft-display text-[15px] font-bold text-soft-ink hover:text-soft-primary-deep"
+            >
+              {author}
+            </Link>
+            {posted && (
+              <span className="font-soft text-[12px] tabular-nums text-soft-ink-faint">{posted}</span>
+            )}
+          </header>
 
-        {post.image && (
-          // images.unoptimized jest wlaczone, wiec Next nie doda wymiarow za nas.
-          // Kontener z aspect-ratio rezerwuje miejsce i nie przesuwa tresci.
-          <div className="relative mt-6 aspect-[16/10] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#101A33]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={post.image}
-              alt=""
-              className="absolute inset-0 h-full w-full object-contain"
-            />
+          <p className="whitespace-pre-wrap break-words font-soft text-[16.5px] leading-[1.6] text-soft-ink-muted">
+            {post.content}
+          </p>
+
+          {post.image && (
+            <div className="relative mt-5 aspect-[16/10] w-full overflow-hidden rounded-[18px] bg-soft-sunken">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={post.image} alt="" className="absolute inset-0 h-full w-full object-contain" />
+            </div>
+          )}
+
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-soft-line pt-4 font-soft text-[13px] tabular-nums text-soft-ink-soft">
+            <span>{post.likes} likes</span>
+            <span>{post.commentCount} comments</span>
+            {post.network && <span className="capitalize">on {post.network}</span>}
+
+            {/* Kwota stoi na koncu i jest jedynym mocnym kolorem - to jedyna
+                liczba na tej stronie, ktorej nie da sie nabic. */}
+            {tipLine && (
+              <span className="ml-auto rounded-pill bg-soft-accent-soft px-3 py-1 font-soft-display font-bold text-soft-accent-deep">
+                {tipLine} in tips
+              </span>
+            )}
           </div>
-        )}
+        </article>
 
-        <div className="mt-8 flex items-center gap-6 border-t border-white/[0.07] pt-5 text-[13px] tabular-nums text-[#93A5C9]">
-          <span>{post.likes} likes</span>
-          <span>{post.commentCount} comments</span>
-          {post.network && <span className="text-[#5C6F94]">on {post.network}</span>}
-        </div>
+        <SharePostActions postId={post.id} authorName={author} />
 
-        <div className="mt-10">
-          <Link
-            href="/basechat"
-            className="inline-block rounded-xl bg-[#0052FF] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#0052FF]/90"
-          >
-            Open MySphere
+        <p className="mt-8 text-center font-soft text-[12.5px] leading-relaxed text-soft-ink-faint">
+          MySphere is a feed where money moves between people, not just posts.{' '}
+          <Link href="/leaderboard" className="font-semibold text-soft-primary-deep underline underline-offset-2">
+            See what has been paid
           </Link>
-        </div>
-      </article>
+          .
+        </p>
+      </div>
     </main>
   );
 }

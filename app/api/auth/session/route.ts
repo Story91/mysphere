@@ -45,11 +45,20 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/**
+ * Odpowiedz zawiera `firebaseToken`, czyli poswiadczenie jednego konkretnego
+ * czlowieka. `force-dynamic` gwarantuje tylko tyle, ze Next nie zbuduje tego
+ * statycznie - NIE zabrania posrednikom (CDN, proxy firmowe, cache
+ * przegladarki przy nawigacji wstecz) trzymac gotowej odpowiedzi. Odpowiedz
+ * podana z cache'u innemu uzytkownikowi zalogowalaby go jako ktos inny.
+ */
+const NO_STORE = { 'Cache-Control': 'no-store, private' } as const;
+
 export async function GET() {
   try {
     const session = getSessionFromCookies(cookies());
     if (!session) {
-      return NextResponse.json({ address: null });
+      return NextResponse.json({ address: null }, { headers: NO_STORE });
     }
 
     // Swiezy token logujacy do Firebase dla adresu z sesji. Zwraca null, gdy
@@ -61,12 +70,15 @@ export async function GET() {
     // uwierzytelnienie, tylko przesuniecie okna waznosci dla aktywnego klienta.
     if (shouldRollSession(session)) {
       const nowSeconds = Math.floor(Date.now() / 1000);
-      const response = NextResponse.json({
-        address: session.address,
-        chainId: session.chainId,
-        expiresAt: nowSeconds + SESSION_TTL_SECONDS,
-        firebaseToken,
-      });
+      const response = NextResponse.json(
+        {
+          address: session.address,
+          chainId: session.chainId,
+          expiresAt: nowSeconds + SESSION_TTL_SECONDS,
+          firebaseToken,
+        },
+        { headers: NO_STORE }
+      );
       response.cookies.set(SESSION_COOKIE, rollSession(session, nowSeconds), {
         httpOnly: true,
         sameSite: 'lax',
@@ -77,16 +89,19 @@ export async function GET() {
       return response;
     }
 
-    return NextResponse.json({
-      address: session.address,
-      chainId: session.chainId,
-      expiresAt: session.expiresAt,
-      firebaseToken,
-    });
+    return NextResponse.json(
+      {
+        address: session.address,
+        chainId: session.chainId,
+        expiresAt: session.expiresAt,
+        firebaseToken,
+      },
+      { headers: NO_STORE }
+    );
   } catch (error) {
     // Najczestszy powod: brak AUTH_SESSION_SECRET. Failujemy zamknieto -
     // brak konfiguracji ma oznaczac "brak sesji", nigdy "sesja wazna".
     console.error('[auth/session] Nie udalo sie odczytac sesji:', error);
-    return NextResponse.json({ address: null });
+    return NextResponse.json({ address: null }, { headers: NO_STORE });
   }
 }
