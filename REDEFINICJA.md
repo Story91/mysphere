@@ -1,3 +1,16 @@
+> ## ⚠️ DOKUMENT HISTORYCZNY — 5 sierpnia 2026
+>
+> **Ten plik jest nieaktualny. Pierwszeństwo ma [`AUDYT.md`](AUDYT.md) (6 sierpnia 2026)** — to jedyny
+> obowiązujący dziennik stanu. Przy rozjeździe `AUDYT.md` ma rację.
+>
+> Wartość tego dokumentu jest dziś **historyczna**: pokazuje, *dlaczego* zmieniliśmy kierunek
+> (Base porzuciło social, rynek creator coins się zawalił, x402 rośnie) i jak wyglądał plan faz 0–2.
+> Nieaktualne są natomiast: tabela stanu funkcji, lista otwartych pytań (decyzja o **własnym rejestrze
+> agentów** została podjęta i wdrożona) oraz zdanie „mamy ich już siedem" o łańcuchach — Robinhood
+> Chain jest w kodzie i sieci jest siedem razem z nim.
+>
+> Materiał do postów z tego okresu: [`POSTY-SOCIAL.md`](POSTY-SOCIAL.md).
+
 # MySphere — redefinicja
 
 Stan: 5 sierpnia 2026. Dokument roboczy, nie manifest.

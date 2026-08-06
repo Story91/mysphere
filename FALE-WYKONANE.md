@@ -1,3 +1,14 @@
+> ## ⚠️ DOKUMENT HISTORYCZNY — 4 sierpnia 2026
+>
+> **Ten plik jest nieaktualny jako opis stanu. Pierwszeństwo ma [`AUDYT.md`](AUDYT.md)
+> (6 sierpnia 2026)** — jedyny obowiązujący dziennik stanu.
+>
+> Opisane tu fale A–E zostały **wykonane w całości**, a ich wynik jest streszczony w `AUDYT.md` §2
+> (290 usuniętych plików, 22 149 linii, `public/` 71 → 22 MB, zależności 107 → 51).
+> Dokument zostaje jako zapis metody i szczegółów pomiarów.
+>
+> Materiał do postów: [`POSTY-SOCIAL.md`](POSTY-SOCIAL.md).
+
 # MySphere — raport z wykonania fal (2026-08-04)
 
 Realizacja `AUDYT.md` (fale A–D) + `MARTWY-KOD.md` (fale 0 i 0.5) + bezpieczna część fali E.

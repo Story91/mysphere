@@ -1,3 +1,15 @@
+> ## ⚠️ DOKUMENT HISTORYCZNY — 4 sierpnia 2026
+>
+> **Ten plik jest nieaktualny jako opis stanu. Pierwszeństwo ma [`AUDYT.md`](AUDYT.md)
+> (6 sierpnia 2026)** — jedyny obowiązujący dziennik stanu.
+>
+> Inwentarz opisuje repozytorium **sprzed kasacji**: 390 śledzonych plików → 284 osiągalne,
+> 106 nieosiągalnych. Kasacja została wykonana (patrz [`FALE-WYKONANE.md`](FALE-WYKONANE.md)),
+> więc wymienione tu pliki w większości już nie istnieją. Dokument zostaje jako zapis **metody**
+> (graf importów od punktów wejścia App Routera) i punkt odniesienia dla przyszłych przeglądów.
+>
+> Materiał do postów: [`POSTY-SOCIAL.md`](POSTY-SOCIAL.md).
+
 # MySphere — inwentarz martwego kodu i plików (2026-08-04)
 
 Uzupełnienie do `AUDYT.md`. Audyt Fable opisywał **co naprawić**; ten dokument opisuje **co usunąć**.

@@ -1,3 +1,15 @@
+> ## ⚠️ DOKUMENT HISTORYCZNY — 5 sierpnia 2026
+>
+> **Ten plik jest nieaktualny. Pierwszeństwo ma [`AUDYT.md`](AUDYT.md) (6 sierpnia 2026)** — to jedyny
+> obowiązujący dziennik stanu. Przy rozjeździe `AUDYT.md` ma rację.
+>
+> Znane rozjazdy z produkcją: „Robinhood Chain — ósma sieć" (jest **siódma** — `camp` i `basecamp`
+> to ten sam łańcuch); PR #16 czekający na merge (poszedł 5 sierpnia); ograniczenia wymienione jako
+> otwarte, a już zamknięte — `PremiumGate` jako publiczny paywall, brak UI treści premium
+> w kompozytorze, brak limitu podejść do egzaminu.
+>
+> Materiał do postów z tego okresu: [`POSTY-SOCIAL.md`](POSTY-SOCIAL.md).
+
 # MySphere — status prac
 
 Stan na 5 sierpnia 2026. Dokument roboczy: co jest zrobione, co w toku, co zostało.
