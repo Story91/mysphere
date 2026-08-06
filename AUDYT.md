@@ -272,14 +272,27 @@ Oba potwierdzone przez `eth_getTransactionByHash` na Base mainnet. Gdyby
 bundler kiedyś przestał odpowiadać, zapis wraca do hasha userOp — degradacja
 do stanu sprzed zmiany, nigdy utrata tipa.
 
+Potem przepuściłem przez `resolveUserOpToTxHash()` **wszystkie 17 historycznych
+hashy z bazy**, nie próbkę: 17/17 rozwiązało się na transakcje, których
+istnienie potwierdziłem na łańcuchu. Ścieżki awaryjne (puste wejście, zły
+format, nieistniejący userOp) zwracają `null` bez rzucania — co jest warunkiem,
+bo funkcja jest wołana **po** udanej płatności i błąd w niej nie może zabrać
+nikomu potwierdzenia.
+
 Link czytający zostaje na **wyszukiwarce eksploratora**, bo starych rekordów
 to nie naprawia: one nadal trzymają hash userOp, a z samych 32 bajtów nie da
 się rozpoznać rodzaju. Wyszukiwarka przyjmuje jedno i drugie.
 
-> **Do decyzji właściciela:** mam działający resolver, więc dałoby się
-> jednorazowo przepisać istniejące rekordy na prawdziwe hashe. To zapis do
-> produkcyjnej bazy, więc czekam na wyraźną zgodę — nie robię tego z własnej
-> inicjatywy.
+> **Do decyzji właściciela — dwie rzeczy, których nie zrobię sam:**
+>
+> 1. **Przepisanie 17 istniejących rekordów** na prawdziwe hashe. Resolver
+>    działa i sprawdziłem go na wszystkich siedemnastu, więc migracja jest
+>    gotowa do uruchomienia. To zapis do produkcyjnej bazy — czekam na wyraźną
+>    zgodę. Dziś ratuje je wyszukiwarka eksploratora, ale to obejście.
+> 2. **Test end-to-end nowej ścieżki zapisu** wymaga wysłania prawdziwej
+>    płatności przez Base Pay. Logika jest sprawdzona na produkcyjnych danych,
+>    ale sam przelew przez nią nie przeszedł — a funduszy nie wydaję bez zgody
+>    na konkretną operację.
 
 ### Znalezione przy tej samej okazji
 
