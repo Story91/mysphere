@@ -69,6 +69,18 @@ export default function SoftFeedMobile({
   activeNetwork?: string | null;
   onNetworkChange?: (id: string | null) => void;
 }) {
+  // BEZ PORTFELA NIE MA CZEGO FILTROWAC.
+  //
+  // Ekran powitalny zajmuje na telefonie caly widok - nie ma pod nim feedu,
+  // bo zmyslone posty zostaly stamtad usuniete. Mimo to nad bohaterem stal
+  // pasek siedmiu sieci i zakladki "All Posts / Follows / Basenames": trzy
+  // filtry do treski, ktorej nie widac, i dwa rzedy interfejsu przed pierwszym
+  // zdaniem produktu. Pierwsza rzecz na ekranie ma mowic, czym to jest, a nie
+  // oferowac sortowanie pustki.
+  //
+  // Po zalogowaniu wszystko wraca bez zmian.
+  if (!currentAddress) return null;
+
   return (
     <div className="-mx-4 mb-3 bg-soft-bg font-soft">
       <SoftStoryRail

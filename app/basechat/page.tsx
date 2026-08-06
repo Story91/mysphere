@@ -1941,7 +1941,13 @@ function BaseChatContent() {
 
       // Aktualizuj stan komponentu
       setActiveUsers(result.users);
-      setTotalUsersPages(5); // 🚀 LIMIT: Zawsze 5 stron maksymalnie
+      // RZECZYWISTA liczba stron, nie stala. Bylo tu `setTotalUsersPages(5)`
+      // z komentarzem "zawsze 5 stron maksymalnie" - czyli stopka oglaszala
+      // piec stron takze wtedy, gdy danych starczylo na jedna. Dokladnie ten
+      // sam blad naprawialem pietro nizej, w getTopActiveUsersPaginated:
+      // funkcja raportowala 5 stron i 50 osob, majac w reku 12 rekordow.
+      // Skoro zrodlo mowi juz prawde, nie ma powodu jej tutaj nadpisywac.
+      setTotalUsersPages(result.totalPages);
       setIsLoadingUsers(false);
       setInitialRefreshDone(true);
       
@@ -2688,33 +2694,17 @@ function BaseChatContent() {
                         />
                       )}
 
-                      {/* ProfileCard at the top */}
-                      {address && (
-                        <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
-                                                      <div className="relative z-10 flex justify-center items-start w-full">
-                              <ProfileCard
-                                name={userProfile.name || 'MySphere User'}
-                                handle={userProfile.name?.replace('.sphere', '').replace('.camper', '').replace('.celo', '').replace('.world', '') || address.slice(0, 6) + '...' + address.slice(-4)}
-                                status={address.slice(0, 6) + '...' + address.slice(-4)}
-                                fullAddress={address}
-                                contactText="Edit"
-                                avatarUrl={userProfile.avatar || `/favicon_io (1)/android-chrome-192x1921.png`}
-                                miniAvatarUrl={userProfile.avatar}
-                                socialLinks={userProfile.socialLinks}
-                                showUserInfo={true}
-                                enableTilt={true}
-                                onContactClick={() => {
-                                  setIsEditingProfile(!isEditingProfile);
-                                }}
-                                className="w-full max-w-sm"
-                              />
-                            </div>
-                        </div>
-                      )}
+                      {/* ===== PANEL EDYCJI STOI TAM, GDZIE PRZYCISK, KTORY GO OTWIERA =====
+                          Byl 340 linii nizej - POD obiema kartami profilu. Na
+                          telefonie znaczylo to: dotykasz "Edit" na gorze, nic
+                          widocznego sie nie dzieje, a formularz otwiera sie poza
+                          ekranem. Zgloszenie brzmialo "pokazuje sie dopiero pod
+                          karta" i bylo trafne co do joty.
 
-
-
-                      {/* Modern Edit Profile Panel */}
+                          Reakcja na dotkniecie ma byc widoczna w tym samym kadrze,
+                          w ktorym nastapilo dotkniecie. Teraz panel wychodzi
+                          bezposrednio spod naglowka z tym przyciskiem, na obu
+                          szerokosciach. */}
                       {isEditingProfile && address && (
                         <div className="mb-3 relative">
                           <div className="bg-gradient-to-br from-blue-50/80 via-white/50 to-purple-50/80 dark:from-blue-900/20 dark:via-gray-800/40 dark:to-purple-900/20 backdrop-blur-xl rounded-xl border border-blue-200/50 dark:border-blue-700/30 p-4 shadow-xl">
@@ -3060,6 +3050,34 @@ function BaseChatContent() {
                         </div>
                       )}
 
+                      {/* ProfileCard at the top */}
+                      {address && (
+                        <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
+                                                      <div className="relative z-10 flex justify-center items-start w-full">
+                              <ProfileCard
+                                name={userProfile.name || 'MySphere User'}
+                                handle={userProfile.name?.replace('.sphere', '').replace('.camper', '').replace('.celo', '').replace('.world', '') || address.slice(0, 6) + '...' + address.slice(-4)}
+                                status={address.slice(0, 6) + '...' + address.slice(-4)}
+                                fullAddress={address}
+                                contactText="Edit"
+                                avatarUrl={userProfile.avatar || `/favicon_io (1)/android-chrome-192x1921.png`}
+                                miniAvatarUrl={userProfile.avatar}
+                                socialLinks={userProfile.socialLinks}
+                                showUserInfo={true}
+                                enableTilt={true}
+                                onContactClick={() => {
+                                  setIsEditingProfile(!isEditingProfile);
+                                }}
+                                className="w-full max-w-sm"
+                              />
+                            </div>
+                        </div>
+                      )}
+
+
+
+                      {/* Modern Edit Profile Panel */}
+
 
 
 
@@ -3299,12 +3317,21 @@ function BaseChatContent() {
                     { label: 'Posts', value: String(totalPosts), tone: 'green' },
                     { label: 'Comments', value: String(totalComments), tone: 'pink' },
                   ]}
-                  activeUsers={(activeUsers || []).slice(0, 5).map((user: any) => ({
+                  /* Cala strona, nie pierwsza piatka. Backend oddaje 10 na
+                     stronie i do 5 stron (1-50) - `slice(0, 5)` obcinal to
+                     w polowie i kasowal sens stronicowania, bo strona druga
+                     pokazywalaby pozycje 11-15 zamiast 11-20. */
+                  activeUsers={(activeUsers || []).map((user: any) => ({
                     address: user.address,
                     name: user.name || `${String(user.address).slice(0, 6)}…${String(user.address).slice(-4)}`,
                     points: user.totalPoints ?? user.points ?? 0,
+                    avatar: user.avatar ?? null,
                   }))}
                   onOpenUser={(userAddress) => handleViewBuilderProfile(userAddress)}
+                  page={currentPage}
+                  totalPages={totalUsersPages}
+                  onPageChange={setCurrentPage}
+                  isLoadingPage={isLoadingUsers}
                 />
 
                 {/* ===== USUNIETE Z PRAWEGO PANELU (poprzedni krok, opis zostaje) =====
