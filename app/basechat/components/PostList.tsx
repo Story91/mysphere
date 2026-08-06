@@ -239,47 +239,47 @@ const renderCampIcon = (className: string) => (
 const NETWORK_BADGES: Record<string, NetworkBadgeDef> = {
   basecamp: {
     alt: 'Camp Network',
-    chipClass: 'bg-orange-50/30 dark:bg-orange-900/20',
+    chipClass: 'bg-soft-sunken',
     renderSvg: renderCampIcon,
     iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
-    label: { text: 'Camp Network', className: 'text-orange-600' },
+    label: { text: 'Camp Network', className: 'text-soft-ink-muted' },
   },
   base: {
     alt: 'Base',
-    chipClass: 'bg-blue-50/30 dark:bg-blue-900/20',
+    chipClass: 'bg-soft-sunken',
     src: '/logotypy/Base_lockup_2color.png',
     iconClass: { post: 'h-3', comment: 'h-3', reply: 'h-2.5' },
   },
   linea: {
     alt: 'Linea',
-    chipClass: 'bg-cyan-50/30 dark:bg-cyan-900/20',
+    chipClass: 'bg-soft-sunken',
     src: '/Logomark Blue BG.svg',
     iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
-    label: { text: 'Linea', className: 'text-cyan-600' },
+    label: { text: 'Linea', className: 'text-soft-ink-muted' },
   },
   celo: {
     alt: 'Celo',
-    chipClass: 'bg-green-50/30 dark:bg-green-900/20',
+    chipClass: 'bg-soft-sunken',
     src: '/logotypy/ENL3ZjX9OnprxVs5u8A81khADqA.webp',
     iconClass: { post: 'h-5', comment: 'h-4', reply: 'h-3' },
   },
   ethereum: {
     alt: 'Ethereum',
-    chipClass: 'bg-blue-50/30 dark:bg-blue-900/20',
+    chipClass: 'bg-soft-sunken',
     src: '/ethlogo.png',
     iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
-    label: { text: 'ETH', className: 'text-blue-600' },
+    label: { text: 'ETH', className: 'text-soft-ink-muted' },
   },
   worldchain: {
     alt: 'World Chain',
-    chipClass: 'bg-purple-50/30 dark:bg-purple-900/20',
+    chipClass: 'bg-soft-sunken',
     src: '/logotypy/logo.svg',
     iconClass: { post: 'h-3', comment: 'h-2.5', reply: 'h-2' },
     onWhiteCircle: true,
   },
   robinhood: {
     alt: 'Robinhood Chain',
-    chipClass: 'bg-green-50/30 dark:bg-green-900/20',
+    chipClass: 'bg-soft-sunken',
     // Logo ma WLASNE, limonkowe tlo wypelniajace caly kwadrat - inaczej niz
     // pozostale ikony sieci, ktore sa przezroczyste. Bez zaokraglenia rysowaloby
     // sie jako ostry zielony kwadrat w owalnej pigulce. `rounded-[4px]` sprawia,
@@ -291,7 +291,7 @@ const NETWORK_BADGES: Record<string, NetworkBadgeDef> = {
       comment: 'w-3 h-3 rounded-[3px]',
       reply: 'w-2.5 h-2.5 rounded-[3px]',
     },
-    label: { text: 'RH', className: 'text-[#00C805]' },
+    label: { text: 'RH', className: 'text-soft-ink-muted' },
   },
 };
 
@@ -305,12 +305,12 @@ const NetworkBadge = ({ network, size }: { network?: string | null; size: Networ
     : <img src={def.src} alt={def.alt} className={iconClass} />;
 
   return (
-    <div className={`flex items-center py-0.5 rounded-full shadow-sm ${size === 'reply' ? 'ml-1.5 px-1.5' : 'ml-2 px-2'} ${def.chipClass}`}>
+    <div className={`flex items-center py-0.5 rounded-pill ${size === 'reply' ? 'ml-1.5 px-1.5' : 'ml-2 px-2'} ${def.chipClass}`}>
       {def.onWhiteCircle
-        ? <div className="bg-white rounded-full p-0.5 flex items-center justify-center">{icon}</div>
+        ? <div className="bg-soft-surface rounded-full p-0.5 flex items-center justify-center">{icon}</div>
         : icon}
       {size === 'post' && def.label && (
-        <span className={`ml-1 text-xs font-bold ${def.label.className}`}>{def.label.text}</span>
+        <span className={`ml-1 font-soft text-xs font-bold ${def.label.className}`}>{def.label.text}</span>
       )}
     </div>
   );
@@ -1436,12 +1436,12 @@ function PostList({
     
     return (
       <div className="space-y-6">
-        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+        <div className="p-4 bg-soft-sunken rounded-card">
             <textarea
               value={newComments[post.id] || ''}
             onChange={(e) => setNewComments(prev => ({...prev, [post.id]: e.target.value}))}
               placeholder="Write a comment..."
-            className="w-full p-3 text-sm border rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white"
+            className="w-full p-3 font-soft text-sm leading-[1.55] border border-soft-line rounded-card bg-soft-surface text-soft-ink placeholder:text-soft-ink-faint outline-none transition-[border-color,box-shadow] duration-[--dur-press] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
               rows={2}
             />
           
@@ -1457,7 +1457,7 @@ function PostList({
         </div>
 
         {visibleMainComments.map((comment: Comment, index: number) => (
-          <div key={comment.id} className={`border-l-2 border-gray-200 dark:border-gray-700 pl-3 pb-3 ${index > 0 ? 'pt-3 border-t border-gray-100 dark:border-gray-800' : ''}`}>
+          <div key={comment.id} className={`border-l-2 border-soft-line pl-3 pb-3 ${index > 0 ? 'pt-3 border-t border-soft-line' : ''}`}>
             <div className="flex items-start">
               <div className="flex-shrink-0 mt-1">
                 {userNames[comment.author]?.avatar ? (
@@ -1474,10 +1474,10 @@ function PostList({
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col">
                     <div className="flex items-center">
-                      <span className="font-medium text-gray-900 dark:text-white">
+                      <span className="font-soft-display font-bold text-soft-ink">
                         {displayUserName(comment.author, `comment-${comment.id}`, false)}
                       </span>
-                      <span className="text-xs text-gray-500 ml-2">
+                      <span className="font-soft text-xs text-soft-ink-faint ml-2">
                         {formatTimestamp(comment.timestamp)}
                       </span>
                       
@@ -1489,13 +1489,13 @@ function PostList({
                         <textarea
                           value={editedCommentContent}
                           onChange={(e) => setEditedCommentContent(e.target.value)}
-                          className="w-full p-2 text-sm border rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full p-2 font-soft text-sm leading-[1.55] border border-soft-line rounded-card bg-soft-surface text-soft-ink outline-none transition-[border-color] duration-[--dur-press] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
                           rows={2}
                         />
                         <div className="flex justify-end mt-1 space-x-2">
                           <button
                             onClick={() => handleEditComment(post.id, comment.id, editedCommentContent)}
-                            className="px-2 py-1 text-xs bg-blue-500 text-white rounded"
+                            className="px-3 py-1 font-soft text-xs font-bold bg-soft-primary text-white rounded-pill transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             Save
                           </button>
@@ -1504,14 +1504,14 @@ function PostList({
                               setEditingComment(null);
                               setEditedCommentContent('');
                             }}
-                            className="px-2 py-1 text-xs bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-white rounded"
+                            className="px-3 py-1 font-soft text-xs font-bold bg-soft-sunken text-soft-ink-muted rounded-pill transition-[background-color,transform,color] duration-[--dur-press] ease-out-strong hover:text-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             Cancel
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-800 dark:text-gray-200 mt-1 whitespace-pre-wrap">
+                      <div className="font-soft text-sm leading-[1.55] text-soft-ink-muted mt-1 whitespace-pre-wrap">
                         {comment.content}
                       </div>
                     )}
@@ -1525,7 +1525,7 @@ function PostList({
                             setEditingComment({ postId: post.id, commentId: comment.id });
                             setEditedCommentContent(comment.content);
                           }}
-                          className="text-gray-400 hover:text-blue-500"
+                          className="text-soft-ink-faint rounded-pill p-0.5 transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           aria-label="Edit comment"
                           title="Edit comment"
                         >
@@ -1536,7 +1536,7 @@ function PostList({
                       )}
                       <button
                         onClick={() => handleDeleteComment(post.id, comment.id)}
-                        className="text-gray-400 hover:text-red-500"
+                        className="text-soft-ink-faint rounded-pill p-0.5 transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-red-600 active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         aria-label="Delete comment"
                         title="Delete comment"
                       >
@@ -1548,11 +1548,13 @@ function PostList({
                   )}
                 </div>
 
-                <div className="flex items-center mt-1 text-xs text-gray-500 space-x-2">
+                <div className="flex items-center mt-1 font-soft text-xs text-soft-ink-soft space-x-2">
                   <button
                     onClick={() => handleToggleCommentLike(post.id, comment.id)}
-                    className={`flex items-center ${
-                      comment.likedBy?.includes(address || '') ? 'text-blue-500' : 'hover:text-blue-500'
+                    aria-pressed={!!comment.likedBy?.includes(address || '')}
+                    aria-label={`${comment.likedBy?.includes(address || '') ? 'Unlike' : 'Like'} comment (${comment.likes || 0})`}
+                    className={`flex items-center rounded-pill tabular-nums transition-[color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                      comment.likedBy?.includes(address || '') ? 'text-soft-primary-deep' : 'hover:text-soft-primary-deep'
                     }`}
                   >
                     {comment.likedBy?.includes(address || '') ? (
@@ -1568,7 +1570,7 @@ function PostList({
                   </button>
                   <button 
                     onClick={() => setReplyingTo({ postId: post.id, commentId: comment.id })}
-                    className="flex items-center hover:text-blue-500"
+                    className="flex items-center rounded-pill transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     <svg className="w-4 h-4 mr-1 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -1578,12 +1580,12 @@ function PostList({
                 </div>
 
                 {replyingTo && replyingTo.commentId === comment.id && (
-                  <div className="mt-2 pl-3 border-l-2 border-blue-200 dark:border-blue-700">
+                  <div className="mt-2 pl-3 border-l-2 border-soft-line-strong">
                     <textarea
                       value={replyContent}
                       onChange={(e) => setReplyContent(e.target.value)}
                       placeholder="Write a reply..."
-                      className="w-full p-2 text-xs border rounded bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full p-2 font-soft text-xs leading-[1.55] border border-soft-line rounded-card bg-soft-sunken text-soft-ink placeholder:text-soft-ink-faint outline-none transition-[border-color] duration-[--dur-press] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
                       rows={2}
                     />
                     <div className="flex justify-end mt-1 space-x-2">
@@ -1598,9 +1600,9 @@ function PostList({
 
                 {/* Wyświetlamy odpowiedzi do tego komentarza */}
                 {repliesByCommentId[comment.id] && repliesByCommentId[comment.id].length > 0 && (
-                  <div className="mt-3 pl-3 border-l-2 border-gray-100 dark:border-gray-800 space-y-2">
+                  <div className="mt-3 pl-3 border-l-2 border-soft-line space-y-2">
                     {repliesByCommentId[comment.id].map((reply: Comment, replyIndex: number) => (
-                      <div key={reply.id || replyIndex} className={`text-xs ${replyIndex > 0 ? 'mt-2 pt-2 border-t border-gray-50 dark:border-gray-900' : ''}`}>
+                      <div key={reply.id || replyIndex} className={`text-xs ${replyIndex > 0 ? 'mt-2 pt-2 border-t border-soft-line' : ''}`}>
                         <div className="flex items-start">
                           <div className="flex-shrink-0 mt-1">
                             {userNames[reply.author]?.avatar ? (
@@ -1615,25 +1617,27 @@ function PostList({
                           </div>
                           <div className="ml-2 flex-1">
                             <div className="flex items-center">
-                              <span className="font-medium text-gray-900 dark:text-white text-xs">
+                              <span className="font-soft-display font-bold text-soft-ink text-xs">
                                 {displayUserName(reply.author, `reply-${comment.id}-${replyIndex}`, false)}
                               </span>
-                              <span className="text-[10px] text-gray-500 ml-1.5">
+                              <span className="font-soft text-[10px] text-soft-ink-faint ml-1.5">
                                 {formatTimestamp(reply.timestamp)}
                               </span>
                               
                               {/* Odznaka sieci odpowiedzi */}
                               <NetworkBadge network={reply.network} size="reply" />
                             </div>
-                            <div className="text-xs text-gray-800 dark:text-gray-200 mt-0.5 whitespace-pre-wrap">
+                            <div className="font-soft text-xs leading-[1.55] text-soft-ink-muted mt-0.5 whitespace-pre-wrap">
                               {reply.content}
                             </div>
                             {/* Dodajemy przycisk lajkowania i usuwania odpowiedzi */}
-                            <div className="flex items-center mt-1 text-xs text-gray-500 space-x-2">
+                            <div className="flex items-center mt-1 font-soft text-xs text-soft-ink-soft space-x-2">
                               <button
                                 onClick={() => handleToggleCommentLike(post.id, reply.id)}
-                                className={`flex items-center ${
-                                  reply.likedBy?.includes(address || '') ? 'text-blue-500' : 'hover:text-blue-500'
+                                aria-pressed={!!reply.likedBy?.includes(address || '')}
+                                aria-label={`${reply.likedBy?.includes(address || '') ? 'Unlike' : 'Like'} reply (${reply.likes || 0})`}
+                                className={`flex items-center rounded-pill transition-[color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                                  reply.likedBy?.includes(address || '') ? 'text-soft-primary-deep' : 'hover:text-soft-primary-deep'
                                 }`}
                               >
                                 {reply.likedBy?.includes(address || '') ? (
@@ -1645,14 +1649,14 @@ function PostList({
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                                   </svg>
                                 )}
-                                <span className="text-[10px]">{reply.likes || 0}</span>
+                                <span className="text-[10px] tabular-nums">{reply.likes || 0}</span>
                               </button>
                               
                               {/* Przycisk usunięcia odpowiedzi - wyświetlany dla autora odpowiedzi lub admina */}
                               {(reply.author === address || address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()) && (
                                 <button
                                   onClick={() => handleDeleteComment(post.id, reply.id)}
-                                  className="flex items-center hover:text-red-500"
+                                  className="flex items-center rounded-pill transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-red-600 active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                                   aria-label="Delete reply"
                                   title="Delete reply"
                                 >
@@ -1675,10 +1679,10 @@ function PostList({
         
         {/* ✅ LAZY LOADING KOMENTARZY: Przycisk "Load more comments" */}
         {hasMoreComments && (
-          <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+          <div className="pt-4 border-t border-soft-line">
             <button
               onClick={() => loadMoreComments(post.id)}
-              className="w-full py-2 px-4 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              className="w-full py-2 px-4 font-soft text-sm font-semibold text-soft-ink-muted hover:text-soft-ink bg-soft-sunken rounded-pill transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-center space-x-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1705,14 +1709,18 @@ function PostList({
     const hashtags = extractHashtags(post.content);
 
     return (
-      <div key={`post-${post.id}`} className={`bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4 border relative ${
-        post.isPinned 
-          ? 'border-yellow-300 dark:border-yellow-600 shadow-yellow-100 dark:shadow-yellow-900/20 shadow-lg' 
-          : 'border-gray-100 dark:border-gray-700'
+      <div key={`post-${post.id}`} className={`bg-soft-surface font-soft rounded-card p-4 mb-4 border relative ${
+        post.isPinned
+          ? 'border-soft-accent shadow-float'
+          : 'border-soft-line shadow-card'
       }`}>
-        {/* Gradient overlay dla przypięć */}
+        {/* Gradient overlay dla przypięć.
+            Przezroczystosc przez `opacity`, nie przez modyfikator `/50` przy
+            kolorze - tokeny soft-* to `var(--...)`, a Tailwind 3 nie potrafi
+            doliczyc alfy do wartosci, ktorej nie umie sparsowac, i cicho
+            zwraca kolor w pelnej mocy. */}
         {post.isPinned && (
-          <div className="absolute inset-0 bg-gradient-to-r from-yellow-50/30 via-transparent to-yellow-50/30 dark:from-yellow-900/10 dark:via-transparent dark:to-yellow-900/10 rounded-xl pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-soft-accent-soft via-transparent to-soft-accent-soft rounded-card pointer-events-none opacity-40" />
         )}
         <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
@@ -1728,7 +1736,7 @@ function PostList({
                 <CoinbaseAvatar address={post.author as `0x${string}`} className="w-8 h-8 rounded-full" />
               )}
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center font-soft-display font-bold text-soft-ink">
               {displayUserName(post.author, `post-author-${post.id}`, false)}
 
               {/* Agent AI zweryfikowany w KYA. Czlowiek nie dostaje odznaki. */}
@@ -1736,16 +1744,16 @@ function PostList({
 
               {/* Przypięcie - żółta gwiazdka */}
               {post.isPinned && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-yellow-50/50 dark:bg-yellow-900/20 shadow-sm">
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-pill bg-soft-accent-soft">
                   <svg
-                    className="w-4 h-4 text-yellow-500"
+                    className="w-4 h-4 text-soft-accent-deep"
                     fill="currentColor"
                     viewBox="0 0 24 24"
                     aria-hidden="true"
                   >
                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                   </svg>
-                  <span className="ml-1 text-xs text-yellow-600 font-bold">Pinned</span>
+                  <span className="ml-1 font-soft text-xs text-soft-accent-deep font-bold">Pinned</span>
                 </div>
               )}
               
@@ -1754,9 +1762,9 @@ function PostList({
 
               {/* AI Generated badge */}
               {post.isAIGenerated && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-green-900/20 dark:to-emerald-900/20 shadow-sm">
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-pill bg-soft-sunken">
                   <svg
-                    className="w-4 h-4 text-green-600 dark:text-green-400"
+                    className="w-4 h-4 text-soft-primary-deep"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1765,39 +1773,39 @@ function PostList({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9" />
                   </svg>
-                  <span className="ml-1 text-xs text-green-600 dark:text-green-400 font-bold">AI</span>
+                  <span className="ml-1 font-soft text-xs text-soft-primary-deep font-bold">AI</span>
                 </div>
               )}
 
               {/* Zora logo and badge */}
               {post.zoraCoinAddress && (
-                <div className="flex items-center ml-2 px-2 py-0.5 rounded-full bg-purple-50/30 dark:bg-purple-900/20 shadow-sm">
+                <div className="flex items-center ml-2 px-2 py-0.5 rounded-pill bg-soft-sunken">
                   <img
                     src="/android-chrome-512x512.png"
                     alt="Sphere Token"
                     className="w-5 h-5"
                     title="This post is a Sphere token"
                   />
-                  <span className="ml-1 text-sm text-purple-600 font-bold">PostCoin</span>
+                  <span className="ml-1 font-soft text-sm text-soft-primary-deep font-bold">PostCoin</span>
                 </div>
               )}
             </div>
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="font-soft text-xs text-soft-ink-faint">
             {postDate}
             {post.lastEdited && <span className="italic"> (edited)</span>}
           </div>
         </div>
 
         <div className="mb-3">
-          <div className={`prose prose-sm max-w-none whitespace-pre-wrap break-words text-black dark:text-white ${!isTextExpanded && post.content.length > 500 ? 'max-h-52 overflow-hidden relative' : ''}`}>
+          <div className={`prose prose-sm max-w-none whitespace-pre-wrap break-words font-soft text-[14.5px] leading-[1.55] text-soft-ink-muted ${!isTextExpanded && post.content.length > 500 ? 'max-h-52 overflow-hidden relative' : ''}`}>
             {post.content.split('\n').map((paragraph, index) => (
               paragraph.trim() ? (
                 <p key={index} className="mb-2 break-words whitespace-normal overflow-wrap-anywhere">
                   {paragraph.split(/(\s+)/).map((part, partIndex) => {
                     if (part.startsWith('#')) {
                       return (
-                        <span key={partIndex} className="text-blue-500 dark:text-blue-400 font-medium hover:underline">
+                        <span key={partIndex} className="text-soft-primary-deep font-semibold hover:underline">
                           {part}
                         </span>
                       );
@@ -1810,14 +1818,14 @@ function PostList({
               )
             ))}
             {!isTextExpanded && post.content.length > 500 && (
-              <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-white dark:from-gray-800 to-transparent"></div>
+              <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-soft-surface to-transparent"></div>
             )}
           </div>
           
           {post.content.length > 500 && (
             <button
               onClick={() => setExpandedTextPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
-              className="text-blue-500 text-xs mt-1 hover:underline"
+              className="font-soft text-soft-primary-deep text-xs font-semibold mt-1 rounded-pill hover:underline transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               {isTextExpanded ? 'Show less' : 'Show more'}
             </button>
@@ -1829,7 +1837,7 @@ function PostList({
               {hashtags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-block px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400 text-xs font-medium rounded-full"
+                  className="inline-block px-2.5 py-0.5 bg-soft-sunken text-soft-primary-deep font-soft text-xs font-semibold rounded-pill"
                 >
                   {tag}
                 </span>
@@ -1857,7 +1865,7 @@ function PostList({
         {/* Media (obrazek lub wideo) */}
         {(post.image || post.video) && (
           <div
-            className="my-3 cursor-pointer"
+            className="my-3 cursor-pointer rounded-card outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             onClick={() => {
               const mediaUrl = post.image || post.video;
               if (mediaUrl) {
@@ -1883,7 +1891,7 @@ function PostList({
                 obraz w feedzie przesuwal wszystko ponizej (CLS). images.unoptimized
                 jest wlaczone, wiec Next nie doda wymiarow za nas. */}
             {post.image && (
-              <div className="relative w-full aspect-[16/10] max-h-96 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+              <div className="relative w-full aspect-[16/10] max-h-96 overflow-hidden rounded-card bg-soft-sunken">
                 <img
                   src={post.image}
                   alt="Post media"
@@ -1894,7 +1902,7 @@ function PostList({
               </div>
             )}
             {post.video && (
-              <div className="relative w-full aspect-[16/10] max-h-96 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+              <div className="relative w-full aspect-[16/10] max-h-96 overflow-hidden rounded-card bg-soft-sunken">
                 <video src={post.video} controls preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
               </div>
             )}
@@ -1911,9 +1919,9 @@ function PostList({
         {/* --- NEW ZORA TOKEN INFO & ACTIONS SECTION --- */}
         {post.zoraCoinAddress && (
           <div className="mt-4 mb-2">
-            <SpotlightCard 
-              spotlightColor="rgba(147, 51, 234, 0.25)" 
-              className="border-2 border-purple-200/50 dark:border-purple-800/50 bg-gradient-to-br from-purple-50/50 via-blue-50/50 to-purple-50/50 dark:from-purple-950/30 dark:via-blue-950/30 dark:to-purple-950/30 shadow-lg hover:shadow-xl transition-shadow"
+            <SpotlightCard
+              spotlightColor="rgba(124, 107, 218, 0.18)"
+              className="rounded-card border border-soft-line bg-soft-sunken shadow-card hover:shadow-float transition-shadow duration-200 ease-out-strong"
             >
               <Card className="border-0 bg-transparent shadow-none">
               <CardHeader className="pb-3">
@@ -1923,7 +1931,7 @@ function PostList({
                       <img 
                         src={zoraData.imageUrl} 
                         alt={zoraData?.name || 'Token'} 
-                        className="w-10 h-10 rounded-full ring-2 ring-purple-200 dark:ring-purple-800"
+                        className="w-10 h-10 rounded-full ring-2 ring-soft-line"
                       />
                     </div>
                   ) : (
@@ -1931,29 +1939,29 @@ function PostList({
                       <img 
                         src="/android-chrome-512x512.png" 
                         alt="Sphere Logo" 
-                        className="w-10 h-10 rounded-full ring-2 ring-purple-200 dark:ring-purple-800"
+                        className="w-10 h-10 rounded-full ring-2 ring-soft-line"
                       />
                     </div>
                   )}
                   <div className="flex flex-col">
                     <div className="flex items-center gap-2">
-                      <CardTitle className="text-lg font-bold text-purple-700 dark:text-purple-300 m-0">
+                      <CardTitle className="font-soft-display text-lg font-bold text-soft-primary-deep m-0">
                         {zoraData?.symbol || 'POSTCOIN'}
                       </CardTitle>
                       {zoraData?.priceUSD && (
-                        <Badge variant="secondary" className="text-xs font-semibold">
+                        <Badge variant="secondary" className="rounded-pill bg-soft-surface font-soft-display text-xs font-bold tabular-nums text-soft-ink">
                           ${formatNumberWithSuffix(zoraData.priceUSD)}
                         </Badge>
                       )}
                       {zoraData?.priceChange24h !== undefined && (
                         <Badge 
                           variant="outline"
-                          className={`text-xs font-semibold ${
-                            zoraData.priceChange24h > 0 
-                              ? 'border-green-500 text-green-600 dark:text-green-400' 
-                              : zoraData.priceChange24h < 0 
-                                ? 'border-red-500 text-red-600 dark:text-red-400' 
-                                : ''
+                          className={`rounded-pill font-soft-display text-xs font-bold tabular-nums ${
+                            zoraData.priceChange24h > 0
+                              ? 'border-green-600 text-green-700'
+                              : zoraData.priceChange24h < 0
+                                ? 'border-red-600 text-red-700'
+                                : 'border-soft-line text-soft-ink-muted'
                           }`}
                         >
                           {zoraData.priceChange24h > 0 ? '↑' : zoraData.priceChange24h < 0 ? '↓' : ''}
@@ -1962,7 +1970,7 @@ function PostList({
                       )}
                     </div>
                     {zoraData?.name && zoraData.name !== zoraData?.symbol && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="font-soft text-xs text-soft-ink-soft mt-0.5">
                         {zoraData.name}
                       </p>
                     )}
@@ -1973,32 +1981,32 @@ function PostList({
               <CardContent className="pt-0">
                 {isLoadingData ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-soft-primary"></div>
                   </div>
                 ) : (
                   <>
                     {/* Token Stats Grid */}
                     <div className="grid grid-cols-3 gap-3 mb-4">
-                      <Card className="bg-background/50 border">
+                      <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
                         <CardContent className="p-3 text-center">
-                          <div className="text-xs text-muted-foreground mb-1">Holders</div>
-                          <div className="text-base font-semibold">{zoraData?.uniqueHolders || '0'}</div>
+                          <div className="font-soft text-xs text-soft-ink-soft mb-1">Holders</div>
+                          <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">{zoraData?.uniqueHolders || '0'}</div>
                         </CardContent>
                       </Card>
-                      <Card className="bg-background/50 border">
+                      <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
                         <CardContent className="p-3 text-center">
-                          <div className="text-xs text-muted-foreground mb-1">Supply</div>
-                          <div className="text-base font-semibold">
+                          <div className="font-soft text-xs text-soft-ink-soft mb-1">Supply</div>
+                          <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">
                             {zoraData?.totalSupply 
                               ? formatNumberWithSuffix(parseFloat(zoraData.totalSupply))
                               : '0'}
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="bg-background/50 border">
+                      <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
                         <CardContent className="p-3 text-center">
-                          <div className="text-xs text-muted-foreground mb-1">Your Balance</div>
-                          <div className="text-base font-semibold">
+                          <div className="font-soft text-xs text-soft-ink-soft mb-1">Your Balance</div>
+                          <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">
                             {isLoadingBalances 
                               ? '...' 
                               : (function() {
@@ -2023,20 +2031,20 @@ function PostList({
                     {(zoraData?.marketCap || zoraData?.volume24h) && (
                       <div className="grid grid-cols-2 gap-3 mb-4">
                         {zoraData?.marketCap && (
-                          <Card className="bg-background/50 border">
+                          <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
                             <CardContent className="p-3 text-center">
-                              <div className="text-xs text-muted-foreground mb-1">Market Cap</div>
-                              <div className="text-base font-semibold">
+                              <div className="font-soft text-xs text-soft-ink-soft mb-1">Market Cap</div>
+                              <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">
                                 ${formatNumberWithSuffix(zoraData.marketCap)}
                               </div>
                             </CardContent>
                           </Card>
                         )}
                         {zoraData?.volume24h && (
-                          <Card className="bg-background/50 border">
+                          <Card className="rounded-card border border-soft-line bg-soft-surface shadow-none">
                             <CardContent className="p-3 text-center">
-                              <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
-                              <div className="text-base font-semibold">
+                              <div className="font-soft text-xs text-soft-ink-soft mb-1">24h Volume</div>
+                              <div className="font-soft-display text-base font-bold tabular-nums text-soft-ink">
                                 ${formatNumberWithSuffix(zoraData.volume24h)}
                               </div>
                             </CardContent>
@@ -2047,7 +2055,7 @@ function PostList({
                     
                     {/* Trade Buttons */}
                     {address && post.zoraCoinAddress && (
-                      <div className="pt-3 border-t">
+                      <div className="pt-3 border-t border-soft-line">
                         <div className="flex gap-2">
                           <button
                             onClick={() => {
@@ -2067,7 +2075,7 @@ function PostList({
                               setTradeCoinMode('buy');
                               setShowTradeCoinModal(true);
                             }}
-                            className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg"
+                            className="flex-1 py-2 px-3 rounded-pill font-soft text-sm font-bold bg-soft-primary text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             Buy
                           </button>
@@ -2089,7 +2097,7 @@ function PostList({
                               setTradeCoinMode('sell');
                               setShowTradeCoinModal(true);
                             }}
-                            className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 transition-all shadow-md hover:shadow-lg"
+                            className="flex-1 py-2 px-3 rounded-pill font-soft text-sm font-bold bg-soft-surface text-soft-primary-deep border border-soft-line-strong transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             Sell
                           </button>
@@ -2098,8 +2106,8 @@ function PostList({
                         {userTokenBalances[post.zoraCoinAddress.toLowerCase()] && 
                          parseFloat(userTokenBalances[post.zoraCoinAddress.toLowerCase()]) > 0 && (
                           <div className="mt-2 text-center">
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              Your balance: <span className="font-medium text-purple-600 dark:text-purple-400">
+                            <span className="font-soft text-xs text-soft-ink-soft">
+                              Your balance: <span className="font-soft-display font-bold tabular-nums text-soft-ink">
                                 {parseFloat(userTokenBalances[post.zoraCoinAddress.toLowerCase()]).toFixed(4)} {zoraData?.symbol || 'TOKEN'}
                               </span>
                             </span>
@@ -2109,14 +2117,14 @@ function PostList({
                     )}
                     
                     {/* External Links */}
-                    <div className="flex flex-wrap items-center justify-center gap-4 pt-3 border-t">
+                    <div className="flex flex-wrap items-center justify-center gap-4 pt-3 border-t border-soft-line">
                       {post.zoraCoinAddress && userTokenBalances[post.zoraCoinAddress.toLowerCase()] && 
                        parseFloat(userTokenBalances[post.zoraCoinAddress.toLowerCase()]) > 0 && (
                         <a 
                           href={`https://zora.co/profile/${address}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 flex items-center gap-1 transition-colors"
+                          className="font-soft text-xs font-semibold text-soft-primary-deep hover:text-soft-ink flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         >
                           View your tokens
                           <ExternalLink className="w-3 h-3" />
@@ -2127,7 +2135,7 @@ function PostList({
                         href={`${getTokenExplorer(post.network).tokenUrl}${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                        className="font-soft text-xs font-semibold text-soft-ink-soft hover:text-soft-ink flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         View on {getTokenExplorer(post.network).name}
                         <ExternalLink className="w-3 h-3" aria-hidden="true" />
@@ -2137,7 +2145,7 @@ function PostList({
                         href={`https://zora.co/coin/base:${post.zoraCoinAddress}?referrer=0xf1fa20027b6202bc18e4454149c85cb01dc91dfd`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 flex items-center gap-1 transition-colors"
+                        className="font-soft text-xs font-semibold text-soft-primary-deep hover:text-soft-ink flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         View on Zora
                         <ExternalLink className="w-3 h-3" />
@@ -2147,7 +2155,7 @@ function PostList({
                         href={`https://dexscreener.com/base/${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200 flex items-center gap-1 transition-colors"
+                        className="font-soft text-xs font-semibold text-soft-primary-deep hover:text-soft-ink flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         View on DexScreener
                         <ExternalLink className="w-3 h-3" />
@@ -2192,10 +2200,10 @@ function PostList({
           </div>
         )}
 
-        <div className="flex items-center space-x-4 text-gray-900 dark:text-gray-200 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex items-center space-x-4 font-soft text-soft-ink-muted mt-3 pt-3 border-t border-soft-line">
           <button
             onClick={() => handleToggleLike(post.id)}
-            className={`flex items-center space-x-1 hover:text-pink-500 transition-colors ${isLiked ? 'text-pink-500' : ''}`}
+            className={`flex items-center space-x-1 rounded-pill px-1 py-0.5 transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 ${isLiked ? 'text-soft-primary-deep' : ''}`}
             disabled={!isConnected}
             aria-pressed={!!isLiked}
             aria-label={`${isLiked ? 'Unlike' : 'Like'} post (${post.likes || 0})`}
@@ -2203,19 +2211,19 @@ function PostList({
             <svg className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
-            <span className="text-xs">{post.likes || 0}</span>
+            <span className="text-xs font-semibold tabular-nums">{post.likes || 0}</span>
           </button>
 
           <button
             onClick={() => setExpandedComments(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
-            className="flex items-center space-x-1 hover:text-blue-500 transition-colors"
+            className="flex items-center space-x-1 rounded-pill px-1 py-0.5 transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             aria-expanded={!!expandedComments[post.id]}
             aria-label={`Comments (${commentCount})`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <span className="text-xs">{commentCount}</span>
+            <span className="text-xs font-semibold tabular-nums">{commentCount}</span>
           </button>
 
           {/* FOLLOW BUTTON - Show only if not author and user is connected */}
@@ -2230,15 +2238,15 @@ function PostList({
                 }
               }}
               disabled={followLoading[post.author]}
-              className={`flex items-center space-x-1 transition-colors text-xs px-2 py-1 rounded-full ${
+              className={`flex items-center space-x-1 font-soft text-xs font-bold px-2.5 py-1 rounded-pill transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 followingStatus[post.author]
-                  ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'
-                  : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-purple-900/30 dark:hover:text-purple-300'
+                  ? 'bg-soft-sunken text-soft-primary-deep hover:bg-soft-line'
+                  : 'bg-soft-primary text-white hover:bg-soft-primary-deep'
               } ${followLoading[post.author] ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {followLoading[post.author] ? (
                 <>
-                  <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
                   <span>Loading...</span>
                 </>
               ) : followingStatus[post.author] ? (
@@ -2276,7 +2284,7 @@ function PostList({
           <TipButton
             recipientAddress={post.author}
             postId={post.id}
-            className="text-gray-900 dark:text-gray-200"
+            className="text-soft-ink-muted"
           />
 
           {/* 🤝 Wsparcie tworcy na okres - platnosc Z GORY, bez odnawiania.
@@ -2286,7 +2294,7 @@ function PostList({
             creatorName={userNames[post.author]?.name}
             isSupported={subscribedCreators.has((post.author || '').toLowerCase())}
             onSubscribed={markSubscribed}
-            className="text-gray-900 dark:text-gray-200"
+            className="text-soft-ink-muted"
           />
 
           {post.txHash && (
@@ -2294,14 +2302,14 @@ function PostList({
               href={`${getTxExplorer(post.network).txUrl}${post.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center space-x-1 text-gray-900 dark:text-gray-200 hover:text-blue-500"
+              className="flex items-center space-x-1 rounded-pill px-1 py-0.5 text-soft-ink-muted transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               title="View Transaction"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               {/* Tekst tylko na desktop */}
-              <span className="hidden md:inline text-xs">Transaction</span>
+              <span className="hidden md:inline text-xs font-semibold">Transaction</span>
             </a>
           )}
 
@@ -2313,7 +2321,7 @@ function PostList({
                   handleDeletePost(post.id);
                 }
               }}
-              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors ml-auto p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+              className="text-red-600 hover:text-red-700 ml-auto p-1 rounded-pill hover:bg-red-50 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               title="Delete post (Admin)"
               aria-label="Delete post (Admin)"
             >
@@ -2331,17 +2339,19 @@ function PostList({
             <div className="relative ml-auto group">
               <button
                 type="button"
-                className="hover:text-gray-700 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="text-soft-ink-soft hover:text-soft-ink p-1 rounded-pill hover:bg-soft-sunken transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 aria-label="Post options"
                 title="Post options"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
               </button>
-              <div className="absolute right-0 bottom-full mb-1 w-32 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 z-10 border border-gray-100 dark:border-gray-600 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
+              {/* Popover skaluje sie od SWOJEGO przycisku (origin-bottom-right),
+                  nie od srodka - inaczej wyglada, jakby przylecial znikad. */}
+              <div className="absolute right-0 bottom-full mb-1 w-32 bg-soft-surface rounded-card shadow-float py-1 opacity-0 scale-95 origin-bottom-right group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 transition-[opacity,transform] duration-200 ease-out-strong z-10 border border-soft-line pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
                 {canEdit && (
                   <button
                     onClick={() => { setEditingPost(post.id); setEditedContent(post.content); }}
-                    className="block w-full text-left px-4 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    className="block w-full text-left px-4 py-2 font-soft text-xs font-semibold text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink transition-[color,background-color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     Edit
                   </button>
@@ -2349,10 +2359,10 @@ function PostList({
                 {address && isUserAdmin(address) && (
                   <button
                     onClick={() => post.isPinned ? handleUnpinPost(post.id) : handlePinPost(post.id)}
-                    className={`block w-full text-left px-4 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-600 ${
-                      post.isPinned 
-                        ? 'text-yellow-600 dark:text-yellow-400' 
-                        : 'text-gray-700 dark:text-gray-200'
+                    className={`block w-full text-left px-4 py-2 font-soft text-xs font-semibold hover:bg-soft-sunken transition-[color,background-color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                      post.isPinned
+                        ? 'text-soft-accent-deep'
+                        : 'text-soft-ink-muted hover:text-soft-ink'
                     }`}
                   >
                     {post.isPinned ? '📌 Unpin' : '📌 Pin'}
@@ -2362,7 +2372,7 @@ function PostList({
                 {canDelete && post.author === address && (
                   <button
                     onClick={() => handleDeletePost(post.id)}
-                    className="block w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/50"
+                    className="block w-full text-left px-4 py-2 font-soft text-xs font-semibold text-red-600 hover:bg-red-50 transition-[background-color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     Delete
                   </button>
@@ -2380,7 +2390,7 @@ function PostList({
             href={`/post/${post.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-gray-500 transition-colors hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+            className="inline-flex items-center gap-1.5 rounded-pill px-1 py-0.5 font-soft text-xs font-semibold text-soft-ink-soft transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14" strokeLinecap="round" strokeLinejoin="round" />
@@ -2395,7 +2405,7 @@ function PostList({
             postId={post.id}
             presetPostStats={postTipStats[post.id] ?? null}
             presetLoading={tipStatsLoading}
-            className="text-gray-900 dark:text-gray-200"
+            className="font-soft-display tabular-nums text-soft-accent-deep"
           />
         </div>
 
@@ -2404,19 +2414,19 @@ function PostList({
             <textarea
               value={editedContent}
               onChange={(e) => setEditedContent(e.target.value)}
-              className="w-full px-3 py-2 text-sm border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 font-soft text-sm leading-[1.55] border border-soft-line rounded-card bg-soft-surface text-soft-ink outline-none transition-[border-color] duration-[--dur-press] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
               rows={3}
             />
             <div className="flex justify-end space-x-2 mt-2">
               <button
                 onClick={() => setEditingPost(null)}
-                className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                className="px-3 py-1 font-soft text-xs font-bold bg-soft-sunken text-soft-ink-muted rounded-pill transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 Cancel
               </button>
               <button
                  onClick={() => handleEditPost(post.id, editedContent)}
-                 className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                 className="px-3 py-1 font-soft text-xs font-bold bg-soft-primary text-white rounded-pill transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                  Save
                </button>
@@ -2425,7 +2435,7 @@ function PostList({
         )}
 
         {expandedComments[post.id] && (
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+          <div className="mt-4 pt-4 border-t border-soft-line">
             {renderComments(post)}
           </div>
         )}
@@ -2438,18 +2448,18 @@ function PostList({
     return (
       <div className="animate-pulse space-y-4">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+          <div key={i} className="bg-soft-surface rounded-card p-4 shadow-card">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+              <div className="w-10 h-10 bg-soft-sunken rounded-full"></div>
               <div className="flex-1">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-2"></div>
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/6"></div>
+                <div className="h-4 bg-soft-sunken rounded-pill w-1/4 mb-2"></div>
+                <div className="h-3 bg-soft-sunken rounded-pill w-1/6"></div>
               </div>
             </div>
             <div className="space-y-2">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/6"></div>
+              <div className="h-4 bg-soft-sunken rounded-pill"></div>
+              <div className="h-4 bg-soft-sunken rounded-pill w-5/6"></div>
+              <div className="h-4 bg-soft-sunken rounded-pill w-4/6"></div>
             </div>
           </div>
         ))}
@@ -2459,10 +2469,10 @@ function PostList({
 
   if (internalPosts.length === 0 && !isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm text-center">
+      <div className="bg-soft-surface rounded-card p-8 shadow-card text-center">
         <div className="text-4xl mb-4">📭</div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No posts found</h3>
-        <p className="text-gray-500 dark:text-gray-400">
+        <h3 className="font-soft-display text-lg font-bold text-soft-ink mb-2">No posts found</h3>
+        <p className="font-soft text-soft-ink-muted leading-[1.55]">
           {showOnlyUserPosts 
             ? "You haven't created any posts yet." 
             : "There are no posts matching your search criteria."}
@@ -2484,20 +2494,18 @@ function PostList({
         <div className="flex justify-center p-4">
           {isLoadingMore ? (
             <div className="animate-pulse space-y-4 w-full">
-              <div className="bg-gray-200 dark:bg-gray-700 h-10 rounded-lg"></div>
+              <div className="bg-soft-sunken h-10 rounded-pill"></div>
             </div>
           ) : hasMorePosts ? (
             <button 
               onClick={loadMorePosts}
-              className="group relative px-8 py-4 bg-gradient-to-r from-gray-900 via-gray-800 to-black text-white rounded-xl font-semibold hover:from-gray-800 hover:via-gray-700 hover:to-gray-900 transition-all duration-300 transform hover:scale-105 shadow-2xl backdrop-blur-sm border border-gray-700/50 hover:border-gray-600/50"
+              className="group relative px-8 py-4 bg-soft-primary text-white rounded-pill font-soft font-bold transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary shadow-chip"
               style={{
-                background: 'linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(17,17,17,0.9) 50%, rgba(0,0,0,0.8) 100%)',
-                backdropFilter: 'blur(12px)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)'
+                boxShadow: 'var(--soft-shadow-float)'
               }}
             >
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-white/10 group-hover:ring-white/20 transition-all duration-300"></div>
+              <div className="absolute inset-0 rounded-pill bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out-strong"></div>
+              <div className="absolute inset-0 rounded-pill ring-1 ring-inset ring-white/20"></div>
               <div className="relative flex items-center space-x-2">
                 <span className="text-lg">📚</span>
                 <span>Load More Posts</span>
@@ -2506,8 +2514,8 @@ function PostList({
             </button>
           ) : internalPosts.length > 0 ? (
             <div className="text-center p-4">
-              <div className="text-gray-500 dark:text-gray-400 text-sm mb-2">🎉 You've reached the end!</div>
-              <div className="text-gray-400 dark:text-gray-500 text-xs">All posts have been loaded</div>
+              <div className="font-soft text-soft-ink-muted text-sm mb-2">🎉 You've reached the end!</div>
+              <div className="font-soft text-soft-ink-faint text-xs">All posts have been loaded</div>
             </div>
           ) : null}
         </div>
@@ -2516,27 +2524,30 @@ function PostList({
       {/* Informacja o limicie wyświetlania */}
       {!disableInfiniteScroll && displayLimit >= MAX_DISPLAY_LIMIT && internalPosts.length > MAX_DISPLAY_LIMIT && (
         <div className="text-center p-4">
-          <div className="text-yellow-500 dark:text-yellow-400 text-sm mb-2">📊 Display limit reached</div>
-          <div className="text-gray-400 dark:text-gray-500 text-xs">
+          <div className="font-soft text-soft-accent-deep text-sm font-semibold mb-2">📊 Display limit reached</div>
+          <div className="font-soft text-soft-ink-faint text-xs">
             Showing {MAX_DISPLAY_LIMIT} most recent posts for performance
           </div>
         </div>
       )}
 
+      {/* rgba to --soft-ink (#2E2A44) przy 85%. Modyfikator alfy (bg-soft-ink/85)
+          nie dziala na tokenach zapisanych jako var() - patrz komentarz przy
+          nakladce przypiecia wyzej. */}
       {enlargedImage && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(46,42,68,0.85)]"
           onClick={() => setEnlargedImage(null)}
         >
           <div className="relative max-w-4xl max-h-[90vh] overflow-auto">
             <img 
               src={enlargedImage} 
-              alt="Enlarged post image" 
-              className="object-contain max-h-[90vh]"
+              alt="Enlarged post image"
+              className="object-contain max-h-[90vh] rounded-card"
               onClick={(e) => e.stopPropagation()}
             />
             <button
-              className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70"
+              className="absolute top-4 right-4 text-white bg-[rgba(46,42,68,0.7)] rounded-pill p-2 transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               onClick={() => setEnlargedImage(null)}
               aria-label="Close image"
             >

@@ -320,7 +320,7 @@ export default function PaidPinModal({
 
   return createPortal(
     <div 
-      className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-start sm:items-center justify-center z-[99999] p-2 sm:p-4 pt-4 sm:pt-4"
+      className="fixed inset-0 bg-soft-ink/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-[99999] p-2 sm:p-4 pt-4 sm:pt-4"
       onClick={onClose}
       style={{ 
         isolation: 'isolate',
@@ -333,7 +333,7 @@ export default function PaidPinModal({
       }}
     >
       <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-[92vw] sm:max-w-md max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
+        className="bg-soft-surface rounded-card shadow-float font-soft w-full max-w-[92vw] sm:max-w-md max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
         style={{ 
           zIndex: 99999,
@@ -341,16 +341,16 @@ export default function PaidPinModal({
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-soft-line">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-              <Crown className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-soft-accent rounded-pill flex items-center justify-center">
+              <Crown className="w-5 h-5 text-soft-ink" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="font-soft-display text-lg font-bold text-soft-ink">
                 Pin Your Post
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-soft-ink-muted">
                 Get premium visibility
               </p>
             </div>
@@ -358,7 +358,7 @@ export default function PaidPinModal({
           <button
             onClick={onClose}
             aria-label="Close pin dialog"
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            className="rounded-pill p-1 text-soft-ink-soft transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <X className="w-6 h-6" />
           </button>
@@ -367,10 +367,10 @@ export default function PaidPinModal({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
           {/* Post Preview */}
-          <div className="p-3 sm:p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 sm:p-4">
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Post to pin:</p>
-              <p className="text-sm sm:text-base text-gray-900 dark:text-white line-clamp-2 sm:line-clamp-3">
+          <div className="p-3 sm:p-6 border-b border-soft-line">
+            <div className="bg-soft-sunken rounded-card p-3 sm:p-4">
+              <p className="text-xs sm:text-sm text-soft-ink-muted mb-2">Post to pin:</p>
+              <p className="text-sm sm:text-base text-soft-ink line-clamp-2 sm:line-clamp-3">
                 {postContent}
               </p>
             </div>
@@ -380,7 +380,7 @@ export default function PaidPinModal({
 
           {/* Duration Selection */}
           <div className="p-3 sm:p-6">
-                      <h4 className="text-sm sm:text-md font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">
+                      <h4 className="font-soft-display text-sm sm:text-md font-semibold text-soft-ink mb-3 sm:mb-4">
               Choose Duration
             </h4>
             
@@ -398,38 +398,38 @@ export default function PaidPinModal({
                   // Wybor jest zamrazany przy platnosci, ale blokada w trakcie
                   // przetwarzania oszczedza uzytkownikowi mylacego widoku.
                   disabled={isProcessing}
-                  className={`relative w-full text-left border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 cursor-pointer transition-all disabled:cursor-not-allowed ${
+                  className={`relative w-full text-left border-2 rounded-card p-3 sm:p-4 cursor-pointer transition-[background-color,border-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                     isSelected
-                      ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      ? 'border-soft-accent bg-soft-accent-soft'
+                      : 'border-soft-line hover:border-soft-line-strong'
                   }`}
                   onClick={() => setSelectedDuration(duration.duration)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className={`w-4 h-4 rounded-full border-2 ${
-                        isSelected 
-                          ? 'border-yellow-400 bg-yellow-400' 
-                          : 'border-gray-300 dark:border-gray-600'
+                        isSelected
+                          ? 'border-soft-accent-deep bg-soft-accent-deep'
+                          : 'border-soft-line-strong'
                       }`}>
                         {isSelected && (
                           <div className="w-full h-full rounded-full bg-white scale-50"></div>
                         )}
                       </div>
                       <div>
-                        <p className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">
+                        <p className="font-soft-display text-sm sm:text-base font-semibold text-soft-ink">
                           {duration.label}
                         </p>
-                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-xs sm:text-sm text-soft-ink-muted">
                           {duration.description}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
+                      <p className="font-soft-display text-sm sm:text-base font-bold tabular-nums text-soft-ink">
                         {cost.ethAmount} ETH
                       </p>
-                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                      <p className="font-soft-display text-xs sm:text-sm tabular-nums text-soft-ink-muted">
                         ~${cost.usdAmount.toFixed(2)}
                       </p>
                     </div>
@@ -437,7 +437,7 @@ export default function PaidPinModal({
                   
                   {/* Popular badge dla 24h */}
                   {duration.duration === 'HOURS_24' && (
-                    <div className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    <div className="absolute -top-2 -right-2 bg-soft-primary text-white font-soft-display text-xs font-bold px-2.5 py-1 rounded-pill">
                       POPULAR
                     </div>
                   )}
@@ -447,26 +447,26 @@ export default function PaidPinModal({
           </div>
 
           {/* Summary */}
-          <div className="mt-6 bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+          <div className="mt-6 bg-soft-sunken rounded-card p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Duration:</span>
-              <span className="font-medium text-gray-900 dark:text-white">
+              <span className="text-sm text-soft-ink-muted">Duration:</span>
+              <span className="font-soft-display font-semibold text-soft-ink">
                 {durations.find(d => d.duration === selectedDuration)?.label}
               </span>
             </div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Expires at:</span>
-              <span className="font-medium text-gray-900 dark:text-white">
+              <span className="text-sm text-soft-ink-muted">Expires at:</span>
+              <span className="font-soft-display font-semibold tabular-nums text-soft-ink">
                 {new Date(expirationTime).toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Total cost:</span>
+              <span className="text-sm text-soft-ink-muted">Total cost:</span>
               <div className="text-right">
-                <span className="font-bold text-gray-900 dark:text-white">
+                <span className="font-soft-display font-bold tabular-nums text-soft-ink">
                   {selectedPrice.ethAmount} ETH
                 </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                <span className="font-soft-display text-sm tabular-nums text-soft-ink-muted ml-2">
                   (~${selectedPrice.usdAmount.toFixed(2)})
                 </span>
               </div>
@@ -476,11 +476,11 @@ export default function PaidPinModal({
           {/* Balance Check */}
           {balance && (
             <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Your balance:</span>
-              <span className={`font-medium ${
-                hasEnoughBalance 
-                  ? 'text-green-600 dark:text-green-400' 
-                  : 'text-red-600 dark:text-red-400'
+              <span className="text-soft-ink-muted">Your balance:</span>
+              <span className={`font-soft-display font-semibold tabular-nums ${
+                hasEnoughBalance
+                  ? 'text-soft-ink'
+                  : 'text-red-700'
               }`}>
                 {parseFloat(balance.formatted).toFixed(4)} ETH
               </span>
@@ -488,15 +488,15 @@ export default function PaidPinModal({
           )}
 
           {/* Action Buttons */}
-          <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+          <div className="p-4 sm:p-6 bg-soft-sunken border-t border-soft-line">
           {/* ETH Payment Button */}
           <button
             onClick={handlePayAndPin}
             disabled={buttonState.disabled}
-            className={`w-full py-3 mt-4 font-bold text-white rounded-lg transition-all 
-              ${buttonState.disabled 
-                ? 'bg-gray-600 cursor-not-allowed' 
-                : 'bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105'}`
+            className={`w-full py-3 mt-4 font-soft-display font-bold rounded-pill transition-[background-color,box-shadow,transform] duration-[--dur-press] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2
+              ${buttonState.disabled
+                ? 'bg-soft-line text-soft-ink-soft cursor-not-allowed'
+                : 'bg-soft-accent text-soft-ink shadow-chip hover:shadow-float active:scale-[0.97]'}`
             }
           >
             {buttonState.text}
@@ -505,8 +505,8 @@ export default function PaidPinModal({
           {/* Base Pay Button - 50% cheaper alternative */}
           <div className="mt-4">
             <div className="text-center mb-2">
-              <span className="text-xs text-gray-600 dark:text-gray-400">Or pay with Base Pay </span>
-              <span className="text-xs text-green-600 dark:text-green-400 font-semibold">(50% cheaper - ${selectedPrice.usdcAmount.toFixed(2)} USDC!)</span>
+              <span className="text-xs text-soft-ink-muted">Or pay with Base Pay </span>
+              <span className="text-xs text-soft-accent-deep font-semibold">(50% cheaper - ${selectedPrice.usdcAmount.toFixed(2)} USDC!)</span>
             </div>
             {/* BasePayButton nie przyjmuje `disabled`, wiec blokujemy wrapperem
                 i strazą w handlerze - inaczej drugie kliknieciu placilo drugi raz. */}
@@ -518,19 +518,19 @@ export default function PaidPinModal({
             </div>
           </div>
 
-          <p className="text-center text-gray-500 mt-4 text-xs">
+          <p className="text-center text-soft-ink-soft mt-4 text-xs">
             Pinning is only available on Base Mainnet.
           </p>
-          
+
           {!isCorrectNetwork && (
-            <p className="text-center text-red-500 mt-2 text-sm">
+            <p className="text-center text-red-700 mt-2 text-sm">
               Please switch to Base Mainnet to pin posts.
             </p>
           )}
           </div>
 
           {/* Help text */}
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3">
+          <p className="text-xs text-soft-ink-soft text-center mt-3">
             Your post will be featured at the top of the feed for the selected duration
           </p>
         </div>

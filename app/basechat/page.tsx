@@ -64,6 +64,7 @@ import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 import GlassIcons from '../components/GlassIcons/GlassIcons';
 import GooeyNav from '../components/GooeyNav/GooeyNav';
 import SoftFeedMobile from './soft/SoftFeedMobile';
+import SoftSectionList from './soft/SoftSectionList';
 const MusicSelector = dynamic(() => import('./components/MusicSelector'), { ssr: false });
 import SpotifyTrackCard from './components/SpotifyTrackCard';
 // Import Zora SDK functions
@@ -446,6 +447,12 @@ function BaseChatContent() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [showMyFeed, setShowMyFeed] = useState(false);
   const [activeFeed, setActiveFeed] = useState<'forYou' | 'following' | 'baseName'>('forYou'); // Dodajemy 'baseName'
+  /**
+   * Filtr sieci dla paska "stories" na telefonie. `null` = wszystkie lancuchy
+   * i taki jest stan poczatkowy: gdyby domyslnie wybrany byl Base, feed po
+   * wejsciu ukrywalby posty z siedmiu pozostalych sieci bez informacji dlaczego.
+   */
+  const [mobileNetwork, setMobileNetwork] = useState<string | null>(null);
   
   // Hook do sprawdzania BaseName
   const { data: baseName } = useName(
@@ -2348,6 +2355,71 @@ function BaseChatContent() {
                 <div className="mb-8">
                   {isConnected ? (
                     <div className="space-y-4">
+                      {/* ===== PRZELACZNIK WIDOKOW - TYLKO NA TELEFONIE =====
+                          "My Profile / Follows / Friends / Discover" siedzialy
+                          dotad na gorze glownego feedu, jako rzad kolorowych
+                          kafli. Zabieraly pierwszy ekran telefonu i konkurowaly
+                          z trescia, po ktora ludzie tu przychodza - a cztery
+                          z pieciu pozycji to wcale nie jest feed, tylko osobne
+                          widoki.
+
+                          Tak samo rozwiazuje to Twitter: os czasu jest sama,
+                          a wszystko "moje" siedzi za profilem.
+
+                          Na desktopie nic sie nie zmienia - tam jest miejsce
+                          w bok i rzad kafli nikomu nie przeszkadza. */}
+                      <SoftSectionList
+                        sections={[
+                          {
+                            id: 'feed',
+                            label: 'All Posts',
+                            description: 'Everything, newest first',
+                            icon: <LayoutGrid className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'feed',
+                            onSelect: () => {
+                              setSelectedTag('');
+                              setSelectedAuthor('');
+                              setActiveMainPanel('feed');
+                              clearViewParams();
+                              setActiveMobilePanel('main');
+                            },
+                          },
+                          {
+                            id: 'following',
+                            label: 'Follows',
+                            description: 'Only people you follow',
+                            icon: <Rss className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'following',
+                            onSelect: () => {
+                              setActiveMainPanel('following');
+                              setActiveMobilePanel('main');
+                            },
+                          },
+                          {
+                            id: 'friends',
+                            label: 'Friends',
+                            description: 'People you both follow',
+                            icon: <Users className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'friends',
+                            onSelect: () => {
+                              setActiveMainPanel('friends');
+                              setActiveMobilePanel('main');
+                            },
+                          },
+                          {
+                            id: 'discover',
+                            label: 'Discover',
+                            description: 'Find people to follow',
+                            icon: <Eye className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'discover',
+                            onSelect: () => {
+                              setActiveMainPanel('discover');
+                              setActiveMobilePanel('main');
+                            },
+                          },
+                        ]}
+                      />
+
                       {/* ProfileCard at the top */}
                       {address && (
                         <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
@@ -2948,39 +3020,47 @@ function BaseChatContent() {
               </div>
             </div>
 
-            {/* ===== MOBILNY FEED - kierunek Soft Social =====
-                 Zastepuje WYGLAD srodkowego panelu ponizej progu `lg` i nic
-                 wiecej. Desktop idzie stara sciezka bez jednej zmienionej linii,
-                 a cala logika - postowanie na osmiu lancuchach, platnosci,
-                 znajomi, powiadomienia - zostaje tam, gdzie byla. Granica jest
-                 ostra: ten komponent dostaje gotowe dane i oddaje zdarzenia
-                 w gore, wiec zmiana wygladu nie dotyka kodu platnosci. */}
-            <div className={activeMobilePanel === 'main' ? 'block w-full lg:hidden' : 'hidden'}>
-              <SoftFeedMobile
-                posts={posts as any}
-                currentAddress={address}
-                avatarUrl={userProfile?.avatar}
-                activeFeed={activeFeed}
-                onFeedChange={(id) => setActiveFeed(id as 'forYou' | 'following' | 'baseName')}
-                onOpenComposer={() => {
-                  // Przewijamy do PRAWDZIWEGO kompozytora zamiast budowac drugi.
-                  // Druga implementacja pisania postu bylaby drugim miejscem,
-                  // w ktorym trzeba naprawiac ten sam blad.
-                  const composer = document.querySelector('textarea');
-                  composer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  (composer as HTMLTextAreaElement | null)?.focus();
-                }}
-                isLoading={isLoadingPosts}
-              />
-            </div>
-
-            {/* Middle panel (Feed) - od progu `lg` w gore */}
-            <div className={`flex-1 p-4 overflow-y-auto ${
-              activeMobilePanel === 'main' ? 'hidden lg:block w-full' : 'hidden lg:block'
+            {/* Middle panel (Feed) */}
+            <div className={`flex-1 overflow-y-auto p-4 max-lg:bg-soft-bg ${
+              activeMobilePanel === 'main' ? 'block w-full' : 'hidden lg:block'
             }`}>
-              {/* Post switcher and network selection - only for logged in users */}
+              {/* ===== OPRAWA MOBILNA - kierunek Soft Social =====
+                  Wymienia WYLACZNIE oprawe feedu ponizej progu `lg`: tlo, pasek
+                  sieci jako "stories", zakladki-pigulki i zwiniety kompozytor.
+                  LISTA POSTOW ZOSTAJE TA SAMA - to jest poprawka po realnej
+                  regresji, ktora sam wprowadzilem: podmiana kart postow na
+                  wlasne zabrala na telefonie tipy, przypinanie, przyciski
+                  transakcji per siec, tresc premium, odznaki agentow i muzyke.
+                  Wyglad wolno wymieniac tylko tam, gdzie nic za soba nie ciagnie. */}
+              <div className="lg:hidden">
+                <SoftFeedMobile
+                  currentAddress={address}
+                  avatarUrl={userProfile?.avatar}
+                  activeFeed={activeFeed}
+                  activeNetwork={mobileNetwork}
+                  onNetworkChange={setMobileNetwork}
+                  onFeedChange={(id) => setActiveFeed(id as 'forYou' | 'following' | 'baseName')}
+                  onOpenComposer={() => {
+                    // Przewijamy do PRAWDZIWEGO kompozytora zamiast budowac drugi.
+                    // Druga implementacja pisania postu bylaby drugim miejscem,
+                    // w ktorym trzeba naprawiac ten sam blad - a ten formularz
+                    // obsluguje osiem lancuchow i tresc premium.
+                    const composer = document.querySelector('textarea');
+                    composer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    (composer as HTMLTextAreaElement | null)?.focus();
+                  }}
+                />
+              </div>
+
+              {/* Post switcher and network selection - only for logged in users.
+                  UKRYTE NA TELEFONIE (`hidden lg:block`): te same funkcje sa tam
+                  podane inaczej - zakladki feedu w pasku Soft Social nad tym
+                  blokiem, a przelacznik widokow (My Profile / Friends / Follows /
+                  Discover) przeniesiony do panelu Profil, tak jak robi to Twitter.
+                  Zostawienie obu naraz dawalo na telefonie DWA rzedy niemal
+                  identycznych filtrow jeden nad drugim. */}
               {isConnected && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4">
+              <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4">
                 <div className="flex flex-col gap-3">
                   {/* Main filters row - Glass Icons */}
                   <div className="relative">
@@ -3557,7 +3637,14 @@ function BaseChatContent() {
                         onRefreshPosts={onRefreshPosts}
                         displayUserName={displayUserName}
                         userNames={userNames}
-                        posts={posts} // Dodajemy przekazywanie postów jako prop
+                        // Filtr sieci z paska "stories" na telefonie. Na
+                        // desktopie mobileNetwork jest zawsze null, wiec lista
+                        // idzie w calosci - dokladnie jak przedtem.
+                        posts={
+                          mobileNetwork
+                            ? posts.filter((p) => (p.network ?? 'base') === mobileNetwork)
+                            : posts
+                        }
                         isLoading={isLoadingPosts} // Przekaż stan ładowania do PostList
                         showMyFeed={showMyFeed} // Przekaż stan My Feed do PostList
                         getCachedPosts={getCachedPosts} // Przekaż funkcje cache'owania

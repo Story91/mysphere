@@ -84,11 +84,17 @@ const robinhoodEntry = {
 const networks = [baseEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry] as const;
 type Network = (typeof networks)[number];
 
-/** Tlo pod logo: nie kazdy wpis ma te pola, wiec pytamy przez `in`, nie przez `any`. */
+/**
+ * Tlo pod logo: nie kazdy wpis ma te pola, wiec pytamy przez `in`, nie przez `any`.
+ *
+ * Same znaki sieci sa nietykalne - zmienia sie wylacznie domyslna podkladka.
+ * `bg-white/10` bylo bialym przydymieniem pod ciemne szklo; na bialej belce
+ * jest niewidoczne, wiec krazek dostaje lawendowa powierzchnie zaglebiona.
+ */
 function iconBackground(network: Network): string {
   if ('bgWhite' in network && network.bgWhite) return 'bg-white';
   if ('bgBlack' in network && network.bgBlack) return 'bg-black';
-  return 'bg-white/10';
+  return 'bg-soft-sunken';
 }
 
 function isNetworkDisabled(network: Network): boolean {
@@ -158,7 +164,7 @@ export function NetworkSwitcher() {
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label={`Switch network, currently ${activeNetwork.name}`}
-        className="flex items-center gap-2 px-3 py-2 bg-black/20 hover:bg-black/30 rounded-xl border border-[#0052FF]/20 hover:border-[#0052FF]/50 transition-all duration-200 backdrop-blur-xl"
+        className="flex items-center gap-2 px-3 py-2 bg-soft-surface hover:bg-soft-sunken rounded-pill border border-soft-line hover:border-soft-line-strong transition-[background-color,border-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
       >
         {activeNetwork.id === base.id ? (
           <div className="w-5 h-5 bg-white rounded p-0.5 flex items-center justify-center">
@@ -181,14 +187,14 @@ export function NetworkSwitcher() {
                 className="object-contain"
               />
             </div>
-            <span className="hidden sm:block text-white text-sm font-['Coinbase_Display'] font-medium">
+            <span className="hidden sm:block text-soft-ink text-sm font-soft-display font-bold">
               {activeNetwork.shortName}
             </span>
           </>
         )}
         <svg
           aria-hidden="true"
-          className={`w-3 h-3 text-gray-300 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 text-soft-ink-faint transition-transform duration-[--dur-press] ease-out-strong ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -199,8 +205,10 @@ export function NetworkSwitcher() {
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-48 bg-black/90 backdrop-blur-xl border border-[#0052FF]/20 rounded-xl shadow-xl z-50 overflow-hidden">
-          <div className="p-1">
+        /* origin-top-right: menu wyrasta spod swojego przycisku, a nie ze
+           swojego srodka. */
+        <div className="absolute top-full right-0 mt-2 w-48 origin-top-right bg-soft-surface border border-soft-line rounded-card shadow-float z-50 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200 ease-out-strong">
+          <div className="p-2">
             {networks.map((network) => {
               const isDisabled = isNetworkDisabled(network);
               const isCurrent = network.id === chainId;
@@ -210,10 +218,10 @@ export function NetworkSwitcher() {
                 key={network.id}
                 type="button"
                 onClick={() => handleNetworkSwitch(network.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg transition-all duration-200 ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-pill transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.98] disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset ${
                   isCurrent
-                    ? 'bg-[#0052FF]/20 text-white'
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                    ? 'bg-soft-sunken text-soft-ink'
+                    : 'text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink'
                 }`}
                 disabled={isCurrent || isDisabled}
                 aria-current={isCurrent ? 'true' : undefined}
@@ -243,7 +251,7 @@ export function NetworkSwitcher() {
                 )}
                 {network.id !== base.id && (
                   <div className="flex-1 min-w-0">
-                    <div className="font-['Coinbase_Display'] font-medium text-sm truncate">
+                    <div className="font-soft-display font-bold text-sm truncate">
                       {network.name}
                     </div>
                   </div>
@@ -252,7 +260,7 @@ export function NetworkSwitcher() {
                 {isDisabled ? (
                   <svg
                     aria-hidden="true"
-                    className="w-3.5 h-3.5 text-gray-400"
+                    className="w-3.5 h-3.5 text-soft-ink-faint"
                     viewBox="0 0 24 24"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -261,7 +269,7 @@ export function NetworkSwitcher() {
                     <rect x="5" y="10" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="2"/>
                   </svg>
                 ) : isCurrent && (
-                  <div aria-hidden="true" className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
+                  <div aria-hidden="true" className="w-2 h-2 bg-soft-primary rounded-full flex-shrink-0"></div>
                 )}
               </button>
               );

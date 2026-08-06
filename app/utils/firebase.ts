@@ -4312,22 +4312,36 @@ export const getTopActiveUsersPaginated = async (
     
     if (cacheValid && paginatedActiveUsersCache.pages[pageIndex]) {
       console.log(`📋 Using cached page ${limitedPage}/${MAX_PAGES} of active users`);
+      // Te same liczby co w gałęzi bez cache'u - inaczej ten sam ekran
+      // raportowalby raz 5 stron, raz tyle, ile realnie jest.
+      const cachedPages = paginatedActiveUsersCache.totalPages || paginatedActiveUsersCache.pages.length;
       return {
         users: paginatedActiveUsersCache.pages[pageIndex],
         currentPage: limitedPage,
-        totalPages: MAX_PAGES,
-        hasNext: limitedPage < MAX_PAGES,
+        totalPages: Math.max(1, cachedPages),
+        hasNext: limitedPage < cachedPages,
         hasPrev: limitedPage > 1,
-        totalUsers: MAX_USERS
+        totalUsers: paginatedActiveUsersCache.pages.reduce((sum, page) => sum + page.length, 0),
       };
     }
 
     // 🚀 PRAWDZIWE LAZY LOADING: Pobierz tylko potrzebną ilość danych
     console.log(`🔄 Fetching page ${limitedPage}/${MAX_PAGES} from Firebase (${pageSize} users)...`);
     
-    // Jeśli nie ma cache, pobierz tylko tyle ile potrzeba do aktualnej strony
-    const usersNeeded = limitedPage * pageSize;
-    const allUsers = await getCachedActiveUsers(Math.min(usersNeeded, MAX_USERS), forceRefresh);
+    // POBIERAMY OD RAZU CALY ZESTAW (50), NIE TYLKO BIEZACA STRONE.
+    //
+    // Wczesniej bylo `limitedPage * pageSize`, czyli przy pierwszym wejsciu 10 -
+    // a getCachedActiveUsers dokłada 20% zapasu, wiec z Firestore wracalo
+    // dokladnie 12 dokumentow. To jest odpowiedz na pytanie "czemu Most Active
+    // pokazuje tylko 12 osob".
+    //
+    // Gorsze bylo to, ze funkcja i tak RAPORTOWALA 5 stron i 50 uzytkownikow
+    // niezaleznie od tego, ile danych przyszlo. Paginacja obiecywala strony,
+    // ktorych nie mialo z czego zbudowac.
+    //
+    // 50 dokumentow to jeden odczyt na okno cache'u - roznica wobec 12 jest
+    // kosztowo nieistotna, a lista przestaje klamac.
+    const allUsers = await getCachedActiveUsers(MAX_USERS, forceRefresh);
     
     // Podziel na strony (maksymalnie 5 stron)
     const pages: any[][] = [];
@@ -4343,7 +4357,7 @@ export const getTopActiveUsersPaginated = async (
     paginatedActiveUsersCache = {
       pages,
       currentPage: limitedPage,
-      totalPages: MAX_PAGES,
+      totalPages: Math.max(1, availablePages),
       lastUpdated: now,
       pageSize
     };
@@ -4353,13 +4367,15 @@ export const getTopActiveUsersPaginated = async (
     // Zwróć żądaną stronę
     const currentPageUsers = pages[pageIndex] || [];
     
+    // Liczby RZECZYWISTE, nie deklarowane. Wczesniej szly tu MAX_PAGES
+    // i MAX_USERS niezaleznie od tego, ile danych faktycznie przyszlo.
     return {
       users: currentPageUsers,
       currentPage: limitedPage,
-      totalPages: MAX_PAGES,
-      hasNext: limitedPage < MAX_PAGES && limitedPage < availablePages,
+      totalPages: Math.max(1, availablePages),
+      hasNext: limitedPage < availablePages,
       hasPrev: limitedPage > 1,
-      totalUsers: MAX_USERS
+      totalUsers: allUsers.length
     };
     
   } catch (error) {

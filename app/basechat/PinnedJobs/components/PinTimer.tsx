@@ -53,16 +53,16 @@ export default function PinTimer({
   // Określ kolor w zależności od pozostałego czasu
   const getTimerColor = () => {
     const hoursLeft = timeLeft / (60 * 60 * 1000);
-    if (hoursLeft < 1) return 'text-red-500'; // Ostatnia godzina - czerwony
-    if (hoursLeft < 6) return 'text-orange-500'; // Ostatnie 6 godzin - pomarańczowy
-    return 'text-green-500'; // Więcej niż 6 godzin - zielony
+    if (hoursLeft < 1) return 'text-red-700'; // Ostatnia godzina - czerwony
+    if (hoursLeft < 6) return 'text-soft-accent-deep'; // Ostatnie 6 godzin - pomarańczowy
+    return 'text-soft-ink-muted'; // Więcej niż 6 godzin - spokojny
   };
 
   const getProgressColor = () => {
     const hoursLeft = timeLeft / (60 * 60 * 1000);
-    if (hoursLeft < 1) return 'bg-red-500';
-    if (hoursLeft < 6) return 'bg-orange-500';
-    return 'bg-green-500';
+    if (hoursLeft < 1) return 'bg-red-600';
+    if (hoursLeft < 6) return 'bg-soft-accent';
+    return 'bg-soft-primary';
   };
 
   // Oblicz progress bar (dla demonstracji - można zrobić dokładniej)
@@ -81,12 +81,12 @@ export default function PinTimer({
   };
 
   return (
-    <div className={`flex items-center justify-between p-2 sm:p-3 bg-gradient-to-r from-yellow-50/80 to-orange-50/80 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-lg border border-yellow-200/50 dark:border-yellow-800/50 ${className}`}>
+    <div className={`flex items-center justify-between p-2 sm:p-3 bg-soft-surface rounded-card border-2 border-soft-accent font-soft ${className}`}>
       <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
         {/* Animated pin icon */}
         <div className="relative">
-          <Crown className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-          <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <Crown className="w-4 h-4 text-soft-accent-deep" />
+          <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
         </div>
         
         <div className="flex-1">
@@ -98,9 +98,9 @@ export default function PinTimer({
           </div>
           
           {/* Progress bar */}
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-            <div 
-              className={`h-1.5 rounded-full transition-all duration-1000 ${getProgressColor()}`}
+          <div className="w-full bg-soft-sunken rounded-pill h-1.5">
+            <div
+              className={`h-1.5 rounded-pill transition-[width] duration-1000 ease-out-strong ${getProgressColor()}`}
               style={{ width: `${getProgress()}%` }}
             ></div>
           </div>
@@ -111,7 +111,7 @@ export default function PinTimer({
       {isOwner && onExtendClick && (
         <button
           onClick={onExtendClick}
-          className="flex items-center space-x-1 ml-2 sm:ml-3 px-2 sm:px-3 py-1 sm:py-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg text-xs font-medium transition-all transform hover:scale-105 shadow-sm"
+          className="flex items-center space-x-1 ml-2 sm:ml-3 px-2 sm:px-3 py-1 sm:py-1.5 bg-soft-sunken hover:bg-soft-line text-soft-ink border border-soft-line rounded-pill text-xs font-semibold shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
         >
           <Plus className="w-3 h-3" />
           <span>Extend</span>
@@ -119,7 +119,7 @@ export default function PinTimer({
       )}
       
       {/* Pin type indicator */}
-      <div className="ml-2 sm:ml-3 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold rounded-full">
+      <div className="ml-2 sm:ml-3 px-2 sm:px-2.5 py-0.5 sm:py-1 bg-soft-accent text-soft-ink font-soft-display text-xs font-bold rounded-pill">
         PAID
       </div>
     </div>

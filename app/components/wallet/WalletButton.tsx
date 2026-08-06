@@ -27,14 +27,16 @@ const MENU_ID = 'wallet-menu';
 
 const ROW = [
   'flex items-center gap-3 w-full px-4 py-2.5',
-  'text-[13px] font-medium text-[#C7D4EE]',
-  'transition-colors duration-150 hover:bg-white/[0.06] hover:text-[#EEF3FF]',
+  'font-soft text-[13px] font-semibold text-soft-ink-muted',
+  'transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong',
+  'hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.98]',
+  'outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset',
 ].join(' ');
 
 function Icon({ children }: { children: React.ReactNode }) {
   return (
     <svg
-      className="h-4 w-4 shrink-0 text-[#7E93BC]"
+      className="h-4 w-4 shrink-0 text-soft-ink-faint"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -49,7 +51,7 @@ function Icon({ children }: { children: React.ReactNode }) {
 function ExternalMark() {
   return (
     <svg
-      className="h-3 w-3 shrink-0 text-[#5C6F94]"
+      className="h-3 w-3 shrink-0 text-soft-ink-faint"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -102,7 +104,7 @@ export default function WalletButton() {
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="rounded-xl bg-[#0052FF] px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#0052FF]/90"
+          className="rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-bold text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
         >
           Connect wallet
         </button>
@@ -124,27 +126,30 @@ export default function WalletButton() {
         aria-haspopup="true"
         aria-controls={MENU_ID}
         aria-label="Wallet menu"
-        className="flex items-center gap-2 rounded-xl bg-[#0052FF] p-2 text-white transition-colors hover:bg-[#0052FF]/90"
+        className="flex items-center gap-2 rounded-pill bg-soft-primary p-2 sm:pr-3 text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
       >
         <Avatar address={address} className="h-6 w-6" />
-        <Name address={address} className="hidden text-[13px] font-medium text-white sm:inline" />
+        <Name address={address} className="hidden font-soft-display text-[13px] font-bold text-white sm:inline" />
       </button>
 
       {isMenuOpen && (
         <div
           id={MENU_ID}
-          className="absolute right-0 top-full z-[9999] mt-2 w-[300px] max-[360px]:w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-white/10 bg-[#0A1024]/95 shadow-[0_24px_64px_-16px_rgba(0,0,0,0.75)] backdrop-blur-xl"
+          /* Popover skaluje sie OD SWOJEGO PRZYCISKU, nie od srodka - stad
+             origin-top-right. Menu wychodzi spod przycisku portfela w prawym
+             gornym rogu, wiec tam ma miec punkt zaczepienia. */
+          className="absolute right-0 top-full z-[9999] mt-2 w-[300px] max-[360px]:w-[calc(100vw-24px)] origin-top-right overflow-hidden rounded-card border border-soft-line bg-soft-surface shadow-float animate-in fade-in-0 zoom-in-95 duration-200 ease-out-strong"
         >
           {/* Blok tozsamosci czytany jak karta profilu - to apka spolecznosciowa,
               gdzie portfel JEST tozsamoscia. */}
-          <div className="flex items-center gap-3 border-b border-white/[0.08] px-4 py-4">
-            <Avatar address={address} className="h-10 w-10 rounded-full ring-2 ring-[#0052FF]/70" />
+          <div className="flex items-center gap-3 border-b border-soft-line px-4 py-4">
+            <Avatar address={address} className="h-10 w-10 rounded-full ring-2 ring-soft-primary/70" />
             <div className="min-w-0">
               <Name
                 address={address}
-                className="block truncate font-['Coinbase_Display'] text-[15px] font-semibold text-[#EEF3FF]"
+                className="block truncate font-soft-display text-[15px] font-bold text-soft-ink"
               />
-              <span className="block text-[12px] tabular-nums text-[#93A5C9]">
+              <span className="block font-soft-display text-[12px] tabular-nums text-soft-ink-soft">
                 <Address address={address} />
                 {balance && ` · ${Number(balance.formatted).toFixed(4)} ${balance.symbol}`}
               </span>
@@ -204,14 +209,17 @@ export default function WalletButton() {
             )}
           </div>
 
-          <div className="border-t border-white/[0.08] py-1">
+          <div className="border-t border-soft-line py-1">
             <button
               type="button"
               onClick={() => {
                 disconnect();
                 setIsMenuOpen(false);
               }}
-              className={`${ROW} !text-[#FF8A8A] hover:!bg-[#FF6B6B]/10 hover:!text-[#FFB3B3]`}
+              /* Jasna czerwien z ciemnego motywu (#FF8A8A) na bialej karcie ma
+                 2.2:1. accent-deep to najciemniejszy cieply ton w palecie i
+                 nadal czyta sie jako ostrzezenie. */
+              className={`${ROW} !text-soft-accent-deep hover:!bg-soft-accent-soft hover:!text-soft-accent-deep`}
             >
               <Icon>
                 <path

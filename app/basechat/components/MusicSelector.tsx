@@ -137,30 +137,32 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+    <div className="fixed inset-0 bg-soft-ink/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-soft-surface rounded-card shadow-float max-w-4xl w-full max-h-[80vh] overflow-hidden">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-6 border-b border-soft-line">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-soft-display font-bold text-soft-ink">
               🎵 Select Track from Spotify
             </h2>
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleRefreshData}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="p-2 hover:bg-soft-sunken rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 title="Refresh Spotify data"
+                aria-label="Refresh Spotify data"
                 disabled={loading}
               >
-                <svg className={`w-5 h-5 text-gray-500 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-5 h-5 text-soft-ink-soft ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="p-2 hover:bg-soft-sunken rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                aria-label="Close track selector"
               >
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-soft-ink-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -168,43 +170,43 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
           </div>
 
           {/* Tabs */}
-          <div className="flex space-x-1 mt-4 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+          <div className="flex space-x-1 mt-4 bg-soft-sunken rounded-pill p-1">
             <button
               onClick={() => setActiveTab('recent')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'recent'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
+                  : 'text-soft-ink-muted hover:text-soft-ink'
               }`}
             >
               Recently Played
             </button>
             <button
               onClick={() => setActiveTab('saved')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'saved'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
+                  : 'text-soft-ink-muted hover:text-soft-ink'
               }`}
             >
               Saved Tracks
             </button>
             <button
               onClick={() => setActiveTab('albums')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'albums'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
+                  : 'text-soft-ink-muted hover:text-soft-ink'
               }`}
             >
               Albums
             </button>
             <button
               onClick={() => setActiveTab('playlists')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'playlists'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
+                  : 'text-soft-ink-muted hover:text-soft-ink'
               }`}
             >
               Playlists
@@ -216,21 +218,21 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
         <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin w-8 h-8 border-4 border-green-400 border-t-transparent rounded-full"></div>
-              <span className="ml-3 text-gray-600 dark:text-gray-300">Loading Spotify data...</span>
+              <div className="animate-spin w-8 h-8 border-4 border-soft-primary border-t-transparent rounded-full"></div>
+              <span className="ml-3 text-soft-ink-muted">Loading Spotify data...</span>
             </div>
           ) : error ? (
             <div className="text-center py-12">
-              <div className="text-red-500 mb-4">❌ {error}</div>
+              <div className="text-soft-accent-deep mb-4">❌ {error}</div>
               <button
                 onClick={() => { void fetchSpotifyData(); }}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                className="px-4 py-2 bg-soft-primary text-white font-semibold rounded-pill shadow-chip hover:bg-soft-primary-deep transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 Try Again
               </button>
             </div>
           ) : !spotifyData ? (
-            <div className="text-center py-12 text-gray-600 dark:text-gray-300">
+            <div className="text-center py-12 text-soft-ink-muted">
               No Spotify data found for this user
             </div>
           ) : (
@@ -242,7 +244,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                     spotifyData.profile.playedTracks.slice(0, 20).map((trackData, index) => (
                       <div
                         key={`recent-${index}`}
-                        className="relative hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        className="relative bg-soft-surface border border-soft-line shadow-chip hover:bg-soft-sunken rounded-card transition-colors duration-[--dur-press] ease-out-strong"
                       >
                         <SpotifyTrackCard
                           trackData={trackData}
@@ -256,17 +258,18 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                             e.stopPropagation();
                             handleSelectTrack(trackData);
                           }}
-                          className="absolute top-3 right-3 w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 border-2 border-white/20 z-10"
+                          className="absolute top-3 right-3 w-8 h-8 bg-soft-primary hover:bg-soft-primary-deep text-white rounded-full flex items-center justify-center shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:scale-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-2 border-soft-surface z-10"
                           title="Add track to post"
+                          aria-label="Add track to post"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                           </svg>
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-soft-ink-soft">
                       No recently played tracks found
                     </div>
                   )}
@@ -280,7 +283,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                     spotifyData.profile.savedTracks.slice(0, 20).map((trackData, index) => (
                       <div
                         key={`saved-${index}`}
-                        className="relative hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        className="relative bg-soft-surface border border-soft-line shadow-chip hover:bg-soft-sunken rounded-card transition-colors duration-[--dur-press] ease-out-strong"
                       >
                         <SpotifyTrackCard
                           trackData={trackData}
@@ -294,17 +297,18 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                             e.stopPropagation();
                             handleSelectTrack(trackData);
                           }}
-                          className="absolute top-3 right-3 w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 border-2 border-white/20 z-10"
+                          className="absolute top-3 right-3 w-8 h-8 bg-soft-primary hover:bg-soft-primary-deep text-white rounded-full flex items-center justify-center shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:scale-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-2 border-soft-surface z-10"
                           title="Add track to post"
+                          aria-label="Add track to post"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                           </svg>
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-soft-ink-soft">
                       No saved tracks found
                     </div>
                   )}
@@ -313,7 +317,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
 
               {/* Albums & Playlists - coming soon */}
               {(activeTab === 'albums' || activeTab === 'playlists') && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-soft-ink-soft">
                   This feature will be available soon...
                 </div>
               )}
@@ -322,8 +326,8 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <div className="text-sm text-gray-600 dark:text-gray-400 text-center space-y-1">
+        <div className="p-4 border-t border-soft-line bg-soft-sunken">
+          <div className="text-sm text-soft-ink-muted text-center space-y-1">
             <div>💡 Click on a track to add it to your post</div>
             <div className="text-xs opacity-75">
               📊 Data cached for 30 minutes • Use refresh button for latest tracks

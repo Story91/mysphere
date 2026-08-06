@@ -124,14 +124,14 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
 
   if (loading) {
     return (
-      <div className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm ${className}`}>
+      <div className={`bg-soft-surface rounded-card p-4 shadow-card ${className}`}>
         <div className="flex items-center space-x-2 mb-3">
-          <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded w-4 h-4"></div>
-          <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded w-20 h-4"></div>
+          <div className="animate-pulse bg-soft-sunken rounded-pill w-4 h-4"></div>
+          <div className="animate-pulse bg-soft-sunken rounded-pill w-20 h-4"></div>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="animate-pulse bg-gray-100 dark:bg-gray-700 rounded p-2 h-12"></div>
+            <div key={i} className="animate-pulse bg-soft-sunken rounded-card p-2 h-12"></div>
           ))}
         </div>
       </div>
@@ -140,25 +140,25 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
 
   if (tips.length === 0) {
     return (
-      <div className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm ${className}`}>
+      <div className={`bg-soft-surface rounded-card p-4 shadow-card ${className}`}>
         <div className="flex items-center space-x-2 mb-3">
           <span className="text-lg">🎯</span>
-          <h3 className="font-medium text-gray-900 dark:text-white">Recent Tips</h3>
+          <h3 className="font-soft-display font-semibold text-soft-ink">Recent Tips</h3>
         </div>
         <div className="text-center py-4">
-          <span className="text-gray-500 dark:text-gray-400 text-sm">No tips received yet</span>
+          <span className="text-soft-ink-soft text-sm">No tips received yet</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm ${className}`}>
+    <div className={`bg-soft-surface rounded-card p-4 shadow-card ${className}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           <span className="text-lg">🎯</span>
-          <h3 className="font-medium text-gray-900 dark:text-white">Recent Tips</h3>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
+          <h3 className="font-soft-display font-semibold text-soft-ink">Recent Tips</h3>
+          <span className="text-sm text-soft-ink-faint font-soft-display tabular-nums">
             ({tips.length})
           </span>
         </div>
@@ -166,32 +166,32 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
           <button
             onClick={() => setShowAll(!showAll)}
             aria-expanded={showAll}
-            className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-xs font-semibold text-soft-primary-deep bg-soft-sunken rounded-pill px-3 py-1.5 transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             {showAll ? 'Show Less' : 'Show All'}
           </button>
         )}
       </div>
       
-      <div className="space-y-2">
+      <div className="space-y-3">
         {displayedTips.map((tip) => (
-          <div key={tip.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div key={tip.id} className="flex items-center justify-between p-3 bg-soft-surface border border-soft-line rounded-card shadow-chip">
             <div className="flex items-center space-x-3">
               {/* Token + Network Icon */}
-              <div className="w-8 h-8 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-full flex items-center justify-center relative">
+              <div className="w-8 h-8 bg-soft-accent-soft rounded-full flex items-center justify-center relative">
                 <span className="text-sm">
                   <TokenIcon token={tip.token as TipToken} />
                 </span>
                 {/* Mała ikona sieci w rogu */}
-                <span className="absolute -bottom-0.5 -right-0.5 text-[10px] bg-white dark:bg-gray-800 rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-sm">
+                <span className="absolute -bottom-0.5 -right-0.5 text-[10px] bg-soft-surface rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-chip">
                   <NetworkIcon network={tip.network} />
                 </span>
               </div>
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                <div className="text-sm font-semibold text-soft-ink">
                   {getSenderName(tip.senderAddress)}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
+                <div className="text-xs text-soft-ink-faint">
                   {formatTimestamp(tip.timestamp)}
                 </div>
               </div>
@@ -199,7 +199,7 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
             
             <div className="flex items-center space-x-2">
               <div className="text-right">
-                <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
+                <div className="text-sm font-semibold text-soft-accent-deep font-soft-display tabular-nums flex items-center gap-1">
                   <TokenIcon token={tip.token as TipToken} />
                   <span>{formatTokenAmount(parseFloat(tip.amount), tip.token as TipToken)}</span>
                 </div>
@@ -211,7 +211,7 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
                     href={`/tip/${tip.txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 flex items-center space-x-1"
+                    className="text-xs font-semibold text-soft-primary-deep hover:text-soft-ink rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center space-x-1"
                   >
                     <span>Receipt</span>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

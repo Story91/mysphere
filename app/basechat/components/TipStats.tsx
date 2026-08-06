@@ -170,7 +170,7 @@ const NetworkWithTokenBadge = ({ network, token, size = 'sm' }: { network: TipNe
       
       {/* Token badge overlay for ETH/USDC */}
       {!isNativeToken && tokenConfig?.iconUrl && (
-        <div className="absolute -bottom-0.5 -right-0.5 bg-white dark:bg-gray-800 rounded-full p-px">
+        <div className="absolute -bottom-0.5 -right-0.5 bg-soft-surface rounded-full p-px">
           <img 
             src={tokenConfig.iconUrl} 
             alt={token} 
@@ -187,21 +187,22 @@ const TipStatsCollapsible = ({ networkGroups, getAmount, activeTips, className =
 
   return (
     <div className={`w-full ${className}`}>
-      <div className="bg-gradient-to-r from-blue-50/80 to-cyan-50/80 dark:from-blue-950/40 dark:to-cyan-950/40 border border-blue-200 dark:border-blue-800 rounded-xl overflow-hidden">
+      <div className="bg-soft-surface border border-soft-line rounded-card overflow-hidden shadow-card">
         {/* Toggle button with tips preview */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-3 py-2 flex items-center justify-between hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors"
+          aria-expanded={isOpen}
+          className="w-full px-3 py-2 flex items-center justify-between hover:bg-soft-sunken transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
         >
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Tips</span>
+            <span className="text-xs font-semibold text-soft-ink-faint uppercase tracking-wider">Tips</span>
             {/* Show active tips on the button - with composite icons */}
             {activeTips.length > 0 && (
               <div className="flex items-center gap-3 flex-wrap">
                 {activeTips.map(({ network, token, amount }) => (
                   <span 
                     key={`${network}:${token}`}
-                    className="flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-300"
+                    className="flex items-center gap-1 text-xs font-semibold text-soft-accent-deep font-soft-display tabular-nums"
                   >
                     <NetworkWithTokenBadge network={network} token={token} size="sm" />
                     <span>{formatTokenAmount(amount, token as TipToken)}</span>
@@ -210,35 +211,35 @@ const TipStatsCollapsible = ({ networkGroups, getAmount, activeTips, className =
               </div>
             )}
             {activeTips.length === 0 && (
-              <span className="text-xs text-gray-400 dark:text-gray-500">No tips yet</span>
+              <span className="text-xs text-soft-ink-faint">No tips yet</span>
             )}
           </div>
           {isOpen ? (
-            <ChevronUp className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
+            <ChevronUp className="w-4 h-4 text-soft-ink-soft shrink-0" aria-hidden="true" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
+            <ChevronDown className="w-4 h-4 text-soft-ink-soft shrink-0" aria-hidden="true" />
           )}
         </button>
 
         {/* Collapsible table */}
         <div 
-          className={`overflow-hidden transition-all duration-200 ease-in-out ${
+          className={`overflow-hidden transition-[max-height,opacity] duration-[--dur-dropdown] ease-out-strong ${
             isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
           }`}
         >
-          <div className="border-t border-blue-200 dark:border-blue-800">
+          <div className="border-t border-soft-line">
             <Table>
               <TableBody>
                 {networkGroups.map(({ network, name, tokens }) => {
                   return (
                     <TableRow 
                       key={network} 
-                      className="border-blue-100 dark:border-blue-800/50 hover:bg-blue-50/50 dark:hover:bg-blue-900/20"
+                      className="border-soft-line hover:bg-soft-sunken"
                     >
                       <TableCell className="py-2 px-3 w-24">
                         <div className="flex items-center gap-2">
                           <NetworkIconSimple network={network} size="md" />
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{name}</span>
+                          <span className="text-sm font-medium text-soft-ink-muted">{name}</span>
                         </div>
                       </TableCell>
                       {tokens.map((t) => {
@@ -248,16 +249,16 @@ const TipStatsCollapsible = ({ networkGroups, getAmount, activeTips, className =
                             key={t.token} 
                             className="py-2 px-3 text-right"
                           >
-                            <div className={`flex items-center justify-end gap-1.5 ${amount > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'}`}>
+                            <div className={`flex items-center justify-end gap-1.5 ${amount > 0 ? 'text-soft-accent-deep' : 'text-soft-ink-faint'}`}>
                               <NetworkWithTokenBadge network={network} token={t.token} size="md" />
-                              <span className="text-sm font-medium">{formatTokenAmount(amount, t.token as TipToken)}</span>
+                              <span className="text-sm font-semibold font-soft-display tabular-nums">{formatTokenAmount(amount, t.token as TipToken)}</span>
                             </div>
                           </TableCell>
                         );
                       })}
                       {/* Fill empty cell if only one token */}
                       {tokens.length === 1 && (
-                        <TableCell className="py-2 px-3 text-right text-gray-300 dark:text-gray-600">
+                        <TableCell className="py-2 px-3 text-right text-soft-ink-faint">
                           —
                         </TableCell>
                       )}
@@ -326,7 +327,7 @@ export default function TipStats({ userAddress, postId, className = '', presetPo
   if (loading) {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
-        <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded px-2 py-1 text-xs">
+        <div className="animate-pulse bg-soft-sunken text-soft-ink-faint rounded-pill px-2 py-1 text-xs">
           Loading...
         </div>
       </div>
@@ -346,9 +347,9 @@ export default function TipStats({ userAddress, postId, className = '', presetPo
 
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
-        <div className="flex items-center space-x-1 bg-green-100 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full px-3 py-1">
+        <div className="flex items-center space-x-1 bg-soft-accent-soft border border-soft-line rounded-pill px-3 py-1 shadow-chip">
           <span className="text-xs">💰</span>
-          <div className="flex items-center space-x-2 text-xs font-medium text-green-700 dark:text-green-300">
+          <div className="flex items-center space-x-2 text-xs font-semibold text-soft-accent-deep font-soft-display tabular-nums">
             {tokenAmounts.map(({ token, amount }) => (
               <span key={token} className="flex items-center" title={`${amount} ${token}`}>
                 <TokenIcon token={token} />

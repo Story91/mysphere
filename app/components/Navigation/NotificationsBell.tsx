@@ -39,10 +39,13 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
       type="button"
       onClick={onNotificationsClick}
       className={`
-        relative p-2 rounded-xl transition-all duration-300
-        text-gray-100 hover:text-white hover:bg-[#0052FF]/20
+        relative p-2 rounded-pill
+        transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong
+        active:scale-[0.97] outline-none
+        focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface
+        hover:bg-soft-sunken
         ${isAnimating ? 'animate-bounce' : ''}
-        ${unreadCount > 0 ? 'text-blue-300' : 'text-gray-300'}
+        ${unreadCount > 0 ? 'text-soft-primary-deep' : 'text-soft-ink-muted hover:text-soft-ink'}
       `}
       title={label}
       aria-label={label}
@@ -68,12 +71,14 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
         // Liczba jest juz w nazwie dostepnej przycisku - powtorzona w drzewie
         // dostepnosci czytalaby sie dwa razy.
         <div aria-hidden="true" className="absolute -top-1 -right-1 flex items-center justify-center">
-          {/* Pulsating background (Pulsujące tło) */}
-          <div className="absolute w-5 h-5 bg-red-500 rounded-full animate-ping opacity-75"></div>
-          
-          {/* Static red dot with count (Statyczna czerwona kropka z liczbą) */}
-          <div className="relative w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">
+          {/* Pulsating background (Pulsujące tło) - jasny pomarancz akcentu,
+              zeby pulsowanie bylo widac na bialej belce. */}
+          <div className="absolute w-5 h-5 bg-soft-accent rounded-full animate-ping opacity-75"></div>
+
+          {/* Statyczna kropka z liczba. Czerwien 500 na bieli miala 4.0:1 pod
+              bialym napisem; accent-deep ma 5.9:1 i nalezy do palety. */}
+          <div className="relative w-5 h-5 bg-soft-accent-deep rounded-full flex items-center justify-center">
+            <span className="text-white text-xs font-bold font-soft-display">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           </div>
@@ -83,7 +88,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
       {/* Loading indicator (Wskaźnik ładowania) */}
       {loading && (
         <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center">
-          <div className="w-3 h-3 border-2 border-blue-300 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-3 h-3 border-2 border-soft-primary border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}
     </button>

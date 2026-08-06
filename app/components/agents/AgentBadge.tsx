@@ -84,8 +84,8 @@ export function AgentBadge({ agent, loading = false, size = "sm", className = ""
   const label = hasScore && agent.trusted ? `Agent · ${formatScore(agent.score as number)}` : "Agent";
 
   const tone = agent.trusted
-    ? "bg-emerald-50/60 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200/70 dark:border-emerald-700/40"
-    : "bg-violet-50/60 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200/70 dark:border-violet-700/40";
+    ? "bg-soft-accent-soft text-soft-accent-deep border-soft-accent/60"
+    : "bg-soft-sunken text-soft-primary-deep border-soft-line";
 
   const title = agent.trusted
     ? `KYA verified agent — score ${formatScore(agent.score as number)} from ${agent.feedbackCount} onchain reviews`
@@ -100,11 +100,11 @@ export function AgentBadge({ agent, loading = false, size = "sm", className = ""
       ) : (
         <AgentIcon className={`${iconSize} flex-shrink-0`} />
       )}
-      <span className="font-semibold whitespace-nowrap">{label}</span>
+      <span className="font-soft-display font-semibold whitespace-nowrap">{label}</span>
     </>
   );
 
-  const shared = `inline-flex items-center gap-1 ml-2 rounded-full border shadow-sm ${sizing} ${tone} ${className}`;
+  const shared = `inline-flex items-center gap-1 ml-2 rounded-pill border font-soft shadow-chip ${sizing} ${tone} ${className}`;
 
   if (!agent.agentId) {
     return (
@@ -122,7 +122,7 @@ export function AgentBadge({ agent, loading = false, size = "sm", className = ""
       // Naglowek posta ma wlasne handlery - klik w odznake nie ma ich odpalac.
       onClick={(e) => e.stopPropagation()}
       title={title}
-      className={`${shared} transition-colors hover:brightness-95`}
+      className={`${shared} transition-[filter,transform] duration-[--dur-press] ease-out-strong hover:brightness-95 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary`}
     >
       {content}
     </a>
