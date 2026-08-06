@@ -21,26 +21,45 @@ type NavLink = {
   label: string;
 };
 
-const LINK_THEME: Record<string, { suffix: string; border: string; hoverBorder: string }> = {
-  MySphere: { suffix: 'text-fuchsia-600', border: 'border-fuchsia-200', hoverBorder: 'hover:border-fuchsia-300' },
-  'Re-Definition': { suffix: 'text-[#5B8CFF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
+/**
+ * Kolor sufiksu per trasa. Obramowania per trasa zniknely wraz z ciemnym
+ * szklem: w Soft Social pigulka nawigacji ma jedna, wspolna linie, a kolorem
+ * rozni ja wylacznie nazwa. Siedem roznych ramek na jasnym tle czytalo sie
+ * jak siedem osobnych komponentow.
+ *
+ * Odcienie sa POGLEBIONE wzgledem poprzednich (600 -> 700 itd.), bo pigulka
+ * jest teraz biala na cala szerokosc etykiety. Poprzednie cyan-600 i #5B8CFF
+ * na bieli nie mialy nawet 3:1.
+ */
+const LINK_THEME: Record<string, { suffix: string }> = {
+  MySphere: { suffix: 'text-fuchsia-700' },
+  'Re-Definition': { suffix: 'text-soft-info' },
   // Zielen zarezerwowana w tej aplikacji dla rozliczonych pieniedzy - ten sam
   // kolor niesie kwota na paragonie i w rankingu.
-  Paid: { suffix: 'text-emerald-600', border: 'border-emerald-200', hoverBorder: 'hover:border-emerald-300' },
-  MyBase: { suffix: 'text-[#0052FF]', border: 'border-blue-200', hoverBorder: 'hover:border-blue-300' },
-  MyCamp: { suffix: 'text-orange-600', border: 'border-orange-200', hoverBorder: 'hover:border-orange-300' },
-  MyAgents: { suffix: 'text-cyan-600', border: 'border-cyan-200', hoverBorder: 'hover:border-cyan-300' },
-  MyClaw: { suffix: 'text-red-500', border: 'border-red-200', hoverBorder: 'hover:border-red-300' },
+  Paid: { suffix: 'text-emerald-700' },
+  // Firmowy niebieski Base zostaje niezmieniony - to znak sieci, nie ozdobnik.
+  MyBase: { suffix: 'text-[#0052FF]' },
+  MyCamp: { suffix: 'text-soft-accent-deep' },
+  MyAgents: { suffix: 'text-cyan-700' },
+  MyClaw: { suffix: 'text-red-600' },
 };
 
-/** "My" zostaje neutralne, sufiks bierze kolor swojej trasy. */
-function NavLinkLabel({ label }: { label: string }) {
+/**
+ * "My" zostaje neutralne, sufiks bierze kolor swojej trasy.
+ *
+ * Na pigulce aktywnej caly napis jest bialy: fiolet marki pod spodem zjada
+ * kazdy z kolorow tras, a emerald czy cyan na fiolecie to juz nie jest zaden
+ * kontrast.
+ */
+function NavLinkLabel({ label, isActive }: { label: string; isActive: boolean }) {
   if (!label.startsWith('My')) return <span>{label}</span>;
   const suffix = label.slice(2);
   return (
     <span className="inline-flex items-center gap-0.5">
-      <span className="text-slate-900">My</span>
-      <span className={LINK_THEME[label]?.suffix ?? 'text-sky-300'}>{suffix}</span>
+      <span className={isActive ? 'text-white' : 'text-soft-ink'}>My</span>
+      <span className={isActive ? 'text-white' : LINK_THEME[label]?.suffix ?? 'text-soft-ink-muted'}>
+        {suffix}
+      </span>
     </span>
   );
 }
@@ -55,13 +74,13 @@ const MOBILE_MENU_ID = 'mobile-nav-menu';
 const NAV_ITEM_VARIANT = {
   desktop: {
     layout: 'inline-flex gap-1.5',
-    active: 'shadow-[0_10px_22px_rgba(0,0,0,0.24)] -translate-y-0.5',
-    idle: 'opacity-95 hover:opacity-100 hover:-translate-y-0.5',
+    active: 'shadow-chip',
+    idle: 'hover:bg-soft-sunken',
   },
   mobile: {
     layout: 'flex gap-2',
-    active: 'shadow-[0_8px_20px_rgba(2,6,23,0.30)]',
-    idle: 'opacity-95',
+    active: 'shadow-chip',
+    idle: 'hover:bg-soft-sunken',
   },
 } as const;
 
@@ -76,7 +95,6 @@ function NavItem({
   variant: keyof typeof NAV_ITEM_VARIANT;
   onClick?: () => void;
 }) {
-  const theme = LINK_THEME[link.label] ?? LINK_THEME.MyBase;
   const style = NAV_ITEM_VARIANT[variant];
 
   return (
@@ -84,19 +102,26 @@ function NavItem({
       href={link.href}
       onClick={onClick}
       aria-current={isActive ? 'page' : undefined}
-      className={`${style.layout} items-center px-4 py-2.5 rounded-xl text-sm font-semibold border bg-white transition-all duration-200 ${theme.border} ${theme.hoverBorder} ${
-        isActive ? style.active : style.idle
+      /* RUCH: zostaje samo nacisniecie. Nawigacja jest klikana dziesiatki razy
+         dziennie - podnoszenie pigulki na hover po dziesiatym razie juz nie
+         cieszy, tylko opoznia. */
+      className={`${style.layout} items-center px-4 py-2.5 rounded-pill font-soft-display text-sm font-bold border transition-[background-color,border-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface ${
+        isActive
+          ? `bg-soft-primary border-soft-primary text-white ${style.active}`
+          : `bg-soft-surface border-soft-line text-soft-ink-muted ${style.idle}`
       }`}
     >
       {/* Ikony sa dekoracja przy tekstowej etykiecie obok - czytnik ekranu ma
           przeczytac "MyCamp", a nie "Camp MyCamp". */}
       {link.label === 'MyCamp' && (
-        <Image src="/Camp.png" alt="" width={14} height={14} className="rounded-sm flex-shrink-0 brightness-110" />
+        /* brightness-110 bylo podbiciem pod ciemne szklo. Na bialej pigulce
+           rozjasnia logo Camp bez powodu. */
+        <Image src="/Camp.png" alt="" width={14} height={14} className="rounded-sm flex-shrink-0" />
       )}
       {link.label === 'MyClaw' && (
         <span className="text-sm flex-shrink-0" aria-hidden="true">🦞</span>
       )}
-      <NavLinkLabel label={link.label} />
+      <NavLinkLabel label={link.label} isActive={isActive} />
     </Link>
   );
 }
@@ -132,18 +157,28 @@ export default function Navigation() {
   const isActiveLink = (href: string) => pathname === href || !!pathname?.startsWith(href + '/');
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-b border-[#0052FF]/20">
-      <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,transparent_24%,rgba(0,82,255,0.03)_25%,rgba(0,82,255,0.03)_26%,transparent_27%,transparent_74%,rgba(0,82,255,0.03)_75%,rgba(0,82,255,0.03)_76%,transparent_77%,transparent),linear-gradient(0deg,transparent_24%,rgba(0,82,255,0.03)_25%,rgba(0,82,255,0.03)_26%,transparent_27%,transparent_74%,rgba(0,82,255,0.03)_75%,rgba(0,82,255,0.03)_76%,transparent_77%,transparent)] bg-[length:30px_30px] opacity-60"></div>
-      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-black/80 to-black/40"></div>
+    /* Belka jest zwykla biala powierzchnia z jedna linia na dole. Wczesniej
+       byla ciemnym szklem (#0052FF/10 + backdrop-blur-xl + dwie czarne
+       nakladki) - jedynym ciemnym elementem nad lawendowym feedem. */
+    <header className="sticky top-0 z-50 w-full bg-soft-surface border-b border-soft-line">
+      {/* Obie nakladki zostaja - to ta sama siatka i to samo przyciemnienie,
+          przemalowane na lawende. Siatka schodzi do ledwie widocznego sladu
+          faktury, a czarny gradient staje sie miekkim zejsciem bieli w kolor
+          tla strony tuz nad linia. */}
+      <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,transparent_24%,rgba(124,107,218,0.05)_25%,rgba(124,107,218,0.05)_26%,transparent_27%,transparent_74%,rgba(124,107,218,0.05)_75%,rgba(124,107,218,0.05)_76%,transparent_77%,transparent),linear-gradient(0deg,transparent_24%,rgba(124,107,218,0.05)_25%,rgba(124,107,218,0.05)_26%,transparent_27%,transparent_74%,rgba(124,107,218,0.05)_75%,rgba(124,107,218,0.05)_76%,transparent_77%,transparent)] bg-[length:30px_30px] opacity-60"></div>
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-transparent to-soft-bg/70"></div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <Link 
+            <Link
               href="/"
-              className="hover:scale-105 transition-transform duration-300 relative group mr-5"
+              className="relative group mr-5 rounded-xl transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
             >
-              <div aria-hidden="true" className="absolute -inset-2 bg-gradient-to-r from-[#0052FF] to-[#00A3FF] opacity-0 group-hover:opacity-20 rounded-xl blur transition-all duration-300"></div>
+              {/* Poswiata pod logo zostaje, tylko w fiolecie marki zamiast
+                  niebieskiego gradientu Base. 300 ms na hover bylo dwa razy
+                  dluzsze niz cokolwiek innego w belce. */}
+              <div aria-hidden="true" className="absolute -inset-2 bg-soft-primary opacity-0 group-hover:opacity-20 rounded-xl blur transition-opacity duration-[--dur-press] ease-out-strong"></div>
               <Image
                 src="/android-chrome-192x192.png"
                 alt="MySphere"
@@ -155,7 +190,7 @@ export default function Navigation() {
             </Link>
             
             {/* Desktop Navigation */}
-            <nav aria-label="Main" className="hidden md:flex items-center gap-2 bg-white/20 border border-white/20 p-1.5 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.22)]">
+            <nav aria-label="Main" className="hidden md:flex items-center gap-2 bg-soft-sunken border border-soft-line p-1.5 rounded-pill">
               {navLinks.map((link) => (
                 <NavItem key={link.href} link={link} isActive={isActiveLink(link.href)} variant="desktop" />
               ))}
@@ -168,7 +203,7 @@ export default function Navigation() {
               aria-expanded={isMobileMenuOpen}
               aria-controls={MOBILE_MENU_ID}
               aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-              className="md:hidden p-2 rounded-lg text-gray-100 hover:bg-[#0052FF]/20"
+              className="md:hidden p-2 rounded-pill text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
             >
               <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isMobileMenuOpen ? (
@@ -192,7 +227,9 @@ export default function Navigation() {
           <nav
             id={MOBILE_MENU_ID}
             aria-label="Mobile"
-            className="md:hidden mt-3 bg-white/20 border border-white/20 p-1.5 rounded-2xl flex flex-col gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.25)]"
+            /* Panel jest lawendowy, nie bialy: pigulki w srodku sa biale i na
+               bialym tle rozniloby je od panelu wylacznie obramowanie. */
+            className="md:hidden mt-3 bg-soft-sunken border border-soft-line p-1.5 rounded-card flex flex-col gap-1 shadow-float animate-in fade-in-0 slide-in-from-top-2 duration-200 ease-out-strong"
           >
             {navLinks.map((link) => (
               <NavItem

@@ -81,12 +81,12 @@ export default function PinTimer({
   };
 
   return (
-    <div className={`flex items-center justify-between p-2 sm:p-3 bg-gradient-to-r from-yellow-50/80 to-orange-50/80 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-lg border border-yellow-200/50 dark:border-yellow-800/50 ${className}`}>
+    <div className={`flex items-center justify-between p-2 sm:p-3 bg-soft-surface rounded-card border-2 border-soft-accent font-soft ${className}`}>
       <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
         {/* Animated pin icon */}
         <div className="relative">
-          <Crown className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-          <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <Crown className="w-4 h-4 text-soft-accent-deep" />
+          <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
         </div>
         
         <div className="flex-1">

@@ -348,7 +348,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
           setIsOpen(!isOpen);
           setTransactionSuccess(false);
         }}
-        className={`flex items-center space-x-1 hover:text-green-500 active:text-green-600 transition-colors touch-manipulation ${className}`}
+        className={`flex items-center space-x-1 rounded-pill hover:text-soft-accent-deep transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary touch-manipulation ${className}`}
         disabled={isTransacting}
         title="Send tip"
         aria-label="Send tip"
@@ -363,30 +363,30 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
       {isOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overscroll-contain">
           <div 
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-soft-ink/30 backdrop-blur-sm"
             onClick={() => { setIsOpen(false); setTipSaved(false); }}
           ></div>
 
           {/* Reguly ukrywajace linki OnchainKit zniknely razem z OnchainKit -
               transakcja idzie teraz przez czyste wagmi, w modalu nie ma czego chowac. */}
           <div
-            className="relative w-full max-w-sm mx-auto bg-gradient-to-br from-gray-900 via-black to-blue-900 backdrop-blur-xl rounded-2xl shadow-2xl border border-blue-500/30 p-5 overflow-hidden max-h-[90vh] overflow-y-auto"
+            className="relative w-full max-w-sm mx-auto bg-soft-surface rounded-card shadow-float border border-soft-line p-5 overflow-hidden max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Glow effects */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-blue-500/30 rounded-full filter blur-2xl animate-pulse"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-cyan-400/20 rounded-full filter blur-xl"></div>
-            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm rounded-2xl"></div>
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-accent-soft/70 rounded-full filter blur-2xl"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-primary/10 rounded-full filter blur-xl"></div>
+            <div className="absolute inset-0 bg-transparent rounded-card"></div>
             
             <div className="relative z-10">
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-light text-white">
-                  💰 <span className="bg-gradient-to-r from-blue-400 to-cyan-400 text-transparent bg-clip-text">Tip Creator</span>
+                <h3 className="text-lg font-soft-display font-bold text-soft-ink">
+                  💰 <span className="text-soft-primary-deep">Tip Creator</span>
                 </h3>
                 <button
                   onClick={() => { setIsOpen(false); setTipSaved(false); }}
-                  className="text-blue-300 hover:text-blue-100 transition-colors bg-white/10 rounded-full p-2 border border-blue-400/30"
+                  className="text-soft-ink-muted hover:text-soft-ink hover:bg-soft-line transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary bg-soft-sunken rounded-full p-2 border border-soft-line"
                   aria-label="Close tip dialog"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -397,21 +397,21 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
 
               {/* Network Selection - Icons Grid */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-blue-200 mb-2">Network</label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-soft-ink-faint mb-2">Network</label>
                 <div className="grid grid-cols-6 gap-2">
                   {ALL_NETWORKS.map((network) => {
                     // Linea i Celo maja logo, ktore wypelnia caly kafelek
                     const useFullImage = NETWORK_FULL_IMAGE.has(network.id);
-                    const bgColor = NETWORK_BG_COLORS[network.id] || 'bg-white/10';
+                    const bgColor = NETWORK_BG_COLORS[network.id] || 'bg-soft-sunken';
 
                     return (
                       <button
                         key={network.id}
                         onClick={() => setSelectedNetwork(network.id)}
-                        className={`w-10 h-10 rounded-lg transition-all duration-200 flex items-center justify-center overflow-hidden ${bgColor} ${
+                        className={`w-10 h-10 rounded-pill transition-[transform,box-shadow] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-center overflow-hidden ${bgColor} ${
                           selectedNetwork === network.id
-                            ? 'ring-2 ring-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.4)] scale-110'
-                            : 'ring-1 ring-white/20 hover:ring-white/40'
+                            ? 'ring-2 ring-soft-primary shadow-chip scale-110'
+                            : 'ring-1 ring-soft-line hover:ring-soft-line-strong'
                         }`}
                         title={network.name}
                         aria-label={network.name}
@@ -436,14 +436,14 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     );
                   })}
                   </div>
-                <div className="text-xs text-blue-300/70 mt-1 text-center">
+                <div className="text-xs text-soft-ink-soft mt-1 text-center">
                   {selectedNetworkConfig?.name}
                 </div>
               </div>
 
               {/* Token Selection - Icons */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-blue-200 mb-2">Token</label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-soft-ink-faint mb-2">Token</label>
                 <div className="flex gap-2">
                   {availableTokens.map((token) => {
                     const tokenBg = TOKEN_BG_COLORS[token.symbol] || '';
@@ -459,10 +459,10 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                           setSelectedToken(token.symbol);
                           setTipAmount(getQuickAmounts(token.symbol)[0]);
                         }}
-                        className={`flex-1 px-3 py-3 rounded-xl border transition-all duration-200 flex items-center justify-center gap-2 ${
+                        className={`flex-1 px-3 py-3 rounded-pill border transition-[background-color,border-color,box-shadow,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-center gap-2 ${
                           selectedToken === token.symbol
-                            ? 'bg-blue-500/30 border-blue-400/60 shadow-[0_0_15px_rgba(59,130,246,0.4)]'
-                            : 'bg-white/10 border-white/20 hover:bg-white/20'
+                            ? 'bg-soft-sunken border-soft-primary shadow-chip'
+                            : 'bg-soft-surface border-soft-line hover:bg-soft-sunken'
                         }`}
                         aria-pressed={selectedToken === token.symbol}
                       >
@@ -477,7 +477,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                         ) : (
                           <span className="text-lg">{token.icon}</span>
                         )}
-                        <span className="text-sm text-blue-100">{token.symbol}</span>
+                        <span className={`text-sm font-semibold ${selectedToken === token.symbol ? 'text-soft-primary-deep' : 'text-soft-ink-muted'}`}>{token.symbol}</span>
                   </button>
                     );
                   })}
@@ -486,7 +486,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
 
               {/* Network mismatch warning */}
               {!isCorrectNetwork && (
-                <div className="mb-4 p-3 bg-orange-500/20 border border-orange-400/50 rounded-xl text-orange-300 text-sm">
+                <div className="mb-4 p-3 bg-soft-accent-soft border border-soft-accent rounded-card text-soft-accent-deep text-sm">
                   <div className="flex items-center gap-2">
                     <span>⚠️</span>
                     <span>Switch to {selectedNetworkConfig?.name} to send tip</span>
@@ -496,14 +496,14 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
 
               {/* Amount Input */}
               <div className="mb-3">
-                <label className="block text-sm font-medium text-blue-200 mb-2">Amount</label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-soft-ink-faint mb-2">Amount</label>
                 <input
                   type="number"
                   value={tipAmount}
                   onChange={(e) => setTipAmount(e.target.value)}
                   min="0"
                   step="any"
-                  className="w-full px-4 py-3 text-base border bg-white/10 border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-blue-300/50"
+                  className="w-full px-4 py-3 text-base border bg-soft-sunken border-soft-line rounded-card text-soft-accent-deep font-soft-display font-bold tabular-nums transition-colors duration-[--dur-press] ease-out-strong focus:outline-none focus:ring-2 focus:ring-soft-primary focus:border-soft-primary placeholder:text-soft-ink-faint"
                   inputMode="decimal"
                 />
               </div>
@@ -515,11 +515,11 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                   <button
                       key={amount}
                       onClick={() => setTipAmount(amount)}
-                      className={`flex-1 px-2 py-2 text-sm rounded-xl border transition-all ${
+                      className={`flex-1 px-2 py-2 text-sm font-soft-display font-bold tabular-nums rounded-pill border transition-[background-color,border-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                         tipAmount === amount
-                          ? 'bg-blue-500/30 border-blue-400/60'
-                          : 'bg-white/10 border-blue-400/30 hover:bg-blue-500/20'
-                      } text-blue-200`}
+                          ? 'bg-soft-sunken border-soft-primary text-soft-primary-deep'
+                          : 'bg-soft-surface border-soft-line hover:bg-soft-sunken text-soft-ink-muted'
+                      }`}
                     >
                       {selectedTokenConfig.decimals === 6 ? '$' : ''}{amount}
                   </button>
@@ -528,22 +528,22 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
               </div>
 
               {/* Balance Display */}
-              <div className="mb-4 text-sm text-blue-300">
-                <span>Balance: {getCurrentBalance()} {selectedToken}</span>
+              <div className="mb-4 text-sm text-soft-ink-muted">
+                <span>Balance: <span className="font-soft-display font-semibold tabular-nums text-soft-ink">{getCurrentBalance()}</span> {selectedToken}</span>
               </div>
 
               {/* Transaction states */}
                 {isTransacting && !transactionSuccess && (
-                <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-400/50 rounded-xl text-yellow-300 text-sm text-center">
+                <div className="mb-4 p-3 bg-soft-accent-soft border border-soft-accent rounded-card text-soft-accent-deep text-sm text-center">
                   <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-300 border-t-transparent"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-soft-accent-deep border-t-transparent"></div>
                     <span>Processing...</span>
                   </div>
                   </div>
                 )}
                 
                 {transactionSuccess && (
-                <div className="mb-4 p-3 bg-green-500/20 border border-green-400/50 rounded-xl text-green-300 text-sm text-center">
+                <div className="mb-4 p-3 bg-soft-info-soft border border-soft-line rounded-card text-soft-info text-sm text-center">
                   <span>✅ Tip sent successfully!</span>
                   </div>
                 )}
@@ -553,7 +553,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 {!isCorrectNetwork ? (
                   <button
                     onClick={ensureCorrectNetwork}
-                    className="w-full px-6 py-3 text-base font-medium rounded-xl bg-orange-500 hover:bg-orange-600 text-white transition-colors"
+                    className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-accent-deep hover:bg-soft-accent text-white shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     Switch to {selectedNetworkConfig?.name}
                   </button>
@@ -574,7 +574,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                       });
                     }}
                     disabled={hasInsufficientBalance() || parseFloat(tipAmount) <= 0 || isTransacting}
-                    className="w-full px-6 py-3 text-base font-medium rounded-xl bg-[#0052FF] text-white transition-colors hover:bg-[#0052FF]/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-primary text-white shadow-chip transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {hasInsufficientBalance()
                       ? `Insufficient ${selectedToken}`
@@ -587,7 +587,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 {/* Base Pay Button - tylko dla USDC na Base */}
                 {selectedNetwork === 'base' && selectedToken === 'USDC' && isCorrectNetwork && (
                   <div className="text-center mt-3">
-                    <div className="text-xs text-blue-300 mb-2">Or pay with Base Pay:</div>
+                    <div className="text-xs text-soft-ink-soft mb-2">Or pay with Base Pay:</div>
                     <BasePayButton
                       colorScheme="dark"
                       onClick={async () => {

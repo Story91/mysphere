@@ -16,12 +16,16 @@ import { useConnect, type Connector } from 'wagmi';
  * dodanie konektora w configu automatycznie pokazuje go tutaj.
  *
  * RENDEROWANY PRZEZ PORTAL DO document.body - to nie jest ozdobnik.
- * WalletButton siedzi w <header>, ktory ma `backdrop-blur-xl`. Wlasciwosc
- * `backdrop-filter` tworzy BLOK ZAWIERAJACY dla potomkow z `position: fixed`
- * oraz wlasny kontekst stackingu. Bez portalu `fixed inset-0` pozycjonowalo sie
- * wzgledem headera (modal ladowal na srodku jego obszaru zamiast ekranu),
- * a `z-[10000]` bylo uwiezione wewnatrz `z-50` headera, wiec modal chowal sie
- * pod nawigacja.
+ * WalletButton siedzi w <header>, ktory jest `sticky z-50`, czyli tworzy
+ * WLASNY KONTEKST STACKINGU. Bez portalu `z-[10000]` bylo uwiezione wewnatrz
+ * `z-50` headera i modal chowal sie pod nawigacja.
+ *
+ * Historycznie doszlo do tego drugie zrodlo tego samego problemu: header mial
+ * `backdrop-blur-xl`, a `backdrop-filter` tworzy takze BLOK ZAWIERAJACY dla
+ * potomkow z `position: fixed` - `fixed inset-0` pozycjonowalo sie wtedy
+ * wzgledem headera i modal ladowal na srodku belki zamiast ekranu. Rozmycie
+ * zniklo wraz z ciemnym szklem, ale portal zostaje: powod z kontekstem
+ * stackingu jest niezalezny i nadal aktualny.
  */
 
 /**
@@ -175,19 +179,22 @@ export default function ConnectModal({
         type="button"
         tabIndex={-1}
         aria-hidden="true"
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-soft-ink/45 backdrop-blur-sm animate-in fade-in-0 duration-200"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-[360px] overflow-hidden rounded-2xl border border-white/10 bg-[#0A1024]/95 shadow-[0_24px_64px_-16px_rgba(0,0,0,0.75)] backdrop-blur-xl">
-        <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4">
-          <h2 className="font-['Coinbase_Display'] text-[15px] font-semibold text-[#EEF3FF]">
+      {/* Modal skaluje sie OD SRODKA - w odroznieniu od popoverow, ktore
+          wychodza od swojego przycisku. Ten nie ma zadnego zaczepienia na
+          ekranie, wiec srodek jest jedynym uczciwym punktem startu. */}
+      <div className="relative w-full max-w-[360px] overflow-hidden rounded-card border border-soft-line bg-soft-surface shadow-float animate-in fade-in-0 zoom-in-95 duration-200 ease-out-strong">
+        <div className="flex items-center justify-between border-b border-soft-line px-5 py-4">
+          <h2 className="font-soft-display text-[15px] font-bold text-soft-ink">
             Connect a wallet
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-[#7E93BC] transition-colors hover:bg-white/[0.06] hover:text-[#EEF3FF]"
+            className="rounded-pill p-1.5 text-soft-ink-faint transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             aria-label="Close"
           >
             <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -215,7 +222,7 @@ export default function ConnectModal({
                 disabled={isPending}
                 aria-busy={isConnecting}
                 onClick={() => handleConnect(connector)}
-                className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full items-center gap-3 px-5 py-3 text-left transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset"
               >
                 {iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- data URI
@@ -227,13 +234,15 @@ export default function ConnectModal({
                   </span>
                 )}
                 <span className="flex-1">
-                  <span className="block text-[13px] font-medium text-[#C7D4EE]">
+                  <span className="block font-soft-display text-[13px] font-bold text-soft-ink">
                     {meta?.label ?? connector.name}
                   </span>
                   {isConnecting ? (
-                    <span className="block text-[11px] text-[#7E93BC]">Check your wallet…</span>
+                    <span className="block font-soft text-[11px] text-soft-ink-soft">Check your wallet…</span>
                   ) : (
-                    meta?.hint && <span className="block text-[11px] text-[#7E93BC]">{meta.hint}</span>
+                    meta?.hint && (
+                      <span className="block font-soft text-[11px] text-soft-ink-soft">{meta.hint}</span>
+                    )
                   )}
                 </span>
               </button>
@@ -242,7 +251,7 @@ export default function ConnectModal({
         </div>
 
         {error && (
-          <p role="alert" className="border-t border-white/[0.08] px-5 py-3 text-[12px] text-[#FF8A8A]">
+          <p role="alert" className="border-t border-soft-line bg-soft-accent-soft px-5 py-3 font-soft text-[12px] font-semibold text-soft-accent-deep">
             {error.message.slice(0, 140)}
           </p>
         )}

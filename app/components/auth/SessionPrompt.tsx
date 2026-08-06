@@ -132,18 +132,18 @@ export default function SessionPrompt() {
     <div
       role="region"
       aria-label="Confirm this wallet is yours"
-      className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-[420px] rounded-2xl border border-white/[0.1] bg-[#0E1730]/95 p-4 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:right-4"
+      className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-[420px] rounded-card border border-soft-line bg-soft-surface p-5 font-soft shadow-float sm:inset-x-auto sm:right-4"
     >
-      <p className="mb-1 font-['Coinbase_Display'] text-[14px] font-semibold text-[#EEF3FF]">
+      <p className="mb-1 font-soft-display text-[15px] font-semibold text-soft-ink">
         Confirm this wallet is yours
       </p>
-      <p className="mb-3 text-[13px] leading-[1.55] text-[#9EB0D2]">
+      <p className="mb-3 text-[13px] leading-[1.55] text-soft-ink-muted">
         Sign a message so your posts and tips are recorded as yours. It costs no gas and sends no
         transaction.
       </p>
 
       {error && (
-        <p role="alert" className="mb-3 text-[12px] text-[#FF8080]">
+        <p role="alert" className="mb-3 text-[12px] text-red-700">
           {error}
         </p>
       )}
@@ -154,14 +154,14 @@ export default function SessionPrompt() {
           onClick={handleSignIn}
           disabled={isSigning}
           aria-busy={isSigning}
-          className="rounded-lg bg-[#0052FF] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[#0044D6] disabled:opacity-60"
+          className="rounded-pill bg-soft-primary px-5 py-2 text-[13px] font-semibold text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-60 disabled:active:scale-100"
         >
           {isSigning ? 'Check your wallet…' : 'Sign'}
         </button>
         <button
           type="button"
           onClick={hide}
-          className="rounded-lg border border-white/[0.12] px-4 py-2 text-[13px] font-medium text-[#9EB0D2] transition hover:bg-white/[0.04]"
+          className="rounded-pill border border-soft-line px-5 py-2 text-[13px] font-semibold text-soft-ink-muted transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
         >
           Not now
         </button>

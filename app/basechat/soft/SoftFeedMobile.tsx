@@ -62,12 +62,10 @@ export default function SoftFeedMobile({
 }) {
   return (
     <div className="-mx-4 mb-3 bg-soft-bg font-soft">
-      {onNetworkChange && (
-        <SoftStoryRail
-          activeNetwork={activeNetwork ?? ''}
-          onSelect={(id) => onNetworkChange(activeNetwork === id ? null : id)}
-        />
-      )}
+      <SoftStoryRail
+        activeNetwork={activeNetwork ?? ''}
+        onSelect={(id) => onNetworkChange?.(activeNetwork === id ? null : id)}
+      />
 
       <SoftTabs tabs={TABS} activeTab={activeFeed} onSelect={onFeedChange} />
 
