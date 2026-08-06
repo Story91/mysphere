@@ -273,6 +273,48 @@ const prependPostToCache = (post: ExtendedPost) => {
 };
 
 /**
+ * Nanosi zmiane na JEDEN post we wszystkich zapisanych listach.
+ *
+ * PO CO. Polubienie zmienia stan w pamieci, ale po przejsciu na inna zakladke
+ * i powrocie widok odtwarza sie z localStorage - czyli serduszko wracaloby do
+ * poprzedniego stanu, mimo ze zapis w Firestore sie powiodl. Alternatywa
+ * byloby skasowanie cache'u i ponowne pobranie CALEJ listy, czyli placenie
+ * odczytem calego feedu za jedno klikniecie.
+ *
+ * Ta funkcja kosztuje ZERO odczytow: post jest juz w pamieci, wiec nanosimy na
+ * niego dokladnie te zmiane, ktora zobaczyl uzytkownik.
+ *
+ * Znacznik waznosci cache'u zostaje nietkniety - polubienie nie jest powodem,
+ * zeby przedluzac waznosc reszty listy.
+ */
+const patchPostInCache = (postId: string, patch: (post: ExtendedPost) => ExtendedPost) => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('posts_') && !key.endsWith('_timestamp'))
+      .forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        try {
+          const cached = JSON.parse(raw);
+          if (!Array.isArray(cached)) return;
+          if (!cached.some((entry: ExtendedPost) => entry?.id === postId)) return;
+          localStorage.setItem(
+            key,
+            JSON.stringify(
+              cached.map((entry: ExtendedPost) => (entry?.id === postId ? patch(entry) : entry))
+            )
+          );
+        } catch {
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
+  } catch (error) {
+    console.error('Error patching post in cache:', error);
+  }
+};
+
+/**
  * Podmienia tymczasowe ID posta na prawdziwe, gdy Firestore je odda.
  *
  * Bez tego w cache zostawalby wpis z ID "temp-...", ktory po odswiezeniu
@@ -662,11 +704,11 @@ function BaseChatContent() {
           alert('🎉 Congratulations! You earned 1250 bonus points for choosing .world!');
         }
       } else {
-        alert('Wystąpił błąd podczas zapisywania nazwy. Spróbuj ponownie.');
+        toast.error('Could not save your name. Try again.');
       }
     } catch (error) {
       console.error('Error saving custom name:', error);
-      alert('Wystąpił błąd podczas zapisywania nazwy. Spróbuj ponownie.');
+      toast.error('Could not save your name. Try again.');
     }
   };
 
@@ -1161,14 +1203,42 @@ function BaseChatContent() {
         const firstWord = newPost.trim().split(/\s+/)[0];
         const cleanSymbol = firstWord.replace(/[^A-Z0-9]/gi, '').substring(0, 10).toUpperCase() || 'POST';
         
+        // SDK Zory ladowany na zadanie - uzywany tylko w tym jednym handlerze,
+        // a na topie pliku szedlby do initial chunka kazdej sesji basechatu.
+        // Musi stac PRZED budowaniem parametrow: CreateConstants sa im potrzebne.
+        const { createCoin, getCoinCreateFromLogs, CreateConstants } = await import('@zoralabs/coins-sdk');
+
+        /**
+         * Parametry wg AKTUALNEGO API @zoralabs/coins-sdk 0.8 (docs.zora.co).
+         *
+         * Poprzednia wersja uzywala podpisu 0.x - trzy argumenty pozycyjne,
+         * pola `uri`, `owners`, `payoutRecipient` - przez co przycisk "PostCoin"
+         * NIE MOGL zadzialac od czasu podbicia zaleznosci. Blad byl niewidoczny,
+         * bo caly plik mial wtedy `@ts-nocheck`.
+         *
+         * DWIE DECYZJE PRODUKTOWE, ktorych nowe API wymaga:
+         *
+         * `currency: ETH` - a nie ZORA ani CREATOR_COIN. Powod jest prosty:
+         * ETH ma kazdy, kto w ogole doszedl do tego przycisku, bo placi nim za
+         * gaz. Wymaganie ZORA znaczyloby, ze zanim ktokolwiek wybije monete
+         * ze swojego posta, musi najpierw kupic obcy token - czyli sciezka
+         * konczy sie porazka dla wiekszosci ludzi. Jako jedyna z czterech opcji
+         * ETH dziala tez na Base Sepolia, wiec da sie ja przetestowac bez
+         * wydawania prawdziwych pieniedzy.
+         *
+         * `startingMarketCap: LOW` - najnizszy prog wejscia. HIGH ustawia
+         * wysoka wycene startowa, co przy poscie w feedzie spolecznosciowym
+         * nie ma uzasadnienia: to nie jest zbiorka, tylko slad po tresci.
+         */
         const coinParams = {
+          creator: address as ViemAddress,
           name: cleanName,
           symbol: cleanSymbol,
-          uri: metadataUri, // Use the URL from Vercel Blob
-          payoutRecipient: address as ViemAddress, // Creator receives earnings
-          owners: [address as ViemAddress], // Required: specify owners array
-          platformReferrer: "0x9fb014812e5c22643640a5885866f499b1bbb5e0" as ViemAddress, // Referral fees recipient
-          // Remove problematic parameters that cause poolConfig issues
+          metadata: { type: 'RAW_URI' as const, uri: metadataUri },
+          currency: CreateConstants.ContentCoinCurrencies.ETH,
+          chainId: base.id,
+          startingMarketCap: CreateConstants.StartingMarketCaps.LOW,
+          platformReferrer: "0x9fb014812e5c22643640a5885866f499b1bbb5e0" as ViemAddress,
         };
               console.log("Zora coin parameters:", coinParams);
         
@@ -1179,34 +1249,22 @@ function BaseChatContent() {
         if (!coinParams.symbol || coinParams.symbol.length === 0) {
           throw new Error("Token symbol cannot be empty"); 
         }
-        if (!coinParams.uri || !coinParams.uri.startsWith('http')) {
+        if (!metadataUri || !metadataUri.startsWith('http')) {
           throw new Error("Invalid metadata URI - must be a valid HTTP/HTTPS URL");
         }
         
-        // 5. Call createCoin
-      // SDK Zory ladowany na zadanie - uzywany tylko w tym jednym handlerze,
-      // a na topie pliku szedl do initial chunka kazdej sesji basechatu.
-      const { createCoin, getCoinCreateFromLogs } = await import('@zoralabs/coins-sdk');
+        // 5. Call createCoin (SDK zaladowany wyzej, razem z CreateConstants)
       console.log("Calling createCoin via Zora SDK...");
       // Make sure walletClient is not null/undefined before calling createCoin
       if (!walletClient) {
           throw new Error("Wallet client is not available.");
       }
-      // ⚠️ TO WYWOLANIE JEST NIEZGODNE Z ZAINSTALOWANYM SDK I MUSI SIE WYWROCIC.
-      // @zoralabs/coins-sdk 0.8.0 ma dwa kroki i przyjmuje JEDEN obiekt:
-      //   const { calls } = await createCoinCall({ creator, name, symbol,
-      //       metadata: { type: 'RAW_URI', uri }, currency, chainId, ... });
-      //   await createCoin({ call, walletClient, publicClient });
-      // Tu leci stary podpis 0.x (trzy argumenty pozycyjne, pole `uri`, `owners`,
-      // `payoutRecipient`), wiec przycisk "PostCoin" nie moze dzialac - blad
-      // wpada w catch i konczy sie zwyklym postem albo czerwonym toastem.
-      // Rozjazd wszedl razem z podbiciem zaleznosci (commit ad646df) i byl
-      // niewidoczny, bo caly plik mial `@ts-nocheck`.
-      // NIE poprawiam tego tutaj: nowe API wymaga wyboru `currency`
-      // (ETH / ZORA / CREATOR_COIN) i `startingMarketCap`, czyli decyzji
-      // produktowej, a sciezki nie da sie sprawdzic bez portfela na Base.
-      // @ts-expect-error - patrz komentarz wyzej: podpis createCoin z SDK 0.8.0
-      const result = await createCoin(coinParams, walletClient, publicClient);
+      // Dwuetapowe API 0.8: jeden obiekt `call` plus oba klienty.
+      const result = await createCoin({
+        call: coinParams,
+        walletClient,
+        publicClient,
+      });
 
       console.log("Zora coin creation transaction sent:", result.hash);
       toast.loading("Waiting for transaction confirmation...", { id: toastId });
@@ -1695,7 +1753,7 @@ function BaseChatContent() {
       setShowModal(false);
     } catch (error) {
       console.error('Error updating avatar:', error);
-      setModalMessage('Wystąpił błąd podczas zapisywania zdjęcia. Spróbuj ponownie.');
+      setModalMessage('Could not save the image. Try again.');
       setModalType('error');
       setShowModal(true);
     } finally {
@@ -3230,7 +3288,7 @@ function BaseChatContent() {
                     {
                       icon: (
                         <img 
-                          src="/logotypy/logo-symbol.svg"
+                          src="/logotypy/world-symbol-dark.svg"
                           alt="World Chain"
                           className="w-5 h-5 rounded-none"
                         />
@@ -3650,6 +3708,7 @@ function BaseChatContent() {
                         getCachedPosts={getCachedPosts} // Przekaż funkcje cache'owania
                         setCachedPosts={setCachedPosts}
                         clearPostsCache={clearPostsCache}
+                        patchPostInCache={patchPostInCache}
                         pendingPins={pendingPins} // Przekaż pending pins state
                         onPinPending={handlePinPending} // Przekaż pending pin handler
                       />

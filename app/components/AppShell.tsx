@@ -44,34 +44,55 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             jednym ekranie, a Firestore widzial wszystkich jako anonimow. */}
         <SessionPrompt />
 
+        {/* ===== POWIADOMIENIA =====
+            Bylo: pelne plachty koloru - zielona przy sukcesie, czerwona przy
+            bledzie, bialy tekst w srodku. Trzy problemy naraz. Plachta krzyczy
+            tak samo przy "polubiono post" i przy "transakcja odrzucona", wiec
+            sila komunikatu nie miala zwiazku z jego waga. Bialy tekst na
+            nasyconym tle czyta sie gorzej niz czarny na bieli. A ciemna,
+            szara karta byla ostatnim elementem z poprzedniego motywu.
+
+            Jest: biala karta, czarny tekst, CIENKA kolorowa ramka i ikona.
+            Kolor niesie wylacznie ramka i ikona - dokladnie tyle, ile trzeba,
+            zeby rozpoznac rodzaj komunikatu katem oka, i ani grama wiecej.
+            Ikona mowi to samo co ramka drugim kanalem, wiec kto nie odroznia
+            zieleni od czerwieni, widzi ptaszek albo krzyzyk.
+
+            Ustawione GLOBALNIE, a nie przy 200 wywolaniach toast.* rozsianych
+            po aplikacji - dzieki temu kazde z nich dostaje nowy wyglad bez
+            dotykania kodu, ktory je wola.
+
+            Blad zostaje dluzej niz sukces (5 s wobec 3 s): sukces potwierdza
+            to, co uzytkownik wlasnie zrobil i o czym wie, a blad niesie
+            informacje, ktorej jeszcze nie ma - czasem z instrukcja. */}
         <Toaster
           position="top-right"
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#1f2937',
-              color: '#f9fafb',
-              border: '1px solid #374151',
-              borderRadius: '8px',
-              fontSize: '14px',
+              background: '#ffffff',
+              color: 'rgb(46 42 68)',
+              border: '1px solid rgb(214 205 242)',
+              borderRadius: '18px',
+              fontSize: '13.5px',
+              fontWeight: 600,
+              padding: '12px 16px',
+              maxWidth: '380px',
+              boxShadow: '0 10px 30px rgba(74, 60, 150, 0.18)',
             },
             success: {
-              style: {
-                background: '#10b981',
-                color: '#ffffff',
-              },
+              duration: 3000,
+              style: { border: '1px solid rgba(22, 163, 74, 0.45)' },
+              iconTheme: { primary: '#16A34A', secondary: '#ffffff' },
             },
             error: {
-              style: {
-                background: '#ef4444',
-                color: '#ffffff',
-              },
+              duration: 5000,
+              style: { border: '1px solid rgba(220, 38, 38, 0.45)' },
+              iconTheme: { primary: '#DC2626', secondary: '#ffffff' },
             },
             loading: {
-              style: {
-                background: '#3b82f6',
-                color: '#ffffff',
-              },
+              style: { border: '1px solid rgb(214 205 242)' },
+              iconTheme: { primary: 'rgb(124 107 218)', secondary: '#ffffff' },
             },
           }}
         />

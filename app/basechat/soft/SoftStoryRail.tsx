@@ -36,7 +36,7 @@ export const SOFT_NETWORKS: SoftNetwork[] = [
   { id: 'linea', label: 'Linea', iconSrc: '/Logomark Blue BG.svg' },
   { id: 'celo', label: 'Celo', iconSrc: '/logotypy/Celo_Symbol_RGB_ProsperityYellow.png' },
   { id: 'ethereum', label: 'ETH', iconSrc: '/ethlogo.png' },
-  { id: 'worldchain', label: 'World', iconSrc: '/logotypy/logo.svg' },
+  { id: 'worldchain', label: 'World', iconSrc: '/logotypy/world-symbol-dark.svg' },
   { id: 'robinhood', label: 'RH', iconSrc: '/robin.webp' },
 ];
 

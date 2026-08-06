@@ -264,7 +264,7 @@ export default function AIPostGenerator({
                       )}
                       {activeNetwork === 'worldchain' && (
                         <img
-                          src="/logotypy/logo-symbol.svg"
+                          src="/logotypy/world-symbol-dark.svg"
                           alt="World Chain"
                           className="w-8 h-8 relative z-10 drop-shadow-md"
                         />

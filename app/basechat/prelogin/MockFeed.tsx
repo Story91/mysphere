@@ -6,6 +6,7 @@ import { createBaseAccountSDK } from '@base-org/account';
 import { useAccount, useConnect } from 'wagmi';
 import { useSiweAuth, fetchSiweNonce, isUserRejection } from '../../utils/auth/useSiweAuth';
 import ConnectModal from '../../components/wallet/ConnectModal';
+import SoftSignInHero from '../soft/SoftSignInHero';
 
 const mockPostsData = [
   {
@@ -209,66 +210,16 @@ const MockFeed = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-br from-black via-gray-900 to-blue-900 rounded-lg text-center text-white p-4">
-        <div className="flex justify-center mb-2 overflow-hidden">
-          <div className="relative w-[250px] h-[100px] overflow-hidden">
-            <img 
-              src="/elo2.png" 
-              alt="MySphere Logo" 
-              className="w-full h-full object-contain"
-            />
-          </div>
-        </div>
-        <p className="text-sm text-gray-300 mb-4">Connect your wallet to join the conversation and see the live feed.</p>
-        
-        {/* Dwie drogi, obie realne.
-            Base Account jest wyzej, bo dla kogos bez portfela to jedyna sciezka
-            konczaca sie sukcesem - zaklada sie go passkeyem, bez rozszerzenia.
-            Ale to NIE jest jedyna opcja i przycisk nie moze tak wygladac: w
-            configu siedzi osiem konektorow (Base Account, Coinbase Wallet,
-            MetaMask, WalletConnect, Safe, Gemini, Farcaster, portfele wykryte
-            przez EIP-6963), wiec obok stoi wybor pelnej listy. */}
-        <div className="flex flex-col items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSignInWithBase}
-            disabled={isBusy}
-            className="w-full max-w-[260px] rounded-xl bg-[#0052FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0044D6] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Continue with Base Account
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsWalletModalOpen(true)}
-            disabled={isBusy}
-            className="w-full max-w-[260px] rounded-xl border border-white/20 px-5 py-2.5 text-sm font-medium text-gray-200 transition-colors hover:border-white/40 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Use another wallet
-          </button>
-        </div>
+      <SoftSignInHero
+        onContinueWithBase={handleSignInWithBase}
+        onUseAnotherWallet={() => setIsWalletModalOpen(true)}
+        isBusy={isBusy}
+        statusMessage={statusMessage}
+        signedInAs={isAuthenticated && sessionAddress ? shortenAddress(sessionAddress) : null}
+      />
 
-        <ConnectModal isOpen={isWalletModalOpen} onClose={() => setIsWalletModalOpen(false)} />
+      <ConnectModal isOpen={isWalletModalOpen} onClose={() => setIsWalletModalOpen(false)} />
 
-        {/* Stan logowania - ta sama stylistyka co reszta karty, bez nowych bibliotek */}
-        {isBusy && (
-          <p className="mt-3 text-xs text-gray-400 animate-pulse">
-            Waiting for your signature...
-          </p>
-        )}
-
-        {!isBusy && isAuthenticated && sessionAddress && (
-          <p className="mt-3 text-xs text-green-400">
-            Signed in as {shortenAddress(sessionAddress)}
-          </p>
-        )}
-
-        {!isBusy && !isAuthenticated && statusMessage && (
-          <p className="mt-3 text-xs text-red-400">
-            {statusMessage}
-          </p>
-        )}
-      </div>
-      
       {mockPostsData.map((post, index) => (
         <MockPost key={index} {...post} />
       ))}
