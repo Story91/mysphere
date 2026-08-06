@@ -35,9 +35,43 @@ const config: Config = {
       },
       fontFamily: {
         'coin-base': ['coin-base-sans', 'sans-serif'],
-        'coinbase': ['Coinbase Display', 'sans-serif']
+        'coinbase': ['Coinbase Display', 'sans-serif'],
+        // Kierunek Soft Social. Zmienne wstrzykuje next/font w app/layout.tsx.
+        'soft-display': ['var(--font-soft-display)', 'Baloo 2', 'system-ui', 'sans-serif'],
+        'soft': ['var(--font-soft-body)', 'Nunito', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        card: 'var(--soft-shadow-card)',
+        chip: 'var(--soft-shadow-chip)',
+        float: 'var(--soft-shadow-float)',
+      },
+      transitionTimingFunction: {
+        'out-strong': 'var(--ease-out-strong)',
+        'in-out-strong': 'var(--ease-in-out-strong)',
+        drawer: 'var(--ease-drawer)',
       },
       colors: {
+        // Soft Social - uzasadnienie kazdej wartosci przy :root w globals.css.
+        // Tutaj samo mapowanie, zeby pisac bg-soft-surface zamiast
+        // bg-[var(--soft-surface)].
+        soft: {
+          bg: 'var(--soft-bg)',
+          surface: 'var(--soft-surface)',
+          sunken: 'var(--soft-surface-sunken)',
+          ink: 'var(--soft-ink)',
+          'ink-muted': 'var(--soft-ink-muted)',
+          'ink-soft': 'var(--soft-ink-soft)',
+          'ink-faint': 'var(--soft-ink-faint)',
+          primary: 'var(--soft-primary)',
+          'primary-deep': 'var(--soft-primary-deep)',
+          line: 'var(--soft-line)',
+          'line-strong': 'var(--soft-line-strong)',
+          accent: 'var(--soft-accent)',
+          'accent-soft': 'var(--soft-accent-soft)',
+          'accent-deep': 'var(--soft-accent-deep)',
+          info: 'var(--soft-info)',
+          'info-soft': 'var(--soft-info-soft)',
+        },
         base: {
           primary: '#0052FF',
           secondary: '#FFFFFF',
@@ -87,6 +121,10 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // Soft Social. Dopisane do ISTNIEJACEGO bloku, nie obok - drugi
+        // borderRadius w tym samym obiekcie cicho nadpisalby tokeny shadcn.
+        card: 'var(--soft-radius-card)',
+        pill: 'var(--soft-radius-pill)',
       },
       backgroundImage: {
         'base-gradient': 'linear-gradient(90deg, #0052FF 0%, #00FF8F 100%)',

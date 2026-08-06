@@ -3,6 +3,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===========================================================================
+   SOFT SOCIAL - tokeny kierunku wizualnego
+   ===========================================================================
+   Zrodlo: projekt wlasciciela w Claude Design ("Mobilny widok - trzy style",
+   wariant 1b). Wartosci sa WYCIAGNIETE Z PROJEKTU, nie dobrane na oko - kazda
+   z nich wystepuje w tamtym pliku i policzylem, ile razy.
+
+   PO CO TO ISTNIEJE JAKO ZMIENNE, A NIE JAKO KLASY W KOMPONENTACH.
+   Poprzedni interfejs mial kolory wpisane na sztywno w kilkuset miejscach -
+   dlatego kazda zmiana wygladu byla operacja na wielkich plikach i konczyla sie
+   rozjazdem. Tutaj kierunek ma JEDNO miejsce. Zmiana odcienia to zmiana jednej
+   linii, a nie przeszukiwanie repo.
+
+   TA SEKCJA NICZEGO JESZCZE NIE ZMIENIA. Zmienne czekaja na uzycie; dopoki
+   komponent po nie nie siegnie, wyglada dokladnie jak przedtem. To celowe -
+   wdrazamy kierunek ekran po ekranie, a nie jednym ruchem przez cala aplikacje.
+   =========================================================================== */
+:root {
+  /* Powierzchnie. Tlo jest lawendowe, nie biale - biel zostaje dla kart,
+     zeby karta odcinala sie sama, bez ramki. */
+  --soft-bg: #f1edfa;
+  --soft-surface: #ffffff;
+  --soft-surface-sunken: #eee9fb;
+
+  /* Tekst - cztery stopnie, od naglowka do znaku wodnego. */
+  --soft-ink: #2e2a44;
+  --soft-ink-muted: #6b6486;
+  --soft-ink-soft: #8d86ab;
+  --soft-ink-faint: #a29bc0;
+
+  /* Fiolet marki. `deep` na tekst na jasnym tle - `primary` nie ma tam
+     kontrastu 4.5:1. */
+  --soft-primary: #7c6bda;
+  --soft-primary-deep: #5f4ec2;
+  --soft-line: #d6cdf2;
+  --soft-line-strong: #b9b1d8;
+
+  /* Pomaranczowy akcent. `deep` na tekst, `soft` na tlo pigulki. */
+  --soft-accent: #f5a73b;
+  --soft-accent-soft: #fde4cc;
+  --soft-accent-deep: #c2410c;
+
+  /* Blekit informacyjny - linki i odznaki neutralne. */
+  --soft-info: #2465d6;
+  --soft-info-soft: #d9ebff;
+
+  /* Cienie. Wszystkie fioletowe, nie czarne - czarny cien na lawendzie
+     wyglada jak brud. */
+  --soft-shadow-card: 0 4px 16px rgba(102, 86, 190, 0.08);
+  --soft-shadow-chip: 0 2px 8px rgba(102, 86, 190, 0.14);
+  --soft-shadow-float: 0 10px 30px rgba(74, 60, 150, 0.18);
+
+  --soft-radius-card: 24px;
+  --soft-radius-pill: 999px;
+}
+
+/* ===========================================================================
+   KRZYWE I CZASY ANIMACJI
+   ===========================================================================
+   Wbudowane easingi CSS sa za slabe - brakuje im wyrazu, przez co ruch
+   wyglada na przypadkowy. Ponizsze krzywe sa mocniejszymi wariantami.
+
+   ease-in jest tu NIEOBECNY celowo: zaczyna wolno, czyli opoznia ruch
+   dokladnie w chwili, gdy uzytkownik patrzy najuwazniej. To samo 200 ms
+   z ease-in CZUJE sie wolniej niz z ease-out.
+   =========================================================================== */
+:root {
+  /* Wejscia i wyjscia - natychmiastowa reakcja, potem wyhamowanie. */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Ruch po ekranie, morfowanie. */
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  /* Szuflady - krzywa z Ionic, odpowiednik zachowania iOS. */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --dur-press: 140ms;
+  --dur-tooltip: 160ms;
+  --dur-dropdown: 200ms;
+  --dur-sheet: 280ms;
+}
+
+/* Ruch ograniczony do niezbednego minimum, gdy uzytkownik o to prosi.
+   NIE zerujemy wszystkiego: przejscia koloru i przezroczystosci pomagaja
+   zrozumiec, co sie stalo, i nie wywoluja choroby lokomocyjnej. Znika
+   wylacznie RUCH - przesuniecia i skalowanie. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-press: 1ms;
+    --dur-tooltip: 1ms;
+    --dur-dropdown: 1ms;
+    --dur-sheet: 1ms;
+  }
+}
+
 
 /* Coinbase Display Font (uzywany w app/basechat/.../ProfileCard.css i w whitepaperze) */
 @font-face {
@@ -311,4 +404,23 @@ h1, h2, h3, h4, h5, h6 {
    spotykaja sie na jednym elemencie. */
 .bg-clip-text.text-transparent {
   -webkit-text-fill-color: transparent;
+}
+
+/* Tasma kursow w widoku Trends (app/basechat/soft/SoftTrends.tsx).
+   Przesuwamy o -50%, bo zawartosc jest zduplikowana - petla nie ma wtedy szwu.
+   linear jest tu jedynym poprawnym wyborem: przyspieszanie i zwalnianie tasmy
+   wyglada jak zacinanie, a nie jak ruch. */
+.soft-marquee {
+  animation: soft-marquee-scroll 32s linear infinite;
+}
+
+@keyframes soft-marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Dekoracja - przy ograniczonym ruchu znika bez straty informacji,
+   bo kursy sa nadal czytelne, tylko nieruchome. */
+@media (prefers-reduced-motion: reduce) {
+  .soft-marquee { animation: none; }
 }

@@ -42,11 +42,11 @@ export const metadata: Metadata = {
 function Marker({ amount, label }: { amount: string; label: string }) {
   return (
     <div className="mb-7 flex items-baseline gap-3">
-      <span className="font-['Coinbase_Display'] text-[13px] font-semibold tabular-nums text-[#00E28A]">
+      <span className="font-soft-display text-[13px] font-semibold tabular-nums text-soft-accent-deep">
         {amount}
       </span>
       <span className="h-px flex-1 bg-gradient-to-r from-[#00E28A]/40 to-transparent" />
-      <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#5C6F94]">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-soft-ink-faint">
         {label}
       </span>
     </div>
@@ -55,19 +55,19 @@ function Marker({ amount, label }: { amount: string; label: string }) {
 
 function H2({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-4 font-['Coinbase_Display'] text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-[#EEF3FF] sm:text-[32px]">
+    <h2 className="mb-4 font-soft-display text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-soft-ink sm:text-[32px]">
       {children}
     </h2>
   );
 }
 
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="mb-4 text-[15px] leading-[1.7] text-[#9EB0D2]">{children}</p>;
+  return <p className="mb-4 text-[15px] leading-[1.7] text-soft-ink-muted">{children}</p>;
 }
 
 /** Wyroznienie w tekscie - jedyny akcent w akapicie, uzywany oszczednie. */
 function Hi({ children }: { children: React.ReactNode }) {
-  return <strong className="font-semibold text-[#EEF3FF]">{children}</strong>;
+  return <strong className="font-semibold text-soft-ink">{children}</strong>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,60 +85,60 @@ function AskCard() {
     <div className="relative">
       {/* Poswiata odpowiada stanowi "otwarty" - bursztyn, nie blekit. */}
       <div
-        className="pointer-events-none absolute -inset-6 rounded-[28px] bg-[#E8B84B]/[0.07] blur-2xl"
+        className="pointer-events-none absolute -inset-6 rounded-[28px] bg-soft-accent/[0.07] blur-2xl"
         aria-hidden="true"
       />
-      <article className="relative overflow-hidden rounded-2xl border border-white/[0.09] bg-[#0E1730]/90 backdrop-blur-xl">
-        <div className="flex items-center justify-between border-b border-white/[0.07] bg-[#E8B84B]/[0.06] px-5 py-2.5">
-          <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#E8B84B]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#E8B84B]" aria-hidden="true" />
+      <article className="relative overflow-hidden rounded-card border border-soft-line bg-soft-surface shadow-card">
+        <div className="flex items-center justify-between border-b border-soft-line/70 bg-soft-accent/[0.06] px-5 py-2.5">
+          <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-soft-accent-deep">
+            <span className="h-1.5 w-1.5 rounded-full bg-soft-accent" aria-hidden="true" />
             Open ask
           </span>
-          <span className="text-[11px] tabular-nums text-[#E8B84B]/80">04:12:39 left</span>
+          <span className="text-[11px] tabular-nums text-soft-accent-deep/80">04:12:39 left</span>
         </div>
 
         <div className="px-5 py-5">
           <div className="mb-4 flex items-center gap-2.5">
             <span className="h-7 w-7 rounded-full bg-gradient-to-br from-[#0052FF] to-[#00E28A]" aria-hidden="true" />
-            <span className="font-['Coinbase_Display'] text-[13px] font-semibold text-[#EEF3FF]">
+            <span className="font-soft-display text-[13px] font-semibold text-soft-ink">
               vault.base.eth
             </span>
-            <span className="rounded-full border border-[#00E28A]/25 bg-[#00E28A]/[0.08] px-2 py-0.5 text-[10px] font-medium tabular-nums text-[#00E28A]">
+            <span className="rounded-full border border-soft-accent/30 bg-soft-accent-soft px-2 py-0.5 text-[10px] font-medium tabular-nums text-soft-accent-deep">
               resolved 12/13
             </span>
           </div>
 
-          <p className="mb-5 text-[15px] leading-[1.6] text-[#DDE6FA]">
+          <p className="mb-5 text-[15px] leading-[1.6] text-soft-ink">
             Our onboarding drops 60% of users between wallet connect and first post. Watch the
             30-second clip, then tell me the one thing you would cut.
           </p>
 
-          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.07]">
+          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-pill border border-soft-line/70 bg-white/[0.07]">
             {[
               { k: 'Budget', v: '$6.00' },
               { k: 'Seats', v: '2 of 3' },
               { k: 'Per answer', v: '$2.00' },
             ].map((cell) => (
-              <div key={cell.k} className="bg-[#0E1730] px-3 py-3">
-                <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[#5C6F94]">
+              <div key={cell.k} className="bg-soft-surface px-3 py-3">
+                <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-soft-ink-faint">
                   {cell.k}
                 </div>
-                <div className="font-['Coinbase_Display'] text-[15px] font-semibold tabular-nums text-[#EEF3FF]">
+                <div className="font-soft-display text-[15px] font-semibold tabular-nums text-soft-ink">
                   {cell.v}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-4 flex items-center justify-between border-t border-white/[0.07] pt-4">
-            <span className="text-[12px] text-[#5C6F94]">7 answers sealed until resolve</span>
-            <span className="rounded-lg bg-[#0052FF] px-3.5 py-1.5 text-[12px] font-semibold text-white">
+          <div className="mt-4 flex items-center justify-between border-t border-soft-line/70 pt-4">
+            <span className="text-[12px] text-soft-ink-faint">7 answers sealed until resolve</span>
+            <span className="rounded-lg bg-soft-primary px-3.5 py-1.5 text-[12px] font-semibold text-white">
               Answer
             </span>
           </div>
         </div>
       </article>
-      <p className="mt-3 text-center text-[11px] text-[#5C6F94]">
+      <p className="mt-3 text-center text-[11px] text-soft-ink-faint">
         Preview of the Ask card. Not live yet.
       </p>
     </div>
@@ -152,10 +152,10 @@ function AskCard() {
 type Status = 'live' | 'wired' | 'building' | 'off';
 
 const STATUS_STYLE: Record<Status, { dot: string; text: string; label: string }> = {
-  live: { dot: 'bg-[#00E28A]', text: 'text-[#00E28A]', label: 'live' },
-  wired: { dot: 'bg-[#E8B84B]', text: 'text-[#E8B84B]', label: 'wired, switch off' },
-  building: { dot: 'bg-[#5B8CFF]', text: 'text-[#5B8CFF]', label: 'building' },
-  off: { dot: 'bg-[#3A4A6B]', text: 'text-[#5C6F94]', label: 'switched off' },
+  live: { dot: 'bg-soft-accent', text: 'text-soft-accent-deep', label: 'live' },
+  wired: { dot: 'bg-soft-accent', text: 'text-soft-accent-deep', label: 'wired, switch off' },
+  building: { dot: 'bg-soft-primary', text: 'text-soft-primary-deep', label: 'building' },
+  off: { dot: 'bg-soft-line-strong', text: 'text-soft-ink-faint', label: 'switched off' },
 };
 
 const CAPABILITIES: { name: string; status: Status; note: string }[] = [
@@ -190,9 +190,9 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
     note: 'Every tip gets a page and a share card carrying the amount, both names and the transaction.',
   },
   {
-    name: 'Weekly payouts board',
+    name: 'The money timeline',
     status: 'live',
-    note: 'Who got paid in the last seven days. Settled payments only — there are no points here.',
+    note: 'A public feed of payments between people. Every line carries a transaction you can open.',
   },
   {
     name: 'Paid sections',
@@ -214,11 +214,11 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
 function CapabilityRow({ cap }: { cap: (typeof CAPABILITIES)[number] }) {
   const style = STATUS_STYLE[cap.status];
   return (
-    <div className="grid grid-cols-[1fr_auto] items-start gap-x-5 gap-y-1.5 border-t border-white/[0.07] py-4 sm:grid-cols-[168px_1fr_auto] sm:items-center">
-      <span className="font-['Coinbase_Display'] text-[14px] font-semibold text-[#EEF3FF]">
+    <div className="grid grid-cols-[1fr_auto] items-start gap-x-5 gap-y-1.5 border-t border-soft-line/70 py-4 sm:grid-cols-[168px_1fr_auto] sm:items-center">
+      <span className="font-soft-display text-[14px] font-semibold text-soft-ink">
         {cap.name}
       </span>
-      <span className="order-3 col-span-2 text-[13px] leading-relaxed text-[#8FA2C6] sm:order-none sm:col-span-1">
+      <span className="order-3 col-span-2 text-[13px] leading-relaxed text-soft-ink-soft sm:order-none sm:col-span-1">
         {cap.note}
       </span>
       <span className={`flex items-center gap-2 whitespace-nowrap text-[11px] ${style.text}`}>
@@ -239,24 +239,24 @@ export default function ReDefinitionPage() {
   ).length;
 
   return (
-    <main className="min-h-screen bg-[#0A1024]">
+    <main className="min-h-screen bg-soft-bg font-soft">
       {/* ---------------- HERO ---------------- */}
-      <section className="border-b border-white/[0.07] px-5 pb-16 pt-16 sm:px-8 sm:pb-20 sm:pt-20">
+      <section className="border-b border-soft-line/70 px-5 pb-16 pt-16 sm:px-8 sm:pb-20 sm:pt-20">
         <div className="mx-auto grid max-w-[1080px] gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
           <div>
-            <p className="mb-6 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5C6F94]">
+            <p className="mb-6 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-soft-ink-faint">
               Re-Definition
-              <span className="h-3 w-px bg-[#3A4A6B]" aria-hidden="true" />
-              <span className="text-[#5B8CFF]">Base · USDC · x402</span>
+              <span className="h-3 w-px bg-soft-line-strong" aria-hidden="true" />
+              <span className="text-soft-primary-deep">Base · USDC · x402</span>
             </p>
 
-            <h1 className="mb-6 font-['Coinbase_Display'] text-[38px] font-bold leading-[1.05] tracking-[-0.03em] text-[#EEF3FF] sm:text-[54px]">
+            <h1 className="mb-6 font-soft-display text-[38px] font-bold leading-[1.05] tracking-[-0.03em] text-soft-ink sm:text-[54px]">
               Your judgment has a price.
               <br />
-              <span className="text-[#00E28A]">Something is already willing to pay it.</span>
+              <span className="text-soft-accent-deep">Something is already willing to pay it.</span>
             </h1>
 
-            <p className="mb-7 max-w-[46ch] text-[17px] leading-[1.6] text-[#9EB0D2]">
+            <p className="mb-7 max-w-[46ch] text-[17px] leading-[1.6] text-soft-ink-muted">
               MySphere is becoming the first feed where the buyer can be a machine, the worker is a
               person, and the only reputation that counts is the one you cannot mint without
               spending money.
@@ -265,13 +265,13 @@ export default function ReDefinitionPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/basechat"
-                className="rounded-xl bg-[#0052FF] px-5 py-3 text-[14px] font-semibold text-white transition hover:bg-[#0044D6]"
+                className="rounded-pill bg-soft-primary px-5 py-3 text-[14px] font-semibold text-white transition hover:bg-soft-primary-deep"
               >
                 Open the feed
               </Link>
               <a
                 href="#ask"
-                className="rounded-xl border border-white/[0.12] px-5 py-3 text-[14px] font-semibold text-[#DDE6FA] transition hover:border-white/25 hover:bg-white/[0.04]"
+                className="rounded-pill border border-soft-line px-5 py-3 text-[14px] font-semibold text-soft-ink transition hover:border-white/25 hover:bg-soft-surface"
               >
                 How an Ask works
               </a>
@@ -340,8 +340,8 @@ export default function ReDefinitionPage() {
             API key, no invoice.
           </P>
           <P>
-            So an agent can post an Ask the same way you can — <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[13px] text-[#DDE6FA]">GET /api/asks</code> to see
-            the price, sign, then <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[13px] text-[#DDE6FA]">POST</code> the question. Your answer
+            So an agent can post an Ask the same way you can — <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">GET /api/asks</code> to see
+            the price, sign, then <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">POST</code> the question. Your answer
             comes back to it as JSON when you deliver it.
           </P>
           <P>
@@ -406,6 +406,21 @@ export default function ReDefinitionPage() {
             So we are not building another feed. We are building objects that carry a
             verifiable amount and travel on their own — a receipt today, an Ask next.
           </P>
+          <P>
+            The first of them is already live, and it is the one thing here that exists nowhere
+            else: <Hi>a public timeline of payments between people</Hi>. Not a leaderboard of
+            points, not a wall of likes — the money itself, in the order it landed, every line
+            carrying a transaction you can open and check against the chain. Every social product
+            has a feed of what people said. None has a feed of what people paid each other.
+          </P>
+          <p className="mb-4">
+            <Link
+              href="/leaderboard"
+              className="inline-flex items-center gap-2 rounded-pill bg-soft-accent-soft px-4 py-2.5 font-soft-display text-[13.5px] font-bold text-soft-accent-deep transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97]"
+            >
+              Watch the money land →
+            </Link>
+          </p>
         </section>
 
         {/* ---------------- stan ---------------- */}
@@ -420,9 +435,9 @@ export default function ReDefinitionPage() {
             {CAPABILITIES.map((cap) => (
               <CapabilityRow key={cap.name} cap={cap} />
             ))}
-            <div className="border-t border-white/[0.07]" />
+            <div className="border-t border-soft-line/70" />
           </div>
-          <p className="mt-7 text-[14px] leading-[1.7] text-[#8FA2C6]">
+          <p className="mt-7 text-[14px] leading-[1.7] text-soft-ink-soft">
             {parked} older modules — the minting camp, the identity page, the marketplace, the
             morning game, the attention scanner, the swap widget — are parked. They were surface
             area, not a product. Everything that mattered in them was one address doing something
@@ -450,8 +465,8 @@ export default function ReDefinitionPage() {
         </section>
 
         {/* ---------------- docs ---------------- */}
-        <section className="border-t border-white/[0.07] py-16">
-          <h2 className="mb-6 font-['Coinbase_Display'] text-[15px] font-semibold uppercase tracking-[0.14em] text-[#5C6F94]">
+        <section className="border-t border-soft-line/70 py-16">
+          <h2 className="mb-6 font-soft-display text-[15px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
             Read further
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -473,19 +488,19 @@ export default function ReDefinitionPage() {
             ].map((link) => {
               const inner = (
                 <>
-                  <span className="mb-1 flex items-center gap-1.5 font-['Coinbase_Display'] text-[14px] font-semibold text-[#EEF3FF]">
+                  <span className="mb-1 flex items-center gap-1.5 font-soft-display text-[14px] font-semibold text-soft-ink">
                     {link.label}
                     {link.external && (
-                      <span className="text-[11px] text-[#5C6F94]" aria-hidden="true">
+                      <span className="text-[11px] text-soft-ink-faint" aria-hidden="true">
                         ↗
                       </span>
                     )}
                   </span>
-                  <span className="text-[13px] text-[#8FA2C6]">{link.note}</span>
+                  <span className="text-[13px] text-soft-ink-soft">{link.note}</span>
                 </>
               );
               const cls =
-                'flex flex-col rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-4 transition hover:border-[#0052FF]/50 hover:bg-white/[0.04]';
+                'flex flex-col rounded-pill border border-soft-line/70 bg-soft-surface px-4 py-4 transition hover:border-[#0052FF]/50 hover:bg-soft-surface';
               return link.external ? (
                 <a key={link.href} href={link.href} target="_blank" rel="noreferrer" className={cls}>
                   {inner}

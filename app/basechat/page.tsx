@@ -63,6 +63,7 @@ import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 import GlassIcons from '../components/GlassIcons/GlassIcons';
 import GooeyNav from '../components/GooeyNav/GooeyNav';
+import SoftFeedMobile from './soft/SoftFeedMobile';
 const MusicSelector = dynamic(() => import('./components/MusicSelector'), { ssr: false });
 import SpotifyTrackCard from './components/SpotifyTrackCard';
 // Import Zora SDK functions
@@ -2947,9 +2948,35 @@ function BaseChatContent() {
               </div>
             </div>
 
-            {/* Middle panel (Feed) */}
+            {/* ===== MOBILNY FEED - kierunek Soft Social =====
+                 Zastepuje WYGLAD srodkowego panelu ponizej progu `lg` i nic
+                 wiecej. Desktop idzie stara sciezka bez jednej zmienionej linii,
+                 a cala logika - postowanie na osmiu lancuchach, platnosci,
+                 znajomi, powiadomienia - zostaje tam, gdzie byla. Granica jest
+                 ostra: ten komponent dostaje gotowe dane i oddaje zdarzenia
+                 w gore, wiec zmiana wygladu nie dotyka kodu platnosci. */}
+            <div className={activeMobilePanel === 'main' ? 'block w-full lg:hidden' : 'hidden'}>
+              <SoftFeedMobile
+                posts={posts as any}
+                currentAddress={address}
+                avatarUrl={userProfile?.avatar}
+                activeFeed={activeFeed}
+                onFeedChange={(id) => setActiveFeed(id as 'forYou' | 'following' | 'baseName')}
+                onOpenComposer={() => {
+                  // Przewijamy do PRAWDZIWEGO kompozytora zamiast budowac drugi.
+                  // Druga implementacja pisania postu bylaby drugim miejscem,
+                  // w ktorym trzeba naprawiac ten sam blad.
+                  const composer = document.querySelector('textarea');
+                  composer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  (composer as HTMLTextAreaElement | null)?.focus();
+                }}
+                isLoading={isLoadingPosts}
+              />
+            </div>
+
+            {/* Middle panel (Feed) - od progu `lg` w gore */}
             <div className={`flex-1 p-4 overflow-y-auto ${
-              activeMobilePanel === 'main' ? 'block w-full' : 'hidden lg:block'
+              activeMobilePanel === 'main' ? 'hidden lg:block w-full' : 'hidden lg:block'
             }`}>
               {/* Post switcher and network selection - only for logged in users */}
               {isConnected && (

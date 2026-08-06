@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { Space_Grotesk, Outfit } from 'next/font/google';
+import { Space_Grotesk, Outfit, Baloo_2, Nunito } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -20,6 +20,36 @@ const headingFont = Outfit({
   weight: ['400', '500', '600', '700'],
   display: 'swap',
   variable: '--font-heading',
+});
+
+/**
+ * Kroje kierunku "Soft Social" (projekt wlasciciela, wariant 1b).
+ *
+ * Baloo 2 niesie naglowki i liczby - ma zaokraglone konce kresek i wysoka
+ * x-height, wiec kwota napisana nim czyta sie jak etykieta na produkcie,
+ * a nie jak dane w tabeli. Nunito jest tekstem: neutralny, ale nie zimny.
+ *
+ * Wczytujemy je przez next/font, a nie przez @import z fonts.googleapis.com -
+ * next/font hostuje pliki same-origin i wstrzykuje preload, wiec nie ma
+ * render-blokujacego zapytania do obcej domeny ani skoku typografii.
+ *
+ * Stare zmienne (--font-body / --font-heading) ZOSTAJA nietkniete: caly
+ * dotychczasowy interfejs stoi na nich i ma dzialac dalej bez zmian.
+ * Nowe kroje sa dostepne przez wlasne zmienne i wchodza tam, gdzie kierunek
+ * jest juz wdrozony.
+ */
+const softDisplayFont = Baloo_2({
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+  display: 'swap',
+  variable: '--font-soft-display',
+});
+
+const softBodyFont = Nunito({
+  subsets: ['latin'],
+  weight: ['400', '600', '700', '800'],
+  display: 'swap',
+  variable: '--font-soft-body',
 });
 
 // Kanoniczny adres produkcyjny. Jedno miejsce, bo uzywaja go i metadane, i
@@ -107,7 +137,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // lang="en": cala tresc interfejsu i metadanych jest po angielsku. Przy
     // lang="pl" czytniki ekranu czytaly angielskie teksty polska fonetyka,
     // a wyszukiwarki dostawaly zly jezyk strony.
-    <html lang="en" className={`${bodyFont.variable} ${headingFont.variable}`}>
+    <html
+      lang="en"
+      className={`${bodyFont.variable} ${headingFont.variable} ${softDisplayFont.variable} ${softBodyFont.variable}`}
+    >
       <body className="min-h-screen bg-white">
         <AppShell>{children}</AppShell>
 

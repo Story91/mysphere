@@ -162,3 +162,58 @@ export function formatAmount(value: number): string {
   if (value >= 1) return value.toFixed(2).replace(/\.00$/, '');
   return value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
 }
+
+/* ------------------------------------------------------------------ */
+/*  Os czasu rozliczonych platnosci                                    */
+/* ------------------------------------------------------------------ */
+
+export type SettledPayment = {
+  txHash: string;
+  from: string;
+  to: string;
+  amount: number;
+  token: string;
+  network: string;
+  timestamp: number;
+};
+
+/**
+ * Ostatnie rozliczone platnosci - w kolejnosci, w jakiej wpadaly.
+ *
+ * PO CO. To jest kanal, ktorego nie ma zaden inny produkt spolecznosciowy:
+ * publiczna, przegladalna OS CZASU PIENIEDZY miedzy ludzmi, gdzie kazda pozycja
+ * ma hash transakcji i kazdy moze ja sprawdzic u zrodla. Feed postow ma
+ * dosiadka wszedzie. Feed przelewow miedzy obcymi ludzmi, z dowodem przy kazdej
+ * pozycji, nie ma nigdzie.
+ *
+ * Roznica wobec rankingu obok: ranking to SUMA (kto uzbieral najwiecej),
+ * a to jest STRUMIEN (co wlasnie sie stalo). Ranking odpowiada na pytanie
+ * "komu ufac", strumien na "czy tu w ogole cos zyje".
+ */
+export async function getSettledPayments(max = 30): Promise<SettledPayment[]> {
+  try {
+    const snapshot = await getDocs(
+      query(collection(getDb(), 'tips'), orderBy('timestamp', 'desc'), limit(max))
+    );
+
+    return snapshot.docs
+      .map((entry) => {
+        const tip = entry.data() as Record<string, any>;
+        const amount = Number.parseFloat(String(tip.amount ?? '0'));
+        return {
+          txHash: typeof tip.txHash === 'string' ? tip.txHash : '',
+          from: typeof tip.senderAddress === 'string' ? tip.senderAddress : '',
+          to: typeof tip.recipientAddress === 'string' ? tip.recipientAddress : '',
+          amount: Number.isFinite(amount) ? amount : 0,
+          token: typeof tip.token === 'string' ? tip.token : 'ETH',
+          network: typeof tip.network === 'string' ? tip.network : 'base',
+          timestamp: typeof tip.timestamp === 'number' ? tip.timestamp : 0,
+        };
+      })
+      // Bez hasha nie ma dowodu, a bez dowodu ta pozycja nie ma po co istniec.
+      .filter((payment) => payment.txHash && payment.amount > 0);
+  } catch (error) {
+    console.error('[getSettledPayments] Odczyt nie powiodl sie:', error);
+    return [];
+  }
+}
