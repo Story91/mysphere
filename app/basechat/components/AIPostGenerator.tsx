@@ -113,16 +113,16 @@ export default function AIPostGenerator({
           border: 'border-gray-400/30',
           shadow: 'shadow-[0_0_30px_rgba(107,114,128,0.3)]',
           titleGradient: 'bg-gradient-to-r from-gray-200 to-gray-300',
-          inputGradient: 'bg-gray-100/90 border-gray-400/30 focus:ring-gray-500/50 focus:border-gray-500 shadow-[0_0_15px_rgba(107,114,128,0.1)]',
-          textColor: 'text-gray-800'
+          inputGradient: 'bg-soft-sunken/90 border-gray-400/30 focus:ring-gray-500/50 focus:border-gray-500 shadow-[0_0_15px_rgba(107,114,128,0.1)]',
+          textColor: 'text-soft-ink'
         };
       case 'worldchain':
         return {
           background: 'bg-white/95 backdrop-blur-xl',
-          border: 'border-gray-300/50',
+          border: 'border-soft-line-strong/50',
           shadow: 'shadow-[0_0_30px_rgba(0,0,0,0.15)]',
           titleGradient: 'bg-gradient-to-r from-black to-gray-800',
-          inputGradient: 'bg-white/90 border-gray-300/50 focus:ring-gray-500/30 focus:border-gray-400 shadow-[0_0_15px_rgba(0,0,0,0.1)]',
+          inputGradient: 'bg-white/90 border-soft-line-strong/50 focus:ring-gray-500/30 focus:border-gray-400 shadow-[0_0_15px_rgba(0,0,0,0.1)]',
           textColor: 'text-black'
         };
       case 'base':
@@ -202,9 +202,9 @@ export default function AIPostGenerator({
                       : activeNetwork === 'celo'
                       ? 'bg-yellow-50/10 border-yellow-300/30 shadow-[0_0_20px_rgba(234,179,8,0.3)]'
                       : activeNetwork === 'ethereum'
-                      ? 'bg-gray-100/10 border-gray-300/30 shadow-[0_0_20px_rgba(107,114,128,0.3)]'
+                      ? 'bg-soft-sunken/10 border-soft-line-strong/30 shadow-[0_0_20px_rgba(107,114,128,0.3)]'
                       : activeNetwork === 'worldchain'
-                      ? 'bg-white/10 border-gray-300/30 shadow-[0_0_20px_rgba(0,0,0,0.2)]'
+                      ? 'bg-white/10 border-soft-line-strong/30 shadow-[0_0_20px_rgba(0,0,0,0.2)]'
                       : 'bg-white/10 border-blue-300/30 shadow-[0_0_20px_rgba(59,130,246,0.3)]'
                   }`}>
 
@@ -219,9 +219,9 @@ export default function AIPostGenerator({
                         : activeNetwork === 'celo'
                         ? 'bg-white border-yellow-300 shadow-lg rounded-full'
                         : activeNetwork === 'ethereum'
-                        ? 'bg-white border-gray-300 shadow-lg rounded-full'
+                        ? 'bg-white border-soft-line-strong shadow-lg rounded-full'
                         : activeNetwork === 'worldchain'
-                        ? 'bg-white border-gray-300 shadow-lg rounded-full'
+                        ? 'bg-white border-soft-line-strong shadow-lg rounded-full'
                         : 'bg-white border-blue-300 shadow-lg rounded-full'
                     }`}>
                       <div className={`absolute inset-0 blur-sm opacity-50 ${
@@ -307,14 +307,14 @@ export default function AIPostGenerator({
                 onClick={onClose}
                 className={`absolute top-0 right-0 transition-colors ${
                   activeNetwork === 'base'
-                    ? 'text-gray-600 hover:text-gray-800'
+                    ? 'text-soft-ink-muted hover:text-soft-ink'
                     : activeNetwork === 'celo'
-                    ? 'text-black hover:text-gray-800'
+                    ? 'text-black hover:text-soft-ink'
                     : activeNetwork === 'ethereum'
                     ? 'text-gray-300 hover:text-white'
                     : activeNetwork === 'worldchain'
-                    ? 'text-black hover:text-gray-800'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'text-black hover:text-soft-ink'
+                    : 'text-soft-ink-faint hover:text-white'
                 }`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,7 +332,7 @@ export default function AIPostGenerator({
                 rows={4}
                 maxLength={500}
               />
-              <div className="absolute bottom-3 right-3 text-xs text-gray-500">
+              <div className="absolute bottom-3 right-3 text-xs text-soft-ink-soft">
                 {aiPrompt.length}/500
               </div>
             </div>
@@ -342,16 +342,16 @@ export default function AIPostGenerator({
                 onClick={onClose}
                 className={`px-4 py-2 text-sm transition-colors ${
                   activeNetwork === 'base'
-                    ? 'text-gray-600 hover:text-gray-800'
+                    ? 'text-soft-ink-muted hover:text-soft-ink'
                     : activeNetwork === 'linea'
                     ? 'text-cyan-400 hover:text-cyan-300'
                     : activeNetwork === 'celo'
-                    ? 'text-black hover:text-gray-800'
+                    ? 'text-black hover:text-soft-ink'
                     : activeNetwork === 'ethereum'
-                    ? 'text-gray-700 hover:text-gray-900'
+                    ? 'text-soft-ink-muted hover:text-soft-ink'
                     : activeNetwork === 'worldchain'
-                    ? 'text-black hover:text-gray-800'
-                    : 'text-gray-400 hover:text-gray-300'
+                    ? 'text-black hover:text-soft-ink'
+                    : 'text-soft-ink-faint hover:text-gray-300'
                 }`}
               >
                 Cancel
@@ -367,11 +367,11 @@ export default function AIPostGenerator({
                     : activeNetwork === 'linea'
                     ? 'bg-black hover:bg-gray-900 border-cyan-400/30 text-cyan-400 hover:text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.1)]'
                     : activeNetwork === 'celo'
-                    ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-600/30 text-black hover:text-gray-900 shadow-[0_0_15px_rgba(234,179,8,0.2)]'
+                    ? 'bg-yellow-500 hover:bg-yellow-600 border-yellow-600/30 text-black hover:text-soft-ink shadow-[0_0_15px_rgba(234,179,8,0.2)]'
                     : activeNetwork === 'ethereum'
                     ? 'bg-gray-600 hover:bg-gray-700 border-gray-500/30 text-white hover:text-gray-100 shadow-[0_0_15px_rgba(107,114,128,0.2)]'
                     : activeNetwork === 'worldchain'
-                    ? 'bg-black hover:bg-gray-900 border-gray-300/30 text-white hover:text-gray-100 shadow-[0_0_15px_rgba(0,0,0,0.2)]'
+                    ? 'bg-black hover:bg-gray-900 border-soft-line-strong/30 text-white hover:text-gray-100 shadow-[0_0_15px_rgba(0,0,0,0.2)]'
                     : 'bg-gradient-to-r from-blue-500/30 to-purple-500/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] border-white/20 text-white'
                 } border`}
               >
@@ -425,20 +425,20 @@ export default function AIPostGenerator({
                     : activeNetwork === 'celo'
                     ? 'bg-yellow-50/90 border-yellow-500/20'
                     : activeNetwork === 'ethereum'
-                    ? 'bg-gray-100/90 border-gray-400/20'
+                    ? 'bg-soft-sunken/90 border-gray-400/20'
                     : activeNetwork === 'worldchain'
-                    ? 'bg-white/90 border-gray-300/20'
+                    ? 'bg-white/90 border-soft-line-strong/20'
                     : 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-white/10'
                 }`}>
                 <p className={`text-sm text-center ${
                   activeNetwork === 'base'
-                    ? 'text-gray-700'
+                    ? 'text-soft-ink-muted'
                     : activeNetwork === 'linea'
                     ? 'text-cyan-300'
                     : activeNetwork === 'celo'
                     ? 'text-black'
                     : activeNetwork === 'ethereum'
-                    ? 'text-gray-800'
+                    ? 'text-soft-ink'
                     : activeNetwork === 'worldchain'
                     ? 'text-black'
                     : 'text-white/80'

@@ -1992,7 +1992,7 @@ export default function BuilderProfile({
                                               </svg>
                                               <span className="text-yellow-400">
                                                 {item.track.popularity}/100 
-                                                <span className="text-gray-400 ml-1">
+                                                <span className="text-soft-ink-faint ml-1">
                                                   {item.track.popularity >= 70 ? 'Mainstream' : item.track.popularity >= 40 ? 'Popular' : 'Niche'}
                                                 </span>
                                               </span>
@@ -2007,7 +2007,7 @@ export default function BuilderProfile({
                                               </svg>
                                               <span className="text-blue-400">
                                                 {new Date(item.track.album.release_date).getFullYear()}
-                                                <span className="text-gray-400 ml-1">
+                                                <span className="text-soft-ink-faint ml-1">
                                                   {(() => {
                                                     const year = new Date(item.track.album.release_date).getFullYear();
                                                     const currentYear = new Date().getFullYear();
@@ -2204,7 +2204,7 @@ export default function BuilderProfile({
                                               </svg>
                                               <span className="text-yellow-400">
                                                 {item.track.popularity}/100 
-                                                <span className="text-gray-400 ml-1">
+                                                <span className="text-soft-ink-faint ml-1">
                                                   {item.track.popularity >= 70 ? 'Mainstream' : item.track.popularity >= 40 ? 'Popular' : 'Niche'}
                                                 </span>
                                               </span>
@@ -2219,7 +2219,7 @@ export default function BuilderProfile({
                                               </svg>
                                               <span className="text-blue-400">
                                                 {new Date(item.track.album.release_date).getFullYear()}
-                                                <span className="text-gray-400 ml-1">
+                                                <span className="text-soft-ink-faint ml-1">
                                                   {(() => {
                                                     const year = new Date(item.track.album.release_date).getFullYear();
                                                     const currentYear = new Date().getFullYear();
