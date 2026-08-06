@@ -424,3 +424,34 @@ h1, h2, h3, h4, h5, h6 {
 @media (prefers-reduced-motion: reduce) {
   .soft-marquee { animation: none; }
 }
+
+/* Orbita na ekranie logowania (app/basechat/soft/SoftSignInHero.tsx).
+   28 s na obrot i `linear` - ruch ciagly to jedyny przypadek, w ktorym
+   easing byloby bledem: przyspieszanie i zwalnianie orbity wyglada jak
+   zacinanie, a nie jak krazenie. */
+.soft-orbit {
+  animation: soft-orbit-spin 28s linear infinite;
+}
+
+/* Awatar odkreca sie o wlasny kat i o kat orbity, wiec zostaje pionowo
+   zamiast koziolkowac po drugiej stronie kola. */
+.soft-orbit-counter {
+  animation: soft-orbit-counter 28s linear infinite;
+  transform: rotate(var(--orbit-deg, 0deg));
+}
+
+@keyframes soft-orbit-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes soft-orbit-counter {
+  from { transform: translate(-50%, -50%) rotate(calc(var(--orbit-deg, 0deg) - 0deg)); }
+  to   { transform: translate(-50%, -50%) rotate(calc(var(--orbit-deg, 0deg) - 360deg)); }
+}
+
+/* Dekoracja - bezruch niczego nie odbiera, uklad zostaje ten sam. */
+@media (prefers-reduced-motion: reduce) {
+  .soft-orbit,
+  .soft-orbit-counter { animation: none; }
+}
