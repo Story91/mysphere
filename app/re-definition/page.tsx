@@ -701,11 +701,11 @@ export default function ReDefinitionPage() {
               {[
                 {
                   t: 'Runs today',
-                  d: 'Posts, tips, receipts and a public timeline of payments. Asks with the budget locked in an escrow contract on Base and payouts claimed back out of it. A machine has paid for an Ask over x402 — once. /money adds up what you are owed, what you locked, what you earned and what you spent.',
+                  d: 'Posts, tips, receipts and a public timeline of payments. An escrow contract live on Base, source verified, whose whole cycle — lock, resolve, pay out — has run on real money. A machine has paid for an Ask over x402, once. /money adds up what you are owed, what you locked, what you earned and what you spent.',
                 },
                 {
                   t: 'Being built',
-                  d: 'The Ask in the feed. Taking an expired budget back without calling the contract by hand. The same x402 route on Base in USDC — the branch is written, nothing has ever paid through it.',
+                  d: 'Funding an Ask from the browser, on mainnet — the contract has only ever been driven from a script, on a test network. The Ask in the feed. Taking an expired budget back without calling the contract by hand. The same x402 route on Base in USDC — the branch is written, nothing has ever paid through it.',
                 },
                 {
                   t: 'Direction',
