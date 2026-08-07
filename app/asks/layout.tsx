@@ -13,8 +13,11 @@ import type { Metadata } from 'next';
  * zalozenie Aska przez agenta platnoscia x402 - sprawdzone jednym prawdziwym
  * przebiegiem, 0,01 USDG na Robinhood Chain, NIE USDC na Base - ORAZ, od
  * podpiecia kontraktu, escrow na Base mainnecie (approve + fund przed zapisem
- * do Firestore, app/asks/page.tsx). NIE dziala i NIE WOLNO tego pisac: Ask
- * w feedzie.
+ * do Firestore, app/asks/page.tsx). Rozstrzygniecie to jedna transakcja
+ * resolve(), odbior to claim() - pelny cykl przeszedl dwa razy prawdziwym USDC
+ * na Base Sepolii (scripts/askEscrowCycle.js), ale NIE z przegladarki i NIE na
+ * mainnecie. NIE dziala i NIE WOLNO tego pisac: Ask w feedzie, powiadomienie
+ * o wygranej (nic nie mowi zwyciezcy, ze ma pieniadze - musi wejsc na /money).
  *
  * TE DWIE PLATNOSCI TO NIE JEST TA SAMA PLATNOSC. x402 placi za ZALOZENIE
  * Aska (grosze, USDG, Robinhood). Escrow blokuje BUDZET Aska (USDC, Base).
@@ -61,6 +64,18 @@ const ASKS_DESCRIPTION =
   // dalej i przy nim nie ma zablokowane NIC. Dlatego zdanie mowi "can lock",
   // a nie "is locked": opis dotyczy wszystkich Askow naraz, a one nie sa
   // jednakowe. Nie zamieniaj tego na obietnice bezwarunkowa.
+  //
+  // === "SEALED" DOPIERO OD TEGO TYGODNIA MA POKRYCIE ===
+  // To zdanie stalo tu, kiedy bylo NIEPRAWDZIWE, i nikt tego nie zauwazyl.
+  // Tresc odpowiedzi lezala w `askAnswerContent` z regula `allow read: if
+  // false`, ale na koncu firestore.rules stala regula `match /{document=**}
+  // { allow read, write: if true; }`. Firestore przyznaje dostep, gdy pozwala
+  // JAKAKOLWIEK pasujaca regula - wiec `if false` bylo dekoracja, a kazdy
+  // czytal cudze odpowiedzi klienckim SDK. Regula ogolna zostala zawezona
+  // (`hasOwnRules`) i sonda potwierdzila, ze kolekcja odmawia odczytu.
+  // JESLI KTOS KIEDYS DOPISZE NOWA KOLEKCJE Z WLASNYMI REGULAMI I ZAPOMNI
+  // DOPISAC JEJ DO `hasOwnRules`, TO ZDANIE ZNOWU STANIE SIE KLAMSTWEM,
+  // a tutaj nie bedzie tego widac. Sprawdzaj regule, nie komentarz.
   'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed — nobody can read what anyone else wrote before the author opens them. The author can lock the whole budget in an escrow contract up front, and every payout is recorded onchain next to the answer that earned it.';
 
 export const metadata: Metadata = {

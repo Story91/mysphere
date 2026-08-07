@@ -7,11 +7,28 @@ export const metadata: Metadata = {
   // Marke dokłada template z layoutu - patrz komentarz w app/leaderboard/page.tsx.
   title: 'Re-Definition — money buys judgment',
   description:
-    'MySphere is becoming the first feed where the buyer can be a machine, the worker is a human, and reputation is minted only by settled payments. Here is how an Ask works.',
+    'MySphere is becoming the first feed where the buyer can be a machine and the worker is a human. One machine payment has already settled. Here is how an Ask works, and what is still missing.',
   openGraph: {
     title: 'Your judgment has a price. Something is already willing to pay it.',
+    // === TU BYLY DWIE ROZNE PLATNOSCI SKLEJONE W JEDNA ===
+    // Stalo: "paid in USDC on Base. In build". Oba czlony byly nieprawdziwe.
+    //
+    // 1. W produkcie sa DWIE platnosci i nie maja ze soba nic wspolnego:
+    //    - BUDZET Aska blokuje sie w USDC na Base (AskEscrow),
+    //    - ZALOZENIE Aska przez maszyne placi sie w USDG na Robinhood Chain
+    //      przez x402.
+    //    Inny lancuch, inny token, inny cel. Ta sama uwaga stoi w
+    //    app/asks/layout.tsx i to nie przypadek - oba opisy lamaly sie na tym
+    //    samym zdaniu.
+    // 2. "In build" bylo prawda, kiedy nie bylo ani kontraktu, ani jednej
+    //    rozliczonej platnosci. Dzis sa oba. Zdanie musi wiec podawac STAN,
+    //    a nie etykiete fazy - i podaje go razem z zastrzezeniem ("once"),
+    //    zeby jeden przebieg nie zabrzmial jak ruch.
+    //
+    // "can lock", nie "locks": escrow jest WYBOREM autora, nie wlasnoscia
+    // kazdego Aska (wariant on-resolve nie blokuje niczego).
     description:
-      'Ask: a question with a budget, seats and a deadline, paid in USDC on Base. In build — what runs today is listed on the page.',
+      'An Ask is a question with a budget, seats and a deadline. The author can lock that budget in an escrow contract on Base, in USDC. A machine can open one by paying over x402 — that has settled once, in USDG on Robinhood Chain.',
     type: 'article',
   },
 };
@@ -433,6 +450,30 @@ function AskCard() {
  * nie przeszedl ani jeden cent. Bez tego drugiego wiersza tabela mowilaby
  * "x402 dziala" i milczala o tym, ze dziala na jednym lancuchu, w jednym tokenie
  * i z jednym przebiegiem w historii.
+ *
+ * === CZEGO W TEJ TABELI BRAKOWALO CALKIEM (uzgodnienie z 7 commitami) ===
+ * Tabela opisywala Aska i pieniadze, a przez ostatnia dobe weszly trzy rzeczy
+ * DLA UZYTKOWNIKA, ktorych nie bylo tu wcale - czyli strona pokazywala produkt
+ * mniejszy, niz jest:
+ *   - /money        odpowiedz na "gdzie sa moje pieniadze", z przyciskiem odbioru,
+ *   - /join         strona, na ktora prowadzi link referalowy (do wczoraj 404),
+ *   - konektory     X / Spotify / TikTok przez Camp, na wlasnym profilu.
+ * Zaniżanie stanu jest tym samym bledem co zawyzanie - w obie strony strona
+ * przestaje byc stanem.
+ *
+ * === WIERSZ O PLATNYCH SEKCJACH BYL NAJGORSZY W CALEJ TABELI ===
+ * Stalo w nim: "It is stored outside the feed, so it is not in the page you did
+ * not pay for". Do wczoraj to bylo NIEPRAWDA w obie strony: `premiumContent`
+ * lezalo OTWARTYM TEKSTEM w dokumencie posta, ktory feed czyta klienckim SDK,
+ * wiec kazdy widzial platny tekst w odpowiedzi sieciowej bez placenia. Do tego
+ * regula `{document=**} allow read: if true` na koncu firestore.rules
+ * unieważniała `if false` przy `askAnswerContent` - czyli obietnica "answers
+ * stay sealed" tez byla martwa. Oba dziury sa zalatane (kolekcje odmawiaja
+ * odczytu, sonda 12/12), i dlatego wiersz moze wreszcie mowic JAK to dziala,
+ * a nie tylko GDZIE lezy.
+ *
+ * NIE DOPISUJ TU WIERSZA, DOPOKI NIE ZOBACZYSZ GO W KODZIE. Ta tabela jest
+ * jedynym miejscem na stronie, gdzie klamstwo nie ma sie gdzie schowac.
  */
 type Status = 'live' | 'wired' | 'building' | 'planned' | 'off';
 
@@ -452,7 +493,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Feed and posts',
     status: 'live',
-    note: 'Post across seven chains. Every post has its own page and its own share card.',
+    note: 'Post across seven chains, with comments and likes. Every post has its own page and its own share card.',
   },
   {
     name: 'Tips',
@@ -482,12 +523,27 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'The money timeline',
     status: 'live',
-    note: 'A public feed of payments between people. Every line carries a transaction you can open.',
+    note: 'A public feed of payments between people, carrying names and avatars rather than bare addresses. 187 settled payments deep, every line with a transaction you can open.',
+  },
+  {
+    name: 'Your money, in one place',
+    status: 'live',
+    note: '/money answers four questions with one wallet connected: what the escrow contract owes you, what your own open Asks are holding, what people paid you, and what you spent. The claim button is there too, so money you are owed does not need a second page to collect.',
   },
   {
     name: 'Paid sections',
     status: 'live',
-    note: 'Text sold per post. It is stored outside the feed, so it is not in the page you did not pay for.',
+    note: 'Text sold per post. The text itself lives in a collection the browser is refused outright — it is not in the feed response, not in the page source, not anywhere a reader could dig for it. A server route hands it over after checking a signed session and a paid unlock. Until this week it sat in the post document in plain text; treat any older claim about it as wrong.',
+  },
+  {
+    name: 'An invite link that arrives somewhere',
+    status: 'live',
+    note: '/join is where every referral link points. It used to point at a route that did not exist, so every invite ever sent landed on a 404. Registering a referrer needs a signature, not just a connected address.',
+  },
+  {
+    name: 'Social accounts on your profile',
+    status: 'live',
+    note: 'X, Spotify and TikTok, linked through the Camp Network connector, from your own profile in the feed. Camp holds the link; we keep a copy for display and nothing else.',
   },
   {
     name: 'x402: an agent pays for an Ask',
@@ -502,17 +558,27 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Ask: post and answer',
     status: 'live',
-    note: 'Budget, seats, deadline, resolve rate. Answers are sealed by a rule the client cannot read past, and the author can accept and resolve from /asks.',
+    note: 'Budget, seats, deadline, resolve rate. Answer text goes to a collection the browser is refused outright and comes back only through a server route, so the seal is a rule and not a curtain. The author accepts and resolves from /asks.',
   },
   {
     name: 'Ask: escrow',
     status: 'live',
-    note: 'AskEscrow on Base, 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source-verified. Choosing it takes the budget from your wallet before the Ask exists.',
+    note: 'AskEscrow on Base, 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source-verified. Approve, fund, wait for the receipt — only then does the Ask document get written. Resolving is one transaction, collecting is a claim. Whoever is thinking of answering reads the locked amount off the chain first.',
+  },
+  {
+    name: 'Ask: escrow from a browser, on mainnet',
+    status: 'wired',
+    note: 'The nearest missing thing on this rail. The full money cycle — fund, resolve, claim into other people’s wallets — has run twice with real USDC, but on Base Sepolia and from a script. The browser path to the same contract is typechecked and built and has never carried a mainnet dollar. Whoever goes first, goes first.',
   },
   {
     name: 'Ask: expiry refund in the interface',
     status: 'planned',
-    note: 'The contract returns an unresolved budget after the deadline plus 48h. Nothing in the product calls it, so today that is a contract call made by hand.',
+    note: 'The contract returns an unresolved budget after the deadline plus 48h. Nothing in the product calls it, so today that is a contract call made by hand — and that path is the one leg with no proof from a real chain at all, because 48 hours cannot be fast-forwarded on one.',
+  },
+  {
+    name: 'Being told you have been paid',
+    status: 'planned',
+    note: 'Resolving credits a winner a balance they have to come and claim, and nothing goes out to tell them. Until it does, /money is a page you have to think to open.',
   },
   {
     name: 'Ask: in the feed',
@@ -561,10 +627,25 @@ export default function ReDefinitionPage() {
       <section className="border-b border-soft-line/70 px-5 pb-16 pt-16 sm:px-8 sm:pb-20 sm:pt-20">
         <div className="mx-auto grid max-w-[1080px] gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
           <div>
-            <p className="mb-6 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-soft-ink-faint">
+            {/* PIGULKA JEST OPISEM PLATNOSCI, NIE LISTA FILAROW - I DLATEGO
+                MUSIALA SIE ZMIENIC.
+                Stalo "Base · USDC · x402". Trzy slowa w jednym rzedzie czyta
+                sie jako jedno zdanie: "x402 na Base w USDC". To jest dokladnie
+                ta platnosc, ktora NIE ISTNIEJE - galaz w kodzie jest, nie
+                przeszedl przez nia ani jeden cent. Prawdziwe sa dwie inne:
+                budzet w USDC na Base (escrow) i x402 w USDG na Robinhoodzie.
+                Rozwazalem zostawienie tego jako listy filarow, ale filar
+                "USDC" nie jest filarem - to nazwa tokena, wiec czytelnik i tak
+                przeczyta te linijke jako rachunek. Skoro ma byc rachunkiem,
+                ma byc pelnym rachunkiem.
+                `flex-wrap`, bo trzy czlony nie mieszcza sie w jednej linii na
+                telefonie, a bez tego tekst lamal by sie w srodku span-a. */}
+            <p className="mb-6 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-soft-ink-faint">
               Re-Definition
               <span className="h-3 w-px bg-soft-line-strong" aria-hidden="true" />
-              <span className="text-soft-primary-deep">Base · USDC · x402</span>
+              <span className="text-soft-primary-deep">
+                USDC on Base · USDG on Robinhood · x402
+              </span>
             </p>
 
             <h1 className="mb-6 font-soft-display text-[38px] font-bold leading-[1.05] tracking-[-0.03em] text-soft-ink sm:text-[54px]">
@@ -598,20 +679,37 @@ export default function ReDefinitionPage() {
                 Cala reszta strony opisuje Aska w czasie terazniejszym, bo tak
                 sie pisze definicje. Czytelnik ma prawo wziac to za stan
                 produktu - i wzial. Ten blok stoi przed pierwszym takim zdaniem
-                i mowi, ktore zdania sa o czym. */}
+                i mowi, ktore zdania sa o czym.
+
+                === PRZESUNIECIE, KTORE WYMUSILA RZECZYWISTOSC ===
+                "Machine buyers over x402" stalo w kolumnie DIRECTION jeszcze
+                po tym, jak maszyna naprawde zaplacila (0,01 USDG, Robinhood
+                Chain). Kolumna kierunku opisywala wiec rzecz, ktora sie juz
+                wydarzyla - czyli ta sama pomylka, tylko odwrocona: zamiast
+                obiecywac za duzo, strona przemilczala to, co dziala.
+                Pozycja idzie do "Runs today" Z ZASTRZEZENIEM (jeden przebieg),
+                a w "Direction" zostaje to, czego naprawde nie ma: RUCH.
+                Jedna platnosc miedzy dwoma naszymi portfelami jest dzialajaca
+                sciezka, nie rynkiem, i ta roznica jest cala trescia tej
+                kolumny.
+
+                Zasada dla kazdego, kto to bedzie przesuwal dalej: pozycja
+                zdjeta z "Being built" nie zostawia pustego miejsca. Na jej
+                miejsce wchodzi nastepna brakujaca rzecz - tu weszla sciezka
+                x402 na Base w USDC, przez ktora nie przeszedl ani cent. */}
             <dl className="mt-9 grid gap-y-4 border-t border-soft-line/70 pt-6 sm:grid-cols-3 sm:gap-x-6">
               {[
                 {
                   t: 'Runs today',
-                  d: 'Posts, tips, receipts and a public timeline of payments. Asks, with the budget lockable in an escrow contract on Base. Every amount settled onchain.',
+                  d: 'Posts, tips, receipts and a public timeline of payments. Asks with the budget locked in an escrow contract on Base and payouts claimed back out of it. A machine has paid for an Ask over x402 — once. /money adds up what you are owed, what you locked, what you earned and what you spent.',
                 },
                 {
                   t: 'Being built',
-                  d: 'The Ask in the feed, and a way to take an expired budget back without calling the contract by hand.',
+                  d: 'The Ask in the feed. Taking an expired budget back without calling the contract by hand. The same x402 route on Base in USDC — the branch is written, nothing has ever paid through it.',
                 },
                 {
                   t: 'Direction',
-                  d: 'Machine buyers over x402, and a price per seat set by settled payments.',
+                  d: 'Machine demand at any volume, and a price per seat set by settled payments. One cent between two wallets we both own is a working path, not a market.',
                 },
               ].map((item) => (
                 <div key={item.t}>
@@ -685,8 +783,18 @@ export default function ReDefinitionPage() {
             literally <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">if false</code> — and only a server route hands it
             back, to the people allowed to have it. Hiding text in the interface would not be
             sealing it: while it sits in a document the feed reads, it is already in the network
-            response and every reader has it. Paid sections already work exactly this way; the Ask
-            reuses that plumbing rather than inventing its own.
+            response and every reader has it. Paid sections now work exactly this way too; the Ask
+            and the paywall share one piece of plumbing rather than each inventing its own.
+          </P>
+          <P>
+            That is worth one more sentence, because until this week it was not true. The{' '}
+            <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">if false</code>{' '}
+            sat there, but a catch-all rule underneath it granted every document in the database to
+            everybody — and in this database, permission is granted if <em>any</em> rule allows it.
+            So the seal was written down and not enforced, and the paid text was sitting in the post
+            document in the clear. Both are closed now, and we checked by trying: those two
+            collections refuse to be read, and the twelve that should still open still open.{' '}
+            <Hi>If you read this page a week ago, it told you something that was not true.</Hi>
           </P>
           <P>
             Funding an Ask once, up front, used to be the one promise on this page with no contract
@@ -730,6 +838,17 @@ export default function ReDefinitionPage() {
             &quot;paid&quot; means the contract owes it irreversibly, not that it has landed in
             their wallet.
           </P>
+          <P>
+            The claim at least has an address now.{' '}
+            <Link href="/money" className="underline decoration-soft-line-strong underline-offset-2">
+              /money
+            </Link>{' '}
+            answers the four questions this product used to leave scattered across four screens:
+            what the escrow owes you, what your own open Asks are holding, what people paid you and
+            for what, and what you spent — with the button that collects the first of those. What it
+            still does not do is <Hi>come and find you</Hi>: nothing notifies a winner, so the money
+            waits until someone thinks to look.
+          </P>
         </section>
 
         {/* ---------------- 402 ---------------- */}
@@ -765,8 +884,8 @@ export default function ReDefinitionPage() {
             because Robinhood Chain has no canonical USDC and USDG is the only stablecoin there that
             can be paid by signature — that is the only reason, not a preference. And the
             facilitator&apos;s signing key on that chain had nineteen transactions in its whole
-            history when we checked. The path works. It is not worn in, and this page is not going
-            to tell you it is.
+            history when we checked, against roughly sixty-eight top-ups keeping it in gas. The
+            path works. It is not worn in, and this page is not going to tell you it is.
           </P>
           <P>
             Every marketplace in this space sells machine work to humans. This one sells{' '}
@@ -841,8 +960,9 @@ export default function ReDefinitionPage() {
             The first of them is already live, and it is the one thing here that exists nowhere
             else: <Hi>a public timeline of payments between people</Hi>. Not a leaderboard of
             points, not a wall of likes — the money itself, in the order it landed, every line
-            carrying a transaction you can open and check against the chain. Every social product
-            has a feed of what people said. None has a feed of what people paid each other.
+            carrying a transaction you can open and check against the chain, and names and faces on
+            both ends of it rather than two truncated addresses. Every social product has a feed of
+            what people said. None has a feed of what people paid each other.
           </P>
           <p className="mb-4">
             <Link
@@ -861,8 +981,10 @@ export default function ReDefinitionPage() {
           <State tone="live">Today, not the plan</State>
           <P>
             The count of parked modules is read from the live routing config when this page is
-            built, so that number cannot drift from production. The rows are written by hand,
-            status included — which is why three of them say the Ask is not finished.
+            built, so that number cannot drift from production. The rows are written by hand, status
+            included. When something stops being a plan it does not leave a gap here — the next
+            missing thing moves into the empty row, which is why the list never gets shorter and
+            never goes all green. <Hi>A table where everything is lit is an advertisement.</Hi>
           </P>
           <div className="mt-8">
             {CAPABILITIES.map((cap) => (
@@ -975,10 +1097,14 @@ export default function ReDefinitionPage() {
             a seat starts at fifty cents and not at fifty dollars.
           </P>
           <P>
-            Two limits worth stating plainly. The escrow path has been exercised against the
-            contract on a test network, and the contract's own unit tests cover the expiry refund,
-            but <Hi>no one has yet run the browser path end to end on mainnet with real money</Hi> —
-            when someone does, they will be the first. And no fiat, no custody of your keys, no
+            Two limits worth stating plainly. The whole money cycle — fund, resolve, claim, with the
+            tokens landing in other people&apos;s wallets and the contract&apos;s books back at zero
+            — has been run twice against the real contract with real USDC, but{' '}
+            <Hi>on a test network and from a script, not from this app on mainnet</Hi>. The browser
+            path to the same contract compiles and typechecks and has never carried a mainnet
+            dollar; whoever runs it first will be the first. The expiry refund has less than that:
+            only a unit test, because you cannot fast-forward forty-eight hours on a real chain. And
+            no fiat, no custody of your keys, no
             investment advice categories, and the longest an Ask can stay open is seven days. If the
             answers turn out to be slop, the product dies of quality and no amount of onchain
             plumbing saves it — so seats are limited, wallets have to be older than a week or carry
