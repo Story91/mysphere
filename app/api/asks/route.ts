@@ -50,6 +50,7 @@ import {
   ASKS_PAGE_SIZE,
   ASK_POST_DESCRIPTION,
   MAX_QUESTION_LENGTH,
+  getAskCurrencySymbol,
   getAskNetwork,
   getAskPostPrice,
   getAskPrice,
@@ -120,7 +121,13 @@ function paymentInfo() {
     scheme: 'exact',
     endpoint: 'POST /api/asks',
     price: getAskPostPrice(),
-    currency: 'USDC',
+    // Z SIECI, NIE NA SZTYWNO. Stalo tu 'USDC' - prawda dokladnie tak dlugo,
+    // jak dlugo X402_NETWORK wskazywalo lancuch z kanonicznym USDC. Robinhood
+    // Chain kanonicznego USDC NIE MA i rozlicza sie w USDG (patrz ASK_ASSETS
+    // w pricing.ts), wiec samo przestawienie zmiennej srodowiskowej sprawiloby,
+    // ze ten publiczny endpoint oglasza agentom nieprawdziwa walute - a to
+    // jest dokladnie ta informacja, na podstawie ktorej agent buduje podpis.
+    currency: getAskCurrencySymbol(),
     network: getAskNetwork(),
     description: ASK_POST_DESCRIPTION,
     enforced,
