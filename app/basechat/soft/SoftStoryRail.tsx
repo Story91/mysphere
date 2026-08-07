@@ -71,7 +71,7 @@ export default function SoftStoryRail({
                 'flex h-[54px] w-[54px] items-center justify-center rounded-[19px] bg-soft-surface',
                 // Nacisniecie skaluje kafel. 0.94 zamiast 0.97, bo element jest
                 // maly - przy wiekszym kaflu ta sama roznica bylaby niewidoczna.
-                'transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.94]',
+                'transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.94]',
                 isActive
                   ? 'border-2 border-soft-primary shadow-chip'
                   : 'border-2 border-dashed border-soft-line',

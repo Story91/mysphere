@@ -57,7 +57,7 @@ export default function PaidPinButton({
       {/* Pin Button */}
       <button
         onClick={handlePinClick}
-        className={`flex items-center space-x-1 px-3 py-1.5 font-soft text-xs font-semibold rounded-pill bg-soft-accent text-soft-ink shadow-chip transition-[background-color,box-shadow,transform] duration-[--dur-press] ease-out-strong hover:shadow-float active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${className}`}
+        className={`flex items-center space-x-1 px-3 py-1.5 font-soft text-xs font-semibold rounded-pill bg-soft-accent text-soft-ink shadow-chip transition-[background-color,box-shadow,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:shadow-float active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${className}`}
         title="Pin this post to the top"
       >
         <Crown className="w-3 h-3" />

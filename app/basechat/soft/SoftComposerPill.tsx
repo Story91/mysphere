@@ -42,7 +42,7 @@ export default function SoftComposerPill({
       className={[
         'flex w-full items-center gap-2.5 rounded-pill bg-soft-surface p-2',
         'shadow-[0_3px_12px_rgba(102,86,190,0.1)]',
-        'transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.985]',
+        'transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.985]',
         'outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg',
         className,
       ].join(' ')}

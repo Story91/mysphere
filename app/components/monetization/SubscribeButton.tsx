@@ -135,7 +135,7 @@ export default function SubscribeButton({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className={`flex items-center space-x-1 rounded-pill transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary touch-manipulation ${className}`}
+        className={`flex items-center space-x-1 rounded-pill transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary touch-manipulation ${className}`}
         title={isSupported ? 'You are supporting this creator' : 'Support this creator for a fixed period'}
         // Ponizej progu `md` w przycisku jest samo emoji, ktore czytnik ekranu
         // przeczytalby jako "fioletowe serce".
@@ -194,7 +194,7 @@ export default function SubscribeButton({
                   type="button"
                   onClick={closeModal}
                   aria-label="Close"
-                  className="text-soft-ink-muted hover:text-soft-ink bg-soft-sunken rounded-pill p-2 border border-soft-line transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+                  className="text-soft-ink-muted hover:text-soft-ink bg-soft-sunken rounded-pill p-2 border border-soft-line transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
                 >
                   <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -218,7 +218,7 @@ export default function SubscribeButton({
                       key={option.id}
                       type="button"
                       onClick={() => setTier(option.id)}
-                      className={`w-full text-left px-3 py-2 rounded-card border transition-[background-color,border-color,box-shadow,transform] duration-[--dur-press] ease-out-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                      className={`w-full text-left px-3 py-2 rounded-card border transition-[background-color,border-color,box-shadow,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                         tier === option.id
                           ? 'bg-soft-sunken border-soft-primary shadow-chip'
                           : 'bg-soft-surface border-soft-line hover:border-soft-line-strong'
@@ -245,7 +245,7 @@ export default function SubscribeButton({
                       key={choice}
                       type="button"
                       onClick={() => setPeriods(choice)}
-                      className={`flex-1 px-2 py-2 font-soft-display text-sm font-semibold tabular-nums rounded-pill border transition-[background-color,border-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                      className={`flex-1 px-2 py-2 font-soft-display text-sm font-semibold tabular-nums rounded-pill border transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                         periods === choice
                           ? 'bg-soft-sunken border-soft-primary text-soft-primary-deep'
                           : 'bg-soft-surface border-soft-line text-soft-ink-muted hover:border-soft-line-strong'
@@ -285,7 +285,7 @@ export default function SubscribeButton({
                 <button
                   type="button"
                   onClick={switchToBase}
-                  className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-accent-deep text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:brightness-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+                  className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-accent-deep text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:brightness-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
                 >
                   Switch to Base
                 </button>
@@ -294,7 +294,7 @@ export default function SubscribeButton({
                   type="button"
                   onClick={payForCurrentSelection}
                   disabled={isBusy}
-                  className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-primary text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+                  className="w-full px-6 py-3 text-base font-semibold rounded-pill bg-soft-primary text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
                 >
                   {phase === 'signing'
                     ? 'Confirm in wallet...'

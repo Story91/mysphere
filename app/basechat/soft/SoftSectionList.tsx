@@ -59,7 +59,7 @@ export default function SoftSectionList({
           className={[
             'flex w-full items-center gap-3 rounded-card text-left',
             isCompact ? 'p-2' : 'p-3.5',
-            'transition-[background-color,transform] duration-[--dur-press] ease-out-strong',
+            'transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong',
             'active:scale-[0.98] outline-none',
             'focus-visible:ring-2 focus-visible:ring-soft-primary',
             section.isActive

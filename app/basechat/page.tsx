@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import PremiumComposer, { EMPTY_PREMIUM, type PremiumComposerValue } from '../components/monetization/PremiumComposer';
 // @ts-ignore - config CommonJS wspoldzielony z next.config.js
@@ -512,6 +512,34 @@ function BaseChatContent() {
    * wejsciu ukrywalby posty z siedmiu pozostalych sieci bez informacji dlaczego.
    */
   const [mobileNetwork, setMobileNetwork] = useState<string | null>(null);
+
+  /**
+   * Lista podawana do PostList, przefiltrowana o wybrana siec.
+   *
+   * === DLACZEGO useMemo, A NIE FILTR W MIEJSCU UZYCIA ===
+   * Stalo to inline w propsach: `mobileNetwork ? posts.filter(...) : posts`.
+   * Przy WLACZONYM filtrze `.filter()` tworzy NOWA TABLICE przy kazdym
+   * renderze rodzica - nawet gdy ani `posts`, ani `mobileNetwork` sie nie
+   * zmienily. PostList jest opakowany w React.memo wlasnie po to, zeby feed
+   * nie przerysowywal sie przy kazdym nacisnieciu klawisza w kompozytorze,
+   * a nowa tozsamosc tablicy przebijala to memo za kazdym razem.
+   *
+   * Gorszy skutek byl widoczny golym okiem: PostList synchronizuje swoj stan
+   * wewnetrzny z tym propsem, wiec swieza tablica KASOWALA optymistyczna
+   * zmiane. Na telefonie z wybrana siecia serduszko potrafilo wrocic do
+   * poprzedniego stanu MIMO udanego zapisu do Firestore - wygladalo jak
+   * nieudany lajk, a zapis byl w porzadku.
+   *
+   * Na desktopie `mobileNetwork` jest zawsze `null`, wiec przechodzi tu ta
+   * sama referencja `posts` co dotad - zero zmiany zachowania.
+   */
+  const visiblePosts = useMemo(
+    () =>
+      mobileNetwork
+        ? posts.filter((p) => (p.network ?? 'base') === mobileNetwork)
+        : posts,
+    [posts, mobileNetwork]
+  );
 
   /**
    * Adresy, ktore ten uzytkownik OBSERWUJE.
@@ -3262,7 +3290,7 @@ function BaseChatContent() {
                                 setUserProfile(prev => ({ ...prev, bio: newBio }));
                               }
                             }}
-                            className="flex items-center space-x-1 rounded-pill px-2 py-1 font-soft text-[13px] font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                            className="flex items-center space-x-1 rounded-pill px-2 py-1 font-soft text-[13px] font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -3480,7 +3508,7 @@ function BaseChatContent() {
                 <div className={`mt-4 ${isRouteDisabled('/yapscan') ? 'hidden' : ''}`}>
                   <a
                     href="/yapscan"
-                    className="flex items-center justify-between rounded-card bg-soft-surface p-4 shadow-card transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                    className="flex items-center justify-between rounded-card bg-soft-surface p-4 shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     <span className="font-soft-display text-[15px] font-bold text-soft-ink">YapScan</span>
                     <svg className="h-4 w-4 text-soft-primary" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -3503,39 +3531,42 @@ function BaseChatContent() {
             <div className={`flex-1 overflow-y-auto bg-soft-bg p-4 lg:px-8 lg:pt-6 lg:pb-24 ${
               activeMobilePanel === 'main' ? 'block w-full' : 'hidden lg:block'
             }`}>
-              {/* ===== EKRAN POWITALNY: NAD FEEDEM I POZA JEGO KOLUMNA =====
-                  DWIE rzeczy zalatwione w jednym miejscu.
+              {/* ===== EKRAN POWITALNY: SAM, POZA KOLUMNA FEEDU =====
+                  DLA NIEZALOGOWANEGO GOSCIA TO JEST CALA STRONA. Nic pod nim
+                  nie stoi.
 
-                  1. NAD FEEDEM, A NIE ZAMIAST NIEGO. Wczesniej gosc dostawal
-                     TYLKO ten ekran: `{isConnected ? (kompozytor + PostList) :
-                     (<MockFeed/>)}` konczylo sprawe i lista postow w ogole sie
-                     nie renderowala. Bramka niczego przy tym nie chronila - te
-                     same posty sa jawne pod /post/[id] i /u/[address]. Teraz to
-                     samo zaproszenie (ten SAM komponent, te same przyciski)
-                     stoi nad feedem, a feed leci dla wszystkich.
+                  Byla tu przez chwile wersja z feedem pod spodem - argument
+                  brzmial, ze te same posty sa i tak jawne pod /post/[id]
+                  oraz /u/[address], wiec bramka niczego nie chroni. Argument
+                  jest prawdziwy i nadal obowiazuje (linki z zewnatrz otwieraja
+                  sie normalnie), ale nie o to tu chodzi: pierwszy ekran ma
+                  postawic JEDNA teze i dac JEDEN przycisk. Lista cudzych postow
+                  pod zaproszeniem robila z tego dwa poczatki naraz i rozmywala
+                  oba. Decyzja wlasciciela produktu, i jest sluszna.
 
-                  2. PELNA SZEROKOSC NA DESKTOPIE. Blok stal wewnatrz
-                     `max-w-[640px]`, wiec na szerokim ekranie byl waska kartka
-                     z pustym lawendowym tlem po obu stronach - wygladal jak
-                     zagubione okno dialogowe, a nie jak ekran powitalny
-                     produktu. Wyszedl WYZEJ, obok tamtej kolumny: bierze cala
-                     szerokosc kolumny glownej (kolumna boczna dla goscia jest
-                     `lg:hidden`, wiec to praktycznie caly ekran), a feed pod
-                     nim zostaje w swojej 640-pikselowej mierze czytania.
+                  PELNA SZEROKOSC NA DESKTOPIE ZOSTAJE. Blok stal kiedys
+                  wewnatrz `max-w-[640px]`, wiec na szerokim ekranie byl waska
+                  kartka z pustym lawendowym tlem po obu stronach - wygladal jak
+                  zagubione okno dialogowe, a nie jak ekran powitalny produktu.
+                  Stoi WYZEJ, obok tamtej kolumny, i bierze cala szerokosc
+                  kolumny glownej (kolumna boczna dla goscia jest `lg:hidden`,
+                  wiec to praktycznie caly ekran).
 
                   BEZ `w-screen` I UJEMNYCH MARGINESOW - 100vw liczy sie razem
                   z paskiem przewijania i dokladalo poziomy scroll. To zwykly
                   blok w kontenerze, ktory juz ma cala szerokosc.
 
                   NA TELEFONIE NIC SIE NIE ZMIENIA: ponizej 640px tamta kolumna
-                  i tak niczego nie zwezala, a padding `p-4` jest ten sam - to
-                  ten sam ekran co przedtem, w tym samym miejscu. */}
-              {!isConnected && (
-                <div className="mb-6">
-                  <MockFeed />
-                </div>
-              )}
+                  i tak niczego nie zwezala, a padding `p-4` jest ten sam. */}
+              {!isConnected && <MockFeed />}
 
+              {/* CALA RESZTA SRODKOWEJ KOLUMNY ZA `isConnected`.
+                  Nie tylko lista postow: siedza tu takze kompozytor, oprawa
+                  mobilna z paskiem sieci i zakladkami oraz przelacznik paneli
+                  (builders / following / friends / discover / notifications).
+                  Zadna z tych rzeczy nie ma sensu bez portfela, a przy wejsciu
+                  goscia doklada tylko pusta ramke pod ekranem powitalnym. */}
+              {isConnected && (
               <div className="mx-auto w-full max-w-[640px]">
               {/* ===== OPRAWA MOBILNA - kierunek Soft Social =====
                   Wymienia WYLACZNIE oprawe feedu ponizej progu `lg`: tlo, pasek
@@ -4140,7 +4171,7 @@ function BaseChatContent() {
                       </p>
                       <button
                         onClick={() => setFeedReloadNonce((value) => value + 1)}
-                        className="rounded-pill bg-soft-primary px-5 py-2 font-soft text-[14px] font-bold text-white transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="rounded-pill bg-soft-primary px-5 py-2 font-soft text-[14px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         Try again
                       </button>
@@ -4159,11 +4190,9 @@ function BaseChatContent() {
                         // Filtr sieci z paska "stories" na telefonie. Na
                         // desktopie mobileNetwork jest zawsze null, wiec lista
                         // idzie w calosci - dokladnie jak przedtem.
-                        posts={
-                          mobileNetwork
-                            ? posts.filter((p) => (p.network ?? 'base') === mobileNetwork)
-                            : posts
-                        }
+                        // Zapamietana referencja, NIE filtr w miejscu - powod
+                        // przy deklaracji `visiblePosts`.
+                        posts={visiblePosts}
                         isLoading={isLoadingPosts} // Przekaż stan ładowania do PostList
                         showMyFeed={showMyFeed} // Przekaż stan My Feed do PostList
                         getCachedPosts={getCachedPosts} // Przekaż funkcje cache'owania
@@ -4178,6 +4207,7 @@ function BaseChatContent() {
                 </>
               )}
               </div>
+              )}
             </div>
 
               {/* Panel prawy zostal scalony z kolumna boczna - jego zawartosc
@@ -4281,7 +4311,7 @@ function BaseChatContent() {
           <button
             onClick={() => setActiveMobilePanel('left')}
             aria-current={activeMobilePanel === 'left' ? 'page' : undefined}
-            className="flex flex-col items-center rounded-card p-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <div className={`p-1 rounded-full ${activeMobilePanel === 'left' ? 'bg-soft-sunken' : ''}`}>
               <UserIcon
@@ -4294,7 +4324,7 @@ function BaseChatContent() {
           <button
             onClick={() => setActiveMobilePanel('main')}
             aria-current={activeMobilePanel === 'main' ? 'page' : undefined}
-            className="flex flex-col items-center rounded-card p-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <div className={`p-1 rounded-full ${activeMobilePanel === 'main' ? 'bg-soft-sunken' : ''}`}>
               <HomeIcon
@@ -4307,7 +4337,7 @@ function BaseChatContent() {
           <button
             onClick={() => setActiveMobilePanel('right')}
             aria-current={activeMobilePanel === 'right' ? 'page' : undefined}
-            className="flex flex-col items-center rounded-card p-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <div className={`p-1 rounded-full ${activeMobilePanel === 'right' ? 'bg-soft-sunken' : ''}`}>
               <ChartBarIcon
@@ -4341,7 +4371,7 @@ function BaseChatContent() {
           <Link
             href="/asks"
             aria-label="Asks"
-            className="flex flex-col items-center rounded-card p-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <div className="p-1 rounded-full">
               {/* Znak zapytania w kolku - Ask to pytanie z kwota. Wektor,

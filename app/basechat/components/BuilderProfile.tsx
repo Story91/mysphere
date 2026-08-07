@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import ProfileSocials from './ProfileSocials';
@@ -25,6 +26,30 @@ import {
 import ReferralDashboard from '../../utils/referrals/components/ReferralDashboard';
 import { initializeReferralStats } from '../../utils/referrals';
 import CreatorCoinSection from './CreatorCoinSection';
+
+/**
+ * Konektor Camp Network (podpinanie X / Spotify / TikTok).
+ *
+ * ssr:false jest wymogiem, nie optymalizacja: CampProvider i hooki z
+ * @campnetwork/origin/react wolaja useContext/useState warunkowo od
+ * `typeof window`, wiec render serwerowy i hydracja maja rozna liczbe hookow.
+ * Przy okazji caly SDK Campa nie wchodzi do pierwszego pakietu /basechat -
+ * dociaga sie dopiero, gdy ktos otworzy WLASNY profil.
+ */
+const CampSocialsCard = dynamic(() => import('../../utils/socials/CampSocialsCard'), {
+  ssr: false,
+  loading: () => (
+    <div className="mb-6 rounded-card bg-soft-surface border border-soft-line shadow-card p-6">
+      <div className="animate-pulse flex items-center">
+        <div className="w-12 h-12 rounded-full bg-soft-sunken mr-4" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 w-40 bg-soft-sunken rounded-pill" />
+          <div className="h-3 w-64 bg-soft-sunken rounded-pill" />
+        </div>
+      </div>
+    </div>
+  )
+});
 
 // Talent Protocol API types
 interface TalentScore {
@@ -1058,7 +1083,7 @@ export default function BuilderProfile({
         <div className="flex items-center justify-between relative z-10">
           <button
             onClick={onBackToFeed}
-            className="flex items-center text-white bg-white/15 rounded-pill px-4 py-2 font-semibold transition-colors duration-[--dur-press] ease-out-strong hover:bg-white/25 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white border border-white/20"
+            className="flex items-center text-white bg-white/15 rounded-pill px-4 py-2 font-semibold transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-white/25 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white border border-white/20"
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1103,7 +1128,7 @@ export default function BuilderProfile({
               
               {/* Premium efekty świetlne */}
               <div className="absolute inset-0 rounded-full bg-transparent"></div>
-              <div className="absolute -inset-2 rounded-full bg-soft-primary/10 filter blur-lg opacity-60 group-hover:opacity-80 transition-opacity duration-[--dur-dropdown] ease-out-strong"></div>
+              <div className="absolute -inset-2 rounded-full bg-soft-primary/10 filter blur-lg opacity-60 group-hover:opacity-80 transition-opacity [transition-duration:var(--dur-dropdown)] ease-out-strong"></div>
             </div>
             
             {/* Nazwa użytkownika pod avatarem */}
@@ -1164,7 +1189,7 @@ export default function BuilderProfile({
               <button
                 onClick={copyAddressToClipboard}
                 aria-label="Copy wallet address"
-                className="flex items-center text-xs text-soft-ink-muted hover:text-soft-primary-deep bg-soft-sunken hover:bg-soft-line px-3 py-1.5 rounded-pill border border-soft-line shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary w-fit"
+                className="flex items-center text-xs text-soft-ink-muted hover:text-soft-primary-deep bg-soft-sunken hover:bg-soft-line px-3 py-1.5 rounded-pill border border-soft-line shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary w-fit"
               >
                 <span className="mr-2 font-mono tabular-nums text-soft-ink">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -1180,7 +1205,7 @@ export default function BuilderProfile({
                   href={`/u/${profile.address}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center text-xs text-soft-primary-deep hover:bg-soft-line bg-soft-sunken px-3 py-1.5 rounded-pill border border-soft-line shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary w-fit"
+                  className="flex items-center text-xs text-soft-primary-deep hover:bg-soft-line bg-soft-sunken px-3 py-1.5 rounded-pill border border-soft-line shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary w-fit"
                 >
                   <span className="mr-1.5 font-semibold">Public profile</span>
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1191,7 +1216,7 @@ export default function BuilderProfile({
                   onClick={copyPublicProfileLink}
                   title="Copy profile link"
                   aria-label="Copy profile link"
-                  className="flex items-center justify-center h-[30px] w-[30px] text-soft-ink-muted hover:text-soft-primary-deep bg-soft-surface hover:bg-soft-sunken rounded-pill border border-soft-line shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  className="flex items-center justify-center h-[30px] w-[30px] text-soft-ink-muted hover:text-soft-primary-deep bg-soft-surface hover:bg-soft-sunken rounded-pill border border-soft-line shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
@@ -1220,7 +1245,7 @@ export default function BuilderProfile({
                 <div className="flex flex-col space-y-4 lg:space-y-5">
                   {/* Creator Earnings - Rozciągnięty na całą szerokość */}
                   {(tipStats && tipStats.tipCount > 0) ? (
-                    <div className="bg-soft-surface border border-soft-line rounded-card px-6 py-4 shadow-card transition-shadow duration-[--dur-press] ease-out-strong relative w-full">
+                    <div className="bg-soft-surface border border-soft-line rounded-card px-6 py-4 shadow-card transition-shadow [transition-duration:var(--dur-press)] ease-out-strong relative w-full">
                       {/* Golden glow effect */}
                       <div className="absolute inset-0 bg-soft-accent-soft/30 rounded-card opacity-50"></div>
                       
@@ -1325,7 +1350,7 @@ export default function BuilderProfile({
                       <button
                         onClick={() => setShowReferralDashboard(!showReferralDashboard)}
                         aria-expanded={showReferralDashboard}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-pill text-sm font-semibold bg-soft-primary text-white hover:bg-soft-primary-deep transition-colors duration-[--dur-press] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="flex items-center space-x-2 px-4 py-2 rounded-pill text-sm font-semibold bg-soft-primary text-white hover:bg-soft-primary-deep transition-colors [transition-duration:var(--dur-press)] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M4.5 12a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z" />
@@ -1348,7 +1373,7 @@ export default function BuilderProfile({
                         <button
                           onClick={isFollowing ? handleUnfollowUser : handleFollowUser}
                           disabled={followLoading}
-                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold transition-colors duration-[--dur-press] ease-out-strong shadow-chip border active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold transition-colors [transition-duration:var(--dur-press)] ease-out-strong shadow-chip border active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                             isFollowing
                               ? 'bg-soft-sunken border-soft-line text-soft-primary-deep hover:bg-soft-line'
                               : 'bg-soft-primary border-soft-primary text-white hover:bg-soft-primary-deep'
@@ -1381,7 +1406,7 @@ export default function BuilderProfile({
                       <button
                         onClick={handleSendFriendRequest}
                         disabled={sendingFriendRequest}
-                        className={`flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold bg-soft-accent-deep border border-soft-accent-deep text-white hover:bg-soft-accent transition-colors duration-[--dur-press] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${sendingFriendRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold bg-soft-accent-deep border border-soft-accent-deep text-white hover:bg-soft-accent transition-colors [transition-duration:var(--dur-press)] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${sendingFriendRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
@@ -1390,7 +1415,7 @@ export default function BuilderProfile({
                       </button>
 
                       {/* Tip Button */}
-                      <div className="bg-soft-sunken border border-soft-line rounded-pill shadow-chip transition-colors duration-[--dur-press] ease-out-strong">
+                      <div className="bg-soft-sunken border border-soft-line rounded-pill shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong">
                         <TipButton
                           recipientAddress={userAddress}
                           postId={`profile-${userAddress}`}
@@ -1500,6 +1525,16 @@ export default function BuilderProfile({
           </div>
         )}
 
+        {/* Konektor Camp Network - tylko na wlasnym profilu.
+            Stoi NAD sekcjami Twittera i Spotify celowo: te sekcje pokazuja dane
+            czytane z Campa po adresie portfela, wiec bez podpiecia konta nie
+            renderuja sie wcale. Wczesniej nie bylo z tego miejsca zadnej drogi
+            do podpiecia - mechanizm zyl tylko na /mycamp, a ta trasa jest
+            wylaczona w config/routeStatus.js. */}
+        {currentUserAddress === userAddress && (
+          <CampSocialsCard address={userAddress} />
+        )}
+
         {/* Twitter Profile Section */}
         {(twitterUser || loadingTwitterData) && (
           <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
@@ -1560,7 +1595,7 @@ export default function BuilderProfile({
                           href={`https://x.com/${twitterUser.userHandle}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-soft-primary-deep hover:bg-soft-line text-sm font-mono bg-soft-sunken px-2 py-1 rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                          className="text-soft-primary-deep hover:bg-soft-line text-sm font-mono bg-soft-sunken px-2 py-1 rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         >
                           @{twitterUser.userHandle}
                         </a>
@@ -1602,7 +1637,7 @@ export default function BuilderProfile({
                       <button
                         onClick={() => setIsTwitterSectionExpanded(!isTwitterSectionExpanded)}
                         aria-expanded={isTwitterSectionExpanded}
-                        className="w-full flex items-center justify-center text-soft-primary-deep hover:text-soft-ink transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-t border-soft-line pt-4"
+                        className="w-full flex items-center justify-center text-soft-primary-deep hover:text-soft-ink transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-t border-soft-line pt-4"
                       >
                         <span className="text-sm font-semibold mr-2">
                           {isTwitterSectionExpanded ? 'Hide Recent Tweets' : `Show Recent Tweets (${twitterTweets.length})`}
@@ -1700,12 +1735,12 @@ export default function BuilderProfile({
                   <button
                     onClick={refreshSpotifyData}
                     disabled={loadingSpotifyData}
-                    className="flex items-center justify-center w-8 h-8 rounded-full bg-soft-sunken border border-soft-line hover:bg-soft-line transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:cursor-not-allowed group"
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-soft-sunken border border-soft-line hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:cursor-not-allowed group"
                     title="Refresh Spotify Data"
                     aria-label="Refresh Spotify Data"
                   >
                     <svg
-                      className={`w-4 h-4 text-soft-primary-deep transition-transform duration-[--dur-dropdown] ease-out-strong ${loadingSpotifyData ? 'animate-spin' : 'group-hover:rotate-180'}`}
+                      className={`w-4 h-4 text-soft-primary-deep transition-transform [transition-duration:var(--dur-dropdown)] ease-out-strong ${loadingSpotifyData ? 'animate-spin' : 'group-hover:rotate-180'}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1745,7 +1780,7 @@ export default function BuilderProfile({
                             href={spotifyUserData.user.external_urls.spotify}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-soft-primary-deep hover:bg-soft-line text-sm font-mono bg-soft-sunken px-2 py-1 rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center"
+                            className="text-soft-primary-deep hover:bg-soft-line text-sm font-mono bg-soft-sunken px-2 py-1 rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center"
                             title="Open Spotify Profile"
                           >
                             <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1868,7 +1903,7 @@ export default function BuilderProfile({
                     <>
                       <button
                         onClick={() => setIsSpotifySectionExpanded(!isSpotifySectionExpanded)}
-                        className="w-full flex items-center justify-center text-soft-primary-deep hover:text-soft-ink transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-t border-soft-line pt-4"
+                        className="w-full flex items-center justify-center text-soft-primary-deep hover:text-soft-ink transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-t border-soft-line pt-4"
                       >
                         <span className="text-sm font-medium mr-2">
                           {isSpotifySectionExpanded ? 'Hide Music Details' : `Show Recent Music (${Math.max(spotifyUserData.profile?.savedTracks?.length || 0, spotifyUserData.profile?.playedTracks?.length || 0)})`}
@@ -1891,7 +1926,7 @@ export default function BuilderProfile({
                                 {(spotifyUserData.profile?.playedTracks || []).slice(0, 3).map((item, index) => (
                                   <div 
                                     key={index} 
-                                    className="relative overflow-hidden rounded-card p-3 hover:scale-[1.02] hover:shadow-float origin-left transition-[transform,box-shadow] duration-[--dur-dropdown] ease-out-strong"
+                                    className="relative overflow-hidden rounded-card p-3 hover:scale-[1.02] hover:shadow-float origin-left transition-[transform,box-shadow] [transition-duration:var(--dur-dropdown)] ease-out-strong"
                                     style={{
                                       backgroundImage: item?.track?.album?.images?.[0]?.url 
                                         ? `url(${item.track.album.images[0].url})` 
@@ -1929,7 +1964,7 @@ export default function BuilderProfile({
                                               <img
                                                 src={item.track.album.images[0].url}
                                                 alt={item.track.album.name}
-                                                className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow duration-[--dur-press] ease-out-strong"
+                                                className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow [transition-duration:var(--dur-press)] ease-out-strong"
                                               />
                                             </a>
                                           ) : (
@@ -2098,7 +2133,7 @@ export default function BuilderProfile({
                                                 }}
                                               >
                                                 <div 
-                                                  className="h-full bg-soft-accent rounded-full transition-[width] duration-[--dur-press] ease-out-strong"
+                                                  className="h-full bg-soft-accent rounded-full transition-[width] [transition-duration:var(--dur-press)] ease-out-strong"
                                                   style={{ width: `${(currentTime / duration) * 100}%` }}
                                                 ></div>
                                               </div>
@@ -2142,7 +2177,7 @@ export default function BuilderProfile({
                                 {(spotifyUserData.profile?.savedTracks || []).slice(0, 3).map((item, index) => (
                                   <div 
                                     key={index} 
-                                    className="relative overflow-hidden rounded-card p-3 hover:scale-[1.02] hover:shadow-float origin-left transition-[transform,box-shadow] duration-[--dur-dropdown] ease-out-strong"
+                                    className="relative overflow-hidden rounded-card p-3 hover:scale-[1.02] hover:shadow-float origin-left transition-[transform,box-shadow] [transition-duration:var(--dur-dropdown)] ease-out-strong"
                                     style={{
                                       backgroundImage: item?.track?.album?.images?.[0]?.url 
                                         ? `url(${item.track.album.images[0].url})` 
@@ -2180,7 +2215,7 @@ export default function BuilderProfile({
                                               <img
                                                 src={item.track.album.images[0].url}
                                                 alt={item.track.album.name}
-                                                className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow duration-[--dur-press] ease-out-strong"
+                                                className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow [transition-duration:var(--dur-press)] ease-out-strong"
                                               />
                                             </a>
                                           ) : (
@@ -2349,7 +2384,7 @@ export default function BuilderProfile({
                                                 }}
                                               >
                                                 <div 
-                                                  className="h-full bg-soft-accent rounded-full transition-[width] duration-[--dur-press] ease-out-strong"
+                                                  className="h-full bg-soft-accent rounded-full transition-[width] [transition-duration:var(--dur-press)] ease-out-strong"
                                                   style={{ width: `${(currentTime / duration) * 100}%` }}
                                                 ></div>
                                               </div>
@@ -2423,7 +2458,7 @@ export default function BuilderProfile({
               {currentUserAddress === userAddress && !isEditingBio && (
                 <button
                   onClick={() => setIsEditingBio(true)}
-                  className="text-xs font-semibold text-soft-primary-deep hover:bg-soft-line flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  className="text-xs font-semibold text-soft-primary-deep hover:bg-soft-line flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -2440,7 +2475,7 @@ export default function BuilderProfile({
                     onChange={(e) => setNewBio(e.target.value)}
                     maxLength={90}
                     placeholder="Write something about yourself..."
-                    className="w-full bg-soft-surface border border-soft-line rounded-card p-3 text-soft-ink placeholder:text-soft-ink-faint transition-colors duration-[--dur-press] ease-out-strong focus:outline-none focus:ring-2 focus:ring-soft-primary focus:border-soft-primary"
+                    className="w-full bg-soft-surface border border-soft-line rounded-card p-3 text-soft-ink placeholder:text-soft-ink-faint transition-colors [transition-duration:var(--dur-press)] ease-out-strong focus:outline-none focus:ring-2 focus:ring-soft-primary focus:border-soft-primary"
                     rows={3}
                   />
                   <div className="flex justify-between items-center mt-2">
@@ -2455,7 +2490,7 @@ export default function BuilderProfile({
                           // zapisie props jest juz nieaktualny.
                           setNewBio(displayedBio || '');
                         }}
-                        className="px-3 py-1.5 bg-soft-surface text-soft-ink-muted border border-soft-line rounded-pill text-xs font-semibold hover:bg-soft-line transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="px-3 py-1.5 bg-soft-surface text-soft-ink-muted border border-soft-line rounded-pill text-xs font-semibold hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         disabled={isSaving}
                       >
                         Cancel
@@ -2463,7 +2498,7 @@ export default function BuilderProfile({
                       <button
                         onClick={handleSaveBio}
                         disabled={isSaving}
-                        className="px-3 py-1.5 bg-soft-primary text-white rounded-pill text-xs font-semibold shadow-chip hover:bg-soft-primary-deep transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1.5 bg-soft-primary text-white rounded-pill text-xs font-semibold shadow-chip hover:bg-soft-primary-deep transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSaving ? 'Saving...' : 'Save'}
                       </button>
@@ -2533,7 +2568,7 @@ export default function BuilderProfile({
 
           {/* Lista punktów */}
           <div className="space-y-2 mb-6">
-            <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+            <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
               <span className="text-soft-ink-muted flex items-center">
                 <svg className="w-5 h-5 mr-2 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -2545,7 +2580,7 @@ export default function BuilderProfile({
               </span>
             </div>
             
-            <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+            <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
               <span className="text-soft-ink-muted flex items-center">
                 <svg className="w-5 h-5 mr-2 text-soft-accent-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -2560,7 +2595,7 @@ export default function BuilderProfile({
 
           {/* Szczegóły punktów - zawsze widoczne */}
           <div className="mt-4 space-y-3 border-t border-soft-line pt-4">
-              <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+              <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
                 <span className="text-soft-ink-muted flex items-center">
                   <svg className="w-4 h-4 mr-2 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -2577,7 +2612,7 @@ export default function BuilderProfile({
 
               {/* Domain Bonuses */}
               {(profile.baseChatPoints?.baseNameBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
                   <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🌐</span>
                     Base Name Bonus
@@ -2589,7 +2624,7 @@ export default function BuilderProfile({
               )}
 
               {(profile.baseChatPoints?.sphereBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
                   <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🌐</span>
                     .sphere Bonus
@@ -2601,7 +2636,7 @@ export default function BuilderProfile({
               )}
 
               {(profile.baseChatPoints?.camperBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
                   <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🏕️</span>
                     .camper Bonus
@@ -2613,7 +2648,7 @@ export default function BuilderProfile({
               )}
 
               {(profile.baseChatPoints?.celoBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
                   <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">💛</span>
                     .celo Bonus
@@ -2625,7 +2660,7 @@ export default function BuilderProfile({
               )}
 
               {(profile.baseChatPoints?.worldBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
                   <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🌍</span>
                     .world Bonus
@@ -2638,7 +2673,7 @@ export default function BuilderProfile({
 
               {/* Referral Points */}
               {(profile.baseChatPoints?.referralPoints || 0) > 0 && (
-                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
                   <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">👥</span>
                     Referral Points

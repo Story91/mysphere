@@ -118,7 +118,7 @@ export default function HireAgentModal({
               onChange={(e) => setBrief(e.target.value)}
               rows={3}
               placeholder="Describe the task in one or two sentences."
-              className="w-full resize-none rounded-2xl border border-soft-line bg-soft-sunken px-3 py-2 text-[13px] text-soft-ink outline-none transition-[border-color] duration-[--dur-press] ease-out-strong placeholder:text-soft-ink-soft focus:border-soft-primary focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="w-full resize-none rounded-2xl border border-soft-line bg-soft-sunken px-3 py-2 text-[13px] text-soft-ink outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong placeholder:text-soft-ink-soft focus:border-soft-primary focus-visible:ring-2 focus-visible:ring-soft-primary"
             />
           </div>
 
@@ -130,7 +130,7 @@ export default function HireAgentModal({
                   key={preset}
                   type="button"
                   onClick={() => setAmount(preset)}
-                  className={`flex-1 rounded-pill border px-3 py-2 font-soft-display text-[13px] font-semibold tabular-nums transition-[background-color,border-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                  className={`flex-1 rounded-pill border px-3 py-2 font-soft-display text-[13px] font-semibold tabular-nums transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                     amount === preset
                       ? 'border-soft-primary bg-soft-sunken text-soft-primary-deep'
                       : 'border-soft-line text-soft-ink-muted hover:border-soft-line-strong'
@@ -155,7 +155,7 @@ export default function HireAgentModal({
               if (!payTo) return;
               sendTransaction({ to: payTo, value: parseEther(amount) });
             }}
-            className="w-full rounded-pill bg-soft-primary px-4 py-2.5 text-[13px] font-semibold text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+            className="w-full rounded-pill bg-soft-primary px-4 py-2.5 text-[13px] font-semibold text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
           >
             {!isConnected
               ? 'Connect a wallet first'

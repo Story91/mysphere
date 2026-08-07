@@ -197,7 +197,7 @@ export default async function PaidPage() {
                           target="_blank"
                           rel="noreferrer"
                           title="Verify onchain"
-                          className="font-mono text-[10.5px] text-soft-ink-faint underline decoration-dotted underline-offset-2 transition-colors duration-[--dur-press] hover:text-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                          className="font-mono text-[10.5px] text-soft-ink-faint underline decoration-dotted underline-offset-2 transition-colors [transition-duration:var(--dur-press)] hover:text-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         >
                           {payment.txHash.slice(0, 10)}…
                         </a>
@@ -242,7 +242,7 @@ export default async function PaidPage() {
                 <li key={entry.address}>
                   <Link
                     href={`/u/${entry.address}`}
-                    className="flex items-center gap-3 rounded-card bg-soft-surface p-3.5 shadow-card transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.99]"
+                    className="flex items-center gap-3 rounded-card bg-soft-surface p-3.5 shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.99]"
                   >
                     <span
                       className="flex h-7 w-7 flex-none items-center justify-center rounded-full font-soft-display text-[12px] font-bold text-white"
@@ -283,13 +283,13 @@ export default async function PaidPage() {
         <div className="mt-10 flex flex-wrap gap-2.5">
           <Link
             href="/basechat"
-            className="rounded-pill bg-soft-primary px-5 py-3 font-soft text-[14px] font-bold text-white shadow-chip transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97]"
+            className="rounded-pill bg-soft-primary px-5 py-3 font-soft text-[14px] font-bold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
             Open the feed
           </Link>
           <Link
             href="/re-definition"
-            className="rounded-pill bg-soft-surface px-5 py-3 font-soft text-[14px] font-semibold text-soft-ink-muted shadow-card transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97]"
+            className="rounded-pill bg-soft-surface px-5 py-3 font-soft text-[14px] font-semibold text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
             Why money, not likes
           </Link>

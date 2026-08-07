@@ -481,7 +481,7 @@ export default function AdminPanel() {
           <button
             type="button"
             onClick={() => router.push('/basechat')}
-            className="mt-6 rounded-pill bg-soft-primary px-5 py-2.5 font-soft text-[13.5px] font-bold text-white transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="mt-6 rounded-pill bg-soft-primary px-5 py-2.5 font-soft text-[13.5px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             Wróć do feedu
           </button>

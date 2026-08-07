@@ -78,7 +78,7 @@ export default function MobileBottomNav() {
                 key={poz.href}
                 href={poz.href}
                 aria-current={aktywna ? 'page' : undefined}
-                className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 <span className={`rounded-full p-1 ${aktywna ? 'bg-soft-sunken' : ''}`}>
                   <svg

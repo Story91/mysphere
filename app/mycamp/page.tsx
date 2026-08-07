@@ -182,7 +182,19 @@ function MyCampPageContent() {
 
   // Environment variables
   const CLIENT_ID = process.env.NEXT_PUBLIC_CAMP_CLIENT_ID!;
-  const API_KEY = process.env.NEXT_PUBLIC_CAMP_API_KEY!;
+  // === NIE MA TU JUZ `NEXT_PUBLIC_CAMP_API_KEY` ===
+  // Prefiks NEXT_PUBLIC_ wpisuje wartosc DOSLOWNIE w chunk JS, ktory kazdy
+  // moze pobrac - klucz z .env.local dalo sie znalezc w
+  // .next/static/chunks/app/mycamp/page-*.js. Przekierowanie /mycamp na
+  // /basechat tego nie zaslania: chunk i tak jest serwowany.
+  //
+  // Ta zmienna nie robila przy tym NIC poza logowaniem do konsoli - jej
+  // jedynymi uzyciami byly dwa console.log ponizej. Zadne zapytanie jej nie
+  // niosło; klucz Campa uzywaja wylacznie trasy serwerowe w app/api/camp/**,
+  // ktore czytaja CAMP_API_KEY (bez prefiksu). Usuniecie niczego nie psuje.
+  //
+  // KLUCZ, KTORY TU BYL, NALEZY UZNAC ZA SPALONY I ZROTOWAC - byl publiczny
+  // w kazdym zbudowanym wydaniu tej strony.
   const FAUCET_URL = process.env.NEXT_PUBLIC_CAMP_FAUCET_URL!;
   const EXPLORER_URL = process.env.NEXT_PUBLIC_CAMP_EXPLORER_URL!
 
@@ -214,12 +226,10 @@ function MyCampPageContent() {
   useEffect(() => {
     console.log('🌍 Environment Variables Check:', {
       CLIENT_ID: CLIENT_ID ? '✅ Loaded' : '❌ Missing',
-      API_KEY: API_KEY ? '✅ Loaded' : '❌ Missing',
       FAUCET_URL: FAUCET_URL ? '✅ Loaded' : '❌ Missing',
       EXPLORER_URL: EXPLORER_URL ? '✅ Loaded' : '❌ Missing',
       actualValues: {
         CLIENT_ID: CLIENT_ID?.substring(0, 8) + '...',
-        API_KEY: API_KEY?.substring(0, 8) + '...',
         FAUCET_URL,
         EXPLORER_URL
       }
@@ -486,7 +496,6 @@ function MyCampPageContent() {
       loading,
       address,
       clientId: CLIENT_ID,
-      hasApiKey: !!API_KEY,
       socialsData,
       socialsError,
       socialsLoading,
@@ -496,7 +505,7 @@ function MyCampPageContent() {
       connectedSocialsCount,
       spotifyFeaturesEnabled: SPOTIFY_FEATURES_ENABLED
     });
-  }, [authenticated, loading, address, socialsData, socialsError, socialsLoading, CLIENT_ID, API_KEY, connectedSocialsCount]);
+  }, [authenticated, loading, address, socialsData, socialsError, socialsLoading, CLIENT_ID, connectedSocialsCount]);
 
   // Auto-load stats from cache on component mount (only if valid)
   useEffect(() => {

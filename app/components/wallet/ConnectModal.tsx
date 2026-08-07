@@ -211,7 +211,7 @@ export default function ConnectModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-pill p-1.5 text-soft-ink-faint transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="rounded-pill p-1.5 text-soft-ink-faint transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             aria-label="Close"
           >
             <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -239,7 +239,7 @@ export default function ConnectModal({
                 disabled={isPending}
                 aria-busy={isConnecting}
                 onClick={() => handleConnect(connector)}
-                className="flex w-full items-center gap-3 px-5 py-3 text-left transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset"
+                className="flex w-full items-center gap-3 px-5 py-3 text-left transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset"
               >
                 {iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- data URI

@@ -41,10 +41,11 @@ import {
   getCountFromServer,
   getDoc,
   getDocs,
+  increment,
   orderBy,
   query,
-  runTransaction,
   setDoc,
+  writeBatch,
   startAfter,
   where,
   limit as firestoreLimit,
@@ -588,27 +589,42 @@ export async function submitFeedback(input: SubmitAgentFeedbackInput): Promise<A
   if (input.txHash) payload.txHash = input.txHash;
   if (typeof input.chainId === 'number') payload.chainId = input.chainId;
 
-  await runTransaction(db, async (transaction) => {
-    const agentSnapshot = await transaction.get(agentRef);
-    if (!agentSnapshot.exists()) {
-      throw new Error('Agent is not registered in the MySphere registry');
-    }
+  // === DLACZEGO TO NIE JEST TRANSAKCJA ===
+  // Transakcje sa na tej bazie odrzucane (RESOURCE_EXHAUSTED nawet dla
+  // transakcji, ktora nic nie zapisuje) - ten sam limit, przez ktory nie
+  // dzialaly lajki. Pelna diagnoza w app/utils/firebase.ts przy `toggleLike`.
+  // Ocena agenta po prostu nie przechodzila.
+  //
+  // LICZNIKI SA DALEJ DOKLADNE, bo `increment` jest atomowy po stronie
+  // serwera - dwie rownoczesne oceny daja +2, nie +1, bez zadnego zamka.
+  // Odczyt zostaje wylacznie po to, zeby (a) sprawdzic, czy agent w ogole
+  // istnieje, i (b) policzyc pochodna flage `trusted`.
+  //
+  // JEDYNA CENA: `trusted` liczymy z sumy sprzed naszego zapisu powiekszonej
+  // o wlasna ocene. Przy dwoch ocenach w tej samej chwili flaga moze byc
+  // o jedna opinie do tylu - i sama sie poprawia przy nastepnej. Same liczby,
+  // po ktorych sie filtruje i sortuje, nie rozjezdzaja sie nigdy.
+  const agentSnapshot = await getDoc(agentRef);
+  if (!agentSnapshot.exists()) {
+    throw new Error('Agent is not registered in the MySphere registry');
+  }
 
-    const data = agentSnapshot.data();
-    const feedbackCount = (Number(data.feedbackCount) || 0) + 1;
-    const scoreSum = (Number(data.scoreSum) || 0) + rawScore;
-    const score = computeScore(scoreSum, feedbackCount);
+  const data = agentSnapshot.data();
+  const feedbackCount = (Number(data.feedbackCount) || 0) + 1;
+  const scoreSum = (Number(data.scoreSum) || 0) + rawScore;
+  const score = computeScore(scoreSum, feedbackCount);
 
-    transaction.set(feedbackRef, payload);
-    transaction.update(agentRef, {
-      feedbackCount,
-      scoreSum,
-      // `trusted` trzymamy na dokumencie, zeby dalo sie po nim filtrowac i
-      // liczyc bez czytania opinii.
-      trusted: isTrusted(score, feedbackCount),
-      updatedAtMs: createdAtMs,
-    });
+  const batch = writeBatch(db);
+  batch.set(feedbackRef, payload);
+  batch.update(agentRef, {
+    feedbackCount: increment(1),
+    scoreSum: increment(rawScore),
+    // `trusted` trzymamy na dokumencie, zeby dalo sie po nim filtrowac i
+    // liczyc bez czytania opinii.
+    trusted: isTrusted(score, feedbackCount),
+    updatedAtMs: createdAtMs,
   });
+  await batch.commit();
 
   return mapFeedbackDoc(feedbackRef.id, payload);
 }

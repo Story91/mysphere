@@ -345,7 +345,7 @@ const ACTION_ICON = 'w-4 h-4 flex-shrink-0';
 // przycisk mierzyl ~28px wysokosci - trafialo sie w niego kciukiem na wyczucie.
 const ACTION_ITEM =
   'inline-flex items-center justify-center gap-1.5 min-h-[40px] min-w-[40px] px-2 rounded-pill font-soft text-[12.5px] font-semibold ' +
-  'transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong ' +
+  'transition-[color,background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong ' +
   'hover:bg-soft-sunken hover:text-soft-primary-deep active:scale-[0.97] ' +
   'outline-none focus-visible:ring-2 focus-visible:ring-soft-primary';
 
@@ -949,7 +949,13 @@ function PostList({
 
     try {
       // 2. Zapis. Dopiero jego niepowodzenie jest bledem lajka.
-      await toggleLike(postId, address);
+      //
+      //    Podajemy `wasLiked` i autora, bo OBA juz mamy - `wasLiked` liczymy
+      //    kilka linii wyzej, zeby narysowac serduszko, a autor stoi na poscie.
+      //    Dzieki temu lajk to jeden zapis i zero odczytow: firebase.ts nie
+      //    musi otwierac posta tylko po to, zeby dowiedziec sie tego, co my juz
+      //    wiemy. Szczegoly przy samej funkcji.
+      await toggleLike(postId, address, { wasLiked, author: post.author });
 
       // 3. Ta sama zmiana na ZAPISANYCH listach. Bez tego serduszko wracaloby
       //    do poprzedniego stanu po przejsciu na inna zakladke i powrocie, bo
@@ -1654,7 +1660,7 @@ function PostList({
               value={newComments[post.id] || ''}
             onChange={(e) => setNewComments(prev => ({...prev, [post.id]: e.target.value}))}
               placeholder="Write a comment..."
-            className="w-full p-3 font-soft text-sm leading-[1.55] border border-soft-line rounded-card bg-soft-surface text-soft-ink placeholder:text-soft-ink-faint outline-none transition-[border-color,box-shadow] duration-[--dur-press] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
+            className="w-full p-3 font-soft text-sm leading-[1.55] border border-soft-line rounded-card bg-soft-surface text-soft-ink placeholder:text-soft-ink-faint outline-none transition-[border-color,box-shadow] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
               rows={2}
             />
           
@@ -1702,13 +1708,13 @@ function PostList({
                         <textarea
                           value={editedCommentContent}
                           onChange={(e) => setEditedCommentContent(e.target.value)}
-                          className="w-full p-2 font-soft text-sm leading-[1.55] border border-soft-line rounded-card bg-soft-surface text-soft-ink outline-none transition-[border-color] duration-[--dur-press] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
+                          className="w-full p-2 font-soft text-sm leading-[1.55] border border-soft-line rounded-card bg-soft-surface text-soft-ink outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
                           rows={2}
                         />
                         <div className="flex justify-end mt-1 space-x-2">
                           <button
                             onClick={() => handleEditComment(post.id, comment.id, editedCommentContent)}
-                            className="px-3 py-1 font-soft text-xs font-bold bg-soft-primary text-white rounded-pill transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                            className="px-3 py-1 font-soft text-xs font-bold bg-soft-primary text-white rounded-pill transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             Save
                           </button>
@@ -1717,7 +1723,7 @@ function PostList({
                               setEditingComment(null);
                               setEditedCommentContent('');
                             }}
-                            className="px-3 py-1 font-soft text-xs font-bold bg-soft-sunken text-soft-ink-muted rounded-pill transition-[background-color,transform,color] duration-[--dur-press] ease-out-strong hover:text-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                            className="px-3 py-1 font-soft text-xs font-bold bg-soft-sunken text-soft-ink-muted rounded-pill transition-[background-color,transform,color] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             Cancel
                           </button>
@@ -1738,7 +1744,7 @@ function PostList({
                             setEditingComment({ postId: post.id, commentId: comment.id });
                             setEditedCommentContent(comment.content);
                           }}
-                          className="text-soft-ink-faint rounded-pill p-0.5 transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                          className="text-soft-ink-faint rounded-pill p-0.5 transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           aria-label="Edit comment"
                           title="Edit comment"
                         >
@@ -1749,7 +1755,7 @@ function PostList({
                       )}
                       <button
                         onClick={() => handleDeleteComment(post.id, comment.id)}
-                        className="text-soft-ink-faint rounded-pill p-0.5 transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-red-600 active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="text-soft-ink-faint rounded-pill p-0.5 transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-red-600 active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         aria-label="Delete comment"
                         title="Delete comment"
                       >
@@ -1766,7 +1772,7 @@ function PostList({
                     onClick={() => handleToggleCommentLike(post.id, comment.id)}
                     aria-pressed={!!comment.likedBy?.includes(address || '')}
                     aria-label={`${comment.likedBy?.includes(address || '') ? 'Unlike' : 'Like'} comment (${comment.likes || 0})`}
-                    className={`flex items-center rounded-pill tabular-nums transition-[color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                    className={`flex items-center rounded-pill tabular-nums transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                       comment.likedBy?.includes(address || '') ? 'text-soft-primary-deep' : 'hover:text-soft-primary-deep'
                     }`}
                   >
@@ -1783,7 +1789,7 @@ function PostList({
                   </button>
                   <button 
                     onClick={() => setReplyingTo({ postId: post.id, commentId: comment.id })}
-                    className="flex items-center rounded-pill transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                    className="flex items-center rounded-pill transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     <svg className="w-4 h-4 mr-1 transform scale-95" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -1798,7 +1804,7 @@ function PostList({
                       value={replyContent}
                       onChange={(e) => setReplyContent(e.target.value)}
                       placeholder="Write a reply..."
-                      className="w-full p-2 font-soft text-xs leading-[1.55] border border-soft-line rounded-card bg-soft-sunken text-soft-ink placeholder:text-soft-ink-faint outline-none transition-[border-color] duration-[--dur-press] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
+                      className="w-full p-2 font-soft text-xs leading-[1.55] border border-soft-line rounded-card bg-soft-sunken text-soft-ink placeholder:text-soft-ink-faint outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
                       rows={2}
                     />
                     <div className="flex justify-end mt-1 space-x-2">
@@ -1849,7 +1855,7 @@ function PostList({
                                 onClick={() => handleToggleCommentLike(post.id, reply.id)}
                                 aria-pressed={!!reply.likedBy?.includes(address || '')}
                                 aria-label={`${reply.likedBy?.includes(address || '') ? 'Unlike' : 'Like'} reply (${reply.likes || 0})`}
-                                className={`flex items-center rounded-pill transition-[color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                                className={`flex items-center rounded-pill transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                                   reply.likedBy?.includes(address || '') ? 'text-soft-primary-deep' : 'hover:text-soft-primary-deep'
                                 }`}
                               >
@@ -1869,7 +1875,7 @@ function PostList({
                               {(reply.author === address || address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()) && (
                                 <button
                                   onClick={() => handleDeleteComment(post.id, reply.id)}
-                                  className="flex items-center rounded-pill transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-red-600 active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                                  className="flex items-center rounded-pill transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-red-600 active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                                   aria-label="Delete reply"
                                   title="Delete reply"
                                 >
@@ -1895,7 +1901,7 @@ function PostList({
           <div className="pt-4 border-t border-soft-line">
             <button
               onClick={() => loadMoreComments(post.id)}
-              className="w-full py-2 px-4 font-soft text-sm font-semibold text-soft-ink-muted hover:text-soft-ink bg-soft-sunken rounded-pill transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-center space-x-2"
+              className="w-full py-2 px-4 font-soft text-sm font-semibold text-soft-ink-muted hover:text-soft-ink bg-soft-sunken rounded-pill transition-[color,background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-center space-x-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1972,7 +1978,7 @@ function PostList({
                 disabled={followLoading[post.author]}
                 title="Follow"
                 aria-label={`Follow ${userNames[post.author]?.name || `${(post.author || '').slice(0, 6)}...${(post.author || '').slice(-4)}`}`}
-                className="absolute -bottom-0.5 -right-0.5 grid h-[18px] w-[18px] place-items-center rounded-full bg-soft-primary text-white ring-2 ring-soft-surface shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.9] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface disabled:opacity-60 before:absolute before:-inset-[11px] before:content-['']"
+                className="absolute -bottom-0.5 -right-0.5 grid h-[18px] w-[18px] place-items-center rounded-full bg-soft-primary text-white ring-2 ring-soft-surface shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.9] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface disabled:opacity-60 before:absolute before:-inset-[11px] before:content-['']"
               >
                 {followLoading[post.author] ? (
                   <span className="block w-2.5 h-2.5 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
@@ -2084,7 +2090,7 @@ function PostList({
           {post.content.length > 500 && (
             <button
               onClick={() => setExpandedTextPosts(prev => ({ ...prev, [post.id]: !prev[post.id] }))}
-              className="font-soft text-soft-primary-deep text-[12.5px] font-semibold mt-1.5 rounded-pill hover:underline transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="font-soft text-soft-primary-deep text-[12.5px] font-semibold mt-1.5 rounded-pill hover:underline transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               {isTextExpanded ? 'Show less' : 'Show more'}
             </button>
@@ -2341,7 +2347,7 @@ function PostList({
                               setTradeCoinMode('buy');
                               setShowTradeCoinModal(true);
                             }}
-                            className="flex-1 py-2 px-3 rounded-pill font-soft text-sm font-bold bg-soft-primary text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                            className="flex-1 py-2 px-3 rounded-pill font-soft text-sm font-bold bg-soft-primary text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             Buy
                           </button>
@@ -2363,7 +2369,7 @@ function PostList({
                               setTradeCoinMode('sell');
                               setShowTradeCoinModal(true);
                             }}
-                            className="flex-1 py-2 px-3 rounded-pill font-soft text-sm font-bold bg-soft-surface text-soft-primary-deep border border-soft-line-strong transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                            className="flex-1 py-2 px-3 rounded-pill font-soft text-sm font-bold bg-soft-surface text-soft-primary-deep border border-soft-line-strong transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                           >
                             Sell
                           </button>
@@ -2392,7 +2398,7 @@ function PostList({
                           href={`https://zora.co/profile/${address}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                          className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] [transition-duration:var(--dur-press)] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         >
                           View your tokens
                           <ExternalLink className="w-3 h-3" />
@@ -2403,7 +2409,7 @@ function PostList({
                         href={`${getTokenExplorer(post.network).tokenUrl}${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] [transition-duration:var(--dur-press)] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         View on {getTokenExplorer(post.network).name}
                         <ExternalLink className="w-3 h-3" aria-hidden="true" />
@@ -2413,7 +2419,7 @@ function PostList({
                         href={`https://zora.co/coin/base:${post.zoraCoinAddress}?referrer=0xf1fa20027b6202bc18e4454149c85cb01dc91dfd`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] [transition-duration:var(--dur-press)] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         View on Zora
                         <ExternalLink className="w-3 h-3" />
@@ -2423,7 +2429,7 @@ function PostList({
                         href={`https://dexscreener.com/base/${post.zoraCoinAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep flex items-center gap-1 rounded-pill transition-[color] [transition-duration:var(--dur-press)] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         View on DexScreener
                         <ExternalLink className="w-3 h-3" />
@@ -2613,7 +2619,7 @@ function PostList({
                 {canEdit && (
                   <button
                     onClick={() => { setEditingPost(post.id); setEditedContent(post.content); }}
-                    className="block w-full text-left px-4 py-2 font-soft text-xs font-semibold text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink transition-[color,background-color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                    className="block w-full text-left px-4 py-2 font-soft text-xs font-semibold text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink transition-[color,background-color] [transition-duration:var(--dur-press)] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     Edit
                   </button>
@@ -2621,7 +2627,7 @@ function PostList({
                 {address && isUserAdmin(address) && (
                   <button
                     onClick={() => post.isPinned ? handleUnpinPost(post.id) : handlePinPost(post.id)}
-                    className={`flex w-full items-center gap-2 px-4 py-2 text-left font-soft text-xs font-semibold hover:bg-soft-sunken transition-[color,background-color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                    className={`flex w-full items-center gap-2 px-4 py-2 text-left font-soft text-xs font-semibold hover:bg-soft-sunken transition-[color,background-color] [transition-duration:var(--dur-press)] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                       post.isPinned
                         ? 'text-soft-accent-deep'
                         : 'text-soft-ink-muted hover:text-soft-ink'
@@ -2639,7 +2645,7 @@ function PostList({
                 {canDelete && post.author === address && (
                   <button
                     onClick={() => handleDeletePost(post.id)}
-                    className="block w-full text-left px-4 py-2 font-soft text-xs font-semibold text-red-600 hover:bg-red-50 transition-[background-color] duration-[--dur-press] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                    className="block w-full text-left px-4 py-2 font-soft text-xs font-semibold text-red-600 hover:bg-red-50 transition-[background-color] [transition-duration:var(--dur-press)] ease-out-strong outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     Delete
                   </button>
@@ -2671,19 +2677,19 @@ function PostList({
             <textarea
               value={editedContent}
               onChange={(e) => setEditedContent(e.target.value)}
-              className="w-full px-3 py-2 font-soft text-sm leading-[1.55] border border-soft-line rounded-card bg-soft-surface text-soft-ink outline-none transition-[border-color] duration-[--dur-press] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
+              className="w-full px-3 py-2 font-soft text-sm leading-[1.55] border border-soft-line rounded-card bg-soft-surface text-soft-ink outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:ring-2 focus-visible:ring-soft-primary focus:border-soft-line-strong"
               rows={3}
             />
             <div className="flex justify-end space-x-2 mt-2">
               <button
                 onClick={() => setEditingPost(null)}
-                className="px-3 py-1 font-soft text-xs font-bold bg-soft-sunken text-soft-ink-muted rounded-pill transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="px-3 py-1 font-soft text-xs font-bold bg-soft-sunken text-soft-ink-muted rounded-pill transition-[color,background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 Cancel
               </button>
               <button
                  onClick={() => handleEditPost(post.id, editedContent)}
-                 className="px-3 py-1 font-soft text-xs font-bold bg-soft-primary text-white rounded-pill transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                 className="px-3 py-1 font-soft text-xs font-bold bg-soft-primary text-white rounded-pill transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                  Save
                </button>
@@ -2766,7 +2772,7 @@ function PostList({
             // dla elementow unoszacych sie NAD trescia (menu, modale).
             <button
               onClick={loadMorePosts}
-              className="px-6 py-3 bg-soft-primary text-white rounded-pill font-soft text-sm font-bold shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="px-6 py-3 bg-soft-primary text-white rounded-pill font-soft text-sm font-bold shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               Load more posts
             </button>
@@ -2807,7 +2813,7 @@ function PostList({
               onClick={(e) => e.stopPropagation()}
             />
             <button
-              className="absolute top-4 right-4 text-white bg-soft-ink/70 rounded-pill p-2 transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="absolute top-4 right-4 text-white bg-soft-ink/70 rounded-pill p-2 transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-ink active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               onClick={() => setEnlargedImage(null)}
               aria-label="Close image"
             >

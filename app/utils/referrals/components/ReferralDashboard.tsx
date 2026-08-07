@@ -106,7 +106,7 @@ export default function ReferralDashboard({ userAddress, isOwnProfile }: Referra
           <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => setShowGuideModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-pill bg-soft-sunken px-3 py-1.5 text-xs font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="inline-flex items-center gap-1.5 rounded-pill bg-soft-sunken px-3 py-1.5 text-xs font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               title="View Guide"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -117,7 +117,7 @@ export default function ReferralDashboard({ userAddress, isOwnProfile }: Referra
             {isOwnProfile && (
               <button
                 onClick={refreshStats}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-pill bg-soft-sunken text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-pill bg-soft-sunken text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 title="Refresh stats"
                 aria-label="Refresh stats"
               >
@@ -157,7 +157,7 @@ export default function ReferralDashboard({ userAddress, isOwnProfile }: Referra
         <div className="flex gap-1 rounded-pill bg-soft-sunken p-1">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`min-w-0 flex-1 truncate rounded-pill px-2 py-1.5 text-xs font-semibold transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+            className={`min-w-0 flex-1 truncate rounded-pill px-2 py-1.5 text-xs font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
               activeTab === 'overview'
                 ? 'bg-soft-surface text-soft-ink shadow-chip'
                 : 'text-soft-ink-muted hover:text-soft-ink'
@@ -167,7 +167,7 @@ export default function ReferralDashboard({ userAddress, isOwnProfile }: Referra
           </button>
           <button
             onClick={() => setActiveTab('referrals')}
-            className={`min-w-0 flex-1 truncate rounded-pill px-2 py-1.5 text-xs font-semibold tabular-nums transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+            className={`min-w-0 flex-1 truncate rounded-pill px-2 py-1.5 text-xs font-semibold tabular-nums transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
               activeTab === 'referrals'
                 ? 'bg-soft-surface text-soft-ink shadow-chip'
                 : 'text-soft-ink-muted hover:text-soft-ink'
@@ -177,7 +177,7 @@ export default function ReferralDashboard({ userAddress, isOwnProfile }: Referra
           </button>
           <button
             onClick={() => setActiveTab('rewards')}
-            className={`min-w-0 flex-1 truncate rounded-pill px-2 py-1.5 text-xs font-semibold transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+            className={`min-w-0 flex-1 truncate rounded-pill px-2 py-1.5 text-xs font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
               activeTab === 'rewards'
                 ? 'bg-soft-surface text-soft-ink shadow-chip'
                 : 'text-soft-ink-muted hover:text-soft-ink'
@@ -215,7 +215,7 @@ export default function ReferralDashboard({ userAddress, isOwnProfile }: Referra
                     />
                     <button
                       onClick={copyToClipboard}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-pill bg-soft-primary px-5 py-2 text-sm font-semibold text-white shadow-chip transition-transform duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-pill bg-soft-primary px-5 py-2 text-sm font-semibold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                     >
                       {copied ? <FiCheck className="h-4 w-4" /> : <FiCopy className="h-4 w-4" />}
                       {copied ? 'Copied' : 'Copy'}
@@ -224,7 +224,7 @@ export default function ReferralDashboard({ userAddress, isOwnProfile }: Referra
                   <button
                     onClick={() => setShowQRCode(!showQRCode)}
                     aria-expanded={showQRCode}
-                    className="mt-3 rounded-pill text-xs font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                    className="mt-3 rounded-pill text-xs font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     {showQRCode ? 'Hide' : 'Show'} QR code
                   </button>

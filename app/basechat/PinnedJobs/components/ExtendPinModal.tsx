@@ -151,7 +151,7 @@ export default function ExtendPinModal({
           <button
             onClick={onClose}
             aria-label="Close extend pin dialog"
-            className="rounded-pill p-1 text-soft-ink-soft transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="rounded-pill p-1 text-soft-ink-soft transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <X className="w-6 h-6" />
           </button>
@@ -188,7 +188,7 @@ export default function ExtendPinModal({
                  <button
                    key={option.duration}
                    onClick={() => setSelectedDuration(option.duration)}
-                   className={`relative p-4 rounded-card border-2 transition-[background-color,border-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                   className={`relative p-4 rounded-card border-2 transition-[background-color,border-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                      isSelected
                        ? 'border-soft-primary bg-soft-sunken'
                        : 'border-soft-line hover:border-soft-line-strong'
@@ -252,7 +252,7 @@ export default function ExtendPinModal({
             <div className="flex space-x-3">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-3 font-semibold border border-soft-line text-soft-ink-muted rounded-pill transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+                className="flex-1 px-4 py-3 font-semibold border border-soft-line text-soft-ink-muted rounded-pill transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
               >
                 Cancel
               </button>
@@ -260,7 +260,7 @@ export default function ExtendPinModal({
               <button
                 onClick={handleExtendPin}
                 disabled={isExtending || !address}
-                className={`flex-1 px-4 py-3 rounded-pill font-semibold transition-[background-color,box-shadow,transform] duration-[--dur-press] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                className={`flex-1 px-4 py-3 rounded-pill font-semibold transition-[background-color,box-shadow,transform] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                   isExtending || !address
                     ? 'bg-soft-sunken text-soft-ink-soft cursor-not-allowed'
                     : 'bg-soft-primary hover:bg-soft-primary-deep text-white shadow-chip hover:shadow-float active:scale-[0.97]'

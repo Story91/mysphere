@@ -198,7 +198,7 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
             {suggestedUsers.map((user) => (
               <div 
                 key={user.address} 
-                className="bg-soft-surface rounded-card p-4 shadow-card border border-soft-line font-soft transition-shadow duration-[--dur-dropdown] ease-out-strong hover:shadow-float"
+                className="bg-soft-surface rounded-card p-4 shadow-card border border-soft-line font-soft transition-shadow [transition-duration:var(--dur-dropdown)] ease-out-strong hover:shadow-float"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
@@ -255,7 +255,7 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => onUserClick?.(user.address)}
-                      className="px-4 py-2 text-sm font-semibold bg-soft-sunken text-soft-ink rounded-pill transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+                      className="px-4 py-2 text-sm font-semibold bg-soft-sunken text-soft-ink rounded-pill transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
                     >
                       View
                     </button>
@@ -264,7 +264,7 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
                       <button
                         onClick={() => handleFollow(user.address)}
                         disabled={loadingAction === user.address && actionType === 'follow'}
-                        className={`px-4 py-2 text-sm font-semibold rounded-pill transition-[background-color,transform] duration-[--dur-press] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                        className={`px-4 py-2 text-sm font-semibold rounded-pill transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                           loadingAction === user.address && actionType === 'follow'
                             ? 'bg-soft-sunken text-soft-ink-soft cursor-not-allowed'
                             : 'bg-soft-primary text-white shadow-chip hover:bg-soft-primary-deep active:scale-[0.97]'
@@ -290,7 +290,7 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
                     <button
                       onClick={() => handleSendFriendRequest(user.address)}
                       disabled={loadingAction === user.address && actionType === 'friend'}
-                      className={`px-4 py-2 text-sm font-semibold rounded-pill transition-[background-color,transform] duration-[--dur-press] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                      className={`px-4 py-2 text-sm font-semibold rounded-pill transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                         loadingAction === user.address && actionType === 'friend'
                           ? 'bg-soft-sunken text-soft-ink-soft cursor-not-allowed'
                           : 'bg-soft-accent-deep text-white shadow-chip hover:brightness-110 active:scale-[0.97]'
@@ -337,7 +337,7 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
           <button
             onClick={handleDiscoverMore}
             disabled={loadingMore}
-            className="px-6 py-3 font-soft font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
+            className="px-6 py-3 font-soft font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
           >
             {loadingMore ? 'Loading...' : 'Discover More'}
           </button>

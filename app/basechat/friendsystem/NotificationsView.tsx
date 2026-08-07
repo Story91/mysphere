@@ -199,7 +199,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             <button
               onClick={handleMarkAllAsRead}
               disabled={markingAll}
-              className="px-4 py-2 font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
+              className="px-4 py-2 font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               Mark all as read
             </button>
@@ -236,7 +236,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               className={`
                 w-full text-left font-soft
                 bg-soft-surface rounded-card p-4 shadow-card border border-soft-line
-                transition-[box-shadow,transform] duration-[--dur-press] ease-out-strong
+                transition-[box-shadow,transform] [transition-duration:var(--dur-press)] ease-out-strong
                 hover:shadow-float active:scale-[0.99] cursor-pointer
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary
                 ${!notification.isRead ? 'border-l-4 border-l-soft-primary bg-soft-sunken' : ''}

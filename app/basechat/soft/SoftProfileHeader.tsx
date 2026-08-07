@@ -48,7 +48,7 @@ export default function SoftProfileHeader({
             type="button"
             onClick={onEdit}
             aria-label="Edit profile"
-            className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" />
@@ -72,7 +72,7 @@ export default function SoftProfileHeader({
         <button
           type="button"
           onClick={onCopyAddress}
-          className="flex items-center gap-2 rounded-pill bg-soft-surface px-3 py-1.5 font-soft text-[12px] font-semibold text-soft-ink-muted shadow-card transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          className="flex items-center gap-2 rounded-pill bg-soft-surface px-3 py-1.5 font-soft text-[12px] font-semibold text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
         >
           <span className="font-mono">{short}</span>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">

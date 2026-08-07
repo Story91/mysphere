@@ -164,7 +164,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleRefreshData}
-                className="p-2 hover:bg-soft-sunken rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="p-2 hover:bg-soft-sunken rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 title="Refresh Spotify data"
                 aria-label="Refresh Spotify data"
                 disabled={loading}
@@ -175,7 +175,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
               </button>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-soft-sunken rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="p-2 hover:bg-soft-sunken rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 aria-label="Close track selector"
               >
                 <svg className="w-5 h-5 text-soft-ink-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -189,7 +189,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
           <div className="flex space-x-1 mt-4 bg-soft-sunken rounded-pill p-1">
             <button
               onClick={() => setActiveTab('recent')}
-              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'recent'
                   ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
                   : 'text-soft-ink-muted hover:text-soft-ink'
@@ -199,7 +199,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
             </button>
             <button
               onClick={() => setActiveTab('saved')}
-              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'saved'
                   ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
                   : 'text-soft-ink-muted hover:text-soft-ink'
@@ -209,7 +209,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
             </button>
             <button
               onClick={() => setActiveTab('albums')}
-              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'albums'
                   ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
                   : 'text-soft-ink-muted hover:text-soft-ink'
@@ -219,7 +219,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
             </button>
             <button
               onClick={() => setActiveTab('playlists')}
-              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'playlists'
                   ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
                   : 'text-soft-ink-muted hover:text-soft-ink'
@@ -242,7 +242,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
               <div className="text-soft-accent-deep mb-4">❌ {error}</div>
               <button
                 onClick={() => { void fetchSpotifyData(); }}
-                className="px-4 py-2 bg-soft-primary text-white font-semibold rounded-pill shadow-chip hover:bg-soft-primary-deep transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="px-4 py-2 bg-soft-primary text-white font-semibold rounded-pill shadow-chip hover:bg-soft-primary-deep transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 Try Again
               </button>
@@ -260,7 +260,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                     spotifyData.profile.playedTracks.slice(0, 20).map((trackData, index) => (
                       <div
                         key={`recent-${index}`}
-                        className="relative bg-soft-surface border border-soft-line shadow-chip hover:bg-soft-sunken rounded-card transition-colors duration-[--dur-press] ease-out-strong"
+                        className="relative bg-soft-surface border border-soft-line shadow-chip hover:bg-soft-sunken rounded-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong"
                       >
                         <SpotifyTrackCard
                           trackData={trackData}
@@ -274,7 +274,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                             e.stopPropagation();
                             handleSelectTrack(trackData);
                           }}
-                          className="absolute top-3 right-3 w-8 h-8 bg-soft-primary hover:bg-soft-primary-deep text-white rounded-full flex items-center justify-center shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:scale-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-2 border-soft-surface z-10"
+                          className="absolute top-3 right-3 w-8 h-8 bg-soft-primary hover:bg-soft-primary-deep text-white rounded-full flex items-center justify-center shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:scale-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-2 border-soft-surface z-10"
                           title="Add track to post"
                           aria-label="Add track to post"
                         >
@@ -299,7 +299,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                     spotifyData.profile.savedTracks.slice(0, 20).map((trackData, index) => (
                       <div
                         key={`saved-${index}`}
-                        className="relative bg-soft-surface border border-soft-line shadow-chip hover:bg-soft-sunken rounded-card transition-colors duration-[--dur-press] ease-out-strong"
+                        className="relative bg-soft-surface border border-soft-line shadow-chip hover:bg-soft-sunken rounded-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong"
                       >
                         <SpotifyTrackCard
                           trackData={trackData}
@@ -313,7 +313,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                             e.stopPropagation();
                             handleSelectTrack(trackData);
                           }}
-                          className="absolute top-3 right-3 w-8 h-8 bg-soft-primary hover:bg-soft-primary-deep text-white rounded-full flex items-center justify-center shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:scale-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-2 border-soft-surface z-10"
+                          className="absolute top-3 right-3 w-8 h-8 bg-soft-primary hover:bg-soft-primary-deep text-white rounded-full flex items-center justify-center shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:scale-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-2 border-soft-surface z-10"
                           title="Add track to post"
                           aria-label="Add track to post"
                         >

@@ -46,7 +46,7 @@ export default function SoftTabs({
             aria-pressed={isActive}
             className={[
               'flex-none whitespace-nowrap rounded-pill px-4 py-2 font-soft text-[12.5px]',
-              'transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong',
+              'transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong',
               'active:scale-[0.97] outline-none',
               'focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg',
               isActive

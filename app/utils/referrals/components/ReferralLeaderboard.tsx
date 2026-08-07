@@ -113,7 +113,7 @@ export default function ReferralLeaderboard() {
               <button
                 key={filter}
                 onClick={() => setTimeFilter(filter)}
-                className={`rounded-pill px-2.5 py-1 text-xs font-semibold transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                className={`rounded-pill px-2.5 py-1 text-xs font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                   timeFilter === filter
                     ? 'bg-soft-surface text-soft-ink shadow-chip'
                     : 'text-soft-ink-muted hover:text-soft-ink'
@@ -158,7 +158,7 @@ export default function ReferralLeaderboard() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="flex items-center gap-3 rounded-card px-2 py-2 transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken"
+                className="flex items-center gap-3 rounded-card px-2 py-2 transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken"
               >
                 {/* Rank Badge */}
                 <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-soft-display text-sm font-bold tabular-nums ${getRankStyle(entry.rank || 0)}`}>
@@ -194,7 +194,7 @@ export default function ReferralLeaderboard() {
           <div className="mt-3">
             <button
               onClick={() => setShowGlobalModal(true)}
-              className="flex w-full items-center justify-center gap-1.5 rounded-pill bg-soft-sunken px-4 py-2 text-sm font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="flex w-full items-center justify-center gap-1.5 rounded-pill bg-soft-sunken px-4 py-2 text-sm font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               <span>View all</span>
               <FiChevronDown className="h-4 w-4" />

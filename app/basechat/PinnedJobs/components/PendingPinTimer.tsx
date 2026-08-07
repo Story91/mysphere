@@ -114,7 +114,7 @@ export default function PendingPinTimer({
           href={`${PAID_PIN_CONTRACT_CONFIG.blockExplorer}/tx/${txHash}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center space-x-1 px-2.5 py-1 bg-soft-sunken hover:bg-soft-line text-soft-ink border border-soft-line rounded-pill text-xs font-semibold transition-[background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+          className="flex items-center space-x-1 px-2.5 py-1 bg-soft-sunken hover:bg-soft-line text-soft-ink border border-soft-line rounded-pill text-xs font-semibold transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
         >
           <ExternalLink className="w-3 h-3" />
           <span>TX</span>

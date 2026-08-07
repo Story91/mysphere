@@ -28,7 +28,7 @@ const MENU_ID = 'wallet-menu';
 const ROW = [
   'flex items-center gap-3 w-full px-4 py-2.5',
   'font-soft text-[13px] font-semibold text-soft-ink-muted',
-  'transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong',
+  'transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong',
   'hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.98]',
   'outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset',
 ].join(' ');
@@ -104,7 +104,7 @@ export default function WalletButton() {
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-bold text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+          className="rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-bold text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
         >
           Connect wallet
         </button>
@@ -126,7 +126,7 @@ export default function WalletButton() {
         aria-haspopup="true"
         aria-controls={MENU_ID}
         aria-label="Wallet menu"
-        className="flex items-center gap-2 rounded-pill bg-soft-primary p-2 sm:pr-3 text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+        className="flex items-center gap-2 rounded-pill bg-soft-primary p-2 sm:pr-3 text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
       >
         <Avatar address={address} className="h-6 w-6" />
         <Name address={address} className="hidden font-soft-display text-[13px] font-bold text-white sm:inline" />

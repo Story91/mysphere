@@ -440,7 +440,7 @@ export default function PaidPinModal({
           <button
             onClick={onClose}
             aria-label="Close pin dialog"
-            className="rounded-pill p-1 text-soft-ink-soft transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="rounded-pill p-1 text-soft-ink-soft transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <X className="w-6 h-6" />
           </button>
@@ -480,7 +480,7 @@ export default function PaidPinModal({
                   // Wybor jest zamrazany przy platnosci, ale blokada w trakcie
                   // przetwarzania oszczedza uzytkownikowi mylacego widoku.
                   disabled={isProcessing}
-                  className={`relative w-full text-left border-2 rounded-card p-3 sm:p-4 cursor-pointer transition-[background-color,border-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                  className={`relative w-full text-left border-2 rounded-card p-3 sm:p-4 cursor-pointer transition-[background-color,border-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                     isSelected
                       ? 'border-soft-accent bg-soft-accent-soft'
                       : 'border-soft-line hover:border-soft-line-strong'
@@ -575,7 +575,7 @@ export default function PaidPinModal({
           <button
             onClick={handlePayAndPin}
             disabled={buttonState.disabled}
-            className={`w-full py-3 mt-4 font-soft-display font-bold rounded-pill transition-[background-color,box-shadow,transform] duration-[--dur-press] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2
+            className={`w-full py-3 mt-4 font-soft-display font-bold rounded-pill transition-[background-color,box-shadow,transform] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2
               ${buttonState.disabled
                 ? 'bg-soft-line text-soft-ink-soft cursor-not-allowed'
                 : 'bg-soft-accent text-soft-ink shadow-chip hover:shadow-float active:scale-[0.97]'}`

@@ -196,7 +196,7 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
           <button
             onClick={() => setShowAll(!showAll)}
             aria-expanded={showAll}
-            className="flex-shrink-0 font-soft text-xs font-semibold text-soft-primary-deep rounded-pill px-2.5 py-1.5 transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex-shrink-0 font-soft text-xs font-semibold text-soft-primary-deep rounded-pill px-2.5 py-1.5 transition-[color,background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             {showAll ? 'Show less' : 'Show all'}
           </button>
@@ -208,7 +208,7 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
           na przestrzeni 150 pikseli. */}
       <div className="space-y-1">
         {displayedTips.map((tip) => (
-          <div key={tip.id} className="flex items-center justify-between gap-3 p-2 rounded-2xl hover:bg-soft-sunken transition-colors duration-[--dur-press] ease-out-strong">
+          <div key={tip.id} className="flex items-center justify-between gap-3 p-2 rounded-2xl hover:bg-soft-sunken transition-colors [transition-duration:var(--dur-press)] ease-out-strong">
             <div className="flex items-center gap-3 min-w-0">
               {/* Token + Network Icon */}
               <div className="flex-shrink-0 w-8 h-8 bg-soft-sunken rounded-full flex items-center justify-center relative">
@@ -245,7 +245,7 @@ export default function RecentTips({ userAddress, limit = 10, className = '' }: 
                     href={`/tip/${tip.txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep rounded-pill transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-end space-x-1"
+                    className="font-soft text-[11.5px] font-semibold text-soft-ink-soft hover:text-soft-primary-deep rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-end space-x-1"
                   >
                     <span>Receipt</span>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

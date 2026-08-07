@@ -196,7 +196,7 @@ export default function SoftTrendsPanel({
             <button
               type="button"
               onClick={onSeeAll}
-              className="font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               See all
             </button>
@@ -214,7 +214,7 @@ export default function SoftTrendsPanel({
                 <button
                   type="button"
                   onClick={() => onOpenUser?.(user.address)}
-                  className="flex w-full items-center gap-3 rounded-pill py-2.5 text-left transition-[background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.99] hover:bg-soft-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  className="flex w-full items-center gap-3 rounded-pill py-2.5 text-left transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.99] hover:bg-soft-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
                   <span
                     className="flex h-6 w-6 flex-none items-center justify-center rounded-full font-soft-display text-[11px] font-bold text-white"
@@ -284,7 +284,7 @@ export default function SoftTrendsPanel({
               type="button"
               disabled={page! <= 1 || isLoadingPage}
               onClick={() => onPageChange!(page! - 1)}
-              className="rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:text-soft-ink-faint disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:text-soft-ink-faint disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               ← Prev
             </button>
@@ -297,7 +297,7 @@ export default function SoftTrendsPanel({
               type="button"
               disabled={page! >= totalPages! || isLoadingPage}
               onClick={() => onPageChange!(page! + 1)}
-              className="rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:text-soft-ink-faint disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className="rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:text-soft-ink-faint disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               Next →
             </button>

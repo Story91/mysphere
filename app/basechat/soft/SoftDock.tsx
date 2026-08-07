@@ -69,7 +69,7 @@ export default function SoftDock({
                 // dawala 41px wysokosci - o trzy piksele za malo, a przy
                 // czterech przyciskach kazdy chybiony dotyk trafia w sasiada.
                 'flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-[3px] rounded-[14px] px-4 py-1.5',
-                'transition-[background-color,transform] duration-[--dur-press] ease-out-strong',
+                'transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong',
                 'active:scale-[0.94] outline-none',
                 'focus-visible:ring-2 focus-visible:ring-soft-primary',
                 // Nieaktywne szly dotad kolorem `soft-line-strong` - to token
@@ -86,7 +86,7 @@ export default function SoftDock({
                   dzieki temu wysokosc przycisku nie skacze przy przelaczaniu. */}
               <span
                 aria-hidden="true"
-                className={`h-1 w-1 rounded-full bg-soft-primary transition-opacity duration-[--dur-press] ${
+                className={`h-1 w-1 rounded-full bg-soft-primary transition-opacity [transition-duration:var(--dur-press)] ${
                   isActive ? 'opacity-100' : 'opacity-0'
                 }`}
               />

@@ -58,7 +58,7 @@ export default function PremiumComposer({
         onClick={onToggle}
         disabled={disabled}
         aria-expanded={isOpen}
-        className="inline-flex items-center gap-1.5 rounded-pill font-soft text-xs font-semibold text-soft-ink-muted transition-[color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-accent-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:active:scale-100"
+        className="inline-flex items-center gap-1.5 rounded-pill font-soft text-xs font-semibold text-soft-ink-muted transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-accent-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:active:scale-100"
       >
         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
           <rect x="4" y="10" width="16" height="10" rx="2" />
@@ -82,7 +82,7 @@ export default function PremiumComposer({
             rows={3}
             disabled={disabled}
             placeholder="Only readers who pay will see this."
-            className="w-full resize-none rounded-2xl border border-soft-accent/60 bg-soft-surface px-3 py-2 text-sm text-soft-ink outline-none transition-[border-color] duration-[--dur-press] ease-out-strong placeholder:text-soft-ink-soft focus:border-soft-accent-deep focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="w-full resize-none rounded-2xl border border-soft-accent/60 bg-soft-surface px-3 py-2 text-sm text-soft-ink outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong placeholder:text-soft-ink-soft focus:border-soft-accent-deep focus-visible:ring-2 focus-visible:ring-soft-primary"
           />
 
           <div className="mt-3 flex items-end gap-2">
@@ -102,7 +102,7 @@ export default function PremiumComposer({
                 value={value.unlockPrice}
                 onChange={(e) => onChange({ ...value, unlockPrice: e.target.value })}
                 disabled={disabled}
-                className="w-full rounded-2xl border border-soft-accent/60 bg-soft-surface px-3 py-2 font-soft-display text-sm tabular-nums text-soft-ink outline-none transition-[border-color] duration-[--dur-press] ease-out-strong focus:border-soft-accent-deep focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="w-full rounded-2xl border border-soft-accent/60 bg-soft-surface px-3 py-2 font-soft-display text-sm tabular-nums text-soft-ink outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong focus:border-soft-accent-deep focus-visible:ring-2 focus-visible:ring-soft-primary"
               />
             </div>
             <div className="flex gap-1 pb-0.5">
@@ -112,7 +112,7 @@ export default function PremiumComposer({
                   type="button"
                   disabled={disabled}
                   onClick={() => onChange({ ...value, unlockToken: token })}
-                  className={`rounded-pill border px-3 py-2 font-soft-display text-xs font-semibold transition-[background-color,border-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                  className={`rounded-pill border px-3 py-2 font-soft-display text-xs font-semibold transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                     value.unlockToken === token
                       ? 'border-soft-accent-deep bg-soft-surface text-soft-accent-deep'
                       : 'border-soft-accent/50 text-soft-ink-muted hover:border-soft-accent'

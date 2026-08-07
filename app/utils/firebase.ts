@@ -343,37 +343,82 @@ export const refreshAllDomainBonuses = async (): Promise<{
   }
 };
 
-// Zaawansowany system lajków
-export const toggleLike = async (postId: string, userId: string): Promise<boolean> => {
+/**
+ * Przelaczenie lajka.
+ *
+ * === DLACZEGO TO NIE JEST JUZ TRANSAKCJA ===
+ * Bylo `runTransaction`. Wygladalo poprawnie i przez to bylo trudne do
+ * znalezienia: lajki NIE DZIALALY w produkcji, a przycisk pokazywal
+ * "Could not save your like" - komunikat z bloku catch, czyli zlapany wyjatek
+ * udajacy odmowe.
+ *
+ * Zmierzone sonda tylko do odczytu na tej bazie:
+ *   - getDoc / getDocs                      -> OK
+ *   - getCountFromServer                    -> RESOURCE_EXHAUSTED
+ *   - runTransaction NIC NIE ZAPISUJACA     -> RESOURCE_EXHAUSTED
+ *
+ * Czyli wyczerpany limit obejmuje CALA sciezke transakcyjna, a nie tylko
+ * agregacje - dlatego postowanie i komentowanie dzialalo, a lajkowanie nie.
+ * Wczesniejsza poprawka (commit 1c6a673) zdjela z agregacji sam LICZNIK
+ * globalny i to bylo za malo, bo prawdziwa blokada byla o poziom nizej.
+ *
+ * === DLACZEGO TRANSAKCJA BYLA TU ZBEDNA OD POCZATKU ===
+ * Sluzyla wylacznie do odczytania `likedBy`, zeby wiedziec, czy to lajk czy
+ * cofniecie. Ale `arrayUnion` i `arrayRemove` sa IDEMPOTENTNE po stronie
+ * serwera - podwojne dodanie tego samego adresu nie robi duplikatu, a
+ * usuniecie nieobecnego nie jest bledem. Odczyt pod zamkiem chronil wiec
+ * decyzje, ktorej i tak nie da sie zepsuc.
+ *
+ * === CO SIE PRZEZ TO TRACI (uczciwie) ===
+ * Pole `likes` to osobny licznik i `increment` nie jest warunkowy. Przy
+ * DWOCH rownoczesnych klknieciach tego samego uzytkownika w tego samego
+ * posta `likedBy` zostanie poprawne, a `likes` moze rozjechac sie o jeden.
+ * To jest realna cena i swiadomie ja placimy: alternatywa to lajki, ktore
+ * nie dzialaja wcale.
+ *
+ * === PODPOWIEDZI OD WYWOLUJACEGO ===
+ * `hints` pozwala pominac odczyt calkowicie. PostList i tak zna `wasLiked`
+ * (liczy je z post.likedBy, zeby narysowac serduszko) oraz autora posta -
+ * przekazanie ich tutaj zamienia lajk w JEDEN zapis i ZERO odczytow.
+ * Bez podpowiedzi spadamy na zwykly getDoc, ktory dziala.
+ */
+export const toggleLike = async (
+  postId: string,
+  userId: string,
+  hints?: { wasLiked?: boolean; author?: string }
+): Promise<boolean> => {
   try {
     const postRef = doc(db, 'posts', postId);
 
-    // Użyj transakcji zamiast batcha - jest szybsza i bardziej niezawodna
-    const outcome = await runTransaction(db, async (transaction) => {
-      const postDoc = await transaction.get(postRef);
+    let isLiked: boolean;
+    let author: string | undefined;
 
+    if (typeof hints?.wasLiked === 'boolean' && hints.author) {
+      isLiked = hints.wasLiked;
+      author = hints.author;
+    } else {
+      // Zwykly odczyt - ta sciezka NIE jest objeta limitem transakcji.
+      const postDoc = await getDoc(postRef);
       if (!postDoc.exists()) {
         throw new Error('Post nie istnieje');
       }
-
       const postData = postDoc.data();
-      const likedBy = postData.likedBy || [];
-      const isLiked = likedBy.includes(userId);
+      isLiked = (postData.likedBy || []).includes(userId);
+      author = postData.author as string;
+    }
 
-      // Aktualizuj post z inkrementacją/dekrementacją lajków
-      transaction.update(postRef, {
-        likes: increment(isLiked ? -1 : 1),
-        likedBy: isLiked ? arrayRemove(userId) : arrayUnion(userId)
-      });
-
-      return { isLiked, author: postData.author as string };
+    await updateDoc(postRef, {
+      likes: increment(isLiked ? -1 : 1),
+      likedBy: isLiked ? arrayRemove(userId) : arrayUnion(userId)
     });
 
-    // Licznik lajkow autora AKTUALIZUJEMY DOPIERO PO transakcji.
+    const outcome = { isLiked, author };
+
+    // Licznik lajkow autora AKTUALIZUJEMY DOPIERO PO zapisie lajka.
     // Wczesniej stal setTimeout wewnatrz callbacku transakcji - a Firestore
     // uruchamia ten callback ponownie przy kazdym konflikcie zapisu, wiec przy
-    // dwoch rownoczesnych lajkach autor dostawal +2 za jeden lajk. Zapis poza
-    // transakcja jest z zalozenia nieatomowy, ale przynajmniej wykonuje sie raz.
+    // dwoch rownoczesnych lajkach autor dostawal +2 za jeden lajk. Zapis osobno
+    // jest z zalozenia nieatomowy, ale przynajmniej wykonuje sie raz.
     if (outcome.author && outcome.author !== userId) {
       try {
         await updateDoc(doc(db, 'users', outcome.author), {
@@ -1306,75 +1351,92 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
   }
 };
 
-// Funkcja do przełączania polubienia komentarza
+/**
+ * Przelaczenie lajka pod komentarzem.
+ *
+ * === TA SAMA PRZYCZYNA CO W toggleLike ===
+ * Bylo `runTransaction`, a transakcje sa na tej bazie odrzucane
+ * (RESOURCE_EXHAUSTED nawet dla transakcji, ktora nic nie zapisuje). Lajk pod
+ * komentarzem po prostu nie dzialal. Pelna diagnoza przy `toggleLike` wyzej.
+ *
+ * === DLACZEGO TU JEST TRUDNIEJ NIZ PRZY POSCIE ===
+ * Lajk posta da sie zrobic bez odczytu, bo `arrayUnion` / `arrayRemove` sa
+ * idempotentne. Komentarz siedzi jako ELEMENT TABLICY w dokumencie posta,
+ * a Firestore nie umie zaadresowac elementu tablicy - trzeba wczytac cala
+ * tablice, podmienic jeden wpis i zapisac ja z powrotem. Odczyt jest wiec
+ * nieusuwalny; usuwalna byla tylko transakcja wokol niego.
+ *
+ * `getDoc` (zwykly odczyt) dziala normalnie, wiec czytamy nim, a oba zapisy
+ * wysylamy jednym `writeBatch`. Batch NIE JEST transakcja - nie sprawdza, czy
+ * dane nie zmienily sie od odczytu - ale gwarantuje, ze dokument posta
+ * i dokument komentarza zmienia sie razem albo wcale. Batche na tej bazie
+ * dzialaja (chodzi po nich kasowanie komentarzy i przyznawanie bonusow).
+ *
+ * === CENA, KTORA PLACIMY SWIADOMIE ===
+ * Zgubiona aktualizacja przy wyscigu: jesli dwie osoby lajkuja DWA ROZNE
+ * komentarze pod TYM SAMYM postem w tej samej chwili, ta druga nadpisze cala
+ * tablice wersja sprzed pierwszej i tamten lajk przepadnie. Transakcja by
+ * tego pilnowala. Zamieniamy rzadka utrate jednego lajka na funkcje, ktora
+ * w ogole dziala - przy dzisiejszym ruchu to nie jest bliska decyzja.
+ */
 export const toggleCommentLike = async (postId: string, commentId: string, userId: string) => {
   try {
     const postRef = doc(db, 'posts', postId);
     const commentRef = doc(db, 'comments', commentId);
-    
-    // Użyj transakcji zamiast wielu operacji odczytu/zapisu
-    return await runTransaction(db, async (transaction) => {
-      // Wykonaj WSZYSTKIE odczyty na początku transakcji
-      const postDoc = await transaction.get(postRef);
-      const commentDoc = await transaction.get(commentRef);
 
-      if (!postDoc.exists()) {
-        throw new Error('Post not found');
-      }
-      
-      // Pobierz tablicę komentarzy z dokumentu posta
-      const postData = postDoc.data();
-      const comments = postData.comments || [];
-      
-      // Znajdź indeks komentarza w tablicy
-      const commentIndex = comments.findIndex((c: any) => c.id === commentId);
-      
-      if (commentIndex === -1) {
-        throw new Error('Comment not found');
-      }
-      
-      // Pobierz dane komentarza
-      const comment = comments[commentIndex];
-      const likedBy = comment.likedBy || [];
-      const isLiked = likedBy.includes(userId);
-      
-      // Przygotuj zaktualizowaną wersję komentarza
-      const updatedComment = {
-        ...comment,
-        likes: (comment.likes || 0) + (isLiked ? -1 : 1),
-        likedBy: isLiked 
-          ? likedBy.filter((id: string) => id !== userId)
-          : [...likedBy, userId]
-      };
-      
-      // Utwórz nową tablicę komentarzy z zaktualizowanym komentarzem
-      comments[commentIndex] = updatedComment;
-      
-      // WSZYSTKIE ZAPISY wykonuj PO wszystkich odczytach
-      
-      // Zaktualizuj dokument posta w transakcji
-      transaction.update(postRef, { 
-        comments: comments,
+    // Oba odczyty rownolegle - sa niezalezne, a i tak czekamy na komplet.
+    const [postDoc, commentDoc] = await Promise.all([getDoc(postRef), getDoc(commentRef)]);
+
+    if (!postDoc.exists()) {
+      throw new Error('Post not found');
+    }
+
+    const postData = postDoc.data();
+    const comments = [...(postData.comments || [])];
+
+    const commentIndex = comments.findIndex((c: any) => c.id === commentId);
+    if (commentIndex === -1) {
+      throw new Error('Comment not found');
+    }
+
+    const comment = comments[commentIndex];
+    const likedBy = comment.likedBy || [];
+    const isLiked = likedBy.includes(userId);
+
+    comments[commentIndex] = {
+      ...comment,
+      likes: Math.max(0, (comment.likes || 0) + (isLiked ? -1 : 1)),
+      likedBy: isLiked
+        ? likedBy.filter((id: string) => id !== userId)
+        : [...likedBy, userId]
+    };
+
+    const batch = writeBatch(db);
+
+    batch.update(postRef, {
+      comments,
+      lastUpdated: serverTimestamp()
+    });
+
+    // Kolekcja `comments` jest opcjonalnym duplikatem - starsze komentarze
+    // zyja wylacznie w tablicy na poscie. Brak dokumentu nie jest bledem.
+    if (commentDoc.exists()) {
+      const commentData = commentDoc.data();
+      const commentLikedBy = commentData.likedBy || [];
+      const isCommentLiked = commentLikedBy.includes(userId);
+
+      batch.update(commentRef, {
+        likes: Math.max(0, (commentData.likes || 0) + (isCommentLiked ? -1 : 1)),
+        likedBy: isCommentLiked
+          ? commentLikedBy.filter((id: string) => id !== userId)
+          : [...commentLikedBy, userId],
         lastUpdated: serverTimestamp()
       });
-      
-      // Jeśli komentarz istnieje w kolekcji comments, zaktualizuj go również tam
-      if (commentDoc.exists()) {
-        const commentData = commentDoc.data();
-        const commentLikedBy = commentData.likedBy || [];
-        const isCommentLiked = commentLikedBy.includes(userId);
-        
-        transaction.update(commentRef, {
-          likes: (commentData.likes || 0) + (isCommentLiked ? -1 : 1),
-          likedBy: isCommentLiked 
-            ? commentLikedBy.filter((id: string) => id !== userId)
-            : [...commentLikedBy, userId],
-          lastUpdated: serverTimestamp()
-        });
-      }
-      
-      return !isLiked; // Zwróć true jeśli dodano lajka, false jeśli usunięto
-    });
+    }
+
+    await batch.commit();
+
+    return !isLiked; // true = dodano lajka, false = usunieto
   } catch (error) {
     console.error('Error toggling comment like:', error);
     throw error;

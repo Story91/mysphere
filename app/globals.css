@@ -601,12 +601,15 @@ h1, h2, h3, h4, h5, h6 {
    teza produktu w jednym obrazku: pieniadz dociera tu z lancuchow i sie
    rozlicza.
 
-   SKAD SIE BIERZE "JEDNA NARAZ" BEZ ZADNEGO JAVASCRIPTU. Wszystkie monety maja
-   ten sam, dlugi cykl (7 x 1600 ms = 11200 ms), w ktorym RUCH zajmuje tylko
-   pierwsze 10% - reszta to przezroczystosc. Komponent podaje kazdemu
-   przewodowi ujemne opoznienie o wielokrotnosc 1600 ms, wiec kazdy startuje
-   w innym miejscu tego samego cyklu i okienka ruchu nigdy sie nie nakladaja.
-   Zaden timer, zaden stan, zero pracy na glownym watku.
+   SKAD SIE BIERZE "JEDNA NARAZ" BEZ ZADNEGO JAVASCRIPTU. Kazdy przewod dostaje
+   od komponentu wlasne DODATNIE opoznienie o wielokrotnosc taktu (1600 ms),
+   a sam przejazd trwa 720 ms - krocej niz takt, wiec dwie monety nigdy nie sa
+   w ruchu naraz. Zaden timer, zaden stan, zero pracy na glownym watku.
+
+   PRZEJAZD JEST SKONCZONY. Kazdy lancuch wysyla RAZ, po kolei, a potem obrazek
+   zastyga w zlozonej klatce koncowej. Powody przy `soft-wire-rest` nizej -
+   w skrocie: petla bez konca twierdzi cos, czego nie da sie sprawdzic, a ten
+   ekran ma zasade "zero wymyslonych danych".
 
    DLACZEGO PRZEJAZD JEST `linear`, A BLYSK NIE. Przejazd to ruch ciagly po
    torze - easing zamienilby go w szarpanie. Blysk rozliczenia jest ZDARZENIEM
@@ -619,13 +622,28 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Dlugosc przewodu = promien kola wezlow. Trzymana jako zmienna, bo korzystaja
    z niej i szerokosc przewodu, i droga monety - musza byc tej samej dlugosci
-   co do piksela, inaczej moneta startuje obok znaku sieci. */
+   co do piksela, inaczej moneta startuje obok znaku sieci.
+
+   --coin-in: gdzie moneta KONCZY bieg. Nie w srodku sceny, tylko tuz PO
+   WEJSCIU POD tarcze znaku marki: promien tarczy minus promien monety minus
+   piksel zapasu. Patrz "JEDNO ZDARZENIE" nizej - to jest cala poprawka.
+
+   PROG 576px, NIE 640px. tailwind.config.ts:12 przestawia `sm` na 576px, wiec
+   przy tej szerokosci tarcza rosnie do 76px, znaki sieci do 30px, a kolo
+   prowadzace do 188px. Dlugosc przewodu jako jedyna czekala do 640px - przez
+   co w oknie 576-639px siedem znakow sieci wisialo 14px WEWNATRZ kola, na
+   ktorym mialy siedziec. To jedyne `min-width: 640px` w calym CSS tego repo
+   i bylo pomylka, nie decyzja. */
 .soft-settle-stage {
   --rail-len: 80px;
+  --coin-in: 27px; /* tarcza r=33, moneta r=5 */
+  --beat: 1600ms; /* odstep miedzy przyjazdami */
+  --send-dur: 720ms; /* czas przejazdu jednej monety */
 }
-@media (min-width: 640px) {
+@media (min-width: 576px) {
   .soft-settle-stage {
     --rail-len: 94px;
+    --coin-in: 32px; /* tarcza r=38, moneta r=5 */
   }
 }
 
@@ -651,8 +669,48 @@ h1, h2, h3, h4, h5, h6 {
   border-top: 1px dashed rgba(255, 255, 255, 0.3);
 }
 
+/* ===========================================================================
+   JEDNO ZDARZENIE: MONETA WJEZDZA POD ZNAK MARKI, OBWODKA BLYSKA W TEJ KLATCE
+   ===========================================================================
+   Tu byl prawdziwy blad, ukryty przez wlasny komentarz. Poprzednia wersja
+   twierdzila, ze "obwodka zapala sie w tej samej klatce, w ktorej moneta
+   wchodzi pod znak marki". Arytmetyka mowila co innego:
+
+     - moneta jechala do translateX(0), czyli do SRODKA sceny, a tarcza znaku
+       marki ma promien 33px i jest rysowana PO monecie - wiec moneta znikala
+       z oczu okolo 700 ms,
+     - blysk mial opoznienie 1120 ms.
+
+   Czterysta milisekund przerwy miedzy przyczyna a skutkiem. Oko nie laczy
+   dwoch rzeczy oddalonych o 0,4 sekundy w jedno zdarzenie, wiec zdanie
+   "pieniadz dociera i sie rozlicza" nie bylo wypowiadane. Byly wypowiadane
+   dwa osobne zdania, drugie do nikogo, bo bohater juz wyszedl z kadru.
+
+   Z czterech klatek kluczowych starego przejazdu TRZY renderowaly sie za
+   czyms: pop ze scale(0.5) do scale(1) przy 1,6% dzial sie pod znakiem sieci,
+   a zanik przezroczystosci na koncu - pod tarcza. Jedyne, co czlowiek kiedy-
+   kolwiek widzial, to liniowy translateX. Reszta byla praca wykonana w
+   ciemnosci.
+
+   TERAZ: moneta jedzie DO --coin-in, czyli tuz pod krawedz tarczy, i tam
+   zostaje. Zadnych klatek przezroczystosci - monete zaslaniaja PRAWDZIWE
+   OBIEKTY, ktore i tak stoja na jej drodze: znak sieci na starcie, tarcza
+   marki na mecie. To jest lepsze niz zanikanie, bo znaczy cos konkretnego:
+   platnosc wychodzi ze znaku lancucha i wchodzi pod znak MySphere.
+
+   Czas przejazdu i opoznienie blysku to teraz TA SAMA ZMIENNA (--send-dur).
+   Nie da sie ich rozjechac, nie zmieniajac obu naraz.
+
+   TEMPO BEZ ZMIAN: dawniej widoczne bylo 34px w 462 ms (74 px/s), teraz
+   widac cale 53px w 720 ms (74 px/s). Ten sam ruch, tylko w calosci widoczny -
+   udzial widocznego ruchu w takcie rosnie z 29% do 45%.
+   =========================================================================== */
+
 /* Moneta. Ujemne marginesy sadzaja ja na osi przewodu raz na zawsze, dzieki
-   czemu w klatkach zostaje sam translateX - bez mieszania z translate(-50%). */
+   czemu w klatkach zostaje sam translateX - bez mieszania z translate(-50%).
+
+   `opacity: 1` w stanie bazowym jest CELOWE, mimo ze przez wiekszosc czasu
+   monety nie widac. Chowaja ja obiekty, nie przezroczystosc. */
 .soft-wire-coin {
   position: absolute;
   left: 0;
@@ -663,31 +721,82 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 999px;
   background: rgb(var(--soft-accent));
   box-shadow: 0 0 0 3px rgba(245, 167, 59, 0.22);
-  opacity: 0;
-  animation: soft-wire-send 11200ms linear infinite;
+  opacity: 1;
+  animation:
+    soft-wire-send var(--send-dur) linear var(--send-delay, 0ms) 1 both,
+    soft-wire-rest var(--dur-sheet) var(--ease-out-strong)
+      calc(var(--settle-count, 7) * var(--beat) - 160ms) 1 forwards;
 }
 
 @keyframes soft-wire-send {
-  0%    { opacity: 0; transform: translateX(var(--rail-len)) scale(0.5); }
-  1.6%  { opacity: 1; transform: translateX(calc(var(--rail-len) * 0.86)) scale(1); }
-  8.4%  { opacity: 1; transform: translateX(calc(var(--rail-len) * 0.16)) scale(1); }
-  10%   { opacity: 0; transform: translateX(0) scale(0.5); }
-  100%  { opacity: 0; transform: translateX(0) scale(0.5); }
+  from { transform: translateX(var(--rail-len)); }
+  to   { transform: translateX(var(--coin-in)); }
 }
 
-/* Blysk rozliczenia. Okres 1600 ms = odstep miedzy przyjazdami, opoznienie
-   1120 ms = czas przejazdu, wiec obwodka zapala sie w tej samej klatce,
-   w ktorej moneta wchodzi pod znak marki. Skala konczy sie na 1.08 - wiecej
-   robi z tego falowanie, ktore przestaje znaczyc "rozliczone". */
+/* ===========================================================================
+   PRZEJAZD, NIE PETLA: KAZDY LANCUCH WYSYLA RAZ, POTEM OBRAZEK STOI
+   ===========================================================================
+   Bylo: osiem animacji `infinite`, w kolko, do konca zycia karty. Dwa powody,
+   zeby to skonczyc - oba wynikaja z tego pliku, nie z ogolnych zaleceń.
+
+   1. NIESKONCZONA PETLA TO ZMYSLONA LICZBA. Naglowek tego komponentu mowi
+      "ZERO WYMYSLONYCH DANYCH" i wyrzucilismy stad trzy fikcyjne posty
+      wlasnie dlatego, ze produkt obiecuje liczby sprawdzalne. Petla bez konca
+      twierdzi "2250 rozliczen na godzine, zawsze" - w aplikacji, ktora nie
+      pokazuje na tym ekranie ani jednej prawdziwej transakcji. Przejazd
+      twierdzi dokladnie tyle, ile jest prawda: TE lancuchy tu rozliczaja.
+
+   2. DLUGOSC BIERZE SIE Z DANYCH. Liczba taktow to dlugosc SOFT_NETWORKS -
+      ta sama tablica, ktora rysuje wezly. Dojdzie osmy lancuch, przejazd sam
+      sie wydluzy. Nigdzie nie ma wpisanej siodemki.
+
+   PRZY OKAZJI: stare ujemne opoznienia (-index * 1600ms) odtwarzaly liste
+   TYLEM (0, 6, 5, 4, 3, 2, 1) i przy skonczonej liczbie powtorzen w ogole by
+   nie zadzialaly - przewody 1-6 zaczynalyby PO swoim oknie ruchu i nigdy by
+   nie ruszyly. Dodatnie opoznienia naprawiaja jedno i drugie.
+
+   KLATKA KONCOWA JEST TA SAMA, CO PRZY OGRANICZONYM RUCHU: moneta na kazdym
+   przewodzie, obwodka przygaszona. Scena ma teraz dokladnie dwa stany - GRA
+   i STOI - a `prefers-reduced-motion` po prostu zaczyna od STOI. To mocniejsza
+   umowa niz "ograniczony ruch to przypadek szczegolny".
+
+   Klatka koncowa MUSI byc zlozona, a nie pusta. Gdyby monety znikaly, ktos,
+   kto wszedl w polowie przejazdu i odwrocil wzrok, zobaczylby martwy obrazek
+   i przeczytal to jako awarie. */
+@keyframes soft-wire-rest {
+  from { opacity: 0; transform: translateX(calc(var(--rail-len) * 0.55)); }
+  to   { opacity: 1; transform: translateX(calc(var(--rail-len) * 0.55)); }
+}
+
+/* Blysk rozliczenia. Opoznienie rowne czasowi przejazdu, okres rowny odstepowi
+   miedzy przyjazdami, liczba powtorzen rowna liczbie lancuchow - obwodka
+   zapala sie dokladnie tyle razy, ile monet dojedzie, i za kazdym razem w tej
+   samej klatce, w ktorej moneta wchodzi pod tarcze.
+
+   `forwards`, a NIE `both`: przy `both` wsteczne wypelnienie zapalaloby
+   obwodke na 0.9 juz w chwili 0 i trzymalo przez cale 720 ms, zanim
+   cokolwiek dojedzie - obwodka swiecilaby na pusto.
+
+   Szczyt przesuniety z 60% na 35%: blysk ma byc ZDARZENIEM, a rozciagniety na
+   960 ms przestawal nim byc. Skala konczy sie na 1.08 - wiecej robi z tego
+   falowanie, ktore przestaje znaczyc "rozliczone". */
 .soft-settle-ring {
   opacity: 0;
-  animation: soft-settle-flash 1600ms var(--ease-out-strong) 1120ms infinite;
+  animation:
+    soft-settle-flash var(--beat) var(--ease-out-strong) var(--send-dur)
+      var(--settle-count, 7) forwards,
+    soft-settle-rest var(--dur-sheet) var(--ease-out-strong)
+      calc(var(--settle-count, 7) * var(--beat) - 160ms) 1 forwards;
 }
 
 @keyframes soft-settle-flash {
   0%   { opacity: 0.9; transform: translate(-50%, -50%) scale(1); }
-  60%  { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
+  35%  { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
+}
+
+@keyframes soft-settle-rest {
+  to { opacity: 0.45; }
 }
 
 /* Wejscie ekranu: scena, naglowek, zdanie i przyciski wchodza kaskada co 60 ms.
@@ -703,10 +812,49 @@ h1, h2, h3, h4, h5, h6 {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Komunikat pod przyciskami: "Signed in as 0x…" albo blad portfela.
+   To JEDYNY element tego ekranu, ktory nie mial zadnego ruchu - cala reszta
+   byla starannie ustawiona w czasie, a stan, ktory czlowiek czyta pod
+   stresem (anulowany passkey, odmowa portfela), po prostu wyskakiwal.
+
+   `@starting-style` zamiast `useEffect` z `mounted` - to jest wejscie
+   elementu, ktory dopiero co pojawil sie w drzewie, wiec nalezy do CSS,
+   a nie do stanu Reacta. Przegladarka bez wsparcia pokazuje komunikat od
+   razu, czyli dokladnie tak jak dzis - czyste ulepszenie stopniowe, bez
+   @supports.
+
+   PRZEJSCIE, a nie klatki kluczowe: komunikat potrafi zmienic sie w trakcie
+   (blad -> inny blad), a przejscia da sie przerwac i przekierowac w locie.
+
+   --dur-dropdown to 200ms i przy ograniczonym ruchu spada do 1ms samo
+   z siebie (patrz blok :root wyzej). To pierwsza rzecz w tym repo, ktora
+   naprawde korzysta z tamtego przelacznika. */
+.soft-note {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--dur-dropdown) var(--ease-out-strong),
+    transform var(--dur-dropdown) var(--ease-out-strong);
+}
+
+@starting-style {
+  .soft-note {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 /* Ograniczony ruch: zatrzymujemy WSZYSTKO, ale nic nie znika. Monety zostaja
    zaparkowane na przewodach, obwodka rozliczenia zostaje widoczna, kaskada
    wejscia oddaje gotowy uklad. Obrazek mowi to samo zdanie - tylko go nie
-   odgrywa. Gdyby monety znikaly, ekran stracilby swoja jedyna teze. */
+   odgrywa. Gdyby monety znikaly, ekran stracilby swoja jedyna teze.
+
+   OD CZASU PRZEJSCIA NA SKONCZONY PRZEJAZD TO NIE JEST JUZ PRZYPADEK
+   SZCZEGOLNY. Wartosci ponizej sa CO DO PIKSELA tym samym, do czego
+   dochodza `soft-wire-rest` i `soft-settle-rest` po ostatnim przyjezdzie.
+   Scena ma dwa stany - GRA i STOI - a ten blok po prostu zaczyna od STOI.
+   Jesli kiedys zmieni sie klatka koncowa przejazdu, MUSI zmienic sie i tutaj:
+   inaczej dwie grupy ludzi zobacza dwa rozne obrazki tego samego produktu. */
 @media (prefers-reduced-motion: reduce) {
   .soft-wire-coin {
     animation: none;

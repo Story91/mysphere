@@ -18,13 +18,21 @@ import { SOFT_NETWORKS } from './SoftStoryRail';
  *
  * Uklad: znak marki w srodku, wokol niego wszystkie sieci z konfiguracji, a od
  * kazdej sieci biegnie do srodka przewod. Po przewodach jedza pomaranczowe
- * monety - JEDNA NARAZ. Kiedy moneta dojezdza, obwodka znaku blyska raz
- * i moneta znika pod spodem: platnosc weszla do feedu.
+ * monety - JEDNA NARAZ. Kiedy moneta dojezdza, obwodka znaku blyska w TEJ
+ * SAMEJ klatce i moneta znika pod tarcza: platnosc weszla do feedu.
  *
  * DLACZEGO JEDNA NARAZ. Siedem monet jednoczesnie to szum - oko nie ma czego
  * sledzic i caly obrazek zamienia sie w migotanie. Jedna moneta na przewodzie
  * jest zdarzeniem: da sie ja przeprowadzic wzrokiem od sieci do srodka. Rytm
  * (1,6 s na przyjazd) robi z tego puls rozliczen, a nie animacje.
+ *
+ * DLACZEGO PRZEJAZD SIE KONCZY. Kazdy lancuch wysyla dokladnie raz, po kolei,
+ * a potem scena zastyga: moneta na kazdym przewodzie, obwodka przygaszona.
+ * Petla bez konca twierdzilaby "2250 rozliczen na godzine, zawsze" - liczbe,
+ * ktorej nikt nie sprawdzi, na ekranie, ktory kilka akapitow nizej obiecuje,
+ * ze niczego tu nie zmyslamy. Skonczony przejazd twierdzi dokladnie tyle, ile
+ * jest prawda: TE lancuchy tu rozliczaja. Dlugosc bierze sie z SOFT_NETWORKS,
+ * wiec osmy lancuch wydluzy przejazd sam.
  *
  * DLACZEGO POMARANCZ TYLKO NA MONECIE. Pomaranczowy akcent jest w tym systemie
  * zarezerwowany dla pieniedzy. Wczesniej mial go wielki dysk pod znakiem marki,
@@ -97,9 +105,14 @@ export default function SoftSignInHero({
           naglowek na monitorze 2560px rozjezdza sie na pol ekranu. */}
       <div className="lg:mx-auto lg:flex lg:w-full lg:max-w-[1080px] lg:items-center lg:gap-16">
       {/* ===== ROZLICZENIE ===== */}
+      {/* --settle-count: ILE RAZY ma sie odegrac przejazd. Bierze sie z dlugosci
+          SOFT_NETWORKS, a nie z liczby wpisanej w CSS - dojdzie osmy lancuch
+          i przejazd sam sie wydluzy. Wpisanie tu siodemki zlamaloby te sama
+          zasade, ktora ten plik trzyma przy liczbie wezlow (patrz STEP). */}
       <div
         aria-hidden="true"
         className="soft-settle-stage soft-hero-rise relative mx-auto mb-7 h-[200px] w-[200px] sm:h-[236px] sm:w-[236px] lg:mb-0 lg:flex-none"
+        style={{ ['--settle-count' as string]: SOFT_NETWORKS.length }}
       >
         {/* Okrag sadzajacy wezly na jednym promieniu. Ledwo widoczny - ma
             trzymac uklad, a nie rywalizowac z przewodami. */}
@@ -118,12 +131,19 @@ export default function SoftSignInHero({
             >
               <span className="soft-wire-line" />
 
-              {/* Ujemne opoznienie przesuwa kazdy przewod o jedno okienko
-                  w tym samym cyklu - dlatego w kadrze jest zawsze dokladnie
-                  jedna moneta, bez zadnego JS-owego zegara. */}
+              {/* DODATNIE opoznienie: kazdy lancuch wysyla po kolei, zaczynajac
+                  od pierwszego z konfiguracji. Bylo tu opoznienie UJEMNE
+                  (-index * 1600ms) - dzialalo tylko przy petli bez konca i mialo
+                  dwie wady. Odtwarzalo liste TYLEM (0, 6, 5, 4, 3, 2, 1), a przy
+                  skonczonej liczbie powtorzen przewody 1-6 zaczynalyby PO swoim
+                  oknie ruchu i nie ruszylyby sie ani razu.
+
+                  W kadrze nadal jest dokladnie jedna moneta w ruchu, bo takt
+                  (1600 ms) jest dluzszy od przejazdu (720 ms). Zadnego zegara
+                  w JS, tak jak dotad. */}
               <span
                 className="soft-wire-coin"
-                style={{ animationDelay: `${-index * 1600}ms` }}
+                style={{ ['--send-delay' as string]: `${index * 1600}ms` }}
               />
 
               {/* Znak sieci odkreca sie o wlasny kat orbity - inaczej lezalby
@@ -213,7 +233,7 @@ export default function SoftSignInHero({
           type="button"
           onClick={onContinueWithBase}
           disabled={isBusy}
-          className="rounded-pill bg-white px-5 py-3.5 font-soft text-[14.5px] font-bold text-soft-primary-deep shadow-float transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+          className="rounded-pill bg-white px-5 py-3.5 font-soft text-[14.5px] font-bold text-soft-primary-deep shadow-float transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
         >
           {isBusy ? 'Check your wallet…' : 'Continue with Base Account'}
         </button>
@@ -222,7 +242,7 @@ export default function SoftSignInHero({
           type="button"
           onClick={onUseAnotherWallet}
           disabled={isBusy}
-          className="rounded-pill border border-white/45 px-5 py-3.5 font-soft text-[14.5px] font-semibold text-white transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-white/10 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+          className="rounded-pill border border-white/45 px-5 py-3.5 font-soft text-[14.5px] font-semibold text-white transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-white/10 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
         >
           Use another wallet
         </button>
@@ -241,12 +261,17 @@ export default function SoftSignInHero({
         Why a like is worth nothing here
       </Link>
 
+      {/* `soft-note` daje tym dwom komunikatom wejscie zamiast wyskoku - patrz
+          globals.css. `role="alert"` zostaje: ogloszenie dla czytnika ekranu
+          jest niezalezne od przejscia i ma sie odbyc tak samo. */}
       {signedInAs && (
-        <p className="mt-5 text-[12.5px] font-semibold text-white/90">Signed in as {signedInAs}</p>
+        <p className="soft-note mt-5 text-[12.5px] font-semibold text-white/90">
+          Signed in as {signedInAs}
+        </p>
       )}
 
       {statusMessage && (
-        <p role="alert" className="mt-5 text-[12.5px] font-semibold text-[#FFD9C2]">
+        <p role="alert" className="soft-note mt-5 text-[12.5px] font-semibold text-[#FFD9C2]">
           {statusMessage}
         </p>
       )}

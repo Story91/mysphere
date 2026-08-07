@@ -100,7 +100,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
       <div className="flex space-x-1 bg-soft-sunken rounded-pill p-1 font-soft">
         <button
           onClick={() => setActiveTab('following')}
-          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
             activeTab === 'following'
               ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
               : 'text-soft-ink-muted hover:text-soft-ink'
@@ -110,7 +110,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('followers')}
-          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
             activeTab === 'followers'
               ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
               : 'text-soft-ink-muted hover:text-soft-ink'
@@ -150,7 +150,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
               {currentList.map((user) => (
                 <div 
                   key={user.address} 
-                  className="bg-soft-surface rounded-card p-4 shadow-card border border-soft-line font-soft transition-shadow duration-[--dur-dropdown] ease-out-strong hover:shadow-float"
+                  className="bg-soft-surface rounded-card p-4 shadow-card border border-soft-line font-soft transition-shadow [transition-duration:var(--dur-dropdown)] ease-out-strong hover:shadow-float"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
@@ -205,7 +205,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => onUserClick?.(user.address)}
-                        className="px-4 py-2 text-sm font-semibold bg-soft-sunken text-soft-ink rounded-pill transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+                        className="px-4 py-2 text-sm font-semibold bg-soft-sunken text-soft-ink rounded-pill transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
                       >
                         View Profile
                       </button>
@@ -215,7 +215,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                         <button
                           onClick={() => handleUnfollow(user.address)}
                           disabled={loadingAction === user.address}
-                          className={`px-4 py-2 text-sm font-semibold rounded-pill border transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+                          className={`px-4 py-2 text-sm font-semibold rounded-pill border transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                             loadingAction === user.address
                               ? 'border-soft-line bg-soft-sunken text-soft-ink-soft cursor-not-allowed'
                               : 'border-soft-line text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97]'

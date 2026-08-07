@@ -192,7 +192,7 @@ const TipStatsCollapsible = ({ networkGroups, getAmount, activeTips, className =
         <button
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
-          className="w-full px-3 py-2 flex items-center justify-between hover:bg-soft-sunken transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          className="w-full px-3 py-2 flex items-center justify-between hover:bg-soft-sunken transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
         >
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xs font-semibold text-soft-ink-faint uppercase tracking-wider">Tips</span>
@@ -223,7 +223,7 @@ const TipStatsCollapsible = ({ networkGroups, getAmount, activeTips, className =
 
         {/* Collapsible table */}
         <div 
-          className={`overflow-hidden transition-[max-height,opacity] duration-[--dur-dropdown] ease-out-strong ${
+          className={`overflow-hidden transition-[max-height,opacity] [transition-duration:var(--dur-dropdown)] ease-out-strong ${
             isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
           }`}
         >

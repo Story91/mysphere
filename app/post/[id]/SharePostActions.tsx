@@ -70,7 +70,7 @@ export default function SharePostActions({
       <button
         type="button"
         onClick={share}
-        className="flex items-center gap-2 rounded-pill bg-soft-primary px-5 py-3 font-soft text-[13.5px] font-bold text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+        className="flex items-center gap-2 rounded-pill bg-soft-primary px-5 py-3 font-soft text-[13.5px] font-bold text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v13" />
@@ -83,7 +83,7 @@ export default function SharePostActions({
           type="button"
           onClick={copy}
           aria-live="polite"
-          className="flex items-center gap-2 rounded-pill bg-soft-surface px-5 py-3 font-soft text-[13.5px] font-semibold text-soft-ink-muted shadow-card transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          className="flex items-center gap-2 rounded-pill bg-soft-surface px-5 py-3 font-soft text-[13.5px] font-semibold text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
         >
           {copied ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

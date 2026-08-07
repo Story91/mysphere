@@ -150,7 +150,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
       <div className="flex bg-soft-sunken rounded-pill p-1 font-soft">
         <button
           onClick={() => setActiveTab('friends')}
-          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
             activeTab === 'friends'
               ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
               : 'text-soft-ink-muted hover:text-soft-ink'
@@ -160,7 +160,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('requests')}
-          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
             activeTab === 'requests'
               ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
               : 'text-soft-ink-muted hover:text-soft-ink'
@@ -175,7 +175,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('sent')}
-          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+          className={`flex-1 rounded-pill px-4 py-2 text-sm font-semibold transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
             activeTab === 'sent'
               ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
               : 'text-soft-ink-muted hover:text-soft-ink'
@@ -207,7 +207,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
               {friends.map((friend) => (
                 <div 
                   key={friend.address} 
-                  className="bg-soft-surface rounded-card p-4 shadow-card border border-soft-line font-soft transition-shadow duration-[--dur-dropdown] ease-out-strong hover:shadow-float"
+                  className="bg-soft-surface rounded-card p-4 shadow-card border border-soft-line font-soft transition-shadow [transition-duration:var(--dur-dropdown)] ease-out-strong hover:shadow-float"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
@@ -249,7 +249,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => onUserClick?.(friend.address)}
-                        className="px-4 py-2 text-sm font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+                        className="px-4 py-2 text-sm font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
                       >
                         View Profile
                       </button>
@@ -304,14 +304,14 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
                       <button
                         onClick={() => handleAcceptRequest(request.id!)}
                         disabled={loadingAction !== null}
-                        className="px-4 py-2 text-sm font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:active:scale-100"
+                        className="px-4 py-2 text-sm font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:active:scale-100"
                       >
                         Accept
                       </button>
                       <button
                         onClick={() => handleRejectRequest(request.id!)}
                         disabled={loadingAction !== null}
-                        className="px-4 py-2 text-sm font-semibold border border-soft-line text-soft-ink-muted rounded-pill transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:active:scale-100"
+                        className="px-4 py-2 text-sm font-semibold border border-soft-line text-soft-ink-muted rounded-pill transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:active:scale-100"
                       >
                         Reject
                       </button>

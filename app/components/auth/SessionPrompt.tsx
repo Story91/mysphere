@@ -161,14 +161,14 @@ export default function SessionPrompt() {
           onClick={handleSignIn}
           disabled={isSigning}
           aria-busy={isSigning}
-          className="rounded-pill bg-soft-primary px-5 py-2 text-[13px] font-semibold text-white shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-60 disabled:active:scale-100"
+          className="rounded-pill bg-soft-primary px-5 py-2 text-[13px] font-semibold text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-60 disabled:active:scale-100"
         >
           {isSigning ? 'Check your wallet…' : 'Sign'}
         </button>
         <button
           type="button"
           onClick={hide}
-          className="rounded-pill border border-soft-line px-5 py-2 text-[13px] font-semibold text-soft-ink-muted transition-[background-color,transform] duration-[--dur-press] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+          className="rounded-pill border border-soft-line px-5 py-2 text-[13px] font-semibold text-soft-ink-muted transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
         >
           Not now
         </button>

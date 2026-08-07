@@ -62,7 +62,7 @@ function IconButton({
       aria-pressed={active}
       className={[
         'flex items-center gap-1.5 rounded-pill px-2.5 py-1.5 font-soft text-[12.5px] font-semibold',
-        'transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong',
+        'transition-[color,background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong',
         'active:scale-[0.94] outline-none',
         'focus-visible:ring-2 focus-visible:ring-soft-primary',
         active ? 'text-soft-accent-deep' : 'text-soft-ink-soft',

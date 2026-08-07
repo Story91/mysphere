@@ -179,7 +179,7 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
                 <button
                   onClick={onClose}
                   aria-label="Close leaderboard"
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-soft-sunken text-soft-ink-muted transition-transform duration-[--dur-press] ease-out-strong hover:bg-soft-line hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-soft-sunken text-soft-ink-muted transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
                   <FiX className="h-5 w-5" />
                 </button>
@@ -215,7 +215,7 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="rounded-card border border-soft-line p-3 transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-sunken"
+                      className="rounded-card border border-soft-line p-3 transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken"
                     >
                       <div className="flex items-center gap-3">
                         {/* Rank Badge */}
@@ -257,7 +257,7 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
                       <button
                         onClick={loadNextPage}
                         disabled={loading}
-                        className="inline-flex items-center gap-1.5 rounded-pill bg-soft-sunken px-5 py-2.5 text-sm font-semibold text-soft-primary-deep transition-transform duration-[--dur-press] ease-out-strong hover:bg-soft-line active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        className="inline-flex items-center gap-1.5 rounded-pill bg-soft-sunken px-5 py-2.5 text-sm font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         {loading ? (
                           <>

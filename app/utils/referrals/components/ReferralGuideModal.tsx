@@ -63,7 +63,7 @@ export default function ReferralGuideModal({ isOpen, onClose }: ReferralGuideMod
               <button
                 onClick={onClose}
                 aria-label="Close guide"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-soft-sunken text-soft-ink-muted transition-transform duration-[--dur-press] ease-out-strong hover:bg-soft-line hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-soft-sunken text-soft-ink-muted transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 <FiX className="h-5 w-5" />
               </button>
@@ -83,7 +83,7 @@ export default function ReferralGuideModal({ isOpen, onClose }: ReferralGuideMod
                         key={section.id}
                         onClick={() => setActiveSection(section.id)}
                         aria-current={activeSection === section.id ? 'true' : undefined}
-                        className={`flex shrink-0 items-center gap-2 rounded-pill px-3 py-2 transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary md:w-full ${
+                        className={`flex shrink-0 items-center gap-2 rounded-pill px-3 py-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary md:w-full ${
                           activeSection === section.id
                             ? 'bg-soft-primary text-white shadow-chip'
                             : 'text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink'

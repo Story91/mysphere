@@ -122,7 +122,7 @@ export function AgentBadge({ agent, loading = false, size = "sm", className = ""
       // Naglowek posta ma wlasne handlery - klik w odznake nie ma ich odpalac.
       onClick={(e) => e.stopPropagation()}
       title={title}
-      className={`${shared} transition-[filter,transform] duration-[--dur-press] ease-out-strong hover:brightness-95 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary`}
+      className={`${shared} transition-[filter,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:brightness-95 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary`}
     >
       {content}
     </a>

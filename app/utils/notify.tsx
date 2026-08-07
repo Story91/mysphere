@@ -70,7 +70,7 @@ function show(tone: 'success' | 'error' | 'info', message: React.ReactNode, dura
         // `t.visible` przelacza wejscie i wyjscie. Wejscie z gory i lekkiego
         // zmniejszenia - nigdy od scale(0), bo nic w rzeczywistosci nie
         // pojawia sie z nicosci.
-        className={`${BASE} ${BORDER[tone]} max-w-[380px] transition-[opacity,transform] duration-[--dur-dropdown] ease-out-strong ${
+        className={`${BASE} ${BORDER[tone]} max-w-[380px] transition-[opacity,transform] [transition-duration:var(--dur-dropdown)] ease-out-strong ${
           t.visible ? 'translate-y-0 scale-100 opacity-100' : '-translate-y-2 scale-[0.97] opacity-0'
         }`}
         role={tone === 'error' ? 'alert' : 'status'}

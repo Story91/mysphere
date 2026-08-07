@@ -112,10 +112,13 @@ args: [`comment:${content}`] // Prefix identifies comments vs posts
 // Authentication
 const { authenticated, loading } = useAuthState();
 
-// Social media management
-const { 
-  linkTwitter, linkDiscord, linkSpotify,
-  unlinkTwitter, unlinkDiscord, unlinkSpotify 
+// Social media management.
+// UWAGA NA WIELKA LITERE: SDK zwraca `linkTikTok` / `unlinkTikTok`, nie
+// `linkTiktok`. Destrukturyzacja z mala `k` kompiluje sie bez slowa skargi
+// i daje `undefined` - blad widac dopiero przy kliknieciu.
+const {
+  linkTwitter, linkSpotify, linkTikTok,
+  unlinkTwitter, unlinkSpotify, unlinkTikTok
 } = useLinkSocials();
 
 // Connected accounts data
@@ -130,13 +133,19 @@ const { data: socialsData } = useSocials();
 - **Global Analytics:** Integration with MySphere analytics system
 
 #### Supported Platforms
+
+Zrodlem prawdy jest `constants.AVAILABLE_SOCIALS` w `@campnetwork/origin@0.0.9`:
+`["twitter", "spotify", "tiktok"]`. `useLinkSocials()` filtruje swoje metody po
+tej liscie, wiec platforma, ktorej tam nie ma, nie ma tez metody do podpiecia -
+niezaleznie od tego, co obiecuje ta tabela.
+
 | Platform | Status | Features |
 |----------|--------|----------|
-| **Twitter/X** | ✅ Active | Full API integration with Camp |
-| **Discord** | ✅ Active | Authorization and tracking |
-| **Spotify** | ✅ Active | Playlist and listening statistics |
-| **TikTok** | 🚧 Development | Coming soon |
-| **Telegram** | 🚧 Development | Coming soon |
+| **Twitter/X** | ✅ Active | Pelne przekierowanie OAuth (`/dev/twitter/connect`). Odczyt tresci: `/api/camp/twitter` |
+| **Spotify** | ✅ Active | Pelne przekierowanie OAuth (`/dev/spotify/connect`). Odczyt tresci: `/api/camp/spotify` |
+| **TikTok** | ⚠️ Ograniczone | Bez OAuth - `linkTikTok(handle)` posyla sama nazwe uzytkownika na `/dev/tiktok/connect-sdk`. Nie ma trasy `/api/camp/tiktok`, wiec widac wylacznie "podpiete / niepodpiete", zadnych tresci |
+| **Discord** | ❌ Niedostepne | Nie ma go w `AVAILABLE_SOCIALS`, wiec `useLinkSocials()` **nie zwraca** `linkDiscord`. Ta tabela twierdzila wczesniej, ze jest "✅ Active" - nieprawda |
+| **Telegram** | ❌ Niedostepne | Tez nie ma go w `AVAILABLE_SOCIALS` |
 
 #### Wallet Integration
 - User wallet display on Camp Network

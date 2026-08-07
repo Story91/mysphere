@@ -164,7 +164,7 @@ export function NetworkSwitcher() {
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label={`Switch network, currently ${activeNetwork.name}`}
-        className="flex items-center gap-2 px-3 py-2 bg-soft-surface hover:bg-soft-sunken rounded-pill border border-soft-line hover:border-soft-line-strong transition-[background-color,border-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+        className="flex items-center gap-2 px-3 py-2 bg-soft-surface hover:bg-soft-sunken rounded-pill border border-soft-line hover:border-soft-line-strong transition-[background-color,border-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
       >
         {activeNetwork.id === base.id ? (
           <div className="w-5 h-5 bg-white rounded p-0.5 flex items-center justify-center">
@@ -194,7 +194,7 @@ export function NetworkSwitcher() {
         )}
         <svg
           aria-hidden="true"
-          className={`w-3 h-3 text-soft-ink-faint transition-transform duration-[--dur-press] ease-out-strong ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 text-soft-ink-faint transition-transform [transition-duration:var(--dur-press)] ease-out-strong ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -218,7 +218,7 @@ export function NetworkSwitcher() {
                 key={network.id}
                 type="button"
                 onClick={() => handleNetworkSwitch(network.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-pill transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.98] disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-pill transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.98] disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset ${
                   isCurrent
                     ? 'bg-soft-sunken text-soft-ink'
                     : 'text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink'

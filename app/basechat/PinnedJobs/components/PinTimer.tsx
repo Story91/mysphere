@@ -111,7 +111,7 @@ export default function PinTimer({
       {isOwner && onExtendClick && (
         <button
           onClick={onExtendClick}
-          className="flex items-center space-x-1 ml-2 sm:ml-3 px-2 sm:px-3 py-1 sm:py-1.5 bg-soft-sunken hover:bg-soft-line text-soft-ink border border-soft-line rounded-pill text-xs font-semibold shadow-chip transition-[background-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+          className="flex items-center space-x-1 ml-2 sm:ml-3 px-2 sm:px-3 py-1 sm:py-1.5 bg-soft-sunken hover:bg-soft-line text-soft-ink border border-soft-line rounded-pill text-xs font-semibold shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
         >
           <Plus className="w-3 h-3" />
           <span>Extend</span>

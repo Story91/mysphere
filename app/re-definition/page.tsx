@@ -58,6 +58,15 @@ export const metadata: Metadata = {
  * opisuja te sama kwote w kolejnych stanach - zero (reputacja za darmo),
  * stawka, 402 (zadanie zaplaty), rozliczona suma.
  */
+
+/**
+ * Czy pokazywac blok "Read further" na samym dole strony.
+ *
+ * WYLACZONY NA ZYCZENIE WLASCICIELA. Kod bloku zostaje nizej, gotowy do
+ * wlaczenia jednym slowem. Uzasadnienie przy samym bloku.
+ */
+const SHOW_READ_FURTHER = false;
+
 /**
  * Znacznik sekcji jest KWOTA, nie numerem - i siedzi jako stacja na kregoslupie
  * biegnacym przez cala strone.
@@ -590,7 +599,7 @@ export default function ReDefinitionPage() {
           <p className="mb-4">
             <Link
               href="/leaderboard"
-              className="inline-flex items-center gap-2 rounded-pill bg-soft-accent-soft px-4 py-2.5 font-soft-display text-[13.5px] font-bold text-soft-accent-deep transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97]"
+              className="inline-flex items-center gap-2 rounded-pill bg-soft-accent-soft px-4 py-2.5 font-soft-display text-[13.5px] font-bold text-soft-accent-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
             >
               Watch the money land →
             </Link>
@@ -657,6 +666,20 @@ export default function ReDefinitionPage() {
         </section>
 
         {/* ---------------- docs ---------------- */}
+        {/* ===== WYLACZONE NA TERAZ - DECYZJA WLASCICIELA =====
+            Blok "Read further" zostaje w kodzie, ale sie nie renderuje.
+            Skasowanie go byloby gorsze: cztery adresy, oznaczenia linkow
+            wychodzacych i uklad siatki trzeba by odtwarzac z pamieci przy
+            wlaczaniu z powrotem.
+
+            Przelacznik jest stala, a nie komentarzem blokowym, bo stala widac
+            w wyszukiwaniu i TypeScript dalej sprawdza kod pod spodem - zakomen-
+            towany JSX cicho gnije przy kazdej zmianie typow obok.
+
+            Zeby wlaczyc: zmien na `true`. Zanim to zrobisz, sprawdz, czy
+            /Docs i /mysphere-whitepaper-english.html faktycznie odpowiadaja -
+            martwy odnosnik na koncu manifestu kosztuje wiecej niz jego brak. */}
+        {SHOW_READ_FURTHER && (
         <section className="border-t border-soft-line/70 py-16">
           <h2 className="mb-6 font-soft-display text-[15px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
             Read further
@@ -705,6 +728,7 @@ export default function ReDefinitionPage() {
             })}
           </div>
         </section>
+        )}
       </div>
     </main>
   );

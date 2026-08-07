@@ -228,7 +228,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     href={receiptLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-white underline underline-offset-2 hover:opacity-80 transition-opacity duration-[--dur-press] ease-out-strong"
+                    className="font-semibold text-white underline underline-offset-2 hover:opacity-80 transition-opacity [transition-duration:var(--dur-press)] ease-out-strong"
                   >
                     Open receipt
                   </a>
@@ -238,7 +238,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                       navigator.clipboard.writeText(`${window.location.origin}${receiptLink}`);
                       toast.success('Receipt link copied');
                     }}
-                    className="text-white underline underline-offset-2 hover:opacity-80 transition-opacity duration-[--dur-press] ease-out-strong"
+                    className="text-white underline underline-offset-2 hover:opacity-80 transition-opacity [transition-duration:var(--dur-press)] ease-out-strong"
                   >
                     Copy link
                   </button>
@@ -246,7 +246,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     href={explorerLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-white/80 underline underline-offset-2 hover:text-white transition-colors duration-[--dur-press] ease-out-strong"
+                    className="text-white/80 underline underline-offset-2 hover:text-white transition-colors [transition-duration:var(--dur-press)] ease-out-strong"
                   >
                     {selectedNetworkConfig?.name}
                   </a>
@@ -402,7 +402,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
           setIsOpen(!isOpen);
           setTransactionSuccess(false);
         }}
-        className={`flex items-center gap-1.5 rounded-pill font-soft transition-[color,background-color,transform] duration-[--dur-press] ease-out-strong hover:text-soft-accent-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary touch-manipulation ${className}`}
+        className={`flex items-center gap-1.5 rounded-pill font-soft transition-[color,background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-accent-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary touch-manipulation ${className}`}
         disabled={isTransacting}
         title="Send tip"
         aria-label="Send tip"
@@ -450,7 +450,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                 </h3>
                 <button
                   onClick={() => { setIsOpen(false); setTipSaved(false); }}
-                  className="text-soft-ink-muted hover:text-soft-ink hover:bg-soft-line transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary bg-soft-sunken rounded-full p-2 border border-soft-line"
+                  className="text-soft-ink-muted hover:text-soft-ink hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary bg-soft-sunken rounded-full p-2 border border-soft-line"
                   aria-label="Close tip dialog"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -472,7 +472,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                       <button
                         key={network.id}
                         onClick={() => setSelectedNetwork(network.id)}
-                        className={`w-10 h-10 rounded-pill transition-[transform,box-shadow] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-center overflow-hidden ${bgColor} ${
+                        className={`w-10 h-10 rounded-pill transition-[transform,box-shadow] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-center overflow-hidden ${bgColor} ${
                           selectedNetwork === network.id
                             ? 'ring-2 ring-soft-primary shadow-chip scale-110'
                             : 'ring-1 ring-soft-line hover:ring-soft-line-strong'
@@ -523,7 +523,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                           setSelectedToken(token.symbol);
                           setTipAmount(getQuickAmounts(token.symbol)[0]);
                         }}
-                        className={`flex-1 px-3 py-3 rounded-pill border transition-[background-color,border-color,box-shadow,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-center gap-2 ${
+                        className={`flex-1 px-3 py-3 rounded-pill border transition-[background-color,border-color,box-shadow,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center justify-center gap-2 ${
                           selectedToken === token.symbol
                             ? 'bg-soft-sunken border-soft-primary shadow-chip'
                             : 'bg-soft-surface border-soft-line hover:bg-soft-sunken'
@@ -569,7 +569,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                   onChange={(e) => setTipAmount(e.target.value)}
                   min="0"
                   step="any"
-                  className="w-full px-4 py-3 text-base border bg-soft-sunken border-soft-line rounded-card text-soft-accent-deep font-soft-display font-bold tabular-nums transition-colors duration-[--dur-press] ease-out-strong focus:outline-none focus:ring-2 focus:ring-soft-primary focus:border-soft-primary placeholder:text-soft-ink-faint"
+                  className="w-full px-4 py-3 text-base border bg-soft-sunken border-soft-line rounded-card text-soft-accent-deep font-soft-display font-bold tabular-nums transition-colors [transition-duration:var(--dur-press)] ease-out-strong focus:outline-none focus:ring-2 focus:ring-soft-primary focus:border-soft-primary placeholder:text-soft-ink-faint"
                   inputMode="decimal"
                 />
               </div>
@@ -581,7 +581,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                   <button
                       key={amount}
                       onClick={() => setTipAmount(amount)}
-                      className={`flex-1 px-2 py-2 text-sm font-soft-display font-bold tabular-nums rounded-pill border transition-[background-color,border-color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                      className={`flex-1 px-2 py-2 text-sm font-soft-display font-bold tabular-nums rounded-pill border transition-[background-color,border-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                         tipAmount === amount
                           ? 'bg-soft-sunken border-soft-primary text-soft-primary-deep'
                           : 'bg-soft-surface border-soft-line hover:bg-soft-sunken text-soft-ink-muted'
@@ -629,7 +629,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     onClick={ensureCorrectNetwork}
                     // Zmiana sieci to czynnosc interfejsu, a nie kwota - stad
                     // `soft-primary`. Pomaranczowy zostaje przy pieniadzach.
-                    className="w-full px-6 py-3 font-soft text-base font-bold rounded-pill bg-soft-primary hover:bg-soft-primary-deep text-white shadow-chip transition-colors duration-[--dur-press] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                    className="w-full px-6 py-3 font-soft text-base font-bold rounded-pill bg-soft-primary hover:bg-soft-primary-deep text-white shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     Switch to {selectedNetworkConfig?.name}
                   </button>
@@ -653,7 +653,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                     // z pustym polem kwoty byl WLACZONY, a klikniecie nie robilo nic
                     // (getCalls() zwracalo pusta tablice i handler cicho wychodzil).
                     disabled={!hasValidAmount || isBalanceLoading || hasInsufficientBalance() || isTransacting}
-                    className="w-full px-6 py-3 font-soft text-base font-bold rounded-pill bg-soft-primary text-white shadow-chip transition-colors duration-[--dur-press] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full px-6 py-3 font-soft text-base font-bold rounded-pill bg-soft-primary text-white shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {hasInsufficientBalance()
                       ? `Insufficient ${selectedToken}`

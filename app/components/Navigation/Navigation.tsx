@@ -105,7 +105,7 @@ function NavItem({
       /* RUCH: zostaje samo nacisniecie. Nawigacja jest klikana dziesiatki razy
          dziennie - podnoszenie pigulki na hover po dziesiatym razie juz nie
          cieszy, tylko opoznia. */
-      className={`${style.layout} items-center px-4 py-2.5 rounded-pill font-soft-display text-sm font-bold border transition-[background-color,border-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface ${
+      className={`${style.layout} items-center px-4 py-2.5 rounded-pill font-soft-display text-sm font-bold border transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface ${
         isActive
           ? `bg-soft-primary border-soft-primary text-white ${style.active}`
           : `bg-soft-surface border-soft-line text-soft-ink-muted ${style.idle}`
@@ -185,12 +185,12 @@ export default function Navigation() {
           <div className="flex items-center">
             <Link
               href="/"
-              className="relative group mr-5 rounded-xl transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+              className="relative group mr-5 rounded-xl transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
             >
               {/* Poswiata pod logo zostaje, tylko w fiolecie marki zamiast
                   niebieskiego gradientu Base. 300 ms na hover bylo dwa razy
                   dluzsze niz cokolwiek innego w belce. */}
-              <div aria-hidden="true" className="absolute -inset-2 bg-soft-primary opacity-0 group-hover:opacity-20 rounded-xl blur transition-opacity duration-[--dur-press] ease-out-strong"></div>
+              <div aria-hidden="true" className="absolute -inset-2 bg-soft-primary opacity-0 group-hover:opacity-20 rounded-xl blur transition-opacity [transition-duration:var(--dur-press)] ease-out-strong"></div>
               <Image
                 src="/android-chrome-192x192.png"
                 alt="MySphere"
@@ -215,7 +215,7 @@ export default function Navigation() {
               aria-expanded={isMobileMenuOpen}
               aria-controls={MOBILE_MENU_ID}
               aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-              className="md:hidden p-2 rounded-pill text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink transition-[background-color,color,transform] duration-[--dur-press] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+              className="md:hidden p-2 rounded-pill text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
             >
               <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isMobileMenuOpen ? (

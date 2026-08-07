@@ -94,7 +94,7 @@ export default async function PostPage({ params }: Props) {
             wiec od razu powiedziec, gdzie jest, zanim przeczyta post. */}
         <Link
           href="/basechat"
-          className="mb-6 inline-flex items-center gap-2.5 rounded-pill bg-soft-surface px-3 py-2 shadow-card transition-transform duration-[--dur-press] ease-out-strong active:scale-[0.97]"
+          className="mb-6 inline-flex items-center gap-2.5 rounded-pill bg-soft-surface px-3 py-2 shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
         >
           <Image src="/android-chrome-192x192.png" alt="" width={22} height={22} className="rounded-md" />
           <span className="font-soft-display text-[13.5px] font-bold text-soft-ink">MySphere</span>
