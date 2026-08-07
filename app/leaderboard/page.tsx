@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  getLeaderboard,
-  getSettledPayments,
-  formatReceived,
-  formatAmount,
-} from '../utils/tips/getLeaderboard';
-import { getName } from '../utils/identity/getName';
+import { getPaidTimeline, formatReceived, formatAmount } from '../utils/tips/getLeaderboard';
+import { getIdentities, type Identity } from '../utils/identity/getIdentities';
 import { shortAddress } from '../utils/posts/getPostForShare';
 import { getProofLink, resolveTipNetwork } from '../basechat/components/TipNetworkConfig';
 
@@ -64,6 +59,45 @@ const MEDALS = ['#F5A73B', '#B9B1D8', '#C98B5A'];
 const proofLink = (network: string, hash: string) =>
   getProofLink(resolveTipNetwork(network), hash);
 
+/**
+ * Kolo z awatarem albo z inicjalem.
+ *
+ * DLACZEGO WLASNY, A NIE <Avatar> Z app/components/identity: tamten jest
+ * klienckim komponentem na hookach (useName/useAvatar) i wciagnalby cala
+ * strone do przegladarki. Tozsamosc jest tu rozwiazana na serwerze, wiec do
+ * narysowania zostaje samo kolo.
+ *
+ * Gdy obrazu nie ma, rysujemy inicjal na tle w odcieniu fioletu marki -
+ * deterministycznie z adresu, zeby ta sama osoba zawsze miala ten sam kafelek.
+ * Pomaranczy tu nie ma: ona nalezy do kwot.
+ */
+function IdentityAvatar({ identity, size }: { identity: Identity; size: number }) {
+  const initial = (identity.named ? identity.name : identity.address.slice(2))
+    .replace(/^0x/i, '')
+    .charAt(0)
+    .toUpperCase();
+
+  // Odcien z adresu - staly dla danej osoby, w waskim zakresie wokol fioletu
+  // marki, zeby siatka kart zostala jednym obrazem, a nie tecza.
+  const hue = 236 + (Number.parseInt(identity.address.slice(2, 6), 16) % 60) - 30;
+
+  return (
+    <span
+      className="relative flex flex-none items-center justify-center overflow-hidden rounded-full font-soft-display font-bold text-white"
+      style={{ width: size, height: size, background: `hsl(${hue} 46% 66%)`, fontSize: size * 0.42 }}
+    >
+      {identity.avatar ? (
+        // eslint-disable-next-line @next/next/no-img-element -- awatary przychodza
+        // z dowolnych hostow (blob storage, bramki IPFS, kontrakty NFT), wiec
+        // next/image musialby miec otwarta liste domen. Ten sam wybor co na /u.
+        <img src={identity.avatar} alt="" width={size} height={size} className="h-full w-full object-cover" />
+      ) : (
+        initial
+      )}
+    </span>
+  );
+}
+
 /** Krotki, ludzki zapis wieku wpisu. Bez bibliotek - to jeden format. */
 function timeAgo(ms: number): string {
   if (!ms) return '';
@@ -78,42 +112,58 @@ function timeAgo(ms: number): string {
 }
 
 export default async function PaidPage() {
-  const [board, tape] = await Promise.all([getLeaderboard(20), getSettledPayments(24)]);
+  // Jeden odczyt kolekcji `tips` na oba widoki - patrz getPaidTimeline.
+  const { board, tape } = await getPaidTimeline(20, 24);
   const { payments, failed: tapeFailed } = tape;
 
-  const addresses = Array.from(
-    new Set(
-      [...board.entries.map((e) => e.address), ...payments.flatMap((p) => [p.from, p.to])]
-        .filter(Boolean)
-        .map((a) => a.toLowerCase())
-    )
-  );
+  /**
+   * Tozsamosci pobierane WSADOWO dla calej strony naraz.
+   *
+   * Wczesniej stalo tu `addresses.map(getName)` - jedno wywolanie RPC na kazdy
+   * wiersz, bez cache i bez limitu, i w dodatku bez `chain: base`, wiec kazdy
+   * Basename wracal jako null. Efekt byl taki, ze najdrozsza czesc renderu
+   * gwarantowanie konczyla sie skrotem adresu. getIdentities robi to jednym
+   * przejsciem po Firestore (paczki po 30) i dotyka lancucha tylko tam, gdzie
+   * nie ma zapisanej nazwy.
+   */
+  const identities = await getIdentities([
+    ...board.entries.map((entry) => entry.address),
+    ...payments.flatMap((payment) => [payment.from, payment.to]),
+  ]);
 
-  const nameEntries = await Promise.all(
-    addresses.map(async (address) => {
-      const name = await getName({ address: address as `0x${string}` }).catch(() => null);
-      return [address, name || shortAddress(address)] as const;
-    })
-  );
-  const names = new Map(nameEntries);
-  const nameOf = (address: string) => names.get(address?.toLowerCase()) ?? shortAddress(address);
+  const identityOf = (address: string): Identity =>
+    identities.get(address?.toLowerCase() ?? '') ?? {
+      address: address ?? '',
+      name: shortAddress(address ?? ''),
+      avatar: null,
+      named: false,
+    };
 
-  const totalLine = formatReceived(board.totalReceived, 3);
+  // Naglowek paragonu opisuje ROZLICZONE platnosci - ten sam zbior, z ktorego
+  // sa wiersze pod nim. Ranking obok liczy szerzej (takze tipy bez hasha), wiec
+  // wziecie jego sum na paragon dawalo sume, ktorej nie da sie otworzyc.
+  const totalLine = formatReceived(tape.settledReceived, 3);
 
   return (
     <main className="min-h-screen bg-soft-bg px-4 py-10 font-soft sm:px-6">
       <div className="mx-auto max-w-[620px]">
         <header className="mb-8">
+          {/* "All time" wolno napisac tylko wtedy, gdy odczyt naprawde objal
+              cala kolekcje. Gdy dobil do limitu, mowimy o tym, co mamy. */}
           <p className="mb-3 font-soft text-[11px] font-bold uppercase tracking-[0.16em] text-soft-primary-deep">
-            {board.windowDays === null ? 'All time' : `Last ${board.windowDays} days`}
+            {board.windowDays !== null
+              ? `Last ${board.windowDays} days`
+              : board.truncated
+                ? 'Most recent payments'
+                : 'All time'}
           </p>
           <h1 className="mb-3 font-soft-display text-[36px] font-bold leading-[1.05] text-soft-ink sm:text-[46px]">
             Money moving
           </h1>
           <p className="max-w-[44ch] font-soft text-[14.5px] leading-[1.6] text-soft-ink-muted">
-            Every line below is a payment that actually settled between two people. Open any of them
-            and check it against the chain. There is no way onto this page that does not involve
-            money moving.
+            Every line on the tape below is a payment that actually settled between two people. Open
+            any of them and check it against the chain. There is no way onto this page that does not
+            involve money moving.
           </p>
         </header>
 
@@ -149,7 +199,8 @@ export default async function PaidPage() {
                     {totalLine || '—'}
                   </p>
                   <p className="mt-1 font-soft text-[12px] text-soft-ink-soft">
-                    {board.totalTips} {board.totalTips === 1 ? 'payment' : 'payments'}
+                    {tape.settledCount} {tape.settledCount === 1 ? 'payment' : 'payments'}
+                    {tape.settledCount > payments.length ? `, ${payments.length} shown` : ''}
                   </p>
                 </div>
 
@@ -162,13 +213,20 @@ export default async function PaidPage() {
                       }`}
                       style={{ animationDelay: `${Math.min(index * 45, 540)}ms` }}
                     >
+                      {/* Na tasmie sa NAZWY, ale nie ma awatarow - i to jest
+                          wybor, nie przeoczenie. Ta sekcja ma jedna wartosc: ze
+                          wyglada jak rolka paragonowa, czyli jak dokument, a nie
+                          jak feed. Paragon jest z definicji tekstem drukowanym w
+                          jednej szerokosci; wpuszczenie na niego zdjec profilowych
+                          kasuje jedyna rzecz, ktora ja odroznia. Twarze sa w
+                          rankingu nizej, gdzie forma to karta. */}
                       <div className="flex items-baseline justify-between gap-3">
                         <span className="min-w-0 flex-1 font-soft text-[13px] leading-tight">
                           <Link
                             href={`/u/${payment.from}`}
                             className="font-semibold text-soft-ink hover:text-soft-primary-deep"
                           >
-                            {nameOf(payment.from)}
+                            {identityOf(payment.from).name}
                           </Link>
                           <span className="mx-1.5 text-soft-ink-faint" aria-label="paid">
                             →
@@ -177,7 +235,7 @@ export default async function PaidPage() {
                             href={`/u/${payment.to}`}
                             className="font-semibold text-soft-ink hover:text-soft-primary-deep"
                           >
-                            {nameOf(payment.to)}
+                            {identityOf(payment.to).name}
                           </Link>
                         </span>
 
@@ -244,20 +302,27 @@ export default async function PaidPage() {
                     href={`/u/${entry.address}`}
                     className="flex items-center gap-3 rounded-card bg-soft-surface p-3.5 shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.99]"
                   >
-                    <span
-                      className="flex h-7 w-7 flex-none items-center justify-center rounded-full font-soft-display text-[12px] font-bold text-white"
-                      /* rgb(var(...)), nie samo var(...) - patrz SoftTrendsPanel.
-                         Tokeny trzymaja trojke kanalow, wiec `background:
-                         var(--soft-line-strong)` bylo nieprawidlowym CSS-em
-                         i znikalo po cichu razem z numerem pozycji. */
-                      style={{ background: MEDALS[index] ?? 'rgb(var(--soft-line-strong))' }}
-                    >
-                      {index + 1}
+                    {/* Twarz i numer pozycji jako jeden obiekt: awatar niesie
+                        "kto", medal niesie "ktory". Rozdzielone na dwa kolka
+                        obok siebie zjadlyby polowe szerokosci wiersza na
+                        telefonie, a nazwa jest tu wazniejsza od obu. */}
+                    <span className="relative flex-none">
+                      <IdentityAvatar identity={identityOf(entry.address)} size={40} />
+                      <span
+                        className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full font-soft-display text-[10px] font-bold text-white ring-2 ring-soft-surface"
+                        /* rgb(var(...)), nie samo var(...) - patrz SoftTrendsPanel.
+                           Tokeny trzymaja trojke kanalow, wiec `background:
+                           var(--soft-line-strong)` bylo nieprawidlowym CSS-em
+                           i znikalo po cichu razem z numerem pozycji. */
+                        style={{ background: MEDALS[index] ?? 'rgb(var(--soft-line-strong))' }}
+                      >
+                        {index + 1}
+                      </span>
                     </span>
 
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-soft-display text-[14.5px] font-bold text-soft-ink">
-                        {nameOf(entry.address)}
+                        {identityOf(entry.address).name}
                       </span>
                       <span className="font-soft text-[11.5px] text-soft-ink-faint">
                         {entry.tipCount} {entry.tipCount === 1 ? 'payment' : 'payments'} from{' '}

@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { getLeaderboard, formatReceived } from '../utils/tips/getLeaderboard';
-import { getName } from '../utils/identity/getName';
+import { getIdentities } from '../utils/identity/getIdentities';
 import { shortAddress } from '../utils/posts/getPostForShare';
 
 /**
@@ -36,12 +36,18 @@ const MEDALS = ['#F5C24C', '#C7D0E0', '#C98B5A'];
 export default async function Image() {
   const board = await getLeaderboard(3);
 
-  const names = await Promise.all(
-    board.entries.map((entry) =>
-      getName({ address: entry.address as `0x${string}` })
-        .catch(() => null)
-        .then((name) => name || shortAddress(entry.address))
-    )
+  /**
+   * Ta sama warstwa tozsamosci, co strona - i z tego samego powodu.
+   *
+   * Stalo tu `getName({ address })` bez `chain`, czyli z domyslka `mainnet`.
+   * Przy mainnecie getName w ogole nie pyta L2Resolvera Basenames, wiec karta,
+   * ktora ma zyc trzema nazwiskami, wysylala w swiat trzy skroty adresow.
+   * getIdentities siega najpierw po nazwe zapisana w bazie, a na lancuch idzie
+   * tylko wtedy, gdy jej nie ma.
+   */
+  const identities = await getIdentities(board.entries.map((entry) => entry.address));
+  const names = board.entries.map(
+    (entry) => identities.get(entry.address.toLowerCase())?.name ?? shortAddress(entry.address)
   );
 
   const totalLine = formatReceived(board.totalReceived, 2);

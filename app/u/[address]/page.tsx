@@ -78,13 +78,22 @@ function formatDate(timestamp: number): string {
   });
 }
 
+/**
+ * Liczba na bialej karcie. Wartosc dostaje pelny tusz (soft-ink), etykieta
+ * najslabszy (soft-ink-faint) - ta sama para, co w SoftProfileHeader, zeby
+ * profil publiczny i profil we feedzie czytalo sie tak samo.
+ *
+ * Zadna z tych liczb nie jest pieniedzmi, wiec zadna nie jest pomaranczowa.
+ */
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
-      <div className="font-['Coinbase_Display'] text-[20px] font-bold tabular-nums text-[#EEF3FF]">
+    <div className="rounded-card bg-soft-surface px-4 py-3.5 shadow-card">
+      <div className="font-soft-display text-[20px] font-bold tabular-nums text-soft-ink">
         {value}
       </div>
-      <div className="mt-0.5 text-[11px] uppercase tracking-[0.12em] text-[#5C6F94]">{label}</div>
+      <div className="mt-0.5 font-soft text-[11px] uppercase tracking-[0.12em] text-soft-ink-faint">
+        {label}
+      </div>
     </div>
   );
 }
@@ -98,7 +107,7 @@ export default async function ProfilePage({ params }: Props) {
   const isNamed = name !== shortAddress(profile.address);
 
   return (
-    <main className="min-h-screen bg-[#0A1024] px-5 py-14 sm:px-8">
+    <main className="min-h-screen bg-soft-bg px-5 py-14 font-soft sm:px-8">
       <div className="mx-auto max-w-[720px]">
         <header className="mb-10">
           <div className="mb-6 flex items-center gap-4">
@@ -112,18 +121,21 @@ export default async function ProfilePage({ params }: Props) {
                 className="h-16 w-16 shrink-0 rounded-full object-cover"
               />
             ) : (
+              // Zastepnik awatara jest fioletowy, nie pomaranczowy: to tozsamosc,
+              // a nie pieniadze. Gradient w obrebie jednego odcienia, zeby plamka
+              // nie krzyczala glosniej niz imie obok niej.
               <div
-                className="h-16 w-16 shrink-0 rounded-full bg-gradient-to-br from-[#0052FF] to-[#00E28A]"
+                className="h-16 w-16 shrink-0 rounded-full bg-gradient-to-br from-soft-primary to-soft-primary-deep"
                 aria-hidden="true"
               />
             )}
 
             <div className="min-w-0">
-              <h1 className="truncate font-['Coinbase_Display'] text-[26px] font-bold tracking-[-0.02em] text-[#EEF3FF] sm:text-[32px]">
+              <h1 className="truncate font-soft-display text-[26px] font-bold tracking-[-0.02em] text-soft-ink sm:text-[32px]">
                 {name}
               </h1>
               {isNamed && (
-                <p className="mt-0.5 font-mono text-[12px] text-[#5C6F94]">
+                <p className="mt-0.5 font-mono text-[12px] text-soft-ink-soft">
                   {shortAddress(profile.address)}
                 </p>
               )}
@@ -131,23 +143,34 @@ export default async function ProfilePage({ params }: Props) {
           </div>
 
           {profile.bio && (
-            <p className="mb-5 max-w-[52ch] text-[15px] leading-[1.65] text-[#9EB0D2]">
+            <p className="mb-5 max-w-[52ch] font-soft text-[15px] leading-[1.65] text-soft-ink-muted">
               {profile.bio}
             </p>
           )}
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-[#5C6F94]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-soft text-[13px] text-soft-ink-soft">
             {profile.joinedAt && <span>Joined {formatDate(profile.joinedAt)}</span>}
             <a
               href={`https://basescan.org/address/${profile.address}`}
               target="_blank"
               rel="noreferrer"
-              className="text-[#5B8CFF] transition hover:text-[#8AB0FF]"
+              className="font-semibold text-soft-primary-deep transition-colors [transition-duration:var(--dur-press)] hover:text-soft-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               View onchain ↗
             </a>
           </div>
         </header>
+
+        {/* AWARIA != PUSTKA. Gdy ktorys odczyt sie wywrocil, liczby ponizej sa
+            zanizone - i bez tego zdania czytalyby sie jako fakt o czlowieku.
+            Wczesniej mowila o tym tylko sekcja postow, wiec nieudany odczyt
+            tipow przechodzil bez sladu. */}
+        {profile.partial && (
+          <p className="mb-4 rounded-card bg-soft-surface px-4 py-3 font-soft text-[13px] leading-[1.55] text-soft-ink-muted shadow-card">
+            Some of this profile could not be read right now, so the numbers below may be
+            incomplete. Try again in a moment.
+          </p>
+        )}
 
         {/* Liczby, ktore da sie sprawdzic - nic tu nie jest deklaracja. */}
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -157,19 +180,21 @@ export default async function ProfilePage({ params }: Props) {
           <Stat value={String(profile.tips.sentCount)} label="Tips out" />
         </div>
 
+        {/* Jedyne pomaranczowe miejsce na tej stronie - bo jedyne, ktore mowi
+            o pieniadzach. Reszta liczb to aktywnosc i dostaje neutralny tusz. */}
         {tipLine && (
-          <div className="mb-12 rounded-xl border border-[#00E28A]/20 bg-[#00E28A]/[0.05] px-4 py-3.5">
-            <div className="mb-1 text-[11px] uppercase tracking-[0.12em] text-[#00E28A]/70">
+          <div className="mb-12 rounded-card bg-soft-accent-soft px-4 py-3.5">
+            <div className="mb-1 font-soft text-[11px] font-bold uppercase tracking-[0.12em] text-soft-accent-deep">
               Received in tips
             </div>
-            <div className="font-['Coinbase_Display'] text-[16px] font-semibold tabular-nums text-[#00E28A]">
+            <div className="font-soft-display text-[16px] font-bold tabular-nums text-soft-accent-deep">
               {tipLine}
             </div>
           </div>
         )}
 
         <section>
-          <h2 className="mb-1 font-['Coinbase_Display'] text-[13px] font-semibold uppercase tracking-[0.14em] text-[#5C6F94]">
+          <h2 className="mb-3 font-soft-display text-[13px] font-bold uppercase tracking-[0.14em] text-soft-ink-faint">
             Recent posts
           </h2>
 
@@ -177,51 +202,60 @@ export default async function ProfilePage({ params }: Props) {
             /* "Nic nie napisal" to twierdzenie o czlowieku. Nie stawiamy go w
                momencie, w ktorym odczyt sie wywrocil - wtedy mowimy prawde
                o sobie, nie nieprawde o nim. */
-            <p className="border-t border-white/[0.07] pt-6 text-[14px] text-[#5C6F94]">
-              {profile.partial
-                ? 'Posts could not be loaded right now. Try again in a moment.'
-                : 'Nothing posted yet.'}
-            </p>
+            <div className="rounded-card bg-soft-surface p-8 text-center shadow-card">
+              <p className="mb-1 font-soft-display text-[15px] font-bold text-soft-ink">
+                {profile.partial ? 'Posts could not be loaded' : 'Nothing posted yet'}
+              </p>
+              <p className="font-soft text-[13px] text-soft-ink-soft">
+                {profile.partial
+                  ? 'This is a read error on our side, not an empty profile. Try again in a moment.'
+                  : 'The first post shows up here.'}
+              </p>
+            </div>
           ) : (
-            <div>
+            /* Posty jako biale karty, a nie wiersze rozdzielone linia: na jasnym
+               tle linia jest za slaba, zeby zamknac blok tekstu, a karta jest
+               dokladnie tym, czym post jest we feedzie. */
+            <div className="flex flex-col gap-2.5">
               {profile.recentPosts.map((post) => (
                 <Link
                   key={post.id}
                   href={`/post/${post.id}`}
-                  className="block border-t border-white/[0.07] py-5 transition hover:bg-white/[0.02]"
+                  className="block rounded-card bg-soft-surface p-4 shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
-                  <p className="mb-2 line-clamp-3 text-[15px] leading-[1.6] text-[#DDE6FA]">
+                  <p className="mb-2 line-clamp-3 font-soft text-[15px] leading-[1.6] text-soft-ink-muted">
                     {post.content || '(no text)'}
                   </p>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#5C6F94]">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-soft text-[12px] text-soft-ink-soft">
                     {post.timestamp > 0 && <span>{formatDate(post.timestamp)}</span>}
                     <span>{post.likes} likes</span>
                     <span>{post.commentCount} comments</span>
-                    {post.network && <span className="text-[#5B8CFF]">{post.network}</span>}
+                    {post.network && (
+                      <span className="font-semibold text-soft-primary-deep">{post.network}</span>
+                    )}
                   </div>
                 </Link>
               ))}
-              <div className="border-t border-white/[0.07]" />
             </div>
           )}
         </section>
 
-        <div className="mt-12 flex flex-wrap gap-3">
+        <div className="mt-12 flex flex-wrap gap-2.5">
           <Link
             href="/basechat"
-            className="rounded-xl bg-[#0052FF] px-5 py-3 text-[14px] font-semibold text-white transition hover:bg-[#0044D6]"
+            className="rounded-pill bg-soft-primary px-5 py-3 font-soft text-[14px] font-bold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
             Open the feed
           </Link>
           <Link
             href="/leaderboard"
-            className="rounded-xl border border-white/[0.12] px-5 py-3 text-[14px] font-semibold text-[#DDE6FA] transition hover:border-white/25 hover:bg-white/[0.04]"
+            className="rounded-pill bg-soft-surface px-5 py-3 font-soft text-[14px] font-semibold text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
             Who got paid this week
           </Link>
           <Link
             href="/re-definition"
-            className="rounded-xl border border-white/[0.12] px-5 py-3 text-[14px] font-semibold text-[#DDE6FA] transition hover:border-white/25 hover:bg-white/[0.04]"
+            className="rounded-pill bg-soft-surface px-5 py-3 font-soft text-[14px] font-semibold text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
             What MySphere is becoming
           </Link>

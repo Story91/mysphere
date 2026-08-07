@@ -39,14 +39,22 @@ const DEFAULT_ASK_POST_PRICE = '$0.01';
  * === SA DWA MAINNETY I OBA DA SIE WLACZYC ===
  *
  * 1. BASE (eip155:8453) - facilitator Coinbase CDP:
- *      X402_FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402
  *      X402_NETWORK=eip155:8453
- *    UWAGA: ten facilitator WYMAGA UWIERZYTELNIENIA (CDP_API_KEY_ID
- *    i CDP_API_KEY_SECRET - oba sa juz w env tego projektu). Zwykly
- *    HTTPFacilitatorClient przyjmuje tylko `url` i `timeout`, bez naglowkow,
- *    wiec samo przestawienie zmiennej NIE WYSTARCZY: `GET /supported` bez
- *    klucza zwraca "Unauthorized" (sprawdzone). Potrzebna jest paczka
- *    @coinbase/x402, ktorej w package.json jeszcze nie ma.
+ *      X402_FACILITATOR_URL=            <- MUSI ZOSTAC PUSTE
+ *
+ *    UWAGA, TU BYL BLAD W TEJ INSTRUKCJI. Stalo tu "ustaw
+ *    X402_FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402".
+ *    To ZEPSULOBY platnosci: route.ts sprawdza `if (url)` JAKO PIERWSZE
+ *    i zbudowalby HTTPFacilitatorClient({url}) BEZ naglowkow uwierzytelniajacych,
+ *    a CDP bez klucza odpowiada 401. Galaz CDP (route.ts, CDP_NETWORKS) odpala
+ *    sie WYLACZNIE wtedy, gdy ta zmienna jest pusta - dopiero ona dokleja
+ *    klucze przez createFacilitatorConfig z @coinbase/x402.
+ *
+ *    Klucze CDP_API_KEY_ID i CDP_API_KEY_SECRET sa juz w env tego projektu,
+ *    a @coinbase/x402 JEST juz w package.json (drugi nieaktualny fragment
+ *    tego komentarza - twierdzil, ze paczki brakuje; route.ts jej uzywa).
+ *    Na tej sciezce `extra` domeny EIP-712 wypelnia sie samo, bo eip155:8453
+ *    siedzi w DEFAULT_STABLECOINS biblioteki.
  *
  * 2. ROBINHOOD CHAIN (eip155:4663) - USDG, bez gazu po stronie placacego:
  *      X402_FACILITATOR_URL=https://x402.primer.systems
@@ -112,11 +120,37 @@ const DEFAULT_ASK_NETWORK = 'eip155:84532';
  * Wpisanie tu 18 miejsc, odruchowo jak przy ETH, pomnozyloby cene przez
  * bilion.
  */
-const ASK_ASSETS: Record<string, { asset: string; decimals: number; symbol: string }> = {
+const ASK_ASSETS: Record<
+  string,
+  { asset: string; decimals: number; symbol: string; eip712: { name: string; version: string } }
+> = {
   'eip155:4663': {
     asset: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
     decimals: 6,
     symbol: 'USDG',
+    /**
+     * === TA PARA MUSI TU BYC, INACZEJ NIKT NICZEGO NIE PODPISZE ===
+     * Klient x402 (@x402/evm, client/index.js) sprawdza to PRZED podpisem:
+     *
+     *   if (!requirements.extra?.name || !requirements.extra?.version)
+     *     throw new Error('EIP-712 domain parameters (name, version) are required...')
+     *
+     * Na sieciach z kanonicznym USDC biblioteka wypelnia to sama z wlasnej
+     * listy DEFAULT_STABLECOINS. Robinhood Chain na tej liscie NIE JEST, wiec
+     * bez tych dwoch pol odpowiedz 402 wychodzi z `extra: {}` i kazda platnosc
+     * konczy sie wyjatkiem u agenta - jeszcze zanim dotknie facilitatora.
+     *
+     * WARTOSCI SA ODTWORZONE Z LANCUCHA, NIE PRZEPISANE Z DOKUMENTACJI.
+     * `version()` i `eip712Domain()` na tym kontrakcie OBA rewertuja
+     * (0x800ab12c), wiec nie da sie ich odczytac w czasie dzialania - stad
+     * wpis na sztywno. Poprawnosc sprawdzona przez zhaszowanie domeny
+     * i porownanie z DOMAIN_SEPARATOR() =
+     * 0x7a3d7400b27830f4f91c2c16a082486d67c1befecaec2f53b33f1f35d5b62036.
+     * Warianty "USDG"/"1", "Global Dollar"/"2" i "Global Dollar"/"" NIE
+     * pasuja - zla wersja psuje kazdy podpis po cichu, bo blad wychodzi
+     * dopiero przy odzyskiwaniu adresu i wyglada jak zly podpis.
+     */
+    eip712: { name: 'Global Dollar', version: '1' },
   },
 };
 
@@ -174,7 +208,9 @@ export function getAskNetwork(): Network {
  * obciecie: przy cenie 0,015 USDG obciecie dawaloby 0,01 - czyli cene INNA
  * niz ta, ktora ogloszilismy w GET /api/asks.
  */
-export function getAskPrice(): string | { asset: string; amount: string } {
+export function getAskPrice():
+  | string
+  | { asset: string; amount: string; extra: { name: string; version: string } } {
   const network = getAskNetwork();
   const known = ASK_ASSETS[network];
   const money = getAskPostPrice();
@@ -188,7 +224,10 @@ export function getAskPrice(): string | { asset: string; amount: string } {
   }
 
   const amount = Math.round(value * 10 ** known.decimals).toString();
-  return { asset: known.asset, amount };
+  // `extra` PRZECHODZI DALEJ BEZ ZMIAN az do odpowiedzi 402 - schemat `exact`
+  // po stronie serwera (@x402/evm, parsePrice) kopiuje je jeden do jednego,
+  // a klient bez niego rzuca wyjatkiem. Patrz ASK_ASSETS wyzej.
+  return { asset: known.asset, amount, extra: known.eip712 };
 }
 
 /** Symbol waluty do pokazania czlowiekowi. Nie uzywany do rozliczenia. */
