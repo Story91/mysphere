@@ -28,10 +28,18 @@ import { ExactEvmScheme } from "@x402/evm/exact/server";
  * wprowadzonym dopiero w Next 16. My tej sciezki NIE uzywamy - bierzemy
  * `withX402` na poziomie pojedynczych API routes.
  *
- * Czego to NIE gwarantuje: pelnej sciezki 402 przy wlaczonym egzekwowaniu nikt
- * jeszcze nie przeszedl na tej kombinacji wersji. Przed ustawieniem
- * X402_PAY_TO_ADDRESS na produkcji zrob realny handshake na Base Sepolia
- * (eip155:84532).
+ * Co sie zmienilo, a czego ten warunek NIE obejmuje. Pelna sciezka 402 na tej
+ * kombinacji wersji JUZ PRZESZLA - ale nie tutaj. Przeszla na `POST /api/asks`,
+ * na Robinhood Chain (eip155:4663) w USDG, przez facilitator primer.systems.
+ * To zdejmuje watpliwosc co do samej biblioteki na Next 14.2.35.
+ *
+ * CZEGO NIE ZDEJMUJE: przez TRASY MyClaw nie przeszla ani jedna platnosc.
+ * Stoja one na eip155:8453 z facilitatorem CDP, czyli na zupelnie innej galezi
+ * niz ta sprawdzona - inny lancuch, inny token, inny facilitator, inne
+ * uwierzytelnienie. X402_PAY_TO_ADDRESS jest juz ustawiony, wiec egzekwowanie
+ * na tych trasach CHODZI, mimo ze nikt ich nie przejechal. Warunek "zrob
+ * realny handshake, zanim ustawisz adres" stal sie wiec bezprzedmiotowy nie
+ * dlatego, ze go spelniono, tylko dlatego, ze adres ustawiono wczesniej.
  */
 import { withX402 } from "@x402/next";
 import type { NextRequest, NextResponse } from "next/server";

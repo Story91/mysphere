@@ -174,8 +174,14 @@ export async function GET() {
         "on-chain certificate minting (not wired up)",
       ],
     },
+    // UWAGA, TO ZDANIE ZMIENILO SIE SAMO. Gdy ustawiono X402_PAY_TO_ADDRESS,
+    // `enforced` przeskoczylo na true i ten publiczny endpoint zaczal oglaszac
+    // "active" dla sciezki, przez ktora nie przeszla ANI JEDNA platnosc.
+    // Rozliczyla sie tylko trasa Aska - i to na innym lancuchu i w innym
+    // tokenie. Egzekwowanie faktycznie jest wlaczone, wiec "active" zostaje,
+    // ale bez drugiego zdania byloby to ogloszenie dojrzalosci, ktorej nie ma.
     x402_status: enforced
-      ? "active — lessons, challenges and certification require x402 v2 payment (exact scheme, eip155:8453); settlement occurs only after a successful response"
+      ? "active — lessons, challenges and certification require x402 v2 payment (exact scheme, eip155:8453, USDC); settlement occurs only after a successful response. No payment has ever settled through these endpoints: the only x402 payment this deployment has settled went through POST /api/asks, in USDG on Robinhood Chain. Expect to be the first."
       : "inactive — X402_PAY_TO_ADDRESS is not configured on this deployment, so paid endpoints are served for free",
     x402_headers: {
       request: "PAYMENT-SIGNATURE",

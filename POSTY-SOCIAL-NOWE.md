@@ -13,18 +13,21 @@ Warianty **PL** na dole — nie tłumaczenia, tylko osobno napisane.
 
 ---
 
-## 1. Główny — x402 na mainnecie
+## 1. Główny — pierwsza rozliczona płatność x402
 
-> An AI agent can now pay a human to answer a question on MySphere.
+> An AI agent can now pay a human to answer a question on MySphere. One just
+> did, for a cent.
 >
-> Real USDC. Base mainnet. No signup, no API key, no invoice — the endpoint
-> answers 402, the agent signs, retries, done.
+> No signup, no API key, no invoice — the endpoint answers 402 with its price,
+> the agent signs, retries, and the Ask is written. The payer signed and paid
+> no gas; the facilitator sent the transaction.
 >
 > Every marketplace in this space sells machine work to humans. We're selling
 > human judgment to machines. That shelf was empty.
 
 *Dlaczego to działa jako post: jedno zdanie tezy, brak przymiotników,
-i odwrócenie, którego nikt nie mówi.*
+i odwrócenie, którego nikt nie mówi. Liczbą jest „a cent" — i to jest cała
+prawdziwa skala tego przebiegu.*
 
 ---
 
@@ -32,35 +35,56 @@ i odwrócenie, którego nikt nie mówi.*
 
 > `POST /api/asks` → 402 Payment Required
 >
-> Agent signs a USDC authorization, retries, and a human gets paid to answer.
->
-> Base mainnet. Live today.
+> Agent signs a transfer authorization, retries, and a human gets paid to
+> answer. First one settled today: 0.01 USDG, no gas on the payer's side.
 
 ---
 
 ## 3. Techniczny — dla ludzi, którzy sprawdzą
 
-> We wired x402 on Base mainnet today. The 402 response carries:
+> Ran a real x402 payment through our own endpoint today. What the 402
+> actually carried:
 >
-> asset `0x833589fC…` (real USDC, not testnet)
-> amount `10000` (6 decimals — that's one cent)
+> network `eip155:4663` (Robinhood Chain)
+> asset `0x5fc5360D…` (USDG — Robinhood Chain has no canonical USDC)
+> amount `10000` (6 decimals — one cent)
 > payTo, deadline, scheme `exact`
 >
+> Balances moved by exactly 10000 units in a transaction the payer never sent.
+> That's EIP-3009: you sign, the facilitator pays the gas.
+>
 > If you're building agents: you don't need us to onboard you. Read the
-> header, sign, retry.
+> response, sign, retry. Read the asset off the response — don't assume USDC.
+
+*Ten post jest sprawdzalny linijka po linijce, więc każda linijka musi być
+przepisana z prawdziwej odpowiedzi, nie z pamięci. Poprzednia wersja podawała
+tu adres USDC z Base — token, którego ten endpoint nigdy nie zażądał.*
 
 ---
 
-## 4. Robinhood Chain
+## 4. Dlaczego USDG, a nie USDC
 
-> MySphere now speaks x402 on Robinhood Chain too — gasless, in USDG.
+> Everyone asks why the payment settles in USDG and not USDC. Because on
+> Robinhood Chain there is no USDC. I checked the addresses USDC uses on Base
+> and on Arbitrum — no contract at either, on that chain.
 >
-> Fun detail I found while wiring it: Robinhood Chain has no canonical USDC.
-> Of the four stablecoins on the explorer, exactly one answers
-> `authorizationState()` — USDG. Without EIP-3009 there's nothing for an agent
-> to sign, so that one token is the whole reason this works there at all.
+> Of the stablecoins listed there, exactly one answers `authorizationState()`
+> — USDG. Without EIP-3009 there's nothing for an agent to sign and the whole
+> scheme has nothing to stand on. So it isn't a taste in tokens. It's the only
+> one that works.
 
 *To jest post typu „patrzcie, sprawdziłem", nie „wspieramy kolejny łańcuch".*
+
+---
+
+## 4a. Uczciwe zastrzeżenie — jeśli ktoś dopyta
+
+> To be exact about what happened: one payment, one cent, between two addresses
+> I control. It proves the handshake and the settlement work end to end. It
+> does not prove anyone else is paying. The facilitator's signing key on that
+> chain had 19 transactions in its entire history when I looked.
+>
+> I'd rather say that than have someone else say it for me.
 
 ---
 
@@ -161,10 +185,12 @@ zamknięta, kontrakt stoi na mainnecie ze zweryfikowanym źródłem. Ale:*
 
 ## 1a. Główny
 
-> Od dziś agent AI może zapłacić człowiekowi za odpowiedź.
+> Od dziś agent AI może zapłacić człowiekowi za odpowiedź. Właśnie zapłacił —
+> jednego centa.
 >
-> Prawdziwe USDC, mainnet Base, bez rejestracji i bez klucza API. Endpoint
-> odpowiada 402, agent podpisuje, ponawia — koniec.
+> Bez rejestracji i bez klucza API. Endpoint odpowiada 402 razem z ceną, agent
+> podpisuje, ponawia, Ask powstaje. Płacący tylko podpisał i nie wydał grosza
+> na gaz — transakcję wysłał facilitator.
 >
 > Wszyscy w tej branży sprzedają pracę maszyn ludziom. My sprzedajemy ludzki
 > osąd maszynom. Ta półka była pusta.
@@ -205,6 +231,19 @@ zamknięta, kontrakt stoi na mainnecie ze zweryfikowanym źródłem. Ale:*
   ani że opłata 2,5% jest pobierana z wypłaty (leci wyłącznie od zwrotu do
   autora), ani że zwrot po wygaśnięciu da się kliknąć w produkcie (nie da się —
   kontrakt to ma, interfejs nie).
+- **„x402 na Base, w USDC"** — nieprawda. Płatna trasa rozlicza się na
+  **Robinhood Chain (`eip155:4663`) w USDG**, bo tam nie ma kanonicznego USDC,
+  a USDG jest jedynym tokenem z EIP-3009 na tym łańcuchu. Gałąź na Base
+  istnieje w kodzie i nie przeszedł przez nią ani jeden cent.
+- **„Przetestowane w boju", „działa w produkcji", „agenci już płacą"** — był
+  **jeden** przebieg, na **0,01 USDG**, między **dwoma naszymi** adresami.
+  To dowód, że ścieżka działa, nie dowód ruchu. Nie powołuj się też na
+  27 tysięcy rozliczeń z `/stats` facilitatora: to suma po wszystkich
+  łańcuchach, a jego klucz podpisujący na 4663 miał 19 transakcji w historii.
+- **Nie sklejaj x402 z escrow.** x402 płaci za **założenie** Aska (0,01 USDG na
+  Robinhood). Escrow blokuje **budżet** Aska (USDC na Base). To dwie różne
+  rzeczy, dwa różne łańcuchy i dwa różne tokeny — a Ask założony przez agenta
+  jest zawsze `on-resolve`, czyli nie ma escrow wcale.
 - **„Wspieramy 8 sieci"** — jest ich **siedem**. Sam się na tym przejechałem,
   licząc `camp` i `basecamp` jako dwie.
 - **Liczby użytkowników bez kontekstu** — 184 064 konta brzmi świetnie, ale

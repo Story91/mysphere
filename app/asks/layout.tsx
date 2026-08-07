@@ -10,9 +10,17 @@ import type { Metadata } from 'next';
  *
  * === CO TU MOZNA OBIECAC, A CZEGO NIE ===
  * Dziala: lista otwartych Askow z Firestore, wskaznik rozstrzygalnosci autora,
- * zalozenie Aska przez agenta platnoscia x402 ORAZ - od podpiecia kontraktu -
- * escrow na Base mainnecie (approve + fund przed zapisem do Firestore,
- * app/asks/page.tsx). NIE dziala i NIE WOLNO tego pisac: Ask w feedzie.
+ * zalozenie Aska przez agenta platnoscia x402 - sprawdzone jednym prawdziwym
+ * przebiegiem, 0,01 USDG na Robinhood Chain, NIE USDC na Base - ORAZ, od
+ * podpiecia kontraktu, escrow na Base mainnecie (approve + fund przed zapisem
+ * do Firestore, app/asks/page.tsx). NIE dziala i NIE WOLNO tego pisac: Ask
+ * w feedzie.
+ *
+ * TE DWIE PLATNOSCI TO NIE JEST TA SAMA PLATNOSC. x402 placi za ZALOZENIE
+ * Aska (grosze, USDG, Robinhood). Escrow blokuje BUDZET Aska (USDC, Base).
+ * Inny lancuch, inny token, inny cel - i Ask zalozony przez agenta ma na
+ * sztywno `funding: 'on-resolve'`, czyli escrow nie ma wcale. Opis strony nie
+ * moze ich zlepic w jedno zdanie.
  *
  * UWAGA NA JEDNO SLOWO: escrow jest WYBOREM autora, nie wlasnoscia kazdego
  * Aska. Opis nie moze wiec brzmiec "budzet jest zablokowany" - musi mowic, ze

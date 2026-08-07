@@ -29,6 +29,13 @@ const DEFAULT_ASK_POST_PRICE = '$0.01';
 /**
  * Domyslna siec: Base Sepolia w CAIP-2.
  *
+ * === UWAGA: TO NIE JEST SIEC, NA KTOREJ TO DZIS CHODZI ===
+ * To tylko awaryjna wartosc dla wdrozenia bez konfiguracji. Wdrozenie, ktore
+ * przyjelo prawdziwa platnosc, mialo X402_NETWORK=eip155:4663 i placilo w USDG
+ * (wariant 2 nizej). Nie wnioskuj z tej stalej, gdzie ida pieniadze - odpowiedz
+ * na to daje GET /api/asks w polach `network` i `currency`, czytanych ze
+ * srodowiska przy kazdym zadaniu.
+ *
  * DLACZEGO NIE MAINNET DOMYSLNIE: publiczny facilitator
  * (https://x402.org/facilitator/supported) deklaruje dla schematu `exact`
  * i przestrzeni eip155 WYLACZNIE `eip155:84532`. Sprawdzone na zywo.
@@ -83,17 +90,30 @@ const DEFAULT_ASK_POST_PRICE = '$0.01';
  *
  *    Primer sprawdzony realnym POST /verify: przechodzi walidacje sieci
  *    ORAZ aktywa (nasze USDG) i dociera do odtwarzania podpisu ECDSA.
- *    /stats podaje 27 466 rozliczonych platnosci, wiec to dzialajacy produkt.
+ *
+ *    OSTROZNIE Z JEGO /stats. Stalo tu "27 466 rozliczonych platnosci, wiec to
+ *    dzialajacy produkt" - liczba jest prawdziwa, ale wniosek za szeroki: to
+ *    suma po WSZYSTKICH lancuchach, ktore ten facilitator obsluguje, a nie
+ *    dowod ruchu na 4663. Sygnatariusz Primera na TYM lancuchu mial przy
+ *    sprawdzeniu 0,000273 ETH gazu i 19 transakcji w calej historii. Dziala -
+ *    ale to swiezy tor, nie ubita droga, i tak trzeba o nim pisac.
  *
  *    UWAGA NA TOKEN "PR": strona Primera podaje dla tej sieci adres
  *    0x235767cc3d01ec18B5db87973975AC8616b2A153. To ICH wlasny token (symbol
  *    odczytany z lancucha: "PR"), NIE USDG. Nie wpisywac go do ASK_ASSETS.
  *
- *    CZEGO NIE SPRAWDZONO: pelnej platnosci koniec-koncem. Potwierdzone sa
- *    deklaracja sieci, prawdziwosc jej walidacji, akceptacja USDG i dotarcie
- *    do weryfikacji podpisu. Realnego `settle` nie da sie sprawdzic bez
- *    prawdziwego podpisu i USDG w portfelu. ZANIM OGLOSIMY TO NA STRONIE
- *    PRODUKTU, trzeba puscic jedna platnosc na 0,01 USDG.
+ *    === TO JUZ PRZESZLO. SETTLE POTWIERDZONY NA ZYWO ===
+ *    Stal tu warunek: "zanim ogloszimy to na stronie produktu, trzeba puscic
+ *    jedna platnosc na 0,01 USDG". Zostal spelniony przez scripts/x402PayAsk.mjs:
+ *    402 z wymaganiami -> podpis EIP-3009 -> ponowienie z PAYMENT-SIGNATURE ->
+ *    201 z identityVia: "x402". Na lancuchu placacy 0xD4885A5a... stracil
+ *    10 000 jednostek, odbiorca 0xF1fa2002... dostal 10 000 - czyli 0,01 USDG.
+ *    Placacy NIE placil gazu; transakcje wyslal facilitator.
+ *
+ *    CO Z TEGO NIE WYNIKA. Jeden przebieg, jeden cent, dwa NASZE adresy. To
+ *    dowod, ze sciezka dziala, a nie ze ktokolwiek nia chodzi. Nie wolno tego
+ *    nazwac "przetestowane w boju" ani "dziala w produkcji" - ani tutaj, ani
+ *    na stronie.
  *
  *    Domena EIP-712 dla USDG (potrzebna do podpisu, odtworzona z
  *    DOMAIN_SEPARATOR, bo eip712Domain() na tym kontrakcie rewertuje):

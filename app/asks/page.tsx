@@ -63,7 +63,9 @@ import { MAX_ANSWER_LENGTH } from '../api/asks/pricing';
  *
  * === DLACZEGO ZAKLADANIE NIE IDZIE PRZEZ POST /api/asks ===
  * Tamta trasa jest dla AGENTOW: stoi za bramka x402 i wymaga podpisanej
- * autoryzacji USDC, ktorej czlowiek w przegladarce nie zlozy. Manifest mowi
+ * autoryzacji EIP-3009 na tokenie, ktory poda odpowiedz 402 - dzis USDG na
+ * Robinhood Chain, NIE USDC (patrz api/asks/pricing.ts). Czlowiek w
+ * przegladarce takiego podpisu nie zlozy. Manifest mowi
  * wprost "an agent can post an Ask THE SAME WAY YOU CAN" - czyli czlowiek ma
  * swoja droge, a nie cudza z doklejona oplata.
  *

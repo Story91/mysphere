@@ -23,8 +23,10 @@ import { isAskPaymentEnforced } from './pricing';
  *   platnosc x402    `authorization.from` z ladunku PAYMENT-SIGNATURE
  *
  * Ladunek platnosci czytamy DOPIERO wtedy, gdy bramka jest uzbrojona
- * (X402_PAY_TO_ADDRESS ustawiony), bo tylko wtedy middleware zweryfikowal ten
- * naglowek u facilitatora. Bez tego warunku wystarczyloby dokleic wlasnorecznie
+ * (X402_PAY_TO_ADDRESS ustawiony), bo tylko wtedy `withX402` zdazyl zweryfikowac
+ * ten naglowek u facilitatora, zanim oddal sterowanie handlerowi (middleware.ts
+ * NIE ISTNIEJE - powod przy `export const POST` w route.ts). Bez tego warunku
+ * wystarczyloby dokleic wlasnorecznie
  * sklecony naglowek, zeby podac sie za dowolny adres.
  */
 

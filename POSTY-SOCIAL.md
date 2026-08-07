@@ -736,15 +736,26 @@ Cztery zastrzeżenia, bez których to zdanie robi się reklamą:
 - **Ścieżka z przeglądarki nie została przejechana na mainnecie.** Pełny cykl pieniądza przeszedł
   dwa razy na Base Sepolii prawdziwym USDC, ale skryptem z node — to dowód kontraktu, nie klienta.
 
-### 7.3. x402 dla agentów — kod gotowy, czeka na jeden adres
-`@x402/next` 2.21 wpięty (CAIP-2, `PAYMENT-SIGNATURE`), lekcje / challenge'e / certyfikacja owinięte
-cenami $0.001 / $0.005 / $0.01, settlement odpala się wyłącznie przy statusie < 400. **Bez
-`X402_PAY_TO_ADDRESS` egzekwowanie się nie włącza** — endpointy działają za darmo z ostrzeżeniem
-w logu. Zweryfikowane w kompilowanym źródle: 429 anuluje settlement, więc agent nie płaci za próbę,
-której mu nie pozwolono podjąć.
-**Otwarte:** `@x402/next` deklaruje peer `next >= 16.2.6`, a projekt stoi na 14.2.35. Sprawdzone, że
-importuje wyłącznie z `next/server`, ale **pełnej ścieżki 402 nikt nie przeszedł end-to-end** na tej
-kombinacji — realny handshake na Base Sepolia (`eip155:84532`) jest warunkiem przed produkcją.
+### 7.3. x402 dla agentów — pierwsza prawdziwa płatność przeszła
+`@x402/next` 2.21 wpięty (CAIP-2, `PAYMENT-SIGNATURE`), settlement odpala się wyłącznie przy
+statusie < 400, więc agent nie płaci za błąd walidacji ani za nieudany zapis. Egzekwowanie jest
+**włączone**: `X402_PAY_TO_ADDRESS` ustawiony, a `POST /api/asks` bez podpisu oddaje 402 z ceną.
+
+**Co dokładnie przeszło.** Jeden przebieg `scripts/x402PayAsk.mjs`: 402 z wymaganiami → podpis
+EIP-3009 → ponowienie z `PAYMENT-SIGNATURE` → **201** z `identityVia: "x402"`. Na łańcuchu
+(Robinhood Chain, `eip155:4663`, USDG `0x5fc5360D…`, 6 miejsc) płacący `0xD4885A5a…` stracił
+10 000 jednostek, odbiorca `0xF1fa2002…` dostał 10 000. Czyli **0,01 USDG**. Płacący **nie płacił
+gazu** — na tym polega EIP-3009, transakcję wysłał facilitator (`https://x402.primer.systems`).
+
+**Czego to NIE dowodzi, i nie wolno tego napisać inaczej:** jeden przebieg, jeden cent, dwa
+**nasze** adresy. To dowód, że handshake i rozliczenie działają, nie dowód ruchu. Klucz podpisujący
+facilitatora na 4663 miał przy sprawdzeniu 0,000273 ETH i **19 transakcji** w całej historii tego
+łańcucha; jego `/stats` podaje 27 tys. rozliczeń, ale to suma po wszystkich łańcuchach.
+
+**Otwarte:** ta sama trasa na **Base w USDC** — gałąź CDP jest w kodzie i wchodzi się w nią dwiema
+zmiennymi środowiskowymi, ale nie przeszedł przez nią ani jeden cent. Dalej otwarte też:
+`@x402/next` deklaruje peer `next >= 16.2.6`, a projekt stoi na 14.2.35 (importuje wyłącznie
+z `next/server`, więc działa — ale to zgodność sprawdzona, nie zadeklarowana).
 
 ### 7.4. Test falsyfikujący kierunek — przed pisaniem backendu Aska
 Największe założenie nie dotyczy agentów, tylko tego, **czy istnieje człowiek gotowy zapłacić realne
@@ -761,7 +772,8 @@ Logika jest sprawdzona na produkcyjnych danych (17/17), ale sam przelew przez ni
 ### 7.6. Blokady po stronie właściciela
 `PRIVATE_KEY` nowego portfela **bez prefiksu `NEXT_PUBLIC_`** (z prefiksem klucz prywatny trafiłby
 do publicznego bundle'a JS) · ETH na Robinhood Chain (most z **Ethereum mainnet**, nie z Base) ·
-`X402_PAY_TO_ADDRESS` · `NEXT_PUBLIC_ROBINHOOD_RPC_URL` (publiczny jest rate-limited i oficjalnie
+~~`X402_PAY_TO_ADDRESS`~~ **(zdjęte — adres ustawiony, egzekwowanie chodzi, patrz 7.3)** ·
+`NEXT_PUBLIC_ROBINHOOD_RPC_URL` (publiczny jest rate-limited i oficjalnie
 „not recommended for production") · rotacja `NEXT_PUBLIC_COINBASE_PRIVATE_KEY` (0 użyć w kodzie,
 ale publiczny prefiks i 548 dni w env).
 

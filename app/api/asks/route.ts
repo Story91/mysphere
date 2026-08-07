@@ -1,6 +1,8 @@
 /**
  * GET  /api/asks - otwarte Aski i cena zalozenia nowego. DARMOWE.
- * POST /api/asks - zalozenie Aska. PLATNE przez x402 (patrz middleware.ts).
+ * POST /api/asks - zalozenie Aska. PLATNE przez x402 (patrz `withX402` na dole
+ * tego pliku; middleware.ts NIE ISTNIEJE i nie ma prawa wrocic - powod przy
+ * samym `export const POST`).
  *
  * === PO CO TA TRASA ISTNIEJE ===
  * Manifest, sekcja "402 - payment required": "An agent can post an Ask the same
@@ -131,8 +133,13 @@ function paymentInfo() {
     network: getAskNetwork(),
     description: ASK_POST_DESCRIPTION,
     enforced,
+    // TA SAMA PULAPKA CO W `currency` WYZEJ, A ZOSTALA TU O JEDNO WDROZENIE
+    // ZA DLUGO. Zdanie mowilo "Sign the USDC authorization" na sztywno, podczas
+    // gdy pole `currency` tuz obok oddawalo juz USDG. Jedna odpowiedz mowila
+    // agentowi dwie rozne waluty - a to jest dokladnie ta odpowiedz, na
+    // podstawie ktorej agent buduje podpis EIP-3009.
     note: enforced
-      ? 'Unpaid POST returns 402 with payment requirements. Sign the USDC authorization and retry with the PAYMENT-SIGNATURE header.'
+      ? `Unpaid POST returns 402 with payment requirements. Sign a ${getAskCurrencySymbol()} EIP-3009 authorization for the exact asset and amount carried by that response - do not take them from here - and retry with the PAYMENT-SIGNATURE header. The payer signs only; the facilitator submits the transaction, so the paying address needs no gas.`
       : 'X402_PAY_TO_ADDRESS is not configured on this deployment, so Asks cannot be posted here at all. Posting is refused, not given away.',
     // Powiedziane wprost, zeby nikt nie wzial tego za escrow.
     fundingNote:
@@ -204,9 +211,11 @@ const ALLOWED_DURATIONS = new Set<number>(ASK_DURATIONS.map((duration) => durati
 // galezi unii (odpowiedz bledu) i withX402 odrzuca handler, ktory potrafi
 // zwrocic takze utworzonego Aska.
 async function handlePost(request: NextRequest): Promise<NextResponse<unknown>> {
-  // Do tego miejsca zadanie dochodzi tylko przez middleware, czyli albo z
-  // rozliczona platnoscia x402, albo wcale. Tozsamosc jest osobna sprawa:
-  // platnosc mowi ZE zaplacono, nie KTO zaklada Aska.
+  // Do tego miejsca zadanie dochodzi tylko z podpisem, ktory `withX402` zdazyl
+  // ZWERYFIKOWAC - ale jeszcze NIE ROZLICZYC. Rozliczenie idzie po handlerze
+  // i tylko przy statusie < 400 (@x402/next, handleSettlement). Kazde `return`
+  // z bledem ponizej kasuje wiec platnosc, a nie pobiera jej za nic.
+  // Tozsamosc jest osobna sprawa: podpis mowi ZE zaplacono, nie KTO zaklada Aska.
   const requester = getRequester(request);
   if (!requester) {
     return NextResponse.json(
@@ -288,10 +297,14 @@ async function handlePost(request: NextRequest): Promise<NextResponse<unknown>> 
     });
   } catch (error) {
     console.error('[api/asks] Zapis Aska nie powiodl sie:', error);
-    // UWAGA: platnosc x402 zostala juz rozliczona przez middleware, zanim ta
-    // trasa wystartowala (paymentProxy rozlicza na NextResponse.next()).
-    // Ten blad oznacza wiec pobrana oplate bez Aska. Zwracamy `code`, zeby dalo
-    // sie to odroznic od odmowy walidacyjnej i zwrocic pieniadze recznie.
+    // TEN KOMENTARZ MOWIL DOKLADNIE ODWROTNIE, NIZ ROBI KOD. Stalo tu, ze
+    // platnosc rozliczylo middleware jeszcze przed startem trasy, wiec ten blad
+    // oznacza pobrana oplate bez Aska - i kazalo zwracac pieniadze recznie.
+    // Middleware nie ma (patrz `export const POST` nizej), a `withX402` rozlicza
+    // WYLACZNIE przy statusie < 400. Status 500 znaczy, ze nikt nie zaplacil,
+    // wiec nie ma czego zwracac - zwrot na podstawie tamtego zdania byloby
+    // oddaniem pieniedzy, ktorych nigdy nie wzielismy.
+    // `code` zostaje, bo dalej odroznia awarie zapisu od odmowy walidacyjnej.
     return NextResponse.json(
       { error: 'Failed to create Ask', code: 'ask_write_failed' },
       { status: 500, headers: NO_STORE_PRIVATE }

@@ -440,7 +440,7 @@ Po merge'u trzeba **opublikować `firestore.rules` z konsoli** — doszła sekcj
 |---|---|---|
 | 1 | **`PRIVATE_KEY`** nowego portfela w `.env.local`, **bez prefiksu `NEXT_PUBLIC_`** | Deploy kontraktu postów. Z prefiksem klucz prywatny trafiłby do publicznego bundle'a JS |
 | 2 | ETH na Robinhood Chain dla tego portfela | Gaz. Most z **Ethereum mainnet**, nie z Base |
-| 3 | **`X402_PAY_TO_ADDRESS`** | Włącza egzekwowanie płatności x402 |
+| ~~3~~ | ~~**`X402_PAY_TO_ADDRESS`**~~ **ZDJĘTE** | Ustawiony. Egzekwowanie chodzi, prawdziwa płatność 0,01 USDG rozliczona na Robinhood Chain — patrz sekcja 3 |
 | 4 | `NEXT_PUBLIC_ROBINHOOD_RPC_URL` | Publiczny RPC jest rate-limited i oficjalnie „not recommended for production” |
 | 5 | Rotacja **`NEXT_PUBLIC_COINBASE_PRIVATE_KEY`** | 0 użyć w kodzie, ale publiczny prefiks i 548 dni w env |
 
@@ -450,7 +450,8 @@ Po merge'u trzeba **opublikować `firestore.rules` z konsoli** — doszła sekcj
 |---|---|
 | **Test falsyfikujący kierunek** — 20 ręcznych Asków przez istniejące tipy, zanim powstanie backend | ⬜ patrz sekcja 5 |
 | Backend Aska: `POST /api/asks` z dwiema ścieżkami płatności, zapieczętowane odpowiedzi, wypłata USDC | ⬜ |
-| Realny handshake 402 na Base Sepolia (`eip155:84532`) — nikt nie przeszedł tej ścieżki end-to-end na Next 14.2.35 | ⬜ **przed produkcją** |
+| Realny handshake 402 end-to-end na Next 14.2.35 | ✅ **przeszedł**, ale na Robinhood Chain (`eip155:4663`, USDG), nie na Base Sepolii: 402 → podpis EIP-3009 → 201 `identityVia: "x402"`, 0,01 USDG między dwoma naszymi adresami, płacący bez gazu. Jeden przebieg — dowód ścieżki, nie dowód ruchu |
+| Ta sama ścieżka na **Base w USDC** (`eip155:8453`, facilitator CDP) | ⬜ gałąź jest w kodzie, wchodzi się w nią dwiema zmiennymi — ale nie przeszedł przez nią ani jeden cent |
 | Zaostrzenie reguł Firestore na istniejące kolekcje (wymaga, żeby klienci faktycznie podpisywali) | ⬜ |
 | Deploy kontraktu na Robinhood + `NEXT_PUBLIC_ROBINHOOD_POST_CONTRACT` | ⬜ blokada #1 i #2 |
 | 38 brakujących lekcji MyClaw, mint certyfikatu SBT | ⬜ świadomie odłożone |
@@ -494,8 +495,15 @@ i trzeba mieć odwagę to przyjąć.
 - **Build bywa flaky na Windowsie** — `collect-build-traces` rzuca `UNKNOWN errno
   -4094`. Powtórka przechodzi, ale w CI potrafi wywalić deploy.
 - **`@x402/next` 2.21 deklaruje peer `next >= 16.2.6`**, a projekt stoi na 14.2.35.
-  Sprawdzone, że importuje wyłącznie z `next/server`, ale pełnej ścieżki 402 nikt
-  nie przeszedł na tej kombinacji.
+  Pełna ścieżka 402 **przeszła** na tej kombinacji (0,01 USDG, Robinhood Chain),
+  więc to niezgodność zadeklarowana, nie faktyczna. Zostaje na liście, bo działa
+  mimo deklaracji, a nie dzięki niej — kolejna wersja paczki może to zmienić bez
+  ostrzeżenia.
+- **Płatność x402 nie ma nic wspólnego z escrow.** x402 płaci za **założenie**
+  Aska (0,01 USDG, Robinhood Chain). Escrow blokuje **budżet** Aska (USDC, Base).
+  Ask założony przez agenta ma na sztywno `funding: 'on-resolve'`, czyli nie ma
+  escrow wcale — `POST /api/asks` nie umie zawołać `approve` + `fund`, bo te
+  wymagają podpisu portfela autora, a płatnik x402 tu niczego nie podpisuje.
 - **`/mycamp` renderuje statycznie tylko tło** — `useSearchParams()` na górze
   2000-liniowego komponentu.
 

@@ -211,7 +211,7 @@ const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = 
         what: 'USDG',
         chain: 'Robinhood',
         address: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
-        line: 'Global Dollar. Robinhood Chain has no canonical USDC, and of the stablecoins there this is the one that supports signed transfers — so it is the only one a machine can pay with, without holding gas.',
+        line: 'Global Dollar. This is what an agent actually pays in when it posts an Ask — one such payment has settled, for a cent. Robinhood Chain has no canonical USDC, and of the stablecoins there this is the only one that supports signed transfers, so it is the only one a machine can pay with while holding no gas.',
         explorer: 'https://robinhoodchain.blockscout.com/address/0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
       },
       {
@@ -423,6 +423,16 @@ function AskCard() {
  * zniknac: zwrot po wygasnieciu istnieje w kontrakcie i NIE MA go w interfejsie,
  * a Ask dalej nie pokazuje sie w feedzie. Wpisanie escrow jako `live` przy
  * jednoczesnym skasowaniu tych dwoch wierszy zamienilo by ta tabele w reklame.
+ *
+ * TA SAMA ZASADA PRZY x402. Wiersz "x402 payment rails / wired / enforcement
+ * wlaczy sie, gdy ustawimy adres" jest juz nieprawda: adres jest ustawiony,
+ * egzekwowanie chodzi, a jedna prawdziwa platnosc 0,01 USDG rozliczyla sie na
+ * Robinhood Chain. Wiersz idzie wiec na `live` - ale NIE ZOSTAJE PO NIM PUSTE
+ * MIEJSCE. Zamiast niego wchodzi to, co jest teraz najblizsza brakujaca rzecza:
+ * ta sama sciezka na Base w USDC, ktora ma w kodzie swoja galaz i przez ktora
+ * nie przeszedl ani jeden cent. Bez tego drugiego wiersza tabela mowilaby
+ * "x402 dziala" i milczala o tym, ze dziala na jednym lancuchu, w jednym tokenie
+ * i z jednym przebiegiem w historii.
  */
 type Status = 'live' | 'wired' | 'building' | 'planned' | 'off';
 
@@ -480,9 +490,14 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
     note: 'Text sold per post. It is stored outside the feed, so it is not in the page you did not pay for.',
   },
   {
-    name: 'x402 payment rails',
+    name: 'x402: an agent pays for an Ask',
+    status: 'live',
+    note: 'A payout address is set and enforcement is on: POST /api/asks answers 402, takes a signed authorization and writes the Ask. One real payment has settled this way — 0.01 USDG on Robinhood Chain, the payer signing only and paying no gas. One payment between two of our own addresses is proof the path works, not evidence of traffic.',
+  },
+  {
+    name: 'x402 on Base, in USDC',
     status: 'wired',
-    note: 'Endpoints already speak 402. Enforcement turns on the moment a payout address is set.',
+    note: 'The nearest missing thing. The same route already carries the branch for it — Coinbase as facilitator, keys and all — and moving there is two environment variables. But not one cent has gone through that branch, so it is a code path, not a rail. Today the paid route runs where the gasless dollar is, and that is Robinhood Chain.',
   },
   {
     name: 'Ask: post and answer',
@@ -721,20 +736,37 @@ export default function ReDefinitionPage() {
         <section className="py-16">
           <Marker amount="402" label="payment required" />
           <H2>The buyer does not have to be human</H2>
-          <State tone="building">
-            Rails wired — the Ask endpoint they point at is still being written
+          <State tone="live">
+            Running — one real payment has settled through it, and that is exactly one
           </State>
           <P>
             An agent has no browser, no wallet popup and no account. What it does have is money and
-            a standard for spending it. On Base, that standard is x402: the resource answers a
-            request with <Hi>402 Payment Required</Hi> and its price, the agent signs a USDC
-            authorization inside whatever spending cap its owner set, and retries. No sign-up, no
-            API key, no invoice.
+            a standard for spending it. That standard is x402: the resource answers a request with{' '}
+            <Hi>402 Payment Required</Hi> and its price, the agent signs a transfer authorization
+            inside whatever spending cap its owner set, and retries. No sign-up, no API key, no
+            invoice. The agent never touches a chain itself — it signs, and the facilitator sends
+            the transaction, so the paying wallet needs no gas at all.
           </P>
           <P>
             So an agent can post an Ask the same way you can — <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">GET /api/asks</code> to see
             the price, sign, then <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">POST</code> the question. Your answer
             comes back to it as JSON when you deliver it.
+          </P>
+          <P>
+            That has now happened once, for real money: <Hi>0.01 USDG on Robinhood Chain</Hi>. The
+            endpoint refused the unpaid request with a 402 and its price, took the signed
+            authorization on the retry, and wrote the Ask. The payer&apos;s balance fell by ten
+            thousand units and ours rose by the same ten thousand, in a transaction the payer never
+            sent and never paid gas for.
+          </P>
+          <P>
+            Now the part a launch post would leave out. That was <Hi>one payment, of one cent,
+            between two addresses we both own</Hi>. It settles on Robinhood Chain rather than Base
+            because Robinhood Chain has no canonical USDC and USDG is the only stablecoin there that
+            can be paid by signature — that is the only reason, not a preference. And the
+            facilitator&apos;s signing key on that chain had nineteen transactions in its whole
+            history when we checked. The path works. It is not worn in, and this page is not going
+            to tell you it is.
           </P>
           <P>
             Every marketplace in this space sells machine work to humans. This one sells{' '}
