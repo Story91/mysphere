@@ -1,8 +1,26 @@
+/**
+ * GET  /api/camp-stats - zbiorcze statystyki podpiec (dzis stale, patrz nizej)
+ * POST /api/camp-stats - zapis listy podpietych sieci dla JEDNEGO portfela
+ *
+ * DLACZEGO POST MA STRAZ. Ta trasa jako jedyna z trojki camp-owej ZAPISUJE:
+ * saveMySphereUserConnections tworzy dokument w kolekcji mySphereUserSocials
+ * pod kluczem adresu. Dopoki adres bralismy z ciala zadania i nikogo o nic nie
+ * pytali, kazdy mogl nadpisac powiazania dowolnego portfela - wlasnie na tym
+ * polega roznica miedzy "adresem" a "tozsamoscia". Teraz wymagamy podpisanej
+ * sesji SIWE i zgodnosci adresu z sesja (guardCampWrite), tym samym wzorcem co
+ * app/api/premium i app/api/unlock.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getMySphereGlobalStats, 
-  saveMySphereUserConnections 
+import {
+  getMySphereGlobalStats,
+  saveMySphereUserConnections
 } from '../../utils/firebase';
+import { guardCampWrite } from '../../utils/camp/proxyGuard';
+
+// guardCampWrite czyta sesje przez node:crypto, a trasa siega po cookies.
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -95,27 +113,65 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Sieci, ktore Camp Origin SDK w ogole obsluguje (constants.AVAILABLE_SOCIALS,
+ * to samo zrodlo co CAMP_SOCIALS w app/utils/socials/campConnector.ts).
+ * Lista jest zamknieta celowo: bez niej ciato zadania wpisywalo do Firestore
+ * dowolne stringi, dowolnej dlugosci, dowolna ilosc.
+ */
+const KNOWN_PLATFORMS = ['twitter', 'spotify', 'tiktok'] as const;
+
+type KnownPlatform = (typeof KNOWN_PLATFORMS)[number];
+
+/**
+ * Przepuszcza wylacznie znane nazwy sieci, bez powtorzen i w stalej kolejnosci.
+ * Zwraca null, gdy wejscie nie jest tablica - "pusta tablica" to poprawna
+ * odpowiedz (uzytkownik odpial wszystko) i nie wolno jej mylic z bledem.
+ */
+function normalizePlatforms(value: unknown): KnownPlatform[] | null {
+  if (!Array.isArray(value)) return null;
+  return KNOWN_PLATFORMS.filter((platform) => value.includes(platform));
+}
+
 export async function POST(request: NextRequest) {
+  let body: { address?: unknown; connectedPlatforms?: unknown };
   try {
-    const { address, connectedPlatforms } = await request.json();
-    
-    if (!address || !Array.isArray(connectedPlatforms)) {
-      return NextResponse.json({
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { success: false, error: 'The request body is not valid JSON.', code: 'invalid_body' },
+      { status: 400 }
+    );
+  }
+
+  // Sesja i zgodnosc adresu ZANIM cokolwiek dotknie Firestore.
+  const guard = guardCampWrite(request, body.address);
+  if (!guard.ok) return guard.response;
+
+  const connectedPlatforms = normalizePlatforms(body.connectedPlatforms);
+  if (connectedPlatforms === null) {
+    return NextResponse.json(
+      {
         success: false,
-        error: 'Invalid request data'
-      }, { status: 400 });
-    }
+        error: 'connectedPlatforms must be a list of linked networks.',
+        code: 'invalid_platforms'
+      },
+      { status: 400 }
+    );
+  }
 
-    console.log(`📊 Updating social connections for ${address}:`, connectedPlatforms);
+  try {
+    console.log(`📊 Updating social connections for ${guard.address}:`, connectedPlatforms);
 
-    // Save to Firebase
-    await saveMySphereUserConnections(address, connectedPlatforms);
-    
+    // Adres bierzemy ze STRAZY, nie z ciala zadania - to jedyny, ktory zostal
+    // potwierdzony podpisem.
+    await saveMySphereUserConnections(guard.address, connectedPlatforms);
+
     return NextResponse.json({
       success: true,
       message: 'Social connections updated successfully in Firebase',
       data: {
-        address,
+        address: guard.address,
         connectedPlatforms,
         count: connectedPlatforms.length,
         timestamp: new Date().toISOString(),
@@ -125,10 +181,14 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Camp stats update error:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to update social media statistics'
-    }, { status: 500 });
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Saving your linked accounts failed. Nothing was changed.',
+        code: 'save_failed'
+      },
+      { status: 500 }
+    );
   }
 } 

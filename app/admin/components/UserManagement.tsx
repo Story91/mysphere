@@ -16,6 +16,7 @@ import {
 import { useAccount } from 'wagmi';
 import { db, ADMIN_ADDRESS } from '../../utils/firebase';
 import { toMillis } from '../../utils/firestoreTime';
+import { addressReadVariants } from '../../utils/monetization/types';
 
 /**
  * Zarządzanie użytkownikami — wyszukiwanie punktowe zamiast ładowania bazy.
@@ -63,12 +64,15 @@ type BanEntry = {
   bannedAt?: number;
 };
 
-/** Adres w obu zapisach - w bazie leży raz w checksumie, raz małymi. */
-function addressVariants(raw: string): string[] {
-  const trimmed = raw.trim();
-  const lower = trimmed.toLowerCase();
-  return trimmed === lower ? [trimmed] : [trimmed, lower];
-}
+/**
+ * Adres w obu zapisach - profile w `users` stoja pod ID w checksumie.
+ *
+ * Wspolny `addressReadVariants` ODTWARZA postac checksum z samego adresu, wiec
+ * admin, ktory wklei adres malymi literami, znajdzie teraz konto. Poprzednia
+ * wersja liczyla warianty z tego, co wpisano, wiec przy malej pisowni pytala
+ * wylacznie o male litery - i nie znajdowala nikogo.
+ */
+const addressVariants = addressReadVariants;
 
 const isAddressLike = (value: string) => /^0x[0-9a-fA-F]{40}$/.test(value.trim());
 

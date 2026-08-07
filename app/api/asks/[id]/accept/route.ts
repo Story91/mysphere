@@ -27,7 +27,9 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
+import { getAddress } from 'viem';
 import { acceptAnswer, getAnswer, getAsk } from '../../../../utils/asks/asks';
+import { notifyAskPayout } from '../../../../utils/friends/notifications';
 import { isValidTxHash, normalizeAddress } from '../../../../utils/monetization/types';
 import { verifyBasePayment } from '../../../../utils/monetization/verifyPayment';
 import { sessionAddress } from '../../identity';
@@ -261,6 +263,39 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       },
       { status: 500, headers: NO_STORE_PRIVATE }
     );
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* ODPOWIADAJACY DOWIADUJE SIE, ZE MU ZAPLACONO                      */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * Przyjecie odpowiedzi bylo dotad nieme: autor placil, a odpowiadajacy nie
+   * mial jak sie o tym dowiedziec inaczej niz zagladajac do wlasnego portfela
+   * albo na /money. Ta sama luka co przy escrow, tylko tu pieniadze SA juz na
+   * miejscu - transfer zostal potwierdzony na lancuchu kilka linii wyzej,
+   * wiec zdanie brzmi inaczej niz przy escrow i nie kaze nic klikac.
+   *
+   * Powiadomienie NIE MOZE cofnac przyjecia: przelew jest na lancuchu, zapis
+   * w bazie zrobiony. Blad idzie do logu, a odpowiedz i tak jest sukcesem.
+   */
+  try {
+    await notifyAskPayout({
+      // Sesja SIWE trzyma adresy malymi literami, a powiadomienia czyta
+      // przegladarka adresem z wagmi (EIP-55). Bez checksumy dokument
+      // wyladowalby pod kluczem, do ktorego nikt nie zaglada.
+      recipientId: getAddress(answer.author),
+      askAuthorId: getAddress(ask.author),
+      askId,
+      answerId,
+      amount: perAnswer.toFixed(2),
+      token: ask.token,
+      // Bezposredni przelew: pieniadze sa juz w portfelu, nic nie trzeba odbierac.
+      delivery: 'wallet',
+      txHash: payoutTxHash,
+    });
+  } catch (error) {
+    console.error('[api/asks/accept] Powiadomienie o wyplacie nie powiodlo sie:', error);
   }
 
   return NextResponse.json(

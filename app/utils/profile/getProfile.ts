@@ -11,6 +11,7 @@ import {
 import { getAddress, isAddress } from 'viem';
 import { getPublicDb as getDb } from '../publicFirestore';
 import { toMillis } from '../firestoreTime';
+import { addressReadVariants } from '../monetization/types';
 
 /**
  * Odczyt publicznego profilu PO STRONIE SERWERA, na potrzeby trasy /u/[address].
@@ -65,12 +66,8 @@ export type Profile = {
   recentPosts: ProfilePost[];
 };
 
-/** Oba warianty zapisu adresu, bez duplikatu gdy checksum == lowercase. */
-function addressVariants(address: string): string[] {
-  const checksummed = getAddress(address as `0x${string}`);
-  const lower = checksummed.toLowerCase();
-  return checksummed === lower ? [checksummed] : [checksummed, lower];
-}
+// Warianty pisowni adresu maja w repo JEDNA implementacje - patrz
+// `addressReadVariants` w app/utils/monetization/types.ts.
 
 /** Ile ostatnich postow pokazujemy na profilu. */
 const RECENT_POSTS = 12;
@@ -79,7 +76,7 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
   if (!rawAddress || !isAddress(rawAddress)) return null;
 
   const address = getAddress(rawAddress as `0x${string}`);
-  const variants = addressVariants(address);
+  const variants = addressReadVariants(address);
   const db = getDb();
 
   // Kazdy odczyt jest niezalezny - profil ma sie wyswietlic nawet wtedy, gdy

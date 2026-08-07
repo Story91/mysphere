@@ -39,7 +39,9 @@ import {
   normalizeLinkedSocials,
   syncCampSocialsToProfile,
   type CampSocialId,
+  type CampSyncResult,
 } from './campConnector';
+import useSiweAuth from '../auth/useSiweAuth';
 
 interface CampSocialsCardProps {
   /** Adres wlasciciela profilu - pod nim ladunku kopia stanu w Firestore. */
@@ -124,6 +126,10 @@ function CampSocialsInner({ address }: CampSocialsCardProps) {
   const { connect, disconnect } = useConnect();
   const { setProvider } = useProvider();
   const { address: walletAddress, connector } = useAccount();
+  /* Kopia podpiec do profilu wymaga podpisanej sesji SIWE (POST /api/camp-stats).
+     Sesja Campa to co innego niz sesja naszego serwera - mozna miec pierwsza bez
+     drugiej, i wtedy zapis odmawia. */
+  const { signIn, isLoading: siweLoading } = useSiweAuth();
 
   const [isConnecting, setIsConnecting] = useState(false);
   /** Ktora siec jest w trakcie operacji - blokuje wlasny wiersz, nie caly panel. */
@@ -147,6 +153,14 @@ function CampSocialsInner({ address }: CampSocialsCardProps) {
      ref trzyma ostatnio wyslany podpis, wiec kazdy render nie generuje zapisu. */
   const lastSyncedRef = useRef<string | null>(null);
 
+  /**
+   * Nieudana kopia do profilu. Trzymamy CALY wynik, nie samo "nie udalo sie":
+   * brak sesji, za szybko i awaria maja trzy rozne wyjscia dla uzytkownika.
+   * Null znaczy "nie ma o czym mowic", a nie "na pewno zapisane".
+   */
+  const [syncIssue, setSyncIssue] = useState<Exclude<CampSyncResult, { state: 'saved' }> | null>(null);
+  const [isRetryingSync, setIsRetryingSync] = useState(false);
+
   useEffect(() => {
     if (!authenticated || !address) return;
     if (socialsQuery.isError || socialsQuery.isLoading || !socialsQuery.data) return;
@@ -156,8 +170,60 @@ function CampSocialsInner({ address }: CampSocialsCardProps) {
     if (lastSyncedRef.current === signature) return;
 
     lastSyncedRef.current = signature;
-    void syncCampSocialsToProfile(address, platforms);
+
+    let cancelled = false;
+    void (async () => {
+      const result = await syncCampSocialsToProfile(address, platforms);
+      if (cancelled) return;
+
+      if (result.state === 'saved') {
+        setSyncIssue(null);
+        return;
+      }
+
+      // Nieudanego zapisu nie wolno zapamietac jako zalatwionego - inaczej ten
+      // stan nie sprobowalby sie zapisac juz nigdy. Zerujemy podpis, zeby
+      // ponowienie (recznie albo po nastepnej zmianie) mialo szanse przejsc.
+      lastSyncedRef.current = null;
+      setSyncIssue(result);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [authenticated, address, linked, socialsQuery.data, socialsQuery.isError, socialsQuery.isLoading]);
+
+  /** Ponowienie kopii do profilu - to samo zadanie, tym razem z reki uzytkownika. */
+  const retrySync = useCallback(async () => {
+    setIsRetryingSync(true);
+    try {
+      const platforms = connectedPlatformList(linked);
+      const result = await syncCampSocialsToProfile(address, platforms);
+
+      if (result.state === 'saved') {
+        lastSyncedRef.current = `${address.toLowerCase()}:${platforms.join(',')}`;
+        setSyncIssue(null);
+        toast.success('Linked accounts saved to your profile.');
+        return;
+      }
+
+      setSyncIssue(result);
+    } finally {
+      setIsRetryingSync(false);
+    }
+  }, [address, linked]);
+
+  /** Podpisanie sesji, a po nim od razu ponowienie zapisu - jedno klikniecie. */
+  const signInAndSync = useCallback(async () => {
+    setIsRetryingSync(true);
+    try {
+      const signedIn = await signIn();
+      if (!signedIn) return;
+    } finally {
+      setIsRetryingSync(false);
+    }
+    await retrySync();
+  }, [signIn, retrySync]);
 
   /**
    * Podlaczenie portfela do Campa. Najpierw probujemy portfela, ktory w
@@ -406,6 +472,32 @@ function CampSocialsInner({ address }: CampSocialsCardProps) {
                   {busySocial === 'tiktok' ? 'Linking...' : 'Confirm'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Kopia do profilu sie nie zapisala. Bez tego bloku panel wygladal
+              identycznie jak przy udanym zapisie - czyli awaria udawala sukces. */}
+          {syncIssue && (
+            <div
+              role="status"
+              className="mt-3 bg-soft-sunken border border-soft-line rounded-card px-4 py-3"
+            >
+              <p className="text-xs text-soft-ink-muted">{syncIssue.message}</p>
+              <p className="text-xs text-soft-ink-faint mt-1">
+                Camp still holds these links. Only the copy shown on your profile is behind.
+              </p>
+              <button
+                type="button"
+                onClick={syncIssue.state === 'needs_sign_in' ? signInAndSync : retrySync}
+                disabled={isRetryingSync || siweLoading}
+                className="mt-2 text-xs font-semibold text-soft-primary-deep bg-soft-surface border border-soft-line px-3 py-1.5 rounded-pill shadow-chip hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isRetryingSync
+                  ? 'Working...'
+                  : syncIssue.state === 'needs_sign_in'
+                    ? 'Sign in and save'
+                    : 'Try again'}
+              </button>
             </div>
           )}
 

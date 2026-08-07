@@ -52,7 +52,28 @@ import { NameWithSuffix } from '../../utils/nameSuffix';
  * tego, kto go uzywa.
  */
 export type SoftTrendTone = 'purple' | 'amber' | 'green' | 'pink' | 'blue' | 'teal' | 'money';
-export type SoftTrendStat = { label: string; value: string; tone: SoftTrendTone };
+export type SoftTrendStat = {
+  label: string;
+  /**
+   * `null` znaczy NIEZMIERZONE i pokazuje sie jako kreska.
+   *
+   * Typ dopuszcza `null` CELOWO. Wczesniej bylo tu samo `string`, wiec
+   * wywolanie robilo `String(totalLikes)` - a `String(null)` to napis "null",
+   * ktory przechodzil przez compact() bez zmian i laduje na kaflu jako slowo
+   * "null". Tak wygladal kafel Likes na produkcji. Znak "nie wiem" ma wstawiac
+   * ten komponent, bo tylko tutaj wiadomo, jak on wyglada.
+   */
+  value: string | number | null;
+  tone: SoftTrendTone;
+  /**
+   * Zastrzezenie pod podpisem, np. "since Aug 6".
+   *
+   * Istnieje dla liczb NIEPELNYCH: licznik lajkow rusza od zera w chwili
+   * wlaczenia i nie obejmuje lajkow wczesniejszych, wiec podana bez tej linijki
+   * bylaby czescia sumy podana jako calosc.
+   */
+  note?: string;
+};
 export type SoftActiveUser = {
   address: string;
   name: string;
@@ -100,8 +121,14 @@ const TONE = {
  */
 const UNKNOWN = '—';
 
-function toTileValue(input: string | number | null): string {
-  return input === null ? UNKNOWN : String(input);
+function toTileValue(input: string | number | null | undefined): string {
+  if (input === null || input === undefined) return UNKNOWN;
+  // "null"/"NaN" przychodzace jako NAPIS to tez brak pomiaru, nie wartosc.
+  // Wywolania skladaja te kafle z roznych zrodel i jedno String(x) po drodze
+  // wystarczy, zeby na kaflu wyladowalo slowo "null" - patrz SoftTrendStat.value.
+  const text = String(input).trim();
+  if (text === '' || text === 'null' || text === 'undefined' || text === 'NaN') return UNKNOWN;
+  return text;
 }
 
 const MEDAL = ['#F5A73B', '#B9B1D8', '#C98B5A'];
@@ -159,8 +186,8 @@ export default function SoftTrendsPanel({
   // indziej. Tips i Asks nie ida przez `stats`, bo maja WLASNE zrodla (kolekcje
   // `tips` i `asks`) i wlasny stan "nie udalo sie odczytac" - a tone dla
   // pieniedzy ustala ten plik, nie wywolanie.
-  const tiles: SoftTrendStat[] = [
-    ...stats,
+  const tiles: { label: string; value: string; tone: SoftTrendTone; note?: string }[] = [
+    ...stats.map((stat) => ({ ...stat, value: toTileValue(stat.value) })),
     ...(tips !== undefined ? [{ label: 'Tips', value: toTileValue(tips), tone: 'money' as const }] : []),
     ...(openAsks !== undefined
       ? [{ label: 'Open Asks', value: toTileValue(openAsks), tone: 'teal' as const }]
@@ -177,7 +204,13 @@ export default function SoftTrendsPanel({
           <div key={stat.label} className={`rounded-card px-4 py-3.5 ${TONE[stat.tone].bg} ${TONE[stat.tone].ring}`}>
             {/* Skrot na wierzchu, pelna liczba w `title` - patrz compact(). */}
             <div
-              title={stat.value === UNKNOWN ? 'Not available right now' : stat.value}
+              title={
+                stat.value === UNKNOWN
+                  ? 'Not available right now'
+                  : stat.note
+                    ? `${stat.value} — ${stat.note}, earlier ones are not included yet`
+                    : stat.value
+              }
               className={`font-soft-display text-[26px] font-bold leading-none tabular-nums ${TONE[stat.tone].text}`}
             >
               {compact(stat.value)}
@@ -185,6 +218,15 @@ export default function SoftTrendsPanel({
             <div className="mt-1.5 font-soft text-[11.5px] font-semibold uppercase tracking-[0.06em] text-soft-ink-soft">
               {stat.label}
             </div>
+            {/* Zastrzezenie stoi PRZY liczbie, nie w dymku - liczba niepelna
+                podana bez niego jest po prostu liczba nieprawdziwa, a dymka
+                nikt nie otwiera. Mniejsze i jasniejsze od podpisu, zeby nie
+                konkurowalo z sama liczba. */}
+            {stat.note && (
+              <div className="mt-0.5 font-soft text-[10.5px] font-medium normal-case tracking-normal text-soft-ink-faint">
+                {stat.note}
+              </div>
+            )}
           </div>
         ))}
       </div>

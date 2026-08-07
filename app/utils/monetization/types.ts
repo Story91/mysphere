@@ -10,6 +10,8 @@
  * to sa zwykle platnosci w ETH/USDC na Base.
  */
 
+import { getAddress } from 'viem';
+
 /** Tokeny obslugiwane przez monetyzacje. Celowo waskie - tylko Base. */
 export type MonetizationToken = 'ETH' | 'USDC';
 
@@ -161,6 +163,78 @@ export function isValidAmount(value: unknown): value is string {
   return Number.isFinite(parsed) && parsed > 0;
 }
 
+/**
+ * KANONICZNA POSTAC ADRESU W ZAPISACH: MALE LITERY.
+ *
+ * === DLACZEGO MALE LITERY, A NIE CHECKSUMA ===
+ * Firestore porownuje stringi BAJT PO BAJCIE. `where('recipientAddress','==',x)`
+ * nie zna pojecia EIP-55, wiec dokument zapisany jako `0xAbC...` jest niewidoczny
+ * dla zapytania o `0xabc...` i odwrotnie. Skoro tylko jedna postac moze byc
+ * kanoniczna, wybieramy male litery, bo:
+ *  - jest BEZSTRATNA i BEZWARUNKOWA: `toLowerCase()` nie wymaga poprawnej sumy
+ *    kontrolnej ani znajomosci EIP-55, wiec nie wywroci sie na adresie z ENS,
+ *    z URL-a, z formularza czy z portfela, ktory checksumy nie liczy,
+ *  - checksuma bywa NIEPOPRAWNA w danych zastanych (przepisany recznie adres),
+ *    a `getAddress()` na takim rzuca wyjatkiem - normalizacja zapisu nie moze
+ *    byc zrodlem awarii przy udanej juz platnosci.
+ *
+ * === GDZIE TO NIE OBOWIAZUJE (i dlaczego nie wolno tego zmienic po cichu) ===
+ * Kolekcja `users` trzyma profil pod IDENTYFIKATOREM DOKUMENTU rownym adresowi,
+ * a te identyfikatory sa dzis CHECKSUMA - sonda
+ * (scripts/countMixedCaseAddresses.mjs) znalazla 265 profili pod checksuma
+ * i ZERO pod mala pisownia. Normalizacja zapisow do `users` nie poprawilaby
+ * niczego, tylko ZALOZYLABY DRUGI, PUSTY profil obok istniejacego i odcielaby
+ * czlowieka od jego punktow, nazwy i socialy. To samo dotyczy `referralStats`
+ * oraz pol `referrals.referrerId` i `referrals.referredAddress`, ktore sa
+ * kluczami obcymi do tych kolekcji. Zmiana tam wymaga MIGRACJI, a migracja
+ * jest decyzja wlasciciela bazy - nie skutkiem ubocznym poprawki.
+ *
+ * Ta funkcja jest wiec przeznaczona do POL Z ADRESEM w kolekcjach ksiegowych
+ * (`tips`, `unlocks`, `subscriptions`, `asks`, `askAnswers`), a nie do
+ * budowania identyfikatorow dokumentow w `users`.
+ */
 export function normalizeAddress(address: string): string {
-  return address.toLowerCase();
+  return address.trim().toLowerCase();
+}
+
+/**
+ * WARSTWA ZGODNOSCI WSTECZNEJ - do ODCZYTOW, nigdy do zapisow.
+ *
+ * Zapisy sa juz znormalizowane (patrz wyzej), ale w bazie leza REKORDY SPRZED
+ * tej zmiany: sonda naliczyla 187 z 189 dokumentow w `tips` i 234 z 234
+ * w `referrals` z adresem w checksumie. Dopoki ich ktos nie przepisze, kazde
+ * zapytanie o historie musi pytac o OBIE postacie naraz.
+ *
+ * === DLACZEGO `getAddress`, A NIE `[wejscie, wejscie.toLowerCase()]` ===
+ * Wariant "trzymaj to, co dostales, i dorzuc male litery" wyglada na
+ * wystarczajacy i NIE JEST. Gdy wolajacy poda adres juz malymi literami - a tak
+ * robi kazde miejsce, ktore najpierw normalizuje, oraz kazdy adres z URL-a -
+ * lista skraca sie do jednej pozycji i wszystkie rekordy zapisane checksuma
+ * wypadaja PO CICHU. Czlowiek widzi wtedy pusta ksiege zamiast swoich napiwkow,
+ * co wyglada jak "nie dostales", a nie jak blad. `getAddress` ODTWARZA postac
+ * checksum z samego adresu, wiec lista jest kompletna niezaleznie od tego,
+ * w jakiej pisowni adres tu przyszedl.
+ *
+ * Koszt pytania o dwa warianty jest taki sam jak o jeden - Firestore rozlicza
+ * ZWROCONE dokumenty, a nie dlugosc listy w `in`.
+ *
+ * @returns jedna pozycja, gdy checksuma i male litery sa identyczne (adres bez
+ *          liter A-F) albo gdy adres jest niepoprawny i checksumy nie da sie
+ *          policzyc - wtedy oddajemy sama postac znormalizowana, bo zgadywanie
+ *          bylo by gorsze od pytania o to, co na pewno mamy.
+ */
+export function addressReadVariants(address: string): string[] {
+  const lower = normalizeAddress(address ?? '');
+  if (!lower) return [];
+
+  let checksummed: string;
+  try {
+    checksummed = getAddress(lower as `0x${string}`);
+  } catch {
+    // Adres spoza formatu EIP-55 (np. obciety albo z literowka w danych
+    // zastanych). Nie zmyslamy drugiego wariantu - pytamy o ten, ktory mamy.
+    return [lower];
+  }
+
+  return checksummed === lower ? [lower] : [checksummed, lower];
 }

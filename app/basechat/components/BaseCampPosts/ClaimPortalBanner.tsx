@@ -1,92 +1,162 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useContractRead, useWalletClient, usePublicClient, useChainId, useSwitchChain } from 'wagmi';
+import { formatEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { baseCampChain } from '../../../contracts/BaseCampPostContract';
 import { describeWalletError } from '../../../components/useTxFeedback';
 
-// Kontrakt nie ma gornego limitu; ta liczba istnieje tylko po to, zeby UI
-// mialo co pokazac, gdyby limit kiedys wrocil.
-const CLAIM_SUPPLY_CAP = 999999;
+const PORTAL_NFT_ADDRESS = '0x57CC99c9E1942a34a0cfF7FCC27c227455f14587' as const;
 
-const PORTAL_NFT_ADDRESS = "0x57CC99c9E1942a34a0cfF7FCC27c227455f14587";
-const PORTAL_NFT_ABI = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"uint256","name":"balance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"},{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"ERC1155InsufficientBalance","type":"error"},{"inputs":[{"internalType":"address","name":"approver","type":"address"}],"name":"ERC1155InvalidApprover","type":"error"},{"inputs":[{"internalType":"uint256","name":"idsLength","type":"uint256"},{"internalType":"uint256","name":"valuesLength","type":"uint256"}],"name":"ERC1155InvalidArrayLength","type":"error"},{"inputs":[{"internalType":"address","name":"operator","type":"address"}],"name":"ERC1155InvalidOperator","type":"error"},{"inputs":[{"internalType":"address","name":"receiver","type":"address"}],"name":"ERC1155InvalidReceiver","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"}],"name":"ERC1155InvalidSender","type":"error"},{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"address","name":"owner","type":"address"}],"name":"ERC1155MissingApprovalForAll","type":"error"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":false,"internalType":"bool","name":"approved","type":"bool"}],"name":"ApprovalForAll","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256[]","name":"ids","type":"uint256[]"},{"indexed":false,"internalType":"uint256[]","name":"values","type":"uint256[]"}],"name":"TransferBatch","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"TransferSingle","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"value","type":"string"},{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"}],"name":"URI","type":"event"},{"inputs":[],"name":"TOKEN_ID","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"uint256","name":"id","type":"uint256"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint256[]","name":"ids","type":"uint256[]"}],"name":"balanceOfBatch","outputs":[{"internalType":"uint256[]","name":"","type":"uint256[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"claim","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"address","name":"operator","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256[]","name":"ids","type":"uint256[]"},{"internalType":"uint256[]","name":"values","type":"uint256[]"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"safeBatchTransferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"id","type":"uint256"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"safeTransferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"newuri","type":"string"}],"name":"setURI","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalClaimed","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"uri","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"}];
+// Tylko te cztery funkcje sa tu wolane. Wczesniej lezal w tym miejscu caly ABI
+// ERC-1155 wklejony w jednej linii i deklarowal `claim` jako `nonpayable`,
+// wiec transakcja szla bez CAMP - a kontrakt wymaga `msg.value >= NFT_PRICE`
+// (odczytane z lancucha: 10 CAMP). Kazda proba odbioru konczyla sie revertem.
+const PORTAL_NFT_ABI = [
+  {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'hasClaimed',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'totalClaimed',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'NFT_PRICE',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  { inputs: [], name: 'claim', outputs: [], stateMutability: 'payable', type: 'function' },
+] as const;
 
-// Interface for NFT metadata
+interface NFTAttribute {
+  trait_type: string;
+  value: string | number;
+}
+
 interface NFTMetadata {
   name: string;
   description: string;
   image: string;
-  attributes?: Array<{
-    trait_type: string;
-    value: string | number;
-  }>;
+  attributes?: NFTAttribute[];
 }
 
-// Fixed NFT metadata for preview
-const fixedNFTMetadata: NFTMetadata = {
-  "name": "MySphere X CampNetwork",
-  "description": "Exclusive NFT for the MySphere X Camp community members",
-  "image": "/MSxCAMP.png",
-  "attributes": [
-    {"trait_type":"Collection","value":"MySphere X"},
-    {"trait_type":"Edition","value":"Limited"},
-    {"trait_type":"Network","value":"Camp"},
-    {"trait_type":"Floor Price","value":"10 $CAMP"}
-  ]
+// Opis kolekcji jest staly (kontrakt trzyma jedno `uri` dla TOKEN_ID = 1),
+// ale cena NIE jest tu wpisana - ta idzie z lancucha, zeby liczba na ekranie
+// i kwota w transakcji nie mogly sie rozjechac.
+const portalMetadata: NFTMetadata = {
+  name: 'MySphere X CampNetwork',
+  description: 'Exclusive NFT for the MySphere X Camp community members',
+  image: '/MSxCAMP.png',
+  attributes: [
+    { trait_type: 'Collection', value: 'MySphere X' },
+    { trait_type: 'Edition', value: 'Limited' },
+    { trait_type: 'Network', value: 'Camp' },
+  ],
+};
+
+// Fiolet jest kolorem akcji w Soft Social, ale `soft-primary` pod bialym
+// napisem daje 4,2:1 - za malo dla 13-14 px. `soft-primary-deep` daje 6,3:1
+// przy tym samym odcieniu, wiec przyciski sprawcze uzywaja glebszego tonu.
+const PRIMARY_BUTTON =
+  'inline-flex items-center justify-center rounded-pill bg-soft-primary-deep px-4 py-2 font-soft-display text-[13px] font-bold text-white shadow-chip transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:scale-[1.03] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface disabled:opacity-60 disabled:hover:scale-100';
+
+const GHOST_BUTTON =
+  'inline-flex items-center justify-center rounded-pill border border-soft-line bg-soft-surface px-4 py-2 font-soft-display text-[13px] font-bold text-soft-primary-deep transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:scale-[1.03] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-60 disabled:hover:scale-100';
+
+// Cztery sytuacje, w ktorych uzytkownik NIE moze kliknac "claim", musza byc
+// czterema roznymi zdaniami. Najwazniejsze rozroznienie: `unreadable` (odczyt
+// padl) to nie to samo co "nie masz NFT" - inaczej awaria sieci wygladalaby
+// jak zaproszenie do kupna czegos, co uzytkownik moze juz miec.
+type BannerState = 'no-wallet' | 'checking' | 'unreadable' | 'owned' | 'wrong-network' | 'ready';
+
+const STATE_SENTENCE: Record<BannerState, string> = {
+  'no-wallet': 'Connect a wallet to see whether this NFT is still yours to claim.',
+  checking: 'Checking your claim status on Camp Network...',
+  unreadable: 'Camp Network did not answer. Your claim status is unchecked, not empty.',
+  owned: 'You already own this NFT.',
+  'wrong-network': 'Your wallet is on another network. Claiming switches it to Camp Network first.',
+  ready: 'One claim per wallet.',
 };
 
 const ClaimPortalBanner = () => {
-  const [showBanner, setShowBanner] = useState(true);
+  const [dismissed, setDismissed] = useState(false);
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { data: walletClient } = useWalletClient();
-  const publicClient = usePublicClient();
+  // Klient przypiety do 484: po `switchChain` domyslny klient moze jeszcze
+  // wskazywac poprzedni lancuch, a symulacja musi isc do Camp.
+  const publicClient = usePublicClient({ chainId: baseCampChain.id });
   const { switchChainAsync } = useSwitchChain();
-  const [totalClaimed, setTotalClaimed] = useState(0);
-  const [claimed, setClaimed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  // Optymistyczne "mam" po wlasnej transakcji - odczyt z lancucha dogoni to
+  // dopiero po kilku sekundach, a baner nie moze w tym czasie zapraszac
+  // do drugiego odbioru.
+  const [justClaimed, setJustClaimed] = useState(false);
 
-  // Check if we're on BaseCamp network
-  const isBaseCampNetwork = chainId === baseCampChain.id;
+  const isOnCampNetwork = chainId === baseCampChain.id;
 
-  // Check if user has already claimed the NFT
-  const { data: hasClaimedData } = useContractRead({
+  const claimedRead = useContractRead({
     address: PORTAL_NFT_ADDRESS,
     abi: PORTAL_NFT_ABI,
     functionName: 'hasClaimed',
-    args: [address],
+    args: address ? [address] : undefined,
     chainId: baseCampChain.id,
+    query: { enabled: Boolean(address) },
   });
 
-  // Get total claimed NFTs
-  const { data: totalClaimedData } = useContractRead({
+  const totalRead = useContractRead({
     address: PORTAL_NFT_ADDRESS,
     abi: PORTAL_NFT_ABI,
     functionName: 'totalClaimed',
     chainId: baseCampChain.id,
   });
 
-  // Update states when data is loaded
-  useEffect(() => {
-    if (hasClaimedData !== undefined) {
-      setClaimed(!!hasClaimedData);
-    }
+  const priceRead = useContractRead({
+    address: PORTAL_NFT_ADDRESS,
+    abi: PORTAL_NFT_ABI,
+    functionName: 'NFT_PRICE',
+    chainId: baseCampChain.id,
+  });
 
-    if (totalClaimedData) {
-      setTotalClaimed(Number(totalClaimedData));
-    }
-  }, [hasClaimedData, totalClaimedData]);
+  // `null` = nie zmierzono. Zaden z tych odczytow nie ma prawa spasc do zera
+  // ani do `false`, bo to sa dwie rozne wiadomosci dla uzytkownika.
+  const claimCount: number | null = typeof totalRead.data === 'bigint' ? Number(totalRead.data) : null;
+  const priceWei: bigint | null = typeof priceRead.data === 'bigint' ? priceRead.data : null;
+  const priceLabel = priceWei === null ? null : `${formatEther(priceWei)} CAMP`;
 
-  // Show NFT preview - simplified to prevent re-renders
-  const handleShowPreview = useCallback(() => {
-    // Only try to switch network when claiming, not when previewing
-    setShowPreviewModal(true);
-  }, []);
+  const state: BannerState = !isConnected || !address
+    ? 'no-wallet'
+    : justClaimed
+      ? 'owned'
+      : claimedRead.isError
+        ? 'unreadable'
+        : claimedRead.data === undefined
+          ? 'checking'
+          : claimedRead.data
+            ? 'owned'
+            : isOnCampNetwork
+              ? 'ready'
+              : 'wrong-network';
 
-  // Handle claim function with proper wagmi v2 pattern
+  const canClaim = state === 'ready' || state === 'wrong-network';
+
+  const retryReads = useCallback(() => {
+    claimedRead.refetch();
+    totalRead.refetch();
+    priceRead.refetch();
+  }, [claimedRead, totalRead, priceRead]);
+
   const handleClaim = useCallback(async () => {
-    if (!isConnected || !address || claimed || isLoading) {
+    if (!isConnected || !address || isLoading) {
       return;
     }
 
@@ -101,12 +171,12 @@ const ClaimPortalBanner = () => {
 
     try {
       setIsLoading(true);
-      loadingToastId = toast.loading('Preparing to purchase NFT...');
+      loadingToastId = toast.loading('Preparing your claim...');
 
       // `switchChainAsync`, nie `switchChain`: ta druga to mutacja bez promisy,
       // wiec `catch` ponizej nigdy sie nie wykonywal, a "Switched to Camp
       // Network" pokazywalo sie nawet po odmowie w portfelu.
-      if (!isBaseCampNetwork) {
+      if (!isOnCampNetwork) {
         try {
           await switchChainAsync({ chainId: baseCampChain.id });
           toast.success('Switched to Camp Network');
@@ -117,43 +187,38 @@ const ClaimPortalBanner = () => {
         }
       }
 
-      // Format the address properly
-      const formattedAddress = PORTAL_NFT_ADDRESS.startsWith('0x') 
-        ? PORTAL_NFT_ADDRESS as `0x${string}` 
-        : `0x${PORTAL_NFT_ADDRESS}` as `0x${string}`;
+      // Cena czytana tuz przed wyslaniem, a nie z ekranu: kontrakt odrzuca
+      // `msg.value` mniejsze niz NFT_PRICE, wiec kwota musi pochodzic z tego
+      // samego zrodla co warunek, ktory ja sprawdza.
+      const price = await publicClient.readContract({
+        address: PORTAL_NFT_ADDRESS,
+        abi: PORTAL_NFT_ABI,
+        functionName: 'NFT_PRICE',
+      });
 
-      // Prepare transaction request using public client
       const { request } = await publicClient.simulateContract({
-        address: formattedAddress,
+        address: PORTAL_NFT_ADDRESS,
         abi: PORTAL_NFT_ABI,
         functionName: 'claim',
-        args: [],
         account: address,
         chain: baseCampChain,
+        value: price,
       });
 
-      // Send transaction using wallet client
-      const txHash = await walletClient.writeContract({
-        ...request,
-        chain: baseCampChain,
-      });
-      
-      toast.success('Purchase transaction sent!');
+      await walletClient.writeContract({ ...request, chain: baseCampChain });
 
-      setClaimed(true);
-
-      // Close the preview modal
+      toast.success('Claim transaction sent!');
+      setJustClaimed(true);
       setShowPreviewModal(false);
-
     } catch (error) {
-      console.error('Purchase transaction error:', error);
+      console.error('Claim transaction error:', error);
       const info = describeWalletError(error, {
         network: 'Camp Network',
         gasSymbol: baseCampChain.nativeCurrency.symbol,
       });
       // Odmowa w portfelu to nie awaria - nie straszymy czerwonym bledem.
       if (info.isFailure) {
-        toast.error('Failed to purchase NFT: ' + info.message);
+        toast.error('Could not claim the NFT: ' + info.message);
       } else {
         toast(info.message);
       }
@@ -164,15 +229,25 @@ const ClaimPortalBanner = () => {
   }, [
     isConnected,
     address,
-    claimed,
     isLoading,
     walletClient,
     publicClient,
-    isBaseCampNetwork,
-    switchChainAsync
+    isOnCampNetwork,
+    switchChainAsync,
   ]);
 
-  if (!showBanner) {
+  // Okno modalne bez Escape jest pulapka dla klawiatury - `aria-modal` obiecuje
+  // zachowanie dialogu, wiec musi je miec.
+  useEffect(() => {
+    if (!showPreviewModal) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowPreviewModal(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showPreviewModal]);
+
+  if (dismissed) {
     return null;
   }
 
@@ -181,133 +256,154 @@ const ClaimPortalBanner = () => {
   // i przemontowywal caly modal od zera - stad migotanie, ktore probowano
   // leczyc komentarzem "simplified to prevent flickering".
   const previewModal = showPreviewModal ? (
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
-           onClick={() => setShowPreviewModal(false)}>
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={fixedNFTMetadata.name}
-          className="bg-gradient-to-r from-black/90 to-orange-700/90 p-6 rounded-xl max-w-md w-full mx-4 shadow-2xl border border-orange-500/30"
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="text-center mb-4">
-            <h2 className="text-xl font-bold text-white">{fixedNFTMetadata.name}</h2>
-            <p className="text-orange-200 text-sm mt-1">{fixedNFTMetadata.description}</p>
-          </div>
-          
-          <div className="relative w-full aspect-square mb-4 overflow-hidden rounded-lg shadow-xl border-2 border-orange-500/50 bg-black/50">
-            <img 
-              src="/MSxCAMP.png"
-              alt={fixedNFTMetadata.name}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          
-          {fixedNFTMetadata.attributes && fixedNFTMetadata.attributes.length > 0 && (
-            <div className="mb-4">
-              <h3 className="text-white font-medium mb-2">Attributes</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {fixedNFTMetadata.attributes.map((attr, idx) => (
-                  <div key={idx} className="bg-black/50 p-2 rounded-md">
-                    <div className="text-orange-300 text-xs">{attr.trait_type}</div>
-                    <div className="text-white font-medium">{attr.value}</div>
-                  </div>
-                ))}
-              </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/45 p-4 backdrop-blur-sm"
+      onClick={() => setShowPreviewModal(false)}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={portalMetadata.name}
+        className="w-full max-w-md rounded-card border border-soft-line bg-soft-surface p-5 font-soft shadow-float"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="font-soft-display text-[18px] font-bold leading-snug text-soft-ink">
+          {portalMetadata.name}
+        </h2>
+        <p className="mt-1 text-[13px] leading-[1.5] text-soft-ink-muted">
+          {portalMetadata.description}
+        </p>
+
+        <div className="mt-4 aspect-square w-full overflow-hidden rounded-card border border-soft-line bg-soft-sunken">
+          <img
+            src={portalMetadata.image}
+            alt={portalMetadata.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        </div>
+
+        <dl className="mt-4 grid grid-cols-2 gap-2">
+          {portalMetadata.attributes?.map((attr) => (
+            <div key={attr.trait_type} className="rounded-card border border-soft-line bg-soft-sunken px-3 py-2">
+              <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-soft-ink-muted">
+                {attr.trait_type}
+              </dt>
+              <dd className="mt-0.5 text-[13px] font-semibold text-soft-ink">{attr.value}</dd>
             </div>
-          )}
-          
-          <div className="flex space-x-3 justify-center mt-4">
-            <button
-              type="button"
-              onClick={() => setShowPreviewModal(false)}
-              className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleClaim}
-              disabled={isLoading}
-              className={`px-6 py-2 ${
-                isLoading 
-                  ? "bg-orange-800" 
-                  : "bg-orange-600 hover:bg-orange-500"
-              } text-white rounded-lg font-medium transition-colors`}
-            >
-              {isLoading ? "Processing..." : "Confirm Purchase"}
-            </button>
+          ))}
+          {/* Biale tlo zamiast `soft-sunken`: pomaranczowy na liliowym daje
+              4,4:1, na bieli 5,2:1. Ta jedna komorka niesie kwote. */}
+          <div className="rounded-card border border-soft-accent/40 bg-soft-surface px-3 py-2">
+            <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-soft-ink-muted">
+              Price
+            </dt>
+            {/* Pomaranczowy tylko tutaj - to jedyna kwota w tym oknie. */}
+            <dd className="mt-0.5 text-[13px] font-bold tabular-nums text-soft-accent-deep">
+              {priceLabel ?? (priceRead.isError ? 'not checked' : 'checking...')}
+            </dd>
           </div>
+        </dl>
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" onClick={() => setShowPreviewModal(false)} className={GHOST_BUTTON}>
+            Cancel
+          </button>
+          <button type="button" onClick={handleClaim} disabled={isLoading} className={PRIMARY_BUTTON}>
+            {isLoading ? 'Waiting for your wallet...' : priceLabel ? `Claim for ${priceLabel}` : 'Claim'}
+          </button>
         </div>
       </div>
+    </div>
   ) : null;
 
   return (
     <>
-      <div className="w-full p-4 mb-6 rounded-lg bg-gradient-to-r from-black via-orange-800 to-orange-600 text-white">
-        <div className="flex flex-col sm:flex-row items-center justify-between">
-          <div className="mb-4 sm:mb-0 text-center sm:text-left">
-            <h3 className="text-lg font-bold mb-1">
-              Get your PORTAL NFT on Camp Network Mainnet
-            </h3>
-            <p className="text-sm text-orange-100">
-              Post for free, get exclusive PORTAL NFT for 10 $CAMP
-            </p>
-            <div className="w-full mt-2">
-              <div className="flex justify-between text-xs text-white mb-1">
-                <span>Progress</span>
-                <span>{totalClaimed} / ∞ claimed</span>
-              </div>
-              <div className="w-full bg-gray-800 rounded-full h-2">
-                <div 
-                  className="bg-orange-400 h-2 rounded-full" 
-                  style={{ width: `${Math.min((totalClaimed / 100) * 100, 100)}%` }}
-                ></div>
-              </div>
+      <section
+        aria-label="Portal NFT on Camp Network"
+        className="mb-4 rounded-card border border-soft-line bg-soft-surface p-3.5 font-soft shadow-card sm:p-4"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {/* Staly kwadrat - obrazek nigdy nie dostaje wymiaru z tekstu obok,
+                wiec nie da sie go rozciagnac ani splaszczyc. */}
+            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-card border border-soft-line bg-soft-sunken sm:h-16 sm:w-16">
+              <img
+                src={portalMetadata.image}
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
+            </div>
+
+            <div className="min-w-0">
+              <h3 className="font-soft-display text-[15px] font-bold leading-snug text-soft-ink sm:text-[16px]">
+                Portal NFT on Camp Network
+              </h3>
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-soft-ink-muted">
+                {/* Akcent wylacznie na kwocie - reszta banera zostaje neutralna. */}
+                <span className="font-bold tabular-nums text-soft-accent-deep">
+                  {priceLabel ?? (priceRead.isError ? 'Price not checked' : 'Checking price...')}
+                </span>
+                <span aria-hidden="true" className="text-soft-line-strong">|</span>
+                <span className="tabular-nums">
+                  {claimCount === null
+                    ? totalRead.isError
+                      ? 'claims not checked'
+                      : 'counting claims...'
+                    : `${claimCount} claimed so far`}
+                </span>
+              </p>
+              {/* `soft-ink-muted`, nie `soft-ink-soft`: przy 12 px ten drugi
+                  daje 3,4:1 na bialej karcie, a to jest zdanie niosace stan. */}
+              <p className="mt-1 text-[12px] leading-[1.45] text-soft-ink-muted">
+                {STATE_SENTENCE[state]}
+              </p>
             </div>
           </div>
-          
-          <div className="flex flex-col items-center">
-            {!isConnected ? (
-              <div className="text-white text-center mb-2 text-sm">Connect wallet to claim</div>
-            ) : claimed ? (
-              <div className="px-4 py-2 bg-green-500 text-white rounded text-sm font-medium">
-                Already Claimed ✓
-              </div>
-            ) : totalClaimed >= CLAIM_SUPPLY_CAP ? (
-              <div className="px-4 py-2 bg-gray-500 text-white rounded text-sm font-medium">
-                All NFTs Claimed
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleShowPreview}
-                disabled={isLoading}
-                className={`px-4 py-2 ${
-                  isLoading 
-                    ? "bg-gray-500" 
-                    : "bg-white hover:bg-orange-100"
-                } text-orange-800 rounded text-sm font-medium transition duration-200`}
-              >
-                {isLoading ? "Processing..." : "10 $CAMP"}
+
+          <div className="flex shrink-0 items-center justify-end gap-2 sm:flex-col sm:items-end sm:gap-1.5">
+            {canClaim && (
+              <button type="button" onClick={() => setShowPreviewModal(true)} disabled={isLoading} className={PRIMARY_BUTTON}>
+                {state === 'wrong-network' ? 'Switch & claim' : 'Claim'}
               </button>
             )}
-            
+            {state === 'checking' && (
+              <span className="inline-flex items-center rounded-pill border border-soft-line bg-soft-sunken px-4 py-2 font-soft-display text-[13px] font-bold text-soft-ink-muted">
+                Checking...
+              </span>
+            )}
+            {state === 'unreadable' && (
+              <button type="button" onClick={retryReads} className={GHOST_BUTTON}>
+                Try again
+              </button>
+            )}
+            {state === 'owned' && (
+              <span className="inline-flex items-center gap-2 rounded-pill border border-soft-line bg-soft-sunken px-4 py-2 font-soft-display text-[13px] font-bold text-soft-ink">
+                <span className="h-1.5 w-1.5 rounded-full bg-soft-primary" aria-hidden="true" />
+                Owned
+              </span>
+            )}
+
             <button
               type="button"
-              onClick={() => setShowBanner(false)}
-              className="mt-3 text-xs text-orange-200 underline"
+              onClick={() => setDismissed(true)}
+              /* Kontrolka klikalna, wiec `soft-ink-faint` (2,6:1) odpada mimo
+                 ze to drobny tekst poboczny. */
+              className="rounded-pill px-2 py-1 text-[11px] text-soft-ink-muted underline decoration-soft-line underline-offset-2 transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               Dismiss
             </button>
           </div>
         </div>
-      </div>
-      
-      {/* NFT Preview Modal */}
+      </section>
+
       {previewModal}
     </>
   );
 };
 
-export default ClaimPortalBanner; 
+export default ClaimPortalBanner;

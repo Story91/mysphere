@@ -15,7 +15,7 @@
  * toasty i nie renderuje sie bez adresu. To osobne zachowanie, nie kosmetyka.
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { toast } from 'react-hot-toast';
 import BanRestriction from '../../admin/components/BanRestriction';
@@ -25,7 +25,6 @@ import { createPost } from '../../utils/firebase';
 import { Avatar } from '../../components/identity';
 import MusicSelector from '../components/MusicSelector';
 import SpotifyTrackCard from '../components/SpotifyTrackCard';
-import AIButton from '../components/AIButton';
 import ChainPostButton from './ChainPostButton';
 import type { ChainComposerSkin, ChainPostingConfig } from './types';
 
@@ -35,9 +34,6 @@ export type ChainWithComposer = ChainPostingConfig & { composer: ChainComposerSk
 export interface ChainCreatePostProps {
   config: ChainWithComposer;
   onPostCreated?: () => Promise<void>;
-  setShowAIModal?: (show: boolean) => void;
-  aiGeneratedContent?: string;
-  onAiContentUsed?: () => void;
 }
 
 /**
@@ -49,9 +45,6 @@ type SpotifyTrack = NonNullable<Parameters<typeof createPost>[0]['musicTrack']>;
 export default function ChainCreatePost({
   config,
   onPostCreated,
-  setShowAIModal,
-  aiGeneratedContent,
-  onAiContentUsed,
 }: ChainCreatePostProps) {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -67,15 +60,6 @@ export default function ChainCreatePost({
   // Bez wdrozonego kontraktu caly formularz jest tylko do podgladu.
   const postingLive = config.isLive ? config.isLive() : true;
   const controlsDisabled = isSaving || !postingLive;
-
-  useEffect(() => {
-    if (aiGeneratedContent) {
-      setContent(aiGeneratedContent);
-      if (onAiContentUsed) {
-        onAiContentUsed();
-      }
-    }
-  }, [aiGeneratedContent, onAiContentUsed]);
 
   const handlePostFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
@@ -336,10 +320,6 @@ export default function ChainCreatePost({
                 {selectedMusic ? 'Change Track' : 'Spotify'}
               </span>
             </button>
-
-            {setShowAIModal && (
-              <AIButton onClick={() => setShowAIModal(true)} disabled={controlsDisabled} />
-            )}
           </div>
 
           <div className="mt-3 flex justify-end">

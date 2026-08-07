@@ -116,29 +116,66 @@ export function connectedPlatformList(linked: Record<CampSocialId, boolean>): Ca
 }
 
 /**
+ * Wynik kopiowania stanu podpiec do profilu.
+ *
+ * DLACZEGO NIE `boolean`. Zapis wymaga teraz podpisanej sesji (POST
+ * /api/camp-stats), wiec "nie zapisano" ma co najmniej trzy rozne przyczyny i
+ * trzy rozne wyjscia dla uzytkownika: podpisz portfel, poczekaj chwile, albo
+ * sprobuj ponownie. Jedno `false` zwijalo je w milczenie - a milczenie tutaj
+ * wyglada dokladnie tak samo jak "nic nie podpiales".
+ */
+export type CampSyncResult =
+  | { state: 'saved' }
+  /** Brak sesji SIWE - jedyne wyjscie to podpisanie portfela. */
+  | { state: 'needs_sign_in'; message: string }
+  /** Za szybko - to mija samo. */
+  | { state: 'rate_limited'; message: string }
+  /** Cokolwiek innego: siec, Firestore, zly ksztalt zadania. */
+  | { state: 'failed'; message: string };
+
+/** Domyslne zdanie, gdy serwer nie przyslal wlasnego. */
+const SYNC_FALLBACK_MESSAGE = 'Your linked accounts could not be saved to this profile.';
+
+/**
  * Kopiuje stan podpiec do `mySphereUserSocials` - tym samym endpointem, ktorego
- * uzywalo /mycamp. Zwraca `false` zamiast rzucac: to zapis pomocniczy do
- * statystyk, a nie warunek dzialania panelu.
+ * uzywalo /mycamp. Nie rzuca: zrodlem prawdy o podpieciach jest Camp, a to
+ * jest kopia do statystyk. Ale KAZDA nieudana proba wraca z wlasnym stanem i
+ * wlasnym zdaniem, zeby panel mial co pokazac zamiast pustki.
  */
 export async function syncCampSocialsToProfile(
   address: string,
   connectedPlatforms: CampSocialId[]
-): Promise<boolean> {
-  if (!address) return false;
+): Promise<CampSyncResult> {
+  if (!address) {
+    return { state: 'failed', message: SYNC_FALLBACK_MESSAGE };
+  }
 
   try {
     const response = await fetch('/api/camp-stats', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // Cookie sesji leci tylko z jawnym credentials - bez tego serwer
+      // zobaczylby kazde zadanie jako niepodpisane i odsylal 401.
+      credentials: 'include',
       body: JSON.stringify({ address, connectedPlatforms }),
     });
 
-    if (!response.ok) return false;
-    const data = await response.json();
-    return Boolean(data?.success);
+    const data = await response.json().catch(() => null) as
+      | { success?: unknown; error?: unknown; code?: unknown }
+      | null;
+
+    if (response.ok && data?.success) return { state: 'saved' };
+
+    const message = typeof data?.error === 'string' && data.error.trim()
+      ? data.error
+      : SYNC_FALLBACK_MESSAGE;
+
+    if (data?.code === 'session_required') return { state: 'needs_sign_in', message };
+    if (data?.code === 'rate_limited') return { state: 'rate_limited', message };
+    return { state: 'failed', message };
   } catch (error) {
     console.error('Camp socials sync failed:', error);
-    return false;
+    return { state: 'failed', message: SYNC_FALLBACK_MESSAGE };
   }
 }
 

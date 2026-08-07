@@ -1,10 +1,11 @@
 import { collection, documentId, getDocs, query, where } from 'firebase/firestore';
-import { getAddress, isAddress } from 'viem';
+import { isAddress } from 'viem';
 import { base } from 'viem/chains';
 import { getPublicDb as getDb } from '../publicFirestore';
 import { getAvatar } from './getAvatar';
 import { getName } from './getName';
 import { getSlicedAddress, isBasename } from './resolver';
+import { addressReadVariants } from '../monetization/types';
 
 /**
  * Tozsamosc dla LISTY adresow naraz - nazwa i awatar.
@@ -107,11 +108,15 @@ function normalize(addresses: readonly string[]): string[] {
   return Array.from(seen);
 }
 
-/** Obie postacie zapisu adresu - checksum i male litery, bez duplikatu. */
-function variantsOf(lowercase: string): string[] {
-  const checksummed = getAddress(lowercase as `0x${string}`);
-  return checksummed === lowercase ? [lowercase] : [checksummed, lowercase];
-}
+/**
+ * Obie postacie zapisu adresu - checksum i male litery, bez duplikatu.
+ *
+ * Wspolna implementacja z `addressReadVariants`. Poprzednia wersja wolala
+ * `getAddress` bez zabezpieczenia, wiec JEDEN adres o zlej sumie kontrolnej
+ * w danych wywracal cale zapytanie o tozsamosci - a to jest paczka po 30, wiec
+ * razem z nim znikalo 29 poprawnych nazw.
+ */
+const variantsOf = addressReadVariants;
 
 /**
  * Czy zapisana "nazwa" to w rzeczywistosci skrocony adres.

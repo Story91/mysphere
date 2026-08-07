@@ -447,7 +447,6 @@ export default function MySphereWhitepaper() {
                 <li><strong>Backend</strong>: Advanced Node.js architecture with Express framework, RESTful API endpoints, and real-time data processing capabilities. Uses multiple data storage solutions and dedicated microservices for different platform functionalities.</li>
                 <li><strong>Storage</strong>: Hybrid solution combining decentralized storage (IPFS) for NFT content with traditional databases for application data</li>
                 <li><strong>Authentication</strong>: Web3 wallet integration with optional email-based account recovery</li>
-                <li><strong>AI Engines</strong>: Advanced generative models for creating posts, quotes, and content analysis</li>
                 <li><strong>AI Agent</strong>: System automating tokenization processes and launching new tokens (Token Launcher)</li>
               </ul>
               

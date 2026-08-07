@@ -435,10 +435,14 @@ export default function BuilderProfile({
   const [twitterTweets, setTwitterTweets] = useState<TwitterTweet[]>([]);
   const [loadingTwitterData, setLoadingTwitterData] = useState(false);
   const [isTwitterSectionExpanded, setIsTwitterSectionExpanded] = useState(false);
+  /* Nieudany odczyt z Campa. Null znaczy "nie bylo awarii", NIE "nie ma danych" -
+     brak podpietego konta zostaje osobnym, pustym stanem. */
+  const [twitterError, setTwitterError] = useState<string | null>(null);
 
   // Spotify/Camp Network state
   const [spotifyUserData, setSpotifyUserData] = useState<SpotifyUserData | null>(null);
   const [loadingSpotifyData, setLoadingSpotifyData] = useState(false);
+  const [spotifyError, setSpotifyError] = useState<string | null>(null);
   const [isSpotifySectionExpanded, setIsSpotifySectionExpanded] = useState(false);
 
   // Audio Player state
@@ -684,37 +688,67 @@ export default function BuilderProfile({
     }
   };
 
+  /**
+   * Wynik odczytu z tras Campa.
+   *
+   * DLACZEGO NIE `T | null`. Trasy /api/camp/* moga teraz odmowic (zly adres,
+   * za szybko) albo nie dostac odpowiedzi od Campa. Zwijanie tego do `null`
+   * sprawialo, ze awaria rysowala sie dokladnie tak samo jak "ten portfel nic
+   * nie podpial" - czyli klamalismy uzytkownikowi w oczy.
+   */
+  type CampReadResult<T> =
+    | { state: 'ok'; data: T }
+    | { state: 'error'; message: string };
+
+  /** Wyciaga zdanie od serwera; kazda odmowa niesie `error`. */
+  const readCampError = async (response: Response, fallback: string): Promise<string> => {
+    try {
+      const data = await response.json();
+      if (typeof data?.error === 'string' && data.error.trim()) return data.error;
+    } catch {
+      // odpowiedz bez JSON - zostajemy przy zdaniu zapasowym
+    }
+    return fallback;
+  };
+
   // Fetch Twitter data from Camp Network
-  const fetchTwitterData = async (address: string) => {
-    if (!address) return null;
-    
+  const fetchTwitterData = async (address: string): Promise<CampReadResult<any>> => {
+    if (!address) return { state: 'error', message: 'No wallet address to look up.' };
+
+    const fallback = 'X data could not be loaded for this wallet.';
+
     try {
       // Try direct Camp Network API first for more complete data
       const response = await fetch(`/api/camp/twitter?address=${encodeURIComponent(address)}&direct=true`);
-      
+
       if (!response.ok) {
         console.warn(`Twitter API returned ${response.status} for address ${address}`);
-        return null;
+        return { state: 'error', message: await readCampError(response, fallback) };
       }
-      
+
       const data = await response.json();
-      
+
       if (data.error) {
         console.warn('Twitter API error:', data.error);
-        return null;
+        return {
+          state: 'error',
+          message: typeof data.error === 'string' && data.error.trim() ? data.error : fallback,
+        };
       }
-      
-      return data.data;
+
+      return { state: 'ok', data: data.data };
     } catch (error) {
       console.error('Error fetching Twitter data:', error);
-      return null;
+      return { state: 'error', message: 'Could not reach the server to load X data.' };
     }
   };
 
   // Fetch Spotify data from Camp Network with localStorage caching
-  const fetchSpotifyData = async (address: string) => {
-    if (!address) return null;
-    
+  const fetchSpotifyData = async (address: string): Promise<CampReadResult<any>> => {
+    if (!address) return { state: 'error', message: 'No wallet address to look up.' };
+
+    const fallback = 'Spotify data could not be loaded for this wallet.';
+
     // Try to load from localStorage first
     const cacheKey = `spotify_data_${address}`;
     const cacheTimestampKey = `spotify_data_${address}_timestamp`;
@@ -728,7 +762,7 @@ export default function BuilderProfile({
         const age = Date.now() - parseInt(cachedTimestamp);
         if (age < CACHE_DURATION) {
           console.log(`🎵 Spotify data loaded from cache (${Math.round(age/1000)}s old)`);
-          return JSON.parse(cachedData);
+          return { state: 'ok', data: JSON.parse(cachedData) };
         } else {
           // Cache expired, remove old data
           localStorage.removeItem(cacheKey);
@@ -743,17 +777,26 @@ export default function BuilderProfile({
     try {
       // Fetch comprehensive Spotify data using Camp Network API
       const response = await fetch(`/api/camp/spotify?address=${encodeURIComponent(address)}&type=full`);
-      
+
       if (!response.ok) {
         console.warn(`Spotify API returned ${response.status} for address ${address}`);
-        return null;
+        return { state: 'error', message: await readCampError(response, fallback) };
       }
-      
+
       const data = await response.json();
-      
-      if (!data.success || data.error) {
+
+      if (data.error) {
         console.warn('Spotify API error:', data.message || data.error);
-        return null;
+        return {
+          state: 'error',
+          message: typeof data.error === 'string' && data.error.trim() ? data.error : fallback,
+        };
+      }
+
+      // 200 + success:false to jedyny przypadek, w ktorym trasa naprawde mowi
+      // "sprawdzilem i nic tu nie ma" - i tylko to wolno pokazac jako pustke.
+      if (!data.success) {
+        return { state: 'ok', data: null };
       }
 
       // 🐛 DEBUG: Check what data we're getting
@@ -774,11 +817,11 @@ export default function BuilderProfile({
       } catch (cacheError) {
         console.warn('Failed to cache Spotify data:', cacheError);
       }
-      
-      return data.data;
+
+      return { state: 'ok', data: data.data };
     } catch (error) {
       console.error('Error fetching Spotify data:', error);
-      return null;
+      return { state: 'error', message: 'Could not reach the server to load Spotify data.' };
     }
   };
 
@@ -793,19 +836,61 @@ export default function BuilderProfile({
     }
   };
 
+  /**
+   * Jedno wejscie do odczytu X - uzywaja go pierwsze ladowanie i przycisk
+   * ponowienia. Awaria zostawia wlasny komunikat, a nie pusty panel.
+   */
+  const loadTwitterData = async (address: string) => {
+    setLoadingTwitterData(true);
+    setTwitterError(null);
+    try {
+      const result = await fetchTwitterData(address);
+
+      if (result.state === 'error') {
+        setTwitterUser(null);
+        setTwitterTweets([]);
+        setTwitterError(result.message);
+        return;
+      }
+
+      const twitterData = result.data;
+      if (twitterData && twitterData.twitterUser) {
+        setTwitterUser(twitterData.twitterUser);
+        setTwitterTweets(twitterData.tweets || []);
+      } else {
+        // Camp odpowiedzial i nic nie mial - to JEST pustka, wolno ja pokazac.
+        setTwitterUser(null);
+        setTwitterTweets([]);
+      }
+    } finally {
+      setLoadingTwitterData(false);
+    }
+  };
+
+  /** To samo dla Spotify - wspolne dla ladowania i przycisku odswiezenia. */
+  const loadSpotifyData = async (address: string) => {
+    setLoadingSpotifyData(true);
+    setSpotifyError(null);
+    try {
+      const result = await fetchSpotifyData(address);
+
+      if (result.state === 'error') {
+        setSpotifyUserData(null);
+        setSpotifyError(result.message);
+        return;
+      }
+
+      setSpotifyUserData(result.data);
+    } finally {
+      setLoadingSpotifyData(false);
+    }
+  };
+
   // Refresh Spotify data
   const refreshSpotifyData = async () => {
     if (!userAddress) return;
     clearSpotifyCache(userAddress);
-    setLoadingSpotifyData(true);
-    try {
-      const freshData = await fetchSpotifyData(userAddress);
-      setSpotifyUserData(freshData);
-    } catch (error) {
-      console.error('Error refreshing Spotify data:', error);
-    } finally {
-      setLoadingSpotifyData(false);
-    }
+    await loadSpotifyData(userAddress);
   };
 
   // Audio Player Functions
@@ -954,55 +1039,16 @@ export default function BuilderProfile({
 
   // Fetch Twitter data
   useEffect(() => {
-    const fetchTwitterDataEffect = async () => {
-      if (!userAddress) return;
-      
-      setLoadingTwitterData(true);
-      try {
-        const twitterData = await fetchTwitterData(userAddress);
-        
-        if (twitterData && twitterData.twitterUser) {
-          setTwitterUser(twitterData.twitterUser);
-          setTwitterTweets(twitterData.tweets || []);
-        } else {
-          setTwitterUser(null);
-          setTwitterTweets([]);
-        }
-      } catch (error) {
-        console.error('Error fetching Twitter data:', error);
-        setTwitterUser(null);
-        setTwitterTweets([]);
-      } finally {
-        setLoadingTwitterData(false);
-      }
-    };
-
-    fetchTwitterDataEffect();
+    if (!userAddress) return;
+    void loadTwitterData(userAddress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userAddress]);
 
   // Fetch Spotify data
   useEffect(() => {
-    const fetchSpotifyDataEffect = async () => {
-      if (!userAddress) return;
-      
-      setLoadingSpotifyData(true);
-      try {
-        const spotifyData = await fetchSpotifyData(userAddress);
-        
-        if (spotifyData) {
-          setSpotifyUserData(spotifyData);
-        } else {
-          setSpotifyUserData(null);
-        }
-      } catch (error) {
-        console.error('Error fetching Spotify data:', error);
-        setSpotifyUserData(null);
-      } finally {
-        setLoadingSpotifyData(false);
-      }
-    };
-
-    fetchSpotifyDataEffect();
+    if (!userAddress) return;
+    void loadSpotifyData(userAddress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userAddress]);
 
   // Funkcja do zapisywania nowego bio
@@ -1535,8 +1581,10 @@ export default function BuilderProfile({
           <CampSocialsCard address={userAddress} />
         )}
 
-        {/* Twitter Profile Section */}
-        {(twitterUser || loadingTwitterData) && (
+        {/* Twitter Profile Section.
+            Sekcja pokazuje sie takze przy awarii odczytu - inaczej padnieta
+            trasa /api/camp/twitter znikala bez sladu i wygladala jak brak konta. */}
+        {(twitterUser || loadingTwitterData || twitterError) && (
           <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Twitter blue poświata */}
             <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
@@ -1574,6 +1622,20 @@ export default function BuilderProfile({
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-10 w-10 border-2 border-soft-line border-t-soft-primary"></div>
                   <span className="ml-4 text-soft-ink-muted">Loading Twitter data...</span>
+                </div>
+              ) : twitterError ? (
+                <div className="text-center py-6" role="status">
+                  <div className="text-soft-ink-muted text-sm">{twitterError}</div>
+                  <div className="text-soft-ink-faint text-xs mt-1">
+                    This is a failed lookup, not an empty profile.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => userAddress && loadTwitterData(userAddress)}
+                    className="mt-3 text-xs font-semibold text-soft-primary-deep bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  >
+                    Try again
+                  </button>
                 </div>
               ) : twitterUser ? (
                 <div>
@@ -1696,8 +1758,8 @@ export default function BuilderProfile({
           </div>
         )}
 
-        {/* Spotify Profile Section */}
-        {(spotifyUserData || loadingSpotifyData) && (
+        {/* Spotify Profile Section - jak wyzej, awaria zostaje widoczna. */}
+        {(spotifyUserData || loadingSpotifyData || spotifyError) && (
           <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Spotify green poświata */}
             <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
@@ -1756,6 +1818,20 @@ export default function BuilderProfile({
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-10 w-10 border-2 border-soft-line border-t-soft-primary"></div>
                   <span className="ml-4 text-soft-ink-muted">Loading Spotify data...</span>
+                </div>
+              ) : spotifyError ? (
+                <div className="text-center py-6" role="status">
+                  <div className="text-soft-ink-muted text-sm">{spotifyError}</div>
+                  <div className="text-soft-ink-faint text-xs mt-1">
+                    This is a failed lookup, not an empty profile.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={refreshSpotifyData}
+                    className="mt-3 text-xs font-semibold text-soft-primary-deep bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  >
+                    Try again
+                  </button>
                 </div>
               ) : spotifyUserData ? (
                 <div>

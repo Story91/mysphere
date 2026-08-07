@@ -51,14 +51,12 @@ import { RefreshCw } from 'lucide-react';
 import TransactionButton from '../components/TransactionButton';
 import { toast } from 'react-hot-toast';
 const YapsMetrics = dynamic(() => import('../yapscan/components/YapsMetrics'), { ssr: false });
-import { useAIGenerator } from './hooks/useAIGenerator';
-const AIPostGenerator = dynamic(() => import('./components/AIPostGenerator'), { ssr: false });
-import AIButton from './components/AIButton';
 
 
 import PostList, { ExtendedPost } from './components/PostList';
 import ProfileCard from './components/ProfileCard';
 import PinnedPosts from './components/PinnedPosts';
+import FeedAskRail from './components/FeedAskRail';
 import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 // GlassIcons juz tu nie wchodzi - nawigacja desktopu idzie przez
@@ -67,7 +65,7 @@ import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 import GooeyNav from '../components/GooeyNav/GooeyNav';
 import SoftFeedMobile from './soft/SoftFeedMobile';
 import { NameWithSuffix } from '../utils/nameSuffix';
-import { getGlobalStats } from '../utils/stats/globalStats';
+import { getGlobalStats, likesTotal, likesNote } from '../utils/stats/globalStats';
 import Link from 'next/link';
 import SoftSectionList from './soft/SoftSectionList';
 import SoftTrendsPanel from './soft/SoftTrendsPanel';
@@ -401,23 +399,6 @@ function BaseChatContent() {
   // Network filter state - renamed to activePostingNetwork to reflect its new purpose
   const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea' | 'celo' | 'worldchain' | 'robinhood'>('base');
   
-  // AI Generator Hook
-  const aiGenerator = useAIGenerator();
-
-  // Update newPost when AI generates content for Base network.
-  // Deps musza byc surowym stanem - `getGeneratedContent('base')` w tablicy zaleznosci
-  // to wywolanie funkcji przy kazdym renderze, a `aiGenerator` to swiezy obiekt,
-  // wiec efekt odpalal sie w kolko.
-  const aiBaseContent = aiGenerator.aiGeneratedContentForBase;
-  useEffect(() => {
-    const baseContent = aiGenerator.getGeneratedContent('base');
-    if (baseContent && activePostingNetwork === 'base') {
-      setNewPost(baseContent);
-      aiGenerator.clearGeneratedContent('base');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiBaseContent, activePostingNetwork]);
-  
   // Globalne deklaracje stanów modalu przeniesione na początek funkcji
   const [modalMessage, setModalMessage] = useState('');
   const [modalType, setModalType] = useState<'error' | 'warning' | 'confirm'>('error');
@@ -479,6 +460,16 @@ function BaseChatContent() {
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
   const [totalComments, setTotalComments] = useState<number | null>(null);
   const [totalTips, setTotalTips] = useState<number | null>(null);
+  /**
+   * Zastrzezenie pod liczba lajkow, np. "since Aug 6" - albo `undefined`, gdy
+   * liczba jest calkowita.
+   *
+   * Lajki nie maja wlasnej kolekcji i nie da sie ich zsumowac agregacja, wiec
+   * dopoki nikt nie policzyl stanu poczatkowego serwerowo, mamy tylko przyrost
+   * od wlaczenia licznika. Ta linijka jest cena za pokazanie takiej liczby -
+   * bez niej czesc sumy udaje calosc.
+   */
+  const [likesNoteText, setLikesNoteText] = useState<string | undefined>(undefined);
   /** Kiedy policzono liczby wyzej. 0 = nie wiadomo. */
   const [statsMeasuredAt, setStatsMeasuredAt] = useState<number>(0);
   const [expandedUsersList, setExpandedUsersList] = useState(false);
@@ -1780,6 +1771,19 @@ function BaseChatContent() {
    * Teraz czytamy jeden dokument, ktory zapisuje panel admina po swoim
    * przeliczeniu. Jeden odczyt na wejscie zamiast 467, liczby prawdziwe,
    * a przy braku pomiaru pokazujemy PUSTKE, nie wymyslona wartosc.
+   *
+   * === LAJKI SA SKLADANE, NIE CZYTANE Z JEDNEGO POLA ===
+   * Bylo tu `setTotalLikes(stats.likes)`, a pola `likes` w tym dokumencie NIE
+   * MA i dlugo nie bedzie: panel admina zapisuje je jawnie jako `null`, bo
+   * lajkow nie da sie policzyc agregacja (siedza jako pole na 263 613 postach).
+   * Odczytany dokument mial `likesSince: 6` i zadnego `likes` - czyli jedyna
+   * istniejaca liczba lajkow byla po prostu POMIJANA przy odczycie. Kafel
+   * dostawal potem `String(null)`, czyli napis "null".
+   *
+   * `likesTotal()` sklada to, co wiadomo: stan poczatkowy (gdy ktos go policzyl
+   * skryptem) plus licznik przyrostowy. Gdy stanu poczatkowego nie ma, liczba
+   * jest niepelna - i wtedy `likesNote()` daje linijke "since <data>", ktora
+   * idzie na kafel razem z liczba.
    */
   const fetchGlobalStats = async () => {
     const { stats, failed } = await getGlobalStats();
@@ -1790,6 +1794,7 @@ function BaseChatContent() {
       // a nie jako zero ani jako zmyslona liczba.
       setTotalUsers(null);
       setTotalLikes(null);
+      setLikesNoteText(undefined);
       setTotalPosts(null);
       setTotalComments(null);
       setTotalTips(null);
@@ -1797,8 +1802,11 @@ function BaseChatContent() {
       return;
     }
 
+    const likes = likesTotal(stats);
+
     setTotalUsers(stats.users);
-    setTotalLikes(stats.likes);
+    setTotalLikes(likes.value);
+    setLikesNoteText(likesNote(likes));
     setTotalPosts(stats.posts);
     setTotalComments(stats.comments);
     setTotalTips(stats.tips);
@@ -2395,18 +2403,6 @@ function BaseChatContent() {
   )};
 
 
-
-  // Helper function to check if network supports AI
-  const isAINetwork = (network: string): network is 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' => {
-    return ['base', 'basecamp', 'linea', 'celo', 'ethereum', 'worldchain', 'robinhood'].includes(network);
-  };
-
-  // AI Generation Handler
-  const handleAIGenerate = () => {
-    if (isAINetwork(activePostingNetwork)) {
-      aiGenerator.generateAIPost(activePostingNetwork);
-    }
-  };
 
   // Drugi efekt ustawiajacy isMounted zostal usuniety - robil dokladnie to samo,
   // co ten przy loadInitialData, tyle ze z zaleznoscia [isMounted], czyli sam
@@ -3547,10 +3543,15 @@ function BaseChatContent() {
               >
                 <SoftTrendsPanel
                   stats={[
-                    { label: 'Users', value: String(totalUsers), tone: 'purple' },
-                    { label: 'Likes', value: String(totalLikes), tone: 'amber' },
-                    { label: 'Posts', value: String(totalPosts), tone: 'green' },
-                    { label: 'Comments', value: String(totalComments), tone: 'pink' },
+                    /* Bez String() - `null` ma dojsc do kafla JAKO null.
+                       String(null) daje napis "null", ktory compact()
+                       przepuszcza bez zmian, wiec kafel z niezmierzona liczba
+                       pokazywal slowo "null" zamiast kreski. Znak "nie wiem"
+                       wstawia SoftTrendsPanel. */
+                    { label: 'Users', value: totalUsers, tone: 'purple' },
+                    { label: 'Likes', value: totalLikes, tone: 'amber', note: likesNoteText },
+                    { label: 'Posts', value: totalPosts, tone: 'green' },
+                    { label: 'Comments', value: totalComments, tone: 'pink' },
                   ]}
                   /* Cala strona, nie pierwsza piatka. Backend oddaje 10 na
                      stronie i do 5 stron (1-50) - `slice(0, 5)` obcinal to
@@ -4039,10 +4040,6 @@ function BaseChatContent() {
                                 <span className="hidden sm:inline font-medium text-blue-600 dark:text-blue-400">Photo</span>
                               </button>
 
-                              <AIButton
-                                onClick={() => aiGenerator.setShowAIModal(true)}
-                              />
-
                               <button
                                 onClick={() => setShowMusicSelector(true)}
                                 className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400 text-xs sm:text-sm bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
@@ -4057,10 +4054,51 @@ function BaseChatContent() {
                               </button>
                             </div>
                             
+                            {/* ===== PRZYCISK MILCZAL, ZAMIAST MOWIC, CZEGO BRAKUJE =====
+                                Zgloszenie wlasciciela: "jesli tworze post Paid Section
+                                i wpisuje tresc to jak go wrzucic, bo przycisk post nie
+                                dziala".
+
+                                Przycisk jest wylaczony przez `!newPost.trim()`, czyli
+                                wymaga tresci PUBLICZNEJ. Kto rozwinal platna sekcje
+                                i wpisal tekst TAM, zostawiajac gorne pole puste, widzi
+                                wylacznie wyszarzony przycisk bez slowa wyjasnienia -
+                                i sluszne jest wtedy wrazenie, ze aplikacja jest zepsuta.
+
+                                Wymog zostaje, bo jest sensowny: platna czesc bez
+                                publicznej to zamknieta skrzynka bez etykiety, ktorej
+                                nikt nie ma powodu kupic. Ale ma byc POWIEDZIANY.
+
+                                To samo z siec: warunek na base/baseSepolia tez wyszarzal
+                                przycisk po cichu.
+
+                                `aria-live` - komunikat pojawia sie w odpowiedzi na to,
+                                co czlowiek wlasnie zrobil, wiec czytnik ekranu ma go
+                                przeczytac bez przenoszenia fokusu. */}
+                            {(() => {
+                              const zlaSiec = chainId !== base.id && chainId !== baseSepolia.id;
+                              const brakPublicznej = !newPost.trim();
+                              const maPlatna = isPremiumOpen && premium.premiumContent.trim().length > 0;
+                              if (isCreatingPost) return null;
+                              if (!zlaSiec && !brakPublicznej) return null;
+                              return (
+                                <p
+                                  aria-live="polite"
+                                  className="mb-2 font-soft text-[12px] leading-[1.5] text-soft-ink-muted"
+                                >
+                                  {zlaSiec
+                                    ? 'Switch to Base to post.'
+                                    : maPlatna
+                                      ? 'Add something above the paywall first — a line everyone can read, so people know what they are paying for.'
+                                      : 'Write something to post.'}
+                                </p>
+                              );
+                            })()}
+
                             <div className="flex space-x-2">
-                            <button 
+                            <button
                               onClick={handleCreatePost}
-                                    disabled={!newPost.trim() || isCreatingPost || (chainId !== base.id && chainId !== baseSepolia.id)} 
+                                    disabled={!newPost.trim() || isCreatingPost || (chainId !== base.id && chainId !== baseSepolia.id)}
                               className={`px-3 py-0.5 text-sm font-medium rounded-lg transition-colors duration-200 flex items-center justify-center h-[32px] ${ 
                                       (!newPost.trim() || isCreatingPost || (chainId !== base.id && chainId !== baseSepolia.id))
                                   ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
@@ -4115,66 +4153,36 @@ function BaseChatContent() {
                           {/* Add BaseCamp post form conditionally */}
                           {activePostingNetwork === 'basecamp' && (
                             <div>
-                              <CreatePostBaseCamp
-                                onPostCreated={refreshPosts}
-                                setShowAIModal={aiGenerator.setShowAIModal}
-                                aiGeneratedContent={aiGenerator.getGeneratedContent('basecamp')}
-                                onAiContentUsed={() => aiGenerator.clearGeneratedContent('basecamp')}
-                              />
+                              <CreatePostBaseCamp onPostCreated={refreshPosts} />
                               <ClaimPortalBanner />
                             </div>
                           )}
 
                           {/* Add Linea post form conditionally */}
                           {activePostingNetwork === 'linea' && (
-                            <CreatePostLinea
-                              onPostCreated={refreshPosts}
-                              setShowAIModal={aiGenerator.setShowAIModal}
-                              aiGeneratedContent={aiGenerator.getGeneratedContent('linea')}
-                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('linea')}
-                            />
+                            <CreatePostLinea onPostCreated={refreshPosts} />
                           )}
 
                           {/* Add Celo post form conditionally */}
                           {activePostingNetwork === 'celo' && (
-                            <CreatePostCelo
-                              onPostCreated={refreshPosts}
-                              setShowAIModal={aiGenerator.setShowAIModal}
-                              aiGeneratedContent={aiGenerator.getGeneratedContent('celo')}
-                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('celo')}
-                            />
+                            <CreatePostCelo onPostCreated={refreshPosts} />
                           )}
 
                           {/* Add Ethereum post form conditionally */}
                           {activePostingNetwork === 'ethereum' && (
-                            <CreatePostEthereum
-                              onPostCreated={refreshPosts}
-                              setShowAIModal={aiGenerator.setShowAIModal}
-                              aiGeneratedContent={aiGenerator.getGeneratedContent('ethereum')}
-                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('ethereum')}
-                            />
+                            <CreatePostEthereum onPostCreated={refreshPosts} />
                           )}
 
                           {/* Add World Chain post form conditionally */}
                           {activePostingNetwork === 'worldchain' && (
-                            <CreatePostWorldChain
-                              onPostCreated={refreshPosts}
-                              setShowAIModal={aiGenerator.setShowAIModal}
-                              aiGeneratedContent={aiGenerator.getGeneratedContent('worldchain')}
-                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('worldchain')}
-                            />
+                            <CreatePostWorldChain onPostCreated={refreshPosts} />
                           )}
 
                           {/* Add Robinhood Chain post form conditionally.
                               Kontrakt postow nie jest jeszcze wdrozony - komponent sam
                               pokazuje baner i wylacza przycisk wysylki. */}
                           {activePostingNetwork === 'robinhood' && (
-                            <CreatePostRobinhood
-                              onPostCreated={refreshPosts}
-                              setShowAIModal={aiGenerator.setShowAIModal}
-                              aiGeneratedContent={aiGenerator.getGeneratedContent('robinhood')}
-                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('robinhood')}
-                            />
+                            <CreatePostRobinhood onPostCreated={refreshPosts} />
                           )}
                         </div>
                       ) : (
@@ -4228,6 +4236,29 @@ function BaseChatContent() {
                       userNames={userNames}
                       onUserNamesUpdate={handleUserNamesUpdate}
                     />
+                  )}
+
+                  {/* ===== ASKI W FEEDZIE =====
+                      Osobny pas NAD lista postow, a nie karty wplecione miedzy
+                      posty. Pelne uzasadnienie tej decyzji (dwa kursory przy
+                      dociaganiu stron, memo i stan optymistyczny PostList,
+                      tykajacy zegar Aska, rozdzielenie awarii) stoi w naglowku
+                      FeedAskRail.tsx.
+
+                      DLA TEGO PLIKU najwazniejsze jest jedno: pas NIE DOTYKA
+                      `posts` ani `visiblePosts`. PostList dostaje dokladnie te
+                      sama referencje co przedtem, wiec optymistyczne zmiany
+                      (serduszko, komentarz) nie maja jak zostac skasowane -
+                      patrz komentarz przy deklaracji `visiblePosts`.
+
+                      Pas ma wlasny stan i wlasny cache, wiec nieudany odczyt
+                      Askow nie ma drogi do listy postow, a nieudany odczyt
+                      postow nie zabiera Askow.
+
+                      W "My Feed" pasa nie ma: tam patrzacy oglada WLASNE posty,
+                      a cudze otwarte Aski nie sa czescia tej odpowiedzi. */}
+                  {!showMyFeed && (
+                    <FeedAskRail viewer={address ?? null} className="mb-4" />
                   )}
 
                   {/* ===== ODCZYT PADL != PUSTY FEED =====
@@ -4480,19 +4511,6 @@ function BaseChatContent() {
 
       {/* Padding for mobile footer */}
       <div className="h-20 lg:h-0" />
-
-      {/* AI Post Generator Modal */}
-      {isAINetwork(activePostingNetwork) && (
-        <AIPostGenerator
-          isOpen={aiGenerator.showAIModal}
-          onClose={() => aiGenerator.setShowAIModal(false)}
-          activeNetwork={activePostingNetwork}
-          aiPrompt={aiGenerator.aiPrompt}
-          setAiPrompt={aiGenerator.setAiPrompt}
-          isGeneratingAI={aiGenerator.isGeneratingAI}
-          onGenerate={handleAIGenerate}
-        />
-      )}
     </BanPage>
   </>
   );

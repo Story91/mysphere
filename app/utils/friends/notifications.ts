@@ -492,6 +492,92 @@ export const notifyTipReceived = async (
 };
 
 /**
+ * Jak wygrany dostaje swoje pieniadze - a wiec co mu wolno o nich powiedziec.
+ *
+ *   'escrow'  kontrakt ZAPISAL saldo (zdarzenie SeatAwarded). W portfelu
+ *             jeszcze nic nie ma: claim() to osobna transakcja, ktora wygrany
+ *             musi podpisac sam i zaplacic za nia gaz na Base.
+ *   'wallet'  autor przelal wprost, a transfer zostal potwierdzony na lancuchu
+ *             (verifyBasePayment). Pieniadze SA juz na miejscu.
+ */
+export type AskPayoutDelivery = 'escrow' | 'wallet';
+
+/**
+ * Powiadomienie o wyplacie za przyjeta odpowiedz na Aska.
+ *
+ * === CO NAPRAWIA ===
+ * Rozstrzygniecie Aska przypisywalo pieniadze i na tym sie konczylo. Wygrany
+ * dowiadywal sie o nich wylacznie wtedy, gdy sam z siebie zajrzal na /money
+ * albo /asks. Przy escrow oznacza to pieniadze lezace w kontrakcie NIEODEBRANE,
+ * bo nikt nie wie, ze sa.
+ *
+ * === DWA ZDANIA, BO DWIE ROZNE SYTUACJE ===
+ * Przy escrow "otrzymales" byloby obietnica, ktorej kod nie dotrzymuje - tam
+ * trzeba jeszcze kliknac i zaplacic gaz. Przy przelewie bezposrednim pieniadze
+ * naprawde juz sa w portfelu. Stad `delivery`, a nie jedno uniwersalne zdanie.
+ *
+ * === DLACZEGO TYP TIP_RECEIVED, A NIE WLASNY ===
+ * `createNotification` odrzuca wszystko, czego nie ma w preferencjach odbiorcy
+ * (`preferences.types[type]`), a dokumenty preferencji SA JUZ ZAPISANE w bazie -
+ * z tymi kluczami, ktore istnialy w chwili zapisu. Nowy typ bylby dla kazdego
+ * istniejacego uzytkownika `undefined`, czyli po cichu zablokowany: kod
+ * wygladalby na dzialajacy, a nikt nie dostalby nic. TIP_RECEIVED to ta sama
+ * polka - "pieniadze dla ciebie" - i ma juz ikone, kolor, filtr w
+ * NotificationsView oraz miejsce na liscie subskrypcji w hooks.ts.
+ *
+ * === O ADRESACH ===
+ * `recipientId` i `askAuthorId` musza przyjsc W FORMIE EIP-55 (checksum).
+ * Powiadomienia lezą pod `users/{adres}/notifications`, a czyta je przegladarka
+ * adresem prosto z wagmi, ktory JEST checksumowany. Sesja SIWE trzyma adres
+ * malymi literami (app/api/auth/verify), wiec zapis "jak leci" trafilby pod
+ * klucz, do ktorego nikt nigdy nie zaglada. Checksumuje wolajacy - to trasy
+ * serwerowe maja viem, a ten modul ladowany jest takze w przegladarce.
+ */
+export const notifyAskPayout = async (params: {
+  recipientId: string;
+  askAuthorId: string;
+  askId: string;
+  answerId: string;
+  /** Kwota gotowa do pokazania, np. "5.00" - formatuje ja wolajacy, bo to on wie, czy patrzy na lancuch, czy na zapis. */
+  amount: string;
+  token: string;
+  delivery: AskPayoutDelivery;
+  /** Hash rozstrzygniecia albo przelewu - zostaje w dokumencie jako slad. */
+  txHash: string;
+}): Promise<void> => {
+  const { recipientId, askAuthorId, askId, answerId, amount, token, delivery, txHash } = params;
+
+  // Autor nie moze wygrac wlasnego Aska (trasy tego pilnuja), ale gdyby kiedys
+  // przeszlo - nie zawiadamiamy kogos o przelewie samemu sobie.
+  if (recipientId.toLowerCase() === askAuthorId.toLowerCase()) return;
+
+  const held = delivery === 'escrow';
+
+  const created = await createNotification({
+    userId: recipientId,
+    type: 'TIP_RECEIVED',
+    fromUserId: askAuthorId,
+    // Tekst widoczny dla uzytkownika - po angielsku, jak reszta interfejsu.
+    title: held ? 'Ask payout waiting for you' : 'Ask payout received',
+    message: held
+      ? `awarded you ${amount} ${token} for your answer. The escrow contract is holding it until you claim it - open Money to collect.`
+      : `paid you ${amount} ${token} for your answer. It is already in your wallet.`,
+    data: { askId, answerId, tipAmount: amount, token, delivery, txHash },
+    // /money to jedyne miejsce z PRZYCISKIEM ODBIORU (AskClaimPanel) i z lista
+    // tego, co juz wplynelo. Trasa istnieje - app/money/page.tsx.
+    actionUrl: '/money'
+  });
+
+  if (!created) {
+    // AWARIA != PUSTKA. `createNotification` zwraca null zarowno przy bledzie
+    // zapisu, jak i przy wyciszeniu przez preferencje albo quiet hours - w
+    // kazdym z tych przypadkow czlowiek NIE WIE o swoich pieniadzach, wiec
+    // slad musi zostac w logu.
+    console.warn('⚠️ Powiadomienie o wyplacie za Aska nie zostalo dostarczone:', { askId, answerId });
+  }
+};
+
+/**
  * Powiadomienie systemowe
  */
 export const notifySystem = async (

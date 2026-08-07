@@ -1,10 +1,24 @@
+/**
+ * GET /api/camp/twitter?address=0x...
+ *
+ * Proxy do Camp Network po dane X danego portfela. Wola Campa NASZYM kluczem
+ * CAMP_API_KEY, wiec limit u Campa placimy my - i dlatego trasa nie moze byc
+ * otwartym proxy na dowolny ciag znakow z internetu. Wpuszczaniem zajmuje sie
+ * guardCampRead (patrz app/utils/camp/proxyGuard.ts); tam tez stoi uzasadnienie,
+ * dlaczego odczyt zostaje dostepny dla niezalogowanych, a nie chowa sie za sesja.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { TwitterAPI } from '@campnetwork/origin';
+import { guardCampRead } from '../../../utils/camp/proxyGuard';
 
 // Trasa czyta dane z zadania (nextUrl / naglowki), wiec nie da sie jej
 // prerenderowac. Bez tej deklaracji Next probuje ja wygenerowac statycznie
 // przy buildzie i zasmieca log stacktrace'ami DYNAMIC_SERVER_USAGE.
 export const dynamic = 'force-dynamic';
+
+// Straz czyta sesje przez node:crypto - na edge tego modulu nie ma.
+export const runtime = 'nodejs';
 
 // Types for Camp Network API responses
 interface TwitterUser {
@@ -82,12 +96,13 @@ async function fetchTwitterDataDirect(address: string) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.nextUrl);
-    const address = searchParams.get('address');
     const useDirectAPI = searchParams.get('direct') === 'true';
 
-    if (!address) {
-      return NextResponse.json({ error: 'Address is required' }, { status: 400 });
-    }
+    // Ksztalt adresu i tempo sprawdzamy PRZED dotknieciem klucza Campa - odmowa
+    // ma nie kosztowac nas ani jednego zapytania na zewnatrz.
+    const guard = guardCampRead(request, searchParams.get('address'));
+    if (!guard.ok) return guard.response;
+    const address = guard.address;
 
     // Try direct Camp Network API first if requested or as fallback
     if (useDirectAPI) {
@@ -138,11 +153,14 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching Twitter data:', error);
+    // Kod bledu, zeby klient odroznil "Camp nie odpowiedzial" od "nic nie
+    // podpieto" i pokazal awarie jako awarie, a nie jako pusty profil.
     return NextResponse.json(
-      { 
-        error: 'Failed to fetch Twitter data',
+      {
+        error: 'Camp Network did not answer for this wallet. This is a failure, not an empty profile.',
+        code: 'upstream_failed',
         details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
+      },
       { status: 500 }
     );
   }

@@ -21,6 +21,9 @@ import {
   type AskUserStats,
   type TokenAmounts,
 } from './types';
+// Jedna wspolna warstwa zgodnosci wstecznej dla pisowni adresu - patrz
+// `addressReadVariants` w monetization/types.ts (same funkcje czyste).
+import { addressReadVariants } from '../monetization/types';
 
 /**
  * SLAD, JAKI CZLOWIEK ZOSTAWIA W ASKACH.
@@ -89,22 +92,6 @@ const readsForCount = (count: number) => Math.max(1, Math.ceil(count / 1000));
 /** Zapytanie zwracajace dokumenty kosztuje 1 odczyt za dokument, minimum jeden. */
 const readsForDocs = (size: number) => Math.max(1, size);
 
-/**
- * Warianty zapisu adresu, po ktorych szukamy.
- *
- * Obie sciezki zapisu normalizuja adres do malych liter (POST /api/asks przez
- * `normalizeAddress`, odpowiedzi przez `saveAnswer`), ale reguly Firestore
- * dopuszczaja przy `asks` zapis wprost z przegladarki z adresem w checksumie.
- * Pytanie o oba warianty kosztuje tyle samo co o jeden - zwraca te same
- * dokumenty - a chroni przed statystyka, ktora cicho gubi polowe historii.
- * Ta sama ostroznosc co w getProfile.ts.
- */
-function addressVariants(address: string): string[] {
-  const trimmed = address.trim();
-  const lower = trimmed.toLowerCase();
-  return trimmed === lower ? [lower] : [trimmed, lower];
-}
-
 /** Zapytanie o dokumenty tego czlowieka w danej kolekcji. */
 function byAuthor(collectionName: string, variants: string[]): Query {
   return query(
@@ -135,7 +122,7 @@ export async function getAskAuthorStats(address: string): Promise<AuthorStatsRes
 
   let snapshot;
   try {
-    snapshot = await getDocs(byAuthor(ASKS_COLLECTION, addressVariants(address)));
+    snapshot = await getDocs(byAuthor(ASKS_COLLECTION, addressReadVariants(address)));
   } catch (error) {
     console.error('[askStats] Odczyt Askow autora nie powiodl sie:', error);
     return { stats: null, reads: 0 };
@@ -251,7 +238,7 @@ function foldAccepted(docs: Array<Record<string, any>>) {
 export async function getAskAnswererStats(address: string): Promise<AnswererStatsResult> {
   if (!address || !address.trim()) return { stats: null, reads: 0 };
 
-  const variants = addressVariants(address);
+  const variants = addressReadVariants(address);
   const all = byAuthor(ASK_ANSWERS_COLLECTION, variants);
   const acceptedOnly = query(
     collection(getPublicDb(), ASK_ANSWERS_COLLECTION),

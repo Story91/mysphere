@@ -30,15 +30,17 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { createPublicClient, http, parseEventLogs, type Hash } from 'viem';
+import { createPublicClient, getAddress, http, parseEventLogs, type Hash } from 'viem';
 import { base } from 'viem/chains';
 import { acceptAnswer, getAnswerMeta, getAsk, resolveAsk } from '../../../../utils/asks/asks';
+import { notifyAskPayout } from '../../../../utils/friends/notifications';
 import {
   ASK_ESCROW_ABI,
   answerIdToBytes32,
   escrowDeployment,
   escrowKeyFor,
   perAnswerToUnits,
+  unitsToAmount,
 } from '../../../../utils/asks/escrow';
 import { isValidTxHash, normalizeAddress } from '../../../../utils/monetization/types';
 import { sessionAddress } from '../../identity';
@@ -215,6 +217,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const unmatched: string[] = [];
   const failed: string[] = [];
 
+  /**
+   * Kogo trzeba zawiadomic, ze ma pieniadze do odebrania.
+   *
+   * Zbieramy TYLKO odpowiedzi zapisane w tym przebiegu. Ponowienie z tym samym
+   * hashem (trasa jest na to odporna) trafia w `alreadyAccepted` i NIE wysyla
+   * drugiego powiadomienia o tych samych pieniadzach.
+   *
+   * Kwota bierze sie ze ZDARZENIA, nie z `ask.perAnswer`: kontrakt mogl
+   * przyznac wiecej niz stawka (warunek wyzej odrzuca tylko mniej), a
+   * powiadomienie ma mowic te kwote, ktora naprawde czeka na claim().
+   */
+  const toNotify: Array<{ recipient: string; answerId: string; amount: string }> = [];
+
   for (const event of seatEvents) {
     const answer = byRef.get(event.args.answerRef.toLowerCase());
     if (!answer) {
@@ -246,6 +261,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         network: ask.network,
       });
       recorded.push(answer.id);
+      toNotify.push({
+        // Adres ze zdarzenia - viem oddaje go w formie EIP-55, a wlasnie tej
+        // formy uzywa przegladarka, czytajac users/{adres}/notifications.
+        recipient: getAddress(event.args.recipient),
+        answerId: answer.id,
+        amount: unitsToAmount(event.args.amount).toFixed(2),
+      });
     } catch (error) {
       console.error('[api/asks/escrow-resolve] Zapis przyjecia nie powiodl sie:', error);
       // Pieniadze SA JUZ PRZYPISANE NA LANCUCHU. Nieudany zapis nie odbiera
@@ -260,6 +282,56 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     closed = true;
   } catch (error) {
     console.error('[api/asks/escrow-resolve] Zamkniecie Aska nie powiodlo sie:', error);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* WYGRANI DOWIADUJA SIE, ZE MAJA PIENIADZE                          */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * Bez tego kroku rozstrzygniecie bylo nieme: kontrakt zapisywal salda, a
+   * odpowiadajacy mial sie o nich dowiedziec, samemu wracajac na /money albo
+   * /asks. Escrow trzyma wtedy pieniadze, po ktore nikt nie przychodzi.
+   *
+   * Robimy to TUTAJ, a nie po stronie klienta, bo tutaj adresy i kwoty sa
+   * potwierdzone przez lancuch, a nie zadeklarowane przez przegladarke autora.
+   *
+   * NIC TU NIE MOZE WYWROCIC ROZSTRZYGNIECIA. Transakcja juz sie odbyla,
+   * przyjecia sa zapisane - nieudane powiadomienie jest do zalogowania, nie do
+   * zwrocenia bledem. Dlatego kazde ma wlasne `catch`, a caly blok jest
+   * `await`-owany przed odpowiedzia: praca puszczona luzem po `return` ginie
+   * razem z instancja funkcji.
+   */
+  if (toNotify.length > 0) {
+    let askAuthor: string | null = null;
+    try {
+      askAuthor = getAddress(ask.author);
+    } catch {
+      // Autor zapisany w Asku nie jest adresem - powiadomienie nie ma od kogo
+      // przyjsc, ale wyplaty juz sa zapisane i to one sie licza.
+      console.warn('[api/asks/escrow-resolve] Autor Aska nie jest adresem, pomijam powiadomienia:', askId);
+    }
+
+    if (askAuthor) {
+      for (const winner of toNotify) {
+        try {
+          await notifyAskPayout({
+            recipientId: winner.recipient,
+            askAuthorId: askAuthor,
+            askId,
+            answerId: winner.answerId,
+            amount: winner.amount,
+            token: ask.token,
+            // Escrow: pieniadze SA PRZYPISANE, ale wciaz w kontrakcie. claim()
+            // to osobna transakcja i osobny gaz - zdanie musi to mowic.
+            delivery: 'escrow',
+            txHash,
+          });
+        } catch (error) {
+          console.error('[api/asks/escrow-resolve] Powiadomienie zwyciezcy nie powiodlo sie:', error);
+        }
+      }
+    }
   }
 
   if (!closed || failed.length > 0) {

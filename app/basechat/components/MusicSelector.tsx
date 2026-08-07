@@ -114,7 +114,10 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
           savedPlaylists: data.data.profile?.savedPlaylists?.length || 0
         });
       } else {
-        setError(data.message || 'Failed to fetch Spotify data');
+        // `error` niesie zdanie kazdej odmowy z /api/camp/spotify (zly adres,
+        // za szybko, Camp nie odpowiedzial). `message` zostaje dla starszego
+        // ksztaltu odpowiedzi "sprawdzilem i nic nie ma".
+        setError(data.error || data.message || 'Failed to fetch Spotify data');
       }
     } catch (err) {
       if (isCancelled()) return;

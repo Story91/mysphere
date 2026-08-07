@@ -29,6 +29,9 @@ import {
 import { getAuth, TwitterAuthProvider } from 'firebase/auth';
 import { UserProfile, Post, Comment } from '../types';
 import { DEFAULT_REFERRAL_CONFIG } from './referrals/types';
+// Jedyna normalizacja adresu w repo. types.ts nie ciagnie za soba Firestore
+// ani niczego ciezkiego (sam viem), wiec import jest bezpieczny takze tutaj.
+import { normalizeAddress, addressReadVariants } from './monetization/types';
 
 // Stała z adresem admina
 /**
@@ -3989,11 +3992,33 @@ export interface PostTipStats {
 // Zapisuje tip do Firebase po udanej transakcji
 export const saveTip = async (tip: Omit<Tip, 'id' | 'timestamp'>): Promise<string> => {
   try {
+    /**
+     * ADRESY MALYMI LITERAMI - INACZEJ NAPIWEK ZNIKA Z CZYJEJS KSIEGI.
+     *
+     * === CO BYLO ===
+     * Tu szlo `...tip` prosto z portfela, czyli adres w takiej pisowni, jaka
+     * akurat podal portfel - zwykle checksuma (`0xAbC...`). Firestore porownuje
+     * stringi bajt po bajcie, wiec `where('recipientAddress','==','0xabc...')`
+     * MIJA taki dokument. Odbiorca patrzyl na /money i widzial ksiege bez
+     * swojego napiwka, mimo ze transakcja byla na lancuchu. Brakujaca pozycja
+     * nie wyglada jak blad - wyglada jak "nie dostales".
+     *
+     * === DLACZEGO TO NIE WYSTARCZA SAMO ===
+     * Poprawka dziala od teraz w przod. 187 z 189 istniejacych dokumentow ma
+     * adres w checksumie i tak zostanie, dopoki wlasciciel bazy nie zdecyduje
+     * o migracji (scripts/migrateAddressCasing.mjs, NIEURUCHOMIONY). Dlatego
+     * odczyty MUSZA dalej pytac o oba warianty - patrz `addressReadVariants`.
+     *
+     * Wybor malych liter, a nie checksumy, jest opisany przy `normalizeAddress`
+     * w app/utils/monetization/types.ts.
+     */
     const tipData = {
       ...tip,
+      senderAddress: normalizeAddress(tip.senderAddress),
+      recipientAddress: normalizeAddress(tip.recipientAddress),
       timestamp: Date.now(),
     };
-    
+
     const docRef = await addDoc(collection(db, 'tips'), tipData);
     console.log('✅ Tip zapisany:', docRef.id); // sam identyfikator - bez adresow i kwot w konsoli
 
@@ -4071,6 +4096,25 @@ const addTipAmount = (
   stats[`${field}${suffix}`] += amount;
 };
 
+/** Pusty komplet statystyk tipow uzytkownika - ten sam obiekt byl wpisany z reki dwa razy. */
+const emptyTipStats = (): TipStats => ({
+  totalReceived: 0,
+  totalSent: 0,
+  tipCount: 0,
+  ethReceived: 0,
+  usdcReceived: 0,
+  celoReceived: 0,
+  wldReceived: 0,
+  lineaReceived: 0,
+  campReceived: 0,
+  ethSent: 0,
+  usdcSent: 0,
+  celoSent: 0,
+  wldSent: 0,
+  lineaSent: 0,
+  campSent: 0
+});
+
 /** Pusty komplet statystyk tipow posta - byl wpisany z reki w trzech miejscach. */
 const emptyPostTipStats = (): PostTipStats => ({
   totalTips: 0,
@@ -4087,34 +4131,34 @@ const emptyPostTipStats = (): PostTipStats => ({
 
 // Pobiera statystyki tipów dla użytkownika
 export const getUserTipStats = async (userAddress: string): Promise<TipStats> => {
+  // Brak adresu to pytanie bez adresata, a nie awaria - i tak nie wolno go
+  // puscic dalej, bo `in` z pusta lista jest w Firestore bledem zapytania.
+  if (!userAddress || !userAddress.trim()) return emptyTipStats();
+
   try {
     const tipsRef = collection(db, 'tips');
-    const receivedQuery = query(tipsRef, where('recipientAddress', '==', userAddress));
-    const sentQuery = query(tipsRef, where('senderAddress', '==', userAddress));
-    
+    /**
+     * WARSTWA ZGODNOSCI WSTECZNEJ, a nie stan docelowy.
+     *
+     * Zapisy sa od teraz normalizowane (`saveTip`), ale 187 z 189 istniejacych
+     * dokumentow ma adres w checksumie. Rownosc `==` na jednej pisowni gubila
+     * tu cala historie kazdego, kto trafil do bazy w drugiej postaci - i to bez
+     * sladu, bo pusty wynik wygladal jak "zero napiwkow". Pytanie o oba warianty
+     * kosztuje tyle samo (Firestore rozlicza ZWROCONE dokumenty).
+     *
+     * Do usuniecia dopiero po migracji danych - patrz
+     * scripts/migrateAddressCasing.mjs.
+     */
+    const variants = addressReadVariants(userAddress);
+    const receivedQuery = query(tipsRef, where('recipientAddress', 'in', variants));
+    const sentQuery = query(tipsRef, where('senderAddress', 'in', variants));
+
     const [receivedSnapshot, sentSnapshot] = await Promise.all([
       getDocs(receivedQuery),
       getDocs(sentQuery)
     ]);
-    
-    const stats: TipStats = {
-      totalReceived: 0,
-      totalSent: 0,
-      tipCount: 0,
-      ethReceived: 0,
-      usdcReceived: 0,
-      celoReceived: 0,
-      wldReceived: 0,
-      lineaReceived: 0,
-      campReceived: 0,
-      ethSent: 0,
-      usdcSent: 0,
-      celoSent: 0,
-      wldSent: 0,
-      lineaSent: 0,
-      campSent: 0
-    };
-    
+
+    const stats = emptyTipStats();
     const fields = stats as unknown as Record<string, number>;
 
     // Policz otrzymane tipy
@@ -4137,23 +4181,16 @@ export const getUserTipStats = async (userAddress: string): Promise<TipStats> =>
     return stats;
   } catch (error) {
     console.error('❌ Błąd pobierania statystyk tipów:', error);
-    return {
-      totalReceived: 0,
-      totalSent: 0,
-      tipCount: 0,
-      ethReceived: 0,
-      usdcReceived: 0,
-      celoReceived: 0,
-      wldReceived: 0,
-      lineaReceived: 0,
-      campReceived: 0,
-      ethSent: 0,
-      usdcSent: 0,
-      celoSent: 0,
-      wldSent: 0,
-      lineaSent: 0,
-      campSent: 0
-    };
+    /**
+     * ZNANY DLUG, NIE DECYZJA: to jest awaria udajaca zero.
+     *
+     * Nieudany odczyt powinien miec wlasne wyjscie (`null`), zeby interfejs
+     * napisal "nie udalo sie wczytac" zamiast "0 napiwkow" - dokladnie tak robi
+     * getMoneyLedger. Zmiana wymaga jednak przerobienia sygnatury na
+     * `TipStats | null` i kazdego wolajacego; zostawione swiadomie poza zakresem
+     * poprawki pisowni adresow, zeby nie mieszac dwoch rzeczy w jednej zmianie.
+     */
+    return emptyTipStats();
   }
 };
 
@@ -4177,7 +4214,9 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
 
       stats.tipCount++;
       stats.totalTips += amount;
-      uniqueTippers.add(tip.senderAddress);
+      // Malymi literami, bo ten sam czlowiek bywa zapisany raz checksuma, raz
+      // nie - bez tego liczylby sie jako dwoch wspierajacych pod jednym postem.
+      uniqueTippers.add(normalizeAddress(tip.senderAddress ?? ''));
 
       // Legacy per-token stats (kept for backwards compatibility)
       addTipAmount(fields, tip.token, 'Tips', amount);
@@ -4235,7 +4274,9 @@ export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId:
         stats.totalTips += amount;
 
         if (!tippersByPost.has(postId)) tippersByPost.set(postId, new Set());
-        tippersByPost.get(postId)!.add(tip.senderAddress);
+        // Malymi literami - ten sam wspierajacy w dwoch pisowniach liczyl sie
+        // dotad jako dwie osoby pod postem.
+        tippersByPost.get(postId)!.add(normalizeAddress(tip.senderAddress ?? ''));
 
         addTipAmount(stats as unknown as Record<string, number>, tip.token, 'Tips', amount);
 
@@ -4259,23 +4300,43 @@ export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId:
   return result;
 };
 
-// Pobiera ostatnie tipy użytkownika (otrzymane)
+/**
+ * Ostatnie OTRZYMANE napiwki. Trzy naprawy naraz, bo kazda z osobna zostawiala
+ * kafelek pusty:
+ *
+ * 1. PISOWNIA ADRESU. Bylo `==` na jednej postaci, a 187 z 189 dokumentow ma
+ *    adres w checksumie. Pytamy o oba warianty (warstwa zgodnosci wstecznej -
+ *    patrz `addressReadVariants`).
+ *
+ * 2. BRAK INDEKSU. Bylo `where(...) + orderBy('timestamp')`, a firestore.indexes.json
+ *    NIE MA ani jednego indeksu zlozonego dla `tips`. Takie zapytanie konczy sie
+ *    bledem FAILED_PRECONDITION ZAWSZE - kafelek "Recent tips" nie mogl pokazac
+ *    niczego nikomu. Sortujemy w pamieci, dokladnie jak getMoneyLedger.
+ *
+ * 3. AWARIA UDAJACA PUSTKE. `catch` zwracal `[]`, wiec RecentTips.tsx dostawal
+ *    "zero napiwkow" i pisal "No tips received yet" takze wtedy, gdy odczyt
+ *    padl. Komponent ma juz wlasny stan `loadFailed` i wlasny komunikat - byl
+ *    martwy, bo nigdy nie dostawal wyjatku. Teraz RZUCAMY dalej.
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od pustki.
+ */
 export const getRecentTips = async (userAddress: string, limit: number = 10): Promise<Tip[]> => {
-  try {
-    const tipsRef = collection(db, 'tips');
-    const recentTipsQuery = query(
-      tipsRef, 
-      where('recipientAddress', '==', userAddress),
-      firestoreOrderBy('timestamp', 'desc'),
-      firestoreLimit(limit)
-    );
-    
-    const snapshot = await getDocs(recentTipsQuery);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tip));
-  } catch (error) {
-    console.error('❌ Błąd pobierania ostatnich tipów:', error);
-    return [];
-  }
+  if (!userAddress || !userAddress.trim()) return [];
+
+  const snapshot = await getDocs(
+    query(
+      collection(db, 'tips'),
+      where('recipientAddress', 'in', addressReadVariants(userAddress)),
+      // Limit celowo WIEKSZY niz zadany: bez orderBy Firestore obcina dowolne
+      // `limit` wierszy, wiec najnowsze musza sie najpierw zmiescic w probce.
+      firestoreLimit(Math.max(limit * 5, 50))
+    )
+  );
+
+  return snapshot.docs
+    .map(entry => ({ id: entry.id, ...entry.data() } as Tip))
+    .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))
+    .slice(0, limit);
 };
 
 // ===============================================

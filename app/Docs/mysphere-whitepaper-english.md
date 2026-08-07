@@ -266,7 +266,6 @@ MySphere AI is built on an advanced technology stack that effectively combines W
 - **Backend**: Serverless architecture for traditional web functionality
 - **Storage**: Hybrid solution combining decentralized storage (IPFS) for NFT content with traditional databases for application data
 - **Authentication**: Web3 wallet integration with optional email-based account recovery
-- **AI Engines**: Advanced generative models for creating posts, quotes, and content analysis
 - **AI Agent**: System automating tokenization processes and launching new tokens (Token Launcher)
 
 #### 5.1.3 Core Technology Modules

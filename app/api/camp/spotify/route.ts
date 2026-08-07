@@ -1,10 +1,24 @@
+/**
+ * GET /api/camp/spotify?address=0x...&type=full|basic|analytics
+ *
+ * Proxy do Camp Network po dane Spotify danego portfela. Kosztuje nas duzo
+ * wiecej niz trasa X - jedno zadanie rozwija sie w piec zapytan na zewnatrz
+ * (utwory zapisane, odtworzone, albumy, playlisty, /top), wszystkie naszym
+ * kluczem CAMP_API_KEY. Dlatego wpuszczaniem zajmuje sie guardCampRead
+ * (app/utils/camp/proxyGuard.ts) i robi to PRZED pierwszym wyjsciem na zewnatrz.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { SpotifyAPI } from '@campnetwork/origin';
+import { guardCampRead } from '../../../utils/camp/proxyGuard';
 
 // Trasa czyta dane z zadania (nextUrl / naglowki), wiec nie da sie jej
 // prerenderowac. Bez tej deklaracji Next probuje ja wygenerowac statycznie
 // przy buildzie i zasmieca log stacktrace'ami DYNAMIC_SERVER_USAGE.
 export const dynamic = 'force-dynamic';
+
+// Straz czyta sesje przez node:crypto - na edge tego modulu nie ma.
+export const runtime = 'nodejs';
 
 interface SpotifyAPIResponse {
   isError: boolean;
@@ -34,12 +48,11 @@ interface SpotifyUserData {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.nextUrl);
-    const address = searchParams.get('address');
     const dataType = searchParams.get('type') || 'full'; // full, basic, analytics
 
-    if (!address) {
-      return NextResponse.json({ error: 'Address is required' }, { status: 400 });
-    }
+    const guard = guardCampRead(request, searchParams.get('address'));
+    if (!guard.ok) return guard.response;
+    const address = guard.address;
 
     // Initialize Spotify API with backend API key
     const apiKey = process.env.CAMP_API_KEY;
@@ -251,12 +264,15 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error fetching Spotify data:', error);
+    // Kod bledu odroznia awarie od "ten portfel nic nie podpial" - bez niego
+    // klient rysowal jedno i drugie tak samo, czyli pustka.
     return NextResponse.json(
-      { 
+      {
         success: false,
-        error: 'Failed to fetch Spotify data',
+        error: 'Camp Network did not answer for this wallet. This is a failure, not an empty profile.',
+        code: 'upstream_failed',
         message: error instanceof Error ? error.message : 'Unknown error'
-      }, 
+      },
       { status: 500 }
     );
   }

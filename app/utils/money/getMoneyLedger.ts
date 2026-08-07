@@ -16,6 +16,9 @@ import {
   type AskFunding,
   type TokenAmounts,
 } from '../asks/types';
+// monetization/types.ts to same typy i funkcje czyste (jedyny import: viem),
+// wiec nie lamie zasady z naglowka o nieciagnieciu tu firebase.ts.
+import { addressReadVariants } from '../monetization/types';
 
 /**
  * KSIEGA JEDNEGO CZLOWIEKA - wszystko, co przeszlo przez jego portfel TUTAJ.
@@ -197,23 +200,6 @@ export type MoneyLedger = {
 /*  ODCZYT                                                             */
 /* ------------------------------------------------------------------ */
 
-/**
- * Warianty zapisu adresu.
- *
- * `tips` zapisuje adres TAK, JAK PODAL GO PORTFEL - `saveTip`
- * (app/utils/firebase.ts) nie normalizuje niczego, wiec w kolekcji leza obok
- * siebie checksuma i male litery. `unlocks` wymusza male litery regula
- * Firestore, a `asks` dopuszcza oba. Pytanie o oba warianty kosztuje tyle samo
- * co o jeden - Firestore rozlicza ZWROCONE dokumenty - a chroni przed ksiega,
- * ktora cicho gubi polowe czyjejs historii. Ta sama ostroznosc co w
- * getProfile.ts i userStats.ts.
- */
-function addressVariants(address: string): string[] {
-  const trimmed = address.trim();
-  const lower = trimmed.toLowerCase();
-  return trimmed === lower ? [lower] : [trimmed, lower];
-}
-
 type RawRow = { id: string; data: Record<string, any> };
 type RawRead = { rows: RawRow[]; truncated: boolean; failed: boolean };
 
@@ -327,7 +313,23 @@ export async function getMoneyLedger(address: string): Promise<MoneyLedger> {
     };
   }
 
-  const variants = addressVariants(address);
+  /**
+   * WARSTWA ZGODNOSCI WSTECZNEJ, nie stan docelowy.
+   *
+   * `saveTip` normalizuje juz adresy do malych liter, ale w bazie leza rekordy
+   * SPRZED tej zmiany - sonda naliczyla 187 z 189 dokumentow w `tips` z adresem
+   * w checksumie. Dopoki ich ktos nie przepisze
+   * (scripts/migrateAddressCasing.mjs, NIEURUCHOMIONY), kazde zapytanie o
+   * historie musi pytac o obie postacie naraz.
+   *
+   * Wczesniej bylo to liczone tutaj jako `[wejscie, wejscie.toLowerCase()]`
+   * i miało cichą dziurę: gdy wolajacy podal adres juz malymi literami, lista
+   * skracala sie do jednej pozycji i WSZYSTKIE dokumenty w checksumie wypadaly
+   * bez sladu. Dzis ratuje nas tylko to, ze wagmi oddaje checksume. Wspolny
+   * `addressReadVariants` odtwarza obie postacie z samego adresu, wiec ksiega
+   * jest kompletna niezaleznie od tego, w jakiej pisowni adres tu przyszedl.
+   */
+  const variants = addressReadVariants(address);
   const db = getPublicDb();
 
   const [tipsIn, tipsOut, unlocksIn, unlocksOut, answers, asks] = await Promise.all([

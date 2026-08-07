@@ -194,7 +194,7 @@ Total Cross-Chain Activity: 1,931 transactions
 ```typescript
 // Camp Network statistics
 GET /api/camp-stats
-POST /api/camp-stats { address, connectedPlatforms }
+POST /api/camp-stats { address, connectedPlatforms }  // wymaga sesji SIWE
 
 // Wallet analysis
 GET /api/wallet-stats?address=${address}
@@ -202,6 +202,26 @@ GET /api/wallet-stats?address=${address}
 // Integration with Blockscout API
 GET https://camp.cloud.blockscout.com/api/v2/addresses/${contractAddress}/transactions
 ```
+
+#### Kto moze te trasy wolac
+
+Trzy trasy chodza do Campa NASZYM kluczem `CAMP_API_KEY`, wiec limit u Campa
+placimy my. Wpuszczaniem zajmuje sie `app/utils/camp/proxyGuard.ts`:
+
+| Trasa | Sesja SIWE | Reszta straznika |
+| --- | --- | --- |
+| `GET /api/camp/twitter` | nie wymagana | adres musi byc `0x` + 40 hex; 20 odczytow/min na IP, 60/min na podpisana sesje |
+| `GET /api/camp/spotify` | nie wymagana | jak wyzej |
+| `POST /api/camp-stats` | **wymagana** | adres w ciele musi rownac sie adresowi z sesji; 20 zapisow/min |
+
+Odczyt zostaje otwarty celowo: profile w `/basechat` sa publiczne i czytaja te
+trasy dla KAZDEGO ogladanego portfela, wiec sesja wygasilaby sekcje X i Spotify
+kazdemu niezalogowanemu gosciowi. Licznik tempa zyje w pamieci instancji, wiec
+jest progiem zwalniajacym, nie murem - mur to regula na brzegu (WAF).
+
+Kazda odmowa niesie zdanie po angielsku i kod (`address_required`,
+`invalid_address`, `rate_limited`, `session_required`, `address_mismatch`,
+`upstream_failed`, `save_failed`), zeby klient pokazal stan zamiast pustki.
 
 ### Firebase Tracking
 
@@ -293,14 +313,10 @@ const [transactionHash, setTransactionHash] = useState<string | null>(null);
 // Handles Camp Network post creation
 interface CreatePostBaseCampProps {
   onPostCreated?: () => Promise<void>;
-  setShowAIModal?: (show: boolean) => void;
-  aiGeneratedContent?: string;
-  onAiContentUsed?: () => void;
 }
 
 // Features:
 // - Media upload support (5MB limit)
-// - AI content generation integration
 // - Automatic blockchain interaction
 // - Firebase storage with network flag
 ```

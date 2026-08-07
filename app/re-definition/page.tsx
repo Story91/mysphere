@@ -414,12 +414,16 @@ function AskCard() {
           </div>
         </div>
       </article>
+      {/* Zdanie musi nadazac za produktem. Do dzis konczylo sie slowami "not in
+          the feed" - a feed ma juz pas otwartych Askow, wiec bylo klamstwem
+          postawionym tuz pod slowem "Drawing". Zastrzezenie o SAMYM RYSUNKU
+          zostaje: ta karta wciaz nie czyta ani jednego pola. */}
       <p className="mt-3 text-[11px] leading-[1.6] text-soft-ink-faint">
-        This card is still a drawing and reads nothing. Asks are real now, but they are on{' '}
+        This card is still a drawing and reads nothing. Real ones run on{' '}
         <a href="/asks" className="underline decoration-soft-line-strong underline-offset-2">
           /asks
         </a>{' '}
-        — not in the feed, and not here.
+        and open ones now show up in the feed — but not here.
       </p>
     </figure>
   );
@@ -437,9 +441,19 @@ function AskCard() {
  *
  * Escrow przeszlo z `planned` na `live` - kontrakt stoi na mainnecie i sciezka
  * zakladania go wola. Ale `planned` NIE zniknelo z tabeli i nie ma prawa
- * zniknac: zwrot po wygasnieciu istnieje w kontrakcie i NIE MA go w interfejsie,
- * a Ask dalej nie pokazuje sie w feedzie. Wpisanie escrow jako `live` przy
- * jednoczesnym skasowaniu tych dwoch wierszy zamienilo by ta tabele w reklame.
+ * zniknac: zwrot po wygasnieciu istnieje w kontrakcie i NIE MA go w interfejsie.
+ * Wpisanie escrow jako `live` przy jednoczesnym skasowaniu tego wiersza
+ * zamienilo by ta tabele w reklame.
+ *
+ * === "Ask: in the feed" PRZESZLO NA `live` I ZOSTAWILO PO SOBIE WIERSZ ===
+ * Feed ma pas otwartych Askow nad lista postow (app/basechat/components/
+ * FeedAskRail.tsx), wiec zdanie "Nothing about an Ask is visible in the feed
+ * yet" przestalo byc prawda i wiersz nie mogl przy nim zostac. Na zwolnione
+ * miejsce weszla NASTEPNA brakujaca rzecz na tej samej szynie, a nie pustka:
+ * z feedu wciaz nie da sie ODPOWIEDZIEC - przycisk karty wyprowadza na /asks,
+ * bo tam stoi panel odpowiedzi, przyjmowania i rozstrzygania. Bez tego drugiego
+ * wiersza tabela mowilaby "Ask jest w feedzie" i milczala o tym, ze feed
+ * pokazuje Aska, a nie pozwala go zajac.
  *
  * TA SAMA ZASADA PRZY x402. Wiersz "x402 payment rails / wired / enforcement
  * wlaczy sie, gdy ustawimy adres" jest juz nieprawda: adres jest ustawiony,
@@ -582,8 +596,13 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   },
   {
     name: 'Ask: in the feed',
+    status: 'live',
+    note: 'A strip above the posts carries up to four open asks — open, still before the deadline, still with a free seat — read once per five minutes and cached like the posts are, so scrolling the feed costs nothing extra. It is a strip, not a card sitting between two posts: an Ask counts down, and a countdown buried at position thirty-seven is a countdown nobody reaches. No resolve record is shown there — that is a query per author, and the card on /asks carries it.',
+  },
+  {
+    name: 'Ask: answering without leaving the feed',
     status: 'planned',
-    note: 'Asks live on their own page. Nothing about an Ask is visible in the feed yet.',
+    note: 'The nearest missing thing on this rail. The card in the feed carries the question, the budget, the seats and the countdown, but its button leaves for /asks — writing an answer, opening the sealed ones and resolving all happen there. You can see an Ask where you already are; you still cannot take a seat where you already are.',
   },
 ];
 
@@ -705,7 +724,7 @@ export default function ReDefinitionPage() {
                 },
                 {
                   t: 'Being built',
-                  d: 'Funding an Ask from the browser, on mainnet — the contract has only ever been driven from a script, on a test network. The Ask in the feed. Taking an expired budget back without calling the contract by hand. The same x402 route on Base in USDC — the branch is written, nothing has ever paid through it.',
+                  d: 'Funding an Ask from the browser, on mainnet — the contract has only ever been driven from a script, on a test network. Answering an Ask without leaving the feed: the feed shows open ones now, but the button walks you to /asks. Taking an expired budget back without calling the contract by hand. The same x402 route on Base in USDC — the branch is written, nothing has ever paid through it.',
                 },
                 {
                   t: 'Direction',
@@ -765,11 +784,12 @@ export default function ReDefinitionPage() {
         <section id="ask" className="scroll-mt-8 py-16">
           <Marker amount="$2.00" label="one seat, one answer" />
           <H2>The unit is not a post. It is an Ask.</H2>
-          <State tone="live">Runs on /asks — not in the feed</State>
+          <State tone="live">Runs on /asks — open ones also show in the feed</State>
           <P>
             An Ask is a question with a budget, a number of seats and a deadline. You set all three
-            and it appears as a card that counts down. It runs on its own page; the feed still does
-            not carry it.
+            and it appears as a card that counts down. It runs on its own page, and open ones now
+            sit in a strip above the feed — you can see one where you already are, though taking a
+            seat still means opening /asks.
           </P>
           <P>
             Answers stay <Hi>sealed until you resolve</Hi>. Nobody can read what anyone else wrote,

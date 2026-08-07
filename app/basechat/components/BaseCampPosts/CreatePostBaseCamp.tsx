@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import BanRestriction from '../../../admin/components/BanRestriction';
 import TransactionButtonBaseCamp from './TransactionButtonBaseCamp';
@@ -11,7 +11,6 @@ import { toast } from 'react-hot-toast';
 import { Avatar } from '../../../components/identity';
 import MusicSelector from '../MusicSelector';
 import SpotifyTrackCard from '../SpotifyTrackCard';
-import AIButton from '../AIButton';
 
 /**
  * Ksztalt utworu bierzemy wprost z sygnatury `createPost` - zmiana w bazie
@@ -21,12 +20,9 @@ type SpotifyTrack = NonNullable<Parameters<typeof createPost>[0]['musicTrack']>;
 
 interface CreatePostBaseCampProps {
   onPostCreated?: () => Promise<void>;
-  setShowAIModal?: (show: boolean) => void;
-  aiGeneratedContent?: string;
-  onAiContentUsed?: () => void;
 }
 
-export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGeneratedContent, onAiContentUsed }: CreatePostBaseCampProps) {
+export default function CreatePostBaseCamp({ onPostCreated }: CreatePostBaseCampProps) {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [postPreviewImage, setPostPreviewImage] = useState<string | null>(null);
@@ -36,17 +32,6 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { address } = useAccount();
-
-  // Update content when AI generates new content
-  useEffect(() => {
-    if (aiGeneratedContent) {
-      setContent(aiGeneratedContent);
-      // Call callback to clear the AI content after using it
-      if (onAiContentUsed) {
-        onAiContentUsed();
-      }
-    }
-  }, [aiGeneratedContent, onAiContentUsed]);
 
   // Handle file selection for media upload
   const handlePostFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,13 +181,6 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
     }
   };
 
-  const handleShowAIModal = () => {
-    // Use direct function call instead of CustomEvent
-    if (setShowAIModal) {
-      setShowAIModal(true);
-    }
-  };
-
   if (!address) {
     return null;
   }
@@ -330,8 +308,6 @@ export default function CreatePostBaseCamp({ onPostCreated, setShowAIModal, aiGe
                 {selectedMusic ? 'Change Track' : 'Spotify'}
               </span>
             </button>
-
-            <AIButton onClick={handleShowAIModal} disabled={isSaving} />
           </div>
           
           <div className="mt-3 flex justify-end">

@@ -1,12 +1,26 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Notification, NotificationType } from '../../utils/friends';
 import { useSocial } from './hooks';
 
 // ===============================================
 // 🔔 NOTIFICATIONS VIEW COMPONENT
 // ===============================================
+
+/**
+ * Trasy, ktore ten produkt NAPRAWDE serwuje.
+ *
+ * `actionUrl` bylo tu martwe: warunek `if (notification.actionUrl)` sprawdzal
+ * jego istnienie i nie uzywal go do niczego - klikniecie zawsze otwieralo
+ * profil nadawcy. Nie da sie jednak po prostu przechodzic pod kazdy
+ * `actionUrl`, bo czesc powiadomien wskazuje adresy, ktorych w app/ nie ma
+ * (/profile/{id}, /friends/requests, /achievements) - przeslanie tam
+ * zamienialoby dzialajacy panel profilu na 404. Wiec: przechodzimy tam, gdzie
+ * jest co pokazac, a dla reszty zostaje dotychczasowe zachowanie.
+ */
+const NAVIGABLE_ACTION_PREFIXES = ['/money', '/asks', '/post/', '/u/'];
 
 interface NotificationsViewProps {
   currentUserAddress: string;
@@ -27,6 +41,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     markAllNotificationsAsRead
   } = useSocial(currentUserAddress);
 
+  const router = useRouter();
   const [filterType, setFilterType] = useState<NotificationType | 'all'>('all');
   const [showOnlyUnread, setShowOnlyUnread] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
@@ -108,12 +123,16 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       await markNotificationAsRead(notification.id!);
     }
 
-    // Handle action URL or user click
-    if (notification.actionUrl) {
-      // For now, just handle user clicks
-      if (notification.fromUserId && onUserClick) {
-        onUserClick(notification.fromUserId);
-      }
+    const actionUrl = notification.actionUrl;
+    if (actionUrl && NAVIGABLE_ACTION_PREFIXES.some((prefix) => actionUrl.startsWith(prefix))) {
+      // Powiadomienie o pieniadzach prowadzi na /money, gdzie stoi przycisk
+      // odbioru - inaczej mowiloby "odbierz" i nie pokazywalo gdzie.
+      router.push(actionUrl);
+      return;
+    }
+
+    if (notification.fromUserId && onUserClick) {
+      onUserClick(notification.fromUserId);
     }
   };
 
@@ -177,7 +196,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   <option value="COMMENT">Comments</option>
                   <option value="FOLLOW">Follows</option>
                   <option value="FRIEND_REQUEST">Friend Requests</option>
-                  <option value="TIP_RECEIVED">Tips</option>
+                  {/* Ta polka to nie tylko napiwki - leza na niej takze
+                      wyplaty za przyjete odpowiedzi na Aski (notifyAskPayout). */}
+                  <option value="TIP_RECEIVED">Money</option>
                   <option value="SYSTEM">System</option>
             </select>
 

@@ -67,6 +67,22 @@ export type GlobalStats = {
   likesSince?: number | null;
   /** Od kiedy liczy `likesSince`. 0 = nie wiadomo. */
   likesSinceStartedAt?: number;
+  /**
+   * Stan poczatkowy lajkow: suma pola `posts.likes` policzona RAZ, serwerowo.
+   *
+   * Bez tego pola `likesSince` nigdy nie bedzie liczba calkowita - zaczyna od
+   * zera w chwili wlaczenia licznika i nie wie nic o cwierc milionie postow,
+   * ktore juz maja lajki. Zmierzone w bazie: dokument globalStats/current mial
+   * `likesSince: 6` i ZERO pola `likes`, czyli calkowitej liczby nie bylo
+   * z czego zlozyc.
+   *
+   * Liczy to scripts/countLikesBaseline.cjs (firebase-admin, poza limitami
+   * klienta). Skrypt przy zapisie ZERUJE `likesSince`, zeby lajki policzone
+   * w skanie nie zostaly doliczone drugi raz - patrz naglowek skryptu.
+   */
+  likesBaseline?: number | null;
+  /** Kiedy policzono `likesBaseline`. 0 = nie wiadomo. */
+  likesBaselineAt?: number;
   comments: number | null;
   tips: number | null;
   /** Kiedy policzono. 0 = nie wiadomo. */
@@ -104,6 +120,8 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
         likes: toCount(data.likes),
         likesSince: toCount(data.likesSince),
         likesSinceStartedAt: toMillis(data.likesSinceStartedAt),
+        likesBaseline: toCount(data.likesBaseline),
+        likesBaselineAt: toMillis(data.likesBaselineAt),
         comments: toCount(data.comments),
         tips: toCount(data.tips),
         measuredAt: toMillis(data.measuredAt),
@@ -122,14 +140,98 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
  * Nie zapisujemy czesciowych wynikow: jesli ktorakolwiek liczba nie doszla,
  * lepiej zostawic poprzedni pomiar w calosci, niz zmieszac swieze liczby ze
  * starymi w jednym dokumencie bez sladu, ktore sa ktore.
+ *
+ * === MERGE, I TO NIE JEST DROBIAZG ===
+ * Bylo tu `setDoc` BEZ `{ merge: true }`, czyli zapis PODMIENIAJACY caly
+ * dokument. Panel admina nie liczy lajkow (nie da sie ich policzyc agregacja),
+ * wiec w jego danych `likesSince` i `likesBaseline` w ogole nie wystepuja -
+ * a zapis bez merge KASOWAL oba. Kazde klikniecie "Policz" w /admin zerowalo
+ * licznik lajkow narastajacy od jego wlaczenia i skasowaloby stan poczatkowy
+ * policzony skryptem. Licznik przyrostowy, ktory kasuje go inny licznik, nie
+ * dojdzie do calkowitej liczby nigdy - to jest jedna z przyczyn, dla ktorych
+ * ta liczba nie pokazuje sie po raz trzeci.
+ *
+ * Merge nie psuje zasady wyzej: pola przekazane tutaj i tak nadpisuja stare
+ * w calosci, a `likes: null` dalej jawnie znaczy "nie zmierzono".
  */
 export async function saveGlobalStats(
   stats: Omit<GlobalStats, 'measuredAt'>
 ): Promise<void> {
-  await setDoc(doc(db, STATS_DOC, STATS_ID), {
-    ...stats,
-    measuredAt: serverTimestamp(),
-  });
+  await setDoc(
+    doc(db, STATS_DOC, STATS_ID),
+    {
+      ...stats,
+      measuredAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * Calkowita liczba lajkow zlozona z tego, co faktycznie wiemy.
+ *
+ * === DLACZEGO TO NIE JEST JEDNO POLE ===
+ * Lajki nie maja wlasnej kolekcji - siedza jako pole `likes` na postach, wiec
+ * ich policzenie to suma po 263 613 dokumentach, a agregacje w tym projekcie
+ * zwracaja RESOURCE_EXHAUSTED. Liczba calkowita powstaje wiec z dwoch czesci:
+ * jednorazowego stanu poczatkowego (`likesBaseline`, liczonego serwerowo) i
+ * licznika przyrostowego (`likesSince`, +1/-1 przy kazdym lajku).
+ *
+ * === CO ZWRACA `complete` ===
+ * Czy suma obejmuje CALA historie. Bez stanu poczatkowego mamy tylko lajki od
+ * wlaczenia licznika - to jest liczba prawdziwa, ale nie jest calkowita, wiec
+ * interfejs ma przy niej napisac, od kiedy liczy. Podanie jej jako calosci
+ * byloby dokladnie tym samym klamstwem co wpisane na sztywno 18 817.
+ *
+ * `value: null` znaczy "nie wiemy" i ma sie pokazac jako kreska, nie jako zero.
+ */
+export type LikesTotal = {
+  value: number | null;
+  complete: boolean;
+  /** Od kiedy liczy czesc przyrostowa. 0 = nie wiadomo. Ma sens przy `complete: false`. */
+  since: number;
+};
+
+export function likesTotal(stats: GlobalStats | null): LikesTotal {
+  if (!stats) return { value: null, complete: false, since: 0 };
+
+  // Pelna suma z agregacji, gdyby limit kiedys wrocil - wtedy nie ma co skladac.
+  if (stats.likes !== null && stats.likes !== undefined) {
+    return { value: stats.likes, complete: true, since: 0 };
+  }
+
+  const since = stats.likesSince ?? 0;
+
+  if (stats.likesBaseline !== null && stats.likesBaseline !== undefined) {
+    // Stan poczatkowy + przyrost od jego policzenia. Skrypt zerujacy
+    // `likesSince` przy zapisie stanu poczatkowego gwarantuje, ze te dwie
+    // czesci sie nie nakladaja.
+    return { value: stats.likesBaseline + since, complete: true, since: stats.likesBaselineAt ?? 0 };
+  }
+
+  // Zostal sam licznik przyrostowy. Zero jest tu prawdziwa odpowiedzia
+  // ("od wlaczenia licznika nikt nie polajkowal"), o ile pole w ogole jest.
+  if (stats.likesSince === null || stats.likesSince === undefined) {
+    return { value: null, complete: false, since: 0 };
+  }
+
+  return { value: since, complete: false, since: stats.likesSinceStartedAt ?? 0 };
+}
+
+/**
+ * Podpis pod liczba lajkow. Po angielsku, bo widzi go uzytkownik.
+ *
+ * Tekst powstaje TUTAJ, a nie w komponencie, bo to warstwa danych wie, czy
+ * liczba jest calkowita - a komponent dostaje gotowe zdanie i nie ma jak
+ * pokazac niepelnej sumy bez tego zastrzezenia.
+ */
+export function likesNote(total: LikesTotal): string | undefined {
+  if (total.value === null) return undefined; // Kreska mowi juz wszystko.
+  if (total.complete) return undefined;
+
+  if (!total.since) return 'partial count';
+  const date = new Date(total.since).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `since ${date}`;
 }
 
 /** Krotki, ludzki wiek pomiaru. */
