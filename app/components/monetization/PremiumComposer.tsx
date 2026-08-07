@@ -13,11 +13,22 @@ import { DEFAULT_UNLOCK_TOKEN, type MonetizationToken } from '../../utils/moneti
  * Domyslnie ZWINIETA. Wiekszosc postow nie jest platna, wiec pole nie moze
  * zabierac miejsca ani sugerowac, ze trzeba je wypelnic.
  *
- * OSTRZEZENIE DLA AUTORA jest tu celowo widoczne, a nie schowane w komentarzu
- * w kodzie: `premiumContent` trafia do dokumentu posta, ktory feed czyta
- * klienckim SDK Firestore. To zaslona platnicza, nie szyfrowanie - kto zajrzy
- * w odpowiedz sieciowa, zobaczy tresc bez placenia. Czlowiek zamykajacy tresc
- * musi to wiedziec ZANIM cos tam wklei.
+ * === OSTRZEZENIE DLA AUTORA ZMIENILO TRESC, BO ZMIENIL SIE KOD ===
+ * Stalo tu: "premiumContent trafia do dokumentu posta, ktory feed czyta
+ * klienckim SDK - kto zajrzy w odpowiedz sieciowa, zobaczy tresc bez
+ * placenia". Bylo to PRAWDA i bylo powaznym bledem: platna czesc lezala
+ * otwartym tekstem w publicznie czytelnej kolekcji `posts`.
+ *
+ * Od naprawy (app/basechat/page.tsx, sealPremiumContent) tresc nie trafia do
+ * dokumentu posta ANI RAZU. Idzie przez POST /api/premium do kolekcji
+ * `premiumContent`, ktora ma w regulach `allow read, write: if false` - czyli
+ * przegladarka nie ma tam wstepu wcale - i wydaje ja wylacznie GET
+ * /api/premium po sprawdzeniu wpisu w `unlocks`.
+ *
+ * CO ZOSTAJE PRAWDA I DLATEGO ZOSTAJE NAPISANE UZYTKOWNIKOWI: to nadal nie
+ * jest szyfrowanie. Kazdy, kto zaplaci, dostaje tekst i moze go skopiowac
+ * gdziekolwiek. Zaslona dziala na tych, ktorzy nie zaplacili - nie na tych,
+ * ktorzy zaplacili raz.
  */
 
 export interface PremiumComposerValue {
@@ -67,11 +78,24 @@ export default function PremiumComposer({
         {isOpen ? 'Remove paid section' : 'Add a paid section'}
       </button>
 
+      {/* ===== POMARANCZ TYLKO NA PIENIADZACH, NIE NA CALYM PANELU =====
+          Ten blok byl w calosci pomaranczowy: tlo bg-soft-accent-soft,
+          wszystkie obwodki border-soft-accent, KAZDA etykieta
+          text-soft-accent-deep. Wygladalo to jak zolta plama w bialym
+          kompozytorze i lamalo wlasna zasade systemu.
+
+          Zasada brzmi "pomaranczowy jest zarezerwowany dla pieniedzy" i ma
+          sens dokladnie tak dlugo, jak dlugo pomaranczowy jest RZADKI. Gdy
+          nosi go tlo, ramka i trzy napisy, przestaje cokolwiek znaczyc -
+          wzrok nie ma za czym isc.
+
+          Teraz panel jest zwyklym blokiem na lawendowym tle, a akcent zostaje
+          na jednej rzeczy: na cenie. To ona jest tu pieniedzmi. */}
       {isOpen && (
-        <div className="mt-2 rounded-card border border-soft-accent/50 bg-soft-accent-soft p-4 font-soft">
+        <div className="mt-2 rounded-card border border-soft-line bg-soft-bg p-4 font-soft">
           <label
             htmlFor={contentId}
-            className="mb-1.5 block font-soft-display text-xs font-semibold text-soft-accent-deep"
+            className="mb-1.5 block font-soft-display text-[11px] font-bold uppercase tracking-[0.08em] text-soft-ink-faint"
           >
             Paid part of this post
           </label>
@@ -82,14 +106,14 @@ export default function PremiumComposer({
             rows={3}
             disabled={disabled}
             placeholder="Only readers who pay will see this."
-            className="w-full resize-none rounded-2xl border border-soft-accent/60 bg-soft-surface px-3 py-2 text-sm text-soft-ink outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong placeholder:text-soft-ink-soft focus:border-soft-accent-deep focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="w-full resize-none rounded-2xl border border-soft-line bg-soft-surface px-3 py-2 text-sm text-soft-ink outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong placeholder:text-soft-ink-soft focus:border-soft-primary focus-visible:ring-2 focus-visible:ring-soft-primary"
           />
 
           <div className="mt-3 flex items-end gap-2">
             <div className="flex-1">
               <label
                 htmlFor={priceId}
-                className="mb-1.5 block font-soft-display text-xs font-semibold text-soft-accent-deep"
+                className="mb-1.5 block font-soft-display text-[11px] font-bold uppercase tracking-[0.08em] text-soft-accent-deep"
               >
                 Price
               </label>
@@ -102,7 +126,7 @@ export default function PremiumComposer({
                 value={value.unlockPrice}
                 onChange={(e) => onChange({ ...value, unlockPrice: e.target.value })}
                 disabled={disabled}
-                className="w-full rounded-2xl border border-soft-accent/60 bg-soft-surface px-3 py-2 font-soft-display text-sm tabular-nums text-soft-ink outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong focus:border-soft-accent-deep focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="w-full rounded-2xl border border-soft-line bg-soft-surface px-3 py-2 font-soft-display text-sm font-bold tabular-nums text-soft-accent-deep outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong focus:border-soft-accent focus-visible:ring-2 focus-visible:ring-soft-primary"
               />
             </div>
             <div className="flex gap-1 pb-0.5">
@@ -114,8 +138,8 @@ export default function PremiumComposer({
                   onClick={() => onChange({ ...value, unlockToken: token })}
                   className={`rounded-pill border px-3 py-2 font-soft-display text-xs font-semibold transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                     value.unlockToken === token
-                      ? 'border-soft-accent-deep bg-soft-surface text-soft-accent-deep'
-                      : 'border-soft-accent/50 text-soft-ink-muted hover:border-soft-accent'
+                      ? 'border-soft-primary bg-soft-surface text-soft-primary-deep'
+                      : 'border-soft-line text-soft-ink-muted hover:border-soft-primary/60'
                   }`}
                 >
                   {token}
@@ -132,16 +156,16 @@ export default function PremiumComposer({
 
           {/* Ostrzezenie widoczne, nie ukryte. Autor podejmuje decyzje
               o zamknieciu tresci i musi wiedziec, czym ta zaslona naprawde jest. */}
-          <p className="mt-3 border-t border-soft-accent/40 pt-2 text-[11px] leading-relaxed text-soft-accent-deep/85">
-            This puts the text behind a payment, but it does not encrypt it. Anyone
-            technical enough to read the page&apos;s network response can see it without
-            paying. Do not put anything here you could not afford to have public.
+          <p className="mt-3 border-t border-soft-line pt-2 text-[11px] leading-relaxed text-soft-ink-soft">
+            This text is stored where the app cannot read it and is only handed out
+            after someone pays. It is not encrypted, though: anyone who pays once can
+            copy it anywhere. Price what a stranger reposting it would cost you.
           </p>
 
           {/* ETH jest weryfikowane slabiej niz USDC - powiedz to wprost,
               zamiast pozwolic autorowi odkryc to pozniej. */}
           {value.unlockToken === 'ETH' && (
-            <p className="mt-2 text-[11px] leading-relaxed text-soft-accent-deep/85">
+            <p className="mt-2 text-[11px] leading-relaxed text-soft-ink-soft">
               Payments in ETH from smart wallets can only be confirmed as
               &ldquo;succeeded&rdquo;, not matched to an exact amount. USDC is verified
               precisely.

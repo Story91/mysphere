@@ -1048,15 +1048,82 @@ function BaseChatContent() {
   // dolozenie kolejnego wariantu nie oznacza kolejnej kopii.
   // ---------------------------------------------------------------------------
 
-  // Pola platnej czesci ZAPISYWANE do Firestore. Puste, gdy autor nic nie wpisal,
-  // wiec post wyglada dokladnie tak jak przed monetyzacja.
-  const buildPremiumWriteFields = () => {
-    if (!isPremiumOpen || !premium.premiumContent.trim()) return {};
-    return {
-      premiumContent: premium.premiumContent.trim(),
-      unlockPrice: premium.unlockPrice,
-      unlockToken: premium.unlockToken,
-    };
+  /**
+   * === PLATNA TRESC NIE IDZIE JUZ DO DOKUMENTU POSTA ===
+   *
+   * Ta funkcja zwracala `premiumContent` razem z cena, a wynik trafial prosto
+   * do `createPost`. Kolekcja `posts` jest CZYTELNA DLA WSZYSTKICH, wiec
+   * platna tresc lezala tam otwartym tekstem - wystarczylo otworzyc konsole
+   * przegladarki, zeby przeczytac ja bez placenia. Paywall byl zaslona na
+   * danych, ktore i tak sa jawne.
+   *
+   * Trasa, ktora robi to poprawnie, ISTNIALA PRZEZ CALY CZAS i nie miala ANI
+   * JEDNEGO WYWOLANIA: POST /api/premium zapisuje tresc do kolekcji
+   * `premiumContent` (reguly: `allow read, write: if false`, czyli klient nie
+   * ma tam wstepu wcale), a dopiero potem oznacza post jako platny i KASUJE
+   * jawne pole z dokumentu.
+   *
+   * Dlatego tutaj nie zostaje nic. Znacznik `hasPremium` i cene ustawia
+   * serwer - PO udanym zapisie tresci. Odwrotna kolejnosc dawalaby paywall
+   * nad pustka: cena jest, tresci nie ma.
+   *
+   * Zostawiam funkcje zamiast usuwac jej wywolania: trzy sciezki tworzenia
+   * posta rozjechalyby sie przy nastepnej zmianie, a tak dalej maja jeden
+   * wspolny punkt.
+   */
+  const buildPremiumWriteFields = () => ({});
+
+  /** Czy autor faktycznie wpisal platna czesc. */
+  const hasPremiumDraft = () => isPremiumOpen && premium.premiumContent.trim().length > 0;
+
+  /**
+   * Zapieczetowanie platnej tresci PO powstaniu posta.
+   *
+   * Wymaga sesji SIWE - trasa sprawdza, czy pieczetujacy jest autorem posta,
+   * a bez podpisu kazdy moglby dokleic platna tresc do cudzego wpisu.
+   *
+   * AWARIA NIE MOZE BYC CICHA. Post juz istnieje i jest publiczny; jesli
+   * pieczetowanie padnie, autor MUSI sie dowiedziec, ze jego platna czesc nie
+   * zostala zapisana - inaczej bedzie przekonany, ze sprzedaje cos, czego
+   * w bazie nie ma.
+   */
+  const sealPremiumContent = async (postId: string) => {
+    if (!hasPremiumDraft() || !postId || postId.startsWith('temp-')) return;
+
+    try {
+      const response = await fetch('/api/premium', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId,
+          content: premium.premiumContent.trim(),
+          unlockPrice: premium.unlockPrice,
+          unlockToken: premium.unlockToken,
+        }),
+      });
+
+      if (response.ok) return;
+
+      const data = await response.json().catch(() => ({}));
+
+      // Brak sesji to jedyny blad, ktory autor moze naprawic sam i od razu.
+      if (response.status === 401) {
+        toast.error(
+          'Your post is up, but the paid part needs your signature. Sign in and add it again.'
+        );
+        return;
+      }
+
+      console.error('[premium] nie udalo sie zapieczetowac tresci:', data);
+      toast.error(
+        data?.error === 'Premium content storage is not configured on this deployment.'
+          ? 'Your post is up, but paid content is switched off on this deployment. Nothing was hidden.'
+          : 'Your post is up, but the paid part did not save. It is not for sale yet.'
+      );
+    } catch (error) {
+      console.error('[premium] blad sieci przy pieczetowaniu:', error);
+      toast.error('Your post is up, but the paid part did not save. Check your connection.');
+    }
   };
 
   // Pola platnej czesci pokazywane OPTYMISTYCZNIE: znacznik i cena, bez tresci.
@@ -1214,6 +1281,11 @@ function BaseChatContent() {
         // To samo w cache - inaczej po odswiezeniu strony zostawalby wpis
         // z ID "temp-...", ktory wyglada jak post, ale prowadzi donikad.
         replacePostIdInCache(tempPostId, realPostId);
+
+        // Platna czesc DOPIERO TERAZ - trasa sprawdza autorstwo po prawdziwym
+        // dokumencie, wiec musi istniec. Celowo bez `await`: post jest juz
+        // widoczny, a pieczetowanie ma wlasny komunikat bledu.
+        void sealPremiumContent(realPostId);
       }).catch((error) => {
         console.error('Error saving post to Firebase:', error);
         // W przypadku błędu, usuń optimistic post - RAZEM z cache'em, inaczej
@@ -1500,6 +1572,10 @@ function BaseChatContent() {
       const zoraPostId = await createPost(postDataForFirebase);
       console.log("Post saved to Firebase.");
 
+      // Platna czesc idzie do zapieczetowanej kolekcji, nie do dokumentu posta -
+      // patrz sealPremiumContent. Bez `await`, zeby nie opozniac odswiezenia listy.
+      void sealPremiumContent(zoraPostId);
+
       // Dopisujemy post do zapisanych list zamiast kasowac caly cache.
       // Kasowanie dzialalo, ale kazalo potem pobrac WSZYSTKIE listy od nowa -
       // czyli placilismy pelnym przeladowaniem feedu za jeden post, ktorego
@@ -1563,7 +1639,7 @@ function BaseChatContent() {
           const { tags, mentions } = extractTagsAndMentions(newPost);
 
           // Create regular post without token
-          await createPost({
+          const fallbackPostId = await createPost({
             author: address,
             content: newPost,
             ...buildPremiumWriteFields(),
@@ -1576,6 +1652,12 @@ function BaseChatContent() {
             network: 'base', // Identify as a Base network post without token
             musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór do fallback post
           });
+
+          // TA SCIEZKA TEZ PIECZETUJE. Jest ratunkiem po nieudanym tworzeniu
+          // monety, ale platna czesc autora nie ma z tym nic wspolnego -
+          // pominiecie jej tutaj gubiloby ja po cichu dokladnie wtedy, gdy
+          // cos juz poszlo nie tak.
+          await sealPremiumContent(fallbackPostId);
 
           // Update UI
           toast.success('Post created successfully!', { id: toastId });

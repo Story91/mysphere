@@ -48,10 +48,49 @@ const DEFAULT_ASK_POST_PRICE = '$0.01';
  *    klucza zwraca "Unauthorized" (sprawdzone). Potrzebna jest paczka
  *    @coinbase/x402, ktorej w package.json jeszcze nie ma.
  *
- * 2. ROBINHOOD CHAIN (eip155:4663) - facilitator VLED, USDG, gasless:
- *      X402_FACILITATOR_URL=<endpoint VLED>
+ * 2. ROBINHOOD CHAIN (eip155:4663) - USDG, bez gazu po stronie placacego:
+ *      X402_FACILITATOR_URL=https://x402.primer.systems
  *      X402_NETWORK=eip155:4663
- *    Ten dziala BEZ klucza i BEZ nowej zaleznosci - stad ASK_ASSETS ponizej.
+ *    Dziala BEZ klucza i BEZ nowej zaleznosci - stad ASK_ASSETS ponizej.
+ *
+ *    === DLACZEGO PRIMER, A NIE VLED (stal tu wczesniej placeholder) ===
+ *    Ten komentarz mowil "facilitator VLED" i zostawial <endpoint VLED> do
+ *    wpisania. VLED ISTNIEJE (facilitator.vledx402.tech) i jest zbudowany
+ *    dokladnie pod nasze USDG - ale WPISANIE GO ZEPSULOBY KAZDA PLATNOSC:
+ *
+ *      VLED /supported deklaruje:  x402Version 1, network "robinhood"
+ *      nasz kod prosi o:           x402Version 2, network "eip155:4663"
+ *
+ *    Mamy @x402/core 2.21, a route.ts rejestruje schemat pod CAIP-2
+ *    z getAskNetwork(). Nie ma czesci wspolnej - agent dostawalby blad
+ *    facilitatora zamiast uczciwego 402. Do tego sygnatariusz VLED
+ *    (0x735b9A0b...) mial przy sprawdzeniu 0,000087 ETH gazu, czyli tyle,
+ *    ile trzeba, zeby przestac dzialac w srodku dnia.
+ *
+ *    Odrzucony zostal takze facilitator.naven.network: jego /supported
+ *    wyglada IDEALNIE (x402Version 2, eip155:4663, bez klucza), ale POST
+ *    /verify zwraca HTTP 500 na KAZDE wejscie, lacznie z pustym obiektem.
+ *    Resource server wola verify przed settle, wiec to dyskwalifikuje.
+ *    Samo /supported nie jest dowodem - trzeba zawolac /verify.
+ *
+ *    Primer sprawdzony realnym POST /verify: przechodzi walidacje sieci
+ *    ORAZ aktywa (nasze USDG) i dociera do odtwarzania podpisu ECDSA.
+ *    /stats podaje 27 466 rozliczonych platnosci, wiec to dzialajacy produkt.
+ *
+ *    UWAGA NA TOKEN "PR": strona Primera podaje dla tej sieci adres
+ *    0x235767cc3d01ec18B5db87973975AC8616b2A153. To ICH wlasny token (symbol
+ *    odczytany z lancucha: "PR"), NIE USDG. Nie wpisywac go do ASK_ASSETS.
+ *
+ *    CZEGO NIE SPRAWDZONO: pelnej platnosci koniec-koncem. Potwierdzone sa
+ *    deklaracja sieci, prawdziwosc jej walidacji, akceptacja USDG i dotarcie
+ *    do weryfikacji podpisu. Realnego `settle` nie da sie sprawdzic bez
+ *    prawdziwego podpisu i USDG w portfelu. ZANIM OGLOSIMY TO NA STRONIE
+ *    PRODUKTU, trzeba puscic jedna platnosc na 0,01 USDG.
+ *
+ *    Domena EIP-712 dla USDG (potrzebna do podpisu, odtworzona z
+ *    DOMAIN_SEPARATOR, bo eip712Domain() na tym kontrakcie rewertuje):
+ *      name="Global Dollar", version="1", chainId=4663,
+ *      verifyingContract=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
  */
 const DEFAULT_ASK_NETWORK = 'eip155:84532';
 

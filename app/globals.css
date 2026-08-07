@@ -647,6 +647,23 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Prog `lg` z tailwind.config.ts (922px, nie 1024px). Ekran powitalny bierze
+   tu cala wysokosc pola pod nawigacja, wiec scena rosnie razem z nim - diagram
+   wielkosci znaczka w polu wysokim na caly ekran po prostu ginie.
+
+   TE DWIE LICZBY SA ZWIAZANE Z WYMIARAMI W SoftSignInHero.tsx i nie wolno
+   zmieniac ich osobno:
+     --rail-len = promien kola prowadzacego = 256px / 2
+     --coin-in  = promien tarczy (104px / 2) - promien monety (5px) - 1px luzu
+   Rozjechanie pierwszej wysadza monety obok znakow sieci, drugiej - zostawia
+   monete wystajaca spod tarczy w chwili, ktora ma znaczyc "rozliczone". */
+@media (min-width: 922px) {
+  .soft-settle-stage {
+    --rail-len: 128px;
+    --coin-in: 46px; /* tarcza r=52, moneta r=5 */
+  }
+}
+
 /* Ramie przewodu. Wysokosc 0 i transform-origin na lewej krawedzi, wiec obrot
    odbywa sie dokladnie wokol srodka sceny. */
 .soft-wire {

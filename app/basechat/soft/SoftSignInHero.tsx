@@ -83,8 +83,30 @@ export default function SoftSignInHero({
   statusMessage?: string | null;
   signedInAs?: string | null;
 }) {
+  // ===== NA DESKTOPIE SEKCJA ZAJMUJE CALE POLE POD NAWIGACJA =====
+  // Byla wysoka na tyle, ile mierzyla jej tresc - okolo 300px - i siedziala
+  // u gory kolumny wysokiej na caly ekran. Reszta byla pustym lawendowym tlem,
+  // przez co ekran powitalny wygladal na splaszczony pasek, a nie na pierwszy
+  // ekran produktu.
+  //
+  // `lg:min-h-full` dziala tu BEZ ZGADYWANIA WYSOKOSCI NAWIGACJI: powloka pod
+  // paskiem ma `h-screen` (basechat/page.tsx), a kolumna glowna jest jej
+  // dzieckiem z `flex-1`, wiec ma wysokosc definitywna. Procent liczy sie od
+  // jej pola tresci, czyli juz po odjeciu `lg:pt-6 lg:pb-24`. Zadnego
+  // calc(100vh - 4.5rem), ktore rozjezdza sie przy kazdej zmianie paska.
+  //
+  // Do tego `lg:flex lg:items-center`: przy wyzszej sekcji tresc ma stac
+  // w pionowym srodku, a nie przykleic sie do gornej krawedzi.
+  //
+  // Scena rozliczen rosnie na `lg` proporcjonalnie (320px zamiast 236px),
+  // bo diagram wielkosci znaczka w polu wysokim na caly ekran ginie.
+  // Wymiary sceny, kola prowadzacego, tarczy i znakow sieci MUSZA zmieniac sie
+  // razem z `--rail-len` i `--coin-in` w globals.css - inaczej monety jada
+  // obok znakow albo wystaja spod tarczy.
+  //
+  // NA TELEFONIE BEZ ZMIAN - wszystkie nowe klasy sa za prefiksem `lg`.
   return (
-    <section className="relative overflow-hidden rounded-card bg-gradient-to-b from-[#8E7BE8] via-[#7C6BDA] to-[#6656BE] px-6 py-10 text-center font-soft lg:px-12 lg:py-14 lg:text-left">
+    <section className="relative overflow-hidden rounded-card bg-gradient-to-b from-[#8E7BE8] via-[#7C6BDA] to-[#6656BE] px-6 py-10 text-center font-soft lg:flex lg:min-h-full lg:items-center lg:px-12 lg:py-14 lg:text-left">
       {/* ===== UKLAD NA DESKTOPIE: OBOK SIEBIE, NIE POD SOBA =====
           Ten ekran renderuje sie teraz na PELNEJ szerokosci kolumny glownej
           (patrz basechat/page.tsx, "EKRAN POWITALNY: NAD FEEDEM I POZA JEGO
@@ -111,12 +133,12 @@ export default function SoftSignInHero({
           zasade, ktora ten plik trzyma przy liczbie wezlow (patrz STEP). */}
       <div
         aria-hidden="true"
-        className="soft-settle-stage soft-hero-rise relative mx-auto mb-7 h-[200px] w-[200px] sm:h-[236px] sm:w-[236px] lg:mb-0 lg:flex-none"
+        className="soft-settle-stage soft-hero-rise relative mx-auto mb-7 h-[200px] w-[200px] sm:h-[236px] sm:w-[236px] lg:mb-0 lg:h-[320px] lg:w-[320px] lg:flex-none"
         style={{ ['--settle-count' as string]: SOFT_NETWORKS.length }}
       >
         {/* Okrag sadzajacy wezly na jednym promieniu. Ledwo widoczny - ma
             trzymac uklad, a nie rywalizowac z przewodami. */}
-        <span className="absolute left-1/2 top-1/2 h-[160px] w-[160px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15 sm:h-[188px] sm:w-[188px]" />
+        <span className="absolute left-1/2 top-1/2 h-[160px] w-[160px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15 sm:h-[188px] sm:w-[188px] lg:h-[256px] lg:w-[256px]" />
 
         {/* Przewody. Kazdy to jedno ramie obrocone o wlasny kat: linia,
             moneta jadaca do srodka i znak sieci na koncu. */}
@@ -149,7 +171,7 @@ export default function SoftSignInHero({
               {/* Znak sieci odkreca sie o wlasny kat orbity - inaczej lezalby
                   na boku po lewej stronie kola. */}
               <span
-                className="absolute left-full top-0 flex h-[26px] w-[26px] items-center justify-center rounded-[9px] bg-white/95 shadow-chip sm:h-[30px] sm:w-[30px]"
+                className="absolute left-full top-0 flex h-[26px] w-[26px] items-center justify-center rounded-[9px] bg-white/95 shadow-chip sm:h-[30px] sm:w-[30px] lg:h-[40px] lg:w-[40px] lg:rounded-[12px]"
                 style={{ transform: `translate(-50%, -50%) rotate(${-deg}deg)` }}
               >
                 <Image
@@ -157,7 +179,7 @@ export default function SoftSignInHero({
                   alt=""
                   width={17}
                   height={17}
-                  className="h-[15px] w-[15px] object-contain sm:h-[17px] sm:w-[17px]"
+                  className="h-[15px] w-[15px] object-contain sm:h-[17px] sm:w-[17px] lg:h-[23px] lg:w-[23px]"
                 />
               </span>
             </span>
@@ -167,17 +189,17 @@ export default function SoftSignInHero({
         {/* Blysk rozliczenia. Okres rowny odstepowi miedzy przyjazdami,
             opoznienie rowne czasowi przejazdu - blyska dokladnie wtedy, gdy
             moneta wchodzi pod znak marki. */}
-        <span className="soft-settle-ring absolute left-1/2 top-1/2 h-[74px] w-[74px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-soft-accent sm:h-[86px] sm:w-[86px]" />
+        <span className="soft-settle-ring absolute left-1/2 top-1/2 h-[74px] w-[74px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-soft-accent sm:h-[86px] sm:w-[86px] lg:h-[118px] lg:w-[118px]" />
 
         {/* Znak marki. Rysowany na koncu, wiec moneta znika POD nim -
             to jest ten moment, w ktorym platnosc wchodzi do feedu. */}
-        <span className="absolute left-1/2 top-1/2 flex h-[66px] w-[66px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-[0_10px_28px_rgba(50,36,110,0.38)] sm:h-[76px] sm:w-[76px]">
+        <span className="absolute left-1/2 top-1/2 flex h-[66px] w-[66px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-[0_10px_28px_rgba(50,36,110,0.38)] sm:h-[76px] sm:w-[76px] lg:h-[104px] lg:w-[104px]">
           <Image
             src="/android-chrome-192x192.png"
             alt=""
             width={46}
             height={46}
-            className="h-[40px] w-[40px] rounded-full object-contain sm:h-[46px] sm:w-[46px]"
+            className="h-[40px] w-[40px] rounded-full object-contain sm:h-[46px] sm:w-[46px] lg:h-[64px] lg:w-[64px]"
             priority
           />
         </span>
