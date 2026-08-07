@@ -169,9 +169,15 @@ export async function getAskAuthorStats(address: string): Promise<AuthorStatsRes
       abandoned++;
     } else {
       open++;
-      // Budzet trwajacego Aska to OBIETNICA. Nic go nie blokuje - nie ma
-      // escrow (patrz naglowek types.ts) - wiec nie wolno tego liczyc jako
-      // wydatku ani nazywac "zablokowane".
+      // Budzet trwajacego Aska nie jest wydatkiem - jeszcze nikomu nie zaplacil.
+      //
+      // Ten worek MIESZA oba warianty finansowania i dlatego nazywa sie
+      // `committed`, a nie "locked". Przy `funding: 'escrowed'` budzet naprawde
+      // lezy na kontrakcie, ale przy 'on-resolve' nie blokuje go NIC i zostaje
+      // sama obietnica. Skoro jedna liczba opisuje oba przypadki, musi byc
+      // opisana slabszym z nich: NIE WOLNO pokazac tego jako "zablokowane".
+      // Zeby uczciwie napisac "locked", trzeba by rozbic to na dwie pozycje po
+      // `data.funding` - pole jest tutaj dostepne, robota nie jest zrobiona.
       addTokenAmount(committed, token, budget);
     }
 

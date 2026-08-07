@@ -503,12 +503,17 @@ export async function isAgentTrusted(
 
 /** Statystyki rejestru. Liczniki serwerowe - nie sciagaja dokumentow. */
 export async function getRegistryStats(): Promise<AgentRegistryStats> {
-  const empty: AgentRegistryStats = {
-    totalAgents: 0,
-    totalFeedback: 0,
+  // NIE ZMIERZONO. Bylo tu piec zer i nazywalo sie `empty` - a zwracamy to
+  // takze wtedy, gdy odczyt PADL. Panel napisalby wiec "0 agents" w chwili,
+  // gdy agentow sa setki, i nikt by sie nie dowiedzial, ze cokolwiek nie
+  // zadzialalo. Dzis agregacje na tym projekcie faktycznie odmawiaja
+  // (RESOURCE_EXHAUSTED), wiec to nie jest hipoteza.
+  const unmeasured: AgentRegistryStats = {
+    totalAgents: null,
+    totalFeedback: null,
     totalChains: SUPPORTED_AGENT_CHAINS.length,
-    trustedAgents: 0,
-    trustedPercent: 0,
+    trustedAgents: null,
+    trustedPercent: null,
   };
 
   try {
@@ -518,7 +523,10 @@ export async function getRegistryStats(): Promise<AgentRegistryStats> {
     ]);
 
     const totalAgents = agentsCount.data().count;
-    if (totalAgents === 0) return empty;
+    // PRAWDZIWE zero - policzone, nie zgadniete. Dlatego liczby, a nie null.
+    if (totalAgents === 0) {
+      return { ...unmeasured, totalAgents: 0, totalFeedback: 0, trustedAgents: 0, trustedPercent: 0 };
+    }
 
     // Zaufanie jest zdenormalizowane na dokumencie agenta, wiec da sie je
     // policzyc jednym zapytaniem po jednym polu (indeks automatyczny).
@@ -536,7 +544,7 @@ export async function getRegistryStats(): Promise<AgentRegistryStats> {
     };
   } catch (error) {
     warnOnce('nie udalo sie pobrac statystyk rejestru', error);
-    return empty;
+    return unmeasured;
   }
 }
 

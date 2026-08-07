@@ -27,10 +27,13 @@ import {
  * wylacznie sukcesy.
  *
  * === CZEGO KARTA NIE OBIECUJE ===
- * 1. ESCROW NIE ISTNIEJE. `funding: 'on-resolve'` znaczy, ze autor placi
- *    dopiero przy rozstrzygnieciu - budzet nie lezy nigdzie zablokowany.
- *    Karta mowi to wprost, zamiast pozwolic czytelnikowi zalozyc, ze pieniadze
- *    juz czekaja. Uzasadnienie przy typie AskFunding w utils/asks/types.ts.
+ * 1. ESCROW NIE JEST DOMYSLNY. Kontrakt AskEscrow istnieje i stoi na mainnecie,
+ *    ale `funding` jest wyborem POJEDYNCZEGO Aska. Przy `'on-resolve'` autor
+ *    placi dopiero przy rozstrzygnieciu i budzet nie lezy nigdzie zablokowany.
+ *    Karta czyta to pole i mowi wprost, ktory to wariant, zamiast pozwolic
+ *    czytelnikowi zalozyc, ze pieniadze juz czekaja. Zdania dla obu wariantow
+ *    sa nizej (sekcja `funding`) i NIE WOLNO ich zamienic miejscami.
+ *    Uzasadnienie przy typie AskFunding w utils/asks/types.ts.
  * 2. TRESCI ODPOWIEDZI NIE MA. Pokazujemy `answerCount` - sama LICZBE.
  *    Zapieczetowanie jest realizowane w warstwie danych (osobna kolekcja poza
  *    zasiegiem klienta), nie zaslona w UI.
@@ -41,6 +44,15 @@ import {
  * Przycisk pojawia sie tylko wtedy, gdy wolajacy da `onAnswer` albo `href`.
  * Karta nie wymysla sobie celu linku - martwy przycisk "Answer", ktory nigdzie
  * nie prowadzi, jest gorszy niz jego brak.
+ *
+ * `isAuthor` zmienia sens tego przycisku, bo dla autora znaczy on co innego:
+ * autor NIE MOZE odpowiedziec na wlasnego Aska (POST /api/asks/answers odrzuca
+ * to z 403), za to jako jedyny moze otworzyc zapieczetowane odpowiedzi i je
+ * przyjac. Napis "Answer" na jego karcie prowadzilby prosto w odmowe.
+ *
+ * Z tego samego powodu autor ma dzialajacy przycisk takze PO TERMINIE: naplyw
+ * odpowiedzi jest wtedy zamkniety, ale zaplacenie z opoznieniem wciaz jest
+ * lepsze niz niezaplacenie wcale (patrz POST /api/asks/[id]/accept).
  */
 
 const SECOND = 1000;
@@ -138,6 +150,8 @@ export type AskCardProps = {
   /** Akcja przycisku. Bez niej (i bez `href`) karta przycisku nie rysuje. */
   onAnswer?: (ask: Ask) => void;
   href?: string;
+  /** Czy patrzacy jest autorem tego Aska. Zmienia napis i zakres przycisku. */
+  isAuthor?: boolean;
   className?: string;
 };
 
@@ -147,6 +161,7 @@ export default function AskCard({
   resolveRate,
   onAnswer,
   href,
+  isAuthor = false,
   className = '',
 }: AskCardProps) {
   const now = useNow(ask.deadline, ask.status === 'open');
@@ -199,8 +214,19 @@ export default function AskCard({
           ? `${plural(ask.answerCount, 'answer')} still sealed, nothing resolved`
           : `${plural(ask.answerCount, 'answer')} sealed until resolve`;
 
-  const actionLabel =
-    view === 'open' ? 'Answer' : view === 'resolved' ? 'See answers' : 'Answering closed';
+  const actionLabel = isAuthor
+    ? view === 'resolved'
+      ? 'See answers'
+      : 'Review answers'
+    : view === 'open'
+      ? 'Answer'
+      : view === 'resolved'
+        ? 'See answers'
+        : 'Answering closed';
+
+  /** Po terminie przycisk zostaje zywy TYLKO dla autora - patrz naglowek. */
+  const actionDisabled = view === 'expired' && !isAuthor;
+
   const actionClass =
     'inline-flex shrink-0 items-center justify-center rounded-lg px-3.5 py-1.5 font-soft-display text-[12px] font-semibold transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface';
 
@@ -245,19 +271,41 @@ export default function AskCard({
         </div>
 
         {/*
-          Zdanie o pieniadzach. NIE WOLNO go skrocic do "funded" - budzet nie
-          lezy nigdzie zablokowany, dopoki nie ma kontraktu escrow.
+          Zdanie o pieniadzach. Musi wynikac z `funding` i z niczego innego.
+          Przy 'escrowed' NIE WOLNO napisac "paid out": resolve() na kontrakcie
+          przypisuje salda, a tokeny wychodza dopiero przy claim() po stronie
+          odpowiadajacego (patrz naglowek contracts/AskEscrow.sol). Przy
+          'on-resolve' nie wolno uzyc slowa escrow w ogole - tam nic nie lezy.
         */}
         <p className="mt-3 break-words text-[11.5px] leading-[1.5] text-soft-ink-faint">
-          {ask.funding === 'escrowed'
-            ? `Held in escrow, paid out on ${ask.network}.`
-            : `Not held in escrow: the author pays each accepted answer on ${ask.network} when they resolve.`}
+          {ask.funding === 'escrowed' ? (
+            <>
+              {view === 'resolved'
+                ? `Awarded from escrow on ${ask.network}. Each accepted answer collects its share from the contract.`
+                : `The whole budget is locked in an escrow contract on ${ask.network}, out of the author's reach.`}
+              {ask.escrowTxHash && (
+                <>
+                  {' '}
+                  <a
+                    href={`https://basescan.org/tx/${ask.escrowTxHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  >
+                    Check the deposit
+                  </a>
+                </>
+              )}
+            </>
+          ) : (
+            `Not held in escrow: the author pays each accepted answer on ${ask.network} when they resolve.`
+          )}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-soft-line/70 pt-4">
           <span className="min-w-0 break-words text-[12px] text-soft-ink-faint">{answers}</span>
 
-          {view === 'expired' ? (
+          {actionDisabled ? (
             // Wylaczony przycisk, a nie brak przycisku: to informacja o stanie,
             // wiec ma zostac widoczna w tym samym miejscu co akcja.
             <button

@@ -712,16 +712,29 @@ tym samym adresem.
 
 ## 7. Co dalej
 
-### 7.1. Ask jako realna funkcja
-Model danych już jest (`app/utils/asks/types.ts`, `asks.ts`): pytanie, budżet, miejsca, termin,
-liczniki, resolve rate. **Nie ma jeszcze** backendu — `POST /api/asks` z dwiema ścieżkami płatności,
-zapieczętowane odpowiedzi i wypłata USDC są przed nami.
+### 7.1. Ask jako realna funkcja — pętla domknięta
+Model danych (`app/utils/asks/types.ts`, `asks.ts`): pytanie, budżet, miejsca, termin, liczniki,
+resolve rate. Domknięte jest też wszystko wokół: kompozytor, zapieczętowane odpowiedzi, przyjmowanie
+(`/api/asks/[id]/accept`, które **sprawdza hash na łańcuchu**, a nie wierzy klientowi na słowo)
+i rozstrzygnięcie (`/api/asks/[id]/resolve`). Wszystko na `/asks`. **Czego dalej nie ma:** Aska
+w feedzie.
 
-### 7.2. Escrow **nie istnieje** i nie udajemy, że jest
-Manifest mówi *„fund it once in USDC"*, czyli środki blokują się przy zakładaniu. W repo nie ma
-kontraktu escrow, a napisanie go to Solidity, wdrożenie i środki właściciela. **Pierwsza wersja płaci
-przy rozstrzygnięciu**, a pole w modelu danych mówi wprost, który to wariant — żeby interfejs nie mógł
-obiecać czegoś, czego nie ma.
+### 7.2. Escrow **istnieje** — i dokładnie tyle, ile istnieje
+Manifest mówił *„fund it once in USDC"* w czasie teraźniejszym, kiedy kontraktu nie było. Teraz jest:
+`AskEscrow` na Base mainnet, `0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340`, źródło zweryfikowane,
+bez `owner`, bez pauzy, bez upgrade'u i bez funkcji ratunkowej. Ścieżka zakładania blokuje budżet
+**przed** zapisem dokumentu — Ask bez pokrycia nie powstaje.
+
+Cztery zastrzeżenia, bez których to zdanie robi się reklamą:
+- **To wybór autora, nie właściwość produktu.** `funding: 'on-resolve'` żyje dalej i nie blokuje
+  niczego. Pole w modelu mówi wprost, który to wariant — po to tam jest.
+- **Opłata 2,5% leci wyłącznie od pieniędzy wracających do autora** (niewypełnione miejsca przy
+  rozstrzygnięciu po terminie albo cały budżet po wygaśnięciu). Odpowiadający dostaje pełne
+  `perAnswer`, nigdy pomniejszone.
+- **Zwrot po wygaśnięciu ma kontrakt, nie interfejs.** Autor po terminie + 48h musi zawołać
+  `settleExpired` ręcznie.
+- **Ścieżka z przeglądarki nie została przejechana na mainnecie.** Pełny cykl pieniądza przeszedł
+  dwa razy na Base Sepolii prawdziwym USDC, ale skryptem z node — to dowód kontraktu, nie klienta.
 
 ### 7.3. x402 dla agentów — kod gotowy, czeka na jeden adres
 `@x402/next` 2.21 wpięty (CAIP-2, `PAYMENT-SIGNATURE`), lekcje / challenge'e / certyfikacja owinięte

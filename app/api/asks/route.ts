@@ -15,10 +15,18 @@
  * zapieczetowane sa ODPOWIEDZI, nie pytania.
  *
  * === CO DOKLADNIE KUPUJE PLATNOSC PRZY POST ===
- * Zalozenie Aska. NIE budzet. Budzetu nie da sie pobrac z gory, bo w repo nie
- * ma kontraktu escrow - i nie wolno tego nazywac escrow (app/utils/asks/types.ts
- * mowi o tym wprost). Pieniadze ida od autora do odpowiadajacego przy
- * rozstrzygnieciu, osobnym przelewem, ktorego hash zostaje przy odpowiedzi.
+ * Zalozenie Aska. NIE budzet. Ta trasa zapisuje na sztywno
+ * `funding: 'on-resolve'` (nizej), wiec pieniadze ida od autora do
+ * odpowiadajacego dopiero przy rozstrzygnieciu, osobnym przelewem, ktorego hash
+ * zostaje przy odpowiedzi. `fundingNote` w cenniku mowi to agentowi wprost.
+ *
+ * UWAGA - POWOD SIE ZMIENIL, ZDANIE ZOSTAJE. Kiedys budzetu nie dalo sie
+ * pobrac z gory, bo kontraktu escrow po prostu nie bylo. Teraz JEST (AskEscrow,
+ * adresy w deployments/) i sciezka z przegladarki go wola - ale nie ta trasa.
+ * Blokada jest inna: escrow wymaga `approve` + `fund` PODPISANYCH przez portfel
+ * autora, a agent placacy przez x402 nie podpisuje tu niczego wlasnym kluczem.
+ * Dopoki to sie nie zmieni, Ask od agenta nie ma pokrycia w kontrakcie i NIE
+ * WOLNO go nazywac escrow.
  */
 
 import { NextResponse, type NextRequest } from 'next/server';

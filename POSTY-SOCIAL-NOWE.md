@@ -117,11 +117,26 @@ błędu, którego nikt nie musiał ujawniać.*
 > The sealing is real, not a UI curtain — answers live in a collection the app
 > itself can't read, released only by a server route.
 >
-> What's not built yet: escrow. Right now the author pays on resolve. I'd
-> rather say that plainly than call it "funded."
+> The budget can now be locked up front. AskEscrow is on Base at
+> 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source verified, no owner and no
+> pause — before you write an answer you can read the locked amount off the
+> contract yourself.
+>
+> It's a choice per Ask, not a blanket claim: the older way pays out of pocket
+> at resolve and locks nothing, so every card says which one it is.
+>
+> What it doesn't fix: the author still picks the winners. Escrow proves the
+> money is there, not that you'll be the one who gets it.
 
-*Nie obiecuj escrow. Adwersarialny przegląd kontraktu znalazł dziurę
-krytyczną i dopóki nie jest zamknięta, ani słowa o escrow.*
+*Escrow wolno juz wymieniać — dziura krytyczna z przeglądu adwersarialnego jest
+zamknięta, kontrakt stoi na mainnecie ze zweryfikowanym źródłem. Ale:*
+- *podawaj adres, nie samo słowo „escrow" — obietnica bez adresu jest znowu
+  tylko obietnicą;*
+- *nigdy „every Ask is escrowed" — to wybór autora, `on-resolve` żyje dalej;*
+- *nie pisz, że ścieżka z przeglądarki jest sprawdzona w boju. Przez `fund()`
+  na mainnecie nie przeszedł jeszcze ani jeden dolar;*
+- *nie pisz, że opłata to prowizja od wypłaty. 2,5% leci wyłącznie od pieniędzy
+  WRACAJĄCYCH do autora, nigdy z kieszeni odpowiadającego.*
 
 ---
 
@@ -185,7 +200,11 @@ krytyczną i dopóki nie jest zamknięta, ani słowa o escrow.*
 
 - **„Zdecentralizowany", „rewolucyjny", „przełomowy"** — nic nie znaczą i
   czytelnik to wie.
-- **Escrow** — nie istnieje, a kontrakt ma niezamkniętą dziurę krytyczną.
+- **Escrow bez adresu ani bez zastrzeżeń.** Kontrakt istnieje i stoi na
+  mainnecie — ale nie pisz „każdy Ask jest zabezpieczony" (to wybór autora),
+  ani że opłata 2,5% jest pobierana z wypłaty (leci wyłącznie od zwrotu do
+  autora), ani że zwrot po wygaśnięciu da się kliknąć w produkcie (nie da się —
+  kontrakt to ma, interfejs nie).
 - **„Wspieramy 8 sieci"** — jest ich **siedem**. Sam się na tym przejechałem,
   licząc `camp` i `basecamp` jako dwie.
 - **Liczby użytkowników bez kontekstu** — 184 064 konta brzmi świetnie, ale

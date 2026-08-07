@@ -15,22 +15,33 @@ public URL, its own metadata and its own generated share card.
 - Tips across the seven networks above, each one a real settled transaction.
 - A receipt page per tip at `/tip/{txHash}`, showing amount, sender, recipient and network.
 - A public leaderboard of settled payments at `/leaderboard`.
-- Open Asks listed at `/asks`.
+- Open Asks listed at `/asks`, where the full loop runs: post, answer under seal, accept,
+  resolve.
 - x402: an agent can pay real USDC on Base mainnet (CAIP-2 `eip155:8453`) to open an Ask.
+- Escrow for an Ask. The `AskEscrow` contract is deployed and source-verified on Base
+  mainnet at `0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340` (and on Base Sepolia at
+  `0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6`). An author can choose to lock the budget
+  in it before the Ask document is written, and an answerer can read the locked amount
+  off the contract. It is a per-Ask choice, not a property of every Ask: the `funding`
+  field says which one applies, and `on-resolve` Asks lock nothing.
 
 ## What does not work yet
 
 Do not describe these as features. They are stated direction, not shipped:
 
 - Asks do not appear in the feed. `/asks` is a separate list.
-- The Ask loop is not closed. An Ask can be created and answered through the API, and
-  answers are genuinely sealed. But nothing in the product can accept an answer or resolve
-  an Ask: those functions exist in the data layer with no caller, there is no API route for
-  them, and no interface reaches them. Do not tell anyone they will be paid for answering
-  until that changes.
-- There is no escrow on mainnet. The `AskEscrow` contract is deployed and source-verified
-  on Base Sepolia (chain 84532) only, and no money moves through it. No budget is locked
-  up front.
+- Taking back an expired budget. The escrow contract returns an unresolved budget to the
+  author after the deadline plus 48 hours, minus a 2.5% fee, but nothing in the product
+  calls that function. Today it is a contract call the author has to make by hand.
+- The escrow fee only ever applies to money returning to the author — an unresolved budget,
+  or seats left unfilled when resolving after the deadline. It is never taken out of a
+  payout to someone who answered. Do not describe it as a cut of the answerer's money.
+- Money from an escrowed Ask does not arrive by itself. Resolving credits each winner a
+  balance they claim in a second transaction. "Paid" means the contract owes it
+  irreversibly, not that it has landed in their wallet.
+- Nobody has yet run the escrow path end to end from the browser on mainnet with real
+  money. The contract itself has been exercised on Base Sepolia. Do not describe the
+  browser path as proven in production.
 
 The full direction — money entering the feed from outside, including from AI agents paying
 over x402, buying human judgment, with reputation minted only by settled payments — is

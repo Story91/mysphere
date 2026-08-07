@@ -67,6 +67,178 @@ export const metadata: Metadata = {
  */
 const SHOW_READ_FURTHER = false;
 
+/* ------------------------------------------------------------------ */
+/*  Kontrakty                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * === KAZDY ADRES TUTAJ BYL ODCZYTANY Z LANCUCHA, NIE Z KOMENTARZA ===
+ *
+ * Weryfikacja: scripts/verifyOnchainInventory.js. Dla kazdej pozycji
+ * `eth_getCode` != '0x' na DEKLAROWANEJ sieci, a tam gdzie kontrakt wystawia
+ * tozsamosc (name / symbol / owner / TOKEN / FEE_BPS) - odczytana i zgodna.
+ * Dziewiec naszych kontraktow ma `owner()` rowny temu samemu skarbcowi
+ * 0xF1fa2002..., co jest mocniejszym dowodem "to nasze" niz sam bytecode.
+ *
+ * === CZEGO TU CELOWO NIE MA ===
+ * Cztery adresy z tego repozytorium NIE PRZESZLY weryfikacji i dlatego ich tu
+ * nie ma. Ta lista istnieje takze po to, zeby nikt ich tu nie dopisal:
+ *
+ *   0xF90733b9... i 0xf528f920... - kod aplikacji podaje je jako targ IP-NFT
+ *     i kolekcje na Camp (484). Na tym lancuchu maja code=0x, balance=0
+ *     I nonce=0, czyli nigdy nic tam nie zrobily. Nie sa ani kontraktem, ani
+ *     uzywanym portfelem. marketplace/page.tsx pokazuje jeden z nich
+ *     uzytkownikowi jako "IP Live source" - to osobny blad do naprawy.
+ *   0x0222ffA0... - deklarowana fabryka smart-kont CDP. Brak kodu na 84532
+ *     I na 8453, a do tego BLEDNA SUMA KONTROLNA EIP-55: `getAddress()` go
+ *     odrzuca. Adres skopiowany z eksploratora nie moze miec zlego checksumu,
+ *     wiec ten zostal przepisany recznie.
+ *   0x2Ca8E0C6... - opisany w tescie jako Chainlink VRF Coordinator. Na
+ *     Base Sepolii nie ma tam kodu.
+ *
+ * === CZEGO TU NIE MA Z INNEGO POWODU ===
+ * Sieci testowych (AskEscrow i USDC na Base Sepolii, L2Resolver na 84532,
+ * gra BaseMorning) - to nie sa pieniadze i mieszalyby sie z mainnetem.
+ * Portfeli: skarbiec, admin i odbiorca prowizji to adresy EOA, nie kontrakty,
+ * a jeden adres wpisany na sztywno w trase recznego przypinania nalezy do
+ * prywatnej osoby i nie ma prawa trafic na strone publiczna.
+ *
+ * === LICZB POSTOW TU NIE MA CELOWO ===
+ * Weryfikacja odczytala je (Base 15 827, Celo 451, Linea 87, World 7,
+ * Ethereum 6, Camp 40), ale kazda z nich zestarzeje sie nastepnego dnia,
+ * a ta strona nie moze podawac liczb, ktorych nie odswieza. Eksplorer pod
+ * linkiem pokazuje stan biezacy - i o to chodzi.
+ *
+ * NIE DOPISUJ TU NICZEGO BEZ URUCHOMIENIA scripts/verifyOnchainInventory.js.
+ */
+type ContractRow = {
+  what: string;
+  chain: string;
+  address: string;
+  line: string;
+  explorer: string;
+};
+
+const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = [
+  {
+    title: 'Ours',
+    note: 'Written in this repository and deployed by us. Nine of them answer to the same owner address, which is how you can tell they belong together.',
+    rows: [
+      {
+        what: 'Ask escrow',
+        chain: 'Base',
+        address: '0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340',
+        line: 'Holds the USDC budget for an Ask until the author accepts answers. Source is verified — you can read it before you write a word.',
+        explorer: 'https://basescan.org/address/0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340#code',
+      },
+      {
+        what: 'Posts',
+        chain: 'Base',
+        address: '0x6e1811A5401dfC30E8F3E2DD9dE0Bbe156F97aC7',
+        line: 'Writes post content on Base.',
+        explorer: 'https://basescan.org/address/0x6e1811A5401dfC30E8F3E2DD9dE0Bbe156F97aC7',
+      },
+      {
+        what: 'Paid pins',
+        chain: 'Base',
+        address: '0x163bd9Ec5267491963163dE70D0B64f9400a20AD',
+        line: 'Records a paid pin that keeps a post at the top of the list, and for how long.',
+        explorer: 'https://basescan.org/address/0x163bd9Ec5267491963163dE70D0B64f9400a20AD',
+      },
+      {
+        what: 'Posts',
+        chain: 'Robinhood',
+        address: '0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6',
+        line: 'Writes posts on Robinhood Chain.',
+        explorer: 'https://robinhoodchain.blockscout.com/address/0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6',
+      },
+      {
+        what: 'Posts',
+        chain: 'Camp',
+        address: '0x71bE438ee579de33EBf353579A413439Db042CA5',
+        line: 'Writes posts on Camp Network.',
+        explorer: 'https://camp.cloud.blockscout.com/address/0x71bE438ee579de33EBf353579A413439Db042CA5',
+      },
+      {
+        what: 'Portal badge',
+        chain: 'Camp',
+        address: '0x57CC99c9E1942a34a0cfF7FCC27c227455f14587',
+        line: 'An NFT badge, claimable once per address.',
+        explorer: 'https://camp.cloud.blockscout.com/address/0x57CC99c9E1942a34a0cfF7FCC27c227455f14587',
+      },
+      {
+        what: 'Posts',
+        chain: 'Celo',
+        address: '0xA79651c953A987C815b3f5b82b69492e437CcFED',
+        line: 'Writes posts on Celo.',
+        explorer: 'https://celoscan.io/address/0xA79651c953A987C815b3f5b82b69492e437CcFED',
+      },
+      {
+        what: 'Posts',
+        chain: 'Ethereum',
+        address: '0x7c4C79176dc098Fb304E4AcD4e93b1a1DfCF1749',
+        line: 'Writes posts on Ethereum mainnet.',
+        explorer: 'https://etherscan.io/address/0x7c4C79176dc098Fb304E4AcD4e93b1a1DfCF1749',
+      },
+      {
+        what: 'Posts',
+        chain: 'Linea',
+        address: '0x9fB36660849D85CEe6609f6020af3336aB7541f5',
+        line: 'Writes posts on Linea.',
+        explorer: 'https://lineascan.build/address/0x9fB36660849D85CEe6609f6020af3336aB7541f5',
+      },
+      {
+        what: 'Posts',
+        chain: 'World Chain',
+        address: '0xFF426EA2f562C6866edA81981C2420bC574eA2DF',
+        line: 'Writes posts on World Chain.',
+        explorer: 'https://worldscan.org/address/0xFF426EA2f562C6866edA81981C2420bC574eA2DF',
+      },
+    ],
+  },
+  {
+    title: 'Not ours — but money moves through them',
+    note: 'Tokens and one name resolver. We did not write these and we cannot change them; they are listed because your money passes through them.',
+    rows: [
+      {
+        what: 'USDC',
+        chain: 'Base',
+        address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        line: 'The currency for tips and for every Ask budget held in escrow.',
+        explorer: 'https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+      },
+      {
+        what: 'USDG',
+        chain: 'Robinhood',
+        address: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
+        line: 'Global Dollar. Robinhood Chain has no canonical USDC, and of the stablecoins there this is the one that supports signed transfers — so it is the only one a machine can pay with, without holding gas.',
+        explorer: 'https://robinhoodchain.blockscout.com/address/0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
+      },
+      {
+        what: 'WLD',
+        chain: 'World Chain',
+        address: '0x2cFc85d8E48F8EAB294be644d9E25C3030863003',
+        line: 'The tipping token on World Chain.',
+        explorer: 'https://worldscan.org/address/0x2cFc85d8E48F8EAB294be644d9E25C3030863003',
+      },
+      {
+        what: 'LINEA',
+        chain: 'Linea',
+        address: '0x1789e0043623282D5DCc7F213d703C6D8BAfBB04',
+        line: 'The tipping token on Linea.',
+        explorer: 'https://lineascan.build/address/0x1789e0043623282D5DCc7F213d703C6D8BAfBB04',
+      },
+      {
+        what: 'Basenames resolver',
+        chain: 'Base',
+        address: '0xC6d566A56A1aFf6508b41f6c90ff131615583BCD',
+        line: 'Turns an address into a readable .base.eth name.',
+        explorer: 'https://basescan.org/address/0xC6d566A56A1aFf6508b41f6c90ff131615583BCD',
+      },
+    ],
+  },
+];
+
 /**
  * Znacznik sekcji jest KWOTA, nie numerem - i siedzi jako stacja na kregoslupie
  * biegnacym przez cala strone.
@@ -226,8 +398,11 @@ function AskCard() {
         </div>
       </article>
       <p className="mt-3 text-[11px] leading-[1.6] text-soft-ink-faint">
-        No Ask has ever been posted. What landed today is the data model behind this card — the
-        card itself reads nothing from it.
+        This card is still a drawing and reads nothing. Asks are real now, but they are on{' '}
+        <a href="/asks" className="underline decoration-soft-line-strong underline-offset-2">
+          /asks
+        </a>{' '}
+        — not in the feed, and not here.
       </p>
     </figure>
   );
@@ -239,9 +414,15 @@ function AskCard() {
 
 /**
  * `planned` dopisane celowo. Bez niego tabela miala tylko rzeczy dzialajace,
- * pisane albo wylaczone - a najwazniejsza brakujaca czesc Aska (escrow) nie
- * miescila sie w zadnej z tych szuflad i przez to nie bylo jej na liscie
- * wcale. Kropka jest pusta, bo nic za nia jeszcze nie stoi.
+ * pisane albo wylaczone - a brakujace czesci Aska nie miescily sie w zadnej
+ * z tych szuflad i przez to nie bylo ich na liscie wcale. Kropka jest pusta,
+ * bo nic za nia jeszcze nie stoi.
+ *
+ * Escrow przeszlo z `planned` na `live` - kontrakt stoi na mainnecie i sciezka
+ * zakladania go wola. Ale `planned` NIE zniknelo z tabeli i nie ma prawa
+ * zniknac: zwrot po wygasnieciu istnieje w kontrakcie i NIE MA go w interfejsie,
+ * a Ask dalej nie pokazuje sie w feedzie. Wpisanie escrow jako `live` przy
+ * jednoczesnym skasowaniu tych dwoch wierszy zamienilo by ta tabele w reklame.
  */
 type Status = 'live' | 'wired' | 'building' | 'planned' | 'off';
 
@@ -304,19 +485,24 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
     note: 'Endpoints already speak 402. Enforcement turns on the moment a payout address is set.',
   },
   {
-    name: 'Ask: data model',
-    status: 'building',
-    note: 'Landed today. Budget, seats, deadline, resolve rate, and answers sealed by a rule the client cannot read past.',
-  },
-  {
-    name: 'Ask: in the feed',
-    status: 'building',
-    note: 'Routes and the composer are being written now. Nothing about an Ask is visible in the feed yet.',
+    name: 'Ask: post and answer',
+    status: 'live',
+    note: 'Budget, seats, deadline, resolve rate. Answers are sealed by a rule the client cannot read past, and the author can accept and resolve from /asks.',
   },
   {
     name: 'Ask: escrow',
+    status: 'live',
+    note: 'AskEscrow on Base, 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source-verified. Choosing it takes the budget from your wallet before the Ask exists.',
+  },
+  {
+    name: 'Ask: expiry refund in the interface',
     status: 'planned',
-    note: 'Money locked at creation needs a contract that does not exist. The first version pays at resolve instead.',
+    note: 'The contract returns an unresolved budget after the deadline plus 48h. Nothing in the product calls it, so today that is a contract call made by hand.',
+  },
+  {
+    name: 'Ask: in the feed',
+    status: 'planned',
+    note: 'Asks live on their own page. Nothing about an Ask is visible in the feed yet.',
   },
 ];
 
@@ -402,15 +588,15 @@ export default function ReDefinitionPage() {
               {[
                 {
                   t: 'Runs today',
-                  d: 'Posts, tips, receipts and a public timeline of payments. Every amount settled onchain.',
+                  d: 'Posts, tips, receipts and a public timeline of payments. Asks, with the budget lockable in an escrow contract on Base. Every amount settled onchain.',
                 },
                 {
                   t: 'Being built',
-                  d: 'The Ask. Data model and sealed answers landed today. Nothing of it is in the feed yet.',
+                  d: 'The Ask in the feed, and a way to take an expired budget back without calling the contract by hand.',
                 },
                 {
                   t: 'Direction',
-                  d: 'Escrow, machine buyers over x402, and a price per seat set by settled payments.',
+                  d: 'Machine buyers over x402, and a price per seat set by settled payments.',
                 },
               ].map((item) => (
                 <div key={item.t}>
@@ -466,20 +652,20 @@ export default function ReDefinitionPage() {
         <section id="ask" className="scroll-mt-8 py-16">
           <Marker amount="$2.00" label="one seat, one answer" />
           <H2>The unit is not a post. It is an Ask.</H2>
-          <State tone="building">Being built — this section is a design</State>
+          <State tone="live">Runs on /asks — not in the feed</State>
           <P>
             An Ask is a question with a budget, a number of seats and a deadline. You set all three
-            and it appears in the feed as a card that counts down. That is the definition, and the
-            feed does not do it yet.
+            and it appears as a card that counts down. It runs on its own page; the feed still does
+            not carry it.
           </P>
           <P>
             Answers stay <Hi>sealed until you resolve</Hi>. Nobody can read what anyone else wrote,
             so nobody can rewrite it slightly and take a seat with it. When you pick your answers,
-            payout leaves immediately and every accepted answer carries a link to the transaction on
-            Basescan. Then all answers open at once.
+            every accepted answer carries a link to the transaction on Basescan. Then all answers
+            open at once.
           </P>
           <P>
-            One part of that stopped being a drawing today. Answer text does not sit inside the Ask.
+            The sealing is not a curtain in the interface. Answer text does not sit inside the Ask.
             It goes to <Hi>its own collection the app is forbidden to read</Hi> — the rule is
             literally <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">if false</code> — and only a server route hands it
             back, to the people allowed to have it. Hiding text in the interface would not be
@@ -488,16 +674,46 @@ export default function ReDefinitionPage() {
             reuses that plumbing rather than inventing its own.
           </P>
           <P>
-            Let the deadline pass without resolving and unclaimed seats return to you, minus fee —
-            and your <Hi>resolve rate</Hi> drops in public, on the front of every Ask you post
-            afterwards. Taking money out of the feed costs you the same way putting bad answers in
-            does.
+            Funding an Ask once, up front, used to be the one promise on this page with no contract
+            behind it. There is one now. <Hi>AskEscrow</Hi> is deployed on Base at{' '}
+            <a
+              href="https://basescan.org/address/0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340#code"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-soft-line-strong underline-offset-2"
+            >
+              <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">
+                0xD5f6…5340
+              </code>
+            </a>{' '}
+            with its source verified, so you can read what it does instead of taking this page's
+            word for it. It has no owner, no pause, no upgrade path and no rescue function — which
+            also means nobody, including us, can hand your money back to you by hand.
           </P>
           <P>
-            One promise here is not kept yet. Funding an Ask once, up front, needs an escrow
-            contract, and <Hi>there is no such contract</Hi>. The first version pays at resolve
-            instead: the author sends USDC to each accepted answer and the hash is stored beside it
-            forever. Weaker, and named below rather than dressed up.
+            Choosing escrow takes the budget out of your wallet <Hi>before the Ask exists</Hi>: if
+            the transfer does not land, the Ask is never posted. Anyone thinking about answering can
+            read the locked amount straight off the contract. It is a choice, not a property of
+            every Ask — the older way, paying out of pocket when you accept, still exists and locks
+            nothing, so each card says which one it is.
+          </P>
+          <P>
+            The fee is <Hi>2.5%</Hi>, and it is charged only on money going <em>back</em> to the
+            author — never on a payout to someone who answered. Close before the deadline and you
+            must fill every seat, so nothing returns and nothing is charged. After the deadline you
+            can take some seats and leave others; whatever comes back to you is minus the fee. Let
+            the deadline pass entirely and the whole budget returns to you the same way, minus the
+            same fee — and your <Hi>resolve rate</Hi> drops in public, on the front of every Ask you
+            post afterwards. Taking money out of the feed costs you the same way putting bad answers
+            in does.
+          </P>
+          <P>
+            Two things about that last path are not finished, and this page will not round them up.
+            The contract has the expiry refund; <Hi>the product does not call it</Hi>, so today
+            getting an expired budget back means calling the contract yourself. And money does not
+            arrive on its own: resolving credits each winner a balance they then claim, so
+            &quot;paid&quot; means the contract owes it irreversibly, not that it has landed in
+            their wallet.
           </P>
         </section>
 
@@ -631,6 +847,69 @@ export default function ReDefinitionPage() {
           </p>
         </section>
 
+        {/* ---------------- kontrakty ---------------- */}
+        <section className="py-16">
+          <Marker amount="0x" label="nothing to take on trust" />
+          <H2>Every contract this app touches</H2>
+          <State tone="live">Verified on the chain, not copied from a comment</State>
+          <P>
+            A product whose whole claim is <Hi>you can check this yourself</Hi> owes you the
+            addresses. Every one below was read straight off its chain before it was printed here:
+            the address has code, and where the contract exposes an identity — a name, a symbol, an
+            owner — it was read too and it matched.
+          </P>
+          <P>
+            Four addresses that live in this codebase are <em>not</em> on this list, because the
+            chain refused to confirm them. That is the point of checking.
+          </P>
+
+          <div className="mt-8">
+            {CONTRACT_GROUPS.map((group) => (
+              <div key={group.title} className="mb-9 last:mb-0">
+                <h3 className="mb-1 font-soft-display text-[15px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
+                  {group.title}
+                </h3>
+                <p className="mb-4 text-[13.5px] leading-[1.6] text-soft-ink-soft">{group.note}</p>
+
+                <div className="border-t border-soft-line/70">
+                  {group.rows.map((row) => (
+                    <a
+                      key={`${row.chain}-${row.address}`}
+                      href={row.explorer}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="group flex flex-col gap-1 border-b border-soft-line/70 py-3.5 transition-colors hover:bg-soft-surface"
+                    >
+                      <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                        <span className="font-soft-display text-[13.5px] font-semibold text-soft-ink">
+                          {row.what}
+                        </span>
+                        <span className="rounded-pill bg-soft-bg px-2 py-0.5 font-soft text-[10.5px] font-bold uppercase tracking-[0.1em] text-soft-ink-faint">
+                          {row.chain}
+                        </span>
+                      </span>
+                      <span className="text-[13px] leading-[1.6] text-soft-ink-muted">
+                        {row.line}
+                      </span>
+                      {/* Adres lamie sie na telefonie zamiast rozpychac strone w poziomie.
+                          `break-all` na 42 znakach bez spacji to jedyne, co dziala. */}
+                      <span className="break-all font-mono text-[11.5px] leading-[1.5] text-soft-ink-faint underline decoration-soft-line underline-offset-4 group-hover:text-soft-primary-deep">
+                        {row.address} ↗
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-7 text-[14px] leading-[1.7] text-soft-ink-soft">
+            The escrow is the only one of these that holds anyone&apos;s money. It has no owner, no
+            pause switch and no rescue function — which cuts both ways, and the section above says
+            how.
+          </p>
+        </section>
+
         {/* ---------------- ryzyko ---------------- */}
         <section className="py-16">
           <Marker amount="risk" label="stated up front" />
@@ -642,26 +921,36 @@ export default function ReDefinitionPage() {
             traders paying humans.
           </P>
           <P>
-            The biggest hole is <Hi>escrow, and it is missing</Hi>. Funding an Ask up front means
-            the money is locked the moment it is posted, and no contract in this repo locks
-            anything. So in the first version the order is reversed: you answer, then you get paid —
-            or you do not, because the author went quiet and nothing onchain stops them. The whole
-            risk of an Ask sits on the person doing the work.
+            Escrow used to be the biggest hole. It is not any more, and the honest thing to say is
+            what it did and did not fix. It settles whether <Hi>the money exists</Hi> — locked, in a
+            contract with no owner and no off switch, readable before you write a word. It settles
+            nothing about <Hi>who gets it</Hi>. The author still picks the winners, and a contract
+            cannot tell a good answer from a bad one.
           </P>
           <P>
-            What stands in for the lock is the <Hi>resolve rate</Hi>: the share of Asks an author
-            actually settled, counted only over Asks whose deadline has already passed, printed on
-            the front of every Ask they post next. That is a reputation cost, not a guarantee.
-            Answering someone with no history means trusting a person rather than a contract, which
-            is why a seat starts at fifty cents and not at fifty dollars. Escrow is the next thing
-            that has to exist, and until it does, this page will not call it done.
+            So the biggest hole now is <Hi>judgement, and there is no appeal</Hi>. Write the best
+            answer in the thread and the author can simply not pick you, pay 2.5% on the way out and
+            keep the rest. Refusing to pay costs a little more than it did — the fee and a public{' '}
+            <Hi>resolve rate</Hi>, the share of Asks an author actually settled, counted only over
+            Asks past their deadline. That is a price, not a guarantee. Nothing here judges answers,
+            and nothing reverses a resolve once it is made.
           </P>
           <P>
-            Nothing is held in the meantime — payment goes wallet to wallet at resolve. No fiat, no
-            custody of your keys, no investment advice categories, and the longest an Ask can stay
-            open is seven days. If the answers turn out to be slop, the product dies of quality and
-            no amount of onchain plumbing saves it — so seats are limited, wallets have to be older
-            than a week or carry a Basename, and accept rate gates the money.
+            The narrower version of the same hole: escrow stops the author paying nobody, but not
+            the author paying <Hi>themselves from a second wallet</Hi>. The contract refuses the
+            address that funded the Ask, which is the cheap version of that trick, not the whole of
+            it. Treat a seat from an author with no resolve rate as trusting a person, which is why
+            a seat starts at fifty cents and not at fifty dollars.
+          </P>
+          <P>
+            Two limits worth stating plainly. The escrow path has been exercised against the
+            contract on a test network, and the contract's own unit tests cover the expiry refund,
+            but <Hi>no one has yet run the browser path end to end on mainnet with real money</Hi> —
+            when someone does, they will be the first. And no fiat, no custody of your keys, no
+            investment advice categories, and the longest an Ask can stay open is seven days. If the
+            answers turn out to be slop, the product dies of quality and no amount of onchain
+            plumbing saves it — so seats are limited, wallets have to be older than a week or carry
+            a Basename, and accept rate gates the money.
           </P>
         </section>
 

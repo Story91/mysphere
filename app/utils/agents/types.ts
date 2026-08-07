@@ -127,12 +127,26 @@ export type ListAgentsResult = {
   hasMore: boolean;
 };
 
+/**
+ * Statystyki rejestru agentow.
+ *
+ * `null` znaczy NIE ZMIERZONO - nigdy "zero". To nie jest ozdoba typu:
+ * `getRegistryStats` przy awarii agregacji zwracalo same zera, wiec panel
+ * napisalby "0 agents, 0 feedback" w chwili, gdy agentow sa setki. Odczyt,
+ * ktory padl, i pusty rejestr to dwie rozne wiadomosci dla czlowieka i musza
+ * byc dwiema roznymi wartosciami w kodzie.
+ *
+ * `totalChains` zostaje zwyklym `number`, bo bierze sie z dlugosci tablicy
+ * w konfiguracji, a nie z bazy - nie ma jak sie nie zmierzyc.
+ *
+ * Ten sam wzorzec co `globalStats` w app/utils/stats/globalStats.ts.
+ */
 export type AgentRegistryStats = {
-  totalAgents: number;
-  totalFeedback: number;
+  totalAgents: number | null;
+  totalFeedback: number | null;
   totalChains: number;
-  trustedAgents: number;
-  trustedPercent: number;
+  trustedAgents: number | null;
+  trustedPercent: number | null;
 };
 
 export type AgentTrustCheck = {

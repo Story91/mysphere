@@ -412,9 +412,23 @@ contract AskEscrow {
      * perAnswer zamrozone przy fund - autor nie podaje kwot, tylko adresy, wiec
      * nie da sie "wyplacic" komus jednostki i reszty wziac dla siebie.
      *
-     * Niewykorzystane miejsca wracaja do autora BEZ oplaty - rozstrzygnal.
-     * Oplata jest wylacznie na sciezce wygasniecia, dokladnie jak mowi manifest:
-     * "unclaimed seats return to you, minus fee".
+     * OPLATA: zwyciezcy NIE placa nic - kazdy dostaje dokladnie perAnswer.
+     * Oplata 2,5% obciaza wylacznie pieniadze WRACAJACE DO AUTORA, i to na
+     * OBU drogach powrotu: tutaj (niewykorzystane miejsca) oraz w
+     * settleExpired (caly budzet). Szczegoly i uzasadnienie przy samym
+     * naliczeniu, ok. 120 linii nizej.
+     *
+     * TEN AKAPIT MOWIL WCZESNIEJ COS ODWROTNEGO - "niewykorzystane miejsca
+     * wracaja do autora BEZ oplaty, oplata jest wylacznie na sciezce
+     * wygasniecia". Bylo to nieprawda juz wtedy: kod ponizej naliczal oplate
+     * od zwrotu. Zostawiam ten slad, bo ZWERYFIKOWANE ZRODLO NA BASESCANIE
+     * NIESIE TAMTA STARA, BLEDNA WERSJE KOMENTARZA - kontrakt jest niezmienny,
+     * wiec kazdy, kto przeczyta go na eksplorerze, zobaczy zdanie sprzeczne
+     * z zachowaniem, ktore obok opisuje. Komentarze nie wchodza do bajtkodu,
+     * wiec poprawka tutaj niczego nie zmienia w dzialaniu ani w weryfikacji.
+     *
+     * Manifest ma o tym mowic tak, jak jest naprawde: prowizja dotyczy
+     * odzyskiwania wlasnych pieniedzy, nie wyplaty dla odpowiadajacego.
      *
      * TERMINALNE i jednorazowe. Manifest obiecuje, ze wszystkie odpowiedzi
      * otwieraja sie naraz, wiec nie ma czesciowego przyjmowania. To tez powod,

@@ -286,10 +286,26 @@ service cloud.firestore {
                     && request.resource.data.deadline is number
                     && request.resource.data.deadline > request.time.toMillis()
                     && request.resource.data.status == 'open'
-                    // `escrowed` nie istnieje - nie ma kontraktu, ktory by go
-                    // dotrzymal. Zapisanie tej wartosci byloby obietnica bez
-                    // pokrycia wypisana wprost w bazie.
-                    && request.resource.data.funding == 'on-resolve'
+                    // DWA WARIANTY FINANSOWANIA I ANI JEDNEGO WIECEJ.
+                    //
+                    // 'on-resolve' - autor placi z wlasnego portfela przy
+                    //    przyjmowaniu; nic nie jest zablokowane i karta ma to
+                    //    mowic wprost.
+                    // 'escrowed'   - budzet lezy na kontrakcie AskEscrow.
+                    //    WYMAGAMY hasha transakcji `fund`. Bez niego slowo
+                    //    "escrowed" w dokumencie jest obietnica bez pokrycia
+                    //    wpisana wprost do bazy - a regula jest ostatnim
+                    //    miejscem, ktorego nie da sie ominac inna sciezka zapisu.
+                    //
+                    // CZEGO TA REGULA NIE SPRAWDZA: czy pod tym hashem naprawde
+                    // lezy transakcja `fund` na wlasciwa kwote. Firestore nie
+                    // czyta lancucha. Sprawdza to klient przed zapisem
+                    // (app/utils/asks/escrow.ts) i moze sprawdzic kazdy przez
+                    // publiczny odczyt escrowFor(author, askId).
+                    && ((request.resource.data.funding == 'on-resolve')
+                        || (request.resource.data.funding == 'escrowed'
+                            && request.resource.data.escrowTxHash is string
+                            && request.resource.data.escrowTxHash.size() == 66))
                     && request.resource.data.answerCount == 0
                     && request.resource.data.acceptedCount == 0;
 
@@ -414,8 +430,64 @@ service cloud.firestore {
     // KOLEJNY KROK: po weryfikacji SIWE mintowac token Firebase z uid = adres
     // portfela, zalogowac klienta przez signInWithCustomToken i DOPIERO WTEDY
     // zamienic ta regule na wymagajaca request.auth.uid == wlasciciel dokumentu.
-    match /{document=**} {
-      allow read, write: if true;
+    //
+    // ========================================================================
+    // TA REGULA UNIEWAZNIALA WSZYSTKO POWYZEJ. NAPRAWIONE.
+    // ========================================================================
+    // Bylo tu `match /{document=**} { allow read, write: if true; }`.
+    // Rekursywny wildcard pasuje do KAZDEGO dokumentu w bazie, a Firestore
+    // przyznaje dostep, gdy pozwala JAKAKOLWIEK pasujaca regula. Skutek: kazde
+    // `allow ... : if false` i kazda walidacja z gornej czesci pliku byly
+    // OZDOBA. Konkretnie i sprawdzalnie:
+    //
+    //   - `askAnswerContent` (tresci odpowiedzi) mialo `if false`, a bylo
+    //     czytelne dla kazdej przegladarki. Opis strony /asks obiecuje
+    //     "Answers stay sealed - nobody can read what anyone else wrote before
+    //     the author opens them". Ta obietnica byla NIEPRAWDZIWA.
+    //   - `premiumContent` - to samo. Platna tresc do wziecia za darmo
+    //     bezposrednio z bazy, z pominieciem /api/premium.
+    //   - `askAnswers.update` wymagalo hasha wyplaty; bez niego dalo sie
+    //     oznaczyc dowolna odpowiedz jako przyjeta.
+    //   - `asks.create` wymagalo escrowTxHash przy funding == 'escrowed';
+    //     dalo sie wiec wpisac "escrowed" bez zablokowania ani centa.
+    //
+    // Naglowek tego pliku twierdzil, ze "sciezki sa rozlaczne". Z regula
+    // `{document=**}` rozlaczne nie sa - i to jedno zdanie kosztowalo cztery
+    // powyzsze dziury.
+    //
+    // ROZWIAZANIE: regula ogolna przestaje byc rekursywna i omija kolekcje,
+    // ktore maja wlasne reguly. Kolekcje ZASTANE zostaja dokladnie tak otwarte
+    // jak byly - nie ma tu zadnego zaciskania istniejacych funkcji, wiec ta
+    // zmiana nie moze niczego zepsuc w dzialajacej aplikacji. Zmienia sie
+    // wylacznie to, ze reguly nowych kolekcji zaczynaja obowiazywac.
+    //
+    // DWIE REGULY, NIE JEDNA: pierwsza obsluguje dokumenty w kolekcji
+    // (`/posts/{id}`), druga wszystko pod nimi (`/users/{id}/followers/{id}`).
+    // Rekursywny wildcard robil oba naraz - rozbicie go jest cena za to, ze
+    // da sie wskazac pierwszy segment sciezki.
+    //
+    // DOPISUJAC NOWA KOLEKCJE Z WLASNYMI REGULAMI, DOPISZ JA TEZ TUTAJ.
+    // Inaczej jej reguly beda dekoracja, dokladnie jak przed ta poprawka.
+    function hasOwnRules(name) {
+      return name in [
+        'agents',
+        'agentFeedback',
+        'agentProgress',
+        'asks',
+        'askAnswers',
+        'askAnswerContent',
+        'unlocks',
+        'creatorSubscriptions',
+        'premiumContent'
+      ];
+    }
+
+    match /{collection}/{docId} {
+      allow read, write: if !hasOwnRules(collection);
+    }
+
+    match /{collection}/{docId}/{rest=**} {
+      allow read, write: if !hasOwnRules(collection);
     }
   }
 }

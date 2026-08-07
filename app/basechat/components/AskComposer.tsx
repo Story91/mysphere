@@ -6,6 +6,7 @@ import {
   MAX_SEATS,
   MIN_PER_ANSWER,
   perAnswerFor,
+  type AskFunding,
 } from '../../utils/asks/types';
 import { formatAskMoney } from './AskCard';
 
@@ -25,16 +26,21 @@ import { formatAskMoney } from './AskCard';
  * do `number | null` (`null` = "nie ma poprawnej liczby"), a dopiero potem
  * porownywane. Nigdzie nie porownujemy surowego wyniku `Number()`.
  *
- * === CZEGO TU NIE OBIECUJEMY ===
- * Wyslanie formularza NIE blokuje zadnych srodkow. Escrow nie istnieje (patrz
- * AskFunding w utils/asks/types.ts), wiec kompozytor mowi wprost, ze autor
- * placi z wlasnej kieszeni przy rozstrzygnieciu. Inaczej "Post ask" czytaloby
- * sie jak zaplata, ktora nie nastapila.
+ * === DWA WARIANTY FINANSOWANIA, DWA ROZNE ZDANIA ===
+ * Kompozytor pyta o jedna rzecz, ktorej wczesniej nie bylo: czy budzet ma sie
+ * zablokowac TERAZ (kontrakt AskEscrow), czy autor zaplaci z wlasnego portfela
+ * dopiero przy przyjmowaniu. Kazdy wybor ma wlasny opis i oba mowia prawde -
+ * bo do wczoraj kazdy Ask byl 'on-resolve' i tekst "nothing is locked" stal tu
+ * na stale. Teraz stoi TYLKO nad tym wariantem, ktorego dotyczy.
+ *
+ * Escrow jest domyslny tam, gdzie kontrakt istnieje: to on jest obietnica
+ * z manifestu ("fund it once in USDC"), a odpowiadajacy pracuje przed zaplata,
+ * wiec domysl ma chronic jego, nie autora.
  *
  * === GRANICA ===
- * Komponent nie zna ani API, ani portfela. Oddaje gotowy `AskDraft` przez
- * `onSubmit` - to wolajacy decyduje, czy leci to na trase serwerowa, czy
- * gdziekolwiek indziej.
+ * Komponent nie zna ani API, ani portfela, ani kontraktu. Oddaje gotowy
+ * `AskDraft` przez `onSubmit` - to wolajacy wysyla approve i fund, i to on
+ * decyduje, czy escrow jest w ogole dostepny (`escrowAvailable`).
  */
 
 export type AskDraft = {
@@ -42,6 +48,7 @@ export type AskDraft = {
   budget: number;
   seats: number;
   durationMs: number;
+  funding: AskFunding;
 };
 
 export type AskComposerProps = {
@@ -49,6 +56,22 @@ export type AskComposerProps = {
   /** Np. brak podlaczonego portfela. Powod pokazujemy w `disabledReason`. */
   disabled?: boolean;
   disabledReason?: string;
+  /**
+   * Czy na sieci portfela stoi kontrakt escrow. `false` chowa wybor i zostawia
+   * sam wariant 'on-resolve' - pokazanie opcji, ktora nie ma jak zadzialac,
+   * konczy sie surowym bledem po klikinieciu.
+   */
+  escrowAvailable?: boolean;
+  /** Dlaczego escrow nie jest dostepny. Pokazywane zamiast wyboru. */
+  escrowUnavailableReason?: string;
+  /** Ile procent zabiera kontrakt od budzetu WRACAJACEGO do autora. */
+  escrowFeeBps?: number | null;
+  /**
+   * Co sie wlasnie dzieje na lancuchu. Escrow to dwa okna portfela pod rzad
+   * i kilkanascie sekund ciszy miedzy nimi - bez tej linii drugie okno wyglada
+   * jak proba pobrania pieniedzy drugi raz.
+   */
+  progressNote?: string | null;
   onCancel?: () => void;
   className?: string;
 };
@@ -67,6 +90,10 @@ export default function AskComposer({
   onSubmit,
   disabled = false,
   disabledReason,
+  escrowAvailable = false,
+  escrowUnavailableReason,
+  escrowFeeBps = null,
+  progressNote = null,
   onCancel,
   className = '',
 }: AskComposerProps) {
@@ -76,6 +103,19 @@ export default function AskComposer({
   const [durationMs, setDurationMs] = useState<number>(DEFAULT_DURATION);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  /**
+   * Wybor finansowania. Escrow tam, gdzie w ogole istnieje - patrz naglowek.
+   *
+   * Zapamietany W STANIE, a nie wyliczany z `escrowAvailable` przy renderze:
+   * gdyby portfel przelaczyl siec w trakcie wypelniania formularza, wyliczany
+   * wybor przeskoczylby czlowiekowi pod palcami. Zamiast tego nizej pilnujemy,
+   * zeby nie dalo sie wyslac escrow tam, gdzie go nie ma.
+   */
+  const [funding, setFunding] = useState<AskFunding>(escrowAvailable ? 'escrowed' : 'on-resolve');
+
+  // Escrow zniknal (zmiana sieci w portfelu) - wybor musi za tym pojsc, bo
+  // inaczej przycisk obiecywalby blokade, ktorej nie da sie wykonac.
+  const effectiveFunding: AskFunding = escrowAvailable ? funding : 'on-resolve';
 
   const budget = parseNumber(budgetText);
   const seats = parseNumber(seatsText);
@@ -116,7 +156,13 @@ export default function AskComposer({
     setPending(true);
     setFailure(null);
     try {
-      await onSubmit({ question: question.trim(), budget, seats, durationMs });
+      await onSubmit({
+        question: question.trim(),
+        budget,
+        seats,
+        durationMs,
+        funding: effectiveFunding,
+      });
       setQuestion('');
       setBudgetText('');
       setSeatsText('1');
@@ -134,6 +180,21 @@ export default function AskComposer({
 
   const fieldClass =
     'w-full rounded-lg border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[14px] text-soft-ink placeholder:text-soft-ink-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary';
+
+  /** Oplata jako procent. `null` = nie znamy jej, wiec jej nie nazywamy liczba. */
+  const feePercent =
+    typeof escrowFeeBps === 'number' && escrowFeeBps > 0 ? `${escrowFeeBps / 100}%` : null;
+
+  const submitLabel =
+    effectiveFunding === 'escrowed'
+      ? pending
+        ? 'Locking…'
+        : budget !== null && budget > 0
+          ? `Lock ${formatAskMoney(budget)} and post`
+          : 'Lock the budget and post'
+      : pending
+        ? 'Posting…'
+        : 'Post ask';
 
   return (
     <form
@@ -216,11 +277,56 @@ export default function AskComposer({
         </span>
       </div>
 
+      {/* ================= FINANSOWANIE ================= */}
+      {escrowAvailable ? (
+        <fieldset className="mt-4">
+          <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
+            The money
+          </legend>
+          <div className="flex flex-col gap-2">
+            <FundingChoice
+              active={effectiveFunding === 'escrowed'}
+              onSelect={() => setFunding('escrowed')}
+              title="Lock the budget now"
+              // Kazde zdanie tutaj ma pokrycie w AskEscrow.sol. Nie skracaj go
+              // do "funded" - to, ze pieniadze wychodza z portfela teraz, i to,
+              // ze nie wracaja za darmo, sa dla autora rownie wazne.
+              body={`The full budget leaves your wallet when you post and sits in a contract with no owner, no pause and no rescue function. Before the deadline you can only close this Ask by filling every seat; after it, unused seats come back${
+                feePercent ? ` minus ${feePercent}` : ' minus a fee'
+              }.`}
+            />
+            <FundingChoice
+              active={effectiveFunding === 'on-resolve'}
+              onSelect={() => setFunding('on-resolve')}
+              title="Pay as you accept"
+              body="Nothing moves now. You pay each answer you accept, yourself, from your own wallet. Nothing is held for the people answering — all they have is your resolve record."
+            />
+          </div>
+        </fieldset>
+      ) : (
+        <p className="mt-4 text-[11.5px] leading-[1.5] text-soft-ink-faint">
+          {escrowUnavailableReason ??
+            'Escrow is not available here, so this Ask holds nothing up front.'}{' '}
+          You pay each answer you accept, yourself, from your own wallet.
+        </p>
+      )}
+
       <p className="mt-3 text-[11.5px] leading-[1.5] text-soft-ink-faint">
-        Posting does not move any money. Nothing is locked in escrow — you pay each answer you
-        accept, yourself, when you resolve. Let the deadline pass without resolving and your resolve
-        rate drops on the front of every Ask you post afterwards.
+        {effectiveFunding === 'escrowed'
+          ? 'Posting sends two transactions: one to approve the USDC, one to lock it. The Ask is only created after the second one is confirmed.'
+          : 'Posting does not move any money.'}{' '}
+        Let the deadline pass without resolving and your resolve rate drops on the front of every Ask
+        you post afterwards.
       </p>
+
+      {progressNote && (
+        <p
+          className="mt-3 break-words text-[12px] leading-[1.5] text-soft-primary-deep"
+          role="status"
+        >
+          {progressNote}
+        </p>
+      )}
 
       {(problem || failure || (disabled && disabledReason)) && (
         <p
@@ -246,9 +352,54 @@ export default function AskComposer({
           disabled={blocked}
           className="rounded-lg bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface disabled:cursor-not-allowed disabled:bg-soft-line-strong"
         >
-          {pending ? 'Posting…' : 'Post ask'}
+          {submitLabel}
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Jeden wybor finansowania.
+ *
+ * `role="radio"` na przycisku, a nie `<input type="radio">`: opis kazdego
+ * wariantu ma dwa zdania i musi byc CZESCIA etykiety, zeby czytnik ekranu
+ * przeczytal go razem z nazwa. Cale pole jest klikalne z tego samego powodu -
+ * to nie jest wybor rozmiaru, tylko decyzja o tym, kiedy wychodza pieniadze.
+ */
+function FundingChoice({
+  active,
+  onSelect,
+  title,
+  body,
+}: {
+  active: boolean;
+  onSelect: () => void;
+  title: string;
+  body: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onSelect}
+      className={`rounded-lg border p-3 text-left transition-transform duration-150 ease-out active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+        active ? 'border-soft-primary bg-soft-primary/[0.06]' : 'border-soft-line bg-soft-surface'
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        <span
+          className={`h-3 w-3 shrink-0 rounded-full border-2 ${
+            active ? 'border-soft-primary bg-soft-primary' : 'border-soft-line-strong'
+          }`}
+          aria-hidden="true"
+        />
+        <span className="font-soft-display text-[13px] font-semibold text-soft-ink">{title}</span>
+      </span>
+      <span className="mt-1 block break-words text-[11.5px] leading-[1.5] text-soft-ink-muted">
+        {body}
+      </span>
+    </button>
   );
 }

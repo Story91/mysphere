@@ -10,11 +10,14 @@ import type { Metadata } from 'next';
  *
  * === CO TU MOZNA OBIECAC, A CZEGO NIE ===
  * Dziala: lista otwartych Askow z Firestore, wskaznik rozstrzygalnosci autora,
- * zalozenie Aska przez agenta platnoscia x402. NIE dziala i NIE WOLNO tego
- * pisac: Ask w feedzie ani escrow na mainnecie. Kontrakt AskEscrow stoi na
- * Base Sepolia i nic przez niego nie plynie, wiec opis mowi dokladnie to samo,
- * co naglowek strony: budzet nie jest blokowany z gory, autor placi przy
- * rozstrzygnieciu.
+ * zalozenie Aska przez agenta platnoscia x402 ORAZ - od podpiecia kontraktu -
+ * escrow na Base mainnecie (approve + fund przed zapisem do Firestore,
+ * app/asks/page.tsx). NIE dziala i NIE WOLNO tego pisac: Ask w feedzie.
+ *
+ * UWAGA NA JEDNO SLOWO: escrow jest WYBOREM autora, nie wlasnoscia kazdego
+ * Aska. Opis nie moze wiec brzmiec "budzet jest zablokowany" - musi mowic, ze
+ * autor moze go zablokowac. Ktory wariant obowiazuje, pisze kazda karta osobno
+ * (pole `funding`).
  *
  * Tytul to samo "Open asks" - marke doklada `title.template` z layoutu
  * glownego, wiec w karcie wyjdzie "Open asks · MySphere". Obrazek dziedziczy
@@ -28,17 +31,29 @@ import type { Metadata } from 'next';
  */
 
 const ASKS_DESCRIPTION =
-  // NIE obiecujemy przyjmowania odpowiedzi ani rozstrzygania.
+  // === TO ZDANIE MA POKRYCIE W KODZIE. SPRAWDZAJ PRZY KAZDEJ ZMIANIE. ===
   //
-  // Poprzednie zdanie konczylo sie na "the author pays only for the ones they
-  // accept" - i to bylo nieprawda. Sprawdzone w kodzie: `acceptAnswer`
-  // i `resolveAsk` nie maja ANI JEDNEGO wywolania w calym repo, nie ma trasy
-  // API do rozstrzygania, a AskCard renderuje przycisk "Answer" jako null,
-  // bo nikt nie podaje mu handlera.
+  // Historia, zeby nikt tego nie cofnal: staly tu kiedys slowa "the author pays
+  // only for the ones they accept" w czasach, gdy `acceptAnswer` i `resolveAsk`
+  // nie mialy ANI JEDNEGO wywolania w repo. Opis obiecywal petle, ktorej nie
+  // bylo. Zdanie zostalo wtedy sciete do samego zapieczetowania - jedynej
+  // rzeczy, ktora naprawde dzialala.
   //
-  // Zapieczetowanie odpowiedzi jest prawdziwe i wyegzekwowane regula
-  // Firestore - i tylko o tym mowimy, dopoki druga polowa petli nie powstanie.
-  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed — nobody can read what anyone else wrote before the author opens them.';
+  // Teraz petla jest zamknieta i to zdanie znow moze mowic o platnosci:
+  //   - POST /api/asks/[id]/accept  -> acceptAnswer (route.ts:244)
+  //   - POST /api/asks/[id]/resolve -> resolveAsk   (route.ts:98)
+  // Trasa przyjmujaca NIE wierzy w hash na slowo: `verifyBasePayment` patrzy
+  // na lancuch i wymaga transferu USDC nie mniejszego niz stawka za odpowiedz,
+  // na adres odpowiadajacego. Dlatego wolno napisac "pays".
+  //
+  // ESCROW JUZ WOLNO WYMIENIC, ALE TYLKO JAKO MOZLIWOSC. Kontrakt AskEscrow
+  // jest podpiety (app/utils/asks/escrow.ts, adresy w deployments/), a sciezka
+  // zakladania blokuje budzet PRZED zapisem dokumentu - wiec Ask z
+  // funding: 'escrowed' naprawde ma pokrycie. Ale wariant 'on-resolve' zyje
+  // dalej i przy nim nie ma zablokowane NIC. Dlatego zdanie mowi "can lock",
+  // a nie "is locked": opis dotyczy wszystkich Askow naraz, a one nie sa
+  // jednakowe. Nie zamieniaj tego na obietnice bezwarunkowa.
+  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed — nobody can read what anyone else wrote before the author opens them. The author can lock the whole budget in an escrow contract up front, and every payout is recorded onchain next to the answer that earned it.';
 
 export const metadata: Metadata = {
   title: 'Open asks',

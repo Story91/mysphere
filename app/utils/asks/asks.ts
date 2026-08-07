@@ -4,6 +4,7 @@ import {
   addDoc,
   getDoc,
   getDocs,
+  setDoc,
   updateDoc,
   query,
   where,
@@ -75,6 +76,10 @@ function toAsk(id: string, data: Record<string, any>): Ask {
     answerCount: Number(data.answerCount) || 0,
     acceptedCount: Number(data.acceptedCount) || 0,
     resolvedAt: data.resolvedAt ? toMillis(data.resolvedAt) : undefined,
+    escrowTxHash: typeof data.escrowTxHash === 'string' ? data.escrowTxHash : null,
+    escrowChainId: typeof data.escrowChainId === 'number' ? data.escrowChainId : null,
+    escrowResolveTxHash:
+      typeof data.escrowResolveTxHash === 'string' ? data.escrowResolveTxHash : null,
   };
 }
 
@@ -86,14 +91,56 @@ export type CreateAskInput = {
   durationMs: number;
   token?: string;
   network?: string;
+  /**
+   * Identyfikator nadany Z GORY przez `newAskId`.
+   *
+   * Potrzebny WYLACZNIE dla escrow i to jest jedyny powod, dla ktorego istnieje:
+   * kontrakt kluczuje escrow po (autor, askId), wiec askId musi byc znany PRZED
+   * transakcja - a transakcja idzie PRZED zapisem. Bez tego dokument powstalby
+   * pierwszy i przez chwile obiecywalby zablokowane srodki, ktorych jeszcze nie ma.
+   */
+  id?: string;
+  /**
+   * Termin PODANY WPROST, w milisekundach.
+   *
+   * Przy escrow ta sama liczba musi trafic do kontraktu i do dokumentu. Liczona
+   * dwa razy z `Date.now() + durationMs` rozjechalaby sie o czas approve i fund,
+   * czyli o kilkanascie sekund - a karta obiecywalaby wtedy inny termin niz ten,
+   * ktorego pilnuje lancuch.
+   */
+  deadlineMs?: number;
+  funding?: 'on-resolve' | 'escrowed';
+  /** Hash `fund`. WYMAGANY przy funding: 'escrowed' - patrz nizej. */
+  escrowTxHash?: string;
+  escrowChainId?: number;
 };
+
+/**
+ * Nadaje identyfikator dokumentu NIE ZAPISUJAC go.
+ *
+ * Firestore generuje identyfikatory lokalnie, wiec `doc(collection(...))` jest
+ * darmowy i nie tworzy dokumentu. Dzieki temu escrow moze pojsc na lancuch pod
+ * ostatecznym identyfikatorem, a Firestore dostaje zapis dopiero, gdy pieniadze
+ * naprawde leza.
+ */
+export function newAskId(): string {
+  return doc(collection(db, ASKS)).id;
+}
 
 /** @returns identyfikator utworzonego Aska. */
 export async function createAsk(input: CreateAskInput): Promise<string> {
   const seats = Math.max(1, Math.floor(input.seats));
   const budget = Math.max(0, input.budget);
+  const funding = input.funding ?? 'on-resolve';
 
-  const ref = await addDoc(collection(db, ASKS), {
+  // Zapisanie 'escrowed' bez hasha `fund` byloby obietnica bez pokrycia wpisana
+  // wprost do bazy - dokladnie tym, czego pole `funding` ma pilnowac. Bramka
+  // stoi TUTAJ, a nie tylko w UI, zeby zadna druga sciezka zapisu jej nie ominela.
+  if (funding === 'escrowed' && !input.escrowTxHash) {
+    throw new Error('An escrowed Ask cannot be recorded without the funding transaction hash.');
+  }
+
+  const payload = {
     author: input.author,
     question: input.question.trim(),
     budget,
@@ -101,17 +148,33 @@ export async function createAsk(input: CreateAskInput): Promise<string> {
     perAnswer: perAnswerFor(budget, seats),
     token: input.token ?? 'USDC',
     network: input.network ?? 'base',
-    // Termin liczony OD TERAZ po stronie klienta. Swiadome uproszczenie:
+    // Termin liczony OD TERAZ po stronie klienta, chyba ze wolajacy poda go
+    // wprost (escrow - patrz `deadlineMs`). Swiadome uproszczenie:
     // serverTimestamp() nie da sie dodac przesuniecia, a rozjazd zegara rzedu
     // sekund nie ma tu znaczenia przy terminach liczonych w godzinach.
-    deadline: Date.now() + input.durationMs,
+    deadline: input.deadlineMs ?? Date.now() + input.durationMs,
     createdAt: serverTimestamp(),
     status: 'open',
-    funding: 'on-resolve',
+    funding,
     answerCount: 0,
     acceptedCount: 0,
-  });
+    ...(funding === 'escrowed'
+      ? {
+          escrowTxHash: input.escrowTxHash,
+          escrowChainId: input.escrowChainId ?? null,
+        }
+      : {}),
+  };
 
+  if (input.id) {
+    // setDoc pod znanym identyfikatorem - ten sam, ktory posluzyl za askId na
+    // lancuchu. addDoc nadalby wlasny i escrow wisialby pod kluczem, do ktorego
+    // zaden dokument by nie prowadzil.
+    await setDoc(doc(db, ASKS, input.id), payload);
+    return input.id;
+  }
+
+  const ref = await addDoc(collection(db, ASKS), payload);
   return ref.id;
 }
 
@@ -160,27 +223,47 @@ export async function getOpenAsks(max = 20): Promise<AsksResult> {
  * Liczba odpowiedzi jest jawna celowo: karta ma pokazywac "7 answers sealed
  * until resolve". Jawne jest TO, ZE ktos odpowiedzial; niejawne CO napisal.
  */
+function toAnswerMeta(id: string, data: Record<string, any>): AskAnswer {
+  return {
+    id,
+    askId: typeof data.askId === 'string' ? data.askId : '',
+    author: typeof data.author === 'string' ? data.author : '',
+    createdAt: toMillis(data.createdAt),
+    content: null, // zapieczetowane - tresc wydaje wylacznie trasa serwerowa
+    accepted: Boolean(data.accepted),
+    payoutTxHash: typeof data.payoutTxHash === 'string' ? data.payoutTxHash : null,
+    // Kwota zapisana w chwili przyjecia. `null` znaczy "nie wiadomo ile",
+    // a nie "zero" - patrz komentarz przy tych polach w types.ts.
+    payoutAmount: typeof data.payoutAmount === 'number' ? data.payoutAmount : null,
+    payoutToken: typeof data.payoutToken === 'string' ? data.payoutToken : null,
+    payoutNetwork: typeof data.payoutNetwork === 'string' ? data.payoutNetwork : null,
+  };
+}
+
 export async function getAnswerMeta(askId: string): Promise<AskAnswer[]> {
   const snapshot = await getDocs(
     query(collection(db, ASK_ANSWERS), where('askId', '==', askId), orderBy('createdAt', 'asc'))
   );
-  return snapshot.docs.map((d) => {
-    const data = d.data();
-    return {
-      id: d.id,
-      askId,
-      author: typeof data.author === 'string' ? data.author : '',
-      createdAt: toMillis(data.createdAt),
-      content: null, // zapieczetowane - tresc wydaje wylacznie trasa serwerowa
-      accepted: Boolean(data.accepted),
-      payoutTxHash: typeof data.payoutTxHash === 'string' ? data.payoutTxHash : null,
-      // Kwota zapisana w chwili przyjecia. `null` znaczy "nie wiadomo ile",
-      // a nie "zero" - patrz komentarz przy tych polach w types.ts.
-      payoutAmount: typeof data.payoutAmount === 'number' ? data.payoutAmount : null,
-      payoutToken: typeof data.payoutToken === 'string' ? data.payoutToken : null,
-      payoutNetwork: typeof data.payoutNetwork === 'string' ? data.payoutNetwork : null,
-    };
-  });
+  return snapshot.docs.map((d) => toAnswerMeta(d.id, d.data()));
+}
+
+/**
+ * JEDNA odpowiedz po jej identyfikatorze - bez tresci, jak wszedzie tutaj.
+ *
+ * === PO CO OSOBNO OD `getAnswerMeta` ===
+ * Trasa przyjmujaca odpowiedz musi sprawdzic trzy rzeczy o JEDNEJ odpowiedzi:
+ * czy nalezy do tego Aska, czy nie jest juz przyjeta i komu nalezy sie przelew.
+ * `getAnswerMeta` odpowiedzialoby na to zapytaniem `askId ==` z `orderBy`, czyli
+ * odczytem WSZYSTKICH odpowiedzi tego Aska ORAZ indeksem zlozonym. Odczyt po
+ * kluczu to jeden dokument i zadnego indeksu.
+ *
+ * @returns `null` znaczy "nie ma takiej odpowiedzi". Blad odczytu leci wyzej -
+ * "nie udalo sie sprawdzic" nie moze wygladac jak "nie istnieje".
+ */
+export async function getAnswer(answerId: string): Promise<AskAnswer | null> {
+  const snapshot = await getDoc(doc(db, ASK_ANSWERS, answerId));
+  if (!snapshot.exists()) return null;
+  return toAnswerMeta(snapshot.id, snapshot.data());
 }
 
 /** Czy ten adres juz odpowiedzial. Jedna odpowiedz na osobe i na Aska. */
@@ -263,11 +346,19 @@ export async function acceptAnswer(
   });
 }
 
-/** Zamyka Aska. Wolane, gdy autor skonczyl przyjmowac odpowiedzi. */
-export async function resolveAsk(askId: string): Promise<void> {
+/**
+ * Zamyka Aska. Wolane, gdy autor skonczyl przyjmowac odpowiedzi.
+ *
+ * `escrowResolveTxHash` podaje sciezka escrow: to hash transakcji `resolve` na
+ * kontrakcie, czyli moment, w ktorym budzet przestal byc autora. Dla wariantu
+ * 'on-resolve' zostaje pusty - tam dowodem sa hashe przy poszczegolnych
+ * odpowiedziach, bo kazda byla osobnym przelewem.
+ */
+export async function resolveAsk(askId: string, escrowResolveTxHash?: string): Promise<void> {
   await updateDoc(doc(db, ASKS, askId), {
     status: 'resolved',
     resolvedAt: serverTimestamp(),
+    ...(escrowResolveTxHash ? { escrowResolveTxHash } : {}),
   });
 }
 

@@ -21,24 +21,28 @@
  *   Ask            tresci JESZCZE nie ma -> placisz, zeby ktos ja napisal
  *                  ryzyko po stronie PISZACEGO (pracuje przed zaplata)
  *
- * === CZEGO TU CELOWO NIE MA: ESCROW ===
- * Manifest mowi "fund it once in USDC" - czyli pieniadze blokuja sie przy
- * zakladaniu Aska. W repo NIE MA kontraktu escrow, a napisanie go to Solidity,
- * wdrozenie i srodki wlasciciela. Dlatego pierwsza wersja placi PRZY
- * ROZSTRZYGNIECIU: autor wysyla przelew do kazdej przyjetej odpowiedzi i hash
- * ladzie przy niej na stale.
+ * === DWA WARIANTY FINANSOWANIA I DLACZEGO OBA ZOSTAJA ===
+ * Pierwsza wersja placila WYLACZNIE przy rozstrzygnieciu ('on-resolve'): autor
+ * wysylal przelew do kazdej przyjetej odpowiedzi i hash ladowal przy niej na
+ * stale. To jest slabsza obietnica niz manifestowe "fund it once in USDC" -
+ * budzet lezy w portfelu autora i nic go nie blokuje.
  *
- * To jest slabsza obietnica niz w manifescie i NIE WOLNO jej opisywac jako
- * escrow. Pole `funding` mowi wprost, ktory to wariant, zeby interfejs nie
- * mogl obiecac czegos, czego nie ma.
+ * Od wdrozenia kontraktu AskEscrow (contracts/AskEscrow.sol, adresy w
+ * deployments/askEscrow.<chainId>.json) istnieje takze wariant 'escrowed':
+ * budzet jest pobierany przy zakladaniu Aska i lezy na kontrakcie, ktory nie ma
+ * ani wlasciciela, ani pauzy, ani funkcji ratunkowej.
+ *
+ * Pole `funding` mowi wprost, ktory to wariant, i KAZDY tekst o pieniadzach
+ * przy Asku musi z niego wynikac. Interfejs nie ma prawa napisac "held in
+ * escrow" przy Asku, ktory ma 'on-resolve' - i odwrotnie.
  */
 
 export type AskStatus = 'open' | 'resolved' | 'expired';
 
 /**
  * Skad biora sie pieniadze.
- * - `on-resolve`  autor placi przy rozstrzygnieciu (dzis jedyny wariant)
- * - `escrowed`    srodki zablokowane przy zakladaniu (wymaga kontraktu)
+ * - `on-resolve`  autor placi z wlasnego portfela przy przyjmowaniu odpowiedzi
+ * - `escrowed`    srodki pobrane i zablokowane na kontrakcie przy zakladaniu
  */
 export type AskFunding = 'on-resolve' | 'escrowed';
 
@@ -65,6 +69,31 @@ export type Ask = {
   /** Ile miejsc juz zajetych (przyjetych odpowiedzi). */
   acceptedCount: number;
   resolvedAt?: number;
+
+  /* --- POLA ISTOTNE WYLACZNIE DLA `funding: 'escrowed'` --- */
+
+  /**
+   * Hash transakcji `fund` - DOWOD, ze budzet naprawde lezy na kontrakcie.
+   *
+   * Bez niego slowo "escrowed" w dokumencie jest samym slowem. Zapisywany
+   * dopiero po POTWIERDZONEJ i niecofnietej transakcji (patrz fundAsk
+   * w ./escrow.ts), nigdy przed.
+   */
+  escrowTxHash?: string | null;
+  /**
+   * Siec, na ktorej lezy escrow. Adres kontraktu wynika z niej jednoznacznie
+   * (deployments/askEscrow.<chainId>.json), wiec adresu NIE duplikujemy tutaj -
+   * dwa zrodla prawdy o tym, gdzie leza pieniadze, to o jedno za duzo.
+   */
+  escrowChainId?: number | null;
+  /**
+   * Hash transakcji `resolve` - moment, w ktorym srodki przestaly byc autora.
+   *
+   * UWAGA NA SLOWA: resolve() nie wysyla tokenow, tylko przypisuje salda.
+   * Ta transakcja jest dowodem PRZYZNANIA, a nie dostarczenia - dostarcza
+   * dopiero claim() po stronie odpowiadajacego.
+   */
+  escrowResolveTxHash?: string | null;
 };
 
 export type AskAnswer = {

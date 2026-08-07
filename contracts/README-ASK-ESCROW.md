@@ -6,29 +6,49 @@ dopiero przy rozstrzygnieciu albo po terminie.
 Domyka jedyna obietnice z manifestu (`app/re-definition/page.tsx`, sekcja
 `$2.00 - one seat, one answer`), ktora byla tam opisana w czasie terazniejszym,
 a nie istniala: *"You set all three, fund it once in USDC"*.
-`app/utils/asks/types.ts` sam to przyznaje - dzisiejszy wariant to
-`funding: 'on-resolve'`, czyli autor placi dopiero przy przyjeciu odpowiedzi,
-albo nie placi wcale.
+
+Od podpiecia kontraktu `funding` ma dwie wartosci i **obie zyja**: `'escrowed'`
+blokuje budzet przy zakladaniu, `'on-resolve'` nie blokuje NICZEGO i autor placi
+dopiero przy przyjeciu odpowiedzi, albo nie placi wcale. Escrow jest wyborem
+autora dla pojedynczego Aska, nie wlasnoscia produktu - zaden tekst nie ma prawa
+napisac "budzet jest zablokowany" bez zajrzenia w to pole.
 
 ## Stan wdrozenia
 
-| | |
-|---|---|
-| **Base Sepolia (84532)** | `0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6` |
-| blok | 45141319 |
-| transakcja | `0xda4602608629843df3c0f3b9cb413407efcec2bddcac38aa7d1d345118642a5f` |
-| token | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (USDC, 6 miejsc) |
-| oplata | 2,5% (`FEE_BPS = 250`, limit 500) |
-| zrodlo | **zweryfikowane na Basescanie** |
+| | Base mainnet (8453) | Base Sepolia (84532) |
+|---|---|---|
+| adres | `0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340` | `0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6` |
+| blok | 49635587 | 45141319 |
+| transakcja | `0xef01d6ae1dbdd2efdfdbc166c2cbc43d05f31bb25c38db5b44732e6312376255` | `0xda4602608629843df3c0f3b9cb413407efcec2bddcac38aa7d1d345118642a5f` |
+| token | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (USDC, 6 miejsc) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (USDC, 6 miejsc) |
+| oplata | 2,5% (`FEE_BPS = 250`, limit 500) | 2,5% (`FEE_BPS = 250`, limit 500) |
+| zrodlo | **zweryfikowane na Basescanie** | **zweryfikowane na Basescanie** |
 
-**Mainnet: NIE wdrozony.** Skrypt wdrozeniowy odmawia wejscia na mainnet bez
-`ASK_ESCROW_CONFIRM_MAINNET=yes` - kontrakt jest niezmienny, wiec pomylka
-sieci kosztuje wdrozenie od nowa.
+Zrodlo mainnetu:
+<https://basescan.org/address/0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340#code>
 
-> **Odbiorca oplaty na testnecie to ten sam goracy klucz, ktory wdrazal**
-> (`ADMIN_PRIVATE_KEY`). Na testnecie jest to bez znaczenia; przy mainnecie
-> nalezy podac osobny adres przez `ASK_ESCROW_FEE_RECIPIENT` - skrypt wymaga
-> go teraz jawnie i odmawia, gdy zmienna jest pusta.
+Adresy sa w `deployments/askEscrow.<chainId>.json` i **stamtad je czytaj** -
+`app/utils/asks/escrow.ts` importuje oba pliki i wybiera po `chainId`. Nie wpisuj
+adresu na sztywno w kodzie ani w tekscie interfejsu.
+
+> ### Odbiorca oplaty to ten sam goracy klucz, ktory wdrazal
+>
+> `FEE_RECIPIENT` = `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` na **obu**
+> sieciach, mainnet wlacznie, i jest to adres wyprowadzony z `ADMIN_PRIVATE_KEY`.
+> Zamiar byl inny - skrypt ma `ASK_ESCROW_FEE_RECIPIENT` wlasnie po to, zeby
+> podac osobny adres - ale mainnet poszedl bez niego.
+>
+> **Co to znaczy naprawde:** klucz uzywany do wdrozen zbiera oplaty. `FEE_BPS`
+> i `FEE_RECIPIENT` sa `immutable`, wiec zmiana to **nowy deployment**, a nie
+> transakcja administracyjna.
+>
+> **Czego to NIE znaczy:** ten klucz nie ma wladzy nad cudzymi pieniedzmi.
+> Kontrakt nie ma `owner`, `pause`, `upgrade` ani funkcji ratunkowej, a
+> `FEE_RECIPIENT` odbiera swoje saldo tym samym `claim()` co kazdy inny.
+> Przejecie klucza kosztuje zebrane oplaty - nie budzety Askow.
+>
+> Wlasciciel podjal te decyzje swiadomie. Jest tu opisana, zeby przy nastepnym
+> wdrozeniu byla wyborem, a nie przeoczeniem.
 
 ---
 
@@ -60,6 +80,38 @@ seats * perAnswer          salda przypisane                (kontrakt wysyla
                            budzet wraca do autora
                            minus oplata
 ```
+
+### Gdzie DOKLADNIE leci oplata
+
+Nie ma jednego zdania "oplata jest przy wygasnieciu" - to bylo prawda przed
+przegladem adwersarialnym i **juz nie jest**. Regula, ktora obowiazuje w kodzie:
+
+**oplate placi wylacznie to, co WRACA DO AUTORA.** Wyplata dla odpowiadajacego
+to zawsze pelne `perAnswer`, nigdy pomniejszone.
+
+| sytuacja | co wraca do autora | oplata |
+|---|---|---|
+| `resolve` **przed** `deadline` | nic - trzeba wypelnic KAZDE miejsce (`EarlyResolveMustFillSeats`) | **zero**, bo zwrot jest zerowy |
+| `resolve` **po** `deadline`, czesciowe | `(seats - n) * perAnswer` | **2,5% od zwrotu** |
+| `settleExpired` po `deadline + 48h` | caly budzet | **2,5% od budzetu** |
+
+Powod, dla ktorego oplata jest takze przy `resolve` (`AskEscrow.sol:529-553`):
+gdyby jej tam nie bylo, odzyskanie pieniedzy przez `resolve` byloby zawsze
+tansze niz przez wygasniecie, wiec autorowi **oplacaloby sie** przyjac jedna
+odpowiedz zamiast zadnej i na tym skonczyc. Teraz obie drogi wyjscia kosztuja
+tyle samo i wybor miedzy nimi przestaje byc decyzja finansowa.
+
+> **UWAGA: docblock nad `resolve()` w `AskEscrow.sol` (linie 415-417) mowi
+> odwrotnie** - *"Niewykorzystane miejsca wracaja do autora BEZ oplaty. Oplata
+> jest wylacznie na sciezce wygasniecia"*. To zostalo z wersji sprzed naprawy
+> i **klamie**; kod 60 linii nizej pobiera oplate od zwrotu.
+>
+> Komentarza **nie poprawiono celowo**. Zrodlo jest zweryfikowane na Basescanie,
+> a metadane solc obejmuja hash zrodla - zmiana chocby jednego znaku w
+> komentarzu sprawia, ze plik w repo przestaje odtwarzac wdrozony bytecode co do
+> bajta. Wybor byl miedzy myslacym komentarzem a odtwarzalnoscia; wygrala
+> odtwarzalnosc, a sprostowanie stoi tutaj. **Przy nastepnym deploymencie
+> popraw tamten docblock** - wtedy zrodlo i tak sie zmienia.
 
 | Funkcja | Kto | Kiedy |
 |---|---|---|
@@ -242,6 +294,38 @@ oddala), a dostarczenie robi `claimFor()`. To mocniejsza obietnica niz dzisiejsz
   z testow (922 207) co do dwunastu jednostek, a `verifyAskEscrow.js`
   porownuje bytecode z lancucha z lokalnym artefaktem (2,51% roznicy = sloty
   `immutable`).
+
+### Co PRZESZLO na prawdziwym lancuchu, a co NIE
+
+Ta granica ma znaczenie przy pisaniu czegokolwiek dla uzytkownika. Nie zacieraj
+jej slowem "przetestowane".
+
+**Przeszlo (Base Sepolia, prawdziwe USDC, nie MockUSDC), dwa razy:**
+`approve` -> `fund` -> `resolve` z dwoma zwyciezcami -> `claimFor` x2.
+Skrypt: `scripts/askEscrowCycle.js`. Salda po cyklu zgodne co do jednostki,
+`totalLiabilities` wrocilo do zera.
+
+**NIE przeszlo na zadnym lancuchu:**
+
+1. **Sciezka wygasniecia (`settleExpired`).** Wymaga `deadline + 48h`, a czasu
+   na publicznej sieci nie da sie przewinac. Pokryta **wylacznie testem
+   jednostkowym**. Wolno napisac, ze kontrakt ja ma; **nie wolno napisac, ze
+   zostala sprawdzona onchain**.
+2. **Cala sciezka z przegladarki.** Kod klienta (`app/utils/asks/escrow.ts`,
+   `app/asks/page.tsx`) jest sprawdzony typami i buildem, nie ruchem pieniedzy.
+   Cykl powyzej dowodzi **kontraktu**, nie tego kodu - szedl skryptem z node,
+   nie portfelem w oknie.
+3. **Mainnet.** Kontrakt stoi i ma zweryfikowane zrodlo. Przez `fund()` na 8453
+   nie przeszedl jeszcze ani jeden dolar.
+
+### Czego NIE MA w interfejsie
+
+`settleExpired` **nie ma zadnego wywolania w `app/`**. Autor, ktoremu minal
+termin plus 48h, nie ma z UI jak odzyskac budzetu - musi zawolac kontrakt
+recznie. Srodki nie sa uwiezione (funkcja jest bez uprawnien, wiec zawolac moze
+ktokolwiek), ale **produkt nie robi tego za niego**. To jedyna sciezka kontraktu
+bez interfejsu i tak jest opisana w manifescie (`Ask: expiry refund in the
+interface`, status `not built`).
 
 ### Konfiguracja hardhata (zalatwione)
 
