@@ -10,6 +10,38 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   trailingSlash: true,
+
+  // ===========================================================================
+  // BEZ TEGO ZADEN OBRAZEK PODGLADU NIE DZIALA NA X, FACEBOOKU ANI SLACKU
+  // ===========================================================================
+  // `trailingSlash: true` przekierowuje KAZDA sciezke bez ukosnika na wersje
+  // z ukosnikiem. Dotyczy to takze tras generujacych obrazki Open Graph -
+  // a Next wypisuje je w znaczniku BEZ ukosnika:
+  //
+  //     <meta property="og:image" content=".../opengraph-image?e51d61f5...">
+  //
+  // Zmierzone na produkcji:
+  //     /opengraph-image           -> 308, text/plain, 15 bajtow
+  //     /opengraph-image/          -> 200, image/png, 37 125 bajtow
+  //
+  // Crawler pobierajacy SAM OBRAZEK nie idzie za przekierowaniem tak, jak robi
+  // to przy stronie - dostaje 308 i rezygnuje. Skutek: link do MySphere na X
+  // wychodzil bez miniatury, mimo ze wszystkie znaczniki byly poprawne,
+  // obrazek sie generowal, a walidator strony pokazywal komplet metadanych.
+  // Blad byl niewidoczny w kazdym miejscu poza faktycznym udostepnieniem.
+  //
+  // Dotyczylo to WSZYSTKICH PIECIU tras z wlasna karta (strona glowna,
+  // /leaderboard, /post/[id], /tip/[txHash], /u/[address]).
+  //
+  // `skipTrailingSlashRedirect` wylacza samo PRZEKIEROWANIE, nie zmieniajac
+  // tego, jak Next generuje odnosniki - linki dalej dostaja ukosnik, a adres
+  // bez ukosnika przestaje odbijac sie 308 i jest obslugiwany od razu.
+  // Wybrane zamiast recznego nadpisywania `openGraph.images` w pieciu plikach,
+  // bo metadane z konwencji plikowej (opengraph-image.tsx) maja w Next
+  // pierwszenstwo nad wpisem w konfiguracji - takie nadpisanie po cichu nie
+  // zadzialaloby, czyli byloby poprawka wygladajaca na zrobiona.
+  skipTrailingSlashRedirect: true,
+
   images: {
     unoptimized: true,
   },

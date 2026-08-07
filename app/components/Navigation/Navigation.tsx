@@ -169,6 +169,17 @@ export default function Navigation() {
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
     { href: '/leaderboard', label: 'Paid' },
+    // "How" TUZ PRZED manifestem, bo odpowiadaja na dwa rozne pytania i to
+    // pierwsze jest pilniejsze. /re-definition mowi, DLACZEGO ten produkt
+    // istnieje - i ma prawo opisywac rzeczy, ktorych jeszcze nie ma. /how mowi,
+    // CO DA SIE ZROBIC TERAZ, i nie ma tam ani jednego zdania w czasie
+    // przyszlym.
+    //
+    // Zgloszenie, ktore to wywolalo, brzmialo wprost: "zrob tutorial dla
+    // uzytkownikow co mozna robic w tej aplikacji". Wczesniej jedyna droga do
+    // dowiedzenia sie, ze da sie sprzedac czesc posta albo zalozyc Aska
+    // z budzetem, bylo natkniecie sie na przycisk.
+    { href: '/how', label: 'How' },
     { href: '/re-definition', label: 'Re-Definition' },
   ];
 
