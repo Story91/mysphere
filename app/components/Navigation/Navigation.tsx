@@ -154,6 +154,16 @@ export default function Navigation() {
     // produktu, wiec nie moze stac za czterema modulami, z ktorych wiekszosc
     // jest dzis wylaczona.
     { href: '/asks', label: 'Asks' },
+    // Money stoi TUZ ZA Askami, bo to ich druga polowa: Ask jest miejscem, w
+    // ktorym pieniadze sie zaczynaja, a /money jedynym, w ktorym widac, gdzie
+    // skonczyly. Do niedawna saldo do odebrania z kontraktu escrow pokazywalo
+    // sie WYLACZNIE na /asks - czyli czlowiek, ktoremu przyznano wyplate,
+    // dowiadywal sie o niej tylko wtedy, gdy sam wrocil na tamta liste.
+    //
+    // NAZWA: "Money", nie "Wallet" i nie "Portfolio". Portfel jest w prawym
+    // rogu tej samej belki i pokazuje salda tokenow; ta strona nie zna zadnych
+    // sald ani kursow i nie ma udawac, ze zna. "Portfolio" obiecywaloby wycene.
+    { href: '/money', label: 'Money' },
     { href: '/base', label: 'MyBase' },
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },

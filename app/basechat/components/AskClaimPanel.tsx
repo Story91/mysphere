@@ -44,7 +44,23 @@ const ESCROW_CHAIN_ID = base.id;
 
 type Phase = 'loading' | 'ready' | 'failed';
 
-export default function AskClaimPanel({ className = '' }: { className?: string }) {
+export default function AskClaimPanel({
+  className = '',
+  showEmpty = false,
+}: {
+  className?: string;
+  /**
+   * Czy odezwac sie takze przy saldzie ZEROWYM.
+   *
+   * Domyslnie `false` i tak zostaje na /asks: tam panel jest wtretem nad lista
+   * pytan, wiec "nie masz nic do odebrania" byloby zdaniem, o ktore nikt nie
+   * pytal. Na /money jest odwrotnie - cala strona istnieje po to, zeby
+   * odpowiedziec na pytanie "ile mam do odebrania", a milczenie nie jest tam
+   * odpowiedzia. To wciaz JEDEN panel i jedna sciezka claim(); rozni sie tylko
+   * to, czy zero wolno przemilczec.
+   */
+  showEmpty?: boolean;
+}) {
   const { address } = useAccount();
   const chainId = useChainId();
   const publicClient = usePublicClient({ chainId: ESCROW_CHAIN_ID });
@@ -98,7 +114,7 @@ export default function AskClaimPanel({ className = '' }: { className?: string }
 
   // Saldo zero i odczyt udany: nie ma o czym mowic. To JEDYNY przypadek, w
   // ktorym panel milczy - awaria odczytu ma swoj wlasny widok nizej.
-  if (phase === 'ready' && units === 0n && !claimedTx) return null;
+  if (phase === 'ready' && units === 0n && !claimedTx && !showEmpty) return null;
 
   const wrap = `rounded-card border border-soft-accent/40 bg-soft-accent-soft p-4 font-soft shadow-card sm:p-5 ${className}`;
   const buttonClass =
@@ -127,6 +143,32 @@ export default function AskClaimPanel({ className = '' }: { className?: string }
         <button type="button" onClick={() => void load()} className={`${buttonClass} bg-soft-primary text-white`}>
           Try again
         </button>
+      </section>
+    );
+  }
+
+  /**
+   * Saldo zerowe, ale wolajacy prosil o odpowiedz mimo wszystko (`showEmpty`).
+   *
+   * Panel jest wtedy NEUTRALNY, nie bursztynowy: bursztyn w tej aplikacji niesie
+   * KWOTE, a tutaj zadnej kwoty nie ma. Zdanie mowi rowniez, czego ten odczyt
+   * dotyczy - inaczej "nic tu nie ma" brzmi jak zdanie o calym portfelu, a
+   * dotyczy wylacznie ksiegi kontraktu escrow.
+   */
+  if (phase === 'ready' && units === 0n && !claimedTx) {
+    return (
+      <section
+        className={`rounded-card border border-soft-line bg-soft-surface p-4 font-soft shadow-card sm:p-5 ${className}`}
+        aria-label="Escrow balance"
+      >
+        <h2 className="mb-1 font-soft-display text-[15px] font-bold text-soft-ink">
+          Nothing waiting to be collected
+        </h2>
+        <p className="break-words text-[12.5px] leading-[1.5] text-soft-ink-muted">
+          The escrow contract is not holding anything for this wallet right now. Accepted answers
+          and the unused part of your own Ask budgets both land here, and they wait as long as you
+          need them to.
+        </p>
       </section>
     );
   }

@@ -20,10 +20,22 @@ import { usePathname } from 'next/navigation';
  * Ten pasek to zwykle LINKI, nie przelacznik stanu. Dziala wiec na kazdej
  * trasie i mozna go dolozyc wszedzie tam, gdzie ktos moze utknac.
  *
- * === DLACZEGO TRZY POZYCJE, A NIE PIEC ===
- * Przy 320px czwarta etykieta zaczyna sie lamac. Trzy pozycje to trzy
- * kierunki, w ktore czlowiek naprawde chce wyjsc: wrocic do feedu, zobaczyc
- * pytania z kwota, zobaczyc rozliczone platnosci.
+ * === DLACZEGO CZTERY POZYCJE, A NIE PIEC ===
+ * Bylo tu trzy, z uzasadnieniem "przy 320px czwarta etykieta zaczyna sie
+ * lamac". To ograniczenie dotyczy DLUGOSCI etykiety, nie samej liczby pozycji:
+ * przy 320px pasek ma 288px wnetrza, a przycisk to max(44px, etykieta + 16px).
+ * Cztery etykiety po najwyzej piec znakow ("Feed", "Asks", "Paid", "Money")
+ * daja 4 x 44 = 176px, czyli 112px zapasu na odstepy. Piata pozycja albo
+ * etykieta dluzsza niz piec znakow ten zapas zjada - i wtedy uzasadnienie
+ * wyzej wraca w mocy.
+ *
+ * Czwarta pozycja to "Money" i nie jest ozdobnikiem: bez niej saldo do
+ * odebrania z kontraktu escrow bylo widoczne WYLACZNIE na /asks, a na telefonie
+ * dodatkowo tylko po wejsciu w tamta zakladke. Pieniadze, ktore czekaja na
+ * czlowieka, nie moga byc schowane o jedno kliknięcie glebiej niz feed.
+ *
+ * Cztery kierunki: wrocic do feedu, zobaczyc pytania z kwota, zobaczyc
+ * rozliczone platnosci wszystkich, zobaczyc WLASNE.
  */
 
 const POZYCJE = [
@@ -51,6 +63,19 @@ const POZYCJE = [
     icon: (
       <>
         <path d="M4 19V10M10 19V5M16 19v-6M22 19H2" />
+      </>
+    ),
+  },
+  {
+    href: '/money',
+    label: 'Money',
+    // Banknot, a nie slupki - slupki oznaczaja w tym pasku "Paid", czyli cudze
+    // rozliczenia. Dwie strony o pieniadzach musza roznic sie KSZTALTEM, nie
+    // samym napisem: przy 11.5px etykieta czytana katem oka nie rozstrzyga.
+    icon: (
+      <>
+        <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
+        <circle cx="12" cy="12" r="2.5" />
       </>
     ),
   },

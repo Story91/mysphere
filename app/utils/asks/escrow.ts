@@ -41,6 +41,13 @@ export type AskEscrowDeployment = {
   address: Address;
   /** Token rozliczeniowy TEGO wdrozenia - USDC, 6 miejsc. */
   token: Address;
+  /**
+   * Odbiorca oplaty ZADEKLAROWANY w pliku wdrozenia. W kontrakcie ta wartosc
+   * jest immutable, wiec plik i lancuch nie maja prawa sie rozjechac - i wlasnie
+   * dlatego pole tu jest: konsola operatora porownuje je z FEE_RECIPIENT()
+   * odczytanym z lancucha. Rozjazd znaczylby, ze plik opisuje INNE wdrozenie.
+   */
+  feeRecipient: Address;
   feeBps: number;
   /** Hash transakcji wdrozeniowej - link do dowodu, nie do uzytku w kodzie. */
   deployTxHash: string;
@@ -59,6 +66,7 @@ const DEPLOYMENTS: Record<number, AskEscrowDeployment> = Object.fromEntries(
       chainId: raw.chainId,
       address: raw.address as Address,
       token: raw.token as Address,
+      feeRecipient: raw.feeRecipient as Address,
       feeBps: raw.feeBps,
       deployTxHash: raw.txHash,
     },

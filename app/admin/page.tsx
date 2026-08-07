@@ -496,6 +496,17 @@ export default function AdminPanel() {
         Panel Administratora
       </h1>
 
+      {/* Konsola operatora stoi za WLASNA bramka serwerowa (sesja SIWE + adres
+          admina), wiec to jest tylko odnosnik, a nie nadanie dostepu. Zwykly
+          <a>, nie <Link>: docelowa strona jest komponentem serwerowym, ktory
+          czyta cookie sesji, i ma sie przeladowac w calosci. */}
+      <a
+        href="/admin/ops"
+        className="inline-flex items-center gap-2 mb-8 px-4 py-2 rounded-lg border border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:scale-[1.02] active:scale-[0.98]"
+      >
+        Operator console — gas, escrow solvency, contracts
+      </a>
+
       {/* Firebase Cost Optimization Notice */}
               <div className="mb-6 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
           <h3 className="text-lg font-semibold text-green-400 mb-2">🎉 Krytyczna Optymalizacja Kosztów Firebase Zakończona!</h3>
