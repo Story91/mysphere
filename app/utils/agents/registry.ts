@@ -346,7 +346,13 @@ export async function getAgent(address: string): Promise<AgentRecord | null> {
     return snapshot.exists() ? mapAgentDoc(snapshot.id, snapshot.data()) : null;
   } catch (error) {
     warnOnce('nie udalo sie pobrac agenta', error);
-    return null;
+    /**
+     * `null` jest tu ZAJETE przez "nie ma go w rejestrze" - odpowiedz o swiecie.
+     * Oddanie go takze przy awarii sprawialo, ze `isAgentTrusted` pisalo
+     * czlowiekowi "Agent is not in the MySphere registry" o agencie, ktory jest
+     * w rejestrze zarejestrowany. Awaria musi miec wlasne wyjscie.
+     */
+    throw error;
   }
 }
 
@@ -436,6 +442,13 @@ export async function listAgents(options: ListAgentsOptions = {}): Promise<ListA
  * Opinie o jednym agencie. Zapytanie po JEDNYM polu (`agentAddress`), bez
  * `orderBy` - sortowanie robimy w pamieci, zeby nie wymagac indeksu zlozonego.
  * Liczba opinii na agenta jest mala, wiec to nic nie kosztuje.
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od pustki.
+ *
+ * Pusta lista opinii to zdanie "nikt jeszcze nie ocenil tego agenta", czyli
+ * wprost przeciwienstwo zaufania. Wpisywanie go po nieudanym zapytaniu psulo
+ * jedyna liczbe, dla ktorej ten ekran istnieje. useFeedback i useAgent maja
+ * juz wlasne stany bledu - byly martwe, bo nigdy nie dostawaly wyjatku.
  */
 export async function getAgentFeedback(
   address: string,
@@ -458,13 +471,16 @@ export async function getAgentFeedback(
       .sort((a, b) => Date.parse(b.createdAt || '0') - Date.parse(a.createdAt || '0'));
   } catch (error) {
     warnOnce('nie udalo sie pobrac opinii', error);
-    return [];
+    throw error;
   }
 }
 
 /**
  * Reputacja agenta. `unified` bierzemy z ZDENORMALIZOWANYCH licznikow na
  * dokumencie agenta (jeden odczyt po kluczu), `perChain` z opinii.
+ *
+ * @throws gdy ktorykolwiek z dwoch odczytow padnie. Zera w `unified` znacza
+ * "agenta nie ma w rejestrze", nie "nie udalo sie sprawdzic".
  */
 export async function getReputation(address: string): Promise<AgentReputation> {
   const [agent, feedback] = await Promise.all([getAgent(address), getAgentFeedback(address)]);
@@ -475,7 +491,14 @@ export async function getReputation(address: string): Promise<AgentReputation> {
   };
 }
 
-/** Szybkie sprawdzenie zaufania - jeden odczyt po kluczu. */
+/**
+ * Szybkie sprawdzenie zaufania - jeden odczyt po kluczu.
+ *
+ * @throws gdy odczyt padnie. `trusted: false` z powodem "Agent is not in the
+ * MySphere registry" jest TWIERDZENIEM o agencie i wolno je wypowiedziec
+ * wylacznie po udanym odczycie. KYATrustBadge lapie wyjatek i nie rysuje
+ * odznaki - brak odznaki nikogo nie oskarza.
+ */
 export async function isAgentTrusted(
   address: string,
   opts: { minScore?: number; minFeedback?: number } = {}

@@ -40,7 +40,17 @@ export interface UseSocialResult {
   followStats: FollowStats | null;
   friendsStats: FriendsStats | null;
   notificationsSummary: NotificationSummary | null;
-  unreadCount: number;
+  /**
+   * Nazwy sekcji, ktorych NIE UDALO SIE odczytac ('followers', 'following',
+   * 'friends', 'notifications', 'followStats', 'friendsStats',
+   * 'notificationsSummary').
+   *
+   * Widok musi to odroznic od pustki: pusta lista obserwujacych znaczy "nikt
+   * cie nie obserwuje", a to zdanie o czlowieku, nie o naszym zapytaniu.
+   */
+  failedSections: string[];
+  /** `null` = liczby NIE ODCZYTANO. Zero znaczy "nic nowego" i jest inna informacja. */
+  unreadCount: number | null;
   
   // Actions
   followUser: (targetUserId: string) => Promise<boolean>;
@@ -76,7 +86,8 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
   const [followStats, setFollowStats] = useState<FollowStats | null>(null);
   const [friendsStats, setFriendsStats] = useState<FriendsStats | null>(null);
   const [notificationsSummary, setNotificationsSummary] = useState<NotificationSummary | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const [failedSections, setFailedSections] = useState<string[]>([]);
 
   // Refs to prevent stale closures
   const socialAPIRef = useRef<SocialAPI | null>(null);
@@ -130,7 +141,7 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
       } catch (err) {
         if (loadTokenRef.current !== token) return;
         console.error('Error initializing social features:', err);
-        setError('Błąd inicjalizacji funkcji społecznościowych');
+        setError("Social features couldn't be loaded.");
         setLoading(false);
       }
     };
@@ -147,44 +158,66 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
   // 📊 DATA LOADING
   // ===============================================
 
+  /**
+   * KAZDY ODCZYT NIESIE WLASNA AWARIE.
+   *
+   * Wczesniej stalo tu jedno `Promise.all` w jednym `try`: padniecie
+   * ktoregokolwiek z siedmiu zapytan kasowalo WSZYSTKIE - lista obserwujacych
+   * znikala, bo nie udalo sie policzyc powiadomien. Teraz kazde zapytanie ma
+   * wlasny `catch`: liczniki, ktorych nie odczytano, sa `null` (czyli "nie
+   * wiem", a nie "zero"), a nazwy padnietych sekcji ida do `failedSections`,
+   * zeby widok napisal o nich prawde zamiast pokazac pustke. Ten sam podzial
+   * na osobne awarie co w getAskUserStats.
+   */
   const loadAllData = async (api: SocialAPI, token = loadTokenRef.current) => {
-    try {
-      const [
-        followersData,
-        followingData,
-        friendsData,
-        notificationsData,
-        followStatsData,
-        friendsStatsData,
-        notificationsSummaryData
-      ] = await Promise.all([
-        api.getFollowers(50),
-        api.getFollowing(50),
-        api.getFriends(50),
-        api.getNotifications(20),
-        api.getFollowStats(),
-        api.getFriendsStats(),
-        api.getNotificationsSummary()
-      ]);
+    const failed: string[] = [];
+    const attempt = async <T,>(label: string, run: () => Promise<T>): Promise<T | null> => {
+      try {
+        return await run();
+      } catch (err) {
+        console.error(`Error loading social data (${label}):`, err);
+        failed.push(label);
+        return null;
+      }
+    };
 
-      if (loadTokenRef.current !== token) return;
+    const [
+      followersData,
+      followingData,
+      friendsData,
+      notificationsData,
+      followStatsData,
+      friendsStatsData,
+      notificationsSummaryData
+    ] = await Promise.all([
+      attempt('followers', () => api.getFollowers(50)),
+      attempt('following', () => api.getFollowing(50)),
+      attempt('friends', () => api.getFriends(50)),
+      attempt('notifications', () => api.getNotifications(20)),
+      attempt('followStats', () => api.getFollowStats()),
+      attempt('friendsStats', () => api.getFriendsStats()),
+      attempt('notificationsSummary', () => api.getNotificationsSummary())
+    ]);
 
-      setFollowers(followersData);
-      setFollowing(followingData);
-      setFriends(friendsData);
-      setNotifications(notificationsData);
-      setFollowStats(followStatsData);
-      setFriendsStats(friendsStatsData);
-      setNotificationsSummary(notificationsSummaryData);
-      setUnreadCount(notificationsSummaryData.unread);
+    if (loadTokenRef.current !== token) return;
 
-      setLoading(false);
-    } catch (err) {
-      if (loadTokenRef.current !== token) return;
-      console.error('Error loading social data:', err);
-      setError('Błąd wczytywania danych społecznościowych');
-      setLoading(false);
-    }
+    // Listy, ktorych nie udalo sie odczytac, zostaja przy poprzedniej
+    // zawartosci - nadpisanie ich pusta tablica bylo tym samym klamstwem
+    // ("nikogo nie obserwujesz") co zero w liczniku.
+    if (followersData) setFollowers(followersData);
+    if (followingData) setFollowing(followingData);
+    if (friendsData) setFriends(friendsData);
+    if (notificationsData) setNotifications(notificationsData);
+
+    setFollowStats(followStatsData);
+    setFriendsStats(friendsStatsData);
+    setNotificationsSummary(notificationsSummaryData);
+    setUnreadCount(notificationsSummaryData ? notificationsSummaryData.unread : null);
+
+    // Awaria czesciowa NIE gasi calego panelu: sekcje, ktore przyszly, zostaja
+    // na ekranie, a te, ktore padly, powiedza to same przez `failedSections`.
+    setFailedSections(failed);
+    setLoading(false);
   };
 
   // ===============================================
@@ -193,7 +226,9 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
 
   const handleNewNotification = useCallback((notification: Notification) => {
     setNotifications(prev => [notification, ...prev.slice(0, 19)]);
-    setUnreadCount(prev => prev + 1);
+    // Przyszlo nowe powiadomienie. Gdy licznika nie udalo sie odczytac, nie
+    // udajemy, ze znamy sume - zostaje `null`.
+    setUnreadCount(prev => (prev === null ? null : prev + 1));
     
     // Update notifications summary
     setNotificationsSummary(prev => prev ? {
@@ -309,7 +344,7 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
         setNotifications(prev => prev.map(n => 
           n.id === notificationId ? { ...n, isRead: true } : n
         ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount(prev => (prev === null ? null : Math.max(0, prev - 1)));
         return true;
       }
       return false;
@@ -384,6 +419,7 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
     followStats,
     friendsStats,
     notificationsSummary,
+    failedSections,
     unreadCount,
     followUser,
     unfollowUser,
@@ -404,7 +440,8 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
 
 export interface UseNotificationsResult {
   notifications: Notification[];
-  unreadCount: number;
+  /** `null` = liczby NIE ODCZYTANO. Zero znaczy "nic nowego". */
+  unreadCount: number | null;
   loading: boolean;
   error: string | null;
   markAsRead: (notificationId: string) => Promise<boolean>;
@@ -418,7 +455,9 @@ export interface UseNotificationsResult {
  */
 export const useNotifications = (userAddress: string | null): UseNotificationsResult => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // `null` = nie odczytano. Zero to twierdzenie "nic nowego" i nie wolno go
+  // wpisac po padnietym zapytaniu.
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -427,6 +466,7 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
   useEffect(() => {
     if (!userAddress) {
       setNotifications([]);
+      // Bez zalogowanego adresu naprawde nie ma zadnych powiadomien.
       setUnreadCount(0);
       setLoading(false);
       socialAPIRef.current = null;
@@ -456,7 +496,7 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
       } catch (err) {
         if (cancelled) return;
         console.error('Error loading notifications:', err);
-        setError('Błąd wczytywania powiadomień');
+        setError("Notifications couldn't be loaded.");
         setLoading(false);
       }
     };
@@ -475,7 +515,7 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
         setNotifications(prev => prev.map(n => 
           n.id === notificationId ? { ...n, isRead: true } : n
         ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount(prev => (prev === null ? null : Math.max(0, prev - 1)));
       }
       return success;
     } catch (error) {
@@ -510,7 +550,7 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
         // Optionally decrease unread count if the notification was unread
         const wasUnread = notifications.find(n => n.id === notificationId && !n.isRead);
         if (wasUnread) {
-          setUnreadCount(prev => Math.max(0, prev - 1));
+          setUnreadCount(prev => (prev === null ? null : Math.max(0, prev - 1)));
         }
       }
       return success;

@@ -424,6 +424,10 @@ export default function BuilderProfile({
   // Tip Stats state
   const [tipStats, setTipStats] = useState<TipStatsType | null>(null);
   const [loadingTipStats, setLoadingTipStats] = useState(false);
+  /* Nieudany odczyt zarobkow. Kafelek "Creator Earnings" musi wtedy napisac,
+     ze nie wie - "0.0000 ETH" bylo twierdzeniem o czyichs pieniadzach, a wynikalo
+     wylacznie z padnietego zapytania. */
+  const [tipStatsFailed, setTipStatsFailed] = useState(false);
   
   // Talent Protocol state
   const [talentScore, setTalentScore] = useState<TalentScore | null>(null);
@@ -464,11 +468,16 @@ export default function BuilderProfile({
   // odczytow) i zakladal nasluch na powiadomienia OBCEGO uzytkownika.
   const [followStats, setFollowStats] = useState<FollowStats | null>(null);
   const [friendsStats, setFriendsStats] = useState<FriendsStats | null>(null);
+  /* Odczyt licznikow padl. Bez tego `null` znaczylo dokladnie to samo, co
+     "jeszcze nie wczytane", wiec rzad odznak po prostu znikal - a milczenie
+     w miejscu, gdzie stalo "128 followers", czyta sie jak zero. */
+  const [socialStatsFailed, setSocialStatsFailed] = useState(false);
 
   useEffect(() => {
     if (!userAddress) {
       setFollowStats(null);
       setFriendsStats(null);
+      setSocialStatsFailed(false);
       return;
     }
 
@@ -480,10 +489,13 @@ export default function BuilderProfile({
           getFriendsStats(userAddress)
         ]);
         if (cancelled) return;
+        // `null` z ktoregokolwiek odczytu to awaria, nie "zero znajomych".
+        setSocialStatsFailed(follow === null || friends === null);
         setFollowStats(follow);
         setFriendsStats(friends);
       } catch (error) {
         console.error('Error loading profile social stats:', error);
+        if (!cancelled) setSocialStatsFailed(true);
       }
     })();
 
@@ -1000,11 +1012,15 @@ export default function BuilderProfile({
       if (!userAddress) return;
       
       setLoadingTipStats(true);
+      setTipStatsFailed(false);
       try {
+        // `null` = odczyt padl. Zera z tego miejsca byly "Creator Earnings 0".
         const stats = await getUserTipStats(userAddress);
+        setTipStatsFailed(stats === null);
         setTipStats(stats);
       } catch (error) {
         console.error('Error fetching tip stats:', error);
+        setTipStatsFailed(true);
       } finally {
         setLoadingTipStats(false);
       }
@@ -1345,6 +1361,16 @@ export default function BuilderProfile({
                         </div>
                       </div>
                     </div>
+                  ) : tipStatsFailed ? (
+                    /* Awaria odczytu. Kafelek zostaje NA EKRANIE i mowi wprost, ze
+                       nie wie - zniknieciem udawalby, ze ten czlowiek nic nie
+                       zarobil. Bez `soft-accent`: to nie jest kwota. */
+                    <div className="bg-soft-surface border border-soft-line rounded-card px-6 py-4 shadow-card w-full">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-soft-ink-faint">Creator Earnings</span>
+                        <span className="font-soft text-sm text-soft-ink-soft">Couldn&apos;t be loaded</span>
+                      </div>
+                    </div>
                   ) : null}
 
                   {/* Creator Coin Section */}
@@ -1354,10 +1380,15 @@ export default function BuilderProfile({
                   />
 
                   {/* Separator gradientowy przed social stats */}
-                  {(followStats || friendsStats) && (
+                  {(followStats || friendsStats || socialStatsFailed) && (
                     <>
                       <div className="w-full h-px bg-soft-line my-3"></div>
                       <div className="flex items-center flex-wrap gap-3 lg:gap-4 text-xs">
+                        {/* Odczyt padl - mowimy to wprost. Brak odznaki wygladal
+                            jak brak obserwujacych. */}
+                        {socialStatsFailed && (
+                          <span className="font-soft text-soft-ink-soft">Follower and friend counts couldn&apos;t be loaded</span>
+                        )}
                         {followStats && (
                         <>
                           <div className="flex items-center space-x-1 bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">

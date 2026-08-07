@@ -248,6 +248,90 @@ export function deadlineMsToSeconds(deadlineMs: number): bigint {
 /** 48h z RESOLVE_GRACE - powielone tu WYLACZNIE po to, zeby UI liczylo to samo. */
 export const RESOLVE_GRACE_MS = 48 * 60 * 60 * 1000;
 
+/**
+ * TRZY OKNA CZASU JEDNEGO ESCROW - i to, ktore z nich trwa, decyduje o tym,
+ * co wolno zrobic z pieniedzmi.
+ *
+ * - `running`      przed terminem. Odpowiedzi wciaz wplywaja, budzet nie ma
+ *                  jak wrocic (resolve przed terminem musi wypelnic KAZDE
+ *                  miejsce, patrz EarlyResolveMustFillSeats).
+ * - `resolving`    miedzy terminem a terminem + 48h. Autor czyta odpowiedzi
+ *                  i przyjmuje te, ktore chce. settleExpired rewertuje tu
+ *                  z TooEarly - okna sa ROZLACZNE, wiec nie ma sekundy,
+ *                  w ktorej obie sciezki byly by otwarte.
+ * - `recoverable`  po terminie + 48h. Nikomu juz nie da sie zaplacic; jedyne,
+ *                  co zostalo, to zwrot budzetu autorowi minus oplata.
+ */
+export type EscrowWindow = 'running' | 'resolving' | 'recoverable';
+
+export type EscrowTiming = {
+  phase: EscrowWindow;
+  /** Termin przyjmowania odpowiedzi, w ms. */
+  deadlineMs: number;
+  /** Termin + 48h: granica, od ktorej settleExpired przechodzi. W ms. */
+  recoverableAtMs: number;
+  /**
+   * Ile ms zostalo DO KONCA biezacego okna. `null` w `recoverable` - tam nic
+   * juz nie odlicza i zadna liczba nie ma tam znaczenia.
+   */
+  msLeft: number | null;
+};
+
+/**
+ * Ktore okno trwa i ile mu zostalo.
+ *
+ * === DLACZEGO TERMIN MA PRZYJSC Z LANCUCHA, A NIE Z DOKUMENTU ===
+ * Wolajacy podaje `deadlineMs` odczytany przez `escrowFor`, bo to TEN termin
+ * sprawdza kontrakt przy settleExpired. Dokument Aska w Firestore trzyma wlasna
+ * kopie i moglby sie z nim rozjechac (zapisujemy sekundy zaokraglone w dol) -
+ * a interfejs, ktory obiecuje "mozna juz odzyskac" na sekunde przed lancuchem,
+ * konczy sie rewertem TooEarly u czlowieka, ktory zrobil dokladnie to, co
+ * kazalismy.
+ *
+ * GRANICA JEST OSTRA PO STRONIE KONTRAKTU: settleExpired wymaga
+ * `block.timestamp > deadline + RESOLVE_GRACE` (ostra nierownosc), wiec
+ * `recoverable` zaczyna sie DOPIERO powyzej tej chwili, nie na niej.
+ */
+export function escrowTiming(deadlineMs: number, now = Date.now()): EscrowTiming {
+  const recoverableAtMs = deadlineMs + RESOLVE_GRACE_MS;
+
+  if (now < deadlineMs) {
+    return { phase: 'running', deadlineMs, recoverableAtMs, msLeft: deadlineMs - now };
+  }
+  if (now <= recoverableAtMs) {
+    return { phase: 'resolving', deadlineMs, recoverableAtMs, msLeft: recoverableAtMs - now };
+  }
+  return { phase: 'recoverable', deadlineMs, recoverableAtMs, msLeft: null };
+}
+
+/** Ile z budzetu zabiera oplata i ile naprawde wraca do autora. */
+export type EscrowRefundSplit = {
+  /** Caly budzet, ktory wciaz lezy na kontrakcie. Jednostki bazowe. */
+  budget: bigint;
+  fee: bigint;
+  /** To, co dostanie autor - jako SALDO do odebrania, nie jako przelew. */
+  toAuthor: bigint;
+  feeBps: number;
+};
+
+/**
+ * Podzial zwracanego budzetu, liczony DOKLADNIE tak jak w kontrakcie:
+ * oplata z zaokragleniem w dol, a autor dostaje RESZTE. Dzieki temu suma
+ * schodzi sie co do jednostki i karta nie obiecuje ani centa wiecej, niz
+ * przypisze lancuch.
+ *
+ * `null` = nie znamy stawki oplaty na tej sieci. Wolajacy MUSI wtedy napisac,
+ * ze kwoty netto nie ustalono - pokazanie samego budzetu jako "wroci do ciebie"
+ * byloby obietnica zawyzona o oplate.
+ */
+export function escrowRefundSplit(budget: bigint, chainId: number): EscrowRefundSplit | null {
+  const feeBps = escrowFeeBps(chainId);
+  if (feeBps === null) return null;
+
+  const fee = (budget * BigInt(feeBps)) / 10_000n;
+  return { budget, fee, toAuthor: budget - fee, feeBps };
+}
+
 /* ------------------------------------------------------------------ */
 /*  ABI - tylko to, czego aplikacja naprawde uzywa                     */
 /* ------------------------------------------------------------------ */
@@ -282,6 +366,21 @@ export const ASK_ESCROW_ABI = [
       { name: 'askId', type: 'bytes32' },
       { name: 'winners', type: 'address[]' },
       { name: 'answerRefs', type: 'bytes32[]' },
+    ],
+    outputs: [],
+  },
+  {
+    /**
+     * Zwrot wygaslego budzetu. BEZ UPRAWNIEN - adres docelowy siedzi w kluczu,
+     * wiec wolajacy placi gaz i nie dostaje nic. Dlatego bierze `author`
+     * jako argument, a nie msg.sender jak resolve().
+     */
+    type: 'function',
+    name: 'settleExpired',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'author', type: 'address' },
+      { name: 'askId', type: 'bytes32' },
     ],
     outputs: [],
   },
@@ -677,6 +776,59 @@ export async function resolveAskOnchain(params: ResolveAskOnchainParams): Promis
   if (receipt.status !== 'success') {
     throw new Error(
       'The resolve transaction reverted on-chain. Nobody was paid and the escrow is still open.'
+    );
+  }
+
+  return txHash;
+}
+
+export type SettleExpiredParams = {
+  reader: EscrowReader;
+  signer: EscrowSigner;
+  chainId: number;
+  /** Autor, do ktorego wroci budzet. Zaszyty w kluczu, wiec nie da sie go podmienic. */
+  author: string;
+  askDocId: string;
+  /**
+   * Kto placi gaz. Zwykle ten sam adres co `author`, ale NIE MUSI - kontrakt
+   * nie sprawdza wolajacego, bo nie ma czego przekierowac.
+   */
+  caller: string;
+};
+
+/**
+ * Zwrot budzetu Aska, ktorego nikt nie rozstrzygnal.
+ *
+ * === CO TA FUNKCJA ROBI, A CZEGO NIE ===
+ * Przypisuje autorowi SALDO (budzet minus oplata), dokladnie jak resolve().
+ * NIE wysyla tokenow. Zeby pieniadze trafily do portfela, potrzebny jest drugi
+ * podpis - claim(). Interfejs nie ma prawa napisac po tej transakcji, ze
+ * srodki wrocily do portfela; wolno napisac, ze wrocily jako saldo, i pokazac,
+ * gdzie je odebrac.
+ *
+ * === DLACZEGO `caller` JEST OSOBNO OD `author` ===
+ * settleExpired nie ma uprawnien. Adres docelowy siedzi w kluczu
+ * keccak256(author, askId), wiec wolajacy nie ma czego przekierowac - placi gaz
+ * i nie dostaje nic. Dzieki temu autor nie potrzebuje ani gazu, ani zycia, zeby
+ * pieniadze wrocily pod jego adres. Symulacja idzie z `caller`, zeby blad
+ * pojawil sie PRZED oknem portfela, a nie po nim.
+ */
+export async function settleExpiredAsk(params: SettleExpiredParams): Promise<Hash> {
+  const { address } = requireEscrowDeployment(params.chainId);
+
+  const simulation = await params.reader.simulateContract({
+    address,
+    abi: ASK_ESCROW_ABI,
+    functionName: 'settleExpired',
+    args: [params.author as Address, askIdToBytes32(params.askDocId)],
+    account: params.caller as Address,
+  });
+  const txHash = await params.signer.writeContract(simulation.request);
+
+  const receipt = await params.reader.waitForTransactionReceipt({ hash: txHash });
+  if (receipt.status !== 'success') {
+    throw new Error(
+      'The settle transaction reverted on-chain. The budget is still locked in the contract, exactly where it was.'
     );
   }
 

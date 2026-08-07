@@ -23,6 +23,11 @@ interface TipStatsProps {
   presetPostStats?: PostTipStats | null;
   /** true dopoki zbiorcze zapytanie nie wrocilo - trzyma stan ladowania. */
   presetLoading?: boolean;
+  /**
+   * true = zbiorcze zapytanie PADLO. Osobno od `presetPostStats === null`, bo
+   * null moze tez znaczyc "post nie byl w tej partii" - a to nie jest awaria.
+   */
+  presetFailed?: boolean;
 }
 
 // Mapuje stare nazwy sieci na nowe
@@ -274,9 +279,17 @@ const TipStatsCollapsible = ({ networkGroups, getAmount, activeTips, className =
   );
 };
 
-export default function TipStats({ userAddress, postId, className = '', presetPostStats, presetLoading }: TipStatsProps) {
+export default function TipStats({ userAddress, postId, className = '', presetPostStats, presetLoading, presetFailed }: TipStatsProps) {
   const [userStats, setUserStats] = useState<TipStatsType | null>(null);
   const [postStats, setPostStats] = useState<PostTipStats | null>(presetPostStats ?? null);
+  /**
+   * Odczyt PADL - to jest cos innego niz "nie ma tipow".
+   *
+   * Bez tego rozroznienia nieudane zapytanie renderowalo tabelke samych zer
+   * i napis "No tips yet" pod postem, ktory zebral pieniadze. Kwota jest
+   * jedyna liczba, ktorej tu nie wolno zmyslic.
+   */
+  const [loadFailed, setLoadFailed] = useState(false);
   // Wylacznie wlasne pobrania. `presetLoading` NIE moze byc czescia tego stanu ani
   // zaleznoscia efektu ponizej - to tylko flaga wyswietlania. Trzymanie jej w deps
   // powodowalo ponowne fetchStats() przy kazdym przelaczeniu flagi.
@@ -300,18 +313,25 @@ export default function TipStats({ userAddress, postId, className = '', presetPo
     let cancelled = false;
     const fetchStats = async () => {
       setFetching(true);
+      setLoadFailed(false);
       try {
         if (needsUserFetch) {
+          // `null` z getUserTipStats to nieudany odczyt, nie brak napiwkow.
           const stats = await getUserTipStats(userAddress!);
-          if (!cancelled) setUserStats(stats);
+          if (cancelled) return;
+          if (stats === null) setLoadFailed(true);
+          setUserStats(stats);
         }
 
         if (needsPostFetch) {
           const stats = await getPostTipStats(postId!);
-          if (!cancelled) setPostStats(stats);
+          if (cancelled) return;
+          if (stats === null) setLoadFailed(true);
+          setPostStats(stats);
         }
       } catch (error) {
         console.error('Error fetching tip stats:', error);
+        if (!cancelled) setLoadFailed(true);
       } finally {
         if (!cancelled) setFetching(false);
       }
@@ -330,6 +350,19 @@ export default function TipStats({ userAddress, postId, className = '', presetPo
         <div className="animate-pulse bg-soft-sunken text-soft-ink-faint rounded-pill px-2 py-1 text-xs">
           Loading...
         </div>
+      </div>
+    );
+  }
+
+  // Odczyt padl. Zaden wariant "zero" ani "No tips yet" nie ma tu prawa wystapic
+  // - obie te rzeczy sa twierdzeniem o pieniadzach, ktorych wlasnie NIE
+  // sprawdzilismy. Bez akcentu (pomaranczowy jest zarezerwowany dla kwot).
+  if (loadFailed || presetFailed === true) {
+    return (
+      <div className={`flex items-center space-x-2 ${className}`}>
+        <span className="bg-soft-sunken border border-soft-line text-soft-ink-soft font-soft rounded-pill px-3 py-1 text-xs">
+          Tips couldn&apos;t be loaded
+        </span>
       </div>
     );
   }

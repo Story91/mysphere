@@ -6,6 +6,7 @@ import PremiumComposer, { EMPTY_PREMIUM, type PremiumComposerValue } from '../co
 // @ts-ignore - config CommonJS wspoldzielony z next.config.js
 import { isRouteDisabled } from '@/config/routeStatus';
 import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
+import { useSiweAuth } from '../utils/auth/useSiweAuth';
 import { base, baseSepolia } from 'wagmi/chains';
 // Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
 import { Avatar, useName } from '../components/identity';
@@ -409,6 +410,33 @@ function BaseChatContent() {
   // Platna czesc posta. Domyslnie wylaczona - wiekszosc postow nie jest platna.
   const [premium, setPremium] = useState<PremiumComposerValue>(EMPTY_PREMIUM);
   const [isPremiumOpen, setIsPremiumOpen] = useState(false);
+  /**
+   * Platna czesc, ktora NIE zostala zapieczetowana, mimo ze post juz istnieje.
+   *
+   * Post w tym stanie jest zwyklym, darmowym postem - i tak tez wyglada dla
+   * wszystkich, lacznie z autorem. Szkic trzymamy, zeby autor mogl dokonczyc
+   * jednym klknieciem zamiast pisac tekst od nowa.
+   */
+  const [pendingPremium, setPendingPremium] = useState<{
+    postId: string;
+    draft: PremiumComposerValue;
+    /** Czy brakuje wylacznie podpisu - wtedy ponowienie zaczyna od logowania. */
+    needsSignIn: boolean;
+    /** Zdanie dla autora: co dokladnie sie nie udalo. */
+    reason: string;
+  } | null>(null);
+  const [isRetryingPremium, setIsRetryingPremium] = useState(false);
+  /**
+   * Publikacja zatrzymana przed powstaniem posta, bo platna czesc wymaga
+   * podpisu, a podpisu nie bylo. Trzymane jako STAN, nie jako toast: toast
+   * znika po kilku sekundach, a czlowiek zostaje z wypelnionym kompozytorem
+   * i bez odpowiedzi na pytanie "dlaczego nic sie nie stalo".
+   *
+   * Dokladny powod (odmowa w portfelu vs. niedzialajace logowanie serwerowe)
+   * zna useSiweAuth, ale dopiero PO przerysowaniu - dlatego tekst skladamy
+   * przy renderze, a nie tuz po `await signIn()`.
+   */
+  const [blockedOnPremiumSignIn, setBlockedOnPremiumSignIn] = useState(false);
   // 🎵 Stany dla funkcjonalności muzyki
   const [selectedMusic, setSelectedMusic] = useState<any>(null);
   const [showMusicSelector, setShowMusicSelector] = useState(false);
@@ -441,6 +469,17 @@ function BaseChatContent() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  /**
+   * Sesja SIWE - potrzebna WYLACZNIE do platnej czesci posta. Zwykly post nie
+   * wymaga tu niczego i nie ma prawa niczego wymagac.
+   *
+   * `siweAddressRef`, bo o sesje pytamy w srodku funkcji asynchronicznych,
+   * ktore moga przezyc kilka renderow - odczyt ze zmiennej z domkniecia
+   * pokazalby stan sprzed podpisu.
+   */
+  const { address: siweAddress, signIn: siweSignIn, error: siweError } = useSiweAuth();
+  const siweAddressRef = useRef<string | null>(siweAddress);
+  siweAddressRef.current = siweAddress;
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [postPreviewImage, setPostPreviewImage] = useState<string | null>(null);
   const [postPreviewVideo, setPostPreviewVideo] = useState<string | null>(null);
@@ -1064,69 +1103,184 @@ function BaseChatContent() {
    */
   const buildPremiumWriteFields = () => ({});
 
-  /** Czy autor faktycznie wpisal platna czesc. */
-  const hasPremiumDraft = () => isPremiumOpen && premium.premiumContent.trim().length > 0;
+  /**
+   * Kopia platnej czesci na czas publikacji - albo `null`, gdy autor jej nie
+   * wypelnil.
+   *
+   * Snapshot, a nie odczyt `premium` w kazdym miejscu: pieczetowanie dzieje sie
+   * po transakcji i po zapisie do Firestore, czyli dlugo po tym, jak
+   * `resetComposer()` wyczyscil pole. Szkic ma przezyc te droge w calosci,
+   * takze na potrzeby ponowienia.
+   */
+  const takePremiumDraft = (): PremiumComposerValue | null =>
+    isPremiumOpen && premium.premiumContent.trim().length > 0
+      ? { ...premium, premiumContent: premium.premiumContent.trim() }
+      : null;
+
+  /**
+   * PODPIS PRZED PUBLIKACJA, NIE PO.
+   *
+   * === CO BYLO ZLE ===
+   * O braku sesji autor dowiadywal sie dopiero z nieudanego pieczetowania,
+   * czyli PO tym, jak post juz istnial (a na sciezce onchain - po zaplaceniu
+   * za transakcje). Zostawal wtedy z wpisem, ktory wygladal na platny
+   * wylacznie jemu, bo znacznik `hasPremium` istnial tylko w stanie Reacta.
+   *
+   * Teraz o podpis prosimy, dopoki nic jeszcze nie powstalo: odmowa nie
+   * zostawia po sobie zadnego sladu, a szkic czeka w kompozytorze.
+   *
+   * Post BEZ platnej czesci nie przechodzi tedy w ogole - zwykle pisanie nie
+   * ma prawa wymagac logowania.
+   *
+   * @returns czy wolno publikowac
+   */
+  const ensurePremiumSession = async (): Promise<boolean> => {
+    if (!takePremiumDraft()) return true;
+
+    setBlockedOnPremiumSignIn(false);
+    if (siweAddressRef.current) return true;
+
+    const toastId = toast.loading(
+      'One signature first - a paid post has to be provably yours. No gas, no transaction.'
+    );
+
+    let signedIn = false;
+    try {
+      signedIn = await siweSignIn();
+    } catch (error) {
+      console.error('[premium] logowanie SIWE przed publikacja nie powiodlo sie:', error);
+    } finally {
+      toast.dismiss(toastId);
+    }
+
+    // Nic nie powstalo - powod zostaje na ekranie przy kompozytorze, bo tam
+    // jest szkic i tam czlowiek patrzy.
+    if (!signedIn) setBlockedOnPremiumSignIn(true);
+
+    return signedIn;
+  };
+
+  /**
+   * Nanosi znacznik platnosci na post, ktory WLASNIE zostal zapieczetowany.
+   *
+   * Wczesniej te pola byly doklejane OPTYMISTYCZNIE, przed zapisem - i wlasnie
+   * stad brala sie glowna skarga: gdy pieczetowanie padalo, autor dalej widzial
+   * blok premium (stan Reacta plus cache w localStorage), a czytelnik widzial
+   * zwykly post. Znacznik pojawia sie teraz WYLACZNIE po potwierdzeniu z
+   * serwera, czyli dokladnie wtedy, gdy to samo zobaczy kazdy inny.
+   */
+  const markPostAsPremium = (postId: string, draft: PremiumComposerValue) => {
+    const apply = (post: ExtendedPost): ExtendedPost => ({
+      ...post,
+      hasPremium: true,
+      unlockPrice: draft.unlockPrice,
+      unlockToken: draft.unlockToken,
+    });
+
+    setPosts(currentPosts => currentPosts.map(post => (post.id === postId ? apply(post) : post)));
+    patchPostInCache(postId, apply);
+  };
 
   /**
    * Zapieczetowanie platnej tresci PO powstaniu posta.
    *
-   * Wymaga sesji SIWE - trasa sprawdza, czy pieczetujacy jest autorem posta,
-   * a bez podpisu kazdy moglby dokleic platna tresc do cudzego wpisu.
+   * Kolejnosc jest wymuszona przez trase: sprawdza ona autorstwo po prawdziwym
+   * dokumencie, wiec post musi juz istniec. Sesja jest za to zalatwiona
+   * WCZESNIEJ (ensurePremiumSession), zeby ta funkcja nie byla pierwszym
+   * miejscem, w ktorym autor slyszy o podpisie.
    *
-   * AWARIA NIE MOZE BYC CICHA. Post juz istnieje i jest publiczny; jesli
-   * pieczetowanie padnie, autor MUSI sie dowiedziec, ze jego platna czesc nie
-   * zostala zapisana - inaczej bedzie przekonany, ze sprzedaje cos, czego
-   * w bazie nie ma.
+   * AWARIA NIE MOZE BYC CICHA ANI KOSMETYCZNA. Gdy zapis padnie, post zostaje
+   * zwyklym, darmowym postem - i tak tez wyglada dla autora. Szkic ladujemy do
+   * `pendingPremium`, zeby dalo sie dokonczyc jednym klknieciem.
+   *
+   * @returns czy platna czesc jest zapisana
    */
-  const sealPremiumContent = async (postId: string) => {
-    if (!hasPremiumDraft() || !postId || postId.startsWith('temp-')) return;
+  const sealPremiumContent = async (
+    postId: string,
+    draft: PremiumComposerValue | null
+  ): Promise<boolean> => {
+    // Brak platnej czesci to nie jest porazka - nie ma czego pieczetowac.
+    if (!draft || !postId || postId.startsWith('temp-')) return true;
 
     try {
       const response = await fetch('/api/premium', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           postId,
-          content: premium.premiumContent.trim(),
-          unlockPrice: premium.unlockPrice,
-          unlockToken: premium.unlockToken,
+          content: draft.premiumContent,
+          unlockPrice: draft.unlockPrice,
+          unlockToken: draft.unlockToken,
         }),
       });
 
-      if (response.ok) return;
-
-      const data = await response.json().catch(() => ({}));
-
-      // Brak sesji to jedyny blad, ktory autor moze naprawic sam i od razu.
-      if (response.status === 401) {
-        toast.error(
-          'Your post is up, but the paid part needs your signature. Sign in and add it again.'
-        );
-        return;
+      if (response.ok) {
+        markPostAsPremium(postId, draft);
+        setPendingPremium(null);
+        return true;
       }
 
-      console.error('[premium] nie udalo sie zapieczetowac tresci:', data);
-      toast.error(
-        data?.error === 'Premium content storage is not configured on this deployment.'
-          ? 'Your post is up, but paid content is switched off on this deployment. Nothing was hidden.'
-          : 'Your post is up, but the paid part did not save. It is not for sale yet.'
-      );
+      const data = await response.json().catch(() => ({}));
+      console.error('[premium] nie udalo sie zapieczetowac tresci:', response.status, data);
+
+      // Brak sesji to jedyny blad, ktory autor moze naprawic sam i od razu.
+      const needsSignIn = response.status === 401;
+      const reason = needsSignIn
+        ? 'We could not confirm it was you, so the paid text was not stored.'
+        : data?.code === 'store_unavailable'
+          ? 'Paid content is switched off on this deployment, so nothing was hidden.'
+          : 'The paid text did not reach our storage.';
+
+      setPendingPremium({ postId, draft, needsSignIn, reason });
+      toast.error('Your post is up as a free post - its paid part did not save. You can finish it below.');
+      return false;
     } catch (error) {
       console.error('[premium] blad sieci przy pieczetowaniu:', error);
-      toast.error('Your post is up, but the paid part did not save. Check your connection.');
+      setPendingPremium({
+        postId,
+        draft,
+        needsSignIn: false,
+        reason: 'We could not reach the server, so the paid text was not stored.',
+      });
+      toast.error('Your post is up as a free post - its paid part did not save. You can finish it below.');
+      return false;
     }
   };
 
-  // Pola platnej czesci pokazywane OPTYMISTYCZNIE: znacznik i cena, bez tresci.
-  // Sama tresc nie trafia do stanu klienta ani do dokumentu posta - zapisuje ja
-  // /api/premium.
-  const buildPremiumPreviewFields = () => {
-    if (!isPremiumOpen || !premium.premiumContent.trim()) return {};
-    return {
-      hasPremium: true,
-      unlockPrice: premium.unlockPrice,
-      unlockToken: premium.unlockToken,
-    };
+  /**
+   * Dokonczenie platnej czesci dla posta, ktory juz istnieje. Zaczyna od
+   * podpisu, gdy to jego brakowalo - inaczej pierwsza proba skonczylaby sie
+   * tym samym 401.
+   */
+  const retryPremiumSeal = async () => {
+    if (!pendingPremium || isRetryingPremium) return;
+
+    setIsRetryingPremium(true);
+    try {
+      if (!siweAddressRef.current) {
+        const toastId = toast.loading(
+          'One signature - it proves this post is yours. No gas, no transaction.'
+        );
+        let signedIn = false;
+        try {
+          signedIn = await siweSignIn();
+        } catch (error) {
+          console.error('[premium] logowanie SIWE przed ponowieniem nie powiodlo sie:', error);
+        } finally {
+          toast.dismiss(toastId);
+        }
+        if (!signedIn) {
+          toast.error('Still not signed in, so the paid part stays unsaved. Your text is kept here.');
+          return;
+        }
+      }
+
+      const sealed = await sealPremiumContent(pendingPremium.postId, pendingPremium.draft);
+      if (sealed) toast.success('Paid part saved. Readers can buy it now.');
+    } finally {
+      setIsRetryingPremium(false);
+    }
   };
 
   // Hashtagi i wzmianki z tresci posta.
@@ -1177,6 +1331,9 @@ function BaseChatContent() {
     setNewPost('');
     setPremium(EMPTY_PREMIUM);
     setIsPremiumOpen(false);
+    // Ostrzezenie "nic nie zostalo opublikowane" dotyczy PRZERWANEJ proby -
+    // po udanej publikacji nie ma prawa zostac na ekranie.
+    setBlockedOnPremiumSignIn(false);
     setPostPreviewImage(null);
     setPostPreviewVideo(null);
     setUploadProgress(0);
@@ -1213,6 +1370,10 @@ function BaseChatContent() {
     setIsCreatingPost(true);
     const toastId = toast.loading("Creating post...");
 
+    // Szkic platnej czesci bierzemy TERAZ - `resetComposer()` nizej wyczysci
+    // pole, a pieczetowanie dzieje sie dopiero po zapisie w Firestore.
+    const premiumDraft = takePremiumDraft();
+
     try {
       // 1. Handle media upload (image or video) - jeśli istnieje
       const { imageUrl, videoUrl } = await uploadPostMedia();
@@ -1225,8 +1386,10 @@ function BaseChatContent() {
       const newPostObject = {
         id: tempPostId,
         author: address,
+        // Znacznika platnosci TU NIE MA celowo. Post jest platny dopiero po
+        // udanym zapisie tresci (markPostAsPremium w sealPremiumContent) -
+        // inaczej autor ogladalby paywall, ktorego nikt inny nie widzi.
         content: newPost,
-        ...buildPremiumPreviewFields(),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -1275,8 +1438,9 @@ function BaseChatContent() {
 
         // Platna czesc DOPIERO TERAZ - trasa sprawdza autorstwo po prawdziwym
         // dokumencie, wiec musi istniec. Celowo bez `await`: post jest juz
-        // widoczny, a pieczetowanie ma wlasny komunikat bledu.
-        void sealPremiumContent(realPostId);
+        // widoczny, a pieczetowanie samo dopisze znacznik platnosci albo
+        // powie, ze go nie ma.
+        void sealPremiumContent(realPostId, premiumDraft);
       }).catch((error) => {
         console.error('Error saving post to Firebase:', error);
         // W przypadku błędu, usuń optimistic post - RAZEM z cache'em, inaczej
@@ -1358,6 +1522,14 @@ function BaseChatContent() {
       toast("Post creation in progress...", { icon: '⏳' }); // Use default toast for info/warning
       return;
     }
+
+    // PODPIS PRZED CZYMKOLWIEK. Dalej jest wgrywanie mediow, transakcja Zory
+    // i zapis do Firestore - kazde z tych trzech zostawia slad, ktorego nie da
+    // sie cofnac. Post bez platnej czesci przechodzi tedy bez pytania.
+    if (!(await ensurePremiumSession())) return;
+
+    // Szkic bierzemy po podpisie, a przed `resetComposer()` na koncu sciezki.
+    const premiumDraft = takePremiumDraft();
 
     // Ustaw flagę blokującą wielokrotne tworzenie postów
     setIsCreatingPost(true);
@@ -1542,8 +1714,8 @@ function BaseChatContent() {
       const tempPost: ExtendedPost = {
         id: `temp-${Date.now()}`,
         author: address,
+        // Bez znacznika platnosci - dokleja go dopiero udane pieczetowanie.
         content: newPost,
-        ...buildPremiumPreviewFields(),
         timestamp: Date.now(),
         image: imageUrl ?? undefined, // Ensure undefined if null
         video: videoUrl ?? undefined, // Ensure undefined if null
@@ -1563,15 +1735,25 @@ function BaseChatContent() {
       const zoraPostId = await createPost(postDataForFirebase);
       console.log("Post saved to Firebase.");
 
-      // Platna czesc idzie do zapieczetowanej kolekcji, nie do dokumentu posta -
-      // patrz sealPremiumContent. Bez `await`, zeby nie opozniac odswiezenia listy.
-      void sealPremiumContent(zoraPostId);
-
       // Dopisujemy post do zapisanych list zamiast kasowac caly cache.
       // Kasowanie dzialalo, ale kazalo potem pobrac WSZYSTKIE listy od nowa -
       // czyli placilismy pelnym przeladowaniem feedu za jeden post, ktorego
       // tresc i tak mamy w pamieci. Firestore liczy za kazdy odczyt dokumentu.
+      //
+      // MUSI STAC PRZED PIECZETOWANIEM: znacznik platnosci nanosi
+      // markPostAsPremium po ID, wiec post musi juz byc w stanie i w cache'u
+      // pod PRAWDZIWYM identyfikatorem. Inaczej cache trzymalby przez pieć
+      // minut wersje "darmowa" posta, ktory w bazie jest platny.
+      setPosts(currentPosts =>
+        currentPosts.map(post => (post.id === tempPost.id ? { ...post, id: zoraPostId } : post))
+      );
       prependPostToCache({ ...tempPost, id: zoraPostId } as ExtendedPost);
+
+      // Platna czesc idzie do zapieczetowanej kolekcji, nie do dokumentu posta -
+      // patrz sealPremiumContent. Z `await`, bo kilka linii nizej ta sciezka
+      // NADPISUJE cala liste swiezym odczytem z Firestore: bez czekania wyscig
+      // konczyl sie postem, ktory jest platny w bazie, a wyglada na darmowy.
+      await sealPremiumContent(zoraPostId, premiumDraft);
 
       // Refresh posts list from Firebase to get the real ID
       const { posts: updatedPosts } = await fetchPosts({ userId: address });
@@ -1648,7 +1830,7 @@ function BaseChatContent() {
           // monety, ale platna czesc autora nie ma z tym nic wspolnego -
           // pominiecie jej tutaj gubiloby ja po cichu dokladnie wtedy, gdy
           // cos juz poszlo nie tak.
-          await sealPremiumContent(fallbackPostId);
+          await sealPremiumContent(fallbackPostId, premiumDraft);
 
           // Update UI
           toast.success('Post created successfully!', { id: toastId });
@@ -3959,9 +4141,84 @@ function BaseChatContent() {
                                   setIsPremiumOpen(next);
                                   // Zamkniecie sekcji czysci tresc, zeby nie zapisac
                                   // platnej czesci, ktorej autor juz nie widzi.
-                                  if (!next) setPremium(EMPTY_PREMIUM);
+                                  // Razem z nia znika powod, dla ktorego prosilismy
+                                  // o podpis - post bez platnej czesci nie wymaga go
+                                  // wcale.
+                                  if (!next) {
+                                    setPremium(EMPTY_PREMIUM);
+                                    setBlockedOnPremiumSignIn(false);
+                                  }
                                 }}
                               />
+
+                              {/* ===== POST JEST, PLATNEJ CZESCI NIE MA =====
+                                  Nieudane pieczetowanie zostawialo po sobie sam
+                                  toast - znikal po kilku sekundach, a post
+                                  zostawal platny WYLACZNIE w oczach autora.
+                                  Teraz stan "nie na sprzedaz" jest widoczny tak
+                                  dlugo, jak dlugo trwa, i ma wyjscie: szkic
+                                  czeka, wystarczy jedno klikniecie.
+
+                                  Bez pomaranczowego: to nie jest kwota, tylko
+                                  informacja o stanie. */}
+                              {/* ===== ZATRZYMANE PRZED PUBLIKACJA =====
+                                  Post NIE powstal, wiec nie ma tu zadnej
+                                  straty do odkrecenia - jest tylko powod
+                                  i szkic, ktory czeka nietkniety. */}
+                              {blockedOnPremiumSignIn && (
+                                <div
+                                  role="alert"
+                                  className="mt-2 rounded-card border border-soft-line bg-soft-sunken p-3 font-soft text-[12px] leading-[1.5] text-soft-ink-muted"
+                                >
+                                  <p>
+                                    Nothing was posted.{' '}
+                                    {siweError ||
+                                      'We could not confirm this wallet is yours, and a paid post has to be provably yours before it goes out.'}
+                                  </p>
+                                  <p className="mt-1 text-soft-ink-faint">
+                                    Your draft is untouched - press the post button again to retry, or
+                                    remove the paid section to post it for free.
+                                  </p>
+                                </div>
+                              )}
+
+                              {pendingPremium && (
+                                <div
+                                  role="alert"
+                                  className="mt-2 rounded-card border border-soft-line bg-soft-sunken p-3 font-soft text-[12px] leading-[1.5] text-soft-ink-muted"
+                                >
+                                  <p>
+                                    Your last post went out as a free post. {pendingPremium.reason} Nobody
+                                    was charged, and nobody sees a paywall on it.
+                                  </p>
+                                  <p className="mt-1 text-soft-ink-faint">
+                                    Your paid text is still here. If you leave this page it is gone, so
+                                    finish it now or copy it somewhere safe.
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={retryPremiumSeal}
+                                      disabled={isRetryingPremium}
+                                      aria-busy={isRetryingPremium}
+                                      className="rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-xs font-semibold text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+                                    >
+                                      {isRetryingPremium
+                                        ? 'Working…'
+                                        : pendingPremium.needsSignIn
+                                          ? 'Sign in and finish it'
+                                          : 'Try saving it again'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPendingPremium(null)}
+                                      className="rounded-pill px-1 font-soft-display text-xs font-semibold text-soft-ink-muted underline transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                                    >
+                                      Leave it free
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -4125,11 +4382,17 @@ function BaseChatContent() {
                               )}
                             </button>
                               
-                              <TransactionButton 
+                              <TransactionButton
                                 content={newPost}
                                 onTransactionSuccess={handleTransactionSuccess}
                                 disabled={isCreatingPost}
                                 autoPost={true}
+                                /* Podpis PRZED transakcja. Na tej sciezce post
+                                   powstaje po zaplaceniu za gaz, wiec pytanie
+                                   o sesje dopiero potem znaczylo, ze autor
+                                   placi za publikacje, ktora i tak nie moze
+                                   stac sie platna. */
+                                beforeTransaction={ensurePremiumSession}
                               />
                             </div>
                           </div>

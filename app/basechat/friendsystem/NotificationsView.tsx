@@ -171,7 +171,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             <div className="text-sm text-soft-ink-muted">Total</div>
           </div>
           <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{unreadCount}</div>
+            {/* Kreska, nie zero - licznika nie odczytano. */}
+            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{unreadCount === null ? '—' : unreadCount}</div>
             <div className="text-sm text-soft-ink-muted">Unread</div>
           </div>
           <div className="text-center">
@@ -216,7 +217,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           </div>
 
           {/* Mark all as read button */}
-          {unreadCount > 0 && (
+          {unreadCount !== null && unreadCount > 0 && (
             <button
               onClick={handleMarkAllAsRead}
               disabled={markingAll}

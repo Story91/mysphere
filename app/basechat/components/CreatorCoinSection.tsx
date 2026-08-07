@@ -11,7 +11,15 @@ interface CreatorCoinSectionProps {
 
 export default function CreatorCoinSection({ userAddress, currentUserAddress }: CreatorCoinSectionProps) {
   const [creatorCoin, setCreatorCoin] = useState<CreatorCoinData | null>(null);
-  const [userBalance, setUserBalance] = useState<string>('0');
+  /**
+   * Saldo w tej monecie. `null` = NIE WIEMY (odczyt padl), a nie "zero".
+   *
+   * Wczesniej startowalo i konczylo na '0', wiec nieudane zapytanie do Zory
+   * dawalo to samo, co pusty portfel: znikaly i saldo, i przycisk "Sell".
+   * Czlowiek nie mial jak sprzedac wlasnej monety i nie wiedzial dlaczego.
+   */
+  const [userBalance, setUserBalance] = useState<string | null>(null);
+  const [balanceFailed, setBalanceFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell'>('buy');
@@ -25,6 +33,7 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
     const balance = balances.find(b =>
       b.coinAddress.toLowerCase() === coinAddress.toLowerCase()
     );
+    // Tutaj zero jest prawda: odczyt sie udal, monety w portfelu nie ma.
     return balance?.balanceFormatted || '0';
   }, [currentUserAddress]);
 
@@ -33,8 +42,11 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
 
     try {
       setUserBalance(await readCoinBalance(creatorCoin.address));
+      setBalanceFailed(false);
     } catch (error) {
       console.error('Error fetching balance:', error);
+      setUserBalance(null);
+      setBalanceFailed(true);
     }
   }, [currentUserAddress, creatorCoin, readCoinBalance]);
 
@@ -47,6 +59,7 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
 
     const fetchCreatorCoin = async () => {
       setLoading(true);
+      setBalanceFailed(false);
       try {
         const coin = await getCreatorCoin(userAddress);
         if (cancelled) return;
@@ -54,9 +67,18 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
 
         // If viewing own profile or logged in, get balance
         if (currentUserAddress && coin) {
-          const balance = await readCoinBalance(coin.address);
-          if (cancelled) return;
-          setUserBalance(balance);
+          // Wlasny try: padniete SALDO nie moze wygasic calej sekcji monety,
+          // ale tez nie moze udac zera.
+          try {
+            const balance = await readCoinBalance(coin.address);
+            if (cancelled) return;
+            setUserBalance(balance);
+          } catch (balanceError) {
+            if (cancelled) return;
+            console.error('Error fetching balance:', balanceError);
+            setUserBalance(null);
+            setBalanceFailed(true);
+          }
         }
       } catch (error) {
         if (cancelled) return;
@@ -169,7 +191,7 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
             >
               Buy
             </button>
-            {parseFloat(userBalance) > 0 && (
+            {userBalance !== null && parseFloat(userBalance) > 0 && (
               <button
                 onClick={() => handleOpenTrade('sell')}
                 className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 transition-all shadow-md hover:shadow-lg"
@@ -181,10 +203,20 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
         )}
 
         {/* User Balance */}
-        {currentUserAddress && parseFloat(userBalance) > 0 && (
+        {currentUserAddress && userBalance !== null && parseFloat(userBalance) > 0 && (
           <div className="mt-2 text-center">
             <span className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">
               Your balance: <span className="font-medium text-purple-600 dark:text-purple-400">{parseFloat(userBalance).toFixed(4)} {creatorCoin.symbol}</span>
+            </span>
+          </div>
+        )}
+
+        {/* Saldo nieodczytane. Piszemy o tym zamiast milczec - milczenie w tym
+            miejscu znaczy "nie masz tej monety", a tego nie sprawdzilismy. */}
+        {currentUserAddress && balanceFailed && (
+          <div className="mt-2 text-center">
+            <span className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">
+              Your balance couldn&apos;t be loaded
             </span>
           </div>
         )}

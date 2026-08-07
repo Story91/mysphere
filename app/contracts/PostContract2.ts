@@ -198,12 +198,38 @@ export const PostABI2 = [
 ];
 
 // Adresy kontraktów - te będą musiały zostać zaktualizowane po wdrożeniu
-export const MAINNET_CONTRACT_ADDRESS2 = '0x6e1811A5401dfC30E8F3E2DD9dE0Bbe156F97aC7'; // Zaktualizowano na Base Mainnet
-export const TESTNET_CONTRACT_ADDRESS2 = '0x6e1811A5401dfC30E8F3E2DD9dE0Bbe156F97aC7'; // Zaktualizowano na Base Sepolia
 
-// Funkcja do pobierania odpowiedniego adresu kontraktu w zależności od sieci
-export const getContractAddress2 = (chainId: number) => {
-  // Base Sepolia testnet
+/**
+ * Base Mainnet (8453). POTWIERDZONE lancuchowo: eth_getCode zwraca 1597 bajtow,
+ * `totalPosts()` oddaje 15827, wlasciciel ustawiony. To wdrozenie istnieje.
+ */
+export const MAINNET_CONTRACT_ADDRESS2 = '0x6e1811A5401dfC30E8F3E2DD9dE0Bbe156F97aC7';
+
+/**
+ * Base Sepolia (84532). NIE MA TAM WDROZENIA.
+ *
+ * DLACZEGO `undefined`, a nie adres: stala trzymala DOKLADNIE ten sam ciag co
+ * linia wyzej, z komentarzem "Zaktualizowano na Base Sepolia". Sprawdzenie
+ * lancucha (scripts/verifyOnchainInventory.js) daje na 84532 eth_getCode = 0x.
+ * Bledem byla wiec STALA, nie komentarz: gdyby zawiodl komentarz, pod adresem
+ * stalby jakis kontrakt na Sepolii - nie stoi zaden. Zostala przeklejona linia
+ * mainnetu i podmieniono w niej tylko nazwe sieci.
+ *
+ * Nie da sie tu wpisac adresu prawdziwego, bo taki nie istnieje - dlatego
+ * zamiast wskazywac mainnet z testnetu, ktory konczylby sie rewertem w
+ * `simulateContract` i komunikatem nie mowiacym o co chodzi, oddajemy brak.
+ * `undefined` wpada w gotowa sciezke `if (!contractAddress)` w
+ * TransactionButton i CommentTransactionButton, ktora odmawia od razu i glosno.
+ *
+ * PO WDROZENIU NA SEPOLIE: wpisz tu adres i nic wiecej nie trzeba zmieniac.
+ */
+export const TESTNET_CONTRACT_ADDRESS2: string | undefined = undefined;
+
+// Funkcja do pobierania odpowiedniego adresu kontraktu w zależności od sieci.
+// `undefined` znaczy "nie ma na tej sieci wdrozenia" - i tak ma byc czytane.
+// Wolajacy MUSI to sprawdzic przed uzyciem; nie ma tu adresu zastepczego.
+export const getContractAddress2 = (chainId: number): string | undefined => {
+  // Base Sepolia testnet - dzis zawsze undefined, patrz TESTNET_CONTRACT_ADDRESS2
   if (chainId === 84532) {
     return TESTNET_CONTRACT_ADDRESS2;
   }

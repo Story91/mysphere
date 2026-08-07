@@ -524,6 +524,14 @@ function PostList({
   // Wczesniej kazdy <TipStats> robil wlasne getDocs - przy 25 postach 25 zapytan.
   const [postTipStats, setPostTipStats] = useState<{ [postId: string]: PostTipStats }>({});
   const [tipStatsLoading, setTipStatsLoading] = useState(true);
+  /**
+   * Zbiorcze zapytanie o tipy PADLO.
+   *
+   * Bez tej flagi pusta mapa `postTipStats` znaczyla to samo, co "zaden post
+   * nie dostal ani zlotowki" - i tak wlasnie renderowal sie caly feed po
+   * jednym nieudanym zapytaniu.
+   */
+  const [tipStatsFailed, setTipStatsFailed] = useState(false);
 
   /**
    * SAM SKLAD feedu, nie jego zawartosc.
@@ -559,15 +567,25 @@ function PostList({
     if (ids.length === 0) {
       // Bez tego flaga zostawala na `true` i TipStats krecil spinner w nieskonczonosc.
       setTipStatsLoading(false);
+      setTipStatsFailed(false);
       setPostTipStats({});
       return;
     }
 
     let cancelled = false;
     setTipStatsLoading(true);
+    setTipStatsFailed(false);
     getBulkPostTipStats(ids)
-      .then(stats => { if (!cancelled) setPostTipStats(stats); })
-      .catch(err => console.error('Error fetching bulk tip stats:', err))
+      .then(stats => {
+        if (cancelled) return;
+        // `null` = odczyt padl. Pusta mapa pod postami znaczylaby "zero tipow".
+        setTipStatsFailed(stats === null);
+        setPostTipStats(stats ?? {});
+      })
+      .catch(err => {
+        console.error('Error fetching bulk tip stats:', err);
+        if (!cancelled) setTipStatsFailed(true);
+      })
       .finally(() => { if (!cancelled) setTipStatsLoading(false); });
 
     return () => { cancelled = true; };
@@ -2649,6 +2667,7 @@ function PostList({
             postId={post.id}
             presetPostStats={postTipStats[post.id] ?? null}
             presetLoading={tipStatsLoading}
+            presetFailed={tipStatsFailed}
             className="font-soft-display tabular-nums text-soft-accent-deep"
           />
         </div>

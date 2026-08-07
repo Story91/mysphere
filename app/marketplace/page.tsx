@@ -282,8 +282,17 @@ export default function MarketplacePage() {
         {activeView === 'live' && (
           <div className="animate-fadeIn">
             <MarketplaceGrid mode="live" onOpenListModal={(nft) => { setPrefillTokenId(nft?.tokenId); setShowCreateModal(true); }} />
+            {/* Stalo tu "IP Live source: 0xF90733b9...", czyli obietnica, ze widok
+                czyta zywe dane spod tego adresu. eth_getCode na Camp Network (484)
+                zwraca 0x - ani dla kolekcji IP-NFT (0xF90733b9...), ani dla targu
+                (0xf528f920...), sprawdzone przez scripts/verifyOnchainInventory.js.
+                Pod obydwoma NIE MA kontraktu, wiec zaden odczyt stamtad nie moze sie
+                udac i siatka zawsze wyjdzie pusta. Sam adres pod pusta siatka czytalo
+                sie jako "zrodlo dziala, po prostu nikt nic nie wystawil" - a to nie
+                to samo. Podpis mowi teraz, ze polaczenia nie ma. */}
             <div className="text-center text-xs text-gray-500 mt-2">
-              IP Live source: 0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E
+              IP Live is not connected: no contract is deployed at the configured
+              Camp Network addresses, so nothing can load here.
             </div>
           </div>
         )}

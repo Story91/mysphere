@@ -441,9 +441,31 @@ function AskCard() {
  *
  * Escrow przeszlo z `planned` na `live` - kontrakt stoi na mainnecie i sciezka
  * zakladania go wola. Ale `planned` NIE zniknelo z tabeli i nie ma prawa
- * zniknac: zwrot po wygasnieciu istnieje w kontrakcie i NIE MA go w interfejsie.
- * Wpisanie escrow jako `live` przy jednoczesnym skasowaniu tego wiersza
- * zamienilo by ta tabele w reklame.
+ * zniknac.
+ *
+ * === "Ask: expiry refund" PRZESZLO NA `live` I ZOSTAWILO PO SOBIE WIERSZ ===
+ * Zwrot po wygasnieciu ma juz swoje miejsce w interfejsie: /money wymienia
+ * kazdy wlasny escrow, nazywa okno czasu, w ktorym ten Ask jest, i na wygaslych
+ * stawia przycisk (app/money/page.tsx, LockedPanel). Zdanie "nothing in the
+ * product calls it" przestalo byc prawda, wiec wiersz nie mogl przy nim zostac.
+ *
+ * DWIE RZECZY, KTORE MUSZA ZOSTAC W NOCIE TEGO WIERSZA:
+ *  - ZASTRZEZENIE O DOWODZIE. Ta noga kontraktu nie przeszla przez ZADEN
+ *    prawdziwy lancuch i nie przejdzie tanio: settleExpired wymaga 48 godzin po
+ *    terminie, a zegara na Base ani na Base Sepolii nie da sie przewinac. Cale
+ *    jej pokrycie to blok "zwrot po wygasnieciu" w test/AskEscrow.test.ts, na
+ *    sieci hardhat w pamieci. Podanie tego jako sprawdzonego byloby dokladnie
+ *    tym klamstwem, ktore ta tabela ma wylapywac.
+ *  - DWA KROKI, NIE JEDEN. settleExpired przypisuje SALDO; do portfela
+ *    przenosi dopiero claim(). Nota nie ma prawa napisac "wraca do portfela".
+ *
+ * Na zwolnione miejsce weszla NASTEPNA brakujaca rzecz na tej samej szynie,
+ * a nie pustka: po udanym zwrocie nikt nie zapisuje tego w bazie. `grep` po
+ * `'expired'` w app/ znajduje wylacznie ODCZYTY statusu - ani jednego zapisu.
+ * Ask, ktorego budzet juz wrocil, zostaje w Firestore jako 'open' i dalej stoi
+ * na liscie /asks jak pytanie czekajace na odpowiedzi. Bez tego drugiego
+ * wiersza tabela mowilaby "zwrot dziala" i milczala o tym, ze lancuch o nim wie,
+ * a baza nie.
  *
  * === "Ask: in the feed" PRZESZLO NA `live` I ZOSTAWILO PO SOBIE WIERSZ ===
  * Feed ma pas otwartych Askow nad lista postow (app/basechat/components/
@@ -586,8 +608,13 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   },
   {
     name: 'Ask: expiry refund in the interface',
+    status: 'live',
+    note: '/money lists every Ask the escrow contract is still holding for you, names which of the three windows it is in — before the deadline, the 48 hours you have left to accept answers, or expired — and counts down the one that is running. Expired ones get a button. It says the 2.5% fee and it says the money comes back as a balance you still have to collect, because that is two transactions and not one. The caveat that does not go away: this leg has never run on a real chain, because 48 hours cannot be fast-forwarded on one. Its only proof is a unit test on a local network where we own the clock.',
+  },
+  {
+    name: 'Ask: a settled Ask that says it is settled',
     status: 'planned',
-    note: 'The contract returns an unresolved budget after the deadline plus 48h. Nothing in the product calls it, so today that is a contract call made by hand — and that path is the one leg with no proof from a real chain at all, because 48 hours cannot be fast-forwarded on one.',
+    note: 'The nearest missing thing on this rail. Sending an expired budget back is a contract call and nothing writes it down: no code path in this repo ever sets an Ask to expired, so the document stays open forever and the Ask keeps sitting in the list on /asks as though it were still waiting for answers. Resolving has a server route that records what happened. Expiry has none — the chain knows, the database does not.',
   },
   {
     name: 'Being told you have been paid',
@@ -724,7 +751,7 @@ export default function ReDefinitionPage() {
                 },
                 {
                   t: 'Being built',
-                  d: 'Funding an Ask from the browser, on mainnet — the contract has only ever been driven from a script, on a test network. Answering an Ask without leaving the feed: the feed shows open ones now, but the button walks you to /asks. Taking an expired budget back without calling the contract by hand. The same x402 route on Base in USDC — the branch is written, nothing has ever paid through it.',
+                  d: 'Funding an Ask from the browser, on mainnet — the contract has only ever been driven from a script, on a test network. Answering an Ask without leaving the feed: the feed shows open ones now, but the button walks you to /asks. Writing an expired Ask down as expired — /money can send that budget back, but nothing records it, so the Ask keeps calling itself open. The same x402 route on Base in USDC — the branch is written, nothing has ever paid through it.',
                 },
                 {
                   t: 'Direction',
@@ -852,11 +879,14 @@ export default function ReDefinitionPage() {
           </P>
           <P>
             Two things about that last path are not finished, and this page will not round them up.
-            The contract has the expiry refund; <Hi>the product does not call it</Hi>, so today
-            getting an expired budget back means calling the contract yourself. And money does not
-            arrive on its own: resolving credits each winner a balance they then claim, so
-            &quot;paid&quot; means the contract owes it irreversibly, not that it has landed in
-            their wallet.
+            The product calls the expiry refund now — /money names the window each of your Asks is
+            in and puts a button on the expired ones — but{' '}
+            <Hi>that leg has never run on a real chain</Hi>, and cheaply it never will: it needs 48
+            hours to have passed, and no live network lets you skip them. Everything we know about
+            it comes from a unit test on a local network where we own the clock. And money does not
+            arrive on its own: resolving credits each winner a balance they then claim, and the
+            expiry refund credits the author the same way, so &quot;paid&quot; and &quot;returned&quot;
+            both mean the contract owes it irreversibly — not that it has landed in a wallet.
           </P>
           <P>
             The claim at least has an address now.{' '}

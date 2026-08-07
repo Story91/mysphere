@@ -162,7 +162,123 @@ describe('AskEscrow', () => {
   });
 
   // ================================================================
-  // 3. POZOSTALE BRAMKI
+  // 3. ZWROT PO WYGASNIECIU
+  // ================================================================
+  /**
+   * TO JEST JEDYNY DOWOD, JAKI TA NOGA KONTRAKTU MA.
+   *
+   * settleExpired wymaga, zeby minelo 48 godzin PO terminie. Na zywej sieci nie
+   * da sie tego przewinac - kazdy przebieg kosztowalby dwie doby czekania, wiec
+   * ta sciezka nigdy nie przeszla ani przez Base Sepolie, ani przez mainnet
+   * (poziomy 2 i 3 z naglowka tego pliku). Zostaje poziom 1, gdzie zegar jest
+   * nasz. Kazde zdanie w interfejsie o zwrocie po wygasnieciu stoi na tym
+   * bloku i na niczym innym - i strona /re-definition ma to mowic wprost.
+   */
+  describe('zwrot po wygasnieciu', () => {
+    it('granica okna: przed terminem, w oknie rozstrzygania i DOKLADNIE na 48h - odmowa', async () => {
+      const { escrow, author, alice, deadline } = await fundedAsk();
+
+      // Kontrakt sam podaje granice, wiec test nie liczy jej rownolegle.
+      expect(await escrow.resolveDeadline(author.address, ASK_ID)).to.equal(
+        BigInt(deadline) + 48n * 3600n
+      );
+
+      // 1. Przed terminem - odpowiedzi jeszcze wplywaja.
+      await expect(
+        escrow.connect(alice).settleExpired(author.address, ASK_ID)
+      ).to.be.revertedWithCustomError(escrow, 'TooEarly');
+
+      // 2. W oknie rozstrzygania - autor wciaz moze przyjac odpowiedzi, wiec
+      //    zabranie mu budzetu w tej chwili pozbawialoby ich zaplaty.
+      await time.increaseTo(deadline + 3600);
+      await expect(
+        escrow.connect(alice).settleExpired(author.address, ASK_ID)
+      ).to.be.revertedWithCustomError(escrow, 'TooEarly');
+
+      // 3. DOKLADNIE na granicy - wciaz nie. Kontrakt wymaga OSTREJ nierownosci
+      //    (`block.timestamp > deadline + RESOLVE_GRACE`), a `setNextBlockTimestamp`
+      //    jest jedynym sposobem, zeby trafic w te sekunde co do jednej.
+      //    Interfejs liczy ta granice tak samo (escrowTiming w
+      //    app/utils/asks/escrow.ts) - gdyby liczyl ja o sekunde wczesniej,
+      //    czlowiek dostawalby TooEarly za zrobienie tego, co mu kazalismy.
+      await time.setNextBlockTimestamp(deadline + 48 * 3600);
+      await expect(
+        escrow.connect(alice).settleExpired(author.address, ASK_ID)
+      ).to.be.revertedWithCustomError(escrow, 'TooEarly');
+
+      // 4. Sekunde pozniej - przechodzi.
+      await time.setNextBlockTimestamp(deadline + 48 * 3600 + 1);
+      await expect(escrow.connect(alice).settleExpired(author.address, ASK_ID)).to.not.be.reverted;
+    });
+
+    it('oddaje autorowi caly budzet minus oplata - jako SALDO, nie przelew', async () => {
+      const { escrow, token, author, alice, feeRecipient, deadline } = await fundedAsk();
+      await time.increaseTo(deadline + 48 * 3600 + 1);
+
+      const before = await token.balanceOf(author.address);
+      // Wola KTOS OBCY - to jest cala teza tej funkcji: autor nie potrzebuje
+      // ani gazu, ani zycia, zeby pieniadze wrocily pod jego adres.
+      await escrow.connect(alice).settleExpired(author.address, ASK_ID);
+
+      const budget = usdc(2) * 5n;
+      const feeBps = await escrow.FEE_BPS();
+      const expectedFee = (budget * feeBps) / 10_000n;
+
+      expect(await escrow.claimable(author.address)).to.equal(budget - expectedFee);
+      expect(await escrow.claimable(feeRecipient.address)).to.equal(expectedFee);
+      // Wolajacy placi gaz i NIE DOSTAJE NIC.
+      expect(await escrow.claimable(alice.address)).to.equal(0n);
+      // I nic jeszcze nie wyszlo z kontraktu - to sa dwa kroki, nie jeden.
+      expect(await token.balanceOf(author.address)).to.equal(before);
+    });
+
+    it('drugi krok: dopiero claim przenosi tokeny do portfela autora', async () => {
+      const { escrow, token, author, alice, deadline } = await fundedAsk();
+      await time.increaseTo(deadline + 48 * 3600 + 1);
+      await escrow.connect(alice).settleExpired(author.address, ASK_ID);
+
+      const owed = await escrow.claimable(author.address);
+      const before = await token.balanceOf(author.address);
+      await escrow.connect(author).claim();
+
+      expect(await token.balanceOf(author.address)).to.equal(before + owed);
+      expect(await escrow.claimable(author.address)).to.equal(0n);
+    });
+
+    it('nie gubi ani jednej jednostki - oplata plus zwrot rowna sie budzetowi', async () => {
+      const { escrow, author, alice, feeRecipient, deadline } = await fundedAsk();
+      await time.increaseTo(deadline + 48 * 3600 + 1);
+      await escrow.connect(alice).settleExpired(author.address, ASK_ID);
+
+      const suma =
+        (await escrow.claimable(author.address)) + (await escrow.claimable(feeRecipient.address));
+      expect(suma).to.equal(usdc(10));
+    });
+
+    it('jest terminalny - drugi zwrot tego samego budzetu sie nie da', async () => {
+      const { escrow, author, alice, deadline } = await fundedAsk();
+      await time.increaseTo(deadline + 48 * 3600 + 1);
+      await escrow.connect(alice).settleExpired(author.address, ASK_ID);
+
+      await expect(
+        escrow.connect(alice).settleExpired(author.address, ASK_ID)
+      ).to.be.revertedWithCustomError(escrow, 'NotOpen');
+    });
+
+    it('nie ma czego zwracac z Aska juz rozstrzygnietego', async () => {
+      const { escrow, author, alice, deadline } = await fundedAsk();
+      await time.increaseTo(deadline + 1);
+      await escrow.connect(author).resolve(ASK_ID, [alice.address], [REF_1]);
+
+      await time.increaseTo(deadline + 48 * 3600 + 1);
+      await expect(
+        escrow.connect(alice).settleExpired(author.address, ASK_ID)
+      ).to.be.revertedWithCustomError(escrow, 'NotOpen');
+    });
+  });
+
+  // ================================================================
+  // 4. POZOSTALE BRAMKI
   // ================================================================
   describe('bramki', () => {
     it('nie pozwala rozstrzygnac nikomu poza autorem', async () => {

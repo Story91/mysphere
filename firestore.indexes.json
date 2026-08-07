@@ -19,7 +19,18 @@
     "obsluguje zapytanie, ktore dzis dziala. NIE USUWAJ ich, dopoki nie",
     "sprawdzisz, ze zadne zapytanie ich nie potrzebuje.",
     "",
-    "Wdrozenie: firebase deploy --only firestore:indexes"
+    "Wdrozenie: firebase deploy --only firestore:indexes",
+    "",
+    "=== CZTERY OSTATNIE (tips, unlocks) NIE SA JESZCZE WDROZONE ===",
+    "Dopisane pod app/utils/money/getMoneyLedger.ts. Dopoki nie zostana",
+    "wdrozone, ksiega /money celowo NIE MA ani jednego `orderBy` - sortuje w",
+    "pamieci i tnie na ROW_CAP=100, bo `where(...) + orderBy(...)` bez indeksu",
+    "konczy sie FAILED_PRECONDITION, czyli pusta sekcja u kogos, kto ma",
+    "pieniadze. Kolejnosc jest odwrotna niz odruch: NAJPIERW wdroz te cztery i",
+    "poczekaj, az Firebase pokaze je jako Enabled, DOPIERO POTEM dopisz",
+    "`orderBy` i stronicowanie w getMoneyLedger.ts. Pola sortowania roznia sie",
+    "miedzy kolekcjami: `tips` trzyma czas w `timestamp`, `unlocks` w",
+    "`unlockedAt` - to nie jest literowka."
   ],
   "indexes": [
     {
@@ -226,6 +237,39 @@
       "fields": [
         { "fieldPath": "active", "order": "ASCENDING" },
         { "fieldPath": "endTime", "order": "ASCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "tips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recipientAddress", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "senderAddress", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "unlocks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "creatorAddress", "order": "ASCENDING" },
+        { "fieldPath": "unlockedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "unlocks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "walletAddress", "order": "ASCENDING" },
+        { "fieldPath": "unlockedAt", "order": "DESCENDING" }
       ]
     }
   ],

@@ -38,16 +38,22 @@ interface TradeCoinModalProps {
   isOpen: boolean;
   onClose: () => void;
   coin: CreatorCoinData;
-  userBalance?: string;
+  /**
+   * Saldo w tej monecie. `null`/brak = NIE ODCZYTANO.
+   *
+   * Domyslne '0' bylo tu klamstwem o cudzych pieniadzach: nieodczytane saldo
+   * rysowalo "Balance: 0", a przycisk MAX wpisywal zero do pola sprzedazy.
+   */
+  userBalance?: string | null;
   mode?: 'buy' | 'sell';
   onTradeSuccess?: () => void;
 }
 
-export default function TradeCoinModal({ 
-  isOpen, 
-  onClose, 
-  coin, 
-  userBalance = '0',
+export default function TradeCoinModal({
+  isOpen,
+  onClose,
+  coin,
+  userBalance = null,
   mode: initialMode = 'buy',
   onTradeSuccess
 }: TradeCoinModalProps) {
@@ -135,9 +141,17 @@ export default function TradeCoinModal({
       return;
     }
 
-    if (mode === 'sell' && parseFloat(userBalance) < amountNum) {
-      toast.error('Insufficient balance');
-      return;
+    if (mode === 'sell') {
+      // Nie sprzedajemy w ciemno. Nieznane saldo to nie jest "za malo" - to
+      // brak podstawy, zeby cokolwiek twierdzic o cudzym portfelu.
+      if (userBalance === null) {
+        toast.error('We could not read your balance. Reopen this window and try again.');
+        return;
+      }
+      if (parseFloat(userBalance) < amountNum) {
+        toast.error('Insufficient balance');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -262,7 +276,8 @@ export default function TradeCoinModal({
               <span>{isBuy ? 'Amount in ETH' : `Amount in ${coin.symbol}`}</span>
               {!isBuy && (
                 <span className="text-xs text-slate-500">
-                  Balance: {formatCompactNumber(parseFloat(userBalance))}
+                  {/* Kreska, nie zero - salda nie odczytano. */}
+                  Balance: {userBalance === null ? '—' : formatCompactNumber(parseFloat(userBalance))}
                 </span>
               )}
             </label>
@@ -282,7 +297,8 @@ export default function TradeCoinModal({
                 )}
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                {!isBuy && (
+                {/* MAX bez znanego salda wpisywalby zero - lepiej go nie dawac. */}
+                {!isBuy && userBalance !== null && (
                   <button
                     onClick={() => setAmount(userBalance)}
                     className="text-xs font-medium text-slate-400 hover:text-white transition-colors px-2 py-1 rounded bg-slate-700/50 hover:bg-slate-700"
@@ -328,7 +344,8 @@ export default function TradeCoinModal({
               </div>
             ) : (
               <div className="flex gap-2">
-                {[25, 50, 75, 100].map((percent) => {
+                {/* Procenty licza sie Z SALDA - bez salda nie ma z czego. */}
+                {userBalance !== null && [25, 50, 75, 100].map((percent) => {
                   const value = (parseFloat(userBalance) * percent / 100).toString();
                   return (
                     <button

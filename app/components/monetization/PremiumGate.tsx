@@ -38,7 +38,7 @@
  *    wiecej.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { toast } from 'react-hot-toast';
 import { getExplorerTxLink } from '../../basechat/components/TipNetworkConfig';
@@ -66,7 +66,7 @@ export default function PremiumGate({
   onUnlocked,
 }: PremiumGateProps) {
   const { address, isConnected } = useAccount();
-  const { signIn } = useSiweAuth();
+  const { signIn, isAuthenticated } = useSiweAuth();
   const [justUnlocked, setJustUnlocked] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
@@ -122,6 +122,30 @@ export default function PremiumGate({
   }, [postId]);
 
   /**
+   * JEDEN PODPIS ODSLANIA WSZYSTKO OD RAZU.
+   *
+   * Sesja jest wspolna dla calej strony (useSiweAuth trzyma ja w module), ale
+   * kazda bramka pamietala WLASNE "serwer nie wie, kim jestes" i czekala na
+   * osobne klikniecie. Autor z dwoma platnymi postami musial wiec podpisac
+   * pierwszy, a drugi i tak dalej prosil - albo odswiezyc strone.
+   *
+   * Skoro sesja wlasnie powstala - obojetne, czy z przycisku tutaj, z paska
+   * sesji, czy z platnosci - powod bledu przestal istniec. Wyzerowanie go jest
+   * jednoczesnie sygnalem dla efektu ponizej, zeby pobrac tresc.
+   *
+   * REAGUJEMY NA PRZEJSCIE, NIE NA STAN. Warunek "jest sesja, wiec skasuj
+   * blad" petliby sie w nieskonczonosc, gdyby serwer mimo wszystko odpowiadal
+   * 401 (wygasle cookie przy adresie wciaz pamietanym po stronie klienta):
+   * blad znikalby, efekt pobierania odpalalby sie od nowa i tak w kolko.
+   */
+  const wasAuthenticatedRef = useRef(isAuthenticated);
+  useEffect(() => {
+    const justSignedIn = isAuthenticated && !wasAuthenticatedRef.current;
+    wasAuthenticatedRef.current = isAuthenticated;
+    if (justSignedIn) setContentError((previous) => (previous?.needsSignIn ? null : previous));
+  }, [isAuthenticated]);
+
+  /**
    * Pobranie tresci. Odpalane tylko wtedy, gdy klient ma POWODY sadzic, ze
    * uzytkownik ma prawo - ale to serwer jest tu rozstrzygajacy. 401 znaczy
    * "nie wiem, kim jestes": bez podpisanej sesji nie da sie odroznic
@@ -154,9 +178,21 @@ export default function PremiumGate({
           const needsSignIn = data.code === 'session_required';
           setContentError({
             needsSignIn,
+            /**
+             * === AUTOR NIE PROSI O POZWOLENIE NA WLASNY TEKST ===
+             * Zgloszenie brzmialo: "nie rozumiem, czemu musze sie podpisac,
+             * zeby zobaczyc swoj wlasny post". Powod jest nasz, nie jego:
+             * tekst lezy poza feedem, wiec serwer widzi tylko zadanie HTTP -
+             * sam adres portfela moze podac kazdy. Trzeba wiec to POWIEDZIEC,
+             * a nie kazac sie domyslac.
+             */
             message: needsSignIn
-              ? 'This text is only served to a wallet that signed in. Signing costs no gas and sends no transaction - your payment stays valid.'
-              : data.error || 'Could not load the premium content.',
+              ? isAuthor
+                ? 'This is your own text - we just have to know it is you. It is kept off the feed so nobody reads it without paying, and the only way we can tell your wallet from anyone typing your address is one signature. No gas, no transaction.'
+                : 'This text is only served to a wallet that signed in - we have to know it is you. Signing costs no gas and sends no transaction, and your payment stays valid.'
+              : response.status === 404 && isAuthor
+                ? 'The paid text for this post was never stored, so there is nothing to hand out and nobody can buy it.'
+                : data.error || 'Could not load the premium content.',
           });
           return;
         }
@@ -172,7 +208,10 @@ export default function PremiumGate({
     return () => {
       cancelled = true;
     };
-  }, [unlocked, content, contentError, postId]);
+    // `isAuthor` jest w zaleznosciach, bo rozstrzyga TRESC komunikatu bledu.
+    // Ponowne wejscie jest tanie: efekt i tak nic nie robi, dopoki tresc albo
+    // blad juz sa.
+  }, [unlocked, content, contentError, postId, isAuthor]);
 
   const recordUnlock = useCallback(
     async (txHash: `0x${string}`) => {
@@ -274,19 +313,38 @@ export default function PremiumGate({
 
   if (unlocked) {
     return (
-      <div className="my-3 rounded-card border border-soft-accent/50 bg-soft-accent-soft p-4 font-soft">
-        <div className="flex items-center gap-2 mb-2 font-soft-display text-xs font-semibold text-soft-accent-deep">
+      /* ===== POMARANCZ TYLKO NA KWOCIE, NIE NA CALYM PANELU =====
+         Ten blok byl pomaranczowy w calosci: tlo bg-soft-accent-soft, obwodka
+         border-soft-accent, naglowek i KAZDY napis w text-soft-accent-deep.
+         To dokladnie ten sam blad, ktory naprawilismy w PremiumComposer, i
+         uzasadnienie jest to samo: zasada "pomaranczowy zarezerwowany dla
+         pieniedzy" dziala tak dlugo, jak dlugo pomaranczowy jest RZADKI. Gdy
+         nosi go tlo, ramka i trzy napisy, przestaje cokolwiek znaczyc - wzrok
+         nie ma za czym isc, a blok czyta sie jak ostrzezenie zamiast jak
+         kupiona tresc.
+
+         Tutaj, w stanie ODBLOKOWANYM, zadnej kwoty juz nie ma - nie ma wiec
+         powodu, zeby byl choc jeden pomaranczowy piksel. Zostaje spokojna
+         karta na lawendowym tle, taka sama jak panel kompozytora, a bohaterem
+         jest tresc, nie ramka wokol niej.
+
+         KONTRAST po przemalowaniu (na bg-soft-bg #f1edfa):
+           ink 12.0:1, ink-muted 4.8:1, primary-deep 5.4:1 - wszystkie >= 4.5:1. */
+      <div className="my-3 rounded-card border border-soft-line bg-soft-bg p-4 font-soft">
+        <div className="flex items-center gap-2 mb-2 font-soft-display text-xs font-semibold text-soft-ink-muted">
           <span>🔓</span>
           <span>{isAuthor ? 'Premium content (yours)' : 'Premium content unlocked'}</span>
         </div>
         {isLoadingContent ? (
           <div className="space-y-2" aria-live="polite" aria-label="Loading premium content">
-            <div className="h-3 w-11/12 animate-pulse rounded-pill bg-soft-accent/35" />
-            <div className="h-3 w-8/12 animate-pulse rounded-pill bg-soft-accent/35" />
+            <div className="h-3 w-11/12 animate-pulse rounded-pill bg-soft-line-strong/70" />
+            <div className="h-3 w-8/12 animate-pulse rounded-pill bg-soft-line-strong/70" />
           </div>
         ) : contentError ? (
           <div className="space-y-2">
-            <p role="alert" className="text-xs leading-relaxed text-soft-accent-deep">
+            {/* Komunikat bledu na pelnym atramencie, nie na akcencie: to nie jest
+                kwota, a przy okazji 12:1 zamiast 4.5:1. */}
+            <p role="alert" className="text-xs leading-relaxed text-soft-ink">
               {contentError.message}
             </p>
             {contentError.needsSignIn ? (
@@ -299,9 +357,20 @@ export default function PremiumGate({
                 onClick={handleSignInForContent}
                 disabled={isSigningIn}
                 aria-busy={isSigningIn}
-                className="rounded-pill bg-soft-primary px-4 py-2 text-xs font-semibold text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+                /* bg-soft-primary-deep, nie bg-soft-primary: bialy tekst na
+                   #7c6bda daje 4.2:1, czyli PONIZEJ 4.5:1 wymaganego dla tekstu
+                   tej wielkosci. Na #5f4ec2 to 6.3:1. Podpis nie jest platnoscia,
+                   wiec kolor zostaje fioletowy - pomaranczowy nalezy do kwoty. */
+                className="rounded-pill bg-soft-primary-deep px-4 py-2 text-xs font-semibold text-white shadow-chip transition-[filter,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:brightness-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
               >
-                {isSigningIn ? 'Check your wallet…' : 'Sign in to read this'}
+                {/* Autor nie "kupuje dostepu" i nie ma czego odblokowywac -
+                    prosimy go wylacznie o potwierdzenie tozsamosci, wiec
+                    przycisk mowi, co sie stanie, a nie czego mu brakuje. */}
+                {isSigningIn
+                  ? 'Check your wallet…'
+                  : isAuthor
+                    ? 'Confirm it is me'
+                    : 'Sign in to read this'}
               </button>
             ) : (
               /* Wyzerowanie bledu odpala efekt jeszcze raz. Bez tego jedna
@@ -310,7 +379,7 @@ export default function PremiumGate({
               <button
                 type="button"
                 onClick={() => setContentError(null)}
-                className="rounded-pill px-1 text-xs font-semibold text-soft-accent-deep underline transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="rounded-pill px-1 text-xs font-semibold text-soft-primary-deep underline transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 Try again
               </button>
@@ -323,7 +392,7 @@ export default function PremiumGate({
         ) : (
           // Pusta tresc to nie to samo, co blad: post jest oznaczony jako platny,
           // ale nic w nim nie ma. Puste miejsce wygladaloby jak zaciecie.
-          <p className="text-xs leading-relaxed text-soft-accent-deep/85">
+          <p className="text-xs leading-relaxed text-soft-ink-muted">
             This post has no premium text.
           </p>
         )}
@@ -331,7 +400,7 @@ export default function PremiumGate({
         {/* Informacja WIDOCZNA DLA AUTORA - to jedyna osoba decydujaca o
             zamknieciu tresci, wiec musi wiedziec, czym ta zaslona naprawde jest. */}
         {isAuthor && (
-          <p className="mt-3 border-t border-soft-accent/40 pt-2 text-[11px] leading-relaxed text-soft-accent-deep/85">
+          <p className="mt-3 border-t border-soft-line pt-2 text-[11px] leading-relaxed text-soft-ink-muted">
             This text is stored outside the feed and served only to readers who paid, so it
             is not visible in the page&apos;s network response. It is still plain text on our
             server, not end-to-end encrypted.
@@ -342,7 +411,11 @@ export default function PremiumGate({
   }
 
   return (
-    <div className="my-3 rounded-card border border-soft-accent/50 bg-soft-accent-soft p-4 font-soft">
+    /* Ta sama zamiana co wyzej: spokojna karta zamiast pomaranczowej plamy.
+       Roznica jest jedna i celowa - TU jest kwota, wiec tu zostaje akcent.
+       Nosza go dokladnie dwie rzeczy, obie bedace pieniedzmi: pigulka z cena
+       i przycisk, ktory te cene pobiera. Reszta jest atramentowa. */
+    <div className="my-3 rounded-card border border-soft-line bg-soft-bg p-4 font-soft">
       {/* Rozmyty podglad - sygnalizuje, ze cos tam jest, ale nic nie zdradza.
           Tresc premium NIE jest tu renderowana; przychodzi dopiero z serwera
           w dokumencie posta, gdy uzytkownik ma do niej prawo. */}
@@ -356,19 +429,33 @@ export default function PremiumGate({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
-          <div className="font-soft-display font-semibold text-soft-accent-deep">🔒 Premium part of this post</div>
+          <div className="font-soft-display font-semibold text-soft-ink">🔒 Premium part of this post</div>
           <div className="text-xs text-soft-ink-muted">
-            One-time payment of {priceLabel} to the author. No subscription, no token.
+            {/* KWOTA - jedyne miejsce w tym zdaniu, ktore dostaje akcent.
+                Pigulka jest biala, nie lawendowa, i nie jest ozdoba: pomaranczowy
+                #c2410c na tle #f1edfa daje 4.496:1, czyli wlos PONIZEJ progu,
+                a na bieli 5.2:1. To ta sama para kolorow co pole ceny w
+                PremiumComposer. */}
+            One-time payment of{' '}
+            <span className="inline-block rounded-pill bg-soft-surface px-1.5 py-0.5 font-soft-display font-bold tabular-nums text-soft-accent-deep">
+              {priceLabel}
+            </span>{' '}
+            to the author. No subscription, no token.
           </div>
         </div>
 
         {!isConnected ? (
-          <span className="text-xs text-soft-ink-soft">Connect your wallet to unlock</span>
+          /* ink-soft na tym tle to 3.0:1 - ponizej progu, a to jedyna
+             wskazowka, jaka niepodlaczony uzytkownik tu dostaje. ink-muted daje 4.8:1. */
+          <span className="text-xs text-soft-ink-muted">Connect your wallet to unlock</span>
         ) : !isOnBase ? (
           <button
             type="button"
             onClick={switchToBase}
-            className="px-4 py-2 text-sm font-semibold rounded-pill bg-soft-accent-deep text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:brightness-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+            /* Zmiana sieci NIE jest platnoscia - to warunek wstepny. Pomaranczowy
+               oddajemy wiec przyciskowi, ktory faktycznie pobiera kwote, a ten
+               zostaje fioletowy. Bialy tekst na #5f4ec2 to 6.3:1. */
+            className="px-4 py-2 text-sm font-semibold rounded-pill bg-soft-primary-deep text-white shadow-chip transition-[filter,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:brightness-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
           >
             Switch to Base
           </button>
@@ -378,7 +465,15 @@ export default function PremiumGate({
             onClick={handleUnlockClick}
             disabled={isBusy || accessCheck === 'checking'}
             aria-busy={isBusy || accessCheck === 'checking'}
-            className="px-4 py-2 text-sm font-semibold rounded-pill bg-soft-primary text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+            /* JEDYNE pelne wypelnienie akcentem w calym komponencie - i jedyne
+               uzasadnione, bo ten przycisk pobiera pieniadze, a jego napis JEST
+               kwota. Wypelnienie zostaje rzadkie, wiec dalej cos znaczy.
+               Kolor: bialy na #c2410c to 5.2:1. Wczesniej bylo tu
+               bg-soft-primary z bialym tekstem, czyli 4.2:1 - PONIZEJ progu
+               dla 14px. disabled:opacity-70 zamiast 50, bo w tym stanie
+               przycisk niesie tresc ("Checking your access..."), a nie sama
+               swoja obecnosc. */
+            className="px-4 py-2 text-sm font-semibold rounded-pill bg-soft-accent-deep text-white shadow-chip transition-[filter,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:brightness-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
           >
             {accessCheck === 'checking'
               ? 'Checking your access...'
@@ -403,7 +498,10 @@ export default function PremiumGate({
       {/* Nie wiemy, czy ten post juz nie jest oplacony - i wlasnie dlatego nic
           nie wyslalismy. Rachunek za niepewnosc nie moze isc na uzytkownika. */}
       {accessCheck === 'unreachable' && (
-        <div role="alert" className="mt-3 flex items-start justify-between gap-3 rounded-2xl border border-soft-line bg-soft-sunken p-2.5 text-xs text-soft-ink-muted">
+        /* bg-soft-surface, nie bg-soft-sunken: karta jest teraz lawendowa, a
+           sunken (#eee9fb) rozni sie od niej o dwa punkty - komunikat po prostu
+           przestalby byc widoczny jako osobny blok. Na bieli ink-muted daje 5.5:1. */
+        <div role="alert" className="mt-3 flex items-start justify-between gap-3 rounded-2xl border border-soft-line bg-soft-surface p-2.5 text-xs text-soft-ink-muted">
           <span>
             We could not check whether you already paid for this post, so we stopped before sending
             anything. Nothing was charged.

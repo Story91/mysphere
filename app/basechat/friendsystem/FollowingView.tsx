@@ -24,11 +24,23 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
     followStats, 
     loading, 
     error, 
+    failedSections,
     unfollowUser 
   } = useSocial(currentUserAddress);
 
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'following' | 'followers'>('following');
+
+  /**
+   * Liczba, ktorej nie udalo sie odczytac, jest KRESKA, nie zerem.
+   *
+   * `followStats` jest `null` wylacznie wtedy, gdy odczyt padl (getUserFollowStats
+   * oddaje policzone zera, gdy naprawde nikt nie obserwuje). Stare
+   * `followStats?.followers || 0` zamienialo awarie w zdanie "nikt cie nie
+   * obserwuje" - i to na ekranie, ktory sluzy wlasnie do sprawdzenia tej liczby.
+   */
+  const statValue = (value: number | undefined): string =>
+    typeof value === 'number' ? value.toLocaleString() : '—';
 
   // Handle unfollow (Obsługa przestania obserwowania)
   const handleUnfollow = async (targetUserId: string) => {
@@ -82,15 +94,15 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
         <h2 className="font-soft-display text-2xl font-bold mb-3 text-soft-ink">👥 Follow Network</h2>
         <div className="flex items-center gap-6">
           <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{followStats?.following || 0}</div>
+            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{statValue(followStats?.following)}</div>
             <div className="text-sm text-soft-ink-muted">Following</div>
           </div>
           <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{followStats?.followers || 0}</div>
+            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{statValue(followStats?.followers)}</div>
             <div className="text-sm text-soft-ink-muted">Followers</div>
           </div>
           <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{followStats?.mutualFollows || 0}</div>
+            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{statValue(followStats?.mutualFollows)}</div>
             <div className="text-sm text-soft-ink-muted">Mutual</div>
           </div>
         </div>
@@ -106,7 +118,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
               : 'text-soft-ink-muted hover:text-soft-ink'
           }`}
         >
-          👥 Following ({followStats?.following || 0})
+          👥 Following ({statValue(followStats?.following)})
         </button>
         <button
           onClick={() => setActiveTab('followers')}
@@ -116,13 +128,29 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
               : 'text-soft-ink-muted hover:text-soft-ink'
           }`}
         >
-          🫂 Followers ({followStats?.followers || 0})
+          🫂 Followers ({statValue(followStats?.followers)})
         </button>
       </div>
 
       {/* Users list based on active tab */}
       {(() => {
         const currentList = activeTab === 'following' ? following : followers;
+
+        // Pusta lista po NIEUDANYM odczycie nie jest zdaniem o nikim - jest
+        // zdaniem o naszym zapytaniu. Bez tego rozroznienia ekran pisal
+        // "No followers yet" komus, kto ma ich trzysta.
+        const listFailed = failedSections.includes(activeTab);
+
+        if (listFailed) {
+          return (
+            <div className="text-center py-12 bg-soft-surface border border-soft-line rounded-card shadow-card font-soft">
+              <h3 className="font-soft-display text-xl font-semibold text-soft-ink mb-2">
+                {activeTab === 'following' ? "Following list couldn't be loaded" : "Followers couldn't be loaded"}
+              </h3>
+              <p className="text-soft-ink-muted">Try again in a moment.</p>
+            </div>
+          );
+        }
 
         if (currentList.length === 0) {
           return (

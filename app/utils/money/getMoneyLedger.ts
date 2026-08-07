@@ -55,12 +55,14 @@ import { addressReadVariants } from '../monetization/types';
  *   askAnswers  author in [...] + accepted == true wplywy: przyjete odpowiedzi
  *   asks        author in [warianty]               wydatki + otwarte escrow
  *
- * ZADNE nie ma `orderBy`. To nie jest zaniedbanie: `tips` i `unlocks` nie maja
- * ani jednego indeksu zlozonego w firestore.indexes.json, wiec zapytanie
- * `where(...) + orderBy('timestamp')` konczy sie bledem FAILED_PRECONDITION,
- * czyli pusta sekcja u kogos, kto ma pieniadze. Sortujemy w pamieci, a limit
- * ustawia `truncated` - obciecie ma byc widoczne, a nie udawac kompletu.
- * (Dwa indeksy, ktore by to zdjely, sa opisane na koncu pliku.)
+ * ZADNE nie ma `orderBy`. To nie jest zaniedbanie: dla `tips` i `unlocks`
+ * potrzebne indeksy zlozone sa DOPISANE do firestore.indexes.json, ale NIE SA
+ * JESZCZE WDROZONE (wdrozenie to komenda wlasciciela). Dopoki Firebase nie
+ * pokaze ich jako Enabled, `where(...) + orderBy('timestamp')` konczy sie
+ * bledem FAILED_PRECONDITION, czyli pusta sekcja u kogos, kto ma pieniadze.
+ * Sortujemy w pamieci, a limit ustawia `truncated` - obciecie ma byc widoczne,
+ * a nie udawac kompletu.
+ * (Cztery indeksy, ktore by to zdjely, sa wypisane na koncu pliku.)
  *
  * === AWARIA != PUSTKA ===
  * Kazda sekcja niesie WLASNA flage `failed`. Nieudany odczyt napiwkow nie moze
@@ -171,11 +173,33 @@ export type MoneyLedger = {
   incoming: MoneySection;
   outgoing: MoneySection;
   /**
-   * Wlasne Aski, ktore jeszcze trwaja. Same dokumenty - ILE naprawde lezy na
-   * kontrakcie, wie wylacznie lancuch (`escrowFor`), bo rozstrzygniecie
+   * Wlasne Aski, ktorych nikt nie zamknal. Same dokumenty - ILE naprawde lezy
+   * na kontrakcie, wie wylacznie lancuch (`escrowFor`), bo rozstrzygniecie
    * i wygasniecie nie zapisuja sie w tym dokumencie.
+   *
+   * === DLACZEGO TO SA DWIE LISTY, A NIE JEDNA ===
+   * Do dzis bylo tu jedno pole i warunek `deadline > now`, wiec Ask PO TERMINIE
+   * wypadal z ksiegi bez sladu. Dla dokumentu to bylo obojetne, dla pieniedzy
+   * nie: zaden proces nie przestawia `status` na 'expired', wiec taki Ask
+   * zostaje w bazie jako 'open', a jego budzet DALEJ lezy na kontrakcie -
+   * tyle ze jedyne, co da sie z nim zrobic, to settleExpired po terminie + 48h.
+   * Odfiltrowanie go tutaj znaczylo, ze strona o pieniadzach nie wiedziala
+   * o jedynych pieniadzach, ktore czekaja na dzialanie.
    */
-  openAsks: { rows: OpenAskRow[]; truncated: boolean; failed: boolean };
+  openAsks: {
+    /** Wciaz przed terminem - odpowiedzi moga jeszcze wplywac. */
+    rows: OpenAskRow[];
+    /**
+     * Termin minal, a Ask nie zostal zamkniety. Kandydaci do okna rozstrzygania
+     * (do terminu + 48h) i do zwrotu budzetu (po nim).
+     *
+     * Ask BEZ zapisanej daty (`deadline === 0`) NIE trafia tutaj, tylko do
+     * `rows`: brak terminu znaczy "nie wiadomo kiedy", a nie "juz po".
+     */
+    pastDeadline: OpenAskRow[];
+    truncated: boolean;
+    failed: boolean;
+  };
   /**
    * Ile poszlo do odpowiadajacych z WLASNEGO PORTFELA autora, per token -
    * czyli wylacznie Aski `funding: 'on-resolve'`.
@@ -307,7 +331,7 @@ export async function getMoneyLedger(address: string): Promise<MoneyLedger> {
       address: '',
       incoming: empty(false),
       outgoing: empty(false),
-      openAsks: { rows: [], truncated: false, failed: false },
+      openAsks: { rows: [], pastDeadline: [], truncated: false, failed: false },
       askPayoutsFromWallet: {},
       reads: 0,
     };
@@ -425,6 +449,7 @@ export async function getMoneyLedger(address: string): Promise<MoneyLedger> {
 
   const askPayoutsFromWallet: TokenAmounts = {};
   const openAskRows: OpenAskRow[] = [];
+  const pastDeadlineRows: OpenAskRow[] = [];
   const now = Date.now();
 
   for (const row of asks.rows) {
@@ -466,10 +491,10 @@ export async function getMoneyLedger(address: string): Promise<MoneyLedger> {
 
     // "Otwarty" liczymy tak samo jak `isExpired` w asks/types.ts: zaden proces
     // nie przestawia `status` na 'expired' sam z siebie, wiec po terminie Ask
-    // wciaz ma w bazie 'open'. Po budzet z lancucha idziemy tylko dla tych,
-    // ktore naprawde jeszcze trwaja.
-    if (status === 'open' && (deadline === 0 || deadline > now)) {
-      openAskRows.push({
+    // wciaz ma w bazie 'open'. Oba przypadki ida do wyniku - rozne sa tylko
+    // listy, bo rozne jest to, co wolno zrobic z ich budzetem.
+    if (status === 'open') {
+      const openRow: OpenAskRow = {
         id: row.id,
         question: asText(data.question),
         budget,
@@ -480,7 +505,9 @@ export async function getMoneyLedger(address: string): Promise<MoneyLedger> {
         funding,
         escrowTxHash,
         escrowChainId: typeof data.escrowChainId === 'number' ? data.escrowChainId : null,
-      });
+      };
+      if (deadline === 0 || deadline > now) openAskRows.push(openRow);
+      else pastDeadlineRows.push(openRow);
     }
   }
 
@@ -496,7 +523,12 @@ export async function getMoneyLedger(address: string): Promise<MoneyLedger> {
       tipsOut.truncated || unlocksOut.truncated || asks.truncated,
       tipsOut.failed || unlocksOut.failed || asks.failed
     ),
-    openAsks: { rows: openAskRows, truncated: asks.truncated, failed: asks.failed },
+    openAsks: {
+      rows: openAskRows,
+      pastDeadline: pastDeadlineRows,
+      truncated: asks.truncated,
+      failed: asks.failed,
+    },
     askPayoutsFromWallet,
     reads:
       readsForDocs(tipsIn.rows.length) +
@@ -529,20 +561,24 @@ export function isLedgerEmpty(ledger: MoneyLedger): boolean {
     ledger.incoming.events.length === 0 &&
     ledger.outgoing.events.length === 0 &&
     ledger.openAsks.rows.length === 0 &&
+    // Ask po terminie tez jest czyms - i to czyms z pieniedzmi do odzyskania.
+    ledger.openAsks.pastDeadline.length === 0 &&
     Object.keys(ledger.askPayoutsFromWallet).length === 0
   );
 }
 
 /*
  * === INDEKSY, KTORE ZDJELYBY SORTOWANIE W PAMIECI ===
- * Gdyby ksiega miala kiedys stronicowac zamiast ciac na ROW_CAP, potrzebne sa
- * cztery indeksy zlozone w firestore.indexes.json (dzis NIE MA tam ani jednego
- * dla `tips` i `unlocks`):
+ * Zeby ksiega mogla stronicowac zamiast ciac na ROW_CAP, potrzebne sa cztery
+ * indeksy zlozone. Sa juz WPISANE w firestore.indexes.json (cztery ostatnie
+ * pozycje w `indexes`), ale NIE SA WDROZONE - wdrozenie to komenda wlasciciela:
  *   tips     (recipientAddress ASC, timestamp DESC)
  *   tips     (senderAddress    ASC, timestamp DESC)
  *   unlocks  (creatorAddress   ASC, unlockedAt DESC)
  *   unlocks  (walletAddress    ASC, unlockedAt DESC)
- * Dopoki ich nie ma, dopisanie `orderBy` do ktoregokolwiek zapytania wyzej
- * wywala je bledem FAILED_PRECONDITION - czyli pusta sekcja u czlowieka,
- * ktory ma pieniadze.
+ *
+ * KOLEJNOSC MA ZNACZENIE. Dopoki `firebase deploy --only firestore:indexes` nie
+ * przejdzie i indeksy nie beda Enabled, dopisanie `orderBy` do ktoregokolwiek
+ * zapytania wyzej wywala je bledem FAILED_PRECONDITION - czyli pusta sekcja u
+ * czlowieka, ktory ma pieniadze. Wpis w pliku to deklaracja, nie indeks.
  */

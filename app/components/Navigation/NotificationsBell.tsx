@@ -19,9 +19,19 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   const { unreadCount, loading } = useNotifications(address || null);
   const [isAnimating, setIsAnimating] = useState(false);
 
+  /**
+   * `unreadCount === null` znaczy, ze licznika NIE ODCZYTANO.
+   *
+   * Wczesniej padniete zapytanie dawalo zero, czyli dokladnie to samo, co
+   * czysta skrzynka - dzwonek milczal i nic nie sugerowalo, ze cos poszlo nie
+   * tak. Teraz kropka nie klamie liczba, ale nazwa dostepna mowi wprost, ze
+   * liczba jest nieznana.
+   */
+  const hasUnread = unreadCount !== null && unreadCount > 0;
+
   // Animacja gdy pojawią się nowe powiadomienia
   useEffect(() => {
-    if (unreadCount > 0) {
+    if (unreadCount !== null && unreadCount > 0) {
       setIsAnimating(true);
       const timer = setTimeout(() => setIsAnimating(false), 1000);
       return () => clearTimeout(timer);
@@ -32,7 +42,12 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   if (!address) return null;
 
   // Reszta interfejsu jest po angielsku - tooltip i nazwa dostepna tez.
-  const label = unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications';
+  const label =
+    unreadCount === null
+      ? "Notifications, unread count couldn't be loaded"
+      : unreadCount > 0
+        ? `Notifications, ${unreadCount} unread`
+        : 'Notifications';
 
   return (
     <button
@@ -45,7 +60,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
         focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface
         hover:bg-soft-sunken
         ${isAnimating ? 'animate-bounce' : ''}
-        ${unreadCount > 0 ? 'text-soft-primary-deep' : 'text-soft-ink-muted hover:text-soft-ink'}
+        ${hasUnread ? 'text-soft-primary-deep' : 'text-soft-ink-muted hover:text-soft-ink'}
       `}
       title={label}
       aria-label={label}
@@ -67,7 +82,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
       </svg>
 
       {/* Red Dot for Unread Notifications (Czerwona kropka dla nieprzeczytanych) */}
-      {unreadCount > 0 && (
+      {hasUnread && (
         // Liczba jest juz w nazwie dostepnej przycisku - powtorzona w drzewie
         // dostepnosci czytalaby sie dwa razy.
         <div aria-hidden="true" className="absolute -top-1 -right-1 flex items-center justify-center">
@@ -79,7 +94,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
               bialym napisem; accent-deep ma 5.9:1 i nalezy do palety. */}
           <div className="relative w-5 h-5 bg-soft-accent-deep rounded-full flex items-center justify-center">
             <span className="text-white text-xs font-bold font-soft-display">
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {unreadCount !== null && unreadCount > 99 ? '99+' : unreadCount}
             </span>
           </div>
         </div>

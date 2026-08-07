@@ -90,9 +90,11 @@ export default function CommentTransactionButton({
         }
       }
 
-      // Check if contract address is available
+      // Ta sciezka jest osiagalna na Base Sepolia: PostContract2 nie ma tam
+      // wdrozenia (patrz TESTNET_CONTRACT_ADDRESS2), wiec komunikat musi
+      // powiedziec CO zrobic, a nie tylko ze cos jest undefined.
       if (!contractAddress) {
-        throw new Error('Contract address is undefined');
+        throw new Error('PostContract2 is not deployed on this network. Switch to Base mainnet to comment.');
       }
 
       // Ensure the contract address has the correct format

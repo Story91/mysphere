@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useAccount, usePublicClient } from 'wagmi';
+import { useAccount, useChainId, useConfig, usePublicClient, useSwitchChain } from 'wagmi';
+import { getWalletClient } from 'wagmi/actions';
 import { base } from 'wagmi/chains';
 import MobileBottomNav from '../components/MobileBottomNav';
 import AskClaimPanel from '../basechat/components/AskClaimPanel';
@@ -15,7 +16,16 @@ import {
   type MoneySection,
   type OpenAskRow,
 } from '../utils/money/getMoneyLedger';
-import { escrowDeployment, readEscrow, unitsToAmount } from '../utils/asks/escrow';
+import {
+  describeEscrowError,
+  escrowDeployment,
+  escrowRefundSplit,
+  escrowTiming,
+  readEscrow,
+  settleExpiredAsk,
+  unitsToAmount,
+  type EscrowTiming,
+} from '../utils/asks/escrow';
 import { formatAmount, formatReceived } from '../utils/tips/getLeaderboard';
 import { getIdentities, type Identity } from '../utils/identity/getIdentities';
 import { getSlicedAddress } from '../utils/identity/resolver';
@@ -202,20 +212,41 @@ export default function MoneyPage() {
     [identities]
   );
 
-  /** Aski z escrow, ktore wciaz trwaja - po ich budzet idziemy na lancuch. */
-  const escrowedOpen = useMemo(
+  /**
+   * Aski z escrow, ktorych nikt nie zamknal - po ich budzet idziemy na lancuch.
+   *
+   * KOLEJNOSC JEST TU DECYZJA O PIENIADZACH, a nie estetyka. Odczytow robimy
+   * najwyzej MAX_ESCROW_LOOKUPS, wiec przy dluzszej liscie CZESC Askow nie
+   * zostanie sprawdzona. Aski PO TERMINIE ida wiec pierwsze: to jedyne, przy
+   * ktorych cokolwiek da sie zrobic. Odwrotna kolejnosc chowalaby przycisk
+   * zwrotu za dwunastoma Askami, ktore i tak tylko odliczaja.
+   */
+  const escrowedOpen = useMemo(() => {
+    const isOurs = (ask: OpenAskRow) =>
+      ask.funding === 'escrowed' && ask.escrowChainId === ESCROW_CHAIN_ID;
+    return [
+      ...(ledger?.openAsks.pastDeadline ?? []).filter(isOurs),
+      ...(ledger?.openAsks.rows ?? []).filter(isOurs),
+    ];
+  }, [ledger]);
+
+  /** Otwarte Aski BEZ escrow - budzet jest obietnica, nie blokada. Patrz nizej. */
+  const promisedOpen = useMemo(
     () =>
-      (ledger?.openAsks.rows ?? []).filter(
-        (ask) => ask.funding === 'escrowed' && ask.escrowChainId === ESCROW_CHAIN_ID
+      [...(ledger?.openAsks.rows ?? []), ...(ledger?.openAsks.pastDeadline ?? [])].filter(
+        (ask) => ask.funding === 'on-resolve'
       ),
     [ledger]
   );
 
-  /** Otwarte Aski BEZ escrow - budzet jest obietnica, nie blokada. Patrz nizej. */
-  const promisedOpen = useMemo(
-    () => (ledger?.openAsks.rows ?? []).filter((ask) => ask.funding === 'on-resolve'),
-    [ledger]
-  );
+  /**
+   * Sygnal dla panelu odbioru: "saldo wlasnie sie zmienilo, przeczytaj je
+   * jeszcze raz". Podnosimy go po udanym zwrocie wygaslego budzetu, bo tamta
+   * transakcja dokłada pieniadze DOKLADNIE do tego salda - a panel stoi wyzej
+   * na tej samej stronie i bez sygnalu pokazywalby kwote sprzed transakcji.
+   */
+  const [claimReloadKey, setClaimReloadKey] = useState(0);
+  const noteBalanceChanged = useCallback(() => setClaimReloadKey((key) => key + 1), []);
 
   return (
     <main className="min-h-screen bg-soft-bg font-soft">
@@ -243,7 +274,7 @@ export default function MoneyPage() {
                 pierwsze z czterech pytan bez odpowiedzi. */}
             <section className="mb-6" aria-labelledby="waiting-heading">
               <SectionLabel id="waiting-heading">Waiting for you</SectionLabel>
-              <AskClaimPanel showEmpty />
+              <AskClaimPanel showEmpty reloadKey={claimReloadKey} />
             </section>
 
             {/* ===== 2. ZABLOKOWANE ===== */}
@@ -256,7 +287,12 @@ export default function MoneyPage() {
                   {ledger.openAsks.failed ? (
                     <LoadFailed onRetry={load} what="your Asks" />
                   ) : (
-                    <LockedPanel author={address} asks={escrowedOpen} promised={promisedOpen} />
+                    <LockedPanel
+                      author={address}
+                      asks={escrowedOpen}
+                      promised={promisedOpen}
+                      onBalanceChanged={noteBalanceChanged}
+                    />
                   )}
                 </>
               )}
@@ -426,6 +462,62 @@ function NothingYet() {
 
 type LockedPhase = 'idle' | 'loading' | 'ready' | 'failed';
 
+/** Jeden wlasny Ask, ktorego budzet NAPRAWDE lezy jeszcze na kontrakcie. */
+type LockedAsk = {
+  row: OpenAskRow;
+  /** Kwota wciaz zablokowana, w jednostkach bazowych. Prosto z `escrowFor`. */
+  budget: bigint;
+  /**
+   * Termin Z LANCUCHA, nie z dokumentu.
+   *
+   * To ten termin sprawdza kontrakt przy settleExpired, a kopia w Firestore
+   * moze sie z nim rozjechac (zapisujemy sekundy zaokraglone w dol). Interfejs,
+   * ktory odlicza wlasny zegar, potrafi obiecac "juz mozna" sekunde przed
+   * lancuchem - i czlowiek dostaje TooEarly za zrobienie tego, co kazalismy.
+   */
+  deadlineMs: number;
+};
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * Ile zostalo, z dokladnoscia do minuty.
+ *
+ * Sekund tu nie ma i nie powinno byc: najkrotsze okno na tej stronie ma 48
+ * godzin, wiec zegar co sekunde bylby ruchem, ktory niczego nie mowi.
+ */
+function formatLeft(ms: number): string {
+  if (ms >= DAY_MS) {
+    return `${Math.floor(ms / DAY_MS)}d ${Math.floor((ms % DAY_MS) / HOUR_MS)}h`;
+  }
+  if (ms >= HOUR_MS) {
+    return `${Math.floor(ms / HOUR_MS)}h ${Math.floor((ms % HOUR_MS) / MINUTE_MS)}m`;
+  }
+  const minutes = Math.floor(ms / MINUTE_MS);
+  return minutes >= 1 ? `${minutes}m` : 'less than a minute';
+}
+
+/** "Teraz" odswiezane co minute - tylko gdy jest co odliczac. */
+function useMinuteTick(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), MINUTE_MS);
+    return () => clearInterval(timer);
+  }, [active]);
+  return now;
+}
+
+/** Najpierw to, z czym da sie cos zrobic; na koncu to, co tylko odlicza. */
+const WINDOW_ORDER: Record<EscrowTiming['phase'], number> = {
+  recoverable: 0,
+  resolving: 1,
+  running: 2,
+};
+
 /**
  * Ile z wlasnych Askow WCIAZ lezy na kontrakcie.
  *
@@ -441,28 +533,59 @@ type LockedPhase = 'idle' | 'loading' | 'ready' | 'failed';
  * autora i moze go wydac na cokolwiek. Wrzucenie obu wariantow do jednej liczby
  * dawaloby napis "locked" nad kwota, ktorej nic nie blokuje. Aski bez escrow
  * dostaja wiec osobne, slabsze zdanie pod spodem.
+ *
+ * === DLACZEGO ZWROT WYGASLEGO BUDZETU STOI WLASNIE TUTAJ ===
+ * settleExpired byla jedyna noga tego kontraktu, ktorej NIC w produkcie nie
+ * wolalo: autor po terminie musial trafic w kontrakt recznie albo zostawic
+ * tam budzet. Rozwazane byly dwa miejsca:
+ *
+ *   karta Aska na /asks   Odpadla. Tamta lista pokazuje DWADZIESCIA najnowszych
+ *                         Askow calego serwisu, wiec wlasny Ask sprzed tygodnia
+ *                         moze sie na niej w ogole nie zmiescic - a pieniadze,
+ *                         ktore wracaja tylko wtedy, gdy trafiles do cudzego
+ *                         top 20, nie sa sciezka odzyskania. Karta jest tez
+ *                         publiczna: przycisk o TWOICH pieniadzach na karcie
+ *                         ogladanej przez odpowiadajacych myli co do tego, czyj
+ *                         ten budzet jest.
+ *
+ *   /money, ta sekcja     Strona jest zbudowana Z WLASNEGO ADRESU i juz dzis
+ *                         pyta lancuch o kazdy wlasny escrow, wiec przycisk nie
+ *                         dokłada ani jednego odczytu. Drugi krok - odbior
+ *                         salda - stoi na tej samej stronie, wiec oba kroki
+ *                         widac naraz i nie da sie ich opisac jako jednego.
+ *                         To jest tez jedyne miejsce, do ktorego czlowiek
+ *                         przychodzi z pytaniem "gdzie sa moje pieniadze".
  */
 function LockedPanel({
   author,
   asks,
   promised,
+  onBalanceChanged,
 }: {
   author: string;
   asks: OpenAskRow[];
   promised: OpenAskRow[];
+  /** Wolane po udanym zwrocie - saldo wyzej na tej stronie wlasnie sie zmienilo. */
+  onBalanceChanged: () => void;
 }) {
   const publicClient = usePublicClient({ chainId: ESCROW_CHAIN_ID });
   const [phase, setPhase] = useState<LockedPhase>('idle');
-  const [lockedUnits, setLockedUnits] = useState<bigint>(0n);
-  const [counted, setCounted] = useState(0);
+  const [locked, setLocked] = useState<LockedAsk[]>([]);
+  /**
+   * Dowody zwrotow wykonanych w tej sesji.
+   *
+   * Trzymane OSOBNO od `locked`, bo po udanej transakcji Ask przestaje byc
+   * `open` i wypada z odczytu - a razem z nim zniknalby hash, czyli jedyny
+   * dowod, ze cokolwiek sie stalo.
+   */
+  const [receipts, setReceipts] = useState<{ id: string; txHash: string }[]>([]);
 
   const looked = useMemo(() => asks.slice(0, MAX_ESCROW_LOOKUPS), [asks]);
 
   const read = useCallback(async () => {
     if (!publicClient || looked.length === 0) {
       setPhase('ready');
-      setLockedUnits(0n);
-      setCounted(0);
+      setLocked([]);
       return;
     }
     setPhase('loading');
@@ -470,18 +593,19 @@ function LockedPanel({
       const states = await Promise.all(
         looked.map((ask) => readEscrow(publicClient, ESCROW_CHAIN_ID, author, ask.id))
       );
-      let sum = 0n;
-      let live = 0;
-      for (const state of states) {
+      const live: LockedAsk[] = [];
+      states.forEach((state, index) => {
         // `funded && open` to jedyny stan, w ktorym pieniadze naprawde tam sa.
         // Po rozstrzygnieciu budzet jest zerem - poszedl na salda odbiorcow.
         if (state.funded && state.open && state.budget > 0n) {
-          sum += state.budget;
-          live++;
+          live.push({
+            row: looked[index],
+            budget: state.budget,
+            deadlineMs: Number(state.deadlineSeconds) * 1000,
+          });
         }
-      }
-      setLockedUnits(sum);
-      setCounted(live);
+      });
+      setLocked(live);
       setPhase('ready');
     } catch (error) {
       console.error('[money] Odczyt zablokowanych budzetow nie powiodl sie:', error);
@@ -493,6 +617,25 @@ function LockedPanel({
     void read();
   }, [read]);
 
+  /**
+   * Po udanym zwrocie: zapisz dowod, powiedz panelowi odbioru, ze saldo sie
+   * zmienilo, i przeczytaj escrow JESZCZE RAZ. Ponowny odczyt jest wazniejszy
+   * niz odjecie kwoty w pamieci - liczbe o pieniadzach ma podawac lancuch,
+   * a nie nasza arytmetyka po transakcji, ktorej wyniku nie widzielismy.
+   */
+  const handleSettled = useCallback(
+    (id: string, txHash: string) => {
+      setReceipts((previous) => [...previous, { id, txHash }]);
+      onBalanceChanged();
+      void read();
+    },
+    [onBalanceChanged, read]
+  );
+
+  // Zegar tyka tylko wtedy, gdy jest co odliczac. Kolejnosc hookow musi byc
+  // stala, wiec stoi tu, przed pierwszym `return`.
+  const now = useMinuteTick(phase === 'ready' && locked.length > 0);
+
   // Kontraktu nie ma na tej sieci - saldo jest wtedy pytaniem bez adresata.
   if (!escrowDeployment(ESCROW_CHAIN_ID)) return null;
 
@@ -500,7 +643,7 @@ function LockedPanel({
     return (
       <div className={CARD} aria-busy="true">
         <p className="text-[12.5px] leading-[1.5] text-soft-ink-muted">
-          Asking the escrow contract what your open Asks are still holding…
+          Asking the escrow contract what your Asks are still holding…
         </p>
       </div>
     );
@@ -523,8 +666,23 @@ function LockedPanel({
     );
   }
 
-  const locked = unitsToAmount(lockedUnits);
+  const lockedUnits = locked.reduce((sum, ask) => sum + ask.budget, 0n);
+  const counted = locked.length;
   const truncated = asks.length > looked.length;
+
+  /**
+   * Wiersze w kolejnosci: najpierw te, ktore czekaja na DZIALANIE.
+   *
+   * Okno liczymy tu, a nie przy odczycie, bo zmienia sie z samego uplywu czasu -
+   * Ask potrafi przejsc z okna rozstrzygania do zwrotu przy otwartej stronie.
+   */
+  const rows = locked
+    .map((ask) => ({ ask, timing: escrowTiming(ask.deadlineMs, now) }))
+    .sort((a, b) => {
+      const order = WINDOW_ORDER[a.timing.phase] - WINDOW_ORDER[b.timing.phase];
+      // Wewnatrz jednego okna: najblizszy termin pierwszy.
+      return order !== 0 ? order : a.timing.deadlineMs - b.timing.deadlineMs;
+    });
 
   return (
     <div className={CARD}>
@@ -533,24 +691,62 @@ function LockedPanel({
           <p className="mb-1 font-soft-display text-[22px] font-bold leading-none">
             {/* Bursztyn TYLKO na kwocie - to jedyna liczba pieniedzy w tej karcie. */}
             <span className="font-mono tabular-nums text-soft-accent-deep">
-              {formatAmount(locked)} USDC
+              {formatAmount(unitsToAmount(lockedUnits))} USDC
             </span>
           </p>
           <p className="text-[12.5px] leading-[1.5] text-soft-ink-muted">
-            held by the escrow contract across {counted === 1 ? 'one open Ask' : `${counted} open Asks`}.
-            It is not yours to spend and not anyone else&apos;s to take: it moves to the answers you
-            accept, and whatever is left comes back to you as a balance you collect at the top of
-            this page.{' '}
+            held by the escrow contract across {counted === 1 ? 'one Ask' : `${counted} Asks`} of
+            yours that nobody has closed yet. It is not yours to spend and not anyone else&apos;s to
+            take: it moves to the answers you accept, and whatever is left comes back to you as a
+            balance you collect at the top of this page.{' '}
             {truncated &&
-              `You have more than ${MAX_ESCROW_LOOKUPS} open Asks, so this is a floor, not the whole bill.`}
+              `You have more than ${MAX_ESCROW_LOOKUPS} unclosed Asks, so this is a floor, not the whole bill.`}
           </p>
+
+          {/* Kazdy Ask osobno: suma nie mowi, KTORE pieniadze da sie juz ruszyc. */}
+          <ul className="mt-4 flex flex-col gap-3 border-t border-soft-line pt-4">
+            {rows.map(({ ask, timing }) => (
+              <LockedAskRow
+                key={ask.row.id}
+                author={author}
+                ask={ask}
+                timing={timing}
+                onSettled={handleSettled}
+              />
+            ))}
+          </ul>
         </>
       ) : (
         <p className="text-[12.5px] leading-[1.5] text-soft-ink-muted">
           {asks.length === 0
-            ? 'None of your open Asks is holding money in escrow right now.'
-            : 'The contract is no longer holding anything for your open Asks — those budgets have already been resolved or settled.'}
+            ? 'None of your Asks is holding money in escrow right now.'
+            : 'The contract is no longer holding anything for your Asks — those budgets have already been resolved or sent back.'}
         </p>
+      )}
+
+      {receipts.length > 0 && (
+        <div className="mt-4 border-t border-soft-line pt-3">
+          <p className="mb-1.5 text-[12px] leading-[1.5] text-soft-ink-muted">
+            {receipts.length === 1
+              ? 'One budget went back to your balance in this session'
+              : `${receipts.length} budgets went back to your balance in this session`}{' '}
+            — collect it at the top of this page.
+          </p>
+          <ul className="flex flex-wrap gap-x-3 gap-y-1">
+            {receipts.map((receipt) => (
+              <li key={receipt.id}>
+                <a
+                  href={`https://basescan.org/tx/${receipt.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[10.5px] text-soft-ink-faint underline decoration-dotted underline-offset-2 transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                >
+                  {receipt.txHash.slice(0, 10)}…
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {promised.length > 0 && (
@@ -559,8 +755,8 @@ function LockedPanel({
               budzetu absolutnie nic - siedzi w portfelu autora i moze go wydac
               na cokolwiek innego. Nazwanie tego "zablokowanym" byloby obietnica
               bez pokrycia wpisana wprost w interfejs. */}
-          You also have {promised.length === 1 ? 'one open Ask' : `${promised.length} open Asks`}{' '}
-          without escrow, promising{' '}
+          You also have {promised.length === 1 ? 'one Ask' : `${promised.length} Asks`} without
+          escrow, promising{' '}
           <span className="font-mono tabular-nums text-soft-ink">
             {formatAmount(promised.reduce((sum, ask) => sum + ask.budget, 0))} USDC
           </span>
@@ -569,6 +765,221 @@ function LockedPanel({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Jeden zablokowany budzet: ile, w ktorym oknie czasu i co z tym wolno zrobic.
+ *
+ * === PO CO OKNO CZASU STOI TU, A NIE DOPIERO PRZY BLEDZIE ===
+ * Kontrakt ma trzy rozlaczne okna i w kazdym z nich znaczy co innego, ale
+ * z zewnatrz wygladaja identycznie: "Ask, ktory sie nie zamknal". Bez tego
+ * wiersza czlowiek dowiadywalby sie, w ktorym oknie jest, dopiero z rewertu
+ * TooEarly - czyli po podpisie, po zaplaceniu gazu i po tym, jak nic sie nie
+ * stalo. Stan czasu ma byc widoczny ZANIM ktokolwiek kliknie.
+ */
+function LockedAskRow({
+  author,
+  ask,
+  timing,
+  onSettled,
+}: {
+  author: string;
+  ask: LockedAsk;
+  timing: EscrowTiming;
+  onSettled: (id: string, txHash: string) => void;
+}) {
+  const held = formatAmount(unitsToAmount(ask.budget));
+  const question = ask.row.question.trim();
+
+  /**
+   * Podzial liczony ARYTMETYKA KONTRAKTU (oplata w dol, autor dostaje reszte).
+   * `null` = nie znamy stawki na tej sieci; wtedy NIE WOLNO podac kwoty netto,
+   * bo kazda podana byla by zawyzona o oplate.
+   */
+  const split = escrowRefundSplit(ask.budget, ESCROW_CHAIN_ID);
+
+  return (
+    <li className="rounded-lg border border-soft-line bg-soft-sunken/40 p-3">
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-soft-ink">
+          {question === '' ? 'An Ask with no question recorded' : question}
+        </span>
+        <span className="shrink-0 font-mono text-[12.5px] font-bold tabular-nums text-soft-accent-deep">
+          {held} USDC
+        </span>
+      </div>
+
+      {/* Zegar rozjezdza sie miedzy serwerem a przegladarka z definicji. */}
+      <p
+        className="text-[11.5px] leading-[1.5] text-soft-ink-muted"
+        suppressHydrationWarning
+      >
+        {timing.phase === 'running' && (
+          <>
+            <strong className="font-semibold text-soft-ink">Still open</strong> —{' '}
+            {formatLeft(timing.msLeft ?? 0)} until the deadline. Nothing can come back before then:
+            closing an Ask early means filling every seat.
+          </>
+        )}
+        {timing.phase === 'resolving' && (
+          <>
+            <strong className="font-semibold text-soft-ink">Deadline passed</strong> — you have{' '}
+            {formatLeft(timing.msLeft ?? 0)} left to open the answers and accept the ones you want.
+            After that nobody can be paid out of this budget, and the only thing left is sending it
+            back to yourself. Read them on{' '}
+            <Link
+              href="/asks"
+              className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            >
+              the Ask
+            </Link>
+            .
+          </>
+        )}
+        {timing.phase === 'recoverable' && (
+          <>
+            <strong className="font-semibold text-soft-ink">Expired</strong> — the deadline and the
+            48 hours after it are both gone, so nobody can be paid out of this budget any more. It
+            can go back to you.
+          </>
+        )}
+      </p>
+
+      {timing.phase === 'recoverable' &&
+        (split === null ? (
+          // Nie znamy oplaty, wiec nie znamy kwoty. Milczenie o tym byloby
+          // gorsze niz brak przycisku - patrz zasada "awaria != zero".
+          <p className="mt-2 text-[11.5px] leading-[1.5] text-soft-ink-muted">
+            We could not work out the fee that applies on this network, so we will not put a number
+            on what comes back. Nothing has been sent.
+          </p>
+        ) : (
+          <>
+            <p className="mt-2 text-[11.5px] leading-[1.5] text-soft-ink-muted">
+              {/* TRZY RZECZY, KTORE MUSZA STAC PRZED PRZYCISKIEM: ile naprawde
+                  wraca, ze to jest SALDO a nie przelew, i ze potem trzeba
+                  wolac claim(). Kazda z nich pominieta zamienia ten przycisk
+                  w obietnice, ktorej kod nie dotrzymuje. */}
+              You get back{' '}
+              <span className="font-mono font-semibold tabular-nums text-soft-accent-deep">
+                {formatAmount(unitsToAmount(split.toAuthor))} USDC
+              </span>{' '}
+              — the budget minus the {split.feeBps / 100}% fee (
+              {formatAmount(unitsToAmount(split.fee))} USDC). This does not land in your wallet: it
+              becomes a balance in the contract, and collecting it into your wallet is a second
+              transaction, at the top of this page.
+            </p>
+            <p className="mt-1 text-[11px] leading-[1.5] text-soft-ink-faint">
+              The contract lets anyone send this transaction and pays your address either way, so
+              whoever presses it pays the gas and gets nothing.
+            </p>
+            <RecoverButton
+              author={author}
+              askDocId={ask.row.id}
+              amountLabel={`${formatAmount(unitsToAmount(split.toAuthor))} USDC`}
+              onSettled={onSettled}
+            />
+          </>
+        ))}
+    </li>
+  );
+}
+
+/**
+ * Przycisk zwrotu. Wlasny stan na wiersz, bo kazdy Ask to osobna transakcja
+ * i osobna mozliwa porazka - jeden wspolny komunikat bledu na cala liste
+ * mowilby o niewlasciwym budzecie.
+ */
+function RecoverButton({
+  author,
+  askDocId,
+  amountLabel,
+  onSettled,
+}: {
+  author: string;
+  askDocId: string;
+  amountLabel: string;
+  onSettled: (id: string, txHash: string) => void;
+}) {
+  const publicClient = usePublicClient({ chainId: ESCROW_CHAIN_ID });
+  const chainId = useChainId();
+  /**
+   * Klient portfela pobierany DOPIERO przy podpisie, jak w AskClaimPanel:
+   * `useWalletClient()` oddaje klienta przypietego do sieci z chwili renderu,
+   * wiec po zmianie sieci podpis szedlby na stary lancuch.
+   */
+  const config = useConfig();
+  const { switchChain } = useSwitchChain();
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  async function handleRecover() {
+    if (busy || !publicClient) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const signer = await getWalletClient(config, { chainId: ESCROW_CHAIN_ID });
+      const txHash = await settleExpiredAsk({
+        reader: publicClient,
+        signer,
+        chainId: ESCROW_CHAIN_ID,
+        author,
+        askDocId,
+        // Tu autor placi za siebie sam. Kontrakt nie sprawdza wolajacego - to
+        // dwa osobne pola wlasnie dlatego, ze nie musza byc tym samym adresem.
+        caller: author,
+      });
+      if (!mountedRef.current) return;
+      onSettled(askDocId, txHash);
+    } catch (caught) {
+      console.error('[money] Zwrot wygaslego budzetu nie powiodl sie:', caught);
+      if (!mountedRef.current) return;
+      // Surowy revert nie jest komunikatem. TooEarly, NotOpen i reszta listy
+      // maja swoje zdania w describeEscrowError.
+      setError(describeEscrowError(caught));
+    } finally {
+      if (mountedRef.current) setBusy(false);
+    }
+  }
+
+  const onEscrowChain = chainId === ESCROW_CHAIN_ID;
+
+  return (
+    <>
+      {onEscrowChain ? (
+        <button
+          type="button"
+          onClick={() => void handleRecover()}
+          disabled={busy}
+          className={`${BUTTON} mt-2.5 bg-soft-primary text-white disabled:cursor-not-allowed disabled:bg-soft-line-strong`}
+        >
+          {busy ? 'Sending it back…' : `Send ${amountLabel} back to your balance`}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => switchChain({ chainId: ESCROW_CHAIN_ID })}
+          className={`${BUTTON} mt-2.5 bg-soft-primary text-white`}
+        >
+          Switch to Base to send it back
+        </button>
+      )}
+      {error && (
+        <p className="mt-2 break-words text-[11.5px] leading-[1.5] text-soft-accent-deep" role="alert">
+          {error}
+        </p>
+      )}
+    </>
   );
 }
 

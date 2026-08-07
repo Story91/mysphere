@@ -23,15 +23,30 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
     friendsStats,
     loading,
     error,
+    failedSections,
     socialAPI,
     refreshData
   } = useSocial(currentUserAddress);
 
   const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'sent'>('friends');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+
+  /**
+   * Liczba, ktorej nie udalo sie odczytac, jest KRESKA, nie zerem.
+   *
+   * `friendsStats` jest `null` wylacznie przy AWARII odczytu. Stare
+   * `friendsStats?.pendingRequests || 0` chowalo wtedy odznake oczekujacych
+   * zaproszen - czlowiek nie odpisywal komus, kto do niego napisal, bo ekran
+   * twierdzil, ze nikt nie pisal.
+   */
+  const statValue = (value: number | undefined): string =>
+    typeof value === 'number' ? value.toLocaleString() : '—';
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
+  /* Nieudany odczyt zaproszen. Bez tego pusta lista mowila "No pending
+     requests" takze wtedy, gdy zapytanie padlo. */
+  const [requestsFailed, setRequestsFailed] = useState(false);
 
   // Load friend requests when tab changes
   React.useEffect(() => {
@@ -43,6 +58,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
 
     const loadRequests = async () => {
       setRequestsLoading(true);
+      setRequestsFailed(false);
       try {
         if (activeTab === 'requests') {
           const received = await socialAPI.getReceivedFriendRequests(20);
@@ -56,6 +72,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
       } catch (error) {
         if (cancelled) return;
         console.error('Error loading friend requests:', error);
+        setRequestsFailed(true);
       } finally {
         if (!cancelled) setRequestsLoading(false);
       }
@@ -132,15 +149,15 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
         <h2 className="font-soft-display text-2xl font-bold mb-3 text-soft-ink">🤝 Friends</h2>
         <div className="flex items-center gap-6">
           <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{friendsStats?.totalFriends || 0}</div>
+            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{statValue(friendsStats?.totalFriends)}</div>
             <div className="text-sm text-soft-ink-muted">Total Friends</div>
           </div>
           <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{friendsStats?.pendingRequests || 0}</div>
+            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{statValue(friendsStats?.pendingRequests)}</div>
             <div className="text-sm text-soft-ink-muted">Pending Requests</div>
           </div>
           <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{friendsStats?.onlineFriends || 0}</div>
+            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{statValue(friendsStats?.onlineFriends)}</div>
             <div className="text-sm text-soft-ink-muted">Online Now</div>
           </div>
         </div>
@@ -156,7 +173,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
               : 'text-soft-ink-muted hover:text-soft-ink'
           }`}
         >
-          Friends ({friendsStats?.totalFriends || 0})
+          Friends ({statValue(friendsStats?.totalFriends)})
         </button>
         <button
           onClick={() => setActiveTab('requests')}
@@ -166,7 +183,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
               : 'text-soft-ink-muted hover:text-soft-ink'
           }`}
         >
-          Requests ({friendsStats?.pendingRequests || 0})
+          Requests ({statValue(friendsStats?.pendingRequests)})
           {(friendsStats?.pendingRequests || 0) > 0 && (
             <span className="ml-1 bg-soft-accent-deep text-white text-xs px-1.5 rounded-pill">
               {friendsStats?.pendingRequests}
@@ -181,14 +198,22 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
               : 'text-soft-ink-muted hover:text-soft-ink'
           }`}
         >
-          Sent ({friendsStats?.sentRequests || 0})
+          Sent ({statValue(friendsStats?.sentRequests)})
         </button>
       </div>
 
       {/* Content based on active tab */}
       {activeTab === 'friends' && (
         <div className="space-y-4">
-          {friends.length === 0 ? (
+          {/* Nieudany odczyt listy to nie jest "nie masz znajomych". */}
+          {failedSections.includes('friends') ? (
+            <div className="text-center py-12 bg-soft-surface border border-soft-line rounded-card shadow-card font-soft">
+              <h3 className="font-soft-display text-xl font-semibold text-soft-ink mb-2">
+                Friends couldn&apos;t be loaded
+              </h3>
+              <p className="text-soft-ink-muted">Try again in a moment.</p>
+            </div>
+          ) : friends.length === 0 ? (
             <div className="text-center py-12 bg-soft-surface border border-soft-line rounded-card shadow-card font-soft">
               <div className="text-soft-ink-faint mb-4">
                 <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -269,6 +294,13 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-soft-primary mx-auto"></div>
             </div>
+          ) : requestsFailed ? (
+            <div className="text-center py-12 bg-soft-surface border border-soft-line rounded-card shadow-card font-soft">
+              <h3 className="font-soft-display text-xl font-semibold text-soft-ink mb-2">
+                Requests couldn&apos;t be loaded
+              </h3>
+              <p className="text-soft-ink-muted">Try again in a moment.</p>
+            </div>
           ) : friendRequests.length === 0 ? (
             <div className="text-center py-12 bg-soft-surface border border-soft-line rounded-card shadow-card font-soft">
               <h3 className="font-soft-display text-xl font-semibold text-soft-ink mb-2">
@@ -330,6 +362,13 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
           {requestsLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-soft-primary mx-auto"></div>
+            </div>
+          ) : requestsFailed ? (
+            <div className="text-center py-12 bg-soft-surface border border-soft-line rounded-card shadow-card font-soft">
+              <h3 className="font-soft-display text-xl font-semibold text-soft-ink mb-2">
+                Sent requests couldn&apos;t be loaded
+              </h3>
+              <p className="text-soft-ink-muted">Try again in a moment.</p>
             </div>
           ) : sentRequests.length === 0 ? (
             <div className="text-center py-12 bg-soft-surface border border-soft-line rounded-card shadow-card font-soft">

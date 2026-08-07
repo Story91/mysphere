@@ -13,6 +13,16 @@ interface TransactionButtonProps {
   disabled?: boolean;
   autoPost?: boolean;
   onPostAdded?: () => Promise<void>;
+  /**
+   * Warunek wstepny sprawdzany PRZED wyslaniem transakcji. `false` zatrzymuje
+   * publikacje, zanim cokolwiek powstanie.
+   *
+   * PO CO: platna czesc posta wymaga podpisanej sesji, a dowiadywalismy sie
+   * o jej braku dopiero PO utworzeniu posta - autor zostawal z wpisem, ktory
+   * wygladal na platny wylacznie jemu. Wolajacy sam pokazuje komunikat, wiec
+   * tutaj tylko cicho przerywamy.
+   */
+  beforeTransaction?: () => Promise<boolean>;
 }
 
 export default function TransactionButton({
@@ -20,7 +30,8 @@ export default function TransactionButton({
   onTransactionSuccess,
   disabled = false,
   autoPost = true,
-  onPostAdded
+  onPostAdded,
+  beforeTransaction
 }: TransactionButtonProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -79,6 +90,19 @@ export default function TransactionButton({
       return;
     }
 
+    // Warunki wstepne PRZED transakcja - patrz beforeTransaction w propsach.
+    // Blad traktujemy jak odmowe: skoro nie wiemy, czy warunek jest spelniony,
+    // nie wysylamy nieodwracalnej transakcji.
+    if (beforeTransaction) {
+      let allowed = false;
+      try {
+        allowed = await beforeTransaction();
+      } catch (preflightError) {
+        console.error('[TransactionButton] warunek wstepny publikacji nie przeszedl:', preflightError);
+      }
+      if (!allowed) return;
+    }
+
     // Toast ladowania trzeba pozniej zdjac PO ID. Wczesniej nikt go nie
     // zamykal, wiec "Preparing post transaction..." zostawalo na ekranie obok
     // komunikatu o sukcesie albo bledzie.
@@ -88,9 +112,11 @@ export default function TransactionButton({
       setIsTransacting(true);
       loadingToastId = toast.loading('Preparing post transaction...');
 
-      // Check if contract address is available
+      // Ta sciezka jest osiagalna na Base Sepolia: PostContract2 nie ma tam
+      // wdrozenia (patrz TESTNET_CONTRACT_ADDRESS2), wiec komunikat musi
+      // powiedziec CO zrobic, a nie tylko ze cos jest undefined.
       if (!contractAddress) {
-        throw new Error('Contract address is undefined');
+        throw new Error('PostContract2 is not deployed on this network. Switch to Base mainnet to post.');
       }
 
       // Ensure the contract address has the correct format
@@ -162,7 +188,8 @@ export default function TransactionButton({
     publicClient,
     onTransactionSuccess,
     onPostAdded,
-    autoPost
+    autoPost,
+    beforeTransaction
   ]);
 
   return (

@@ -262,9 +262,16 @@ export const checkIfFollowing = async (
 
 /**
  * Pobierz statystyki obserwowania użytkownika
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU, nigdy "nikt go nie obserwuje".
+ *
+ * Liczba obserwujacych to slad wlasnej aktywnosci czlowieka. Zero wpisane po
+ * nieudanym `getDoc` czytalo sie jak fakt o nim samym - i tak wlasnie
+ * renderowal sie profil, bez ani jednego znaku, ze cokolwiek padlo.
  */
-export const getUserFollowStats = async (userId: string): Promise<FollowStats> => {
+export const getUserFollowStats = async (userId: string): Promise<FollowStats | null> => {
   try {
+    // Adres nie do przyjecia to nie awaria odczytu - nie bylo o kogo zapytac.
     if (!isValidEthereumAddress(userId)) {
       return { followers: 0, following: 0, mutualFollows: 0 };
     }
@@ -286,12 +293,18 @@ export const getUserFollowStats = async (userId: string): Promise<FollowStats> =
     return { followers: 0, following: 0, mutualFollows: 0 };
   } catch (error) {
     console.error('Błąd pobierania statystyk obserwowania:', error);
-    return { followers: 0, following: 0, mutualFollows: 0 };
+    return null;
   }
 };
 
 /**
  * Pobierz listę obserwowanych użytkowników
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od pustki.
+ *
+ * `[]` znaczy "nikogo nie obserwuje" i tak wlasnie renderuje sie ekran
+ * ("Not following anyone yet"). Po nieudanym zapytaniu jest to zdanie
+ * falszywe - patrz `failedSections` w app/basechat/friendsystem/hooks.ts.
  */
 export const getFollowing = async (
   userId: string, 
@@ -351,7 +364,7 @@ export const getFollowing = async (
 
   } catch (error) {
     console.error('Błąd pobierania listy obserwowanych:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -393,6 +406,9 @@ export const fetchFollowingIdSet = async (userId: string): Promise<Set<string>> 
 
 /**
  * Pobierz listę obserwujących użytkowników
+ *
+ * @throws gdy odczyt sie nie powiedzie - "No followers yet" po padnietym
+ * zapytaniu to zdanie o czlowieku, ktore wypowiadamy bez pokrycia.
  */
 export const getFollowers = async (
   userId: string, 
@@ -446,7 +462,7 @@ export const getFollowers = async (
 
   } catch (error) {
     console.error('Błąd pobierania listy obserwujących:', error);
-    return [];
+    throw error;
   }
 };
 

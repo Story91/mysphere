@@ -371,7 +371,10 @@ export const getReceivedFriendRequests = async (
 
   } catch (error) {
     console.error('Błąd pobierania otrzymanych zaproszeń:', error);
-    return [];
+    // Pusta skrzynka zaproszen to "nikt do ciebie nie napisal". Po nieudanym
+    // odczycie jest to najdrozsze mozliwe klamstwo w calym module: czlowiek
+    // nie odpowiada komus, kto czeka.
+    throw error;
   }
 };
 
@@ -408,7 +411,7 @@ export const getSentFriendRequests = async (
 
   } catch (error) {
     console.error('Błąd pobierania wysłanych zaproszeń:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -478,6 +481,12 @@ export const getPendingFriendRequest = async (
 
 /**
  * Pobierz listę znajomych użytkownika
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od pustki.
+ *
+ * `[]` renderuje sie jako "No friends yet - send friend requests to connect!".
+ * Po padnietym zapytaniu jest to zaproszenie do naprawiania czegos, co nie
+ * jest zepsute. Sluzy do tego `failedSections` w friendsystem/hooks.ts.
  */
 export const getFriendsList = async (
   userId: string,
@@ -532,7 +541,7 @@ export const getFriendsList = async (
 
   } catch (error) {
     console.error('Błąd pobierania listy znajomych:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -623,9 +632,17 @@ export const removeFriend = async (
 
 /**
  * Pobierz statystyki znajomych użytkownika
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU, nigdy "nie ma znajomych".
+ *
+ * Te liczby powstaja z TRZECH odczytow naraz (znajomi, zaproszenia otrzymane,
+ * wyslane) - padniecie ktoregokolwiek wywracalo cala trojke na zera, w tym
+ * licznik oczekujacych zaproszen. "0 pending" to komunikat, przez ktory
+ * czlowiek po prostu nie odpowiada komus, kto do niego napisal.
  */
-export const getFriendsStats = async (userId: string): Promise<FriendsStats> => {
+export const getFriendsStats = async (userId: string): Promise<FriendsStats | null> => {
   try {
+    // Adres nie do przyjecia to nie awaria odczytu - nie bylo o kogo zapytac.
     if (!isValidEthereumAddress(userId)) {
       return {
         totalFriends: 0,
@@ -655,13 +672,7 @@ export const getFriendsStats = async (userId: string): Promise<FriendsStats> => 
 
   } catch (error) {
     console.error('Błąd pobierania statystyk znajomych:', error);
-    return {
-      totalFriends: 0,
-      pendingRequests: 0,
-      sentRequests: 0,
-      onlineFriends: 0,
-      mutualFriends: 0
-    };
+    return null;
   }
 };
 

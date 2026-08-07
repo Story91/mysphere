@@ -349,20 +349,23 @@ export const WATCHED_CONTRACTS: WatchedContract[] = [
     label: 'L2Resolver Basenames (testnet)', source: 'app/utils/identity/resolver.ts' },
 
   /* --- ZNANE BRAKI KODU ---
-   * To NIE jest awaria i nie ma prawa krzyczec. Kazdy z tych czterech adresow
+   * To NIE jest awaria i nie ma prawa krzyczec. Kazdy z tych trzech adresow
    * zostal sprawdzony (scripts/verifyOnchainInventory.js) i nie ma pod nim
    * bajtkodu na deklarowanej sieci. Zostaja na liscie, bo sa w konfiguracji
    * aplikacji - a wpis w konfiguracji, o ktorym nikt nie pamieta, jest gorszy
-   * niz wpis widoczny i opisany. */
+   * niz wpis widoczny i opisany.
+   *
+   * Byl tu czwarty: 'cdpfactory-84532' (0x0222ffA0...b5B0c1, "CDP smart account
+   * factory"). Zszedl, bo aplikacja juz go nie zawiera - app/api/cdp/wallet
+   * /route.ts przeszedl na `enableSpendPermissions` z SDK i zaden plik nie
+   * podaje tego adresu. Trzymanie go tutaj znaczyloby, ze konsola ops wskazuje
+   * `source`, ktorego nie ma, czyli klamie o wlasnej konfiguracji. */
   { key: 'ipnft-484', address: '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E', chainId: 484, expects: 'no-code',
     label: 'DEFAULT_IP_NFT_CONTRACT', source: 'app/marketplace/config/simpleMarketplace.ts',
     note: 'Known: no bytecode at this address on Camp. The marketplace config points at nothing.' },
   { key: 'ipmarket-484', address: '0xf528f920d0ce1d1ea230b0ec10f0f64b8f43cbac', chainId: 484, expects: 'no-code',
     label: 'SimpleIPNFTMarketplace', source: 'app/marketplace/config/simpleMarketplace.ts',
     note: 'Known: no bytecode at this address on Camp.' },
-  { key: 'cdpfactory-84532', address: '0x0222ffA046596B3Abf7818cCBfef1cb6b3b5B0c1', chainId: 84532, expects: 'no-code',
-    label: 'CDP smart account factory', source: 'app/api/cdp/wallet/route.ts',
-    note: 'Known: no bytecode on Base Sepolia. The address is only a comment in the route, nothing calls it.' },
   { key: 'vrf-84532', address: '0x2Ca8E0C643bDe4C2E08ab1fA0da3401AdAD7734D', chainId: 84532, expects: 'no-code',
     label: 'Chainlink VRF Coordinator', source: 'app/basemorning/test/BaseMorningGame.test.ts',
     note: 'Known: no bytecode on Base Sepolia. Test fixture only - production never calls it.' },

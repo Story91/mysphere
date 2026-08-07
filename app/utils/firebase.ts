@@ -162,6 +162,42 @@ const mapPostDoc = (postDoc: QueryDocumentSnapshot): ExtendedPost => {
     pinnedBy: postData.pinnedBy || undefined,
     isPaidPin: postData.isPaidPin || false,
     paidPinExpiresAt: toMillis(postData.paidPinExpiresAt),
+
+    /**
+     * === BEZ TYCH DWOCH POL PLATNY POST BYL NIEWIDOCZNY DLA KUPUJACEGO ===
+     *
+     * To mapowanie jest JEDYNA droga, ktora dokument posta pokonuje z Firestore
+     * do feedu - i nie przepisywalo ono ANI hasPremium, ANI unlockPrice. Feed
+     * decyduje o narysowaniu bramki przez hasPremiumContent(), ktore pyta
+     * dokladnie o te pola, wiec dla KAZDEGO posta wczytanego z bazy wychodzilo
+     * "to nie jest platny post". Czytelnik nie widzial ceny, tokena ani
+     * przycisku - nie mial czego kupic, choc dokument w Firestore byl poprawny.
+     *
+     * Autor widzial bramke tylko dlatego, ze jego wlasny post trafial do stanu
+     * Reacta z pominieciem tej funkcji (optymistyczny wpis z kompozytora).
+     * Stad dwa rozne widoki tego samego posta.
+     *
+     * `premiumContent` (tresc starych postow, sprzed przeniesienia jej do
+     * zapieczetowanej kolekcji) skladamy TU do flagi zamiast przepisywac tekst:
+     * feed i tak go nie renderuje - wydaje go GET /api/premium - a obiekty
+     * postow lada potem w localStorage.
+     */
+    hasPremium:
+      postData.hasPremium === true ||
+      (typeof postData.premiumContent === 'string' && postData.premiumContent.trim() !== ''),
+    // Cena bywa w bazie liczba (rekordy sprzed ustalenia formatu), a feed i
+    // bramka licza na stringu dziesietnym. Zamiana zamiast odrzucenia, bo
+    // "zly typ" nie moze znaczyc "post nie jest platny".
+    unlockPrice:
+      typeof postData.unlockPrice === 'string'
+        ? postData.unlockPrice
+        : typeof postData.unlockPrice === 'number' && Number.isFinite(postData.unlockPrice)
+          ? String(postData.unlockPrice)
+          : undefined,
+    unlockToken:
+      postData.unlockToken === 'ETH' || postData.unlockToken === 'USDC'
+        ? postData.unlockToken
+        : undefined,
   };
 };
 
@@ -3052,8 +3088,20 @@ export const getGlobalStatsIncremental = async (forceFullRefresh: boolean = fals
   }
 };
 
-// Funkcja do pobierania globalnych statystyk dla strony głównej
-// ⚠️ OPTIMIZED - Global stats with 12h cache per user for accurate data
+/**
+ * Globalne statystyki platformy (panel admina).
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od wyniku.
+ *
+ * === TU BYLY LICZBY WZIETE Z POWIETRZA ===
+ * `catch` zwracal `{ userCount: 41547, postsCount: 39660, transactionsCount:
+ * 4950, likesCount: 9121, commentsCount: 2101 }`. To nie byla nawet awaria
+ * udajaca zero - to byla awaria udajaca KONKRETNY, wiarygodnie wygladajacy
+ * pomiar, ktorego nikt nigdy nie zmierzyl. Panel animowal te liczby licznikiem
+ * i wpisywal date "ostatniej aktualizacji", wiec nie do odroznienia od prawdy.
+ * Wywolujacy (app/admin/page.tsx) ma juz `catch`, ktory ustawia `null` i nie
+ * pokazuje niczego.
+ */
 export const getGlobalStats = async () => {
   try {
     // Create unique cache key per user session if possible, otherwise global
@@ -3125,14 +3173,8 @@ export const getGlobalStats = async () => {
     
   } catch (error) {
     console.error('Error fetching global stats:', error);
-    // Return fallback values
-    return {
-      userCount: 41547,
-      postsCount: 39660,
-      transactionsCount: 4950,
-      likesCount: 9121,
-      commentsCount: 2101
-    };
+    // Zadnych "fallback values". Niezmierzonej liczby sie nie wymysla.
+    throw error;
   }
 };
 
@@ -4129,10 +4171,20 @@ const emptyPostTipStats = (): PostTipStats => ({
   networkTips: []
 });
 
-// Pobiera statystyki tipów dla użytkownika
-export const getUserTipStats = async (userAddress: string): Promise<TipStats> => {
+/**
+ * Statystyki tipow jednego czlowieka.
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU, nigdy "nie dostal zadnego napiwku".
+ *
+ * Wczesniej nieudany odczyt zwracal komplet zer i profil pisal "0" komus, kto
+ * dostal piecdziesiat napiwkow - awaria udajaca fakt o swiecie. To sa PIENIADZE
+ * czlowieka, wiec pomylka kosztuje tu najwiecej. Ten sam podzial co
+ * getMoneyLedger i getAskAuthorStats: pustka to jedno, awaria to drugie.
+ */
+export const getUserTipStats = async (userAddress: string): Promise<TipStats | null> => {
   // Brak adresu to pytanie bez adresata, a nie awaria - i tak nie wolno go
   // puscic dalej, bo `in` z pusta lista jest w Firestore bledem zapytania.
+  // Zostaje zerem, bo o NICZYM nie klamie: nie bylo o kogo zapytac.
   if (!userAddress || !userAddress.trim()) return emptyTipStats();
 
   try {
@@ -4181,21 +4233,19 @@ export const getUserTipStats = async (userAddress: string): Promise<TipStats> =>
     return stats;
   } catch (error) {
     console.error('❌ Błąd pobierania statystyk tipów:', error);
-    /**
-     * ZNANY DLUG, NIE DECYZJA: to jest awaria udajaca zero.
-     *
-     * Nieudany odczyt powinien miec wlasne wyjscie (`null`), zeby interfejs
-     * napisal "nie udalo sie wczytac" zamiast "0 napiwkow" - dokladnie tak robi
-     * getMoneyLedger. Zmiana wymaga jednak przerobienia sygnatury na
-     * `TipStats | null` i kazdego wolajacego; zostawione swiadomie poza zakresem
-     * poprawki pisowni adresow, zeby nie mieszac dwoch rzeczy w jednej zmianie.
-     */
-    return emptyTipStats();
+    // Nie zgadujemy zera. Wolajacy ma napisac "nie udalo sie wczytac".
+    return null;
   }
 };
 
-// Pobiera statystyki tipów dla konkretnego posta
-export const getPostTipStats = async (postId: string): Promise<PostTipStats> => {
+/**
+ * Statystyki tipow jednego posta.
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU, nigdy "pod tym postem nie ma tipow".
+ * Tabelka tipow z samymi zerami wyglada jak stwierdzenie o poscie, a byla
+ * wylacznie stwierdzeniem o naszym nieudanym zapytaniu.
+ */
+export const getPostTipStats = async (postId: string): Promise<PostTipStats | null> => {
   try {
     const tipsRef = collection(db, 'tips');
     const postTipsQuery = query(tipsRef, where('postId', '==', postId));
@@ -4236,15 +4286,22 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
     return stats;
   } catch (error) {
     console.error('❌ Błąd pobierania statystyk tipów posta:', error);
-    return emptyPostTipStats();
+    return null;
   }
 };
 
 /**
  * Statystyki tipow dla WIELU postow naraz - jedno zapytanie na kazde 30 postow
  * zamiast osobnego getDocs() per post (feed z 25 postami = 25 zapytan).
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU calego zbiorczego zapytania.
+ *
+ * To bylo najszersze zero w calym repo: mapa jest WSTEPNIE WYPELNIANA zerami
+ * (zeby post bez ani jednego tipa mial swoj wpis), a `catch` oddawal ja bez
+ * slowa. Jedno nieudane zapytanie pisalo wiec "0 tipow" pod KAZDYM postem
+ * w feedzie naraz - i wygladalo to dokladnie jak prawda o feedzie.
  */
-export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId: string]: PostTipStats }> => {
+export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId: string]: PostTipStats } | null> => {
   const result: { [postId: string]: PostTipStats } = {};
   const unique = Array.from(new Set(postIds.filter(Boolean)));
   if (unique.length === 0) return result;
@@ -4295,6 +4352,11 @@ export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId:
     });
   } catch (error) {
     console.error('❌ Błąd pobierania zbiorczych statystyk tipów:', error);
+    // Czesciowy wynik tez jest klamstwem: kawalki po 30 leca rownolegle, wiec
+    // gdy padnie jeden, posty z pozostalych kawalkow maja juz policzone tipy,
+    // a te z padnietego zostaja z wpisanym zerem. Nie da sie tego rozroznic po
+    // stronie wolajacego, wiec caly odczyt oznaczamy jako nieudany.
+    return null;
   }
 
   return result;
@@ -5434,6 +5496,11 @@ export const getUsersWithBasenameCount = async (): Promise<number> => {
     return baseNameSnapshot.size;
   } catch (error) {
     console.error("Błąd podczas pobierania liczby użytkowników z BaseName:", error);
-    return 0;
+    /**
+     * @throws zamiast `0`. Panel pokazywal "0 uzytkownikow z BaseName" jako
+     * wynik pomiaru; wolajacy (app/admin/page.tsx) ma juz `catch`, ktory
+     * ustawia `null`, wiec ta sciezka byla martwa.
+     */
+    throw error;
   }
 };

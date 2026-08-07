@@ -47,6 +47,7 @@ type Phase = 'loading' | 'ready' | 'failed';
 export default function AskClaimPanel({
   className = '',
   showEmpty = false,
+  reloadKey = 0,
 }: {
   className?: string;
   /**
@@ -60,6 +61,17 @@ export default function AskClaimPanel({
    * to, czy zero wolno przemilczec.
    */
   showEmpty?: boolean;
+  /**
+   * Zmiana tej liczby wymusza PONOWNY odczyt salda.
+   *
+   * PO CO: zwrot wygaslego budzetu (settleExpired) dokłada autorowi saldo w tym
+   * samym kontrakcie, ale robi to INNY komponent, nizej na /money. Bez tego
+   * sygnalu ten panel dalej pokazywalby saldo sprzed transakcji - czyli liczbe,
+   * ktora wlasnie przestala byc prawdziwa, tuz obok komunikatu o sukcesie.
+   * Sam licznik, a nie callback z kwota: zrodlem prawdy o saldzie zostaje
+   * lancuch, a nie arytmetyka po stronie przegladarki.
+   */
+  reloadKey?: number;
 }) {
   const { address } = useAccount();
   const chainId = useChainId();
@@ -89,6 +101,10 @@ export default function AskClaimPanel({
   const load = useCallback(async () => {
     if (!address || !publicClient) return;
     setPhase('loading');
+    // Paragon poprzedniego odbioru schodzi razem ze swoim saldem. Zostawiony
+    // przy nowej kwocie mowilby "Collected" nad pieniedzmi, ktorych nikt
+    // jeszcze nie odebral.
+    setClaimedTx(null);
     try {
       const value = await readClaimable(publicClient, ESCROW_CHAIN_ID, address);
       if (!mountedRef.current) return;
@@ -99,7 +115,10 @@ export default function AskClaimPanel({
       if (!mountedRef.current) return;
       setPhase('failed');
     }
-  }, [address, publicClient]);
+    // reloadKey nie jest uzyty w ciele celowo - to sygnal "przeczytaj jeszcze
+    // raz", nie dana wejsciowa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, publicClient, reloadKey]);
 
   useEffect(() => {
     void load();

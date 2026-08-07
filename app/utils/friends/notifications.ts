@@ -182,6 +182,13 @@ export const createNotification = async (
 
 /**
  * Pobierz powiadomienia użytkownika
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od pustki.
+ *
+ * DOKLADNIE TEN SAM BLAD, CO W RecentTips: `catch` zwracal `[]`, wiec ekran
+ * powiadomien pisal "No notifications - all caught up!" takze wtedy, gdy nie
+ * udalo sie ich odczytac. NotificationsView ma juz wlasny stan bledu (`error`)
+ * i wlasny komunikat - byl martwy, bo nigdy nie dostawal wyjatku.
  */
 export const getUserNotifications = async (
   userId: string,
@@ -219,7 +226,7 @@ export const getUserNotifications = async (
 
   } catch (error) {
     console.error('Błąd pobierania powiadomień użytkownika:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -341,9 +348,16 @@ export const deleteNotification = async (
 
 /**
  * Pobierz liczbę nieprzeczytanych powiadomień
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU, nigdy "nic nowego".
+ *
+ * Zero na dzwonku to komunikat "nikt sie do ciebie nie odezwal". Wpisane po
+ * padnietym `getDoc` jest to zdanie falszywe i kosztowne: czlowiek nie wchodzi
+ * sprawdzic czegos, o czym mu powiedziano, ze nie istnieje.
  */
-export const getUnreadNotificationsCount = async (userId: string): Promise<number> => {
+export const getUnreadNotificationsCount = async (userId: string): Promise<number | null> => {
   try {
+    // Adres nie do przyjecia - nie bylo o kogo zapytac, wiec zero nie klamie.
     if (!isValidEthereumAddress(userId)) {
       return 0;
     }
@@ -359,7 +373,7 @@ export const getUnreadNotificationsCount = async (userId: string): Promise<numbe
     return 0;
   } catch (error) {
     console.error('Błąd pobierania liczby nieprzeczytanych powiadomień:', error);
-    return 0;
+    return null;
   }
 };
 
@@ -724,7 +738,9 @@ export const getNotificationsSummary = async (userId: string): Promise<Notificat
 
   } catch (error) {
     console.error('Błąd pobierania podsumowania powiadomień:', error);
-    return getEmptyNotificationSummary();
+    // Puste podsumowanie ma `unread: 0` i puste `recent` - czyli wyglada
+    // identycznie jak czyste konto. Wolajacy ma sie dowiedziec, ze nie wiemy.
+    throw error;
   }
 };
 
