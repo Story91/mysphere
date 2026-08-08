@@ -325,7 +325,29 @@ service cloud.firestore {
                     // nie moze wrocic do `open`, bo `resolve rate` autora
                     // przestalby cokolwiek znaczyc.
                     && (resource.data.status != 'resolved'
-                        || request.resource.data.status == 'resolved');
+                        || request.resource.data.status == 'resolved')
+                    // WYGASNIECIE TAK SAMO JEDNOKIERUNKOWE.
+                    // Bez tego Ask oznaczony jako porzucony dalo sie cofnac do
+                    // 'open' i wyczyscic sobie wskaznik rozstrzygalnosci -
+                    // czyli dokladnie ta liczbe, ktora ma pokazywac, ze ktos
+                    // zebral cudza prace i nie zaplacil.
+                    && (resource.data.status != 'expired'
+                        || request.resource.data.status == 'expired')
+                    // "WYGASL" TO ZDANIE O PIENIADZACH I WYMAGA DOWODU.
+                    //
+                    // Znaczy: budzet wrocil z kontraktu do autora, pomniejszony
+                    // o oplate. Bez hasha byloby to nasze slowo o cudzych
+                    // srodkach - ten sam problem, ktory przy zakladaniu Aska
+                    // rozwiazuje `escrowTxHash`, i to samo lekarstwo.
+                    //
+                    // Wymagane WYLACZNIE przy `funding == 'escrowed'`: przy
+                    // 'on-resolve' nic nie bylo zablokowane, wiec nie ma
+                    // transakcji zwrotu, ktora mogla by byc dowodem, i zadanie
+                    // hasha uniemozliwiloby oznaczenie takiego Aska w ogole.
+                    && (request.resource.data.status != 'expired'
+                        || resource.data.funding != 'escrowed'
+                        || (request.resource.data.expiredTxHash is string
+                            && request.resource.data.expiredTxHash.size() == 66));
 
       // Skasowany Ask to skasowana historia rozstrzygalnosci.
       allow delete: if false;

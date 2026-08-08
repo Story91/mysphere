@@ -31,6 +31,7 @@ import { formatAmount, formatReceived } from '../utils/tips/getLeaderboard';
 import { getIdentities, type Identity } from '../utils/identity/getIdentities';
 import { getSlicedAddress } from '../utils/identity/resolver';
 import type { TokenAmounts } from '../utils/asks/types';
+import { expireAsk } from '../utils/asks/asks';
 
 /**
  * TWOJE PIENIADZE TUTAJ.
@@ -1043,6 +1044,33 @@ function RecoverButton({
         // dwa osobne pola wlasnie dlatego, ze nie musza byc tym samym adresem.
         caller: author,
       });
+      if (!mountedRef.current) return;
+
+      /**
+       * ===== LANCUCH WIE, WIEC BAZA TEZ MA WIEDZIEC =====
+       * Do tej pory `settleExpired` konczyl sie na lancuchu i na tym koniec:
+       * budzet wracal, a dokument dalej mowil `status: 'open'`. Ask zostawal
+       * na /asks z martwym odliczaniem i wygladal, jakby czekal na odpowiedzi,
+       * ktorych juz nikt nie moze przyjac. `'expired'` bylo czytane w czterech
+       * miejscach i nie zapisywane w zadnym.
+       *
+       * Zapis idzie PO kwicie i niesie hash, bo "wygasl" to zdanie o cudzych
+       * pieniadzach i musi miec pokrycie (patrz expireAsk).
+       *
+       * Nieudany zapis NIE przewraca odzyskania - transakcja juz przeszla
+       * i pieniadze wrocily. Byloby klamstwem pokazac blad tam, gdzie sukces
+       * jest na lancuchu; zamiast tego zostawiamy slad w konsoli, a paragon
+       * z hashem i tak lezy nizej.
+       */
+      try {
+        await expireAsk(askDocId, txHash);
+      } catch (writeError) {
+        console.error(
+          '[money] Zwrot przeszedl na lancuchu, ale oznaczenie Aska jako wygasly nie:',
+          writeError
+        );
+      }
+
       if (!mountedRef.current) return;
       onSettled(askDocId, txHash);
     } catch (caught) {

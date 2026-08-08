@@ -465,6 +465,47 @@ export async function resolveAsk(askId: string, escrowResolveTxHash?: string): P
 }
 
 /**
+ * Ask wygasl: termin minal, autor nie rozstrzygnal, budzet wrocil z kontraktu.
+ *
+ * ===========================================================================
+ * DLACZEGO TO W OGOLE POWSTALO
+ * ===========================================================================
+ * `status: 'expired'` bylo CZYTANE w czterech miejscach (ten plik, userStats,
+ * getMoneyLedger, AskCard), a NIE BYLO ZAPISYWANE NIGDZIE. Kontrakt oddawal
+ * pieniadze przez `settleExpired`, a dokument dalej mowil "open" - Ask stal na
+ * /asks z odliczaniem po terminie i wygladal, jakby czekal na odpowiedzi,
+ * ktorych nikt juz nie moze przyjac. Lancuch wiedzial, baza nie.
+ *
+ * ===========================================================================
+ * DLACZEGO HASH JEST WYMAGANY, A NIE OPCJONALNY
+ * ===========================================================================
+ * Inaczej niz przy `resolveAsk`, gdzie hash jest dodatkiem. "Wygasl" to zdanie
+ * o PIENIADZACH: mowi, ze budzet wrocil do autora pomniejszony o oplate. Bez
+ * dowodu byloby to nasze slowo o cudzych srodkach - dokladnie ten sam problem,
+ * ktory przy zakladaniu Aska rozwiazuje `escrowTxHash`. Regula Firestore tez
+ * tego pilnuje: przy `status == 'expired'` wymaga hasha dlugosci 66 znakow.
+ * Sama regula nie czyta lancucha, ale kazdy czytelnik moze - i wlasnie o to
+ * chodzi.
+ *
+ * Wolane DOPIERO po potwierdzeniu transakcji. Zapis przed kwitem oznaczalby
+ * Aska jako wygasly na podstawie zamiaru, a nie faktu.
+ */
+export async function expireAsk(askId: string, settleTxHash: string): Promise<void> {
+  const hash = settleTxHash.trim();
+  if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
+    // Rzucamy, zamiast zapisywac bez dowodu. Nieoznaczony Ask jest mniej
+    // szkodliwy niz oznaczony klamliwie: pierwszy tylko wisi, drugi twierdzi,
+    // ze pieniadze wrocily.
+    throw new Error('expireAsk wymaga hasha potwierdzonej transakcji settleExpired.');
+  }
+  await updateDoc(doc(db, ASKS, askId), {
+    status: 'expired',
+    expiredAt: serverTimestamp(),
+    expiredTxHash: hash,
+  });
+}
+
+/**
  * Wskaznik rozstrzygalnosci autora.
  *
  * Liczymy TYLKO Aski, ktorych termin juz minal - wciaz otwarty Ask nie jest
