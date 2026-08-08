@@ -72,7 +72,9 @@ const MINIAPP_EMBED = JSON.stringify({
   version: '1',
   imageUrl: `${APP_URL}/miniapp-image/`,
   button: {
-    title: 'Tip Creators',
+    // Limit Farcastera to 32 znaki; tu jest 22. Bez wiodacej spacji - klient
+    // nie przycina bialych znakow, wiec napis wjezdzalby na przycisku z wcieciem.
+    title: 'Ask. Answer. Get paid.',
     action: {
       type: 'launch_miniapp',
       name: 'MySphere',
@@ -90,30 +92,46 @@ const MINIAPP_EMBED = JSON.stringify({
  * spolecznosciowego z portfelem. Nie mowilo ani co tu sie robi, ani czym to
  * miejsce rozni sie od pozostalych.
  *
- * Teza MySphere jest jedna: OSIA CZASU SA PIENIADZE, nie tresc. Kazdy napiwek
- * to rozliczona platnosc z hashem, ktory kazdy moze otworzyc. Opis mowi wiec
+ * Teza MySphere jest jedna: OSIA CZASU SA PIENIADZE, nie tresc. Opis mowi wiec
  * dokladnie to i tylko to, co dziala DZIS: posty, napiwki w ETH i USDC na
- * siedmiu sieciach, rozliczenie z hashem. Zadnego escrow, zadnych Askow
- * w feedzie, zadnej liczby uzytkownikow.
+ * siedmiu sieciach oraz rynek Askow - budzet, zapieczetowane odpowiedzi,
+ * wyplata z hashem. Zadnej liczby uzytkownikow, zadnego czasu przyszlego.
  *
  * Liczba sieci wzieta z app/basechat/soft/SoftStoryRail.tsx (SOFT_NETWORKS):
  * Base, Camp, Linea, Celo, Ethereum, World, Robinhood. SIEDEM. Jesli ta lista
  * urosnie, to zdanie trzeba poprawic recznie - dlatego stoi tu ta notka.
+ *
+ * === DLACZEGO SLOWO "EVERY" PRZENIESLO SIE Z NAPIWKOW NA ASKI ===
+ * Stalo tu "every tip settles onchain with a hash anyone can open". To nie jest
+ * prawda: firestore.rules (blok tipow) mowi wprost, ze z 189 napiwkow hash ma
+ * 18 - reszta pochodzi ze sciezek, ktore go nie zapisuja, i /money pokazuje ten
+ * brak jako `withoutProof`. "Every" jest natomiast prawda O ASKACH, bo tam
+ * serwer odmawia przyjecia wyplaty bez hasha i sam sprawdza log Transfer na
+ * lancuchu (app/api/asks/[id]/accept/route.ts:84). Slowo stoi wiec teraz tam,
+ * gdzie da sie go bronic.
  */
 const APP_DESCRIPTION =
-  'A social feed where money is the timeline. Post, tip in ETH or USDC across seven networks, and every tip settles onchain with a hash anyone can open.';
+  'Post and tip in ETH or USDC across seven networks. Open an Ask with a budget, collect sealed answers, and pay the ones you pick - every Ask payout carries a transaction hash anyone can open.';
 
 /**
  * Jeden tytul dla <title>, og:title i twitter:title.
  *
- * DLACZEGO NIE POWTARZA ZDAN Z KARTY. Karta obrazka niesie juz "A like is worth
- * $0.00. A payment is not.", a X pokazuje pod obrazkiem dokladnie jeden pasek
- * tekstu - powtorzenie tych samych slow zmarnowaloby go w calosci. Tytul mowi
- * wiec to, czego na obrazku NIE MA: czym to jest (social na Base) i czym w tym
- * miejscu mierzy sie pozycje (rozliczonymi platnosciami). Obrazek i tytul
- * skladaja sie na jedno zdanie, zamiast mowic je dwa razy.
+ * DLACZEGO NIE POWTARZA ZDAN Z KARTY. Karta obrazka niesie teraz zdarzenie
+ * ("An AI agent paid to ask...") i rynek Askow, a X pokazuje pod obrazkiem
+ * dokladnie jeden pasek tekstu - powtorzenie tych samych slow zmarnowaloby go
+ * w calosci. Na obrazku nie pada ani "social", ani "feed", ani "Base": to trzy
+ * rzeczy, ktore czlowiek musi wiedziec, zeby zrozumiec, na co patrzy, i one
+ * wlasnie sa tutaj. Obrazek i pasek skladaja sie na jedno zdanie.
+ *
+ * Poprzednik brzmial "MySphere - social on Base, scored by settled payments".
+ * Wymieniony razem z karta: mowil o mierzeniu pozycji platnosciami, czego nowy
+ * obrazek nie zapowiada ani slowem, wiec para przestala sie skladac.
+ *
+ * DLUGOSC MA ZNACZENIE: X urywa ten pasek w okolicach 70 znakow na pulpicie
+ * i wczesniej na telefonie. Ponizej jest 59 - nazwa i teza mieszcza sie przed
+ * kazdym mozliwym ucieciem.
  */
-const SOCIAL_TITLE = 'MySphere - social on Base, scored by settled payments';
+const SOCIAL_TITLE = 'MySphere - a social feed on Base where money is the timeline';
 
 /**
  * Metadane generowane po stronie SERWERA.
