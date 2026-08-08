@@ -56,6 +56,33 @@ const body = JSON.stringify({
   durationMs: 86400000,
 });
 
+// ===========================================================================
+// TEN SKRYPT ZAKLADA PRAWDZIWEGO ASKA. NA PRODUKCJI TEZ.
+// ===========================================================================
+// Sprawdzenie platnosci polega na wywolaniu POST /api/asks, wiec KAZDY UDANY
+// PRZEBIEG ZOSTAWIA WPIS NA PUBLICZNEJ LISCIE. Serwer deweloperski czyta to
+// samo .env.local co produkcja, wiec "lokalnie" NIE ZNACZY "w piaskownicy" -
+// dokument i tak ladue w produkcyjnym Firestore.
+//
+// Trzy przebiegi zostawily trzy Aski i wlasciciel zauwazyl je pierwszy.
+// Sprzatanie: scripts/cleanupTestAsks.cjs (pomija te z odpowiedziami).
+//
+// Dlatego kazdy przebieg musi byc SWIADOMY, a nie odruchowy:
+const POTWIERDZENIE = process.argv.includes('--i-know-this-creates-an-ask');
+if (!POTWIERDZENIE) {
+  console.log(
+    [
+      'Ten skrypt ZAKLADA PRAWDZIWEGO ASKA na publicznej liscie i wydaje',
+      'prawdziwe pieniadze. Serwer deweloperski pisze do TEJ SAMEJ bazy co',
+      'produkcja, wiec adres localhost niczego nie izoluje.',
+      '',
+      'Jesli o tym wiesz, dodaj:  --i-know-this-creates-an-ask',
+      'Sprzatanie po testach:     node scripts/cleanupTestAsks.cjs',
+    ].join('\n')
+  );
+  process.exit(1);
+}
+
 // ---- 1. NASZ SERWER MOWI, CZEGO CHCE ----
 const first = await fetch(url, {
   method: 'POST',
