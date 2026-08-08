@@ -152,7 +152,7 @@ describe('MemoPay', function () {
       const amount = ethers.parseEther('100');
       const fee = (amount * BigInt(FEE_BPS)) / 10_000n;
 
-      const before = await token.balanceOf(payer.address);
+      const before: bigint = await token.balanceOf(payer.address);
       await memoPay.connect(payer).pay(await token.getAddress(), alice.address, amount, memo);
 
       expect(await token.balanceOf(alice.address)).to.equal(amount);
@@ -405,3 +405,7 @@ describe('MemoPay', function () {
     });
   });
 });
+
+// Ten plik musi byc modulem: bez tego `const hre` zyje w globalnej
+// przestrzeni i koliduje z identyczna deklaracja w AskEscrow.test.ts.
+export {};

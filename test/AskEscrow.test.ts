@@ -326,3 +326,7 @@ describe('AskEscrow', () => {
     });
   });
 });
+
+// Modul, nie skrypt: bez tego `const hre` zyje w globalnej przestrzeni
+// i koliduje z identyczna deklaracja w MemoPay.test.ts.
+export {};
