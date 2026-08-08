@@ -33,11 +33,12 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { withX402 } from '@x402/next';
-import { HTTPFacilitatorClient, x402ResourceServer } from '@x402/core/server';
+import { x402ResourceServer } from '@x402/core/server';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
-// Uwierzytelnienie facilitatora Coinbase. Tu, w trasie na runtime nodejs,
-// CDP SDK ma wszystkie API, ktorych brakowalo mu w Edge.
-import { createFacilitatorConfig } from '@coinbase/x402';
+// Wybor facilitatora PER SIEC. Ten modul ciagnie CDP SDK, wiec chodzi wylacznie
+// na runtime nodejs - tu, w trasie, ma wszystkie API, ktorych brakowalo mu
+// w Edge.
+import { NetworkRoutedFacilitatorClient } from '../../utils/x402/facilitators';
 import { createAsk, getOpenAsks } from '../../utils/asks/asks';
 import {
   ASK_DURATIONS,
@@ -54,50 +55,50 @@ import {
   MAX_QUESTION_LENGTH,
   getAskCurrencySymbol,
   getAskNetwork,
+  getAskPaymentOptions,
   getAskPostPrice,
-  getAskPrice,
+  getAskPriceFor,
   getPayToAddress,
   isAskPaymentEnforced,
 } from './pricing';
 
 /**
+ * ===== OFERTA PLATNOSCI: KILKA SIECI W JEDNEJ ODPOWIEDZI 402 =====
+ *
+ * Do 2026-08-08 `accepts` mialo JEDNA pozycje, bo caly serwer zasobu byl
+ * budowany z jednej sieci. Agent nie mial wyboru: albo trzymal USDG na
+ * Robinhood Chain, albo odpadal - czyli odpadala wiekszosc, bo wiekszosc trzyma
+ * USDC na Base. Protokol x402 pozwala podac WIELE pozycji i zostawia wybor
+ * KLIENTOWI (@x402/core: RouteConfig.accepts to `PaymentOption | PaymentOption[]`,
+ * a findMatchingRequirements dopasowuje pozycje po polu `accepted`, ktore klient
+ * odsyla w podpisie). Wiec podajemy wszystkie, ktore naprawde umiemy rozliczyc.
+ *
+ * TA LISTA JEST CZYTANA RAZ, przy ladowaniu modulu - `withX402` dostaje
+ * `accepts` jako gotowa konfiguracje trasy i nie ma tam wariantu funkcyjnego na
+ * cala liste. Rzeczy, ktore MUSZA byc swieze przy kazdym zadaniu (adres odbiorcy
+ * z AUDYT.md par. 2 oraz cena), sa przekazane JAKO FUNKCJE - biblioteka wola je
+ * per zadanie. Zmiana samej LISTY SIECI wymaga nowego procesu; sluzy do tego
+ * X402_ASK_NETWORKS, zeby dalo sie to zrobic bez wdrozenia kodu.
+ */
+const ASK_PAYMENT_OPTIONS = getAskPaymentOptions();
+
+/**
  * Serwer zasobu x402 dla tej trasy.
  *
- * Trzy sciezki facilitatora, kazda z innego powodu:
- *   1. wlasny adres z X402_FACILITATOR_URL - tak wpina sie VLED dla Robinhood
- *      Chain (eip155:4663, USDG, gasless); nie wymaga klucza
- *   2. CDP z kluczami, gdy siec to Base mainnet - ten facilitator WYMAGA
- *      uwierzytelnienia, samo wskazanie adresu nie wystarczy
- *   3. brak konfiguracji - publiczny facilitator x402.org, ktory dla EVM
- *      obsluguje wylacznie Base Sepolia
- *
- * Gdy siec to mainnet Base, a kluczy CDP nie ma, swiadomie NIE cofamy sie po
- * cichu do publicznego facilitatora: on tej sieci nie obsluguje, wiec zadanie
- * skonczyloby sie jego bledem zamiast uczciwym 402.
+ * Facilitator jest wybierany PER SIEC, a nie jedna zmienna srodowiskowa -
+ * historia tego bledu i powod, dla ktorego to router, a nie tablica klientow,
+ * siedzi w app/utils/x402/facilitators.ts. Krotko: Base wymaga kluczy CDP,
+ * Robinhood idzie przez Primera bez klucza, a Primer deklaruje takze Base, wiec
+ * kolejnosc w tablicy decydowalaby o tym, kto rozlicza Base.
  */
-const CDP_NETWORKS = new Set(['eip155:8453']);
-
 function buildAskResourceServer() {
-  const network = getAskNetwork();
-  const url = process.env.X402_FACILITATOR_URL?.trim();
-
-  let client;
-  if (url) {
-    client = new HTTPFacilitatorClient({ url });
-  } else if (CDP_NETWORKS.has(network)) {
-    const id = process.env.CDP_API_KEY_ID?.trim();
-    const secret = process.env.CDP_API_KEY_SECRET?.trim();
-    client = id && secret
-      ? new HTTPFacilitatorClient(createFacilitatorConfig(id, secret))
-      : new HTTPFacilitatorClient();
-  } else {
-    client = new HTTPFacilitatorClient();
-  }
-
-  return new x402ResourceServer(client).register(
-    network as `${string}:${string}`,
-    new ExactEvmScheme()
+  const server = new x402ResourceServer(
+    new NetworkRoutedFacilitatorClient(ASK_PAYMENT_OPTIONS)
   );
+  for (const option of ASK_PAYMENT_OPTIONS) {
+    server.register(option.network, new ExactEvmScheme());
+  }
+  return server;
 }
 
 // getSessionFromCookies uzywa node:crypto, ktorego nie ma na Edge.
@@ -131,6 +132,16 @@ function paymentInfo() {
     // jest dokladnie ta informacja, na podstawie ktorej agent buduje podpis.
     currency: getAskCurrencySymbol(),
     network: getAskNetwork(),
+    // DOPISANE OBOK, NIE ZAMIAST. Pola `network` i `currency` wyzej sa
+    // pojedyncze i takie zostaja, bo czytaja je istniejacy agenci - podmiana
+    // na tablice zepsulaby im integracje w dniu wdrozenia. Ale one juz NIE
+    // OPISUJA CALEJ PRAWDY: bramka przyjmuje kazda pozycje z tej listy, a nie
+    // tylko siec glowna. Kolejnosc to nasza preferencja, nie nakaz - wybiera
+    // klient.
+    networks: ASK_PAYMENT_OPTIONS.map((option) => ({
+      network: option.network,
+      currency: option.currency,
+    })),
     description: ASK_POST_DESCRIPTION,
     enforced,
     // TA SAMA PULAPKA CO W `currency` WYZEJ, A ZOSTALA TU O JEDNO WDROZENIE
@@ -138,8 +149,13 @@ function paymentInfo() {
     // gdy pole `currency` tuz obok oddawalo juz USDG. Jedna odpowiedz mowila
     // agentowi dwie rozne waluty - a to jest dokladnie ta odpowiedz, na
     // podstawie ktorej agent buduje podpis EIP-3009.
+    //
+    // TERAZ NIE WOLNO WPISAC TU ZADNEJ POJEDYNCZEJ WALUTY. Odpowiedz 402 niesie
+    // kilka pozycji naraz, wiec zdanie "sign a USDG authorization" byloby tym
+    // samym bledem, tylko z drugiej strony: kazalo by agentowi placic w walucie,
+    // ktorej moze nie miec, choc druga pozycja jest dla niego dostepna.
     note: enforced
-      ? `Unpaid POST returns 402 with payment requirements. Sign a ${getAskCurrencySymbol()} EIP-3009 authorization for the exact asset and amount carried by that response - do not take them from here - and retry with the PAYMENT-SIGNATURE header. The payer signs only; the facilitator submits the transaction, so the paying address needs no gas.`
+      ? 'Unpaid POST returns 402 whose `accepts` array carries every payment option this deployment can settle - pick one, sign an EIP-3009 authorization for the exact network, asset and amount of THAT entry (do not take them from here) and retry with the PAYMENT-SIGNATURE header, echoing the chosen entry back as `accepted`. The payer signs only; the facilitator submits the transaction, so the paying address needs no gas.'
       : 'X402_PAY_TO_ADDRESS is not configured on this deployment, so Asks cannot be posted here at all. Posting is refused, not given away.',
     // Powiedziane wprost, zeby nikt nie wzial tego za escrow.
     fundingNote:
@@ -357,9 +373,9 @@ async function handlePost(request: NextRequest): Promise<NextResponse<unknown>> 
 export const POST = withX402(
   handlePost,
   {
-    accepts: {
-      scheme: 'exact',
-      network: getAskNetwork(),
+    accepts: ASK_PAYMENT_OPTIONS.map((option) => ({
+      scheme: 'exact' as const,
+      network: option.network,
       // Adres odbiorcy rozwiazywany PER ZADANIE, nie zapamietany przy
       // ladowaniu modulu - patrz pricing.ts i AUDYT.md par. 2.
       payTo: () => {
@@ -367,8 +383,12 @@ export const POST = withX402(
         if (!payTo) throw new Error('X402_PAY_TO_ADDRESS is not configured');
         return payTo;
       },
-      price: getAskPrice(),
-    },
+      // TAKZE PER ZADANIE. Wczesniej stalo tu `getAskPrice()`, czyli wynik
+      // policzony raz przy ladowaniu modulu: zmiana X402_ASK_PRICE nie ruszala
+      // cieplej instancji, ktora dalej brala stara stawke. To ta sama rodzina
+      // bledu co zapamietany payTo z AUDYT.md par. 2.
+      price: () => getAskPriceFor(option.network),
+    })),
     description: ASK_POST_DESCRIPTION,
     mimeType: 'application/json',
   },

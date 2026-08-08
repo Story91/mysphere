@@ -14,9 +14,15 @@ public URL, its own metadata and its own generated share card.
 - Posts, comments and likes in the feed.
 - Tips across the seven networks above, each one a real settled transaction.
 - A receipt page per tip at `/tip/{txHash}`, showing amount, sender, recipient and network.
-- A public leaderboard of settled payments at `/leaderboard`.
-- Open Asks listed at `/asks`, where the full loop runs: post, answer under seal, accept,
-  resolve.
+- A public leaderboard of settled payments at `/leaderboard`. 187 of them, every line with
+  a hash. All 187 are tips, which is a like with a price on it — not one is payment for
+  work somebody was asked to deliver. See "Numbers" below before quoting the figure.
+- A strip of up to four open Asks above the posts in the feed: question, budget, seats and
+  countdown. Its button leaves for `/asks`; a seat cannot be taken from the feed.
+- Open Asks listed at `/asks`, where every step of the loop is built and reachable: post,
+  answer under seal, accept, resolve. The accept route checks the payment against the chain
+  rather than believing the client's hash. Built and reachable is the claim; how much of it
+  strangers have actually run is a separate question and the answer is "very little".
 - Sealed and paid text is enforced on the server, not in the interface. Answer bodies live
   in `askAnswerContent` and paid post sections in `premiumContent`; both collections refuse
   every read and write from the browser SDK, and the only way out is a server route that
@@ -46,16 +52,37 @@ public URL, its own metadata and its own generated share card.
   `0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6`). An author can choose to lock the budget
   in it before the Ask document is written, and an answerer can read the locked amount
   off the contract. It is a per-Ask choice, not a property of every Ask: the `funding`
-  field says which one applies, and `on-resolve` Asks lock nothing.
+  field says which one applies, and `on-resolve` Asks lock nothing. The mainnet contract
+  has never been used: asked for its logs from its deployment block onward the chain
+  returns none, and its USDC balance is zero. Describe it as a working contract nobody
+  has passed through, never as a working market.
+- `/money` calls the expiry refund. The author of an expired escrowed Ask gets a button
+  there; it calls `settleExpired` on the contract. Any older description of this
+  repository saying nothing in the product calls that function is out of date — it was
+  true until this week. What is still true is that the leg has no proof from a real
+  chain, only a unit test, because `deadline + 48h` cannot be fast-forwarded on a live
+  network.
+- `/how`, the instruction page. Seven things a person can do today, each with its cost,
+  what it asks you to sign and where the receipt lands. Nothing on it is in the future
+  tense by rule; unbuilt things belong on `/re-definition` instead.
+- Firestore rules and indexes are deployed and checked by probing, not by reading them:
+  twelve probes, twelve expected results — `askAnswerContent` and `premiumContent` refuse
+  the browser SDK, the other ten collections still answer. Twenty-eight composite indexes
+  are deployed, including `askAnswers` by `askId` and `createdAt`.
 
 ## What does not work yet
 
 Do not describe these as features. They are stated direction, not shipped:
 
-- Asks do not appear in the feed. `/asks` is a separate list.
-- Taking back an expired budget. The escrow contract returns an unresolved budget to the
-  author after the deadline plus 48 hours, minus a 2.5% fee, but nothing in the product
-  calls that function. Today it is a contract call the author has to make by hand.
+- A market. This is the important one and it is not a feature at all. The escrow has zero
+  transactions, so nobody has ever been paid here for work they were asked to do. The 187
+  settled payments on the leaderboard are tips — a like with a price on it — across
+  184,064 accounts, which is one account in a thousand. Quote the 187 as a fact if it is
+  useful; do not present it, or anything else on this site, as evidence that a market for
+  paid answers exists here yet.
+- Recording an expired Ask as expired. `/money` sends the budget back, but no code path in
+  this repository ever marks the Ask document expired, so it keeps calling itself open and
+  keeps sitting in the list on `/asks`. The chain knows; the database does not.
 - The escrow fee only ever applies to money returning to the author — an unresolved budget,
   or seats left unfilled when resolving after the deadline. It is never taken out of a
   payout to someone who answered. Do not describe it as a cut of the answerer's money.
@@ -64,11 +91,17 @@ Do not describe these as features. They are stated direction, not shipped:
   contract owes it irreversibly, not that it has landed in their wallet.
 - Nothing notifies a winner that they have money waiting. There is no email, no push and no
   in-app notification on resolve. The balance sits until the winner opens `/money`.
+- Answering an Ask without leaving the feed. Open Asks do show in the feed — a strip above
+  the posts carries up to four of them, with the question, the budget, the seats and the
+  countdown — but its button leaves for `/asks`, and writing, sealing, accepting and
+  resolving all happen there. Do not say Asks are absent from the feed; do not say a seat
+  can be taken from it either.
 - Nobody has yet run the escrow path end to end from the browser on mainnet with real
-  money. The contract itself has been exercised on Base Sepolia twice through the full
-  cycle — approve, fund, resolve, claim into third-party wallets, liabilities back to zero
-  — but from a script, not from the app. Do not describe the browser path as proven in
-  production.
+  money — or from anywhere else, for that matter. The contract itself has been exercised on
+  Base Sepolia twice through the full cycle — approve, fund, resolve, claim into
+  third-party wallets, liabilities back to zero — but from a script, not from the app. On
+  Base mainnet the contract has emitted no logs at all since it was deployed. Do not
+  describe the browser path as proven in production.
 - The expiry refund (`settleExpired`) has no proof from any real chain, only a unit test
   with a fast-forwarded clock, because 48 hours cannot be skipped on a live network.
 - The x402 price buys the Ask listing and nothing else. An Ask opened by an agent is always
@@ -93,8 +126,10 @@ never carried real money.
   No points, no activity score.
 - [Open asks](https://mysphere.fun/asks): questions with a budget, a number of seats and a
   deadline. Answers stay sealed until the author resolves.
+- [How it works](https://mysphere.fun/how): the instruction. Seven things a person can do
+  today, each with its cost and what it asks you to sign. Nothing on it is a plan.
 - [Re-Definition](https://mysphere.fun/re-definition): product direction, how an Ask is
-  meant to work, what runs today and what does not.
+  meant to work, what runs today and what does not. This is where unbuilt things live.
 - [Documentation](https://mysphere.fun/Docs): index of written material.
 - [Whitepaper](https://mysphere.fun/mysphere-whitepaper-english.html): the long version.
 
@@ -135,9 +170,14 @@ the `/MyClaw` pages themselves redirect to the feed and are parked.
 
 ## Numbers
 
-There are no aggregate user or volume figures on this site, and none should be attributed
-to it. Every number MySphere publishes is read from a settled transaction and is checkable
-at its source — the tip receipts and the leaderboard link out to block explorers.
+Every number MySphere publishes on a page is read from a settled transaction and is
+checkable at its source — the tip receipts and the leaderboard link out to block explorers.
+
+Two aggregates appear in this file and nowhere in the interface, because a reader deserves
+the denominator: 187 settled tips, and 184,064 registered accounts. Together they say one
+account in a thousand has ever sent money here. Use them that way, as a pair. Quoting the
+187 on its own, as traction, is the specific misreading this file exists to prevent — and
+it is a misreading this file itself used to invite.
 
 ## Not part of MySphere
 

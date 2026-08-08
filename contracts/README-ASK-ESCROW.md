@@ -316,16 +316,35 @@ Skrypt: `scripts/askEscrowCycle.js`. Salda po cyklu zgodne co do jednostki,
    Cykl powyzej dowodzi **kontraktu**, nie tego kodu - szedl skryptem z node,
    nie portfelem w oknie.
 3. **Mainnet.** Kontrakt stoi i ma zweryfikowane zrodlo. Przez `fund()` na 8453
-   nie przeszedl jeszcze ani jeden dolar.
+   nie przeszedl jeszcze ani jeden dolar - i to nie jest szacunek. `eth_getLogs`
+   od bloku wdrozenia (49635587) do biezacego zwraca **pusta liste**: ani
+   `AskFunded`, ani `SeatAwarded`, ani `Claimed`, ani `ExpiredSettled`.
+   `balanceOf(USDC)` kontraktu wynosi **zero**. Kontrakt nie zostal wiec
+   dotkniety **przez nikogo i w zaden sposob**, nie tylko "nie z przegladarki".
 
-### Czego NIE MA w interfejsie
+   Konsekwencja dla kazdego tekstu: wolno pisac, ze escrow **dziala** i ze
+   **mozna** w nim zablokowac budzet. Nie wolno napisac ani zasugerowac, ze
+   ludzie juz przez niego przechodza. Sprawdzenie zajmuje jedno zapytanie do
+   RPC i pierwszy czytelnik z Base je zrobi.
 
-`settleExpired` **nie ma zadnego wywolania w `app/`**. Autor, ktoremu minal
-termin plus 48h, nie ma z UI jak odzyskac budzetu - musi zawolac kontrakt
-recznie. Srodki nie sa uwiezione (funkcja jest bez uprawnien, wiec zawolac moze
-ktokolwiek), ale **produkt nie robi tego za niego**. To jedyna sciezka kontraktu
-bez interfejsu i tak jest opisana w manifescie (`Ask: expiry refund in the
-interface`, status `not built`).
+### Co ma juz interfejs, a nie mialo
+
+`settleExpired` **ma wywolanie w `app/`**: `app/money/page.tsx` (`handleRecover`
+-> `settleExpiredAsk` z `app/utils/asks/escrow.ts`). Autor, ktoremu minal termin
+plus 48h, dostaje na `/money` przycisk przy swoim Asku, z nazwana oplata 2,5%
+i z jawnym powiedzeniem, ze zwrot to **dwa kroki** - kontrakt najpierw dopisuje
+saldo, a przelew robi dopiero `claim()`.
+
+**Ta sekcja mowila cos przeciwnego, kiedy przycisk juz istnial**, razem z
+odsylaczem do manifestu i statusem `not built`. Manifest ma dzis w tym wierszu
+(`Ask: expiry refund in the interface`) status `live`. Zostaje natomiast w mocy
+punkt 1 wyzej: **noga wygasniecia nie przeszla na zadnej prawdziwej sieci** i
+jej jedynym dowodem jest test jednostkowy z przewinietym zegarem.
+
+Bez interfejsu nie zostaje juz zadna sciezka kontraktu. Bez **zapisu w bazie**
+zostaje jedna: nic w tym repozytorium nie ustawia Aska na wygasly, wiec po
+zwrocie budzetu dokument dalej mowi o sobie "otwarty" i dalej stoi na liscie
+`/asks`. Lancuch wie, baza nie.
 
 ### Konfiguracja hardhata (zalatwione)
 

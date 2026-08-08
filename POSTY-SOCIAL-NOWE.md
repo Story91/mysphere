@@ -158,7 +158,11 @@ zamknięta, kontrakt stoi na mainnecie ze zweryfikowanym źródłem. Ale:*
   tylko obietnicą;*
 - *nigdy „every Ask is escrowed" — to wybór autora, `on-resolve` żyje dalej;*
 - *nie pisz, że ścieżka z przeglądarki jest sprawdzona w boju. Przez `fund()`
-  na mainnecie nie przeszedł jeszcze ani jeden dolar;*
+  na mainnecie nie przeszedł jeszcze ani jeden dolar — kontrakt nie ma tam ani
+  jednego zdarzenia od bloku wdrożenia, a jego saldo USDC wynosi zero;*
+- *nie zestawiaj escrow z liczbą 187. To napiwki i 0,1% kont; przez escrow nie
+  przeszedł nikt. Zlepienie tych dwóch rzeczy w jeden post robi z nich dowód
+  rynku, którego nie ma;*
 - *nie pisz, że opłata to prowizja od wypłaty. 2,5% leci wyłącznie od pieniędzy
   WRACAJĄCYCH do autora, nigdy z kieszeni odpowiadającego.*
 

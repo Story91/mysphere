@@ -66,7 +66,7 @@ import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 import GooeyNav from '../components/GooeyNav/GooeyNav';
 import SoftFeedMobile from './soft/SoftFeedMobile';
 import { NameWithSuffix } from '../utils/nameSuffix';
-import { getGlobalStats, likesTotal, likesNote } from '../utils/stats/globalStats';
+import { getGlobalStats, likesTotal, likesNote, likesDetail } from '../utils/stats/globalStats';
 import Link from 'next/link';
 import SoftSectionList from './soft/SoftSectionList';
 import SoftTrendsPanel from './soft/SoftTrendsPanel';
@@ -500,8 +500,8 @@ function BaseChatContent() {
   const [totalComments, setTotalComments] = useState<number | null>(null);
   const [totalTips, setTotalTips] = useState<number | null>(null);
   /**
-   * Zastrzezenie pod liczba lajkow, np. "since Aug 6" - albo `undefined`, gdy
-   * liczba jest calkowita.
+   * Zastrzezenie pod liczba lajkow, np. "at least" albo "since Aug 6" - albo
+   * `undefined`, gdy liczba jest calkowita.
    *
    * Lajki nie maja wlasnej kolekcji i nie da sie ich zsumowac agregacja, wiec
    * dopoki nikt nie policzyl stanu poczatkowego serwerowo, mamy tylko przyrost
@@ -509,6 +509,15 @@ function BaseChatContent() {
    * bez niej czesc sumy udaje calosc.
    */
   const [likesNoteText, setLikesNoteText] = useState<string | undefined>(undefined);
+  /**
+   * To samo zastrzezenie, ale calym zdaniem - idzie do dymka nad liczba.
+   *
+   * Osobny stan od `likesNoteText`, bo krotki podpis ma sie zmiescic w kaflu
+   * o polowie szerokosci panelu, a powod, dla ktorego liczba jest niepelna,
+   * w dwa slowa sie nie miesci. Oba zdania buduje globalStats.ts - tylko ono
+   * wie, ktorego rodzaju jest ta niepelnosc.
+   */
+  const [likesDetailText, setLikesDetailText] = useState<string | undefined>(undefined);
   /** Kiedy policzono liczby wyzej. 0 = nie wiadomo. */
   const [statsMeasuredAt, setStatsMeasuredAt] = useState<number>(0);
   const [expandedUsersList, setExpandedUsersList] = useState(false);
@@ -1963,9 +1972,10 @@ function BaseChatContent() {
    * dostawal potem `String(null)`, czyli napis "null".
    *
    * `likesTotal()` sklada to, co wiadomo: stan poczatkowy (gdy ktos go policzyl
-   * skryptem) plus licznik przyrostowy. Gdy stanu poczatkowego nie ma, liczba
-   * jest niepelna - i wtedy `likesNote()` daje linijke "since <data>", ktora
-   * idzie na kafel razem z liczba.
+   * skryptem) plus licznik przyrostowy. Gdy suma nie jest dokladna, `likesNote()`
+   * i `likesDetail()` daja gotowe zastrzezenie - krotkie na kafel, pelne do
+   * dymka. Strona ich NIE SKLADA i nie ma prawa: to warstwa danych wie, czy
+   * brakuje poczatku, czy srodka, a to sa dwa rozne zdania.
    */
   const fetchGlobalStats = async () => {
     const { stats, failed } = await getGlobalStats();
@@ -1977,6 +1987,7 @@ function BaseChatContent() {
       setTotalUsers(null);
       setTotalLikes(null);
       setLikesNoteText(undefined);
+      setLikesDetailText(undefined);
       setTotalPosts(null);
       setTotalComments(null);
       setTotalTips(null);
@@ -1989,6 +2000,7 @@ function BaseChatContent() {
     setTotalUsers(stats.users);
     setTotalLikes(likes.value);
     setLikesNoteText(likesNote(likes));
+    setLikesDetailText(likesDetail(likes));
     setTotalPosts(stats.posts);
     setTotalComments(stats.comments);
     setTotalTips(stats.tips);
@@ -3731,7 +3743,7 @@ function BaseChatContent() {
                        pokazywal slowo "null" zamiast kreski. Znak "nie wiem"
                        wstawia SoftTrendsPanel. */
                     { label: 'Users', value: totalUsers, tone: 'purple' },
-                    { label: 'Likes', value: totalLikes, tone: 'amber', note: likesNoteText },
+                    { label: 'Likes', value: totalLikes, tone: 'amber', note: likesNoteText, detail: likesDetailText },
                     { label: 'Posts', value: totalPosts, tone: 'green' },
                     { label: 'Comments', value: totalComments, tone: 'pink' },
                   ]}

@@ -2,11 +2,16 @@
  * Cennik i konfiguracja platnosci x402 dla Askow.
  *
  * === PO CO OSOBNY PLIK ===
- * Ten modul jest importowany z DWOCH srodowisk: z `middleware.ts` (Edge, bo
- * Next 14 nie umie middleware na runtime nodejs) i z tras `app/api/asks/**`
- * (Node). Dlatego NIE WOLNO tu niczego importowac poza typami - zaden
- * `server-only`, zaden firebase-admin, zaden `node:*`. Inaczej build Edge'a
- * wywali sie na middleware.
+ * NIE WOLNO tu niczego importowac poza typami - zaden `server-only`, zaden
+ * firebase-admin, zaden `node:*`, zaden @coinbase/x402. Ten modul opisuje
+ * DECYZJE (ktora siec, jaka cena, czyj facilitator), a nie ich wykonanie:
+ * budowanie klientow facilitatora siedzi w app/utils/x402/facilitators.ts,
+ * ktory ciagnie CDP SDK i chodzi wylacznie na runtime nodejs.
+ *
+ * Powod historyczny: plik byl kiedys importowany takze z `middleware.ts`, czyli
+ * z Edge. Middleware juz nie ma (patrz naglowek route.ts - to on wywrocil
+ * wdrozenie na Vercelu), ale ta zasada zostaje, bo dzieki niej cennik da sie
+ * przeczytac z dowolnego srodowiska i sondy.
  *
  * Jest jednym zrodlem prawdy o cenie. Manifest obiecuje agentowi:
  * "GET /api/asks to see the price, sign, then POST the question" - a to
@@ -19,6 +24,43 @@
  * pieniadze bez kontraktu, ktory je trzyma i wydaje. Tu placi sie WYLACZNIE
  * za zalozenie Aska. Budzet nadal idzie od autora do odpowiadajacego przy
  * rozstrzygnieciu, przelewem, ktorego hash laduje przy odpowiedzi.
+ *
+ * === CO DOKLADNIE SPRAWDZONO NA ZYWO PRZY WLACZANIU DRUGIEJ SIECI ===
+ * (2026-08-08, lokalnie, na tej konfiguracji env)
+ *
+ * PRZESZLO:
+ *  - GET /api/asks oglasza obie sieci, a odpowiedz 402 niesie DWIE pozycje
+ *    w `accepts`: eip155:4663/USDG i eip155:8453/USDC, obie po 10000 jednostek
+ *    przy cenie $0.01, obie z tym samym payTo.
+ *  - Obie domeny EIP-712 z pola `extra` zhaszowane i porownane z DOMAIN_SEPARATOR()
+ *    kontraktow: ZGADZAJA SIE. Robi to scripts/x402CheckAccepts.mjs, ktory bierze
+ *    wymagania z naszego serwera i nie wydaje ani grosza.
+ *  - TRASOWANIE FACILITATOROW POTWIERDZONE, nie zalozone. Wyslane dwa celowo
+ *    bledne podpisy - po jednym na siec - i odpowiedzi przyszly OD ROZNYCH
+ *    facilitatorow, co widac po ich wlasnym slownictwie:
+ *      eip155:4663 -> "invalid_payment"                       (Primer)
+ *      eip155:8453 -> "invalid_exact_evm_payload_signature:
+ *                      invalid signature: signature R + N >= P" (CDP, slowo
+ *                      w slowo to samo, co CDP odpowiedzial odpytany wprost)
+ *    Gdyby Base szedl przez Primera - a poszedlby, gdyby zostawic rozstrzyganie
+ *    kolejnosci w tablicy facilitatorow - obie odpowiedzi bylyby identyczne.
+ *    Verify odmowilo, wiec settle sie nie odpalilo i nic sie nie ruszylo.
+ *
+ * NIE PRZESZLO, BO NIKT TEGO NIE PROBOWAL:
+ *  - Przez Base nie przeszla ANI JEDNA platnosc. Rozliczenie na tej sieci jest
+ *    SKONFIGUROWANE I OGLOSZONE, a nie sprawdzone. Nie pisac o nim inaczej.
+ *    Jedyne potwierdzone settle to nadal ten jeden przelew 0,01 USDG na 4663.
+ *
+ * === CENA TEGO, ZE SIECI SA DWIE ===
+ * @x402/next wola initialize() przed pierwszym zadaniem, a walidacja trasy
+ * (x402HTTPResourceServer.validateRouteConfiguration) RZUCA, gdy ktorakolwiek
+ * pozycja `accepts` nie ma pokrycia w /supported. Dolozenie drugiej sieci
+ * dokladalo wiec drugi powod, dla ktorego cala trasa POST /api/asks moglaby
+ * przewrocic - lacznie ze sciezka USDG, ktora z CDP nie ma nic wspolnego.
+ * Dlatego NetworkRoutedFacilitatorClient.getSupported() przezywa awarie
+ * pojedynczego facilitatora (szczegoly i uzasadnienie tam). Odpowiedz 402
+ * pozostaje wtedy pelna, ale platnosc na chorej sieci zostanie ODRZUCONA -
+ * nie pobrana i nie obiecana.
  */
 
 import type { Network } from '@x402/core/types';
@@ -33,8 +75,7 @@ const DEFAULT_ASK_POST_PRICE = '$0.01';
  * To tylko awaryjna wartosc dla wdrozenia bez konfiguracji. Wdrozenie, ktore
  * przyjelo prawdziwa platnosc, mialo X402_NETWORK=eip155:4663 i placilo w USDG
  * (wariant 2 nizej). Nie wnioskuj z tej stalej, gdzie ida pieniadze - odpowiedz
- * na to daje GET /api/asks w polach `network` i `currency`, czytanych ze
- * srodowiska przy kazdym zadaniu.
+ * na to daje GET /api/asks, a wiazaco: naglowek `payment-required` przy 402.
  *
  * DLACZEGO NIE MAINNET DOMYSLNIE: publiczny facilitator
  * (https://x402.org/facilitator/supported) deklaruje dla schematu `exact`
@@ -43,25 +84,45 @@ const DEFAULT_ASK_POST_PRICE = '$0.01';
  * zamiast uczciwym 402 - wiec testnet jest jedynym wariantem, ktory dziala
  * bez dodatkowej konfiguracji.
  *
- * === SA DWA MAINNETY I OBA DA SIE WLACZYC ===
+ * === SA DWA MAINNETY I OD 2026-08-08 IDA NARAZ ===
+ * Wczesniej stalo tu "oba DA SIE wlaczyc" i byla to instrukcja PRZELACZANIA:
+ * X402_NETWORK wskazywalo jedna siec, `accepts` w odpowiedzi 402 mialo jedna
+ * pozycje, a agent bez USDG na Robinhoodzie po prostu odpadal. Protokol x402
+ * pozwala podac WIELE pozycji i to KLIENT wybiera, czym zaplaci - wiec teraz
+ * oglaszamy obie. Ktore konkretnie: patrz getAskPaymentOptions() nizej.
  *
  * 1. BASE (eip155:8453) - facilitator Coinbase CDP:
- *      X402_NETWORK=eip155:8453
- *      X402_FACILITATOR_URL=            <- MUSI ZOSTAC PUSTE
+ *      CDP_API_KEY_ID + CDP_API_KEY_SECRET   <- i NIC WIECEJ
  *
  *    UWAGA, TU BYL BLAD W TEJ INSTRUKCJI. Stalo tu "ustaw
  *    X402_FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402".
- *    To ZEPSULOBY platnosci: route.ts sprawdza `if (url)` JAKO PIERWSZE
- *    i zbudowalby HTTPFacilitatorClient({url}) BEZ naglowkow uwierzytelniajacych,
- *    a CDP bez klucza odpowiada 401. Galaz CDP (route.ts, CDP_NETWORKS) odpala
- *    sie WYLACZNIE wtedy, gdy ta zmienna jest pusta - dopiero ona dokleja
- *    klucze przez createFacilitatorConfig z @coinbase/x402.
+ *    To ZEPSULOBY platnosci: kod sprawdzal `if (url)` JAKO PIERWSZE i budowal
+ *    HTTPFacilitatorClient({url}) BEZ naglowkow uwierzytelniajacych, a CDP bez
+ *    klucza odpowiada 401. Ta pulapka JUZ NIE ISTNIEJE - wybor facilitatora
+ *    jest teraz mapa siec -> plan (NETWORK_FACILITATORS nizej), a nie kolejnoscia
+ *    ifow, wiec adres z env nie ma jak podmienic galezi CDP.
  *
  *    Klucze CDP_API_KEY_ID i CDP_API_KEY_SECRET sa juz w env tego projektu,
- *    a @coinbase/x402 JEST juz w package.json (drugi nieaktualny fragment
- *    tego komentarza - twierdzil, ze paczki brakuje; route.ts jej uzywa).
- *    Na tej sciezce `extra` domeny EIP-712 wypelnia sie samo, bo eip155:8453
- *    siedzi w DEFAULT_STABLECOINS biblioteki.
+ *    a @coinbase/x402 JEST juz w package.json. Na tej sciezce `extra` domeny
+ *    EIP-712 wypelnia sie samo, bo eip155:8453 siedzi w DEFAULT_STABLECOINS
+ *    biblioteki: USDC 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913,
+ *    name "USD Coin", version "2", 6 miejsc. Sprawdzone na lancuchu tak samo
+ *    jak USDG: zhaszowana domena rowna sie DOMAIN_SEPARATOR() kontraktu
+ *    (0x02fa7265e7c5d81118673727957699e4d68f74cd74b7db77da710fe8a2c7834f).
+ *
+ *    CDP odpytany kluczami z env 2026-08-08: /supported HTTP 200 deklaruje
+ *    {x402Version 2, scheme "exact", network "eip155:8453"} (oraz `upto`
+ *    i `batch-settlement`, ktorych nie rejestrujemy). Samo /supported to za malo
+ *    - kosztowal nas juz facilitator z idealnym /supported i HTTP 500 na kazde
+ *    /verify - wiec zawolane zostalo takze POST /verify z celowo zepsutym
+ *    podpisem: HTTP 400 i STRUKTURALNA odmowa
+ *    {"isValid":false,"invalidReason":"invalid_exact_evm_payload_signature",
+ *     "payer":"0x...2"}. Odzyskany adres placacego dowodzi, ze CDP przeszedl
+ *    przez siec, aktyw i kwote az do odtwarzania ECDSA - dokladnie ta sama
+ *    glebokosc dowodu, co przy Primerze.
+ *
+ *    CZEGO TO NIE DOWODZI: przez Base nie przeszla ANI JEDNA nasza platnosc.
+ *    Sciezka jest ogloszona i skonfigurowana, nie przejechana.
  *
  * 2. ROBINHOOD CHAIN (eip155:4663) - USDG, bez gazu po stronie placacego:
  *      X402_FACILITATOR_URL=https://x402.primer.systems
@@ -76,8 +137,8 @@ const DEFAULT_ASK_POST_PRICE = '$0.01';
  *      VLED /supported deklaruje:  x402Version 1, network "robinhood"
  *      nasz kod prosi o:           x402Version 2, network "eip155:4663"
  *
- *    Mamy @x402/core 2.21, a route.ts rejestruje schemat pod CAIP-2
- *    z getAskNetwork(). Nie ma czesci wspolnej - agent dostawalby blad
+ *    Mamy @x402/core 2.21, a route.ts rejestruje schemat pod CAIP-2.
+ *    Nie ma czesci wspolnej - agent dostawalby blad
  *    facilitatora zamiast uczciwego 402. Do tego sygnatariusz VLED
  *    (0x735b9A0b...) mial przy sprawdzeniu 0,000087 ETH gazu, czyli tyle,
  *    ile trzeba, zeby przestac dzialac w srodku dnia.
@@ -102,6 +163,16 @@ const DEFAULT_ASK_POST_PRICE = '$0.01';
  *    0x235767cc3d01ec18B5db87973975AC8616b2A153. To ICH wlasny token (symbol
  *    odczytany z lancucha: "PR"), NIE USDG. Nie wpisywac go do ASK_ASSETS.
  *
+ *    UWAGA DRUGA, WAZNA OD CHWILI, GDY OGLASZAMY DWIE SIECI: Primer deklaruje
+ *    w /supported takze eip155:8453, czyli NASZE BASE (sprawdzone 2026-08-08:
+ *    8453, 84532, 4663, 46630, 324705682, 1187947933). Zakresy facilitatorow
+ *    sie NAKLADAJA, a x402ResourceServer rozstrzyga takie kolizje KOLEJNOSCIA
+ *    w tablicy facilitatorow - wiec przy naiwnym [Primer, CDP] platnosci na Base
+ *    poszlyby do Primera, mimo kluczy CDP w env i mimo tego komentarza. Dlatego
+ *    przypisanie sieci do facilitatora jest JAWNE i nie zalezy od kolejnosci:
+ *    patrz NETWORK_FACILITATORS nizej i NetworkRoutedFacilitatorClient
+ *    w app/utils/x402/facilitators.ts.
+ *
  *    === TO JUZ PRZESZLO. SETTLE POTWIERDZONY NA ZYWO ===
  *    Stal tu warunek: "zanim ogloszimy to na stronie produktu, trzeba puscic
  *    jedna platnosc na 0,01 USDG". Zostal spelniony przez scripts/x402PayAsk.mjs:
@@ -121,6 +192,145 @@ const DEFAULT_ASK_POST_PRICE = '$0.01';
  *      verifyingContract=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
  */
 const DEFAULT_ASK_NETWORK = 'eip155:84532';
+
+/** Base mainnet - siec dolaczana do oferty, gdy tylko sa klucze CDP. */
+const BASE_MAINNET = 'eip155:8453';
+
+/** Facilitator Robinhood Chain. Adres domyslny, nadpisywalny z env. */
+const PRIMER_FACILITATOR_URL = 'https://x402.primer.systems';
+
+/**
+ * Skad brac facilitatora dla danej sieci.
+ *
+ * `cdp` MUSI byc osobnym rodzajem, a nie adresem: facilitator Coinbase wymaga
+ * naglowka Authorization z JWT budowanym przez createFacilitatorConfig, wiec
+ * "adres URL" go NIE opisuje. To jest ta sama roznica, ktora kiedys zamienila
+ * konfiguracje Base w ciche 401.
+ */
+export type AskFacilitatorPlan =
+  | { kind: 'url'; url: string }
+  | { kind: 'cdp' }
+  | { kind: 'public' };
+
+const NETWORK_FACILITATORS: Record<string, AskFacilitatorPlan> = {
+  [BASE_MAINNET]: { kind: 'cdp' },
+  'eip155:4663': { kind: 'url', url: PRIMER_FACILITATOR_URL },
+  'eip155:84532': { kind: 'public' },
+};
+
+/** Jedna pozycja oferty: siec, jej waluta i facilitator, ktory ja rozlicza. */
+export interface AskPaymentOption {
+  network: Network;
+  currency: string;
+  facilitator: AskFacilitatorPlan;
+}
+
+/** Czy w ogole mamy czym uwierzytelnic sie w CDP. */
+function hasCdpCredentials(): boolean {
+  return (
+    !!process.env.CDP_API_KEY_ID?.trim() && !!process.env.CDP_API_KEY_SECRET?.trim()
+  );
+}
+
+/**
+ * Adres facilitatora podany recznie dla KONKRETNEJ sieci.
+ *
+ * Dwie drogi, obie potrzebne:
+ *  - X402_FACILITATOR_URL_<referencja CAIP-2>, np. X402_FACILITATOR_URL_4663 -
+ *    jednoznaczna, dziala niezaleznie od tego, ktora siec jest glowna;
+ *  - X402_FACILITATOR_URL - stara galka JEDNOSIECIOWA. Dziala WYLACZNIE dla
+ *    sieci z X402_NETWORK i tylko dlatego, ze tak jest ustawione dzialajace
+ *    wdrozenie (=primer.systems + eip155:4663). Gdyby stosowala sie do
+ *    wszystkich sieci, wlaczenie Base przekierowaloby Base na Primera -
+ *    dokladnie ten blad, ktory ten plik opisuje dwa akapity wyzej.
+ */
+function facilitatorUrlOverride(network: Network): string | undefined {
+  const reference = network.split(':')[1];
+  const perNetwork = process.env[`X402_FACILITATOR_URL_${reference}`]?.trim();
+  if (perNetwork) return perNetwork;
+
+  const legacy = process.env.X402_FACILITATOR_URL?.trim();
+  if (legacy && network === getAskNetwork()) return legacy;
+
+  return undefined;
+}
+
+/**
+ * Kto rozlicza platnosci na tej sieci. `null` znaczy DOKLADNIE jedno: nie mamy
+ * czym - i wtedy tej sieci nie wolno ogloszic w odpowiedzi 402.
+ */
+export function getAskFacilitatorPlan(network: Network): AskFacilitatorPlan | null {
+  const url = facilitatorUrlOverride(network);
+  if (url) return { kind: 'url', url };
+
+  // Siec spoza mapy dostaje publicznego facilitatora. On obsluguje tylko Base
+  // Sepolia, wiec kazda inna skonczy sie GLOSNYM bledem konfiguracji przy
+  // starcie trasy - i tak ma byc. Zgadywanie facilitatora byloby gorsze.
+  const plan = NETWORK_FACILITATORS[network] ?? ({ kind: 'public' } as const);
+  if (plan.kind === 'cdp' && !hasCdpCredentials()) return null;
+  return plan;
+}
+
+/**
+ * PELNA OFERTA PLATNOSCI - to trafia do `accepts` odpowiedzi 402 i do GET.
+ *
+ * Kolejnosc to nasza PREFERENCJA, nie nakaz: protokol x402 zostawia wybor
+ * klientowi, wiec agent moze wziac dowolna pozycje z listy.
+ *
+ * Domyslnie: siec z X402_NETWORK plus Base mainnet, o ile sa klucze CDP.
+ * Bez kluczy Base po prostu nie ma na liscie - lepiej nie ogloszic sieci, niz
+ * ogloszic i odbic kazda platnosc na 401.
+ *
+ * X402_ASK_NETWORKS (lista CAIP-2 po przecinku) nadpisuje ten dobor w calosci.
+ * Istnieje po to, zeby wylaczyc jedna siec BEZ wdrozenia kodu - bo lista sieci
+ * jest czytana raz, przy budowaniu trasy (withX402 dostaje `accepts` w chwili
+ * ladowania modulu i nie da sie tego zrobic per zadanie). Cena i adres odbiorcy
+ * czytane sa juz per zadanie i tego ograniczenia nie maja.
+ */
+export function getAskPaymentOptions(): AskPaymentOption[] {
+  const explicit = process.env.X402_ASK_NETWORKS?.trim();
+  const wanted = explicit
+    ? explicit
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => NETWORK_RE.test(entry))
+    : defaultAskNetworks();
+
+  const options: AskPaymentOption[] = [];
+  const seen = new Set<string>();
+  for (const network of wanted) {
+    if (seen.has(network)) continue;
+    const facilitator = getAskFacilitatorPlan(network as Network);
+    if (!facilitator) continue;
+    seen.add(network);
+    options.push({
+      network: network as Network,
+      currency: getAskCurrencySymbolFor(network as Network),
+      facilitator,
+    });
+  }
+
+  if (options.length > 0) return options;
+
+  // Pusta oferta oznaczalaby odpowiedz 402 z pustym `accepts`, czyli zadanie
+  // zaplaty bez podania czym - agent nie ma wtedy nic do podpisania. Wolimy
+  // oddac siec glowna z publicznym facilitatorem i pozwolic jej odmowic
+  // glosno przy starcie, niz wystawic zadanie bez tresci.
+  const fallback = getAskNetwork();
+  return [
+    {
+      network: fallback,
+      currency: getAskCurrencySymbolFor(fallback),
+      facilitator: getAskFacilitatorPlan(fallback) ?? { kind: 'public' },
+    },
+  ];
+}
+
+/** Siec glowna, a do niej Base - bo wiekszosc agentow trzyma USDC wlasnie tam. */
+function defaultAskNetworks(): string[] {
+  const primary = getAskNetwork();
+  return primary === BASE_MAINNET ? [primary] : [primary, BASE_MAINNET];
+}
 
 /**
  * Token rozliczeniowy per siec, gdy nie jest to domyslny stablecoin schematu.
@@ -193,7 +403,7 @@ const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
  * cache'owac.
  *
  * Zwraca null przy braku albo blednym adresie. Wolajacy MA wtedy odmowic,
- * a nie przepuscic za darmo - patrz middleware.ts.
+ * a nie przepuscic za darmo - patrz `payTo` w route.ts.
  */
 export function getPayToAddress(): string | null {
   const raw = process.env.X402_PAY_TO_ADDRESS?.trim();
@@ -228,10 +438,11 @@ export function getAskNetwork(): Network {
  * obciecie: przy cenie 0,015 USDG obciecie dawaloby 0,01 - czyli cene INNA
  * niz ta, ktora ogloszilismy w GET /api/asks.
  */
-export function getAskPrice():
+export function getAskPriceFor(
+  network: Network
+):
   | string
   | { asset: string; amount: string; extra: { name: string; version: string } } {
-  const network = getAskNetwork();
   const known = ASK_ASSETS[network];
   const money = getAskPostPrice();
   if (!known) return money;
@@ -250,15 +461,18 @@ export function getAskPrice():
   return { asset: known.asset, amount, extra: known.eip712 };
 }
 
-/** Symbol waluty do pokazania czlowiekowi. Nie uzywany do rozliczenia. */
-export function getAskCurrencySymbol(): string {
-  return ASK_ASSETS[getAskNetwork()]?.symbol ?? 'USDC';
+/**
+ * Symbol waluty na danej sieci - do pokazania czlowiekowi i agentowi
+ * przy WYBORZE sieci. Nie uzywany do rozliczenia: tam liczy sie wylacznie
+ * `asset` z odpowiedzi 402.
+ */
+export function getAskCurrencySymbolFor(network: Network): string {
+  return ASK_ASSETS[network]?.symbol ?? 'USDC';
 }
 
-/** Adres facilitatora albo undefined (wtedy biblioteka bierze swoj domyslny). */
-export function getFacilitatorUrl(): string | undefined {
-  const raw = process.env.X402_FACILITATOR_URL?.trim();
-  return raw && raw.length > 0 ? raw : undefined;
+/** Waluta sieci glownej - zgodnosc wsteczna dla pola `payment.currency` w GET. */
+export function getAskCurrencySymbol(): string {
+  return getAskCurrencySymbolFor(getAskNetwork());
 }
 
 /** Czy bramka platnosci jest w ogole uzbrojona w tym procesie. */

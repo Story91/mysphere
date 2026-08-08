@@ -482,11 +482,42 @@ i trzeba mieć odwagę to przyjąć.
 
 ## 6. Znane ograniczenia (świadome, nie zapomniane)
 
+- **Przez escrow nie przeszedł NIKT.** `eth_getLogs` na
+  `0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340` od bloku wdrożenia 49635587 do
+  bieżącego: pusto. `balanceOf(USDC)` = 0. To działający **kontrakt**, nie
+  działający **rynek**, i tak ma być opisywany wszędzie. Pełny cykl przeszedł
+  dwa razy — na Base Sepolii, ze skryptu.
+- **187 rozliczonych płatności to NAPIWKI, nie zapłata za dostarczoną pracę.**
+  188 dokumentów w `tips` na 184 064 konta, czyli 0,1% ludzi. Napiwek to lajk
+  z ceną: więcej niż lajk, mniej niż zamówiona i opłacona robota. **To nie jest
+  fosa produktu i nie wolno tak tego opisywać.** Fosa jest w kodzie: escrow bez
+  właściciela, zapieczętowane odpowiedzi, wskaźnik rozstrzygalności. Liczbę
+  wolno podawać jako fakt, nigdy jako dowód trakcji — i najlepiej z mianownikiem.
+- **Onchain jest 6% postów.** `PostContract2.totalPosts` = 15 827 wobec 263 613
+  postów w bazie. Zdanie „posty lądują na łańcuchu" jest prawdziwe o ścieżce
+  zapisu, nie o zawartości feedu.
+- **Dzienny limit odczytów Firestore da się położyć jednym skryptem.** Skrypt
+  liczący lajki przeczytał 33 000 postów i domknął limit; przez godziny padały
+  odpowiedzi na Aski i płatna treść — czyli dokładnie te dwie rzeczy, za które
+  produkt bierze pieniądze. Skrypt ma teraz sufit `--max-reads` (domyślnie
+  20 000) i odmawia zapisu przy częściowej sumie. **Nad samą aplikacją nie ma
+  takiego sufitu.**
+- **B20 to ślepy zaułek dla nas, mimo że istnieje.** Natywny standard tokenów
+  Base (nadzbiór ERC-20, `transferWithMemo` z `bytes32`, fabryka
+  `0xB20f0000…0000`). Nasz `AskEscrow` emituje `SeatAwarded(key, recipient,
+  answerRef, amount)` — więcej niż `Memo` — na kontrakcie **bez właściciela**,
+  a B20 dokładałoby `burnBlocked`, czyli przycisk konfiskaty. To zaprzeczenie
+  tezy produktu. Dokumentacja Base przy „launch a token" wymienia Zorę,
+  Clankera, Flauncha i Mint Club; B20 nie pada tam ani razu.
 - **`PremiumGate` to paywall, nie szyfrowanie end-to-end.** Treść jest już poza
   feedem, ale na serwerze leży zwykłym tekstem. Autor widzi to napisane wprost.
 - **Posty sprzed przeniesienia treści** mają ją w dokumencie i jest publiczna —
   nic tego nie cofnie. Edycja przez autora kasuje pole.
-- **Reguły nie odróżniają serwera od przeglądarki** poza kolekcją `premiumContent`.
+- **Reguły nie odróżniają serwera od przeglądarki** poza `premiumContent`
+  i `askAnswerContent`. Obie **odmawiają** przeglądarce odczytu i zapisu —
+  sprawdzone sondą, 12/12 oczekiwanych wyników, reszta kolekcji dalej odpowiada.
+  Wdrożonych jest też 28 indeksów złożonych, w tym `askAnswers` po
+  `askId` + `createdAt`. Regułę sprawdza się uruchomieniem, nie czytaniem.
   Trasy `/api/unlock` piszą tym samym klienckim SDK.
 - **Brak cookie-SSR dla wagmi.** Na Next 14 wyklucza się z prerenderem całego
   serwisu — sprawdzone: 46 stron statycznych spadło do 2. Rozwiąże PPR z Next 15.

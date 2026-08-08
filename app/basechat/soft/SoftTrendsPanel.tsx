@@ -73,6 +73,18 @@ export type SoftTrendStat = {
    * bylaby czescia sumy podana jako calosc.
    */
   note?: string;
+  /**
+   * Pelne zdanie do dymka, np. "at least this many. A full count as of
+   * Aug 16, 2025, plus ...".
+   *
+   * Bylo tu zdanie sklejane NA MIEJSCU: `${note}, earlier ones are not included
+   * yet`. Dzialalo, dopoki niepelna liczba mogla byc niepelna tylko na jeden
+   * sposob. Odkad suma potrafi byc dolna granica (stara migawka + licznik),
+   * tamten dopisek stal sie nieprawda - tam wczesniejsze lajki wlasnie SA
+   * policzone, a brakuje srodka. Ten plik nie ma skad wiedziec, ktory to
+   * przypadek, wiec dostaje gotowe zdanie od tego, kto wie.
+   */
+  detail?: string;
 };
 export type SoftActiveUser = {
   address: string;
@@ -186,7 +198,7 @@ export default function SoftTrendsPanel({
   // indziej. Tips i Asks nie ida przez `stats`, bo maja WLASNE zrodla (kolekcje
   // `tips` i `asks`) i wlasny stan "nie udalo sie odczytac" - a tone dla
   // pieniedzy ustala ten plik, nie wywolanie.
-  const tiles: { label: string; value: string; tone: SoftTrendTone; note?: string }[] = [
+  const tiles: { label: string; value: string; tone: SoftTrendTone; note?: string; detail?: string }[] = [
     ...stats.map((stat) => ({ ...stat, value: toTileValue(stat.value) })),
     ...(tips !== undefined ? [{ label: 'Tips', value: toTileValue(tips), tone: 'money' as const }] : []),
     ...(openAsks !== undefined
@@ -207,8 +219,8 @@ export default function SoftTrendsPanel({
               title={
                 stat.value === UNKNOWN
                   ? 'Not available right now'
-                  : stat.note
-                    ? `${stat.value} — ${stat.note}, earlier ones are not included yet`
+                  : stat.detail
+                    ? `${stat.value} — ${stat.detail}`
                     : stat.value
               }
               className={`font-soft-display text-[26px] font-bold leading-none tabular-nums ${TONE[stat.tone].text}`}

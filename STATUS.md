@@ -8,6 +8,11 @@
 > otwarte, a już zamknięte — `PremiumGate` jako publiczny paywall, brak UI treści premium
 > w kompozytorze, brak limitu podejść do egzaminu.
 >
+> **Test falsyfikujący z sekcji „KIERUNEK" nigdy nie został przeprowadzony.** Kod Aska powstał
+> przed nim, a nie po. Progu (70% / ≥5 powracających) nikt nie zmierzył — nie jest ani osiągnięty,
+> ani niezaliczony, jest **niezmierzony**. Stan na dziś: przez escrow nie przeszedł nikt (zero
+> zdarzeń na kontrakcie), a 187 rozliczonych płatności to napiwki, nie zapłata za zamówioną pracę.
+>
 > Materiał do postów z tego okresu: [`POSTY-SOCIAL.md`](POSTY-SOCIAL.md).
 
 # MySphere — status prac

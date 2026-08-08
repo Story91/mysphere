@@ -67,17 +67,24 @@ dla kogoś, kto nigdy nie zajrzy do naszego produktu.
 > settled between two people — 187 of them, every line carrying a hash you
 > can open on Basescan and check against ours.
 >
-> USDC on Base. Names on both ends, not truncated addresses. Sorted by what
-> moved, not by what an algorithm thinks you'll stare at.
+> Now the number nobody posts next to that one: 184,064 accounts. One in a
+> thousand has ever sent a cent. And all 187 are tips — a like with a price on
+> it — not payment for work somebody asked for.
 >
-> It reads like a receipt roll, and that's on purpose. It's the one screen
-> in the product that nobody can game, because gaming it means paying
-> strangers real money — at which point they got paid, and the number is
-> honest anyway.
+> I'll still take it over a like count, because gaming this feed means paying
+> strangers real money, at which point they got paid and the number stayed
+> honest. It just isn't a market yet. You'd have found that out in one query,
+> so you may as well hear it from me.
 
-**Dlaczego to działa:** ostatni akapit to argument, który zamyka temat
-„a co jeśli ktoś to nabije". Odpowiedź „to zapłacił, więc liczba jest
-prawdziwa" jest satysfakcjonująca i nie da się z nią dyskutować.
+**Dlaczego to działa:** publiczność Base i tak policzy ten ułamek, więc podanie
+go samemu kosztuje nic, a kupuje wiarygodność wszystkich pozostałych liczb
+w poście. Argument „nie da się tego nabić, bo nabicie to zapłata" zostaje
+nienaruszony — działa tak samo przy 187 jak przy 187 000.
+
+**Czego ten wariant NIE MA PRAWA robić:** podawać 187 jako dowodu, że rynek
+działa. To napiwki, czyli lajk z ceną. Zapłat za zamówioną pracę jest **zero** —
+escrow, przez który by szły, nie ma ani jednego zdarzenia. Liczba wolno jako
+fakt, nigdy jako trakcja.
 
 ---
 
@@ -115,7 +122,8 @@ Wariant techniczny:
 > Shipped an immutable escrow to Base for about a cent of gas.
 >
 > No owner, no pause, no upgrade path. If we vanish tomorrow the money still
-> comes out — resolve and expiry both work without us.
+> comes out — resolve and expiry both work without us. Expiry only has a unit
+> test behind it, because you can't fast-forward 48 hours on a live chain.
 >
 > Deploying something you can't fix later is a design decision, not an
 > oversight.
@@ -164,7 +172,9 @@ Publiczność Base otwiera adresy. Każda liczba ma pokrycie na łańcuchu.
 | USDC na Base | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 | Posty na Base | `0x6e1811A5401dfC30E8F3E2DD9dE0Bbe156F97aC7` |
 | Płatne przypięcia | `0x163bd9Ec5267491963163dE70D0B64f9400a20AD` |
-| Rozliczone płatności | 187, wszystkie z hashem |
+| Rozliczone płatności | 187, wszystkie z hashem — **to napiwki**, nie zapłata za zamówioną pracę |
+| Konta w bazie | 184 064, czyli napiwek wysłało 0,1% z nich |
+| Ruch przez escrow | **zero** — `eth_getLogs` od bloku 49635587 pusty, `balanceOf(USDC)` = 0 |
 
 Czego w tych postach nie ma i dlaczego — ktoś z tej publiczności sprawdzi to
 w pięć minut:
@@ -172,11 +182,17 @@ w pięć minut:
 - **x402 na Base w USDC** — gałąź jest napisana i nie przeszedł przez nią ani
   cent. Nasza jedyna rozliczona płatność maszynowa poszła na Robinhood Chain
   w USDG. Wątek x402 należy do drugiego pliku.
-- **liczby postów i użytkowników** — zestarzeją się nazajutrz, a 187 rozliczeń
-  to liczba, która rośnie i której nie trzeba zaokrąglać.
+- **liczby postów** — zestarzeją się nazajutrz. Liczba kont zostaje, ale
+  wyłącznie **jako mianownik** przy 187 napiwkach: sama, bez ułamka, jest tym
+  samym chwaleniem się, którego ten plik zabrania.
+- **187 jako dowód trakcji.** Wariant 3 podaje tę liczbę razem z mianownikiem
+  i z tym, czym ona jest — napiwkami. Napiwek to lajk z ceną: więcej niż lajk
+  i mniej niż zamówiona i opłacona praca. Takich transakcji jest zero.
 - **„ludzie już z tego korzystają"** przy escrow. Kontrakt działa i jego pełny
-  cykl przeszedł prawdziwym USDC, ale ze skryptu na Sepolii. Dlatego wariant 1
-  mówi o **kontrakcie i o tym, czego mu odebraliśmy**, a nie o ruchu.
+  cykl przeszedł prawdziwym USDC, ale ze skryptu na Sepolii. **Na mainnecie nie
+  ma na nim ani jednego zdarzenia.** Dlatego wariant 1 mówi o **kontrakcie
+  i o tym, czego mu odebraliśmy**, a nie o ruchu — i to jest jedyny bezpieczny
+  sposób pisania o escrow, dopóki ktoś przez niego nie przejdzie.
 
 Weryfikacja przed publikacją:
 

@@ -716,8 +716,9 @@ tym samym adresem.
 Model danych (`app/utils/asks/types.ts`, `asks.ts`): pytanie, budżet, miejsca, termin, liczniki,
 resolve rate. Domknięte jest też wszystko wokół: kompozytor, zapieczętowane odpowiedzi, przyjmowanie
 (`/api/asks/[id]/accept`, które **sprawdza hash na łańcuchu**, a nie wierzy klientowi na słowo)
-i rozstrzygnięcie (`/api/asks/[id]/resolve`). Wszystko na `/asks`. **Czego dalej nie ma:** Aska
-w feedzie.
+i rozstrzygnięcie (`/api/asks/[id]/resolve`). Wszystko na `/asks`. **Czego dalej nie ma:**
+odpowiadania bez wychodzenia z feedu. Pas otwartych Asków nad postami już jest (`FeedAskRail`),
+ale jego przycisk prowadzi na `/asks` i dopiero tam się pisze, otwiera i rozstrzyga.
 
 ### 7.2. Escrow **istnieje** — i dokładnie tyle, ile istnieje
 Manifest mówił *„fund it once in USDC"* w czasie teraźniejszym, kiedy kontraktu nie było. Teraz jest:
@@ -731,10 +732,16 @@ Cztery zastrzeżenia, bez których to zdanie robi się reklamą:
 - **Opłata 2,5% leci wyłącznie od pieniędzy wracających do autora** (niewypełnione miejsca przy
   rozstrzygnięciu po terminie albo cały budżet po wygaśnięciu). Odpowiadający dostaje pełne
   `perAnswer`, nigdy pomniejszone.
-- **Zwrot po wygaśnięciu ma kontrakt, nie interfejs.** Autor po terminie + 48h musi zawołać
-  `settleExpired` ręcznie.
+- **Zwrot po wygaśnięciu ma już i kontrakt, i interfejs** — przycisk jest na `/money`
+  (`handleRecover` → `settleExpiredAsk`). Czego nie ma: **zapisu w bazie**. Nic nie ustawia Aska na
+  wygasły, więc po zwrocie budżetu dokument dalej mówi o sobie „otwarty". I noga wygaśnięcia dalej
+  nie przeszła na żadnej prawdziwej sieci — wymaga terminu + 48h, dowodem jest test jednostkowy.
 - **Ścieżka z przeglądarki nie została przejechana na mainnecie.** Pełny cykl pieniądza przeszedł
   dwa razy na Base Sepolii prawdziwym USDC, ale skryptem z node — to dowód kontraktu, nie klienta.
+- **Przez kontrakt na mainnecie nie przeszedł NIKT.** `eth_getLogs` od bloku wdrożenia 49635587:
+  pusto. `balanceOf(USDC)` = 0. To jest mocniejsze zdanie niż „nie z przeglądarki" i to ono ma
+  stać w każdym tekście dla użytkownika. Escrow jest **działającym kontraktem bez ruchu**, nie
+  działającym rynkiem.
 
 ### 7.3. x402 dla agentów — pierwsza prawdziwa płatność przeszła
 `@x402/next` 2.21 wpięty (CAIP-2, `PAYMENT-SIGNATURE`), settlement odpala się wyłącznie przy

@@ -145,7 +145,7 @@ const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = 
         what: 'Ask escrow',
         chain: 'Base',
         address: '0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340',
-        line: 'Holds the USDC budget for an Ask until the author accepts answers. Source is verified — you can read it before you write a word.',
+        line: 'Holds the USDC budget for an Ask until the author accepts answers. Source is verified — you can read it before you write a word. It is holding nothing today: no transaction has touched it since it was deployed, and the explorer under this link will tell you that before we do.',
         explorer: 'https://basescan.org/address/0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340#code',
       },
       {
@@ -508,6 +508,32 @@ function AskCard() {
  * odczytu, sonda 12/12), i dlatego wiersz moze wreszcie mowic JAK to dziala,
  * a nie tylko GDZIE lezy.
  *
+ * === TRZY WIERSZE DOPISANE PRZY UZGADNIANIU CALOSCI ===
+ * Znowu zanizanie stanu, i znowu przez rzeczy, ktore weszly szybciej niz opis:
+ *   - /how                strona-instrukcja. Istnieje, jest w nawigacji, a tabela
+ *                         o niej nie wiedziala. Podzial obowiazkow miedzy strony
+ *                         stoi w nocie tego wiersza, bo to jedyne miejsce, gdzie
+ *                         czytelnik obu stron naraz go zobaczy.
+ *   - reguly i indeksy    28 indeksow zlozonych wdrozonych, reguly EGZEKWOWANE
+ *                         i sprawdzone sonda 12/12. To byla dziura krytyczna
+ *                         opisana nizej; jej ZAMKNIECIE nie mialo wlasnego
+ *                         wiersza, wiec tabela pokazywala tylko skutek uboczny
+ *                         w dwoch innych notach.
+ *   - sufit na odczyty    status `planned`, celowo, bo naprawiony jest SKRYPT,
+ *                         a nie produkt. Skrypt liczacy lajki przeczytal 33 000
+ *                         postow, domknal dzienny limit i przez godziny padaly
+ *                         odpowiedzi na Aski oraz platna tresc - czyli dokladnie
+ *                         to, za co produkt bierze pieniadze. Skrypt ma teraz
+ *                         --max-reads; nad aplikacja nie ma nic.
+ *
+ * === CZEGO TA TABELA NIE MA PRAWA WIECEJ ZROBIC Z LICZBA 187 ===
+ * Wiersz "The money timeline" podawal "187 settled payments deep" i nic wiecej.
+ * Tak podana liczba czyta sie jako trakcja, a to NAPIWKI: lajk z cena, 187 na
+ * 184 064 konta, czyli 0,1% ludzi. Ani jedna z nich nie jest zaplata za prace,
+ * o ktora ktos poprosil - takich jest zero, bo escrow nie ma zdarzen. Nota musi
+ * wiec niesc MIANOWNIK i slowo "tips". Liczba jako fakt: tak. Liczba jako dowod,
+ * ze rynek dziala: nigdy.
+ *
  * NIE DOPISUJ TU WIERSZA, DOPOKI NIE ZOBACZYSZ GO W KODZIE. Ta tabela jest
  * jedynym miejscem na stronie, gdzie klamstwo nie ma sie gdzie schowac.
  */
@@ -559,7 +585,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'The money timeline',
     status: 'live',
-    note: 'A public feed of payments between people, carrying names and avatars rather than bare addresses. 187 settled payments deep, every line with a transaction you can open.',
+    note: 'A public feed of payments between people, carrying names and avatars rather than bare addresses. 187 settled payments deep, every line with a transaction you can open. Read what they are before you read them as traction: all 187 are tips — a like with a price on it — across 184,064 accounts, so one account in a thousand has ever sent one. Nobody has yet been paid here for work they were asked to do.',
   },
   {
     name: 'Your money, in one place',
@@ -570,6 +596,21 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
     name: 'Paid sections',
     status: 'live',
     note: 'Text sold per post. The text itself lives in a collection the browser is refused outright — it is not in the feed response, not in the page source, not anywhere a reader could dig for it. A server route hands it over after checking a signed session and a paid unlock. Until this week it sat in the post document in plain text; treat any older claim about it as wrong.',
+  },
+  {
+    name: 'A page that says what you can do today',
+    status: 'live',
+    note: '/how is seven steps, each with its price on the front: what it costs, what you sign, where the receipt ends up. Nothing on it is in the future tense — a thing you cannot do today is not allowed on that page in any form, not even as a promise. That is the division of labour between the two pages: /how is the instruction, this one is the state, and everything unbuilt lives here.',
+  },
+  {
+    name: 'Rules and indexes, deployed rather than described',
+    status: 'live',
+    note: 'The database rules are enforced, and we know because we tried them rather than read them: twelve probes, twelve expected answers — the two sealed collections refuse the browser outright, the other ten still open. Twenty-eight composite indexes are deployed alongside them, including answers by Ask and time, so the Ask pages are read by index instead of scanned. A rule that has not been probed is a comment.',
+  },
+  {
+    name: 'A read the product cannot be taken down by',
+    status: 'planned',
+    note: 'The nearest missing thing away from the money rails. A counting script walked 33,000 posts and used up the whole day of reads, and for hours after that the product could not answer an Ask or hand over paid text — the two things it charges for. The script now stops at a ceiling and refuses to write a partial total. Nothing does that for the product itself: a page that starts reading too much has nothing above it to say no.',
   },
   {
     name: 'An invite link that arrives somewhere',
@@ -599,7 +640,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Ask: escrow',
     status: 'live',
-    note: 'AskEscrow on Base, 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source-verified. Approve, fund, wait for the receipt — only then does the Ask document get written. Resolving is one transaction, collecting is a claim. Whoever is thinking of answering reads the locked amount off the chain first.',
+    note: 'AskEscrow on Base, 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source-verified, no owner. Approve, fund, wait for the receipt — only then does the Ask document get written. Resolving is one transaction, collecting is a claim. Whoever is thinking of answering reads the locked amount off the chain first. What it is holding right now is nothing: asked for every log it has emitted since its deployment block, the chain returns none, and its USDC balance is zero. This is a live contract nobody has walked through, and the row says live because the code path is finished, not because money has moved.',
   },
   {
     name: 'Ask: escrow from a browser, on mainnet',
@@ -742,12 +783,30 @@ export default function ReDefinitionPage() {
                 Zasada dla kazdego, kto to bedzie przesuwal dalej: pozycja
                 zdjeta z "Being built" nie zostawia pustego miejsca. Na jej
                 miejsce wchodzi nastepna brakujaca rzecz - tu weszla sciezka
-                x402 na Base w USDC, przez ktora nie przeszedl ani cent. */}
+                x402 na Base w USDC, przez ktora nie przeszedl ani cent.
+
+                === 187 PLATNOSCI TO NAPIWKI I TAK MA TU BYC NAPISANE ===
+                Kolumna "Runs today" mowila wczesniej o escrow, ktorego "caly
+                cykl przeszedl na prawdziwych pieniadzach", w jednym zdaniu ze
+                slowami "live on Base". Czytelnik ma prawo przeczytac to jako
+                mainnet, a na mainnecie eth_getLogs od bloku wdrozenia
+                49635587 nie zwraca ANI JEDNEGO zdarzenia i balanceOf(USDC)
+                kontraktu wynosi zero. Cykl przeszedl na Base Sepolii, ze
+                skryptu.
+
+                Druga poprawka jest tego samego rodzaju. 187 rozliczonych
+                platnosci to NAPIWKI - lajk z cena - a nie zaplata za
+                dostarczona prace, i dotycza 0,1% kont (187 na 184 064).
+                Liczbe wolno podawac jako fakt. NIE WOLNO jej podawac jako
+                dowodu, ze rynek dziala, bo rynek to zaplata za robote na
+                zamowienie, a takich przejsc jest zero. Fosa tego produktu
+                lezy w kodzie: escrow bez wlasciciela, zapieczetowane
+                odpowiedzi i wskaznik rozstrzygalnosci - nie w tej liczbie. */}
             <dl className="mt-9 grid gap-y-4 border-t border-soft-line/70 pt-6 sm:grid-cols-3 sm:gap-x-6">
               {[
                 {
                   t: 'Runs today',
-                  d: 'Posts, tips, receipts and a public timeline of payments. An escrow contract live on Base, source verified, whose whole cycle — lock, resolve, pay out — has run on real money. A machine has paid for an Ask over x402, once. /money adds up what you are owed, what you locked, what you earned and what you spent.',
+                  d: 'Posts, tips, receipts and a public timeline of payments — 187 of them, each with a hash, and every one of them a tip rather than payment for delivered work. An escrow contract live on Base, source verified, with no owner; its whole cycle has run on real money, but on a test network and from a script. On Base itself nobody has funded an Ask through it yet. A machine has paid for an Ask over x402, once. /money adds up what you are owed, what you locked, what you earned and what you spent, and carries the buttons that collect it.',
                 },
                 {
                   t: 'Being built',
@@ -755,7 +814,7 @@ export default function ReDefinitionPage() {
                 },
                 {
                   t: 'Direction',
-                  d: 'Machine demand at any volume, and a price per seat set by settled payments. One cent between two wallets we both own is a working path, not a market.',
+                  d: 'Machine demand at any volume, and a price per seat set by settled payments. One cent between two wallets we both own is a working path, not a market — and 187 tips across 184,064 accounts are a like with a price on it, which is more than a like and still not a market. The first stranger who funds an Ask and pays another stranger for the answer is ahead of us, not behind us.',
                 },
               ].map((item) => (
                 <div key={item.t}>
@@ -866,6 +925,13 @@ export default function ReDefinitionPage() {
             read the locked amount straight off the contract. It is a choice, not a property of
             every Ask — the older way, paying out of pocket when you accept, still exists and locks
             nothing, so each card says which one it is.
+          </P>
+          <P>
+            One sentence before you read any of that as a running market. <Hi>Nobody has gone
+            through this contract yet.</Hi> Ask it for every event it has emitted since the block it
+            was deployed in and it returns none; its balance is zero. What exists is a finished
+            contract and a finished path to it, checkable by anyone, carrying nobody&apos;s money.
+            That is a smaller claim than the one this section could make, and it is the true one.
           </P>
           <P>
             The fee is <Hi>2.5%</Hi>, and it is charged only on money going <em>back</em> to the
@@ -1007,12 +1073,26 @@ export default function ReDefinitionPage() {
             verifiable amount and travel on their own — a receipt today, an Ask next.
           </P>
           <P>
-            The first of them is already live, and it is the one thing here that exists nowhere
-            else: <Hi>a public timeline of payments between people</Hi>. Not a leaderboard of
-            points, not a wall of likes — the money itself, in the order it landed, every line
-            carrying a transaction you can open and check against the chain, and names and faces on
-            both ends of it rather than two truncated addresses. Every social product has a feed of
-            what people said. None has a feed of what people paid each other.
+            The first of them is already live: <Hi>a public timeline of payments between people</Hi>.
+            Not a leaderboard of points, not a wall of likes — the money itself, in the order it
+            landed, every line carrying a transaction you can open and check against the chain, and
+            names and faces on both ends of it rather than two truncated addresses. Every social
+            product has a feed of what people said. None has a feed of what people paid each other.
+          </P>
+          <P>
+            And now the size of it, because a page that hides this has no business asking you to
+            trust the rest. That timeline is <Hi>187 payments deep</Hi>, all of them tips, spread
+            across 184,064 accounts — one account in a thousand has ever sent one. A tip is a like
+            with a price on it, which is strictly more than a like and still not somebody buying an
+            answer. Not one of those 187 was payment for work somebody asked for. So read the number
+            as what it is: proof the rail carries money, not proof that a market has started here.
+          </P>
+          <P>
+            The thing that would be hard to copy is not that number either. It is the part written
+            in code and given away: <Hi>an escrow with no owner</Hi>, so nobody — us included — can
+            reach into it; answers sealed by a database rule rather than by an interface; and a
+            resolve rate an author cannot raise without paying somebody. Those exist whether or not
+            anyone has used them yet, and the row above is honest that nobody has.
           </P>
           <p className="mb-4">
             <Link
@@ -1035,6 +1115,15 @@ export default function ReDefinitionPage() {
             included. When something stops being a plan it does not leave a gap here — the next
             missing thing moves into the empty row, which is why the list never gets shorter and
             never goes all green. <Hi>A table where everything is lit is an advertisement.</Hi>
+          </P>
+          <P>
+            This is the state. If what you want is the instruction —{' '}
+            <Link href="/how" className="underline decoration-soft-line-strong underline-offset-2">
+              /how
+            </Link>{' '}
+            is the same product from the other side: seven things you can do today, each with what
+            it costs and what you sign. Nothing in the future tense is allowed on that page, which
+            is why everything in the future tense is on this one.
           </P>
           <div className="mt-8">
             {CAPABILITIES.map((cap) => (
@@ -1123,6 +1212,15 @@ export default function ReDefinitionPage() {
             answer from strangers in a feed. Machine demand is the second layer — it is what makes
             this unlike anything else, but the first dollars will come from founders, projects and
             traders paying humans.
+          </P>
+          <P>
+            And that bet is <Hi>not yet won by anything on this page</Hi>. The strongest number here
+            is 187 tips, and a tip is somebody rewarding a post they were going to read anyway — not
+            somebody commissioning work and paying for it when it arrives. The escrow, which is
+            where commissioned work would settle, has never been used. Everything above is a rail,
+            an address and a rule you can check. None of it is evidence that people want this. The
+            first Ask a stranger funds and a stranger answers is the experiment; until then this page
+            is describing a machine that has not been switched on.
           </P>
           <P>
             Escrow used to be the biggest hole. It is not any more, and the honest thing to say is

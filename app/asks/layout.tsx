@@ -16,8 +16,18 @@ import type { Metadata } from 'next';
  * do Firestore, app/asks/page.tsx). Rozstrzygniecie to jedna transakcja
  * resolve(), odbior to claim() - pelny cykl przeszedl dwa razy prawdziwym USDC
  * na Base Sepolii (scripts/askEscrowCycle.js), ale NIE z przegladarki i NIE na
- * mainnecie. NIE dziala i NIE WOLNO tego pisac: Ask w feedzie, powiadomienie
- * o wygranej (nic nie mowi zwyciezcy, ze ma pieniadze - musi wejsc na /money).
+ * mainnecie. NIE dziala i NIE WOLNO tego pisac: powiadomienie o wygranej (nic
+ * nie mowi zwyciezcy, ze ma pieniadze - musi wejsc na /money) oraz odpowiadanie
+ * bez wychodzenia z feedu (pas otwartych Askow nad postami JEST, ale przycisk
+ * prowadzi na /asks i tam sie pisze).
+ *
+ * === KONTRAKT NA MAINNECIE MA ZERO PRZEJSC ===
+ * eth_getLogs od bloku wdrozenia 49635587 nie zwraca ANI JEDNEGO zdarzenia,
+ * a balanceOf(USDC) escrow wynosi zero. Sciezka jest napisana i osiagalna,
+ * ale nikt jeszcze nie zablokowal tam ani centa. Opis strony ma prawo mowic,
+ * ze autor MOZE zablokowac budzet - bo moze - i nie ma prawa sugerowac ruchu
+ * ani kolejki. Kazde zdanie w rodzaju "budzety sa juz blokowane" bedzie tu
+ * klamstwem dopoty, dopoki ta linijka stoi.
  *
  * TE DWIE PLATNOSCI TO NIE JEST TA SAMA PLATNOSC. x402 placi za ZALOZENIE
  * Aska (grosze, USDG, Robinhood). Escrow blokuje BUDZET Aska (USDC, Base).

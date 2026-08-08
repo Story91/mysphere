@@ -17,6 +17,23 @@ import Link from 'next/link';
  * da sie jeszcze zrobic, NIE MA PRAWA byc na tej stronie w zadnej formie -
  * nawet jako zapowiedz. Zapowiedzi sa na /re-definition, w tabeli ze statusami.
  *
+ * === "DZIALA" TO NIE TO SAMO CO "KTOS PRZEZ TO PRZESZEDL" ===
+ * Dwa kroki opisuja rzeczy, ktore dzialaja i przez ktore NIKT jeszcze nie
+ * przeszedl, i oba musza to mowic W SWOIM KROKU, a nie w gwiazdce na dole:
+ *
+ *   krok 05 (escrow)  Kontrakt na Base stoi i ma zweryfikowane zrodlo, ale
+ *                     eth_getLogs od bloku wdrozenia nie zwraca ani jednego
+ *                     zdarzenia, a balanceOf(USDC) wynosi zero. Nikt nie
+ *                     zablokowal tam ani centa.
+ *   krok 07 (zwrot)   settleExpired ma przycisk na /money (page.tsx wola
+ *                     settleExpiredAsk), ale ta noga nie przeszla na zadnej
+ *                     prawdziwej sieci - wymaga terminu + 48h, czego nie da
+ *                     sie przewinac. Jedyny dowod to test jednostkowy.
+ *
+ * Instrukcja, ktora przemilcza pustke po drugiej stronie przycisku, klamie
+ * przez sugestie kolejki, ktorej nie ma. Czlowiek, ktory bedzie pierwszy, ma
+ * prawo wiedziec, ze jest pierwszy.
+ *
  * === DLACZEGO KAZDY KROK MOWI, ILE KOSZTUJE I CO PODPISUJESZ ===
  * Produkt operuje prawdziwymi pieniedzmi i prawdziwymi podpisami. Czlowiek,
  * ktory klika "Sign", ma prawo wiedziec ZAWCZASU, czy to kosztuje gaz, czy nie,
@@ -127,7 +144,9 @@ export default function HowPage() {
 
         <p className="mb-2 max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
           Nothing on this page is a plan. If it is written here, it works right
-          now. What is still being built is listed on{' '}
+          now — and where the thing that works has never had anyone go through
+          it, the step says so in the step. What is still being built is listed
+          on{' '}
           <Link
             href="/re-definition"
             className="font-semibold text-soft-primary-deep underline decoration-soft-line underline-offset-4 hover:text-soft-primary"
@@ -230,6 +249,13 @@ export default function HowPage() {
               and no off switch, so not even we can take it back out.
             </P>
             <P>
+              Worth knowing before you do it: <Hi>nobody has yet</Hi>. The
+              contract is deployed, its source is public and it is holding
+              exactly nothing — no transaction has ever touched it. That is a
+              working contract with no queue in front of it, not a busy one.
+              Whoever goes first goes first.
+            </P>
+            <P>
               Answers stay <Hi>sealed</Hi> until you open them. Nobody reads
               anybody else&apos;s and rewrites it slightly to take a seat.
               Everyone answers blind, which is the only way the person who
@@ -269,6 +295,14 @@ export default function HowPage() {
               the same page is where the budget comes back — minus the fee, and
               in two steps, because the contract credits you first and moves the
               money when you ask it to.
+            </P>
+            <P>
+              That last button is the one thing on this page we cannot show you
+              working on a real chain. Getting a budget back needs the deadline
+              plus 48 hours to have passed, and no live network lets you skip
+              two days, so the only proof it works is a test on a machine where
+              we owned the clock. The button exists, it names the fee, and it
+              has never been pressed for real by anyone.
             </P>
             <Go href="/money">Open Money</Go>
           </Step>

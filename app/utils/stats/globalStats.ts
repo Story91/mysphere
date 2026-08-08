@@ -41,6 +41,9 @@ import { toMillis } from '../firestoreTime';
 const STATS_DOC = 'globalStats';
 const STATS_ID = 'current';
 
+/** Pochodzenie `likesBaseline`. Opis przy polu w `GlobalStats`. */
+export type LikesBaselineSource = 'scan' | 'snapshot';
+
 export type GlobalStats = {
   /**
    * `null` znaczy "nie zmierzono", NIE "zero".
@@ -68,7 +71,7 @@ export type GlobalStats = {
   /** Od kiedy liczy `likesSince`. 0 = nie wiadomo. */
   likesSinceStartedAt?: number;
   /**
-   * Stan poczatkowy lajkow: suma pola `posts.likes` policzona RAZ, serwerowo.
+   * Stan poczatkowy lajkow: to, co bylo na postach ZANIM ruszyl licznik.
    *
    * Bez tego pola `likesSince` nigdy nie bedzie liczba calkowita - zaczyna od
    * zera w chwili wlaczenia licznika i nie wie nic o cwierc milionie postow,
@@ -76,13 +79,36 @@ export type GlobalStats = {
    * `likesSince: 6` i ZERO pola `likes`, czyli calkowitej liczby nie bylo
    * z czego zlozyc.
    *
-   * Liczy to scripts/countLikesBaseline.cjs (firebase-admin, poza limitami
-   * klienta). Skrypt przy zapisie ZERUJE `likesSince`, zeby lajki policzone
-   * w skanie nie zostaly doliczone drugi raz - patrz naglowek skryptu.
+   * Wpisac to moga DWA skrypty i to nie jest to samo:
+   *   scripts/countLikesBaseline.cjs          - skan cwierc miliona postow,
+   *     liczba dokladna, zapisuje `likesBaselineSource: 'scan'`;
+   *   scripts/setLikesBaselineFromSnapshot.cjs - zamrozona liczba z historii
+   *     kodu, zero odczytow, zapisuje `likesBaselineSource: 'snapshot'`.
+   *
+   * Roznice miedzy nimi trzyma `likesBaselineSource` i to ona decyduje, co
+   * interfejs ma napisac pod liczba. Nie czytaj tego pola bez tamtego.
    */
   likesBaseline?: number | null;
-  /** Kiedy policzono `likesBaseline`. 0 = nie wiadomo. */
+  /**
+   * Z KTOREGO MOMENTU pochodzi `likesBaseline` - dla skanu dzien liczenia, dla
+   * migawki dzien, ktory ta migawka opisuje. 0 = nie wiadomo.
+   */
   likesBaselineAt?: number;
+  /**
+   * SKAD wziety stan poczatkowy - i to decyduje, czy suma jest liczba dokladna.
+   *
+   * `'scan'`     - policzony skanem TERAZ (countLikesBaseline.cjs). Skan widzi
+   *                lajki takie, jakie sa w chwili liczenia, i przy zapisie zeruje
+   *                licznik przyrostowy, wiec `likesBaseline + likesSince` nie ma
+   *                ani luki, ani zakladki. Liczba DOKLADNA.
+   * `'snapshot'` - liczba wyjeta z zamrozonej migawki w historii kodu, czyli opis
+   *                DAWNEGO dnia. Miedzy tamtym dniem a wlaczeniem licznika
+   *                przyrostowego jest okres, ktorego NIKT nie policzyl. Suma jest
+   *                wiec DOLNA GRANICA, nie pomiarem - i interfejs ma to napisac.
+   *
+   * Brak pola traktujemy jak `'snapshot'`, nie jak `'scan'` - patrz likesTotal().
+   */
+  likesBaselineSource?: LikesBaselineSource | null;
   comments: number | null;
   tips: number | null;
   /** Kiedy policzono. 0 = nie wiadomo. */
@@ -106,6 +132,16 @@ function toCount(value: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+/**
+ * Pochodzenie stanu poczatkowego. Wszystko, co nie jest jawnym `'scan'` albo
+ * `'snapshot'`, wraca jako `null` - a `null` zostanie nizej potraktowany jak
+ * migawka, czyli ostrozniej. Nierozpoznany napis nie moze awansowac liczby do
+ * rangi pomiaru.
+ */
+function toBaselineSource(value: unknown): LikesBaselineSource | null {
+  return value === 'scan' || value === 'snapshot' ? value : null;
+}
+
 /** Jeden odczyt. Nigdy nie zmysla liczb - brak danych zwraca `null`. */
 export async function getGlobalStats(): Promise<GlobalStatsResult> {
   try {
@@ -122,6 +158,7 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
         likesSinceStartedAt: toMillis(data.likesSinceStartedAt),
         likesBaseline: toCount(data.likesBaseline),
         likesBaselineAt: toMillis(data.likesBaselineAt),
+        likesBaselineSource: toBaselineSource(data.likesBaselineSource),
         comments: toCount(data.comments),
         tips: toCount(data.tips),
         measuredAt: toMillis(data.measuredAt),
@@ -177,45 +214,71 @@ export async function saveGlobalStats(
  * jednorazowego stanu poczatkowego (`likesBaseline`, liczonego serwerowo) i
  * licznika przyrostowego (`likesSince`, +1/-1 przy kazdym lajku).
  *
- * === CO ZWRACA `complete` ===
- * Czy suma obejmuje CALA historie. Bez stanu poczatkowego mamy tylko lajki od
- * wlaczenia licznika - to jest liczba prawdziwa, ale nie jest calkowita, wiec
- * interfejs ma przy niej napisac, od kiedy liczy. Podanie jej jako calosci
- * byloby dokladnie tym samym klamstwem co wpisane na sztywno 18 817.
+ * === DLACZEGO `basis`, A NIE `complete: boolean` ===
+ * Bylo tu jedno pole `complete`. Dwa stany nie wystarczaja, bo suma zlozona ze
+ * STAREJ migawki nie jest ani calkowita, ani "tylko od wlaczenia licznika" -
+ * jest DOLNA GRANICA: zna przeszlosc do dnia migawki i terazniejszosc od startu
+ * licznika, a nie zna okresu pomiedzy. Wcisniecie tego w `complete: true` (bo
+ * przeciez stan poczatkowy jest) opisaloby domysl jako pomiar, a w `false` -
+ * skasowaloby fakt, ze cwierc miliona starych lajkow JEST juz w tej liczbie.
+ * Kazdy z tych stanow ma inne zdanie do napisania na ekranie, wiec ma wlasna
+ * nazwe.
  *
  * `value: null` znaczy "nie wiemy" i ma sie pokazac jako kreska, nie jako zero.
  */
+export type LikesBasis =
+  /** Pelna suma na teraz. Nie ma czego dopowiadac. */
+  | 'exact'
+  /** Stara migawka + przyrost. Luka pomiedzy nie policzona, wiec to DOLNA GRANICA. */
+  | 'lowerBound'
+  /** Sam licznik przyrostowy. Liczba prawdziwa, ale nie zna niczego sprzed wlaczenia. */
+  | 'sinceOnly'
+  /** Nie wiadomo nic. */
+  | 'unknown';
+
 export type LikesTotal = {
   value: number | null;
-  complete: boolean;
-  /** Od kiedy liczy czesc przyrostowa. 0 = nie wiadomo. Ma sens przy `complete: false`. */
+  basis: LikesBasis;
+  /**
+   * Data, o ktora opiera sie zastrzezenie: przy `lowerBound` dzien migawki,
+   * przy `sinceOnly` start licznika. 0 = nie wiadomo.
+   */
   since: number;
 };
 
 export function likesTotal(stats: GlobalStats | null): LikesTotal {
-  if (!stats) return { value: null, complete: false, since: 0 };
+  if (!stats) return { value: null, basis: 'unknown', since: 0 };
 
   // Pelna suma z agregacji, gdyby limit kiedys wrocil - wtedy nie ma co skladac.
   if (stats.likes !== null && stats.likes !== undefined) {
-    return { value: stats.likes, complete: true, since: 0 };
+    return { value: stats.likes, basis: 'exact', since: 0 };
   }
 
   const since = stats.likesSince ?? 0;
 
   if (stats.likesBaseline !== null && stats.likesBaseline !== undefined) {
-    // Stan poczatkowy + przyrost od jego policzenia. Skrypt zerujacy
-    // `likesSince` przy zapisie stanu poczatkowego gwarantuje, ze te dwie
-    // czesci sie nie nakladaja.
-    return { value: stats.likesBaseline + since, complete: true, since: stats.likesBaselineAt ?? 0 };
+    // Skan liczy stan NA TERAZ i przy zapisie zeruje licznik przyrostowy, wiec
+    // obie czesci stykaja sie dokladnie - suma jest pomiarem.
+    //
+    // Migawka opisuje dzien sprzed miesiecy. Licznik przyrostowy ruszyl duzo
+    // pozniej, wiec lajki z okresu pomiedzy nie sa ani w jednej czesci, ani
+    // w drugiej. Suma jest wtedy mniejsza od prawdy - i tylko tyle wolno o niej
+    // powiedziec.
+    //
+    // Brak pola tez daje `lowerBound`: baseline nieznanego pochodzenia to
+    // baseline, o ktorym nie wiemy, czy styka sie z licznikiem. Domyslanie sie
+    // "pewnie skan" awansowaloby niewiedze do rangi pomiaru.
+    const basis: LikesBasis = stats.likesBaselineSource === 'scan' ? 'exact' : 'lowerBound';
+    return { value: stats.likesBaseline + since, basis, since: stats.likesBaselineAt ?? 0 };
   }
 
   // Zostal sam licznik przyrostowy. Zero jest tu prawdziwa odpowiedzia
   // ("od wlaczenia licznika nikt nie polajkowal"), o ile pole w ogole jest.
   if (stats.likesSince === null || stats.likesSince === undefined) {
-    return { value: null, complete: false, since: 0 };
+    return { value: null, basis: 'unknown', since: 0 };
   }
 
-  return { value: since, complete: false, since: stats.likesSinceStartedAt ?? 0 };
+  return { value: since, basis: 'sinceOnly', since: stats.likesSinceStartedAt ?? 0 };
 }
 
 /**
@@ -227,11 +290,69 @@ export function likesTotal(stats: GlobalStats | null): LikesTotal {
  */
 export function likesNote(total: LikesTotal): string | undefined {
   if (total.value === null) return undefined; // Kreska mowi juz wszystko.
-  if (total.complete) return undefined;
 
-  if (!total.since) return 'partial count';
-  const date = new Date(total.since).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return `since ${date}`;
+  switch (total.basis) {
+    case 'exact':
+    case 'unknown':
+      return undefined;
+
+    // Dwa slowa, bo tyle miesci sie pod liczba w kaflu o polowie szerokosci
+    // panelu - i bo tyle wystarczy. Czytelnik ma wyjsc z przekonaniem "prawdziwa
+    // liczba jest wyzsza", a nie "to jest wynik pomiaru". Data i powod luki ida
+    // do dymka; gdyby zmiescic je tutaj, zastrzezenie przewazyloby sama liczbe
+    // i zaczeloby brzmiec jak tlumaczenie sie.
+    case 'lowerBound':
+      return 'at least';
+
+    case 'sinceOnly':
+      if (!total.since) return 'partial count';
+      return `since ${shortDate(total.since)}`;
+  }
+}
+
+/**
+ * Pelne zdanie do dymka nad liczba. Puste, gdy liczba nie wymaga zastrzezenia.
+ *
+ * Istnieje, bo krotki podpis z `likesNote` musi sie zmiescic w kaflu, a powod,
+ * dla ktorego liczba jest niepelna, ROZNI SIE miedzy przypadkami. Wczesniej to
+ * zdanie bylo wpisane na sztywno w SoftTrendsPanel jako "earlier ones are not
+ * included yet" - prawda dla samego licznika przyrostowego, ale FALSZ dla sumy
+ * z migawka: tam wlasnie te wczesniejsze lajki sa policzone, a brakuje srodka.
+ * Panel nie ma skad tego wiedziec, wiec zdanie powstaje tam, gdzie sie to wie.
+ */
+export function likesDetail(total: LikesTotal): string | undefined {
+  if (total.value === null) return undefined;
+
+  switch (total.basis) {
+    case 'exact':
+    case 'unknown':
+      return undefined;
+
+    case 'lowerBound':
+      // Bez myslnika w srodku: panel sklada dymek jako `${liczba} — ${detail}`,
+      // wiec drugi myslnik rozbijalby zdanie na trzy czlony.
+      return total.since
+        ? `at least this many. A full count as of ${longDate(total.since)}, plus every like counted since the live counter started. Likes in between were never counted, so the real number is higher.`
+        : 'at least this many. The count joins an older total to a live counter, and the stretch between them was never counted.';
+
+    case 'sinceOnly':
+      return total.since
+        ? `counted live since ${shortDate(total.since)}. Likes from before that are not included yet.`
+        : 'a partial count. Likes from before the live counter started are not included yet.';
+  }
+}
+
+/** "Aug 6" - do zastrzezenia o swiezej dacie, gdzie rok jest oczywisty. */
+function shortDate(ms: number): string {
+  return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * "Aug 16, 2025" - z rokiem, bo migawka bywa sprzed kilkunastu miesiecy, a bez
+ * roku "Aug 16" wyglada na zeszly tydzien i zastrzezenie traci caly sens.
+ */
+function longDate(ms: number): string {
+  return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 /** Krotki, ludzki wiek pomiaru. */

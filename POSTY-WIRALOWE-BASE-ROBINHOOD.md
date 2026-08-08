@@ -115,9 +115,10 @@ zdanie, które nazywa różnicę między saldem a historią.
 > Every onchain social app counts likes.
 >
 > Ours counts what people paid each other. 187 settled payments, every line
-> with a hash you can open.
+> with a hash you can open. Out of 184,064 accounts, so: one in a thousand.
 >
-> That number is much smaller and much harder to fake.
+> That number is much smaller and much harder to fake. Both halves of that
+> sentence are the point.
 
 Wariant techniczny:
 
@@ -172,7 +173,9 @@ w kodzie albo na łańcuchu — używaj tych, nie zaokrąglaj.
 | USDG, Robinhood Chain | `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168`, 6 miejsc, EIP-3009 |
 | Płatność x402 | 0,01 USDG, `eip155:4663`, gaz po stronie facilitatora |
 | Łańcuchy | Base, Robinhood, Camp, Linea, Celo, Ethereum, World Chain |
-| Rozliczone płatności | 187, wszystkie z hashem, widoczne na `/leaderboard` |
+| Rozliczone płatności | 187, wszystkie z hashem, widoczne na `/leaderboard` — **napiwki**, nie zapłata za zamówioną pracę |
+| Konta w bazie | 184 064; napiwek wysłało 0,1% z nich |
+| Ruch przez escrow | **zero** zdarzeń od bloku wdrożenia, `balanceOf(USDC)` = 0 |
 
 Dwie rzeczy, których w tych postach celowo nie ma, bo publiczność je sprawdzi
 i zapyta:
@@ -180,8 +183,13 @@ i zapyta:
 - **x402 na Base w USDC** — gałąź jest napisana, nie przeszedł przez nią ani
   cent. Płatność poszła na Robinhoodzie.
 - **escrow z przeglądarki na mainnecie** — kontrakt działa i cykl przeszedł
-  prawdziwym USDC, ale ze skryptu. Dlatego wariant 2 mówi o **kontrakcie**,
-  a nie o tym, ilu ludzi przez niego przeszło.
+  prawdziwym USDC, ale ze skryptu i na Sepolii. Na mainnecie **nie ma na nim
+  ani jednego zdarzenia**. Dlatego wariant 2 mówi o **kontrakcie**, a nie
+  o tym, ilu ludzi przez niego przeszło. Odpowiedź na to pytanie brzmi „zero"
+  i tak trzeba jej udzielić, jeśli ktoś zapyta.
+- **187 jako dowód, że rynek ruszył.** Nie ruszył. To napiwki — lajk z ceną —
+  i 0,1% kont. Wariant 5 podaje liczbę z mianownikiem właśnie po to, żeby nie
+  dało się jej przeczytać jako trakcji.
 
 Weryfikacja przed publikacją:
 
