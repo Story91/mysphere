@@ -640,12 +640,12 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Ask: escrow',
     status: 'live',
-    note: 'AskEscrow on Base, 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source-verified, no owner. Approve, fund, wait for the receipt — only then does the Ask document get written. Resolving is one transaction, collecting is a claim. Whoever is thinking of answering reads the locked amount off the chain first. What it is holding right now is nothing: asked for every log it has emitted since its deployment block, the chain returns none, and its USDC balance is zero. This is a live contract nobody has walked through, and the row says live because the code path is finished, not because money has moved.',
+    note: 'AskEscrow on Base, 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source-verified, no owner. Approve, fund, wait for the receipt — only then does the Ask document get written. Resolving is one transaction, collecting is a claim. Whoever is thinking of answering reads the locked amount off the chain first, and that reading is now worth something: the contract has been funded from this app on mainnet and holds a real budget against a real deadline. It went for months holding nothing, and this row said so.',
   },
   {
     name: 'Ask: escrow from a browser, on mainnet',
-    status: 'wired',
-    note: 'The contract works and has moved real money in testing. From this app, on Base, nobody has locked a budget in it yet. Whoever goes first, goes first.',
+    status: 'live',
+    note: 'Somebody went first. A budget was approved and locked from this app, on Base mainnet, in two transactions from a browser wallet, and the contract now answers for that ask with a funded escrow, a per-answer amount and a deadline. Two things were learned in the process and both are fixed. A wallet warns you that the contract is untrusted, because it is new and has no history to judge it by, and it asks to spend the exact budget rather than an open-ended allowance. And the first attempt failed: the second transaction went out before the first had been mined.',
   },
   {
     name: 'Ask: expiry refund in the interface',
@@ -654,8 +654,8 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   },
   {
     name: 'Ask: a settled Ask that says it is settled',
-    status: 'planned',
-    note: 'The nearest missing thing on this rail. Sending an expired budget back is a contract call and nothing writes it down: no code path in this repo ever sets an Ask to expired, so the document stays open forever and the Ask keeps sitting in the list on /asks as though it were still waiting for answers. Resolving has a server route that records what happened. Expiry has none — the chain knows, the database does not.',
+    status: 'live',
+    note: 'Sending an expired budget back used to be a contract call nothing wrote down: the document stayed open forever and the Ask kept sitting on /asks as though it were still waiting for answers. The chain knew, the database did not. Now the refund and the record happen together, and the record carries the transaction that paid it, because a sentence about money returning is worth what its proof is worth. Two directions are closed off in the database itself: an expired Ask cannot be flipped back to open, and one that was escrowed cannot be marked expired without that transaction.',
   },
   {
     name: 'Being told you have been paid',
