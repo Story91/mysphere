@@ -679,8 +679,8 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   },
   {
     name: 'Ask: answering without leaving the feed',
-    status: 'planned',
-    note: 'The nearest missing thing on this rail. The card in the feed carries the question, the budget, the seats and the countdown, but its button leaves for /asks — writing an answer, opening the sealed ones and resolving all happen there. You can see an Ask where you already are; you still cannot take a seat where you already are.',
+    status: 'live',
+    note: 'The button on a feed card opens the answer box in place. You read the question, the amount and the clock, and you write without going anywhere. What stays on /asks is the author side of it: opening the sealed answers and resolving with a payment, which needs a wallet and a signature and sometimes two transactions. The feed does not fetch the thread behind each card, so it does not know whether you have already answered - the server does, and it says so when you send. Past the deadline or with every seat taken the button goes back to being a link, because a form that cannot be submitted is worse than no form.',
   },
 ];
 
