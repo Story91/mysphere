@@ -3,6 +3,7 @@
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import AskCard from './AskCard';
+import FeedAnswerForm from './FeedAnswerForm';
 import { getOpenAsks, getResolvedAsks } from '../../utils/asks/asks';
 import { isExpired, type Ask } from '../../utils/asks/types';
 
@@ -384,6 +385,32 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
     setPicked(true);
   }, []);
 
+  /** Ktory Ask ma otwarty formularz odpowiedzi. Najwyzej jeden naraz. */
+  const [answering, setAnswering] = useState<string | null>(null);
+
+  /**
+   * Po wyslanej odpowiedzi podbijamy licznik NA MIEJSCU, zamiast pobierac
+   * liste jeszcze raz.
+   *
+   * Ponowny odczyt kosztowalby zapytanie zaraz po tym, jak juz wiemy, co sie
+   * zmienilo - a przy nieudanym odczycie zamienilby potwierdzenie sukcesu
+   * w komunikat awarii. To ta sama zasada, ktora rzadzi uniewaznianiem cache'u
+   * po zalozeniu Aska: swiezosc bierzemy przy najblizszym wejsciu, nie zaraz
+   * po udanej akcji.
+   *
+   * Cache w localStorage zostaje nietkniety celowo: niesie stan sprzed
+   * odpowiedzi, a rozjazd o jeden w liczniku jest tansza pomylka niz zapisanie
+   * do kieszeni czegos, czego serwer jeszcze nie potwierdzil.
+   */
+  const bumpAnswerCount = useCallback((askId: string) => {
+    setOpenList((previous) => ({
+      ...previous,
+      asks: previous.asks.map((item) =>
+        item.id === askId ? { ...item, answerCount: item.answerCount + 1 } : item
+      ),
+    }));
+  }, []);
+
   const resolvedShown =
     resolvedList.phase === 'ready' ? resolvedList.asks.slice(0, SHOW_LIMIT) : [];
 
@@ -406,7 +433,19 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
    * Aski nie zepchnely postow o kilka ekranow w dol. `snap` daje na telefonie
    * zatrzymanie na karcie, a nie w polowie dwoch.
    */
-  const renderCards = (list: Ask[]) => {
+  const renderCards = (fullList: Ask[]) => {
+    /**
+     * ===== PISANIE ODPOWIEDZI ZWIJA PAS DO JEDNEJ KARTY =====
+     * Karty stoja w poziomej karuzeli po 290px. Formularz w takiej kolumnie
+     * znaczylby pisanie w waskim pasku, ktory jeszcze przewija sie na boki pod
+     * palcem - na telefonie nie do uzycia.
+     *
+     * Gdy ktos zaczyna odpowiadac, pas pokazuje WYLACZNIE tego Aska, na pelnej
+     * szerokosci. Reszta wraca po zamknieciu formularza; nic nie jest tracone,
+     * a uwaga i tak jest wtedy przy jednym pytaniu.
+     */
+    const focused = answering ? fullList.find((item) => item.id === answering) : undefined;
+    const list = focused ? [focused] : fullList;
     const single = list.length === 1;
     return (
       <div
@@ -416,19 +455,58 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
             : '-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]'
         }
       >
-        {list.map((ask) => (
-          <AskCard
-            key={ask.id}
-            ask={ask}
-            // Bez `resolveRate` karta nie rysuje odznaki - "nie sprawdzilismy",
-            // nie wyzerowany wskaznik. Powod przy naglowku (DECYZJA 4).
-            isAuthor={viewerAddress !== null && ask.author.toLowerCase() === viewerAddress}
-            // Przycisk prowadzi na /asks, bo TAM stoi panel odpowiedzi,
-            // przyjmowania i rozstrzygania. Feed nie dubluje tamtej mechaniki.
-            href="/asks"
-            className={single ? 'w-full' : 'w-[290px] shrink-0 snap-start sm:w-[330px]'}
-          />
-        ))}
+        {list.map((ask) => {
+          const isAuthor = viewerAddress !== null && ask.author.toLowerCase() === viewerAddress;
+          /**
+           * Czy da sie jeszcze zajac miejsce. Liczone z BIEZACEGO czasu, bo
+           * karta moze wisiec na ekranie dluzej niz do terminu.
+           */
+          const answerable =
+            !isAuthor &&
+            ask.status === 'open' &&
+            ask.deadline > Date.now() &&
+            ask.acceptedCount < ask.seats;
+
+          return (
+            <div
+              key={ask.id}
+              className={single ? 'w-full' : 'w-[290px] shrink-0 snap-start sm:w-[330px]'}
+            >
+              <AskCard
+                ask={ask}
+                // Bez `resolveRate` karta nie rysuje odznaki - "nie sprawdzilismy",
+                // nie wyzerowany wskaznik. Powod przy naglowku (DECYZJA 4).
+                isAuthor={isAuthor}
+                /**
+                 * ===== ODPOWIADAJACY ZOSTAJE, AUTOR WYCHODZI =====
+                 * Dla odpowiadajacego przycisk otwiera formularz TUTAJ: cala
+                 * wartosc Aska jest ograniczona terminem, a kazde przekierowanie
+                 * to miejsce, w ktorym czesc ludzi odpada.
+                 *
+                 * Autor dalej idzie na /asks i tak ma zostac. Jego robota to
+                 * otwieranie zapieczetowanych odpowiedzi i rozstrzyganie
+                 * z platnoscia - portfel, podpis, czasem dwie transakcje. To
+                 * jest praca na wlasnym ekranie, nie w pasku nad postami.
+                 *
+                 * Po terminie albo przy komplecie miejsc nie ma czego otwierac,
+                 * wiec karta wraca do zwyklego odnosnika - martwy formularz
+                 * byl by gorszy niz jego brak.
+                 */
+                {...(answerable
+                  ? { onAnswer: () => setAnswering(ask.id) }
+                  : { href: '/asks' })}
+                className="w-full"
+              />
+              {answering === ask.id && (
+                <FeedAnswerForm
+                  ask={ask}
+                  onSent={bumpAnswerCount}
+                  onClose={() => setAnswering(null)}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   };
