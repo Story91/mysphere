@@ -11,7 +11,7 @@ import AskClaimPanel from '../basechat/components/AskClaimPanel';
 import AskComposer, { type AskDraft } from '../basechat/components/AskComposer';
 import { usePaymentFlow } from '../components/monetization/usePaymentFlow';
 import useSiweAuth from '../utils/auth/useSiweAuth';
-import { createAsk, getOpenAsks, getResolveRate, newAskId } from '../utils/asks/asks';
+import { createAsk, getOpenAsks, getResolvedAsks, getResolveRate, newAskId } from '../utils/asks/asks';
 import { perAnswerFor, type Ask, type ResolveRate } from '../utils/asks/types';
 import {
   RESOLVE_GRACE_MS,
@@ -86,6 +86,15 @@ import { MAX_ANSWER_LENGTH } from '../api/asks/pricing';
 const MAX_ASKS = 20;
 const MAX_RATE_LOOKUPS = 12;
 
+/**
+ * Ile rozstrzygnietych Askow pokazujemy.
+ *
+ * Mniej niz otwartych i to jest celowe: otwarte sa zaproszeniem do dzialania,
+ * historia jest dowodem, ze cos sie tu naprawde dzieje. Dziesiec wystarczy,
+ * zeby to udowodnic, a nie spycha zaproszenia pod zwij.
+ */
+const MAX_RESOLVED = 10;
+
 /** Jedyna siec, w ktorej dzialaja wyplaty (usePaymentFlow placi na Base). */
 const EXPLORER_TX = 'https://basescan.org/tx/';
 
@@ -153,6 +162,15 @@ export default function AsksPage() {
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [asks, setAsks] = useState<Ask[]>([]);
+  /**
+   * Rozstrzygniete Aski - osobna lista i osobny stan awarii.
+   *
+   * Nieudany odczyt historii NIE MOZE zabrac listy otwartych: to dwa
+   * niezalezne zapytania i awaria jednego nie jest awaria drugiego.
+   * `null` znaczy "jeszcze nie wiemy", pusta tablica "nie ma zadnych".
+   */
+  const [resolved, setResolved] = useState<Ask[] | null>(null);
+  const [resolvedFailed, setResolvedFailed] = useState(false);
   const [rates, setRates] = useState<Record<string, ResolveRate>>({});
   const [attempt, setAttempt] = useState(0);
 
@@ -189,6 +207,21 @@ export default function AsksPage() {
 
       setAsks(result.asks);
       setPhase('ready');
+
+      // Historia leci OSOBNO i PO otwartych: otwarte sa powodem, dla ktorego
+      // ktos tu wchodzi, wiec nie moga czekac na drugie zapytanie.
+      getResolvedAsks(MAX_RESOLVED)
+        .then((historia) => {
+          if (cancelled) return;
+          if (historia.failed) {
+            setResolvedFailed(true);
+            return;
+          }
+          setResolved(historia.asks);
+        })
+        .catch(() => {
+          if (!cancelled) setResolvedFailed(true);
+        });
 
       const authors = Array.from(
         new Set(result.asks.map((ask) => ask.author).filter(Boolean))
@@ -596,6 +629,39 @@ export default function AsksPage() {
 
         {phase === 'ready' && listed.length > 0 && (
           <div className="flex flex-col gap-4">{listed.map(renderAsk)}</div>
+        )}
+
+        {/* ===== HISTORIA =====
+            Rozstrzygniety Ask znikal z produktu calkowicie - nie widzial go
+            ani autor, ani ludzie, ktorzy na niego odpowiedzieli i chcieli
+            zobaczyc swoja wyplate. Na produkcie, ktorego teza brzmi
+            "rozliczone platnosci sa zapisem", chowanie kazdej rozliczonej
+            sprawy bylo odwrotnoscia tezy.
+
+            Stoi POD otwartymi, bo otwarte sa powodem wejscia. Historia jest
+            dowodem, ze to nie jest pusty rynek - i dziala tylko wtedy, gdy
+            nie zaslania zaproszenia. */}
+        {phase === 'ready' && resolved !== null && resolved.length > 0 && (
+          <div className="mt-10">
+            <h2 className="mb-1.5 font-soft-display text-[15px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
+              Settled
+            </h2>
+            <p className="mb-4 text-[13.5px] leading-[1.6] text-soft-ink-soft">
+              Closed and paid. Every answer is unsealed, and the accepted ones carry the
+              transaction that paid for them.
+            </p>
+            <div className="flex flex-col gap-4">{resolved.map(renderAsk)}</div>
+          </div>
+        )}
+
+        {/* Awaria historii NIE zabiera listy otwartych - to osobne zapytanie
+            i osobna wiadomosc. Milczenie tutaj znaczyloby "nic sie nigdy nie
+            rozliczylo", czyli nieprawde o produkcie. */}
+        {phase === 'ready' && resolvedFailed && (
+          <p className="mt-10 text-[13px] leading-[1.6] text-soft-ink-soft">
+            Settled asks could not be loaded. This is a failed read, not an empty history — the
+            open ones above are unaffected.
+          </p>
         )}
       </div>
       {/* Wyjscie z tej strony na telefonie. Dolny pasek feedu jest jego

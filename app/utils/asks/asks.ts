@@ -218,6 +218,46 @@ export async function getOpenAsks(max = 20): Promise<AsksResult> {
 }
 
 /**
+ * Rozstrzygniete Aski, najswiezsze pierwsze.
+ *
+ * === DLACZEGO TO MUSI ISTNIEC ===
+ * Strona /asks pokazywala WYLACZNIE otwarte. Rozstrzygniety Ask znikal
+ * z produktu calkowicie: nie widzial go autor, nie widzieli go ludzie, ktorzy
+ * na niego odpowiedzieli i chcieli zobaczyc swoja wyplate, i nie widzial go
+ * nikt, kto chcial sprawdzic, jak ten autor rozlicza.
+ *
+ * Na produkcie, ktorego teza brzmi "rozliczone platnosci sa zapisem", chowanie
+ * kazdej rozliczonej sprawy jest odwrotnoscia tezy. Rozstrzygniecie to moment,
+ * w ktorym Ask staje sie NAJBARDZIEJ warty pokazania - odpowiedzi sa
+ * odpieczetowane, a przy przyjetych stoja hashe wyplat.
+ *
+ * Wyszlo to dopiero, gdy domknelismy dwa Aski i lista zrobila sie pusta.
+ *
+ * === DLACZEGO OSOBNE ZAPYTANIE, A NIE `in` ===
+ * `where('status','in',['open','resolved'])` zwrocilby jedna liste posortowana
+ * po czasie UTWORZENIA, w ktorej rozstrzygniete mieszalyby sie z otwartymi.
+ * A to sa dwie rozne rzeczy dla czytelnika: w otwarte da sie jeszcze wejsc,
+ * rozstrzygniete sa do obejrzenia. Dwie listy, dwa naglowki, ten sam indeks
+ * (status + createdAt), ktory juz jest wdrozony.
+ */
+export async function getResolvedAsks(max = 10): Promise<AsksResult> {
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, ASKS),
+        where('status', '==', 'resolved'),
+        orderBy('createdAt', 'desc'),
+        fsLimit(max)
+      )
+    );
+    return { asks: snapshot.docs.map((d) => toAsk(d.id, d.data())), failed: false };
+  } catch (error) {
+    console.error('[asks] Lista rozstrzygnietych Askow nie powiodla sie:', error);
+    return { asks: [], failed: true };
+  }
+}
+
+/**
  * Odpowiedzi BEZ TRESCI - metadane, ktore wolno pokazac kazdemu.
  *
  * Liczba odpowiedzi jest jawna celowo: karta ma pokazywac "7 answers sealed
