@@ -57,6 +57,11 @@ export type AskTemplate = {
    * Tresc wstawiana do pola. Nawiasy ostre sa CELOWE: zaczatek ma zostac
    * dokonczony, a nie wyslany jak stoi. Pytanie bez konkretu ("przeanalizuj
    * jakis vault") nie da sie rozstrzygnac, wiec i tak spalilo by budzet.
+   *
+   * TRZY Z NICH DOKONCZA SIE SAME, gdy ktos wybierze skarbiec z listy
+   * w kompozytorze: `<vault address>`, `<market or vault>` i `<APY>`. Robi to
+   * `attachVaultContext` w ./vaultContext.ts - i gdy zmieniasz tu ten napis,
+   * zmien go rowniez tam, bo dopasowanie jest doslowne.
    */
   question: string;
   budget: number;

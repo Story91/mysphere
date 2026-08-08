@@ -9,6 +9,9 @@ import {
   type AskFunding,
 } from '../../utils/asks/types';
 import { ASK_TEMPLATES_SAFE, type AskTemplate } from '../../utils/asks/templates';
+import { attachVaultContext } from '../../utils/asks/vaultContext';
+import type { VaultFacts, VaultListResult } from '../../utils/morpho/types';
+import AskVaultPicker from './AskVaultPicker';
 import { formatAskMoney } from './AskCard';
 
 /**
@@ -37,6 +40,14 @@ import { formatAskMoney } from './AskCard';
  * Escrow jest domyslny tam, gdzie kontrakt istnieje: to on jest obietnica
  * z manifestu ("fund it once in USDC"), a odpowiadajacy pracuje przed zaplata,
  * wiec domysl ma chronic jego, nie autora.
+ *
+ * === SKARBIEC WYBIERANY Z LISTY, A NIE PRZEPISYWANY Z PALCA ===
+ * Zaczatki pytaja o skarbiec i do dzis kazdy wklejal adres recznie - adres
+ * z literowka wyglada jak adres i daje Aska o czyms, czego nie ma. Gdy wolajacy
+ * poda `loadVaults`, formularz pokazuje WYBOR Z LISTY notowanych skarbcow razem
+ * z rozbitym oprocentowaniem, a wybrana migawka dokleja sie do tresci pytania
+ * (patrz `attachVaultContext`). Bez tego propsa formularz wyglada dokladnie tak,
+ * jak dotad - i tak samo dziala, gdy odczyt Morpho padnie.
  *
  * === GRANICA ===
  * Komponent nie zna ani API, ani portfela, ani kontraktu. Oddaje gotowy
@@ -73,6 +84,12 @@ export type AskComposerProps = {
    * jak proba pobrania pieniedzy drugi raz.
    */
   progressNote?: string | null;
+  /**
+   * Skad brac notowane skarbce. BRAK TEGO PROPSA = bloku wyboru nie ma wcale -
+   * kompozytor stoi w dwoch miejscach naraz i zadne z nich nie ma placic za
+   * odczyt Morpho, dopoki ktos swiadomie go tam nie wlaczy.
+   */
+  loadVaults?: () => Promise<VaultListResult>;
   onCancel?: () => void;
   className?: string;
 };
@@ -104,6 +121,7 @@ export default function AskComposer({
   escrowUnavailableReason,
   escrowFeeBps = null,
   progressNote = null,
+  loadVaults,
   onCancel,
   className = '',
 }: AskComposerProps) {
@@ -113,6 +131,12 @@ export default function AskComposer({
   const [durationMs, setDurationMs] = useState<number>(DEFAULT_DURATION);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  /**
+   * Wybrany skarbiec RAZEM Z LICZBAMI, a nie sam adres. Migawka dokleja sie do
+   * tresci dopiero przy wysylce, wiec do tego czasu nie rusza tego, co czlowiek
+   * napisal. `null` = Ask nie jest o zadnym skarbcu i to jest normalny stan.
+   */
+  const [vault, setVault] = useState<VaultFacts | null>(null);
   /**
    * Wybor finansowania. Escrow tam, gdzie w ogole istnieje - patrz naglowek.
    *
@@ -187,7 +211,13 @@ export default function AskComposer({
     setFailure(null);
     try {
       await onSubmit({
-        question: question.trim(),
+        /**
+         * Migawka skarbca wchodzi W TRESC, a nie w osobne pole: pytanie dojezdza
+         * wszedzie (karta, odpowiedz, kwit), a nowe pole widzialoby tylko te
+         * miejsca, ktore ktos pamietal podpiac. Bez wybranego skarbca to jest
+         * dokladnie `question.trim()` i nic wiecej.
+         */
+        question: attachVaultContext(question.trim(), vault),
         budget,
         seats,
         durationMs,
@@ -197,6 +227,7 @@ export default function AskComposer({
       setBudgetText('');
       setSeatsText('1');
       setDurationMs(DEFAULT_DURATION);
+      setVault(null);
     } catch (error) {
       setFailure(
         error instanceof Error && error.message
@@ -274,6 +305,20 @@ export default function AskComposer({
             ))}
           </div>
         </div>
+      )}
+
+      {/* ===== SKARBIEC Z LISTY =====
+          Stoi POD pytaniem, bo dotyczy tego, o co pytamy, a nie tego, ile za to
+          placimy. Cala mechanika (odczyt, awaria, ponowna proba) siedzi w
+          `AskVaultPicker` - tutaj zostaje sam wybor. Bez `loadVaults` tego bloku
+          nie ma i formularz jest co do piksela taki jak przed ta zmiana. */}
+      {loadVaults && (
+        <AskVaultPicker
+          loadVaults={loadVaults}
+          selected={vault}
+          onSelect={setVault}
+          disabled={disabled || pending}
+        />
       )}
 
       <div className="mt-3 grid grid-cols-2 gap-3">

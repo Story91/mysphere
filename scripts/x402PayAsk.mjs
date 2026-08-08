@@ -49,11 +49,45 @@ const RPC_PER_CHAIN = {
   84532: process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
 };
 
+/**
+ * Tresc Aska z linii polecen, a nie wpisana na sztywno.
+ *
+ * Bylo tu jedno zdanie o USDG na Robinhoodzie - pytanie testowe, ktore mialo
+ * sens dokladnie raz. Kazdy nastepny przebieg zakladal PUBLICZNEGO Aska z tym
+ * samym, juz nieaktualnym pytaniem; tak powstala czesc smieci, ktore trzeba
+ * bylo potem sprzatac. Parametry ratuja przed edytowaniem skryptu przy kazdym
+ * uzyciu - a edytowanie skryptu, ktory wydaje pieniadze, jest samo w sobie
+ * dobra okazja do pomylki.
+ */
+function arg(name, fallback) {
+  const prefix = `--${name}=`;
+  const found = process.argv.find((item) => item.startsWith(prefix));
+  return found === undefined ? fallback : found.slice(prefix.length);
+}
+
+const budgetArg = Number(arg('budget', '1'));
+const seatsArg = Number(arg('seats', '1'));
+const hoursArg = Number(arg('hours', '24'));
+
+// Stawka za odpowiedz jest wazniejsza niz budzet i to ona bywa zaskoczeniem:
+// serwer odrzuca Aski, w ktorych na odpowiedz wypada mniej niz 0.50. Lepiej
+// zatrzymac sie tutaj niz na 400 po podpisaniu platnosci za wystawienie.
+if (!Number.isFinite(budgetArg) || !Number.isFinite(seatsArg) || seatsArg < 1) {
+  throw new Error('Bledny --budget lub --seats');
+}
+if (budgetArg / seatsArg < 0.5) {
+  throw new Error(
+    `Na odpowiedz wypada ${(budgetArg / seatsArg).toFixed(2)} - minimum to 0.50`
+  );
+}
+
+const question = arg('question', 'Does the USDG payment path on Robinhood Chain actually settle?');
+
 const body = JSON.stringify({
-  question: 'Does the USDG payment path on Robinhood Chain actually settle?',
-  budget: 1,
-  seats: 1,
-  durationMs: 86400000,
+  question,
+  budget: budgetArg,
+  seats: seatsArg,
+  durationMs: Math.round(hoursArg * 60 * 60 * 1000),
 });
 
 // ===========================================================================

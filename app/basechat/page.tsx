@@ -65,6 +65,7 @@ import FeedAskRail, { ASKS_RAIL_CACHE_KEY } from './components/FeedAskRail';
 import AskComposer, { type AskDraft } from './components/AskComposer';
 import AskCard from './components/AskCard';
 import { useCreateAsk } from '../utils/asks/useCreateAsk';
+import { loadListedVaults } from '../utils/asks/listedVaults';
 import type { Ask } from '../utils/asks/types';
 import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
@@ -4276,6 +4277,11 @@ function BaseChatContent() {
                           escrowUnavailableReason={askFlow.escrowUnavailableReason}
                           escrowFeeBps={askFlow.feeBps}
                           progressNote={askFlow.progressNote}
+                          // Ten sam wybor skarbca co na /asks i z tego samego
+                          // powodu: adres przepisany recznie wiaze Aska z niczym.
+                          // Odczyt idzie dopiero po wybraniu trybu "Ask", bo
+                          // kompozytor montuje sie dopiero wtedy.
+                          loadVaults={loadListedVaults}
                           // Bez `onCancel`: wyjsciem z tego formularza jest
                           // pigulka "Post" tuz nad nim. Drugi przycisk robiacy
                           // to samo kazalby zgadywac, ktory z nich czysci szkic.

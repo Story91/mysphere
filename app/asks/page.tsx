@@ -13,6 +13,7 @@ import { usePaymentFlow } from '../components/monetization/usePaymentFlow';
 import useSiweAuth from '../utils/auth/useSiweAuth';
 import { createAsk, getOpenAsks, getResolvedAsks, getResolveRate, newAskId } from '../utils/asks/asks';
 import { perAnswerFor, type Ask, type ResolveRate } from '../utils/asks/types';
+import { loadListedVaults } from '../utils/asks/listedVaults';
 import {
   RESOLVE_GRACE_MS,
   describeEscrowError,
@@ -557,6 +558,11 @@ export default function AsksPage() {
               }
               escrowFeeBps={feeBps}
               progressNote={fundNote}
+              // Skarbiec wybierany Z LISTY, nie wklejany z palca - adres
+              // z literowka daje Aska o czyms, czego nie ma. Odczyt idzie przez
+              // wlasna trase (wspolny cache), a jego awaria nie blokuje
+              // zakladania: kompozytor pokazuje wtedy sam komunikat.
+              loadVaults={loadListedVaults}
             />
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-soft-line bg-soft-surface p-4 shadow-card sm:p-5">
@@ -1570,18 +1576,64 @@ function EscrowFacts({ ask }: { ask: Ask }) {
     };
   }, []);
 
+  /**
+   * ===== "NIE ZNALAZLEM" NIE JEST TYM SAMYM CO "NIE MA" =====
+   *
+   * Pierwszy prawdziwy Ask z escrow na mainnecie pokazal to zdanie:
+   * "This Ask says it is escrowed, but the contract holds nothing under it".
+   * Bylo NIEPRAWDZIWE - kontrakt trzymal pod tym kluczem pelne 5 USDC
+   * (funded=true, budget=5.0, seatsLeft=1). Odpowiadajacy czytali wiec
+   * "nie trac czasu" nad Askiem, ktory byl oplacony co do centa.
+   *
+   * Powod: publiczne RPC Base jest ZA LOAD BALANCEREM i nie kazdy wezel ma juz
+   * najswiezszy blok. Wezel, ktory nie widzi bloku z `fund()`, oddaje na
+   * `escrowFor` czyste zera - a zera znacza tu "nie ma zadnego escrow".
+   * Zaraz po zalozeniu Aska trafienie w taki wezel jest NAJBARDZIEJ
+   * prawdopodobne, bo blok ma kilka sekund. Ten sam blad mielismy juz raz przy
+   * skrypcie cyklu escrow i naprawilismy go tam ponowieniami.
+   *
+   * Dlatego ponawiamy, ale TYLKO w jedna strone. `funded === true` jest
+   * odpowiedzia pewna - zadne opoznienie nie wymysli depozytu, ktorego nie ma,
+   * wiec bierzemy ja od razu. `funded === false` moze byc albo prawda, albo
+   * spoznionym wezlem, i dopiero po kilku probach wolno je oglosic.
+   *
+   * Asymetria jest celowa, bo koszty pomylki sa skrajnie rozne: falszywe
+   * "oplacony" naraza kogos na darmowa prace, falszywe "nieoplacony" odstrasza
+   * od Aska, ktory ma pieniadze. Pierwsze jest niemozliwe (wezel nie zmysli
+   * depozytu), drugie wlasnie sie zdarzylo.
+   */
   const load = useCallback(async () => {
     if (!publicClient) return;
     setPhase('loading');
-    try {
-      const result = await readEscrow(publicClient, ESCROW_CHAIN_ID, ask.author, ask.id);
+
+    // Trzy proby, 1.2s i 2.4s przerwy - lacznie ~3.6s. Tyle wystarcza, zeby
+    // wezel dociagnal blok sprzed kilku sekund, i na tyle malo, zeby panel nie
+    // wygladal na zawieszony.
+    const OPOZNIENIA = [1200, 2400];
+
+    for (let proba = 0; ; proba += 1) {
+      try {
+        const result = await readEscrow(publicClient, ESCROW_CHAIN_ID, ask.author, ask.id);
+        if (!mountedRef.current) return;
+
+        if (result.funded || proba >= OPOZNIENIA.length) {
+          setState(result);
+          setPhase('ready');
+          return;
+        }
+      } catch (error) {
+        console.error('[asks] Odczyt escrow nie powiodl sie:', error);
+        if (!mountedRef.current) return;
+        // Ostatnia proba padla - dopiero teraz mowimy, ze nie wiemy. Wczesniejsze
+        // padniecie idzie na kolejna probe, bo pojedynczy wezel bywa chwilowo zly.
+        if (proba >= OPOZNIENIA.length) {
+          setPhase('failed');
+          return;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, OPOZNIENIA[proba]));
       if (!mountedRef.current) return;
-      setState(result);
-      setPhase('ready');
-    } catch (error) {
-      console.error('[asks] Odczyt escrow nie powiodl sie:', error);
-      if (!mountedRef.current) return;
-      setPhase('failed');
     }
   }, [publicClient, ask.author, ask.id]);
 
@@ -1621,11 +1673,19 @@ function EscrowFacts({ ask }: { ask: Ask }) {
   // To najgrozniejszy z tych stanow i dostaje najmocniejsze zdanie.
   if (!state.funded) {
     return (
-      <div className={`${box} border-soft-accent/40 bg-soft-accent-soft`}>
-        <p className="break-words text-[12px] leading-[1.5] text-soft-accent-deep">
-          This Ask says it is escrowed, but the contract holds nothing under it. Treat it as
-          unfunded: do not spend time on an answer expecting a locked payout.
+      <div className={`${box} border-soft-line bg-soft-sunken`}>
+        <p className="mb-2 break-words text-[12px] leading-[1.5] text-soft-ink-muted">
+          This Ask says it is escrowed, but we cannot see anything locked under it. If it was just
+          posted, the network may not have caught up yet — check again in a moment. If this stays,
+          treat it as unfunded and do not expect a locked payout.
         </p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className={`${buttonClass} bg-soft-primary text-white`}
+        >
+          Check again
+        </button>
       </div>
     );
   }
