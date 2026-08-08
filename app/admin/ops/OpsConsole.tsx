@@ -49,6 +49,28 @@ const HEALTH_STYLE: Record<Health, { label: string; chip: string }> = {
   alarm: { label: 'Alarm', chip: 'bg-[#F7D9DF] text-[#8F1F36]' },
 };
 
+/**
+ * Przyciski konsoli.
+ *
+ * === CO STAD ZNIKNELO I DLACZEGO ===
+ * Kazdy z nich mial `hover:scale-[1.03]`, czyli POWIEKSZANIE na najechaniu.
+ * Dwa powody, kazdy sam wystarczy. Po pierwsze, w calym tym produkcie przyciski
+ * reaguja na NACISNIECIE (`active:scale-[0.97]`) i nigdy na najechanie - konsola
+ * byla jedynym ekranem mowiacym innym jezykiem. Po drugie, ekran dotykowy nie ma
+ * najechania: pierwsze dotkniecie odpala tam `:hover`, wiec przycisk najpierw
+ * puchl, a potem sie kurczyl, co przy przycisku odswiezajacym raport wyglada jak
+ * usterka. Zostaje reakcja na nacisniecie i zmiana tla.
+ *
+ * Doszly za to obwodki ogniskowej. Konsola byla jedyna z czterech przejrzanych
+ * stron, po ktorej nie dalo sie chodzic klawiatura z widocznym zaznaczeniem.
+ */
+const BUTTON_BASE =
+  'rounded-pill px-5 py-2.5 font-soft-display text-[13px] font-bold transition-[background-color,transform] ease-out-strong [transition-duration:var(--dur-press)] active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface';
+
+const BUTTON_PRIMARY = `${BUTTON_BASE} bg-soft-primary text-white shadow-chip hover:bg-soft-primary-deep`;
+
+const BUTTON_QUIET = `${BUTTON_BASE} border border-soft-line bg-soft-surface text-soft-primary hover:bg-soft-sunken`;
+
 function Chip({ health, children }: { health: Health; children?: React.ReactNode }) {
   const style = HEALTH_STYLE[health];
   return (
@@ -63,7 +85,7 @@ function Chip({ health, children }: { health: Health; children?: React.ReactNode
 /** Zdanie o niepowodzeniu odczytu. Zawsze widoczne, nigdy zwiniete w ikonke. */
 function ReadFailure({ reason }: { reason: string | null }) {
   return (
-    <p className="mt-2 rounded-2xl bg-soft-sunken px-3 py-2 text-xs leading-relaxed text-soft-ink-muted">
+    <p className="mt-2 rounded-2xl bg-soft-sunken px-3 py-2 text-[12px] leading-relaxed text-soft-ink-muted">
       <span className="font-bold text-soft-ink">Could not read this. </span>
       {reason ?? 'No reason came back from the call.'}
     </p>
@@ -90,13 +112,18 @@ function shortAddr(address: string) {
 
 function AddressLink({ address, url }: { address: string; url: string | null }) {
   const label = shortAddr(address);
-  if (!url) return <span className="font-mono text-xs text-soft-ink-soft">{label}</span>;
+  if (!url) return <span className="font-mono text-[11.5px] text-soft-ink-soft">{label}</span>;
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="font-mono text-xs text-soft-ink-soft underline decoration-soft-line underline-offset-2 transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:scale-[1.03] hover:text-soft-primary"
+      /* Bylo `transition-transform` z `hover:scale-[1.03]` i zmiana koloru bez
+         przejscia - czyli animowana byla wlasnie ta wlasciwosc, ktora sie nie
+         zmienia, a ta, ktora sie zmienia, skakala. Do tego powiekszanie na hover
+         na ekranie dotykowym odpala sie przy dotknieciu: adres puchnie pod
+         palcem, ktory chcial go otworzyc. Zostaje sam kolor. */
+      className="font-mono text-[11.5px] text-soft-ink-soft underline decoration-soft-line underline-offset-2 transition-colors ease-out-strong [transition-duration:var(--dur-press)] hover:text-soft-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
     >
       {label}
     </a>
@@ -115,7 +142,9 @@ function Section({
   return (
     <section className="mt-10">
       <h2 className="font-soft-display text-xl font-bold text-soft-ink">{title}</h2>
-      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-soft-ink-muted">{lead}</p>
+      {/* `max-w-[62ch]` zamiast `max-w-2xl` - miara wiersza liczona w znakach,
+          jak na pozostalych stronach, a nie w pikselach kontenera. */}
+      <p className="mt-1 max-w-[62ch] text-[13px] leading-relaxed text-soft-ink-muted">{lead}</p>
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -131,14 +160,14 @@ function GasCard({ row }: { row: GasRow }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-soft-display text-base font-bold text-soft-ink">{row.label}</h3>
-          <p className="mt-0.5 text-xs text-soft-ink-soft">
+          <p className="mt-0.5 text-[11.5px] text-soft-ink-soft">
             {row.chainName} · <AddressLink address={row.address} url={row.explorerUrl} />
           </p>
         </div>
         <Chip health={row.health} />
       </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-soft-ink-muted">{row.consequence}</p>
+      <p className="mt-3 text-[12px] leading-relaxed text-soft-ink-muted">{row.consequence}</p>
 
       <div className="mt-4 flex items-baseline gap-2">
         {row.balanceText === null ? (
@@ -155,10 +184,10 @@ function GasCard({ row }: { row: GasRow }) {
       {row.monitored ? (
         row.actionsLeft !== null ? (
           <div className="mt-3 rounded-2xl bg-soft-sunken px-4 py-3">
-            <p className="font-soft-display text-sm font-bold text-soft-ink">
+            <p className="font-soft-display text-[13px] font-bold text-soft-ink">
               About {row.actionsLeft.toLocaleString('en-US')} more {row.actionNoun}
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-soft-ink-muted">
+            <p className="mt-1 text-[12px] leading-relaxed text-soft-ink-muted">
               At {row.gasPriceText}, one costs {row.costPerActionText}. Alarm below{' '}
               {row.alarmBelowActions}, watch below {row.warnBelowActions}.
             </p>
@@ -167,7 +196,7 @@ function GasCard({ row }: { row: GasRow }) {
           <ReadFailure reason={row.error} />
         )
       ) : (
-        <p className="mt-3 text-xs leading-relaxed text-soft-ink-soft">
+        <p className="mt-3 text-[12px] leading-relaxed text-soft-ink-soft">
           No threshold on this one: it receives and never pays gas, so there is nothing here to run out.
         </p>
       )}
@@ -190,7 +219,7 @@ function EscrowCard({ row }: { row: EscrowRow }) {
           <h3 className="font-soft-display text-base font-bold text-soft-ink">
             AskEscrow · {row.chainName}
           </h3>
-          <p className="mt-0.5 text-xs text-soft-ink-soft">
+          <p className="mt-0.5 text-[11.5px] text-soft-ink-soft">
             <AddressLink address={row.address} url={row.explorerUrl} />
           </p>
         </div>
@@ -226,7 +255,7 @@ function EscrowCard({ row }: { row: EscrowRow }) {
         </div>
       </div>
 
-      <p className="mt-3 text-sm leading-relaxed text-soft-ink">{row.verdict}</p>
+      <p className="mt-3 text-[13px] leading-relaxed text-soft-ink">{row.verdict}</p>
       {row.error && <ReadFailure reason={row.error} />}
     </article>
   );
@@ -244,7 +273,7 @@ function FeeCard({ row }: { row: FeeRow }) {
           <h3 className="font-soft-display text-base font-bold text-soft-ink">
             Platform fee waiting · {row.chainName}
           </h3>
-          <p className="mt-0.5 text-xs text-soft-ink-soft">
+          <p className="mt-0.5 text-[11.5px] text-soft-ink-soft">
             Recipient{' '}
             {row.feeRecipient ? (
               <span className="font-mono">{shortAddr(row.feeRecipient)}</span>
@@ -261,7 +290,7 @@ function FeeCard({ row }: { row: FeeRow }) {
       </p>
 
       {row.matchesDeploymentFile === false && (
-        <p className="mt-3 rounded-2xl bg-[#FBEEF1] px-4 py-3 text-xs leading-relaxed text-[#A33A50]">
+        <p className="mt-3 rounded-2xl bg-[#FBEEF1] px-4 py-3 text-[12px] leading-relaxed text-[#A33A50]">
           The chain reports a different fee recipient than deployments/askEscrow.{row.chainId}.json.
           The file describes a different deployment than the one being read.
         </p>
@@ -269,7 +298,7 @@ function FeeCard({ row }: { row: FeeRow }) {
 
       {/* Konsola PATRZY. Zdanie ponizej jest tu po to, zeby nikt nie szukal
           przycisku, ktorego swiadomie nie ma. */}
-      <p className="mt-3 text-xs leading-relaxed text-soft-ink-muted">
+      <p className="mt-3 text-[12px] leading-relaxed text-soft-ink-muted">
         This console cannot claim it. Claiming sends a transaction, and nothing on this page sends
         transactions.
       </p>
@@ -291,12 +320,12 @@ function FacilitatorCard({ status }: { status: FacilitatorStatus }) {
           <h3 className="font-soft-display text-base font-bold text-soft-ink">
             x402 facilitator still serves us
           </h3>
-          <p className="mt-0.5 break-all font-mono text-xs text-soft-ink-soft">{status.url}</p>
+          <p className="mt-0.5 break-all font-mono text-[11.5px] text-soft-ink-soft">{status.url}</p>
         </div>
         <Chip health={status.health} />
       </div>
 
-      <p className="mt-3 text-sm leading-relaxed text-soft-ink">
+      <p className="mt-3 text-[13px] leading-relaxed text-soft-ink">
         {status.supported === true &&
           `The facilitator still lists ${status.requiredKind}. Agent payments have somewhere to settle.`}
         {status.supported === false &&
@@ -306,7 +335,7 @@ function FacilitatorCard({ status }: { status: FacilitatorStatus }) {
       </p>
 
       {status.kindsSeen !== null && (
-        <p className="mt-2 text-xs text-soft-ink-soft">
+        <p className="mt-2 text-[11.5px] text-soft-ink-soft">
           {status.kindsSeen} scheme{status.kindsSeen === 1 ? '' : 's'} advertised in total.
         </p>
       )}
@@ -328,12 +357,12 @@ function ContractLine({ row }: { row: ContractRow }) {
         quiet ? 'opacity-70' : ''
       }`}
     >
-      <span className="min-w-[10rem] flex-1 font-soft-display text-sm font-bold text-soft-ink">
+      <span className="min-w-[10rem] flex-1 font-soft-display text-[13px] font-bold text-soft-ink">
         {row.label}
       </span>
-      <span className="text-xs text-soft-ink-soft">{row.chainName}</span>
+      <span className="text-[11.5px] text-soft-ink-soft">{row.chainName}</span>
       <AddressLink address={row.address} url={row.explorerUrl} />
-      <span className="font-mono text-xs text-soft-ink-soft">
+      <span className="font-mono text-[11.5px] text-soft-ink-soft">
         {row.codeSize === null
           ? 'size unknown'
           : row.codeSize === 0
@@ -354,7 +383,7 @@ function ContractLine({ row }: { row: ContractRow }) {
                 : undefined}
       </Chip>
       {(row.note || row.error) && (
-        <p className="w-full text-xs leading-relaxed text-soft-ink-muted">{row.error ?? row.note}</p>
+        <p className="w-full text-[12px] leading-relaxed text-soft-ink-muted">{row.error ?? row.note}</p>
       )}
     </li>
   );
@@ -467,16 +496,32 @@ export default function OpsConsole() {
   return (
     <main className="min-h-screen bg-soft-bg px-4 py-10 font-soft text-soft-ink">
       <div className="mx-auto max-w-5xl">
-        {/* ---------- naglowek i werdykt ---------- */}
-        <header className="rounded-card bg-soft-surface p-6 shadow-card">
-          <p className="font-soft-display text-xs font-bold uppercase tracking-[0.2em] text-soft-ink-soft">
+        {/* ---------- naglowek i werdykt ----------
+            Karta werdyktu ZMIENIA SIE RAZEM Z WERDYKTEM. Do tej pory alarm i
+            spokoj wygladaly identycznie - biala karta, a jedyna roznica byla
+            pigulka wielkosci paznokcia w rogu. Konsola ma odpowiedziec w
+            pierwszej sekundzie, a pierwsza sekunda to kolor calej plaszczyzny,
+            nie odczytana etykieta. Roz, nie pomarancz: pomarancz nalezy do kwot
+            i gdyby krzyczal takze alarm, przestalby cokolwiek znaczyc. */}
+        <header
+          className={`rounded-card border bg-soft-surface p-6 shadow-card ${
+            worst === 'alarm'
+              ? 'border-[#8F1F36]/40'
+              : worst === 'warn'
+                ? 'border-[#A33A50]/30'
+                : 'border-soft-line'
+          }`}
+        >
+          <p className="font-soft-display text-[11px] font-bold uppercase tracking-[0.2em] text-soft-ink-soft">
             Operator console
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h1 className="font-soft-display text-2xl font-bold sm:text-3xl">{VERDICT[worst]}</h1>
+            <h1 className="font-soft-display text-[24px] font-bold leading-[1.15] sm:text-[30px]">
+              {VERDICT[worst]}
+            </h1>
             <Chip health={worst} />
           </div>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-soft-ink-muted">
+          <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-soft-ink-muted">
             Eleven contracts, seven chains, two hot keys and one external payment facilitator. This
             page only reads them. Nothing here can send a transaction.
           </p>
@@ -486,7 +531,7 @@ export default function OpsConsole() {
               type="button"
               onClick={() => void load('hot')}
               disabled={isLoading}
-              className="rounded-pill bg-soft-primary px-5 py-2.5 font-soft-display text-sm font-bold text-white shadow-chip transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50"
+              className={BUTTON_PRIMARY}
             >
               {isLoading ? 'Checking…' : 'Check now'}
             </button>
@@ -494,11 +539,11 @@ export default function OpsConsole() {
               type="button"
               onClick={() => void load('all')}
               disabled={isLoading}
-              className="rounded-pill border border-soft-line bg-soft-surface px-5 py-2.5 font-soft-display text-sm font-bold text-soft-primary transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50"
+              className={BUTTON_QUIET}
             >
               Re-check contract bytecode
             </button>
-            <p className="text-xs text-soft-ink-soft">
+            <p className="text-[11.5px] leading-relaxed text-soft-ink-soft">
               {ageSeconds === null
                 ? 'Nothing loaded yet.'
                 : `Live figures checked ${ageSeconds}s ago, refreshed every ${POLL_MS / 1000}s. Bytecode inventory checked ${coldAgeMinutes}m ago.`}
@@ -507,17 +552,17 @@ export default function OpsConsole() {
 
           {fetchError && (
             <div className="mt-4 rounded-2xl bg-[#FBEEF1] px-4 py-3">
-              <p className="font-soft-display text-sm font-bold text-[#8F1F36]">
+              <p className="font-soft-display text-[13px] font-bold text-[#8F1F36]">
                 The last request failed.
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-[#A33A50]">
+              <p className="mt-1 text-[12px] leading-relaxed text-[#A33A50]">
                 {fetchError}
                 {report ? ' Everything below is the last successful read and is now out of date.' : ''}
               </p>
               <button
                 type="button"
                 onClick={() => void load('hot')}
-                className="mt-3 rounded-pill bg-[#8F1F36] px-4 py-2 font-soft-display text-xs font-bold text-white transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:scale-[1.03] active:scale-[0.97]"
+                className="mt-3 rounded-pill bg-[#8F1F36] px-4 py-2 font-soft-display text-[12px] font-bold text-white transition-[background-color,transform] ease-out-strong [transition-duration:var(--dur-press)] hover:bg-[#7A1A2E] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8F1F36] focus-visible:ring-offset-2"
               >
                 Try again
               </button>
@@ -525,12 +570,27 @@ export default function OpsConsole() {
           )}
         </header>
 
+        {/* PIERWSZE WEJSCIE. Bylo tu jedno zdanie w szarosci na calej pustej
+            stronie - czyli ekran nie do odroznienia od "nic tu nie ma".
+            Ksztalty kart mowia, ILE tresci sie zaraz pojawi i gdzie, wiec
+            czekanie przestaje wygladac jak wynik. */}
         {!report && !fetchError && (
-          <p className="mt-10 text-sm text-soft-ink-muted">Reading the chains…</p>
+          <div className="mt-10" aria-busy="true">
+            <p className="text-[13px] text-soft-ink-muted">Reading the chains…</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {[0, 1, 2, 3].map((slot) => (
+                <div key={slot} className="rounded-card bg-soft-surface p-5 shadow-card">
+                  <div className="h-3.5 w-2/5 rounded-pill bg-soft-sunken" />
+                  <div className="mt-3 h-3 w-3/4 rounded-pill bg-soft-sunken" />
+                  <div className="mt-5 h-6 w-1/3 rounded-pill bg-soft-sunken" />
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {!report && fetchError && (
-          <p className="mt-10 text-sm text-soft-ink-muted">
+          <p className="mt-10 max-w-[62ch] text-[13px] leading-relaxed text-soft-ink-muted">
             Nothing has been read yet, so there is nothing to show. This is not an empty system - it
             is an unanswered question. Use “Try again” above.
           </p>
@@ -598,7 +658,8 @@ export default function OpsConsole() {
                   <button
                     type="button"
                     onClick={() => setShowQuiet((v) => !v)}
-                    className="mt-3 rounded-pill border border-soft-line bg-soft-surface px-4 py-2 font-soft-display text-xs font-bold text-soft-primary transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:scale-[1.03] active:scale-[0.97]"
+                    aria-expanded={showQuiet}
+                    className={`${BUTTON_QUIET} mt-3 px-4 py-2 text-[12px]`}
                   >
                     {showQuiet ? 'Hide' : 'Show'} {quietContracts.length} known-quiet addresses
                   </button>
@@ -625,10 +686,10 @@ export default function OpsConsole() {
                       key={chain.chainId}
                       className="border-b border-soft-line/60 px-4 py-3 last:border-b-0"
                     >
-                      <p className="font-soft-display text-sm font-bold text-soft-ink">
+                      <p className="font-soft-display text-[13px] font-bold text-soft-ink">
                         {chain.chainName}
                       </p>
-                      <p className="mt-1 break-words text-xs leading-relaxed text-soft-ink-muted">
+                      <p className="mt-1 break-words text-[12px] leading-relaxed text-soft-ink-muted">
                         {chain.error ?? 'No reason came back.'}
                       </p>
                     </li>
@@ -637,7 +698,7 @@ export default function OpsConsole() {
               </Section>
             )}
 
-            <p className="mt-10 pb-6 text-xs leading-relaxed text-soft-ink-soft">
+            <p className="mt-10 pb-6 text-[12px] leading-relaxed text-soft-ink-soft">
               Every figure on this page comes from eth_call, eth_getBalance or eth_getCode, plus one
               HTTPS request to the facilitator. There is no write path in this console.
             </p>

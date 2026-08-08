@@ -56,55 +56,203 @@ export const metadata = {
 
 /* ------------------------------------------------------------------ */
 
-function Step({
-  number,
-  title,
-  children,
-}: {
-  number: string;
+/**
+ * === SIEDEM KROKOW W JEDNYM MIEJSCU ===
+ *
+ * Tytul, numer i CENA kazdego kroku sa tu, a nie w JSX-ie ponizej, z jednego
+ * powodu: skorowidz na gorze strony i naglowek samego kroku musza podawac to
+ * samo. Dwie recznie utrzymywane listy tych samych siedmiu pozycji rozjezdzaja
+ * sie przy pierwszej zmianie ceny - a ta strona zyje z tego, ze cena zgadza sie
+ * z rzeczywistoscia.
+ *
+ * `cost` to PIERWSZY czlon linii kosztu (do pierwszego " · "), `note` to reszta.
+ * Podzial nie jest kosmetyczny: skorowidz pokazuje wylacznie `cost`, wiec to
+ * musi byc czlon, ktory sam z siebie odpowiada "ile to kosztuje".
+ */
+type StepMeta = {
+  n: string;
+  id: string;
   title: string;
-  children: React.ReactNode;
-}) {
+  cost: string;
+  note: React.ReactNode;
+};
+
+const STEPS: StepMeta[] = [
+  {
+    n: '01',
+    id: 'get-in',
+    title: 'Get in',
+    cost: 'Free',
+    note: 'One signature · No gas, no transaction',
+  },
+  {
+    n: '02',
+    id: 'post',
+    title: 'Write a post that lands onchain',
+    cost: 'Gas only',
+    note: 'Cheap on Base, usually under a cent',
+  },
+  {
+    n: '03',
+    id: 'tip',
+    title: 'Pay someone for a post you liked',
+    cost: 'Your choice of amount',
+    note: 'USDC on Base, or the native token elsewhere',
+  },
+  {
+    n: '04',
+    id: 'sell',
+    title: 'Sell part of a post',
+    cost: 'Free to publish',
+    note: 'You set the price readers pay',
+  },
+  {
+    n: '05',
+    id: 'ask',
+    title: 'Ask a question and put money on it',
+    cost: 'You set the budget',
+    // Jedyna prawdziwa kwota na calej stronie - i jedyne miejsce, ktore
+    // dostaje bursztyn. Reszta linii kosztu jest tekstem, nie liczba.
+    note: (
+      <>
+        From <span className="font-semibold tabular-nums text-soft-accent-deep">$0.50</span> per seat
+      </>
+    ),
+  },
+  {
+    n: '06',
+    id: 'answer',
+    title: "Answer someone else's, and get paid for it",
+    cost: 'Free to answer',
+    note: 'One signature, no gas',
+  },
+  {
+    n: '07',
+    id: 'collect',
+    title: 'Collect what you are owed',
+    cost: 'Gas only',
+    note: 'The amount is already yours',
+  },
+];
+
+function Step({ meta, children }: { meta: StepMeta; children: React.ReactNode }) {
   return (
-    <section className="border-t border-soft-line/70 py-10">
+    // `scroll-mt`, bo do kazdego kroku prowadzi teraz kotwica ze skorowidza,
+    // a belka nawigacji jest przyklejona na gorze.
+    <section id={meta.id} className="scroll-mt-24 border-t border-soft-line/70 py-10">
       <div className="mb-3 flex items-baseline gap-3">
         {/* Numer jest tu POPRAWNY, w przeciwienstwie do /re-definition.
             Tam sekcje sa stanami tej samej kwoty, nie krokami, wiec numer nic
             by nie niosl. Tutaj to instrukcja i kolejnosc naprawde ma znaczenie:
-            bez portfela nie napiszesz posta, bez posta nie sprzedasz jego czesci. */}
-        <span className="font-soft-display text-[13px] font-bold tabular-nums text-soft-primary-deep">
-          {number}
+            bez portfela nie napiszesz posta, bez posta nie sprzedasz jego czesci.
+
+            Stala szerokosc rynny: siedem naglowkow zaczyna sie na tym samym
+            pionie, wiec wzrok schodzacy po stronie ma po czym isc. */}
+        <span className="w-[26px] shrink-0 font-soft-display text-[13px] font-bold tabular-nums text-soft-primary-deep">
+          {meta.n}
         </span>
         <h2 className="font-soft-display text-[22px] font-bold leading-[1.2] tracking-[-0.01em] text-soft-ink sm:text-[26px]">
-          {title}
+          {meta.title}
         </h2>
       </div>
+      <Cost lead={meta.cost}>{meta.note}</Cost>
       <div className="max-w-[64ch]">{children}</div>
     </section>
   );
 }
 
-function P({ children }: { children: React.ReactNode }) {
-  return <p className="mb-3 text-[15px] leading-[1.7] text-soft-ink-muted">{children}</p>;
+/**
+ * Akapit. `lead` dostaje PIERWSZY akapit kroku i tylko on.
+ *
+ * Siedem krokow po cztery akapity jednego rozmiaru to sciana. Pierwszy akapit
+ * niesie sens calego kroku, wiec dostaje wiekszy stopien i ciemniejszy tusz -
+ * kto czyta strone naglowkami, dostaje z niej cala tresc, a nie same tytuly.
+ */
+function P({ lead = false, children }: { lead?: boolean; children: React.ReactNode }) {
+  return lead ? (
+    <p className="mb-3.5 text-[16px] leading-[1.65] text-soft-ink">{children}</p>
+  ) : (
+    <p className="mb-3 text-[15px] leading-[1.7] text-soft-ink-muted">{children}</p>
+  );
 }
 
 function Hi({ children }: { children: React.ReactNode }) {
   return <strong className="font-semibold text-soft-ink">{children}</strong>;
 }
 
-/** Koszt kroku. Kwota dostaje akcent, bo akcent nalezy sie pieniadzom. */
-function Cost({ gas, children }: { gas: 'none' | 'gas' | 'money'; children: React.ReactNode }) {
-  const style =
-    gas === 'money'
-      ? 'border-soft-accent/40 text-soft-accent-deep'
-      : 'border-soft-line text-soft-ink-muted';
-
+/**
+ * Koszt kroku.
+ *
+ * === TRZECIE ZLAMANIE ZASADY BURSZTYNU, ZNALEZIONE I NAPRAWIONE ===
+ * Wariant `gas="money"` malowal CALA PIGULKE na bursztyn: obwodke i caly tekst.
+ * A tekst w tym wariancie brzmial "Your choice of amount · USDC on Base, or the
+ * native token elsewhere" - ani jednej cyfry. Kolor zarezerwowany dla kwot
+ * niosl wiec zdanie bez kwoty, na dodatek przez ramke, czyli dokladnie to, czego
+ * zasada zabrania. Bursztyn zszedl z komponentu; jedyna prawdziwa kwota na tej
+ * stronie ($0.50 w kroku 05) dostaje go w swoim miejscu, na samej liczbie.
+ *
+ * === DRUGI POWOD TEJ PRZEBUDOWY: TELEFON ===
+ * Cala linia byla jedna pigulka. Przy 360px trzyczlonowe zdanie lamalo sie w
+ * srodku na trzy wiersze, a rounded-pill zamienialo je w owalna klache. Teraz
+ * w pigulce stoi sama cena - jedno do czterech slow, ktore zawsze sie mieszcza -
+ * a reszta jest zwyklym tekstem obok i lamie sie jak tekst.
+ */
+function Cost({ lead, children }: { lead: string; children: React.ReactNode }) {
   return (
-    <p
-      className={`mb-3 inline-flex items-start gap-2 rounded-pill border bg-soft-surface px-3 py-1.5 font-soft text-[12.5px] font-semibold leading-[1.45] ${style}`}
-    >
-      {children}
+    <p className="mb-4 flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5">
+      <span className="rounded-pill border border-soft-line bg-soft-surface px-2.5 py-1 font-soft text-[11px] font-bold uppercase tracking-[0.08em] text-soft-ink">
+        {lead}
+      </span>
+      <span className="font-soft text-[12.5px] font-semibold leading-[1.5] text-soft-ink-soft">
+        {children}
+      </span>
     </p>
+  );
+}
+
+/**
+ * Skorowidz siedmiu krokow z cena kazdego z nich.
+ *
+ * Strona odpowiada na pytanie "co moge tu zrobic i ile to kosztuje". Do dzis
+ * odpowiadala na nie w siedmiu miejscach oddalonych od siebie o ekran, wiec
+ * calosci nie dalo sie zobaczyc naraz - a to wlasnie calosc jest odpowiedzia.
+ * Ten blok mowi ja na jednym ekranie, a kazdy wiersz jest kotwica do kroku.
+ */
+function StepIndex() {
+  return (
+    <nav
+      aria-label="The seven steps"
+      className="mt-10 rounded-card border border-soft-line bg-soft-surface p-4 shadow-card sm:p-5"
+    >
+      <p className="mb-2 font-soft text-[11px] font-bold uppercase tracking-[0.16em] text-soft-ink-faint">
+        Seven steps, and what each one costs
+      </p>
+      <ol>
+        {STEPS.map((step) => (
+          <li key={step.id} className="border-b border-dashed border-soft-line/70 last:border-b-0">
+            {/* SIATKA, NIE RZAD. Przy 360px trzy pozycje w jednym rzedzie zostawialy
+                tytulowi okolo 120px, wiec kazdy lamal sie na trzy wiersze obok
+                jednowierszowej ceny. Do 576px cena schodzi pod tytul, w te sama
+                kolumne; wyzej wraca na prawa krawedz. Zaden wariant nie przewija
+                w poziomie. */}
+            <a
+              href={`#${step.id}`}
+              className="grid grid-cols-[26px_1fr] items-baseline gap-x-3 gap-y-0.5 py-2.5 transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary sm:grid-cols-[26px_1fr_auto]"
+            >
+              <span className="font-soft-display text-[12px] font-bold tabular-nums text-soft-primary-deep">
+                {step.n}
+              </span>
+              <span className="min-w-0 font-soft-display text-[14px] font-semibold leading-[1.35] text-soft-ink">
+                {step.title}
+              </span>
+              <span className="col-start-2 font-soft text-[11.5px] font-semibold text-soft-ink-soft sm:col-start-3 sm:text-right">
+                {step.cost}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
   );
 }
 
@@ -135,14 +283,14 @@ export default function HowPage() {
           That is the point.
         </h1>
 
-        <p className="mb-2 max-w-[58ch] text-[16px] leading-[1.65] text-soft-ink-muted">
+        <p className="mb-4 max-w-[58ch] text-[16px] leading-[1.65] text-soft-ink-muted">
           Most feeds measure attention, which is free to give and therefore
           proves nothing. This one measures payments, which are not. Below is
           every single thing you can do here today — what it costs, what you
           sign, and where the receipt ends up.
         </p>
 
-        <p className="mb-2 max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
+        <p className="max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
           Nothing on this page is a plan. If it is written here, it works right
           now — and where the thing that works has never had anyone go through
           it, the step says so in the step. What is still being built is listed
@@ -156,13 +304,12 @@ export default function HowPage() {
           , with its status next to it.
         </p>
 
+        <StepIndex />
+
         <div className="mt-10">
           {/* ---------------------------------------------------------- */}
-          <Step number="01" title="Get in">
-            <Cost gas="none">
-              Free · One signature · No gas, no transaction
-            </Cost>
-            <P>
+          <Step meta={STEPS[0]}>
+            <P lead>
               Connect a wallet, then sign one message. If you do not have a
               wallet, <Hi>Base Account</Hi> makes one with a passkey — your face
               or your fingerprint, no extension and no seed phrase to write down.
@@ -180,9 +327,8 @@ export default function HowPage() {
           </Step>
 
           {/* ---------------------------------------------------------- */}
-          <Step number="02" title="Write a post that lands onchain">
-            <Cost gas="gas">Gas only · Cheap on Base, usually under a cent</Cost>
-            <P>
+          <Step meta={STEPS[1]}>
+            <P lead>
               Write, pick a network, post. The text is written to a contract, so
               the post has a transaction behind it that anyone can open — it is
               not only a row in our database.
@@ -197,9 +343,8 @@ export default function HowPage() {
           </Step>
 
           {/* ---------------------------------------------------------- */}
-          <Step number="03" title="Pay someone for a post you liked">
-            <Cost gas="money">Your choice of amount · USDC on Base, or the native token elsewhere</Cost>
-            <P>
+          <Step meta={STEPS[2]}>
+            <P lead>
               A tip is the whole thesis in one button. It costs you something,
               so it means something — and it lands with a hash that both of you
               can open.
@@ -213,9 +358,8 @@ export default function HowPage() {
           </Step>
 
           {/* ---------------------------------------------------------- */}
-          <Step number="04" title="Sell part of a post">
-            <Cost gas="none">Free to publish · You set the price readers pay</Cost>
-            <P>
+          <Step meta={STEPS[3]}>
+            <P lead>
               Open <Hi>Add a paid section</Hi> under the composer, write the part
               you want to sell and set a price. Everyone sees the free part; only
               people who pay see the rest.
@@ -234,9 +378,8 @@ export default function HowPage() {
           </Step>
 
           {/* ---------------------------------------------------------- */}
-          <Step number="05" title="Ask a question and put money on it">
-            <Cost gas="money">You set the budget · From $0.50 per seat</Cost>
-            <P>
+          <Step meta={STEPS[4]}>
+            <P lead>
               An <Hi>Ask</Hi> is a question with three numbers: a budget, a
               number of seats and a deadline. People answer, you pay for the
               answers you accept, and each payout is recorded next to the answer
@@ -266,9 +409,8 @@ export default function HowPage() {
           </Step>
 
           {/* ---------------------------------------------------------- */}
-          <Step number="06" title="Answer someone else's, and get paid for it">
-            <Cost gas="none">Free to answer · One signature, no gas</Cost>
-            <P>
+          <Step meta={STEPS[5]}>
+            <P lead>
               Pick an open Ask with a free seat and write. Check two things
               first: whether the budget is locked in escrow, and the
               author&apos;s <Hi>resolve rate</Hi> — the share of their past Asks
@@ -282,9 +424,8 @@ export default function HowPage() {
           </Step>
 
           {/* ---------------------------------------------------------- */}
-          <Step number="07" title="Collect what you are owed">
-            <Cost gas="gas">Gas only · The amount is already yours</Cost>
-            <P>
+          <Step meta={STEPS[6]}>
+            <P lead>
               <Hi>Money</Hi> answers four questions in one place: what is waiting
               for you, what you locked in your own open Asks, what you earned and
               what you spent. Every line with a hash opens the transaction.
@@ -309,10 +450,16 @@ export default function HowPage() {
         </div>
 
         {/* ---------------------------------------------------------- */}
-        <section className="border-t border-soft-line/70 py-10">
-          <h2 className="mb-4 font-soft-display text-[15px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
+        {/* Nie jest krokiem, wiec nie ma numeru i zaczyna sie od lewej krawedzi,
+            a nie od rynny numerow - brak numeru w tym miejscu jest informacja:
+            tego nie da sie "wykonac", to sie czyta przed wykonaniem reszty.
+            Naglowek dostaje ten sam stopien co kroki; wczesniej byl 15-punktowa
+            wersalikowa etykieta, wiec caly blok czytal sie jak stopka. */}
+        <section className="scroll-mt-24 border-t border-soft-line/70 py-10">
+          <h2 className="mb-4 font-soft-display text-[22px] font-bold leading-[1.2] tracking-[-0.01em] text-soft-ink sm:text-[26px]">
             Two things worth knowing before you spend anything
           </h2>
+          <div className="max-w-[64ch]">
           <P>
             <Hi>Nothing here judges answers.</Hi> Escrow settles whether the
             money exists — locked, readable before you write. It settles nothing
@@ -326,6 +473,7 @@ export default function HowPage() {
             the numbers here worth anything, and it is also the part that
             deserves a second of thought before you press the button.
           </P>
+          </div>
         </section>
       </div>
     </main>

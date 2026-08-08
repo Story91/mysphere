@@ -135,9 +135,22 @@ export default function AskClaimPanel({
   // ktorym panel milczy - awaria odczytu ma swoj wlasny widok nizej.
   if (phase === 'ready' && units === 0n && !claimedTx && !showEmpty) return null;
 
-  const wrap = `rounded-card border border-soft-accent/40 bg-soft-accent-soft p-4 font-soft shadow-card sm:p-5 ${className}`;
+  /**
+   * TEN PANEL BYL BURSZTYNOWY W CALOSCI - ramka i tlo.
+   *
+   * Bursztyn w tym produkcie niesie KWOTE i nic wiecej. Panel pomalowany na
+   * kolor kwoty rozciaga to znaczenie na pojemnik, a wtedy sama kwota w srodku
+   * przestaje sie czymkolwiek wyrozniac - stoi na tle wlasnego koloru. Wyroznik
+   * wraca tam, gdzie jest jego miejsce: na LICZBIE, ktora dostaje rozmiar
+   * najwiekszy na calej stronie.
+   *
+   * Panel nie traci przez to obecnosci. Fiolet marki na obwodce i mocniejszy
+   * cien mowia "to jest inna rzecz niz karty obok" tak samo dobrze, a nie
+   * zuzywaja na to koloru pieniedzy.
+   */
+  const wrap = `rounded-card border border-soft-primary/30 bg-soft-surface p-4 font-soft shadow-float sm:p-5 ${className}`;
   const buttonClass =
-    'inline-flex shrink-0 items-center justify-center rounded-lg px-3.5 py-2 font-soft-display text-[12.5px] font-semibold transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface disabled:cursor-not-allowed disabled:bg-soft-line-strong';
+    'inline-flex shrink-0 items-center justify-center rounded-lg px-3.5 py-2 font-soft-display text-[12.5px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface disabled:cursor-not-allowed disabled:bg-soft-line-strong';
 
   if (phase === 'loading') {
     return (
@@ -219,7 +232,12 @@ export default function AskClaimPanel({
   return (
     <section className={wrap} aria-label="Escrow balance">
       {claimedTx ? (
-        <>
+        /* JEDYNY RUCH W TYM PANELU. Wejscie paragonu to potwierdzenie, ze
+           pieniadze wlasnie sie ruszyly - czyli zmiana stanu, a nie ozdobnik.
+           `soft-hero-rise` to ta sama krzywa i ten sam dystans co wszedzie
+           indziej w produkcie, a przy ograniczonym ruchu (globals.css) tresc
+           zostaje na miejscu, nieruchoma i widoczna. */
+        <div className="soft-hero-rise">
           <h2 className="mb-1.5 font-soft-display text-[15px] font-bold text-soft-ink">
             Collected
           </h2>
@@ -234,14 +252,22 @@ export default function AskClaimPanel({
           >
             {claimedTx.slice(0, 10)}…{claimedTx.slice(-6)}
           </a>
-        </>
+        </div>
       ) : (
         <>
-          <h2 className="mb-1 font-soft-display text-[15px] font-bold text-soft-ink">
+          {/* ROZMIAR JEST TU HIERARCHIA, NIE OZDOBA. Na /money stoja pod soba
+              cztery kwoty, a tylko ta jedna CZEKA NA KLIKNIECIE - reszta jest
+              historia albo blokada. Dopoki wszystkie mialy 15-22px, strona nie
+              podpowiadala, po co sie na nia weszlo. Zdanie zostaje w calosci,
+              zmienia sie wylacznie skala jego srodka. */}
+          <h2 className="mb-1.5 font-soft-display text-[17px] font-bold leading-tight text-soft-ink">
             You have{' '}
             {/* Bursztyn tylko na kwocie - to jedyne miejsce w tym panelu,
-                w ktorym stoi liczba pieniedzy. */}
-            <span className="tabular-nums text-soft-accent-deep">{formatAskMoney(amount)}</span>{' '}
+                w ktorym stoi liczba pieniedzy. Monospace jak na /leaderboard
+                i na liscie pozycji: kwoty w tym produkcie maja jeden kroj. */}
+            <span className="font-mono text-[30px] font-bold tabular-nums text-soft-accent-deep sm:text-[34px]">
+              {formatAskMoney(amount)}
+            </span>{' '}
             waiting
           </h2>
           <p className="mb-3 break-words text-[12.5px] leading-[1.5] text-soft-ink-muted">

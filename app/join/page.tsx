@@ -62,11 +62,30 @@ const QUIET_BUTTON = [
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2',
 ].join(' ');
 
-/** Karta, w której mieści się cała strona - jeden kształt dla każdego stanu. */
-function Panel({ children }: { children: React.ReactNode }) {
+/**
+ * Karta, w której mieści się cała strona - jeden kształt dla każdego stanu.
+ *
+ * === DLACZEGO `state` I DLACZEGO JAKO KLUCZ ===
+ * Ta strona jest automatem stanów, a karta jest jego jedynym oknem: człowiek
+ * podłącza portfel, podpisuje, czeka i dostaje wynik, a prostokąt przez cały ten
+ * czas stoi w tym samym miejscu i tylko podmienia treść. Bez klucza React
+ * ponownie używa tego samego węzła DOM, więc kolejne ekrany po prostu
+ * podskakiwały - nowy tekst pojawiał się w jednej klatce, bez żadnego znaku, że
+ * właśnie coś się wydarzyło.
+ *
+ * Klucz wymusza wymianę węzła, dzięki czemu `soft-hero-rise` odgrywa się RAZ na
+ * każde przejście. To JEDYNY ruch na tej stronie i jedyny, na jaki jest tu
+ * miejsce: człowiek zobaczy go trzy albo cztery razy w życiu, przy zmianach,
+ * które sam wywołał. Przy `prefers-reduced-motion` (globals.css) treść stoi
+ * gotowa i nieruchoma - znika ruch, nie ekran.
+ */
+function Panel({ state, children }: { state: string; children: React.ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-[520px] px-4 py-10 font-soft sm:py-14">
-      <div className="rounded-card border border-soft-line bg-soft-surface p-6 shadow-card sm:p-8">
+      <div
+        key={state}
+        className="soft-hero-rise rounded-card border border-soft-line bg-soft-surface p-6 shadow-card sm:p-8"
+      >
         {children}
       </div>
     </div>
@@ -216,7 +235,7 @@ export default function JoinPage() {
   if (outcome) {
     if (outcome.status === 'registered') {
       return (
-        <Panel>
+        <Panel state="registered">
           <Title>You are in</Title>
           <Body>
             Your invite is linked to {shorten(outcome.referrerId)}. They get their referral points
@@ -230,7 +249,7 @@ export default function JoinPage() {
 
     if (outcome.status === 'already_referred') {
       return (
-        <Panel>
+        <Panel state="already-referred">
           <Title>This wallet already has an inviter</Title>
           <Body>
             Someone brought you here earlier, and an invite counts once per wallet. Nothing changed
@@ -243,7 +262,7 @@ export default function JoinPage() {
 
     if (outcome.status === 'self_referral') {
       return (
-        <Panel>
+        <Panel state="self-referral">
           <Title>This is your own invite link</Title>
           <Body>
             You cannot invite yourself. Send the link to someone else - their first post is what
@@ -256,7 +275,7 @@ export default function JoinPage() {
 
     if (outcome.status === 'unknown_code') {
       return (
-        <Panel>
+        <Panel state="unknown-code">
           <Title>We do not recognise this code</Title>
           <Body>
             No account carries this invite code, so there is nothing to link. The link may have been
@@ -270,7 +289,7 @@ export default function JoinPage() {
 
     // status === 'failed' - jedyny przypadek, w którym ponowna próba ma sens.
     return (
-      <Panel>
+      <Panel state="failed">
         <Title>We could not save your invite</Title>
         <Body>{outcome.message}</Body>
         {shownCode && <CodeBadge code={shownCode} />}
@@ -298,7 +317,7 @@ export default function JoinPage() {
      * jedyną treścią, jaką dostaje crawler linku i ktoś z wolnym łączem.
      */
     return (
-      <Panel>
+      <Panel state="reading">
         <Title>Joining MySphere</Title>
         <Body>Reading your invite link.</Body>
         <div className="mt-5 space-y-2" aria-live="polite" aria-label="Reading your invite link">
@@ -315,7 +334,7 @@ export default function JoinPage() {
    */
   if (!code) {
     return (
-      <Panel>
+      <Panel state="no-code">
         <Title>This link has no invite code</Title>
         <Body>
           An invite link ends with <code className="font-soft-display">?ref=</code> and a code. This
@@ -333,7 +352,7 @@ export default function JoinPage() {
 
   if (!isConnected || !address) {
     return (
-      <Panel>
+      <Panel state="connect">
         <Title>You were invited to MySphere</Title>
         <Body>
           Connect a wallet and confirm it is yours. That is the whole sign-up - there is no form, no
@@ -359,7 +378,7 @@ export default function JoinPage() {
 
   if (!signedInWithThisWallet) {
     return (
-      <Panel>
+      <Panel state="sign">
         <Title>Confirm this wallet is yours</Title>
         <Body>
           Sign a message with {shorten(address)} so the invite is attached to you and not to whoever
@@ -397,7 +416,7 @@ export default function JoinPage() {
   /* ---------------------------------------------------------------- */
 
   return (
-    <Panel>
+    <Panel state="linking">
       <Title>Linking your invite</Title>
       <Body>Recording that {shorten(address)} came in through this link.</Body>
       <CodeBadge code={code} />

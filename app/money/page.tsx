@@ -6,6 +6,7 @@ import { useAccount, useChainId, useConfig, usePublicClient, useSwitchChain } fr
 import { getWalletClient } from 'wagmi/actions';
 import { base } from 'wagmi/chains';
 import MobileBottomNav from '../components/MobileBottomNav';
+import ConnectModal from '../components/wallet/ConnectModal';
 import AskClaimPanel from '../basechat/components/AskClaimPanel';
 import { getProofLink, resolveTipNetwork } from '../basechat/components/TipNetworkConfig';
 import {
@@ -248,6 +249,18 @@ export default function MoneyPage() {
   const [claimReloadKey, setClaimReloadKey] = useState(0);
   const noteBalanceChanged = useCallback(() => setClaimReloadKey((key) => key + 1), []);
 
+  /**
+   * Nic sie nie wydarzylo i KAZDY odczyt sie udal.
+   *
+   * Liczone raz i wysoko, bo przesadza o ukladzie calej strony: przy pustej
+   * ksiedze trzy sekcje historii mowilyby po kolei "nic", "nic" i "nic", a
+   * dopiero pod nimi stalaby jedyna karta, ktora cokolwiek proponuje. Trzy
+   * zaprzeczenia przed jedna propozycja to nie jest stan pusty, to jest
+   * odprawa. Zamiast tego historii nie ma wcale, a jej miejsce zajmuje karta
+   * z wyjsciem.
+   */
+  const nothingHappenedYet = phase === 'ready' && !!ledger && isLedgerEmpty(ledger);
+
   return (
     <main className="min-h-screen bg-soft-bg font-soft">
       <div className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-5">
@@ -255,7 +268,9 @@ export default function MoneyPage() {
           <h1 className="mb-3 font-soft-display text-[30px] font-bold leading-[1.1] tracking-[-0.02em] text-soft-ink sm:text-[38px]">
             Your money here
           </h1>
-          <p className="text-[14.5px] leading-[1.65] text-soft-ink-muted">
+          {/* `max-w-[52ch]` - ta sama miara wiersza co na /leaderboard i /how.
+              Bez niej akapit na desktopie ciagnal sie przez cale 640px. */}
+          <p className="max-w-[52ch] text-[14.5px] leading-[1.65] text-soft-ink-muted">
             Not a token list — your wallet already does that better. This is the money that moved
             through MySphere: what is waiting for you, what your open Asks are holding, what people
             paid you, and what you spent. Every settled line opens its transaction.
@@ -271,72 +286,96 @@ export default function MoneyPage() {
                 CZEKA NA DZIALANIE - reszta jest historia. Panel jest tym samym
                 komponentem, ktory dziala na /asks; `showEmpty` wlacza mu tylko
                 odpowiedz przy saldzie zerowym, bo tutaj milczenie zostawiloby
-                pierwsze z czterech pytan bez odpowiedzi. */}
-            <section className="mb-6" aria-labelledby="waiting-heading">
-              <SectionLabel id="waiting-heading">Waiting for you</SectionLabel>
+                pierwsze z czterech pytan bez odpowiedzi.
+
+                ETYKIETA TEJ SEKCJI JEST INNA NIZ POZOSTALE TRZY, i to jedyna
+                taka na stronie. Cztery identyczne szare naglowki mowily, ze
+                cztery sekcje sa tak samo wazne - a po pieniadze do odebrania
+                ludzie tu przychodza, po historie nie. */}
+            <section className="mb-8" aria-labelledby="waiting-heading">
+              <h2
+                id="waiting-heading"
+                className="mb-3 font-soft text-[12px] font-bold uppercase tracking-[0.14em] text-soft-primary-deep"
+              >
+                Waiting for you
+              </h2>
               <AskClaimPanel showEmpty reloadKey={claimReloadKey} />
             </section>
 
-            {/* ===== 2. ZABLOKOWANE ===== */}
-            <section className="mb-6" aria-labelledby="locked-heading">
-              <SectionLabel id="locked-heading">Locked in your open Asks</SectionLabel>
-              {phase === 'loading' && <SkeletonCard />}
-              {phase === 'failed' && <LoadFailed onRetry={load} what="your Asks" />}
-              {phase === 'ready' && ledger && (
-                <>
-                  {ledger.openAsks.failed ? (
-                    <LoadFailed onRetry={load} what="your Asks" />
-                  ) : (
-                    <LockedPanel
-                      author={address}
-                      asks={escrowedOpen}
-                      promised={promisedOpen}
-                      onBalanceChanged={noteBalanceChanged}
+            {/* Pustka calkowita - ale tylko wtedy, gdy KAZDY odczyt sie udal.
+                Stoi TU, zaraz pod pierwsza sekcja, a nie na koncu strony: to
+                jedyna karta, ktora przy pustej ksiedze cokolwiek proponuje,
+                wiec nie ma prawa byc ostatnia. */}
+            {nothingHappenedYet && <NothingYet />}
+
+            {!nothingHappenedYet && (
+              <>
+                {/* ===== 2. ZABLOKOWANE ===== */}
+                <section className="mb-6" aria-labelledby="locked-heading">
+                  <SectionLabel id="locked-heading">Locked in your open Asks</SectionLabel>
+                  {phase === 'loading' && <SkeletonCard />}
+                  {phase === 'failed' && <LoadFailed onRetry={load} what="your Asks" />}
+                  {phase === 'ready' && ledger && (
+                    <>
+                      {ledger.openAsks.failed ? (
+                        <LoadFailed onRetry={load} what="your Asks" />
+                      ) : (
+                        <LockedPanel
+                          author={address}
+                          asks={escrowedOpen}
+                          promised={promisedOpen}
+                          onBalanceChanged={noteBalanceChanged}
+                        />
+                      )}
+                    </>
+                  )}
+                </section>
+
+                {/* GRANICA MIEDZY "TERAZ" A "BYLO".
+                    Nad ta linia stoja dwie kwoty, ktore wciaz sa w grze: jedna
+                    do odebrania, druga zablokowana na kontrakcie. Pod nia dwie,
+                    ktore sa juz tylko zapisem. Bez tej linii cztery sekcje
+                    czytaly sie jako jedna lista czterech rownowaznych liczb. */}
+                <hr className="mb-6 border-0 border-t border-soft-line" />
+
+                {/* ===== 3. WPLYWY ===== */}
+                <section className="mb-6" aria-labelledby="paid-heading">
+                  <SectionLabel id="paid-heading">Paid to you</SectionLabel>
+                  {phase === 'loading' && <SkeletonCard />}
+                  {phase === 'failed' && <LoadFailed onRetry={load} what="what you were paid" />}
+                  {phase === 'ready' && ledger && (
+                    <Ledger
+                      section={ledger.incoming}
+                      direction="in"
+                      nameOf={nameOf}
+                      onRetry={load}
+                      emptyTitle="Nobody has paid you here yet"
+                      emptyBody="Tips, unlocked posts and accepted answers all land in this list, each with the transaction that settled it."
                     />
                   )}
-                </>
-              )}
-            </section>
+                </section>
 
-            {/* ===== 3. WPLYWY ===== */}
-            <section className="mb-6" aria-labelledby="paid-heading">
-              <SectionLabel id="paid-heading">Paid to you</SectionLabel>
-              {phase === 'loading' && <SkeletonCard />}
-              {phase === 'failed' && <LoadFailed onRetry={load} what="what you were paid" />}
-              {phase === 'ready' && ledger && (
-                <Ledger
-                  section={ledger.incoming}
-                  direction="in"
-                  nameOf={nameOf}
-                  onRetry={load}
-                  emptyTitle="Nobody has paid you here yet"
-                  emptyBody="Tips, unlocked posts and accepted answers all land in this list, each with the transaction that settled it."
-                />
-              )}
-            </section>
-
-            {/* ===== 4. WYDATKI ===== */}
-            <section className="mb-6" aria-labelledby="spent-heading">
-              <SectionLabel id="spent-heading">What you spent</SectionLabel>
-              {phase === 'loading' && <SkeletonCard />}
-              {phase === 'failed' && <LoadFailed onRetry={load} what="what you spent" />}
-              {phase === 'ready' && ledger && (
-                <>
-                  <Ledger
-                    section={ledger.outgoing}
-                    direction="out"
-                    nameOf={nameOf}
-                    onRetry={load}
-                    emptyTitle="You have not spent anything here yet"
-                    emptyBody="Tips you send, posts you unlock and budgets you lock in escrow show up here with their transactions."
-                  />
-                  <WalletPayouts totals={ledger.askPayoutsFromWallet} />
-                </>
-              )}
-            </section>
-
-            {/* Pustka calkowita - ale tylko wtedy, gdy KAZDY odczyt sie udal. */}
-            {phase === 'ready' && ledger && isLedgerEmpty(ledger) && <NothingYet />}
+                {/* ===== 4. WYDATKI ===== */}
+                <section className="mb-6" aria-labelledby="spent-heading">
+                  <SectionLabel id="spent-heading">What you spent</SectionLabel>
+                  {phase === 'loading' && <SkeletonCard />}
+                  {phase === 'failed' && <LoadFailed onRetry={load} what="what you spent" />}
+                  {phase === 'ready' && ledger && (
+                    <>
+                      <Ledger
+                        section={ledger.outgoing}
+                        direction="out"
+                        nameOf={nameOf}
+                        onRetry={load}
+                        emptyTitle="You have not spent anything here yet"
+                        emptyBody="Tips you send, posts you unlock and budgets you lock in escrow show up here with their transactions."
+                      />
+                      <WalletPayouts totals={ledger.askPayoutsFromWallet} />
+                    </>
+                  )}
+                </section>
+              </>
+            )}
 
             {phase === 'ready' && ledger && (
               <p className="px-1 font-soft text-[11px] leading-relaxed text-soft-ink-faint">
@@ -402,7 +441,19 @@ function LoadFailed({ onRetry, what }: { onRetry: () => void; what: string }) {
   );
 }
 
+/**
+ * Brak portfela - najczestsze wejscie na te strone i jedyny jej stan pusty,
+ * ktory da sie opuscic jednym kliknieciem.
+ *
+ * PRZYCISK STOI TU, A NIE W ZDANIU. Do dzis karta odsylala do belki na gorze
+ * ("use the Connect button in the top bar"). Belka faktycznie ma ten przycisk,
+ * ale na telefonie jest to ikona w prawym rogu nad trescia, ktorej czlowiek
+ * wlasnie nie widzi - a stan pusty ma PROWADZIC DO DZIALANIA, nie opisywac,
+ * gdzie ono lezy. To ten sam ConnectModal, ktory otwiera /join.
+ */
 function NoWallet() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   return (
     <div className={CARD}>
       <h2 className="mb-1.5 font-soft-display text-[16px] font-bold text-soft-ink">
@@ -410,9 +461,17 @@ function NoWallet() {
       </h2>
       <p className="text-[13.5px] leading-[1.6] text-soft-ink-muted">
         This page is built entirely out of your address: what the escrow contract owes it, what your
-        open Asks are holding, and every payment it sent or received here. Use the Connect button in
-        the top bar — nothing on this page is shared or stored anywhere else.
+        open Asks are holding, and every payment it sent or received here. Nothing on this page is
+        shared or stored anywhere else.
       </p>
+      <button
+        type="button"
+        onClick={() => setIsModalOpen(true)}
+        className={`${BUTTON} mt-4 bg-soft-primary text-white`}
+      >
+        Connect a wallet
+      </button>
+      <ConnectModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }
@@ -685,10 +744,10 @@ function LockedPanel({
     });
 
   return (
-    <div className={CARD}>
+    <div className={`${CARD} soft-hero-rise`}>
       {counted > 0 ? (
         <>
-          <p className="mb-1 font-soft-display text-[22px] font-bold leading-none">
+          <p className="mb-1 break-words font-soft-display text-[22px] font-bold leading-tight">
             {/* Bursztyn TYLKO na kwocie - to jedyna liczba pieniedzy w tej karcie. */}
             <span className="font-mono tabular-nums text-soft-accent-deep">
               {formatAmount(unitsToAmount(lockedUnits))} USDC
@@ -725,6 +784,10 @@ function LockedPanel({
       )}
 
       {receipts.length > 0 && (
+        /* Bez wlasnego wejscia. Po udanym zwrocie `read()` przestawia panel na
+           'loading' i z powrotem, wiec CALA karta montuje sie od nowa i to ona
+           odgrywa wejscie - dolozenie drugiej animacji w srodku dalo by dwa
+           ruchy naraz o tym samym zdarzeniu. */
         <div className="mt-4 border-t border-soft-line pt-3">
           <p className="mb-1.5 text-[12px] leading-[1.5] text-soft-ink-muted">
             {receipts.length === 1
@@ -1053,12 +1116,21 @@ function Ledger({
   const hidden = section.events.length - visible.length;
 
   return (
-    <div className={CARD}>
+    // Wejscie karty = "odczyt wlasnie wrocil". Nie ozdobnik: do tej sekundy
+    // stal tu szkielet, wiec ruch niesie zmiane stanu. Jedna klatka, ta sama
+    // co wszedzie w produkcie, i nic wiecej sie tu nie rusza.
+    <div className={`${CARD} soft-hero-rise`}>
       {/* SUMA jest odpowiedzia na pytanie sekcji, wiec to ona - i tylko ona -
           dostaje bursztyn i rozmiar. Wiersze pod spodem sa dowodem, nie
           naglowkiem; gdyby kazda kwota krzyczala tak samo, sekcja przestalaby
-          cokolwiek podpowiadac. */}
-      <p className="mb-0.5 font-soft-display text-[22px] font-bold leading-none">
+          cokolwiek podpowiadac.
+
+          18px, a nie 22px. To sa pieniadze, ktore JUZ SIE ZDARZYLY, i musza byc
+          mniejsze od dwoch kwot nad nimi: tej do odebrania (34px) i tej wciaz
+          zablokowanej (22px). Trzy rozmiary to trzy stany tej samej rzeczy -
+          do wziecia, w grze, po sprawie. `break-words`, bo suma potrafi miec
+          trzy tokeny i na 360px musi sie zlamac, a nie wystawac. */}
+      <p className="mb-0.5 break-words font-soft-display text-[18px] font-bold leading-tight">
         {total ? (
           <span className="font-mono tabular-nums text-soft-accent-deep">{total}</span>
         ) : (
