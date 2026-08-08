@@ -33,6 +33,12 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: 'daily' 
   // ktore ludzie zadaja wyszukiwarce, a nie nam.
   { path: '/how', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/curators', priority: 0.7, changeFrequency: 'daily' },
+  // /b20 z tego samego powodu: "co to jest B20" i "jak zrobic ladny adres
+  // tokena" to pytania zadawane wyszukiwarce. Standard jest swiezy (mainnet
+  // 25.06.2026), a najpelniejszy zbior materialow o Base nie ma o nim ani
+  // jednej wzmianki - wiec konkurencja o te fraze praktycznie nie istnieje.
+  // `monthly`, bo tresc jest wyjasnieniem, a nie strumieniem zdarzen.
+  { path: '/b20', priority: 0.7, changeFrequency: 'monthly' },
   // Paragony (/tip/[txHash]) celowo NIE trafiaja do sitemapy: sa niezmienne i
   // istnieja po to, zeby ktos je WYSLAL, a nie zeby crawler je zindeksowal.
   { path: '/Docs', priority: 0.6, changeFrequency: 'monthly' },

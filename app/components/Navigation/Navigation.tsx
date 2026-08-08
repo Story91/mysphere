@@ -184,6 +184,14 @@ export default function Navigation() {
     // profil); to jest strona, ktora sie CZYTA, i pchanie jej miedzy przyciski
     // akcji zabraloby miejsce czemus, po co ludzie tam siegaja.
     { href: '/curators', label: 'Curators' },
+    // "B20" obok "Curators", bo obie strony dotycza tego samego: rzeczy, ktore
+    // istnieja NA BASE i o ktorych da sie powiedziec cos sprawdzalnego.
+    //
+    // Trafia tu z tego samego powodu, dla ktorego trafily tam /asks i /curators:
+    // strona, do ktorej prowadzi wylacznie wpisanie adresu z palca, z punktu
+    // widzenia uzytkownika nie istnieje. Sama zbudowana i niepodlinkowana byla
+    // dokladnie tym bledem, ktory na tej liscie naprawialismy juz dwa razy.
+    { href: '/b20', label: 'B20' },
     // "How" TUZ PRZED manifestem, bo odpowiadaja na dwa rozne pytania i to
     // pierwsze jest pilniejsze. /re-definition mowi, DLACZEGO ten produkt
     // istnieje - i ma prawo opisywac rzeczy, ktorych jeszcze nie ma. /how mowi,
