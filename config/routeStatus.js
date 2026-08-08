@@ -30,17 +30,19 @@ const DISABLED_ROUTES = [
   '/base',
   '/basemorning',
   '/marketplace',
-  // '/mycamp' WROCILO. Powod nie jest sentymentalny - ta trasa byla jedynym
-  // miejscem, w ktorym da sie podlaczyc Spotify, Twittera i TikToka, a DWIE
-  // ZYWE rzeczy w aplikacji czytaja te dane:
-  //   1. przycisk Spotify w kompozytorze feedu otwiera MusicSelector, ktory
-  //      pyta /api/camp/spotify o utwory tego adresu,
-  //   2. BuilderProfile rysuje CampSocialsCard z podlaczonymi kontami.
-  // Przy wylaczonej trasie wygladalo to tak: feed zaprasza do wrzucenia posta
-  // muzycznego, selektor mowi "No Spotify data found for this user", a jedyna
-  // droga do podlaczenia konta odsyla przekierowaniem na /basechat. Funkcja
-  // byla wiec widoczna i nieosiagalna naraz - dokladnie ten rodzaj "dziala,
-  // ale nie dziala", ktory ta lista miala eliminowac, a nie tworzyc.
+  // '/mycamp' ZOSTAJE WYLACZONE - i to jest przemyslane, nie zapomniane.
+  //
+  // Podpiecie kont NIE POTRZEBUJE tej strony. Konektor
+  // (app/utils/socials/CampSocialsCard.tsx) nosi wlasny CampProvider i wlasny
+  // CampModal, a `buildCampRedirectUri` oddaje BIEZACY adres - wiec logowanie
+  // Origin wraca tam, gdzie czlowiek stal, a nie na /mycamp. Zadna z podtras
+  // /mycamp/* nie jest w tej sciezce potrzebna.
+  //
+  // Cala funkcja zyje wiec w dwoch miejscach, w ktorych czlowiek jej szuka:
+  // na wlasnym profilu (BuilderProfile, nad sekcjami Twittera i Spotify)
+  // oraz w selektorze muzyki w kompozytorze feedu - czyli dokladnie tam, gdzie
+  // brak podpietego Spotify zatrzymuje robote.
+  '/mycamp',
   '/MyAgents',
   '/MyClaw',
   '/swap',

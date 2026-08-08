@@ -1,8 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useAccount } from 'wagmi';
+
+/**
+ * ssr:false jest WYMOGIEM, nie optymalizacja: CampProvider i hooki SDK wolaja
+ * useContext/useState warunkowo (`typeof window !== 'undefined' ? useHook() : ...`),
+ * wiec przy renderze serwerowym liczba hookow rozjezdza sie z hydracja.
+ * Ten sam import z tym samym zastrzezeniem stoi w BuilderProfile.
+ */
+const CampSocialsCard = dynamic(() => import('../../utils/socials/CampSocialsCard'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-card border border-soft-line bg-soft-surface p-4">
+      <div className="h-4 w-40 animate-pulse rounded bg-soft-sunken" />
+    </div>
+  ),
+});
 import SpotifyTrackCard, { SpotifyTrackData } from './SpotifyTrackCard';
 
 interface MusicSelectorProps {
@@ -263,17 +278,26 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                brak podlaczonego konta to co innego niz podlaczone konto bez
                historii sluchania. Pierwsze naprawia sie klikiem, drugie
                sluchaniem muzyki - i tylko przy pierwszym ma sens odnosnik. */
-            <div className="py-10 text-center">
-              <p className="mx-auto max-w-[280px] text-[13px] leading-[1.5] text-soft-ink-muted">
-                No Spotify data for this wallet. Link your Spotify on MyCamp and your recent tracks
-                show up here.
+            /* ===== KONEKTOR STOI TU, A NIE ZA ODNOSNIKIEM =====
+               Stalo tu samo "No Spotify data found for this user" - zdanie
+               prawdziwe i bezuzyteczne. Nie mowilo DLACZEGO (konto nie jest
+               podpiete) ani CO Z TYM ZROBIC.
+
+               Pierwsza poprawka dawala przycisk prowadzacy na /mycamp. To bylo
+               gorsze rozwiazanie tego samego problemu: czlowiek jest w polowie
+               pisania posta, a my wysylamy go na inna strone i kazemy wrocic.
+               Konektor nosi wlasny CampProvider i wlasny CampModal, a logowanie
+               Origin wraca na BIEZACY adres - wiec da sie go postawic dokladnie
+               tutaj i nie ruszac nikogo z miejsca.
+
+               Ten sam komponent stoi na wlasnym profilu. Jeden mechanizm, dwa
+               miejsca - bo w obu ta sama czynnosc blokuje robote. */
+            <div className="py-6">
+              <p className="mx-auto mb-4 max-w-[300px] text-center text-[13px] leading-[1.5] text-soft-ink-muted">
+                No Spotify tracks for this wallet yet. Link Spotify below and your recent listening
+                shows up here.
               </p>
-              <Link
-                href="/mycamp"
-                className="mt-3 inline-flex items-center rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
-              >
-                Link Spotify on MyCamp
-              </Link>
+              {address && <CampSocialsCard address={address} />}
             </div>
           ) : (
             <div className="space-y-3">
