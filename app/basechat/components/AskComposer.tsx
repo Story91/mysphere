@@ -8,6 +8,7 @@ import {
   perAnswerFor,
   type AskFunding,
 } from '../../utils/asks/types';
+import { ASK_TEMPLATES_SAFE, type AskTemplate } from '../../utils/asks/templates';
 import { formatAskMoney } from './AskCard';
 
 /**
@@ -126,6 +127,26 @@ export default function AskComposer({
   // inaczej przycisk obiecywalby blokade, ktorej nie da sie wykonac.
   const effectiveFunding: AskFunding = escrowAvailable ? funding : 'on-resolve';
 
+  /**
+   * Wstawienie zaczatku. Ustawia CALY szkic naraz - tresc, budzet, miejsca
+   * i termin - bo zaczatek, ktory daje samo zdanie, zostawia czlowieka
+   * dokladnie z tym pytaniem, na ktore mial odpowiedziec ("ile to kosztuje?").
+   *
+   * Finansowania NIE dotyka: to jedyne pole, ktore zalezy od stanu portfela
+   * i sieci, a nie od tematu pytania. Zaczatek nie ma prawa przestawiac
+   * czlowiekowi tego, gdzie leza jego pieniadze.
+   *
+   * Kasuje tez `failure`: komunikat z poprzedniej proby dotyczyl innej tresci
+   * i po podmianie szkicu mowilby o czyms, czego juz nie ma na ekranie.
+   */
+  const applyTemplate = (template: AskTemplate) => {
+    setQuestion(template.question);
+    setBudgetText(template.budget.toFixed(2));
+    setSeatsText(String(template.seats));
+    setDurationMs(template.durationMs);
+    setFailure(null);
+  };
+
   const budget = parseNumber(budgetText);
   const seats = parseNumber(seatsText);
 
@@ -225,6 +246,35 @@ export default function AskComposer({
           className={`mt-1.5 block resize-y ${fieldClass} font-normal normal-case tracking-normal`}
         />
       </label>
+
+      {/* ===== ZACZATKI - TYLKO NA PUSTYM FORMULARZU =====
+          Znikaja, gdy tylko ktos zacznie pisac. Pigulka podmieniajaca budzet
+          i termin pod palcami czlowieka, ktory juz je ustawil, kasowalaby jego
+          prace jednym przypadkowym klknieciem - a to jest formularz od
+          pieniedzy. Warunek patrzy tez na budzet, bo ktos moze zaczac od kwoty.
+
+          Po co w ogole: puste pole nie mowi, o co WOLNO zapytac ani ile to
+          kosztuje. Zaczatek odpowiada na oba naraz, bo niesie tresc RAZEM
+          z budzetem, miejscami i terminem. Uzasadnienie doboru tematow stoi
+          w app/utils/asks/templates.ts. */}
+      {question === '' && budgetText === '' && ASK_TEMPLATES_SAFE.length > 0 && (
+        <div className="mt-2">
+          <p className="mb-1.5 text-[11px] text-soft-ink-faint">Or start from one of these:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {ASK_TEMPLATES_SAFE.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                disabled={disabled || pending}
+                onClick={() => applyTemplate(template)}
+                className="rounded-pill border border-soft-line bg-soft-bg px-2.5 py-1 font-soft-display text-[11.5px] font-semibold text-soft-ink-muted transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:border-soft-primary/60 hover:text-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:active:scale-100"
+              >
+                {template.chip}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">

@@ -173,11 +173,23 @@ export default function AskCard({
 
   const author = authorName || (ask.author ? getSlicedAddress(ask.author) : 'unknown address');
 
+  /**
+   * Pasek stanu. Trzy stany, trzy rozne kolory - i ZADEN z nich nie jest
+   * pomaranczowy.
+   *
+   * Stan "open" mial tu `soft-accent` (tlo, tekst i pulsujaca kropka), czyli
+   * kolor zarezerwowany w tym produkcie WYLACZNIE dla kwot. Odznaka stanu nie
+   * jest kwota, a na karcie Aska pomaranczowy jest juz zajety przez budzet i
+   * stawke za odpowiedz nizej - dwie rzeczy w tym samym kolorze kazaly czytac
+   * pasek jak drugi wiersz z pieniedzmi. Otwarty Ask dostaje `soft-info`:
+   * dalej odroznia sie od fioletu "resolved" i szarosci "expired", ale nie
+   * podszywa sie pod liczbe.
+   */
   const bar = {
     open: {
-      wrap: 'border-soft-line/70 bg-soft-accent/[0.06]',
-      text: 'text-soft-accent-deep',
-      dot: 'bg-soft-accent motion-safe:animate-pulse',
+      wrap: 'border-soft-line/70 bg-soft-info/[0.06]',
+      text: 'text-soft-info',
+      dot: 'bg-soft-info motion-safe:animate-pulse',
       label: 'Open ask',
     },
     expired: {

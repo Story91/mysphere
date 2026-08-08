@@ -57,7 +57,15 @@ const YapsMetrics = dynamic(() => import('../yapscan/components/YapsMetrics'), {
 import PostList, { ExtendedPost } from './components/PostList';
 import ProfileCard from './components/ProfileCard';
 import PinnedPosts from './components/PinnedPosts';
-import FeedAskRail from './components/FeedAskRail';
+import FeedAskRail, { ASKS_RAIL_CACHE_KEY } from './components/FeedAskRail';
+// Zakladanie Aska Z FEEDU. Kompozytor i karta sa te same, ktore stoja na
+// /asks - drugi formularz dotykajacy pieniedzy bylby drugim miejscem, w
+// ktorym trzeba naprawiac ten sam blad. Sciezka approve -> fund -> kwit ->
+// Firestore siedzi w `useCreateAsk` i tez jest wspolna.
+import AskComposer, { type AskDraft } from './components/AskComposer';
+import AskCard from './components/AskCard';
+import { useCreateAsk } from '../utils/asks/useCreateAsk';
+import type { Ask } from '../utils/asks/types';
 import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 // GlassIcons juz tu nie wchodzi - nawigacja desktopu idzie przez
@@ -644,7 +652,106 @@ function BaseChatContent() {
    * Na DESKTOPIE bez zmian - tam nie ma pigulki i kompozytor stoi otwarty.
    */
   const [mobileComposerOpen, setMobileComposerOpen] = useState(false);
-  
+
+  /**
+   * ===================================================================
+   * CO WLASNIE PISZESZ: POST CZY ASK
+   * ===================================================================
+   * Zgloszenie: "panel na glownym feedzie powinien miec przycisk do
+   * przelaczania pomiedzy Post i Postcoin czyli to co teraz jest a ASK".
+   *
+   * === DLACZEGO DWIE PIGULKI, A NIE TRZY ===
+   * Kusi ulozyc to jako "Post / PostCoin / Ask", ale wybor miedzy Postem
+   * a PostCoinem NIE JEST DZIS TRYBEM i nie wolno go w tryb zamienic.
+   * To sa DWA PRZYCISKI WYSYLKI pod jednym szkicem: piszesz raz, a na koncu
+   * decydujesz, czy to leci jako zwykly post (TransactionButton), czy jako
+   * PostCoin. Trzecia pigulka wymusilaby te decyzje PRZED napisaniem
+   * czegokolwiek i zabralaby mozliwosc zmiany zdania na koncu - czyli
+   * zepsulaby dzialajacy uklad, zeby doloczyc do niego czwarta rzecz.
+   *
+   * Ask stoi na innej osi: to inny PRZEDMIOT (pytanie z budzetem, miejscami
+   * i terminem), a nie inny sposob wyslania posta. Dlatego przelacznik ma
+   * dwa stany - "co robisz" - a wewnatrz trybu Post zostaje nietkniety wybor
+   * "jak to wysylasz". Przy okazji: dwie pigulki miesza sie na 360px obok
+   * istniejacych ikon, trzy juz nie.
+   *
+   * Domyslnie 'post'. `AskComposer` jest ciezki (budzet, miejsca, termin,
+   * escrow), wiec dopoki nikt go nie wybral, NIE JEST W OGOLE MONTOWANY -
+   * tak samo jak platna sekcja, ktora czeka zwinieta.
+   */
+  const [composerMode, setComposerMode] = useState<'post' | 'ask'>('post');
+
+  /**
+   * Aski zalozone W TEJ SESJI, z tego urzadzenia.
+   *
+   * Sa OSOBNO od pasa `FeedAskRail`, bo pas ma wlasny cache i wlasny odczyt,
+   * a ten, kto wlasnie zablokowal budzet, musi zobaczyc kwit NATYCHMIAST -
+   * nie za piec minut i nie po przejsciu na /asks. Ta lista niczego nie
+   * dociaga: kazde pole pochodzi z tego, co poszlo do zapisu.
+   */
+  const [asksCreatedHere, setAsksCreatedHere] = useState<Ask[]>([]);
+
+  /**
+   * Cala sciezka pieniedzy Aska: approve -> fund -> kwit -> dopiero Firestore.
+   * Kolejnosc i komunikaty stoja w `app/utils/asks/useCreateAsk.ts`.
+   */
+  const askFlow = useCreateAsk();
+
+  /**
+   * Ask zalozony z feedu.
+   *
+   * Rzucony blad wraca do `AskComposer`, ktory pokazuje go nad przyciskiem i
+   * NIE czysci formularza - dlatego tutaj nie ma zadnego catch. Czyszczenie
+   * pol robi kompozytor sam, dopiero po udanym zapisie.
+   */
+  const handleCreateAskFromFeed = useCallback(
+    async (draft: AskDraft) => {
+      const created = await askFlow.submit(draft);
+      setAsksCreatedHere((previous) => [created, ...previous]);
+
+      /**
+       * ===== PAS NAD FEEDEM MA SIE DOWIEDZIEC, ZE COS DOSZLO =====
+       * `FeedAskRail` trzyma odpowiedz w localStorage na piec minut. Bez
+       * uniewaznienia wpisu autor po zalozeniu Aska widzialby nad feedem
+       * liste SPRZED wlasnego Aska - i to przez caly ten czas wygladaloby
+       * jak nieudany zapis.
+       *
+       * Czyscimy WPIS, a nie przerysowujemy pasa. Wymuszony ponowny odczyt
+       * (remount przez `key`) kosztowalby dodatkowe zapytanie natychmiast po
+       * zapisie, pokazalby tego samego Aska DWA RAZY - raz w pasie, raz w
+       * kwicie ponizej - a przy nieudanym odczycie zamienilby potwierdzenie
+       * sukcesu w komunikat awarii. Pas i tak pobierze swieza liste przy
+       * najblizszym wejsciu na feed.
+       *
+       * Klucz jest IMPORTOWANY, nie przepisany. Przez chwile stal tu literal
+       * skopiowany z `FeedAskRail.tsx` - dwie kopie jednego napisu, ktore
+       * rozjezdzaja sie przy pierwszej zmianie nazwy, a rozjazd nie wywala
+       * buildu: uniewaznienie po prostu przestaje trafiac w cache i autor
+       * znowu widzi liste sprzed wlasnego Aska. Cichy blad, ktory wroci jako
+       * "zalozylem Aska i go nie ma".
+       *
+       * Znacznik czasu chodzi za kluczem (`${key}_timestamp`) - ta konwencja
+       * nalezy do pasa i jest w nim zapisana w readCachedAsks/writeCachedAsks.
+       *
+       * Uniewazniamy WYLACZNIE otwarte. Historia (`_resolved`) ma osobny wpis
+       * i zalozenie nowego Aska jej nie zmienia, wiec nie ma powodu kasowac
+       * odpowiedzi, za ktora ktos juz zaplacil odczytem.
+       */
+      try {
+        localStorage.removeItem(ASKS_RAIL_CACHE_KEY);
+        localStorage.removeItem(`${ASKS_RAIL_CACHE_KEY}_timestamp`);
+      } catch (error) {
+        // Brak dostepu do localStorage nie moze przewrocic zalozonego Aska -
+        // on juz istnieje, a to jest tylko sprzatanie cache'u.
+        console.error('[asks] Uniewaznienie cache pasa Askow nie powiodlo sie:', error);
+      }
+    },
+    // Sam `submit` jest stabilny miedzy renderami, a caly `askFlow` nie -
+    // to nowy obiekt przy kazdym przerysowaniu feedu, czyli useCallback bez
+    // zadnego efektu.
+    [askFlow.submit]
+  );
+
   // Hook do sprawdzania BaseName
   const { data: baseName } = useName(
     { address: (address || '0x0000000000000000000000000000000000000000') as `0x${string}`, chain: base },
@@ -3911,8 +4018,14 @@ function BaseChatContent() {
                   kompozytor sie pokazuje i na ktorym lancuchu wyladuje post.
                   Dlatego zostaje w kolumnie glownej, tuz nad kompozytorem,
                   a nie w kolumnie bocznej. Podpis dodany, bo sam rzad logotypow
-                  nie mowil, co robi klikniecie. */}
-              {isConnected && (
+                  nie mowil, co robi klikniecie.
+
+                  W TRYBIE ASK ZNIKA. Ask ma jedna siec i jeden token: budzet
+                  jest w USDC, a kontrakt escrow stoi na Base (patrz
+                  ASK_ESCROW_CHAIN_ID). Siedem logotypow nad formularzem, ktory
+                  i tak poprosi o Base, obiecywaloby wybor, ktorego nie ma -
+                  a na 360px zabieraloby caly rzad na nic. */}
+              {isConnected && composerMode === 'post' && (
               <div
                 className={`mb-4 rounded-card bg-soft-surface p-3 shadow-card lg:block ${
                   mobileComposerOpen ? '' : 'hidden'
@@ -4100,7 +4213,74 @@ function BaseChatContent() {
                       bo czytanie jest darmowe, a pisanie nie. */}
                   {isConnected && (
                     <>
-                      {canCreatePosts ? (
+                      {/* ===== POST ALBO ASK =====
+                          Dwie pigulki, nie trzy - pelne uzasadnienie stoi przy
+                          deklaracji `composerMode`. W skrocie: PostCoin nie jest
+                          trybem, tylko drugim przyciskiem wysylki pod tym samym
+                          szkicem, i tak zostaje.
+
+                          Pigulki dziela widocznosc z kompozytorem: na telefonie
+                          pojawiaja sie dopiero po dotknieciu plusa
+                          (`mobileComposerOpen`), na desktopie stoja zawsze.
+                          Inaczej nad zwinietym feedem wisialby wybor, ktory nie
+                          ma pod soba niczego do wybrania.
+
+                          `role="group"` + `aria-pressed`, a nie zakladki: to nie
+                          jest nawigacja i nic tu nie zmienia adresu - podmienia
+                          formularz w miejscu. */}
+                      <div
+                        role="group"
+                        aria-label="What are you posting"
+                        className={`mb-3 gap-2 lg:flex ${
+                          mobileComposerOpen ? 'flex' : 'hidden'
+                        }`}
+                      >
+                        {([
+                          { id: 'post', label: 'Post' },
+                          { id: 'ask', label: 'Ask' },
+                        ] as const).map((mode) => {
+                          const isActive = composerMode === mode.id;
+                          return (
+                            <button
+                              key={mode.id}
+                              type="button"
+                              onClick={() => setComposerMode(mode.id)}
+                              aria-pressed={isActive}
+                              className={`flex-none whitespace-nowrap rounded-pill px-4 py-2 font-soft text-[12.5px] transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg ${
+                                isActive
+                                  ? 'bg-soft-primary font-bold text-white shadow-chip'
+                                  : 'bg-soft-surface font-semibold text-soft-ink-muted'
+                              }`}
+                            >
+                              {mode.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {composerMode === 'ask' ? (
+                        /* Ten sam kompozytor, ktory stoi na /asks: budzet,
+                           miejsca, termin, wybor escrow i walidacja kwoty za
+                           odpowiedz. Druga implementacja tego formularza bylaby
+                           drugim miejscem, w ktorym trzeba naprawiac ten sam
+                           blad - a ten formularz dotyka pieniedzy.
+
+                           `mb-6` i zwijanie na telefonie - jak kompozytor postu
+                           obok, zeby przelaczenie trybu nie przesuwalo feedu. */
+                        <AskComposer
+                          onSubmit={handleCreateAskFromFeed}
+                          className={`mb-6 lg:block ${mobileComposerOpen ? '' : 'hidden'}`}
+                          disabled={!askFlow.walletConnected}
+                          disabledReason="Connect your wallet to post an Ask."
+                          escrowAvailable={askFlow.escrowAvailable}
+                          escrowUnavailableReason={askFlow.escrowUnavailableReason}
+                          escrowFeeBps={askFlow.feeBps}
+                          progressNote={askFlow.progressNote}
+                          // Bez `onCancel`: wyjsciem z tego formularza jest
+                          // pigulka "Post" tuz nad nim. Drugi przycisk robiacy
+                          // to samo kazalby zgadywac, ktory z nich czysci szkic.
+                        />
+                      ) : canCreatePosts ? (
                         /* Na telefonie zwiniety, dopoki ktos nie tknie plusa w
                            pigulce - patrz `mobileComposerOpen`. Na desktopie
                            (`lg:block`) stoi otwarty jak dotad. */
@@ -4501,6 +4681,33 @@ function BaseChatContent() {
                           </div>
                     </div>
                   )}
+                      {/* ===== KWIT ZA ZALOZONEGO ASKA =====
+                          Po zalozeniu Aska z feedu czlowiek ma zobaczyc, ze cos
+                          POWSTALO, i to bez odsylania go na /asks. Pas nad
+                          feedem czyta z cache'u (piec minut), wiec sam by tego
+                          nie pokazal - dlatego karta stoi tutaj, zlozona z
+                          tego, co naprawde poszlo do zapisu.
+
+                          Zostaje na ekranie takze po powrocie na pigulke
+                          "Post": to potwierdzenie czegos, co juz sie stalo,
+                          a nie czesc formularza. Znika dopiero z odswiezeniem
+                          strony - wtedy Ask jest juz w pasie wyzej.
+
+                          Przycisk karty prowadzi na /asks, bo TAM stoi panel
+                          odpowiedzi, przyjmowania i rozstrzygania. Feed nie
+                          dubluje tamtej mechaniki. */}
+                      {asksCreatedHere.length > 0 && (
+                        <section className="mb-6" aria-label="Asks you posted from this device">
+                          <h2 className="mb-2.5 px-0.5 font-soft text-[11px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
+                            Posted from this device
+                          </h2>
+                          <div className="flex flex-col gap-4">
+                            {asksCreatedHere.map((ask) => (
+                              <AskCard key={ask.id} ask={ask} isAuthor href="/asks" />
+                            ))}
+                          </div>
+                        </section>
+                      )}
                     </>
                   )}
 
