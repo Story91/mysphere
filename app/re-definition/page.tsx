@@ -629,8 +629,8 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   },
   {
     name: 'x402 on Base, in USDC',
-    status: 'wired',
-    note: 'The nearest missing thing. The same route already carries the branch for it — Coinbase as facilitator, keys and all — and moving there is two environment variables. But not one cent has gone through that branch, so it is a code path, not a rail. Today the paid route runs where the gasless dollar is, and that is Robinhood Chain.',
+    status: 'live',
+    note: 'The 402 answer now carries both rails at once and the payer picks: USDC on Base, or USDG on Robinhood Chain. Both have settled real money — a cent each way, gas paid by the facilitator rather than the payer. One quirk worth knowing if you build against this: the Coinbase facilitator refuses a payment to yourself, so the Base rail cannot be tested by paying your own address. The Robinhood one allows it.',
   },
   {
     name: 'Ask: post and answer',
@@ -659,8 +659,8 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   },
   {
     name: 'Being told you have been paid',
-    status: 'planned',
-    note: 'Resolving credits a winner a balance they have to come and claim, and nothing goes out to tell them. Until it does, /money is a page you have to think to open.',
+    status: 'live',
+    note: 'Resolving sends every winner a notification with the amount, and it says which of the two things happened: the contract is holding it for you and you collect it on /money, or it is already in your wallet. Those are different sentences because they are different situations. The amount comes from what the chain actually credited, not from what the Ask document says it should have.',
   },
   {
     name: 'Ask: in the feed',
