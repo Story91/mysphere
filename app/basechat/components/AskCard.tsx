@@ -372,12 +372,35 @@ function ResolveRateBadge({ rate }: { rate?: ResolveRate | null }) {
     );
   }
 
+  // === DLACZEGO NIE "resolved 0/2" ===
+  // Odznaka stala obok autora i mowila `resolved 0/2`, a naglowek tej samej
+  // karty mowil `CLOSED, NOT RESOLVED`. To samo slowo, dwa rozne znaczenia,
+  // piec centymetrow od siebie: raz status TEGO Aska, raz historia AUTORA.
+  // Wlasciciel przeczytal to i zapytal, czemu Ask ze statusem rozstrzygnietym
+  // pisze "resolved 0/2" - czyli odznaka nie tylko nie pomogla, ale wprost
+  // wprowadzila w blad.
+  //
+  // "settles N of M asks" mowi, CZYJA to cecha (autora, bo czasownik jest
+  // w trzeciej osobie) i ze dotyczy WIELU Askow, a nie tego jednego.
+  //
+  // Kolor tez zszedl z akcentu. To nie jest kwota, a pomaranczowy w tym
+  // systemie nalezy wylacznie do kwot - obok trzech prawdziwych kwot na tej
+  // samej karcie (budzet, stawka) odznaka udawala czwarta.
+  const zaniedbane = rate.settled - rate.resolved;
   return (
     <span
-      className="shrink-0 rounded-full border border-soft-accent/30 bg-soft-accent-soft px-2 py-0.5 text-[10px] font-medium tabular-nums text-soft-accent-deep"
-      title={`${rate.resolved} of ${rate.settled} asks past their deadline were resolved`}
+      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium tabular-nums ${
+        zaniedbane > 0
+          ? 'border-soft-line-strong bg-soft-sunken text-soft-ink-muted'
+          : 'border-soft-line bg-soft-sunken text-soft-ink-muted'
+      }`}
+      title={
+        zaniedbane > 0
+          ? `This author has let ${zaniedbane} of ${rate.settled} asks pass their deadline without resolving them. Nothing forces them to pay.`
+          : `This author resolved every one of their ${rate.settled} asks that reached its deadline.`
+      }
     >
-      resolved {rate.resolved}/{rate.settled}
+      settles {rate.resolved} of {rate.settled}
     </span>
   );
 }
