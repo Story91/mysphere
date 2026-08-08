@@ -30,13 +30,24 @@ import { Wallet, JsonRpcProvider, Contract, getAddress, hexlify, randomBytes } f
 config({ path: '.env.local' });
 
 const url = process.argv[2] || 'http://localhost:4021/api/asks/';
-const RPC = process.env.ROBINHOOD_RPC_URL || 'https://rpc.mainnet.chain.robinhood.com';
 
 const key = process.env.ADMIN_PRIVATE_KEY?.trim();
 if (!key) throw new Error('Brak ADMIN_PRIVATE_KEY w .env.local');
 
-const provider = new JsonRpcProvider(RPC);
-const wallet = new Wallet(key.startsWith('0x') ? key : `0x${key}`, provider);
+/**
+ * RPC MUSI ISC ZA WYBRANA SIECIA, a nie byc wpisany na sztywno.
+ *
+ * Bylo tu jedno RPC Robinhooda, ustawione zanim skrypt w ogole wiedzial,
+ * ktora pozycje z `accepts` wybierzemy. Przy `--network=eip155:8453` skrypt
+ * pytal o saldo USDC z Base pod adresem tego kontraktu, ale NA LANCUCHU
+ * ROBINHOODA - gdzie pod tym adresem nie ma kodu. Wynik: BAD_DATA
+ * "could not decode result data", czyli awaria wygladajaca na blad ABI.
+ */
+const RPC_PER_CHAIN = {
+  4663: process.env.ROBINHOOD_RPC_URL || 'https://rpc.mainnet.chain.robinhood.com',
+  8453: process.env.BASE_RPC_URL || 'https://mainnet.base.org',
+  84532: process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
+};
 
 const body = JSON.stringify({
   question: 'Does the USDG payment path on Robinhood Chain actually settle?',
@@ -61,7 +72,33 @@ const header = first.headers.get('payment-required');
 if (!header) throw new Error('402 bez naglowka payment-required');
 
 const required = JSON.parse(Buffer.from(header, 'base64').toString('utf8'));
-const req = required.accepts[0];
+// === WYBOR SIECI ===
+// Od chwili, gdy `accepts` niesie WIELE pozycji, branie zerowej znaczy
+// "testujemy zawsze te sama noge". Agent w prawdziwym swiecie wybiera ta,
+// w ktorej ma pieniadze - i my musimy umiec sprawdzic kazda z osobna.
+//   node scripts/x402PayAsk.mjs <url> --network=eip155:8453
+const chcianaSiec = (process.argv.find((a) => a.startsWith('--network=')) || '').split('=')[1];
+const req = chcianaSiec
+  ? required.accepts.find((a) => a.network === chcianaSiec)
+  : required.accepts[0];
+
+if (!req) {
+  console.log(`Siec ${chcianaSiec} nie jest w accepts. Dostepne:`);
+  for (const a of required.accepts) console.log('   ', a.network, a.asset);
+  process.exit(1);
+}
+
+console.log(`accepts ma ${required.accepts.length} pozycji, wybrana: ${req.network}
+`);
+
+const chainIdWybrany = Number(req.network.split(':')[1]);
+const rpc = RPC_PER_CHAIN[chainIdWybrany];
+if (!rpc) {
+  console.log(`Brak RPC dla chainId ${chainIdWybrany}. Dopisz go do RPC_PER_CHAIN.`);
+  process.exit(1);
+}
+const provider = new JsonRpcProvider(rpc);
+const wallet = new Wallet(key.startsWith('0x') ? key : `0x${key}`, provider);
 
 console.log('WYMAGANIA Z NASZEGO SERWERA:');
 console.log(`  siec:    ${req.network}`);
@@ -76,8 +113,8 @@ if (!req.extra?.name || !req.extra?.version) {
 }
 
 // ---- SALDO PRZED ----
-const USDG_ABI = ['function balanceOf(address) view returns (uint256)'];
-const token = new Contract(req.asset, USDG_ABI, provider);
+const ERC20_ABI = ['function balanceOf(address) view returns (uint256)'];
+const token = new Contract(req.asset, ERC20_ABI, provider);
 const before = {
   from: await token.balanceOf(wallet.address),
   to: await token.balanceOf(req.payTo),
@@ -96,7 +133,7 @@ const authorization = {
   nonce: hexlify(randomBytes(32)),
 };
 
-const chainId = Number(req.network.split(':')[1]);
+const chainId = chainIdWybrany;
 const signature = await wallet.signTypedData(
   {
     name: req.extra.name,
