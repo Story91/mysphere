@@ -84,6 +84,26 @@ const POZYCJE = [
 export default function MobileBottomNav() {
   const pathname = usePathname();
 
+  /**
+   * ===== KOMPONENT SAM PILNUJE, GDZIE GO NIE MA =====
+   *
+   * Dotad wstawialy go POJEDYNCZE strony - i tylko dwie z osmiu to zrobily.
+   * Na telefonie /asks i /money mialy dolny pasek, a /curators, /how,
+   * /leaderboard, /re-definition i /join nie mialy nic w zasiegu kciuka:
+   * jedynym wyjsciem byla gorna belka albo przycisk "wstecz" przegladarki.
+   * Nowa strona domyslnie ladowala w tej gorszej grupie, bo trzeba bylo
+   * PAMIETAC o dopisaniu paska.
+   *
+   * Teraz pasek stoi raz, w AppShell, a warunek widocznosci nalezy do niego
+   * samego. Kazda przyszla trasa dostaje go bez pamietania o czymkolwiek.
+   *
+   * WYJATEK: /basechat. Tamtejszy dolny pasek NIE JEST nawigacja miedzy
+   * stronami, tylko przelacznikiem trzech paneli jednej strony (Profile /
+   * Feed / Trends) sterujacym jej stanem. Dwa paski jeden na drugim to dwa
+   * rozne znaczenia tego samego miejsca na ekranie.
+   */
+  if (pathname === '/basechat' || pathname?.startsWith('/basechat/')) return null;
+
   return (
     <>
       <nav

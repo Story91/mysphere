@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useAccount, useChainId, useConfig, usePublicClient, useSwitchChain } from 'wagmi';
 import { getWalletClient } from 'wagmi/actions';
 import { base } from 'wagmi/chains';
-import MobileBottomNav from '../components/MobileBottomNav';
 import AskCard, { formatAskMoney } from '../basechat/components/AskCard';
 import AskClaimPanel from '../basechat/components/AskClaimPanel';
 import AskComposer, { type AskDraft } from '../basechat/components/AskComposer';
@@ -674,7 +673,6 @@ export default function AsksPage() {
           wewnetrznym przelacznikiem paneli i tu nie dziala - bez tego /asks
           bylo na telefonie slepym zaulkiem: gorna belka chowa sie pod
           hamburgerem, wiec droga powrotna istniala, ale nie bylo jej widac. */}
-      <MobileBottomNav />
     </main>
   );
 }

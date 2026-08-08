@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import Navigation from './Navigation/Navigation';
+import MobileBottomNav from './MobileBottomNav';
 import { ThemeProvider } from '../context/ThemeContext';
 import { Providers } from '../providers';
 import SessionPrompt from './auth/SessionPrompt';
@@ -38,6 +39,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Providers>
         <Navigation />
         <main className="w-full">{children}</main>
+        {/* Dolny pasek dla tras spoza feedu. Stoi TUTAJ, a nie w stronach:
+            wstawialy go tylko dwie z osmiu, wiec /curators, /how, /leaderboard,
+            /re-definition i /join nie mialy na telefonie nic w zasiegu kciuka.
+            Warunek widocznosci (ukrycie na /basechat, gdzie dolny pasek jest
+            przelacznikiem paneli, a nie nawigacja) nalezy do komponentu. */}
+        <MobileBottomNav />
 
         {/* Zaproszenie do podpisu SIWE dla portfeli podlaczonych z pominieciem
             ekranu przedlogowania. Bez tego lancuch tozsamosci konczyl sie na

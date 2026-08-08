@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useAccount, useChainId, useConfig, usePublicClient, useSwitchChain } from 'wagmi';
 import { getWalletClient } from 'wagmi/actions';
 import { base } from 'wagmi/chains';
-import MobileBottomNav from '../components/MobileBottomNav';
 import ConnectModal from '../components/wallet/ConnectModal';
 import AskClaimPanel from '../basechat/components/AskClaimPanel';
 import { getProofLink, resolveTipNetwork } from '../basechat/components/TipNetworkConfig';
@@ -390,7 +389,6 @@ export default function MoneyPage() {
       </div>
 
       {/* Wyjscie z tej strony na telefonie - ten sam pasek co na /asks. */}
-      <MobileBottomNav />
     </main>
   );
 }
