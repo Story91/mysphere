@@ -341,9 +341,71 @@ export async function acceptAnswer(
       : {}),
   });
 
+  // ===================================================================
+  // OSTATNIE OPLACONE MIEJSCE ZAMYKA ASKA SAM
+  // ===================================================================
+  // Zgloszenie wlasciciela: "settles 0 of 2, a 2 sa resolved, bo zaplacilem
+  // za najlepsze odpowiedzi". Sprawdzone w bazie - mial racje i to byl blad
+  // dzialajacy na jego niekorzysc:
+  //
+  //   status=open  seats=1  acceptedCount=1   <- kazde miejsce oplacone
+  //   status=open  seats=1  acceptedCount=1   <- to samo
+  //
+  // Obie przyjete odpowiedzi mialy hash wyplaty. Autor zaplacil w CALOSCI,
+  // a jego publiczny wskaznik rozstrzygalnosci pokazywal, ze porzucil dwa
+  // Aski - bo `resolve` bylo osobnym, drugim klikiem, o ktorym nikt nie
+  // powiedzial, ze jest konieczny.
+  //
+  // Panel mowil doslownie "1 of 1 seats paid" i obok trzymal czynny przycisk
+  // "Resolve this Ask". Gdy wszystkie miejsca sa oplacone, nie ma juz CZEGO
+  // rozstrzygac: nie ma wolnego miejsca, nie ma decyzji do podjecia. Drugi
+  // klik nie niosl informacji, a jego pominiecie kosztowalo reputacje.
+  //
+  // TYLKO DLA 'on-resolve'. Przy escrow `resolve` jest wywolaniem NA
+  // KONTRAKCIE, ktore dopiero rozdziela pieniadze - zamkniecie samego
+  // dokumentu twierdziloby, ze wyplacono, podczas gdy budzet dalej lezy
+  // zablokowany. Tam drugi krok jest prawdziwym krokiem i zostaje.
+  const zamkniete = await zamknijGdyWszystkieMiejscaOplacone(askId);
+
+  if (!zamkniete) {
+    await updateDoc(doc(db, ASKS, askId), {
+      acceptedCount: increment(1),
+    });
+  }
+}
+
+/**
+ * Podbija licznik przyjec i - jesli to bylo ostatnie miejsce - zamyka Aska
+ * w TYM SAMYM zapisie.
+ *
+ * Jeden `updateDoc` zamiast dwoch nie jest optymalizacja, tylko poprawnoscia:
+ * dwa osobne zapisy zostawialyby okno, w ktorym Ask ma komplet oplaconych
+ * miejsc i status `open`, czyli dokladnie ten stan, ktory naprawiamy.
+ *
+ * Zwraca `false`, gdy nie dalo sie odczytac Aska - wtedy wolajacy robi sam
+ * goly increment. Nieudany odczyt NIE MOZE kosztowac zapisu przyjecia:
+ * przelew juz poszedl na lancuch.
+ */
+async function zamknijGdyWszystkieMiejscaOplacone(askId: string): Promise<boolean> {
+  let ask: Ask | null = null;
+  try {
+    ask = await getAsk(askId);
+  } catch (error) {
+    console.error('[asks] Nie udalo sie sprawdzic, czy Ask domyka sie sam:', error);
+    return false;
+  }
+  if (!ask) return false;
+
+  const poTym = (ask.acceptedCount ?? 0) + 1;
+  const komplet = ask.seats > 0 && poTym >= ask.seats;
+  const samoDomkniecie = komplet && ask.funding === 'on-resolve' && ask.status === 'open';
+
   await updateDoc(doc(db, ASKS, askId), {
     acceptedCount: increment(1),
+    ...(samoDomkniecie ? { status: 'resolved', resolvedAt: Date.now() } : {}),
   });
+
+  return true;
 }
 
 /**
