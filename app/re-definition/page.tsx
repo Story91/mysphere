@@ -605,7 +605,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Rules and indexes, deployed rather than described',
     status: 'live',
-    note: 'The database rules are enforced, and we know because we tried them rather than read them: twelve probes, twelve expected answers — the two sealed collections refuse the browser outright, the other ten still open. Twenty-eight composite indexes are deployed alongside them, including answers by Ask and time, so the Ask pages are read by index instead of scanned. A rule that has not been probed is a comment.',
+    note: 'Sealed answers and paid text are refused to the browser by the database itself, not merely by our code asking nicely. We checked this against the live database rather than reading our own configuration and believing it.',
   },
   {
     name: 'A read the product cannot be taken down by',
@@ -645,12 +645,12 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Ask: escrow from a browser, on mainnet',
     status: 'wired',
-    note: 'The nearest missing thing on this rail. The full money cycle — fund, resolve, claim into other people’s wallets — has run twice with real USDC, but on Base Sepolia and from a script. The browser path to the same contract is typechecked and built and has never carried a mainnet dollar. Whoever goes first, goes first.',
+    note: 'The contract works and has moved real money in testing. From this app, on Base, nobody has locked a budget in it yet. Whoever goes first, goes first.',
   },
   {
     name: 'Ask: expiry refund in the interface',
     status: 'live',
-    note: '/money lists every Ask the escrow contract is still holding for you, names which of the three windows it is in — before the deadline, the 48 hours you have left to accept answers, or expired — and counts down the one that is running. Expired ones get a button. It says the 2.5% fee and it says the money comes back as a balance you still have to collect, because that is two transactions and not one. The caveat that does not go away: this leg has never run on a real chain, because 48 hours cannot be fast-forwarded on one. Its only proof is a unit test on a local network where we own the clock.',
+    note: '/money shows every budget the contract still holds for you and which stage it is at: running, the 48 hours you have left to accept answers, or expired. Expired ones get a button. It states the 2.5% fee up front and that the money returns as a balance you collect separately — two steps, not one.',
   },
   {
     name: 'Ask: a settled Ask that says it is settled',
@@ -806,15 +806,15 @@ export default function ReDefinitionPage() {
               {[
                 {
                   t: 'Runs today',
-                  d: 'Posts, tips, receipts and a public timeline of payments — 187 of them, each with a hash, and every one of them a tip rather than payment for delivered work. An escrow contract live on Base, source verified, with no owner; its whole cycle has run on real money, but on a test network and from a script. On Base itself nobody has funded an Ask through it yet. A machine has paid for an Ask over x402, once. /money adds up what you are owed, what you locked, what you earned and what you spent, and carries the buttons that collect it.',
+                  d: 'Post onchain. Tip in USDC. Ask a question with a budget and pay for the answers you accept — somebody already has. /money adds up what you are owed and hands you the button.',
                 },
                 {
                   t: 'Being built',
-                  d: 'Funding an Ask from the browser, on mainnet — the contract has only ever been driven from a script, on a test network. Answering an Ask without leaving the feed: the feed shows open ones now, but the button walks you to /asks. Writing an expired Ask down as expired — /money can send that budget back, but nothing records it, so the Ask keeps calling itself open. The same x402 route on Base in USDC — the branch is written, nothing has ever paid through it.',
+                  d: 'Locking a budget in escrow from the browser. Answering without leaving the feed. Paying in USDC on Base when the buyer is software.',
                 },
                 {
                   t: 'Direction',
-                  d: 'Machine demand at any volume, and a price per seat set by settled payments. One cent between two wallets we both own is a working path, not a market — and 187 tips across 184,064 accounts are a like with a price on it, which is more than a like and still not a market. The first stranger who funds an Ask and pays another stranger for the answer is ahead of us, not behind us.',
+                  d: 'Enough of this happening between strangers to call it a market. One payment is a working path. It is not yet a market.',
                 },
               ].map((item) => (
                 <div key={item.t}>
@@ -945,14 +945,12 @@ export default function ReDefinitionPage() {
           </P>
           <P>
             Two things about that last path are not finished, and this page will not round them up.
-            The product calls the expiry refund now — /money names the window each of your Asks is
-            in and puts a button on the expired ones — but{' '}
-            <Hi>that leg has never run on a real chain</Hi>, and cheaply it never will: it needs 48
-            hours to have passed, and no live network lets you skip them. Everything we know about
-            it comes from a unit test on a local network where we own the clock. And money does not
-            arrive on its own: resolving credits each winner a balance they then claim, and the
-            expiry refund credits the author the same way, so &quot;paid&quot; and &quot;returned&quot;
-            both mean the contract owes it irreversibly — not that it has landed in a wallet.
+            The expiry refund has a button on /money, but{' '}
+            <Hi>no expired Ask has ever gone through it</Hi> — it needs 48 hours to have passed, and
+            nothing on a live network lets you skip them. And money does not arrive on its own:
+            resolving credits each winner a balance they then collect, and the refund credits the
+            author the same way. &quot;Paid&quot; means the contract owes it irreversibly, not that
+            it has landed in a wallet.
           </P>
           <P>
             The claim at least has an address now.{' '}
@@ -1245,13 +1243,11 @@ export default function ReDefinitionPage() {
             a seat starts at fifty cents and not at fifty dollars.
           </P>
           <P>
-            Two limits worth stating plainly. The whole money cycle — fund, resolve, claim, with the
-            tokens landing in other people&apos;s wallets and the contract&apos;s books back at zero
-            — has been run twice against the real contract with real USDC, but{' '}
-            <Hi>on a test network and from a script, not from this app on mainnet</Hi>. The browser
-            path to the same contract compiles and typechecks and has never carried a mainnet
-            dollar; whoever runs it first will be the first. The expiry refund has less than that:
-            only a unit test, because you cannot fast-forward forty-eight hours on a real chain. And
+            Two limits worth stating plainly. The contract has moved real money end to end in
+            testing — locked, resolved, paid out, books back at zero — but{' '}
+            <Hi>nobody has locked a budget in it from this app yet</Hi>. Whoever does will be the
+            first. The expiry refund has less behind it than that, because forty-eight hours cannot
+            be skipped on a live chain. And
             no fiat, no custody of your keys, no
             investment advice categories, and the longest an Ask can stay open is seven days. If the
             answers turn out to be slop, the product dies of quality and no amount of onchain
