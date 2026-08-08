@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import type { VaultFacts, VaultListResult } from '../../utils/morpho/types';
 import { vaultLabel } from '../../utils/asks/vaultContext';
 import VaultFactsCard from './VaultFactsCard';
@@ -157,6 +158,20 @@ export default function AskVaultPicker({
           <p className="mt-1.5 text-[11.5px] leading-[1.45] text-soft-ink-faint">
             These numbers get attached to your ask, so whoever answers argues with the same snapshot
             you saw.
+          </p>
+          {/* Jedyny moment w produkcie, w ktorym czlowiek patrzy na prowizje
+              KONKRETNEGO skarbca - wiec zapis zmian jest tu dana na miejscu,
+              a nie osobna wycieczka. Prowizja to procent, nie kwota: odnosnik
+              idzie fioletem, nie bursztynem. */}
+          <p className="mt-1 text-[11.5px] leading-[1.45] text-soft-ink-faint">
+            Fee and curator changes for listed vaults are on{' '}
+            <Link
+              href="/curators"
+              className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            >
+              the curator record
+            </Link>
+            .
           </p>
         </>
       )}

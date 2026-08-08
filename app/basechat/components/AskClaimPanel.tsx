@@ -98,6 +98,13 @@ export default function AskClaimPanel({
     };
   }, []);
 
+  /**
+   * `reloadKey` z pierwszego renderu. Sluzy wylacznie do odroznienia "wejscia
+   * na panel" od "przeczytaj jeszcze raz, bo cos sie stalo" - wolajacy moze
+   * zaczac od dowolnej liczby, wiec porownanie z zerem bylo by zgadywaniem.
+   */
+  const pierwszyKluczRef = useRef(reloadKey);
+
   const load = useCallback(async () => {
     if (!address || !publicClient) return;
     setPhase('loading');
@@ -105,15 +112,48 @@ export default function AskClaimPanel({
     // przy nowej kwocie mowilby "Collected" nad pieniedzmi, ktorych nikt
     // jeszcze nie odebral.
     setClaimedTx(null);
-    try {
-      const value = await readClaimable(publicClient, ESCROW_CHAIN_ID, address);
+
+    /**
+     * ===== ZERO PO AKCJI JEST PODEJRZANE, ZERO NA WEJSCIU NIE =====
+     *
+     * Publiczne RPC Base stoi za load balancerem: wezel bez najswiezszego bloku
+     * oddaje zero tam, gdzie saldo juz istnieje. Kosztowalo to juz falszywe
+     * "nieoplacony" na /asks i znikajacy przycisk zwrotu na /money.
+     *
+     * Tutaj NIE WOLNO jednak ponawiac zawsze, bo zero jest tu normalnym stanem
+     * wiekszosci ludzi - nikt nie ma nic do odebrania, dopoki mu nie zaplacono.
+     * Trzy proby na kazdym wejsciu opoznialyby panel wszystkim po to, by
+     * potwierdzic prawde, ktora juz znamy.
+     *
+     * Podejrzane jest zero PO AKCJI: `reloadKey` rosnie tylko wtedy, gdy cos
+     * sie wlasnie stalo (rozstrzygniecie, odbior) i wolajacy prosi o ponowny
+     * odczyt. Wtedy zero czesto znaczy "wezel jeszcze nie widzi", a nie "nie ma".
+     * Niezerowe saldo jest odpowiedzia pewna i konczy petle od razu.
+     */
+    const poAkcji = reloadKey !== pierwszyKluczRef.current;
+    const OPOZNIENIA = poAkcji ? [1200, 2400] : [];
+
+    for (let proba = 0; ; proba += 1) {
+      try {
+        const value = await readClaimable(publicClient, ESCROW_CHAIN_ID, address);
+        if (!mountedRef.current) return;
+
+        if (value > 0n || proba >= OPOZNIENIA.length) {
+          setUnits(value);
+          setPhase('ready');
+          return;
+        }
+      } catch (error) {
+        console.error('[asks] Odczyt salda escrow nie powiodl sie:', error);
+        if (!mountedRef.current) return;
+        if (proba >= OPOZNIENIA.length) {
+          setPhase('failed');
+          return;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, OPOZNIENIA[proba]));
       if (!mountedRef.current) return;
-      setUnits(value);
-      setPhase('ready');
-    } catch (error) {
-      console.error('[asks] Odczyt salda escrow nie powiodl sie:', error);
-      if (!mountedRef.current) return;
-      setPhase('failed');
     }
     // reloadKey nie jest uzyty w ciele celowo - to sygnal "przeczytaj jeszcze
     // raz", nie dana wejsciowa.

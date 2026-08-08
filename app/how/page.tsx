@@ -45,7 +45,7 @@ export const metadata = {
   // Marke doklada `title.template` z layoutu glownego.
   title: 'How it works',
   description:
-    'What you can do on MySphere today: post onchain, tip in USDC, sell part of a post, ask a question with a budget, and collect what you are owed.',
+    'What you can do on MySphere today: post onchain, tip in USDC, sell part of a post, ask a question with a budget, collect what you are owed, and look up what a vault curator changed.',
   openGraph: {
     title: 'How MySphere works',
     description:
@@ -57,11 +57,11 @@ export const metadata = {
 /* ------------------------------------------------------------------ */
 
 /**
- * === SIEDEM KROKOW W JEDNYM MIEJSCU ===
+ * === OSIEM KROKOW W JEDNYM MIEJSCU ===
  *
  * Tytul, numer i CENA kazdego kroku sa tu, a nie w JSX-ie ponizej, z jednego
  * powodu: skorowidz na gorze strony i naglowek samego kroku musza podawac to
- * samo. Dwie recznie utrzymywane listy tych samych siedmiu pozycji rozjezdzaja
+ * samo. Dwie recznie utrzymywane listy tych samych pozycji rozjezdzaja
  * sie przy pierwszej zmianie ceny - a ta strona zyje z tego, ze cena zgadza sie
  * z rzeczywistoscia.
  *
@@ -133,6 +133,25 @@ const STEPS: StepMeta[] = [
     cost: 'Gas only',
     note: 'The amount is already yours',
   },
+  /**
+   * === OSMY KROK LAMIE ZASADE KOLEJNOSCI I ROBI TO SWIADOMIE ===
+   * Numery na tej stronie znacza zaleznosc: bez portfela nie napiszesz posta,
+   * bez posta nie sprzedasz jego czesci. Ten krok nie zalezy od NICZEGO - da
+   * sie go zrobic przed krokiem 01, bez portfela i bez podpisu.
+   *
+   * Mimo to stoi na koncu, a nie na poczatku. Instrukcja zaczynajaca sie od
+   * czytania cudzego rejestru odpowiadalaby na pytanie, ktorego nikt nie ma
+   * przy pierwszym wejsciu. Sam krok mowi wprost, ze nie potrzebuje niczego
+   * z poprzednich siedmiu - to jest tansze niz przenumerowanie calej strony
+   * po to, zeby numer niosl dwie rozne rzeczy naraz.
+   */
+  {
+    n: '08',
+    id: 'curators',
+    title: 'Look up what changed in a vault',
+    cost: 'Free',
+    note: 'No wallet, no signature, nothing to connect',
+  },
 ];
 
 function Step({ meta, children }: { meta: StepMeta; children: React.ReactNode }) {
@@ -145,8 +164,9 @@ function Step({ meta, children }: { meta: StepMeta; children: React.ReactNode })
             Tam sekcje sa stanami tej samej kwoty, nie krokami, wiec numer nic
             by nie niosl. Tutaj to instrukcja i kolejnosc naprawde ma znaczenie:
             bez portfela nie napiszesz posta, bez posta nie sprzedasz jego czesci.
+            Jedyny wyjatek to krok 08 - uzasadnienie stoi przy nim w tablicy STEPS.
 
-            Stala szerokosc rynny: siedem naglowkow zaczyna sie na tym samym
+            Stala szerokosc rynny: kazdy naglowek zaczyna sie na tym samym
             pionie, wiec wzrok schodzacy po stronie ma po czym isc. */}
         <span className="w-[26px] shrink-0 font-soft-display text-[13px] font-bold tabular-nums text-soft-primary-deep">
           {meta.n}
@@ -221,11 +241,11 @@ function Cost({ lead, children }: { lead: string; children: React.ReactNode }) {
 function StepIndex() {
   return (
     <nav
-      aria-label="The seven steps"
+      aria-label="The eight steps"
       className="mt-10 rounded-card border border-soft-line bg-soft-surface p-4 shadow-card sm:p-5"
     >
       <p className="mb-2 font-soft text-[11px] font-bold uppercase tracking-[0.16em] text-soft-ink-faint">
-        Seven steps, and what each one costs
+        Eight steps, and what each one costs
       </p>
       <ol>
         {STEPS.map((step) => (
@@ -386,6 +406,26 @@ export default function HowPage() {
               that earned it.
             </P>
             <P>
+              You do not have to go anywhere to start one. Above the box you
+              write posts in there is a <Hi>Post / Ask</Hi> switch — flip it to
+              Ask and the same box turns into the question, the budget, the
+              seats and the deadline. On an empty form you also get a row of
+              ready-made starters (<Hi>Vault risk</Hi>,{' '}
+              <Hi>Is this yield real</Hi>, <Hi>What can the owner do</Hi> and
+              two more); tapping one fills in the question, the budget, the
+              seats and the deadline together, and you edit from there. They
+              disappear the moment you start typing, so nothing you set gets
+              overwritten.
+            </P>
+            <P>
+              If your question is about a Morpho vault on Base, you can attach
+              the vault itself instead of pasting an address. The list only
+              contains vaults Morpho lists — anyone can deploy a vault and name
+              it after a curator they are not, and a picked-from-list vault
+              cannot be one of those. Whoever answers sees the same fee and the
+              same split of the yield you did.
+            </P>
+            <P>
               You can lock the budget in an escrow contract on Base before the
               question exists. Then whoever answers can check, before writing a
               word, that the money is really there — the contract has no owner
@@ -417,6 +457,14 @@ export default function HowPage() {
               they actually settled, counted only over ones past their deadline.
             </P>
             <P>
+              You do not have to hunt for one. Open asks sit in a strip above
+              the feed, with an <Hi>Open</Hi> / <Hi>Resolved</Hi> switch on it.
+              Resolved shows asks that are closed and paid — nothing to answer
+              there, but each accepted answer carries the transaction that paid
+              for it, which is the fastest way to see what this actually pays
+              before you write anything.
+            </P>
+            <P>
               We are blunt about this: on an Ask without escrow, nothing is held
               and nothing forces the author to pay. A seat starts at fifty cents
               and not at fifty dollars for exactly that reason.
@@ -446,6 +494,41 @@ export default function HowPage() {
               has never been pressed for real by anyone.
             </P>
             <Go href="/money">Open Money</Go>
+          </Step>
+
+          {/* ---------------------------------------------------------- */}
+          {/* Krok bez portfela i bez podpisu - jedyny taki na tej stronie.
+              Uzasadnienie jego miejsca w kolejnosci stoi przy STEPS[7]. */}
+          <Step meta={STEPS[7]}>
+            <P lead>
+              A Morpho vault has a curator: whoever sets its fee and decides
+              what it lends against. They can raise that fee, or hand the vault
+              to somebody else, and nobody has to tell the people whose money is
+              in it. <Hi>Curators</Hi> is a dated record of exactly that — the
+              fee before, the fee after, and the dates we saw it between.
+            </P>
+            <P>
+              It covers the vaults Morpho lists on Base, and it records three
+              things and only three: the fee, who curates, and whether a vault
+              is on that list. Not the yield, which moves on its own every hour
+              and is nobody&apos;s decision. Not what a vault lends against,
+              which we do not read — so an empty page there is not proof that a
+              vault stayed the same, and the page says so itself.
+            </P>
+            <P>
+              The dates are ranges, not moments. It is one reading a day
+              compared with the previous one, so an entry says a change happened
+              between two dates, not the hour it happened. Worth knowing before
+              you open it: it started collecting recently, so it can honestly
+              have nothing in it — and when that is the case, it tells you which
+              of the two it is, an empty record or a quiet month.
+            </P>
+            <P>
+              There is nothing about you in there. It reads public vault
+              parameters, has no idea which vaults you use, and never touches a
+              wallet — yours or anyone else&apos;s.
+            </P>
+            <Go href="/curators">Open the curator record</Go>
           </Step>
         </div>
 

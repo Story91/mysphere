@@ -648,27 +648,68 @@ function LockedPanel({
       return;
     }
     setPhase('loading');
-    try {
-      const states = await Promise.all(
-        looked.map((ask) => readEscrow(publicClient, ESCROW_CHAIN_ID, author, ask.id))
-      );
-      const live: LockedAsk[] = [];
-      states.forEach((state, index) => {
-        // `funded && open` to jedyny stan, w ktorym pieniadze naprawde tam sa.
-        // Po rozstrzygnieciu budzet jest zerem - poszedl na salda odbiorcow.
-        if (state.funded && state.open && state.budget > 0n) {
-          live.push({
-            row: looked[index],
-            budget: state.budget,
-            deadlineMs: Number(state.deadlineSeconds) * 1000,
-          });
+
+    /**
+     * ===== BRAK POKRYCIA JEST TU PODEJRZANY, A NIE NORMALNY =====
+     *
+     * `looked` zawiera WYLACZNIE Aski, ktore same o sobie mowia
+     * `funding: 'escrowed'` (filtr `escrowedOpen` wyzej). Kazdy z nich POWINIEN
+     * miec pokrycie w kontrakcie. Odczyt mowiacy "nie ma" jest wiec albo realna
+     * rozbieznoscia, albo - znacznie czesciej - spoznionym wezlem.
+     *
+     * Publiczne RPC Base stoi za load balancerem i wezel bez najswiezszego
+     * bloku oddaje na `escrowFor` czyste zera, ktore czytaja sie jak "pusto".
+     * Na /asks kosztowalo to falszywe ostrzezenie, ze oplacony Ask jest
+     * nieoplacony. TUTAJ kosztuje wiecej i ciszej: Ask wypada z listy
+     * `locked`, wiec czlowiek NIE WIDZI przycisku zwrotu dla pieniedzy, ktore
+     * naprawde leza w kontrakcie. Brak przycisku nie wyglada na blad - wyglada
+     * na "nie ma czego odzyskiwac".
+     *
+     * Dlatego ponawiamy dopoki KTORYKOLWIEK wiersz nie ma pokrycia. Komplet
+     * pokrycia konczy petle natychmiast, wiec normalny przypadek nic nie placi.
+     * Pusta lista wychodzi wyzej i tu nie dociera.
+     */
+    const OPOZNIENIA = [1200, 2400];
+
+    for (let proba = 0; ; proba += 1) {
+      try {
+        const states = await Promise.all(
+          looked.map((ask) => readEscrow(publicClient, ESCROW_CHAIN_ID, author, ask.id))
+        );
+        const live: LockedAsk[] = [];
+        states.forEach((state, index) => {
+          // `funded && open` to jedyny stan, w ktorym pieniadze naprawde tam sa.
+          // Po rozstrzygnieciu budzet jest zerem - poszedl na salda odbiorcow.
+          if (state.funded && state.open && state.budget > 0n) {
+            live.push({
+              row: looked[index],
+              budget: state.budget,
+              deadlineMs: Number(state.deadlineSeconds) * 1000,
+            });
+          }
+        });
+
+        // `funded` bez `open` to Ask JUZ ROZSTRZYGNIETY - pokrycie bylo i
+        // zostalo wydane. To nie jest brak, wiec nie ponawiamy przez niego.
+        const bezPokrycia = states.filter((state) => !state.funded).length;
+
+        if (bezPokrycia === 0 || proba >= OPOZNIENIA.length) {
+          setLocked(live);
+          setPhase('ready');
+          return;
         }
-      });
-      setLocked(live);
-      setPhase('ready');
-    } catch (error) {
-      console.error('[money] Odczyt zablokowanych budzetow nie powiodl sie:', error);
-      setPhase('failed');
+      } catch (error) {
+        console.error('[money] Odczyt zablokowanych budzetow nie powiodl sie:', error);
+        // Padniecie na ostatniej probie znaczy "nie wiemy". Wczesniejsze idzie
+        // na kolejna probe - pojedynczy wezel bywa chwilowo zly, a zaden z tych
+        // odczytow niczego nie zmienia, wiec powtorzenie jest darmowe.
+        if (proba >= OPOZNIENIA.length) {
+          setPhase('failed');
+          return;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, OPOZNIENIA[proba]));
     }
   }, [publicClient, looked, author]);
 

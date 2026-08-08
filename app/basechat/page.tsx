@@ -2717,14 +2717,59 @@ function BaseChatContent() {
     const isApple = /iphone|ipad|macintosh|mac os x/.test(userAgent) && !('MSStream' in window);
     setIsAppleDevice(isApple);
     
-    // Naprawianie problemu z vh na iOS
+    /**
+     * ===== DLACZEGO --vh NIE IDZIE ZA KAZDYM `resize` =====
+     *
+     * Feed zacinal sie przy przewijaniu w aplikacji mobilnej i to bylo zrodlo.
+     *
+     * Na telefonie pasek adresu chowa sie i wraca W TRAKCIE przewijania, a
+     * kazde takie drgniecie to zdarzenie `resize`. Poprzednia wersja pisala
+     * przy kazdym z nich `--vh` na <html>. Zmienne CSS SA DZIEDZICZONE, wiec
+     * zapis na korzeniu uniewaznia style KAZDEGO elementu w dokumencie -
+     * przy dlugim feedzie to pelne przeliczenie stylow na klatke przewijania.
+     * W webview miniappki boli to najbardziej, bo ta warstwa i tak zmienia
+     * wysokosc czesciej niz zwykla przegladarka.
+     *
+     * Gorsze: to bylo sprzeczne z samym celem tej sztuczki. `--vh` istnieje po
+     * to, zeby uklad mial STALA wysokosc odniesienia i NIE skakal, gdy pasek
+     * adresu znika. Przeliczanie go przy kazdej zmianie wysokosci sprawialo, ze
+     * uklad skakal dokladnie wtedy, kiedy mial nie skakac.
+     *
+     * Teraz liczymy tylko wtedy, gdy zmienila sie SZEROKOSC (obrot ekranu,
+     * zmiana okna). Zmiana samej wysokosci to pasek adresu i ma byc zignorowana.
+     * Zapis jest dodatkowo pomijany, gdy wartosc wychodzi ta sama, i wpuszczony
+     * w `requestAnimationFrame`, zeby nigdy nie liczyc dwa razy w jednej klatce.
+     */
+    let ostatniaSzerokosc = window.innerWidth;
+    let ostatnieVh = '';
+    let ramka = 0;
+
     const setVh = () => {
-      const vh = window.innerHeight * 0.01;
-      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      const vh = `${window.innerHeight * 0.01}px`;
+      if (vh === ostatnieVh) return; // ten sam wynik - zapis nic nie zmieni, a kosztuje przeliczenie
+      ostatnieVh = vh;
+      document.documentElement.style.setProperty('--vh', vh);
     };
-    
+
+    const onResize = () => {
+      // Sama wysokosc = pasek adresu. Nie ruszamy niczego.
+      if (window.innerWidth === ostatniaSzerokosc) return;
+      ostatniaSzerokosc = window.innerWidth;
+      if (ramka) cancelAnimationFrame(ramka);
+      ramka = requestAnimationFrame(setVh);
+    };
+
+    // Obrot ekranu zmienia wysokosc RAZEM z szerokoscia, ale kolejnosc zdarzen
+    // bywa odwrotna - stad osobny nasluch, ktory liczy bezwarunkowo.
+    const onOrientation = () => {
+      ostatniaSzerokosc = window.innerWidth;
+      if (ramka) cancelAnimationFrame(ramka);
+      ramka = requestAnimationFrame(setVh);
+    };
+
     setVh();
-    window.addEventListener('resize', setVh);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onOrientation);
     
     // Dodanie styli CSS dla urządzeń Apple
     if (isApple) {
@@ -2755,7 +2800,9 @@ function BaseChatContent() {
     }
     
     return () => {
-      window.removeEventListener('resize', setVh);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onOrientation);
+      if (ramka) cancelAnimationFrame(ramka);
     };
   }, []);
 

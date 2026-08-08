@@ -2,8 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cleanupExpiredPaidPins, ADMIN_ADDRESS } from '../../utils/firebase';
 
 /**
- * Cron job endpoint do automatycznego czyszczenia wygasłych paid pins
- * Uruchamiany co 5 minut przez Vercel Cron
+ * Czyszczenie wygaslych paid pins.
+ *
+ * === SPROSTOWANIE: TA TRASA NIE CHODZI CO 5 MINUT ===
+ * Stalo tu "Uruchamiany co 5 minut przez Vercel Cron". To bylo NIEPRAWDA od
+ * poczatku: w repozytorium nie bylo pliku vercel.json, wiec zaden harmonogram
+ * nie istnial i tej trasy NIKT NIGDY nie wolal. Wygasle przypiecia znikaly
+ * wylacznie przy recznym uruchomieniu przez admina (POST nizej).
+ *
+ * Sprawdzone przy dopisywaniu harmonogramu dla /api/curator-watch - to wtedy
+ * powstal pierwszy vercel.json w tym repozytorium.
+ *
+ * === DLACZEGO NIE DOPISALEM TU HARMONOGRAMU PRZY OKAZJI ===
+ * Dwa powody i oba sa decyzja wlasciciela, nie moja:
+ *   (a) Cykl pieciominutowy jest niedostepny na najnizszym planie Vercela,
+ *       ktory dopuszcza wylacznie harmonogramy dobowe. Wpisanie "*\/5 * * * *"
+ *       daloby blad wdrozenia, a nie dzialajace czyszczenie.
+ *   (b) Wlaczenie po raz pierwszy trasy, ktora od miesiecy nie chodzila, jest
+ *       zmiana zachowania produkcji - i nie ma prawa dziac sie przy okazji
+ *       zupelnie innego zadania. Ta trasa kasuje dane.
+ * Komentarz opisuje wiec stan faktyczny, zamiast opisywac zamiar sprzed roku.
+ *
+ * UWAGA na sprawdzanie sekretu nizej: jest WARUNKOWE (`if (cronSecret && ...)`),
+ * czyli przy nieustawionej zmiennej trasa wpuszcza kazdego. /api/curator-watch
+ * robi to odwrotnie - odmawia bez sekretu - bo tamta trasa zapisuje.
  */
 export async function GET(request: NextRequest) {
   try {

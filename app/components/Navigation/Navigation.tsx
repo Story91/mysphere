@@ -169,6 +169,21 @@ export default function Navigation() {
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
     { href: '/leaderboard', label: 'Paid' },
+    // "Curators" TUZ ZA "Paid", bo obie strony sa tym samym rodzajem rzeczy:
+    // publicznym zapisem faktow z data, ktorego nie da sie przepisac. Paid
+    // zapisuje pieniadze, ktore przeszly miedzy ludzmi; Curators zapisuje
+    // zmiany parametrow skarbcow Morpho (prowizja, kurator, notowanie).
+    //
+    // DLACZEGO W OGOLE W BELCE: to samo zgloszenie co przy /asks - "nie widac
+    // nic co wdrozylismy, skad oni maja wiedziec co robic". Strona, do ktorej
+    // prowadzi wylacznie wpisanie adresu recznie, z punktu widzenia
+    // uzytkownika nie istnieje.
+    //
+    // Do dolnego paska na telefonie (MobileBottomNav) tego NIE dopisujemy.
+    // Tamten pasek trzyma cztery rzeczy, ktore sie ROBI (feed, Aski, pieniadze,
+    // profil); to jest strona, ktora sie CZYTA, i pchanie jej miedzy przyciski
+    // akcji zabraloby miejsce czemus, po co ludzie tam siegaja.
+    { href: '/curators', label: 'Curators' },
     // "How" TUZ PRZED manifestem, bo odpowiadaja na dwa rozne pytania i to
     // pierwsze jest pilniejsze. /re-definition mowi, DLACZEGO ten produkt
     // istnieje - i ma prawo opisywac rzeczy, ktorych jeszcze nie ma. /how mowi,

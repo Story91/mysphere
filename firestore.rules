@@ -479,7 +479,9 @@ service cloud.firestore {
         'unlocks',
         'creatorSubscriptions',
         'premiumContent',
-        'tips'
+        'tips',
+        'curatorWatch',
+        'curatorChanges'
       ];
     }
 
@@ -531,6 +533,38 @@ service cloud.firestore {
 
       // Paragon, ktory da sie poprawic, nie jest paragonem.
       allow update, delete: if false;
+    }
+
+    // ========================================================================
+    // ZAPIS DZIALAN KURATORA - CZYTA KAZDY, PISZE WYLACZNIE SERWER
+    // ========================================================================
+    // `curatorWatch` trzyma JEDEN dokument z ostatnia migawka parametrow
+    // notowanych skarbcow Morpho na Base. `curatorChanges` trzyma po jednym
+    // dokumencie na wykryta roznice: prowizja z 5% na 15%, zmiana kuratora,
+    // wejscie albo zejscie z listy notowanych.
+    //
+    // ODCZYT JAWNY, bo to jest cala idea tego rejestru: zapis, ktorego nie da
+    // sie przeczytac bez logowania, nie jest publicznym zapisem.
+    //
+    // ZAPIS ZAMKNIETY NA GLUCHO i to nie jest ostroznosc na wyrost. Wpis brzmi
+    // "ten kurator podniosl tego dnia prowizje" - czyli jest twierdzeniem
+    // o konkretnej, nazwanej z imienia firmie. Kolekcja zapisywalna z konsoli
+    // przegladarki zamienia taki rejestr w narzedzie do obgadywania cudzej
+    // reputacji, i to podpisane naszym interfejsem. Ta sama pomylka kosztowala
+    // juz kolekcje `tips` (patrz wyzej): kazdy mogl przepisac cudzy napiwek.
+    //
+    // `if false` NIE blokuje naszego zapisu: trasa /api/curator-watch pisze
+    // kluczem administracyjnym (app/utils/auth/firebaseAdmin.ts), a admin SDK
+    // omija reguly z definicji. Przegladarka nie ma tu zadnej drogi zapisu
+    // i miec nie powinna.
+    match /curatorWatch/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /curatorChanges/{changeId} {
+      allow read: if true;
+      allow write: if false;
     }
 
     match /{collection}/{docId} {

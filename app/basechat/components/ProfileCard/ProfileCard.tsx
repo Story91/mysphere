@@ -98,9 +98,24 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
     };
 
     detectMobile();
-    window.addEventListener('resize', detectMobile);
-    
-    return () => window.removeEventListener('resize', detectMobile);
+
+    /**
+     * Przeliczamy tylko przy zmianie SZEROKOSCI. Na telefonie `resize` leci
+     * takze wtedy, gdy w trakcie przewijania chowa sie pasek adresu - a wtedy
+     * zmienia sie sama wysokosc i odpowiedz `detectMobile` bylaby identyczna.
+     * Bez tego strazy kazda taka klatka placila regexem po userAgent i
+     * zapytaniem `matchMedia`, ktore i tak nie moglo zmienic wyniku.
+     */
+    let ostatniaSzerokosc = window.innerWidth;
+    const onResize = () => {
+      if (window.innerWidth === ostatniaSzerokosc) return;
+      ostatniaSzerokosc = window.innerWidth;
+      detectMobile();
+    };
+
+    window.addEventListener('resize', onResize);
+
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   const animationHandlers = useMemo(() => {

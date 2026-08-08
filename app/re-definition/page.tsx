@@ -600,7 +600,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'A page that says what you can do today',
     status: 'live',
-    note: '/how is seven steps, each with its price on the front: what it costs, what you sign, where the receipt ends up. Nothing on it is in the future tense — a thing you cannot do today is not allowed on that page in any form, not even as a promise. That is the division of labour between the two pages: /how is the instruction, this one is the state, and everything unbuilt lives here.',
+    note: '/how is eight steps, each with its price on the front: what it costs, what you sign, where the receipt ends up. Nothing on it is in the future tense — a thing you cannot do today is not allowed on that page in any form, not even as a promise. That is the division of labour between the two pages: /how is the instruction, this one is the state, and everything unbuilt lives here.',
   },
   {
     name: 'Rules and indexes, deployed rather than described',
@@ -666,6 +666,16 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
     name: 'Ask: in the feed',
     status: 'live',
     note: 'A strip above the posts carries up to four open asks — open, still before the deadline, still with a free seat — read once per five minutes and cached like the posts are, so scrolling the feed costs nothing extra. It is a strip, not a card sitting between two posts: an Ask counts down, and a countdown buried at position thirty-seven is a countdown nobody reaches. No resolve record is shown there — that is a query per author, and the card on /asks carries it.',
+  },
+  {
+    name: 'Ask: starting one where you already are',
+    status: 'live',
+    note: 'A Post / Ask switch above the box you write posts in. Flip it and the same box becomes the question, the budget, the seats and the deadline — nothing to navigate to. An empty form offers five ready-made starts, and each one fills the question, the budget, the seats and the deadline together, because a blank field does not tell you what you are allowed to ask or what it costs. They vanish the moment you type, so nothing you already set gets overwritten.',
+  },
+  {
+    name: 'A record of what vault curators changed',
+    status: 'live',
+    note: 'Money in a lending vault sits under somebody else’s decisions: they set the fee they take and they can raise it without telling anyone. /curators keeps a dated record of exactly that for the vaults Morpho lists on Base — the fee before, the fee after, and who was curating. No score for anybody, no forecast, nothing about your wallet or anyone else’s, and no automatic posts in the feed. It reads one set of parameters a day, so an entry says a change happened between two dates rather than inventing an hour. It records the fee, the curator and whether a vault is listed; it does not read what a vault lends against, and it says so on the page rather than letting an empty list imply nothing happened.',
   },
   {
     name: 'Ask: answering without leaving the feed',
@@ -1102,6 +1112,58 @@ export default function ReDefinitionPage() {
           </p>
         </section>
 
+        {/* ---------------- zapis kuratorow ----------------
+            === DLACZEGO ZNACZNIK NIE JEST PROCENTEM ===
+            `Marker` maluje swoja tresc bursztynem, a bursztyn nalezy w tym
+            produkcie WYLACZNIE do kwot. Sekcja jest o prowizji podnoszonej
+            z 5% na 15%, wiec najbardziej kuszacy znacznik ("5% → 15%") byl by
+            zlamaniem tej zasady w najbardziej widocznym miejscu strony.
+            Δ nie jest ani kwota, ani procentem - jest nazwa tego, co ta sekcja
+            zapisuje: samej roznicy. Precedens na znacznik nieliczbowy stoi
+            wyzej ("/u/", "0x…").
+
+            Tresc jest pisana JEZYKIEM KORZYSCI CZYTELNIKA i nie ma w niej ani
+            slowa o tym, jak to dziala od srodka. Wlasciciel raz juz kazal
+            wyciac stad nasze wewnetrzne sprawy.
+        */}
+        <section className="py-16">
+          <Marker amount="Δ" label="the change nobody announces" />
+          <H2>Somebody can change the terms of your vault overnight</H2>
+          <State tone="live">Running — the record collects one reading a day</State>
+          <P>
+            Money parked in a lending vault sits under somebody else&apos;s decisions. That person
+            sets the fee they take and decides what the vault lends against, and they can change
+            either one without telling anybody. The numbers are public the whole time. What is
+            missing is <Hi>anyone writing down what they used to be</Hi> — so &ldquo;this used to
+            charge 5%&rdquo; is a memory, not a fact, and memories are not what you want between you
+            and your money.
+          </P>
+          <P>
+            So we keep the record. Every day we read the fee and the curator of every listed vault
+            on Base, and keep only what moved: <Hi>this vault charged 5%, now it charges 15%</Hi>,
+            with the dates it happened between. No score for any curator, no forecast, and nothing
+            about anybody&apos;s wallet — a fee is either the number it was or it is not, and that is
+            the whole claim.
+          </P>
+          <P>
+            It is a page you look things up on, not a robot that talks in your feed. And it is
+            honest about its own age: on a day with nothing in it, it tells you whether that means
+            nothing changed or that it has not been watching long enough to say.
+          </P>
+          <p className="mb-4">
+            <Link
+              href="/curators"
+              /* CELOWO fioletowy, a nie bursztynowy jak przycisk pod sekcja
+                 o platnosciach. Tamten prowadzi do KWOT, ktore naprawde
+                 przeszly miedzy ludzmi; ten prowadzi do prowizji i procentow,
+                 a bursztyn w tym produkcie znaczy "to jest kwota". */
+              className="inline-flex items-center gap-2 rounded-pill bg-soft-primary-deep px-4 py-2.5 font-soft-display text-[13.5px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+            >
+              Open the curator record →
+            </Link>
+          </p>
+        </section>
+
         {/* ---------------- stan ---------------- */}
         <section className="py-16">
           <Marker amount="today" label="no promises, only state" />
@@ -1119,7 +1181,7 @@ export default function ReDefinitionPage() {
             <Link href="/how" className="underline decoration-soft-line-strong underline-offset-2">
               /how
             </Link>{' '}
-            is the same product from the other side: seven things you can do today, each with what
+            is the same product from the other side: eight things you can do today, each with what
             it costs and what you sign. Nothing in the future tense is allowed on that page, which
             is why everything in the future tense is on this one.
           </P>

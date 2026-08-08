@@ -27,6 +27,12 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: 'daily' 
   { path: '/basechat', priority: 1, changeFrequency: 'daily' },
   { path: '/re-definition', priority: 0.9, changeFrequency: 'weekly' },
   { path: '/leaderboard', priority: 0.8, changeFrequency: 'daily' },
+  // /how i /curators sa jedynymi stronami, ktore ktos moze SZUKAC z zewnatrz:
+  // pierwsza odpowiada "co da sie tu zrobic", druga jest publicznym zapisem
+  // zmian prowizji i kuratorow w skarbcach Morpho na Base - czyli pytaniem,
+  // ktore ludzie zadaja wyszukiwarce, a nie nam.
+  { path: '/how', priority: 0.8, changeFrequency: 'monthly' },
+  { path: '/curators', priority: 0.7, changeFrequency: 'daily' },
   // Paragony (/tip/[txHash]) celowo NIE trafiaja do sitemapy: sa niezmienne i
   // istnieja po to, zeby ktos je WYSLAL, a nie zeby crawler je zindeksowal.
   { path: '/Docs', priority: 0.6, changeFrequency: 'monthly' },
