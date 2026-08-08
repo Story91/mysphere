@@ -40,6 +40,23 @@ import { ToastProvider } from './components/Toast';
 import UltraModernSocialCard from './components/UltraModernSocialCard';
 import HolographicStats from './components/HolographicStats';
 import FloatingNavigation from './components/FloatingNavigation';
+import { isRouteDisabled } from '@/config/routeStatus';
+
+/**
+ * Czy marketplace jest dzis wlaczony.
+ *
+ * DLACZEGO WARUNEK, A NIE USUNIECIE PRZYCISKOW: `/marketplace` siedzi
+ * w DISABLED_ROUTES, wiec klikniecie konczylo sie przekierowaniem na
+ * /basechat - przycisk nie tyle nie dzialal, co po cichu wyrzucal czlowieka
+ * z MyCamp na zupelnie inna strone. Dopoki ta trasa byla wylaczona razem
+ * z /mycamp, nikt tego nie widzial; po przywroceniu MyCamp stalo sie to
+ * dwoma zywymi pulapkami.
+ *
+ * Warunek czyta TE SAMA liste co nawigacja, wiec przyciski wroca same
+ * w chwili, gdy `/marketplace` zniknie z DISABLED_ROUTES. Zero pracy
+ * do zapamietania na pozniej i zero skasowanego kodu.
+ */
+const MARKETPLACE_LIVE = !isRouteDisabled('/marketplace');
 // Removed API imports - these should only be used in backend
 
 const CAMP_NFT_CONTRACT = '0x57CC99c9E1942a34a0cfF7FCC27c227455f14587';
@@ -1053,7 +1070,8 @@ function MyCampPageContent() {
               )}
             </motion.button>
 
-            {/* IP Market V3 Button */}
+            {/* IP Market V3 Button - tylko gdy trasa jest wlaczona, patrz MARKETPLACE_LIVE */}
+            {MARKETPLACE_LIVE && (
             <Link href="/marketplace" className="block h-full">
               <motion.button
                 initial={{ opacity: 0, y: 20 }}
@@ -1085,6 +1103,7 @@ function MyCampPageContent() {
                 </div>
               </motion.button>
             </Link>
+            )}
 
             {/* Social Media Dropdown Button - REMOVED */}
           </div>
@@ -1861,13 +1880,15 @@ function MyCampPageContent() {
                     >{t.toUpperCase()}</button>
                   ))}
                 </div>
-                <Link
-                  href="/marketplace"
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-2 px-4 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2"
-                >
-                  <span>🛒</span>
-                  <span>Marketplace</span>
-                </Link>
+                {MARKETPLACE_LIVE && (
+                  <Link
+                    href="/marketplace"
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-2 px-4 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2"
+                  >
+                    <span>🛒</span>
+                    <span>Marketplace</span>
+                  </Link>
+                )}
               </div>
               
               {!isConnected ? (

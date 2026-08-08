@@ -30,7 +30,17 @@ const DISABLED_ROUTES = [
   '/base',
   '/basemorning',
   '/marketplace',
-  '/mycamp',
+  // '/mycamp' WROCILO. Powod nie jest sentymentalny - ta trasa byla jedynym
+  // miejscem, w ktorym da sie podlaczyc Spotify, Twittera i TikToka, a DWIE
+  // ZYWE rzeczy w aplikacji czytaja te dane:
+  //   1. przycisk Spotify w kompozytorze feedu otwiera MusicSelector, ktory
+  //      pyta /api/camp/spotify o utwory tego adresu,
+  //   2. BuilderProfile rysuje CampSocialsCard z podlaczonymi kontami.
+  // Przy wylaczonej trasie wygladalo to tak: feed zaprasza do wrzucenia posta
+  // muzycznego, selektor mowi "No Spotify data found for this user", a jedyna
+  // droga do podlaczenia konta odsyla przekierowaniem na /basechat. Funkcja
+  // byla wiec widoczna i nieosiagalna naraz - dokladnie ten rodzaj "dziala,
+  // ale nie dziala", ktory ta lista miala eliminowac, a nie tworzyc.
   '/MyAgents',
   '/MyClaw',
   '/swap',

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAccount } from 'wagmi';
 import SpotifyTrackCard, { SpotifyTrackData } from './SpotifyTrackCard';
 
@@ -251,8 +252,28 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
               </button>
             </div>
           ) : !spotifyData ? (
-            <div className="text-center py-12 text-soft-ink-muted">
-              No Spotify data found for this user
+            /* ===== SLEPY ZAULEK MIAL DROGE WYJSCIA, TYLKO JEJ NIE POKAZYWAL =====
+               Stalo tu samo "No Spotify data found for this user" - zdanie
+               prawdziwe i bezuzyteczne. Nie mowilo DLACZEGO (konto nie jest
+               podlaczone) ani CO Z TYM ZROBIC, a podlaczyc da sie wylacznie
+               na /mycamp. Czlowiek klikal zielony przycisk w kompozytorze,
+               dostawal te linijke i zamykal okno.
+
+               Rozdzielamy tez dwa rozne "pusto", ktore wygladaly tak samo:
+               brak podlaczonego konta to co innego niz podlaczone konto bez
+               historii sluchania. Pierwsze naprawia sie klikiem, drugie
+               sluchaniem muzyki - i tylko przy pierwszym ma sens odnosnik. */
+            <div className="py-10 text-center">
+              <p className="mx-auto max-w-[280px] text-[13px] leading-[1.5] text-soft-ink-muted">
+                No Spotify data for this wallet. Link your Spotify on MyCamp and your recent tracks
+                show up here.
+              </p>
+              <Link
+                href="/mycamp"
+                className="mt-3 inline-flex items-center rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+              >
+                Link Spotify on MyCamp
+              </Link>
             </div>
           ) : (
             <div className="space-y-3">
