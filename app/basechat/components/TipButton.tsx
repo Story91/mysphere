@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { normalizeAmountInput } from '../../utils/monetization/parseAmount';
 import { createPortal } from 'react-dom';
 import {
   useAccount,
@@ -563,12 +564,16 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
               {/* Amount Input */}
               <div className="mb-3">
                 <label className="block font-soft text-[11px] font-bold uppercase tracking-wider text-soft-ink-soft mb-2">Amount</label>
+                {/* type="text", nie "number" - przegladarka w polu liczbowym
+                    ODRZUCA przecinek zamiast zamienic go na kropke, wiec
+                    wpisane "0,5" zostawalo jako "05", czyli PIEC. Ten sam blad
+                    zlapal wlasciciel na cenie platnej sekcji. Powod i testy
+                    w app/utils/monetization/parseAmount.ts. */}
                 <input
-                  type="number"
+                  type="text"
                   value={tipAmount}
-                  onChange={(e) => setTipAmount(e.target.value)}
-                  min="0"
-                  step="any"
+                  onChange={(e) => setTipAmount(normalizeAmountInput(e.target.value))}
+                  autoComplete="off"
                   className="w-full px-4 py-3 text-base border bg-soft-sunken border-soft-line rounded-card text-soft-accent-deep font-soft-display font-bold tabular-nums transition-colors [transition-duration:var(--dur-press)] ease-out-strong focus:outline-none focus:ring-2 focus:ring-soft-primary focus:border-soft-primary placeholder:text-soft-ink-faint"
                   inputMode="decimal"
                 />

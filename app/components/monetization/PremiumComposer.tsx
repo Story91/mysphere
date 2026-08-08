@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from 'react';
 import { DEFAULT_UNLOCK_TOKEN, type MonetizationToken } from '../../utils/monetization/types';
+import { normalizeAmountInput } from '../../utils/monetization/parseAmount';
 
 /**
  * Sekcja kompozytora do oznaczania czesci posta jako platnej.
@@ -117,14 +118,29 @@ export default function PremiumComposer({
               >
                 Price
               </label>
+              {/* === DLACZEGO NIE type="number" ===
+                  Bylo `type="number"`. W polu liczbowym przegladarka ODRZUCA
+                  przecinek jako niedozwolony znak - nie zamienia go na kropke,
+                  tylko po cichu wyrzuca. Wpisane "0,5" zostawalo jako "05",
+                  czyli PIEC. Dziesiec razy za duzo, bez ostrzezenia, na polu
+                  ustalajacym cene.
+
+                  W kraju, w ktorym przecinek JEST separatorem dziesietnym, to
+                  nie jest przypadek brzegowy, tylko domyslny sposob pisania
+                  kwot - i wlasnie tak zglosil to wlasciciel.
+
+                  `inputMode="decimal"` daje na telefonie te sama klawiature
+                  co przedtem; roznica jest taka, ze o przecinku decydujemy my.
+                  Uzasadnienie i testy w app/utils/monetization/parseAmount.ts. */}
               <input
                 id={priceId}
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
                 inputMode="decimal"
+                autoComplete="off"
                 value={value.unlockPrice}
-                onChange={(e) => onChange({ ...value, unlockPrice: e.target.value })}
+                onChange={(e) =>
+                  onChange({ ...value, unlockPrice: normalizeAmountInput(e.target.value) })
+                }
                 disabled={disabled}
                 className="w-full rounded-2xl border border-soft-line bg-soft-surface px-3 py-2 font-soft-display text-sm font-bold tabular-nums text-soft-accent-deep outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong focus:border-soft-accent focus-visible:ring-2 focus-visible:ring-soft-primary"
               />

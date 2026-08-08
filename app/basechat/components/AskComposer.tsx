@@ -77,8 +77,17 @@ export type AskComposerProps = {
 };
 
 /** `null` znaczy "nie ma tu poprawnej liczby" - inaczej niz `NaN`, ktory klamie w porownaniach. */
+/**
+ * Liczba z pola tekstowego. PRZYJMUJE PRZECINEK.
+ *
+ * `Number('0,5')` to NaN, wiec budzet wpisany po polsku byl odrzucany
+ * komunikatem "Set a budget." - czyli formularz mowil, ze pole jest puste,
+ * gdy bylo wypelnione. Odmowa jest tu bezpieczniejsza niz blad ceny w platnej
+ * sekcji (tam "0,5" stawalo sie 5), ale czlowiek i tak nie wiedzial, co
+ * poprawic.
+ */
 function parseNumber(raw: string): number | null {
-  const trimmed = raw.trim();
+  const trimmed = raw.trim().replace(/,/g, '.');
   if (trimmed === '') return null;
   const value = Number(trimmed);
   return Number.isFinite(value) ? value : null;
