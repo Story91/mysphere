@@ -478,8 +478,59 @@ service cloud.firestore {
         'askAnswerContent',
         'unlocks',
         'creatorSubscriptions',
-        'premiumContent'
+        'premiumContent',
+        'tips'
       ];
+    }
+
+    // ========================================================================
+    // NAPIWKI - KOLEKCJA, NA KTOREJ STOI CALA TEZA PRODUKTU
+    // ========================================================================
+    // `tips` wpadalo dotad pod regule ogolna, czyli `allow read, write: if true`.
+    // Odczyt jest w porzadku i ma taki zostac - te dane sa jawne z zalozenia
+    // i cale /leaderboard je pokazuje.
+    //
+    // ZAPIS BYL KATASTROFA I NIKT TEGO NIE ZAUWAZYL. Kazdy, kto otworzyl
+    // konsole przegladarki, mogl:
+    //   - PRZEPISAC dowolny z 189 istniejacych napiwkow (inna kwota, inny
+    //     odbiorca, inny hash),
+    //   - SKASOWAC cala kolekcje,
+    //   - dopisac dowolna liczbe zmyslonych platnosci.
+    //
+    // Produkt, ktorego jedno zdanie brzmi "reputacje bije sie wylacznie
+    // rozliczonymi platnosciami", trzymal te platnosci w kolekcji zapisywalnej
+    // przez kazdego. Hash w POJEDYNCZYM wierszu jest sprawdzalny na lancuchu -
+    // ale ZBIOR jako calosc mogl zatruc ktokolwiek, a to wlasnie zbior
+    // pokazuje ranking i wskazniki.
+    //
+    // === DLACZEGO NIE ZAMYKAM ZAPISU CALKIEM ===
+    // saveTip() w app/utils/firebase.ts wola addDoc Z PRZEGLADARKI. Zamkniecie
+    // create zepsuloby napiwki natychmiast. Docelowo zapis powinien isc przez
+    // trase serwerowa weryfikujaca transakcje na lancuchu - `verifyBasePayment`
+    // juz istnieje i robi dokladnie to dla Askow. To osobna zmiana.
+    //
+    // === CZEGO NIE WYMAGAM I DLACZEGO ===
+    // NIE wymagam `txHash`. Z 189 napiwkow tylko 18 ma hash - reszta pochodzi
+    // ze sciezek, ktore go nie zapisuja. Wymuszenie go tutaj zablokowaloby
+    // wysylanie napiwkow wiekszosci ludzi, czyli naprawa zepsulaby dzialajaca
+    // funkcje. To ma byc pierwszy stopien, nie ostatni.
+    //
+    // Zostaje wiec: walidacja ksztaltu przy tworzeniu ORAZ - najwazniejsze -
+    // zakaz zmiany i kasowania. Historia platnosci staje sie dopisywalna,
+    // ale NIEODWRACALNA, a to jest cecha, ktora ta kolekcja musiala miec
+    // od pierwszego dnia.
+    match /tips/{tipId} {
+      allow read: if true;
+
+      allow create: if request.resource.data.senderAddress is string
+                    && request.resource.data.senderAddress.matches('^0x[0-9a-fA-F]{40}$')
+                    && request.resource.data.recipientAddress is string
+                    && request.resource.data.recipientAddress.matches('^0x[0-9a-fA-F]{40}$')
+                    && request.resource.data.senderAddress != request.resource.data.recipientAddress
+                    && request.resource.data.timestamp is number;
+
+      // Paragon, ktory da sie poprawic, nie jest paragonem.
+      allow update, delete: if false;
     }
 
     match /{collection}/{docId} {
