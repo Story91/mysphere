@@ -48,10 +48,16 @@ Zostaja dwa znaleziska (`5` - tworca uwieziony w nieawansowanym tokenie,
 ### 2.3 Nie piszemy wlasnej matematyki pieniedzy
 
 Jednostronna pozycja plynnosci zachowuje sie prawie identycznie jak krzywa
-wiazana: wrzucamy cala podaz powyzej ceny startowej, bez ETH; ludzie kupuja,
-cena idzie w gore po krzywej. **Ten sam efekt "wczesni kupuja taniej"** - tylko
-ze liczy to kod Uniswapa, ktory stoi na mainnecie od lat i byl audytowany, a nie
+wiazana: wrzucamy cala podaz po jednej stronie, bez ETH; ludzie kupuja, a token
+drozeje wzdluz krzywej. **Ten sam efekt "wczesni kupuja taniej"** - tylko ze
+liczy to kod Uniswapa, ktory stoi na mainnecie od lat i byl audytowany, a nie
 nasze `mulDiv` z wlasnym dowodem wyplacalnosci.
+
+UWAGA NA KIERUNEK: w v4 `price = amount1/amount0`, czyli TOKENOW ZA ETH, wiec
+"token drozeje" znaczy, ze `sqrtPriceX96` MALEJE, a pozycja z samego tokena
+stoi PONIZEJ ceny biezacej. Pierwsza wersja tego akapitu mowila "powyzej ceny
+startowej, cena idzie w gore" - i bylo to nieprawda, sprzeczna z zalacznikiem
+na koncu tego dokumentu. Pelne wyprowadzenie z pomiarem: patrz ZALACZNIK.
 
 Znika: dowod niemalejacego `k`, reguly zaokraglen na niekorzysc wolajacego,
 straznik wyplacalnosci, `LiquidityVault` jako osobny byt, cala sciezka awansu.
