@@ -304,6 +304,17 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
   const [segment, setSegment] = useState<Segment>('traded');
   const [sort, setSort] = useState<Sort>('volume');
   const [limit, setLimit] = useState(PAGE);
+  /**
+   * Szukanie. Filtruje LOKALNIE po nazwie, symbolu i adresie - zero zapytan,
+   * odpowiedz przy kazdym nacisnieciu klawisza.
+   *
+   * Ale wazniejsze jest to, co robi z WKLEJONYM ADRESEM. Lista pokazuje okno
+   * dwudziestu czterech godzin, wiec token sprzed dwoch dni w niej NIE ISTNIEJE
+   * - a jego strona dziala dla kazdego adresu, bo `getTokenDetail` czyta token
+   * wprost, bez okna. Wklejony adres daje wiec wejscie do tokena, ktorego lista
+   * nie zna, zamiast pustego wyniku i sciany.
+   */
+  const [query, setQuery] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [failing, setFailing] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -371,10 +382,27 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
     return pending.tokens.filter((t) => !known.has(t.address)).length;
   }, [pending, snapshot]);
 
+  /** Wklejony adres B20 - wtedy zamiast filtrowac, proponujemy wejscie. */
+  const pastedAddress = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return /^0xb2000000000000000000[0-9a-f]{20}$/.test(q) ? q : null;
+  }, [query]);
+
   const rows = useMemo(() => {
     const pool =
       segment === 'all' ? snapshot.tokens : snapshot.tokens.filter((t) => t.state === segment);
-    const list = [...pool];
+
+    const q = query.trim().toLowerCase();
+    const matched = q
+      ? pool.filter(
+          (t) =>
+            t.symbol.toLowerCase().includes(q) ||
+            t.name.toLowerCase().includes(q) ||
+            t.address.includes(q)
+        )
+      : pool;
+
+    const list = [...matched];
     if (segment === 'traded') {
       if (sort === 'volume') {
         // Tokeny bez cytatu ida na dol, ale NIE jako zero - jako "nie podano".
@@ -394,7 +422,7 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
       }
     }
     return list;
-  }, [snapshot, segment, sort]);
+  }, [snapshot, segment, sort, query]);
 
   const visible = rows.slice(0, limit);
 
@@ -408,6 +436,56 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
   return (
     <div>
       <BoardHeadline snapshot={snapshot} now={now} />
+
+      {/* --- SZUKANIE ---
+          Stoi NAD zakladkami, bo szukanie konkretnego tokena jest czynnoscia
+          pierwotna wobec przegladania kategorii: kto wie, czego szuka, nie
+          powinien najpierw wybierac zakladki. */}
+      <div className="mb-3">
+        <label className="relative block">
+          <span className="sr-only">Search tokens</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name, ticker or paste an address"
+            spellCheck={false}
+            className="w-full rounded-pill border border-soft-line bg-soft-surface px-4 py-2.5 font-soft text-[13.5px] text-soft-ink shadow-chip outline-none transition-[border-color] [transition-duration:var(--dur-press)] ease-out-strong placeholder:text-soft-ink-faint focus:border-soft-primary focus-visible:ring-2 focus-visible:ring-soft-primary"
+          />
+          {query !== '' && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-pill px-2.5 py-1 font-soft-display text-[12px] font-bold text-soft-ink-faint transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.94]"
+            >
+              clear
+            </button>
+          )}
+        </label>
+
+        {/* ===== WKLEJONY ADRES OTWIERA TOKEN, NAWET SPOZA LISTY =====
+            Lista zna dwadziescia cztery godziny. Strona tokena zna kazdy adres,
+            bo czyta go wprost. Bez tego przejscia token sprzed dwoch dni byl
+            nieosiagalny inaczej niz przez recznie zlozony URL. */}
+        {pastedAddress && (
+          <Link
+            href={`/b20/${pastedAddress}`}
+            className="mt-2 flex items-center justify-between gap-3 rounded-card border border-soft-line bg-soft-surface px-4 py-3 shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:border-soft-primary/60 active:scale-[0.99]"
+          >
+            <span className="min-w-0">
+              <span className="block font-soft-display text-[13px] font-bold text-soft-ink">
+                Open this token
+              </span>
+              <span className="mt-0.5 block break-all font-mono text-[11px] text-soft-ink-faint">
+                {pastedAddress}
+              </span>
+            </span>
+            <span className="shrink-0 font-soft-display text-[13px] font-bold text-soft-primary-deep">
+              →
+            </span>
+          </Link>
+        )}
+      </div>
 
       {/* --- ZAKLADKI ---
           "Trending" i "Hot" nie istnieja, bo kazdy taki ranking jest nasza
@@ -510,11 +588,30 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
       {/* --- LISTA --- */}
       <div className={`${CARD} overflow-hidden`}>
         {visible.length === 0 ? (
-          <p className="px-4 py-8 text-center text-[13px] leading-[1.55] text-soft-ink-muted">
-            {segment === 'traded'
-              ? 'Nothing in this window has traded yet. That is a reading, not a failure — most B20 tokens never get a single swap.'
-              : 'Nothing here in this window.'}
-          </p>
+          <div className="px-4 py-8 text-center">
+            {/* Pustka po SZUKANIU znaczy co innego niz pusta zakladka: token moze
+                istniec i po prostu byc starszy niz okno. Zdanie musi to
+                rozroznic, inaczej czlowiek odejdzie przekonany, ze go nie ma. */}
+            {query.trim() !== '' ? (
+              <>
+                <p className="text-[13px] leading-[1.55] text-soft-ink-muted">
+                  Nothing matching{' '}
+                  <span className="font-semibold text-soft-ink">{query.trim()}</span> in the last{' '}
+                  {snapshot.windowHours} hours.
+                </p>
+                <p className="mt-1.5 text-[12.5px] leading-[1.55] text-soft-ink-faint">
+                  This list only reads the last day. If the token is older, paste its full address
+                  above and it will open.
+                </p>
+              </>
+            ) : (
+              <p className="text-[13px] leading-[1.55] text-soft-ink-muted">
+                {segment === 'traded'
+                  ? 'Nothing in this window has traded yet. That is a reading, not a failure — most B20 tokens never get a single swap.'
+                  : 'Nothing here in this window.'}
+              </p>
+            )}
+          </div>
         ) : (
           <ul>
             {visible.map((token, i) => (
