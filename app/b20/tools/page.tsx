@@ -34,7 +34,7 @@ const CARD = 'rounded-card border border-soft-line bg-soft-surface p-4 shadow-ca
 export default function B20ToolsPage() {
   return (
     <div className="min-h-screen bg-soft-bg px-4 pb-24 pt-6 font-soft sm:pt-10">
-      <div className="mx-auto w-full max-w-[760px]">
+      <div className="mx-auto w-full max-w-[920px]">
         <header className="mb-4">
           <p className="font-soft-display text-[11px] font-bold uppercase tracking-[0.12em] text-soft-ink-faint">
             Base · B20 · Tools
@@ -53,33 +53,27 @@ export default function B20ToolsPage() {
 
         <B20Console />
 
-        {/* ===== CO JESZCZE NIE ISTNIEJE =====
-            Osobna sekcja, a nie przypis. Strona, ktora nie mowi, gdzie sie
-            konczy, zaczyna obiecywac. */}
+        {/* Sekcja "What is not here yet" zostala stad usunieta razem z bliznaczka
+            na ekranie tworzenia. Tlumaczyla, ze kontrakt platnosci jest napisany,
+            ale niewdrozony - czyli nasz stan wdrozenia na ekranie uzytkownika.
+
+            Zasada zostaje bez zmian: nie klamiemy. Nie ma tu przycisku, ktory
+            udaje, ze wysle platnosc. Ale brakujaca funkcja po prostu NIE MA
+            przycisku - nie dostaje akapitu o tym, dlaczego go nie ma. */}
         <section className={`${CARD} mt-4`}>
           <h2 className="font-soft-display text-[15px] font-bold text-soft-ink">
-            What is not here yet
+            Making a token works today
           </h2>
           <p className="mt-1.5 text-[12.5px] leading-[1.55] text-soft-ink-muted">
-            Sending a payment with one of these memos is the next step, and it is not wired to
-            anything on this page. The payment contract is written and tested but is not deployed on
-            any network yet, so there is nothing for a button to call. A dead button that looks alive
-            is worse than a missing one.
-          </p>
-          {/* Bylo tu "use it whenever creation lands" - zdanie prawdziwe do
-              chwili, w ktorej ekran tworzenia zaczal wolac fabryke Base wprost.
-              Tworzenie dziala DZIS i strona nie ma prawa sugerowac inaczej. */}
-          <p className="mt-2 text-[12.5px] leading-[1.55] text-soft-ink-muted">
-            Making a token, unlike sending a memo, does work today — Base makes it, not us, so there
-            was nothing to deploy first.{' '}
+            Base makes the token, not us, so there was nothing to deploy first.{' '}
             <Link
               href="/b20/create"
               className="font-semibold text-soft-primary-deep underline underline-offset-2"
             >
               The creation screen
             </Link>{' '}
-            mines the same way and signs the transaction at the end. A salt does not expire either:
-            it depends only on your wallet, so one you find here works whenever you use it.
+            works the address out in your browser and runs the transaction against Base before you
+            are allowed to sign it.
           </p>
         </section>
 

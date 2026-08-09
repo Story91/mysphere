@@ -43,7 +43,7 @@ const CARD = 'rounded-card border border-soft-line bg-soft-surface p-4 shadow-ca
 export default function B20CreatePage() {
   return (
     <div className="min-h-screen bg-soft-bg px-4 pb-24 pt-6 font-soft sm:pt-10">
-      <div className="mx-auto w-full max-w-[860px]">
+      <div className="mx-auto w-full max-w-[1040px]">
         <header className="mb-4">
           <p className="font-soft-display text-[11px] font-bold uppercase tracking-[0.12em] text-soft-ink-faint">
             Base · B20 · Create
@@ -66,31 +66,18 @@ export default function B20CreatePage() {
 
         <CreateToken />
 
-        {/* ===== CZEGO TU JESZCZE NIE MA =====
-            Osobna sekcja pod ekranem, tym samym wzorem co /b20/tools. Strona,
-            ktora nie mowi, gdzie sie konczy, zaczyna obiecywac. */}
-        <section className={`${CARD} mt-4`}>
-          <h2 className="font-soft-display text-[15px] font-bold text-soft-ink">
-            What is not here yet
-          </h2>
-          <p className="mt-1.5 text-[12.5px] leading-[1.55] text-soft-ink-muted">
-            <span className="font-semibold text-soft-ink">A way for anyone to buy it.</span> This
-            page makes a token and stops there. The part that opens a pool, takes a first buy and
-            gives a token a price is written but is not deployed on any network, so there is no
-            button for it here and there will not be one until there is something for it to call.
-          </p>
-          <p className="mt-2 text-[12.5px] leading-[1.55] text-soft-ink-muted">
-            Until somebody opens a pool, the token has no price, no chart and nothing for an indexer
-            to pick up. On our own list it shows up as{' '}
-            <span className="font-semibold text-soft-ink">no pool</span> — the state most tokens made
-            on Base each day never leave.
-          </p>
-          <p className="mt-2 text-[12.5px] leading-[1.55] text-soft-ink-muted">
-            Everything above that line is real. The address is worked out in this tab, the fee is
-            measured against Base, and the transaction is run against Base before you are allowed to
-            sign it.
-          </p>
-        </section>
+        {/* ===== CZEGO TU NIE MA I DLACZEGO GO TU NIE MA =====
+            Stala tu sekcja "What is not here yet" tlumaczaca, ze kontrakt puli
+            jest napisany, ale niewdrozony. To sa NASZE sprawy wewnetrzne na
+            ekranie uzytkownika - ten sam blad, ktory wlasciciel wytkal juz raz
+            przy /re-definition ("ona ma tam nasze wewnetrzne sprawy w tresci,
+            a to ma byc sekcja dla uzytkownikow").
+
+            Roznica, ktora ma znaczenie: NIE KLAMAC to nie to samo, co SPOWIADAC
+            SIE. Nie klamiemy dalej - nie ma tu przycisku, ktory udaje, ze
+            otworzy pule, i nigdzie nie pokazujemy zmyslonej ceny. Ale produkt
+            nie tlumaczy sie ze swojego stanu wdrozenia; brakujaca funkcja po
+            prostu nie ma przycisku, a nie akapit o tym, dlaczego go nie ma. */}
 
         <p className="mt-4 px-1 text-[11.5px] leading-[1.5] text-soft-ink-faint">
           Nothing is sent until you sign it in your wallet.{' '}

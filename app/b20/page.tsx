@@ -121,7 +121,7 @@ async function BoardSection() {
 export default function B20MarketPage() {
   return (
     <div className="min-h-screen bg-soft-bg px-4 pb-24 pt-6 font-soft sm:pt-10">
-      <div className="mx-auto w-full max-w-[860px]">
+      <div className="mx-auto w-full max-w-[1280px]">
         <header className="mb-4">
           <p className="font-soft-display text-[11px] font-bold uppercase tracking-[0.12em] text-soft-ink-faint">
             Base · B20
