@@ -4,6 +4,7 @@ import { getTokenDetail, type TokenDetail } from '../../utils/b20/token';
 import { tokenInitials, uniswapBuyUrl } from '../../utils/b20/format';
 import B20Nav from '../B20Nav';
 import PriceChart from './PriceChart';
+import OpenPoolPanel from './OpenPoolPanel';
 
 /**
  * /b20/[address] - strona jednego tokena B20.
@@ -272,6 +273,11 @@ export default async function TokenPage({ params }: Props) {
                 Nobody has opened a pool for this token, so it has no price and nothing to chart.
                 This is where most tokens made on Base stay.
               </p>
+              {/* Zdanie o pustce jest prawdziwe, ale samo w sobie zostawia
+                  czlowieka bez wyjscia. Panel obok daje mu je: pule moze
+                  otworzyc kazdy i wtedy token dostaje cene, wykres i przycisk
+                  kupna, ktore ta strona juz umie pokazac. */}
+              <OpenPoolPanel address={t.address} />
             </>
           )}
         </section>

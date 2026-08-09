@@ -369,10 +369,36 @@ export default function CreateToken() {
           </p>
         )}
         {landed.kind === 'success' && (
-          <p className="mt-1.5 text-[13px] leading-[1.55] text-soft-ink-muted">
-            Base included it and it went through. The token address is the one you saw before you
-            signed — it could not have been anything else.
-          </p>
+          <>
+            <p className="mt-1.5 text-[13px] leading-[1.55] text-soft-ink-muted">
+              Base included it and it went through. The token address is the one you saw before you
+              signed — it could not have been anything else.
+            </p>
+            {/* ===== NASTEPNY KROK, A NIE KONIEC =====
+                Token bez puli nie ma ceny i nikt go nie kupi. Ekran, ktory
+                konczy sie gratulacjami, zostawia czlowieka z martwym tokenem
+                i bez pojecia, dlaczego nic sie nie dzieje.
+
+                Docelowo pule otwiera nasz kontrakt w tej samej transakcji.
+                Zanim stanie na sieci, ta droga istnieje i dziala. */}
+            <p className="mt-2.5 text-[13px] leading-[1.55] text-soft-ink">
+              <span className="font-semibold">One thing left:</span> nobody can buy it until a pool
+              exists. Open one against ETH and the token gets a price, a chart and a buy button
+              everywhere on this site.
+            </p>
+            {/* Prowadzimy na STRONE TOKENA, a nie prosto na Uniswapa: tam stoi
+                panel z adresem do skopiowania i wyjasnieniem, a po otwarciu puli
+                ta sama strona pokazuje juz cene i wykres. Jedno miejsce zamiast
+                dwoch rozjezdzajacych sie sciezek. */}
+            {predicted && (
+              <a
+                href={`/b20/${predicted.toLowerCase()}`}
+                className="mt-3 inline-flex rounded-pill bg-soft-primary px-5 py-2.5 font-soft-display text-[13px] font-bold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
+              >
+                Open your token’s page
+              </a>
+            )}
+          </>
         )}
         {landed.kind === 'reverted' && (
           <p className="mt-1.5 text-[13px] leading-[1.55] text-soft-ink-muted" role="alert">
