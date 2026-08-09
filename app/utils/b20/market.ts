@@ -183,7 +183,7 @@ export type B20Token = {
    * Cytat z GeckoTerminal. `null` na polu znaczy "GT tego nie podal" - nie zero.
    * Cale pole `null` znaczy, ze o ten token w ogole nie pytalismy.
    */
-  quoted: { volume24hUsd: number | null; priceUsd: number | null } | null;
+  quoted: GtQuote | null;
   /** Sufit podazy kontra podaz. `cap === null` znaczy, ze supplyCap() zrewertowal. */
   supply: { total: string; cap: string | null } | null;
 };
@@ -395,7 +395,21 @@ function priceEthFromSqrt(sqrtPriceX96: bigint, decimals: number): number {
 /*  CYTAT Z GECKOTERMINAL                                                      */
 /* -------------------------------------------------------------------------- */
 
-type GtQuote = { volume24hUsd: number | null; priceUsd: number | null };
+type GtQuote = {
+  volume24hUsd: number | null;
+  priceUsd: number | null;
+  /** Kapitalizacja w pelnym rozcienczeniu - cena razy cala podaz. */
+  fdvUsd: number | null;
+  /**
+   * Ile realnie stoi w puli, w dolarach.
+   *
+   * To jest LEPSZA odpowiedz na "jak gleboka jest pula" niz plynnosc odczytana
+   * z lancucha: ta ostatnia podaje plynnosc W BIEZACYM TIKU i dla swiezo
+   * zasilonych pul czyta sie jako zero. Liczba, ktora klamie w dol, jest gorsza
+   * niz jej brak - a ta nie klamie.
+   */
+  reserveUsd: number | null;
+};
 
 async function fetchEthUsd(): Promise<number | null> {
   try {
@@ -444,6 +458,8 @@ async function fetchQuotes(addresses: Address[]): Promise<Map<string, GtQuote>> 
           attributes?: {
             address?: string;
             price_usd?: string | null;
+            fdv_usd?: string | null;
+            total_reserve_in_usd?: string | null;
             volume_usd?: { h24?: string | null };
           };
         }[];
@@ -451,13 +467,18 @@ async function fetchQuotes(addresses: Address[]): Promise<Map<string, GtQuote>> 
       for (const d of json.data ?? []) {
         const a = d.attributes;
         if (!a?.address) continue;
-        const vol = Number(a.volume_usd?.h24);
-        const price = Number(a.price_usd);
+        const num = (v: unknown): number | null => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : null;
+        };
+        const price = num(a.price_usd);
         map.set(a.address.toLowerCase(), {
-          // NaN znaczy "GT nie podal" i musi zostac nullem az do ekranu.
-          // Zamiana na zero byla by wymysleniem pomiaru, ktorego nikt nie zrobil.
-          volume24hUsd: Number.isFinite(vol) ? vol : null,
-          priceUsd: Number.isFinite(price) && price > 0 ? price : null,
+          // `null` znaczy "GT nie podal" i musi dojechac nullem az do ekranu.
+          // Zamiana na zero bylaby wymysleniem pomiaru, ktorego nikt nie zrobil.
+          volume24hUsd: num(a.volume_usd?.h24),
+          priceUsd: price !== null && price > 0 ? price : null,
+          fdvUsd: num(a.fdv_usd),
+          reserveUsd: num(a.total_reserve_in_usd),
         });
       }
     } catch {
@@ -676,7 +697,8 @@ async function buildSnapshot(): Promise<BoardSnapshot> {
     traded.length > 0 ? fetchQuotes(traded.map((t) => t.address)) : Promise.resolve(new Map()),
   ]);
   for (const t of traded) {
-    t.quoted = quotes.get(t.address) ?? { volume24hUsd: null, priceUsd: null };
+    t.quoted =
+      quotes.get(t.address) ?? { volume24hUsd: null, priceUsd: null, fdvUsd: null, reserveUsd: null };
   }
   if (ethUsd === null) {
     notes.push(

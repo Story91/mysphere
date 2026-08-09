@@ -157,33 +157,20 @@ export default function B20MarketPage() {
           <BoardSection />
         </Suspense>
 
-        <section className={`${CARD} mt-4 p-4 sm:p-5`}>
-          <h2 className="font-soft-display text-[15px] font-bold text-soft-ink">
-            What this list will not tell you
-          </h2>
-          <ul className="mt-2 space-y-1.5 text-[12.5px] leading-[1.55] text-soft-ink-muted">
-            <li>
-              <span className="font-semibold text-soft-ink">How many people hold a token.</span>{' '}
-              Counting holders means replaying every transfer of every token. That is far outside
-              what this page can read, so the number is absent rather than estimated.
-            </li>
-            <li>
-              <span className="font-semibold text-soft-ink">How deep a pool is.</span> The figure the
-              chain returns is liquidity in the current tick, and it reads zero for most freshly
-              seeded pools. A number that lies downward is worse than no number.
-            </li>
-            <li>
-              <span className="font-semibold text-soft-ink">A 24-hour price change.</span> Every
-              token here is younger than a day, so there is nothing to compare against. We show the
-              move since the pool opened instead, and say so.
-            </li>
-            <li>
-              <span className="font-semibold text-soft-ink">Who can mint or freeze a token.</span>{' '}
-              The chain answers “does this address hold that role”, never “who holds it”. We can
-              check one address at a time, so no badge here can honestly say a token is safe.
-            </li>
-          </ul>
-        </section>
+        {/* Stala tu sekcja "What this list will not tell you" - cztery akapity
+            o tym, czego NIE pokazujemy. Wyleciala z trzech powodow.
+
+            Po pierwsze, to jest spowiedz na ekranie uzytkownika, ten sam blad
+            co przy /re-definition i przy ekranie tworzenia.
+
+            Po drugie - i to wazniejsze - byla w trzech czwartych NIEPRAWDZIWA.
+            Glebokosc puli i zmiana ceny sa w tej samej odpowiedzi GeckoTerminal,
+            ktora i tak wolamy; doszly do tabeli. "Kto moze dodrukowac" ma
+            odpowiedz definitywna bez pytania o role: gdy sufit rowna sie podazy,
+            NIKT nie moze, i to widac na stronie tokena.
+
+            Po trzecie, zostaje jedna rzecz naprawde niedostepna - liczba
+            posiadaczy - i ona nie potrzebuje akapitu. Po prostu jej nie ma. */}
 
         <p className="mt-4 px-1 text-[11.5px] leading-[1.5] text-soft-ink-faint">
           Nothing on this page is a recommendation, and most of what is listed here has never been

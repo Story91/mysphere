@@ -103,6 +103,16 @@ function TokenRow({
   const launchEth = token.pool ? formatEthPrice(token.pool.launchPriceEth) : null;
   const move = token.pool ? describeMove(token.pool.moveSinceLaunch) : null;
   const volume = token.quoted ? formatUsdAmount(token.quoted.volume24hUsd) : null;
+  /**
+   * Ile realnie stoi w puli. Liczba z GeckoTerminal, a NIE plynnosc odczytana
+   * z lancucha - ta ostatnia podaje plynnosc w biezacym tiku i dla swiezo
+   * zasilonych pul czyta sie jako zero, czyli klamie w dol.
+   *
+   * To jest odpowiedz na pytanie "czy da sie tu w ogole wyjsc": pula za
+   * czterdziesci dolarow i pula za czterdziesci tysiecy wygladaja w kolumnie
+   * wolumenu tak samo, a nie sa tym samym.
+   */
+  const liquidity = token.quoted ? formatUsdAmount(token.quoted.reserveUsd) : null;
 
   return (
     <li
@@ -164,6 +174,12 @@ function TokenRow({
                 <span className="text-soft-ink-faint">24h volume not quoted</span>
               )}
             </span>
+            {liquidity !== null && (
+              <span className="text-[12.5px] text-soft-ink-muted">
+                <span className="font-semibold tabular-nums text-soft-accent-deep">{liquidity}</span>{' '}
+                in the pool
+              </span>
+            )}
           </div>
         )}
 

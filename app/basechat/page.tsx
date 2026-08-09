@@ -777,6 +777,15 @@ function BaseChatContent() {
   const router = useRouter();
   const urlView = searchParams.get('view');
   const welcomeParam = searchParams.get('welcome');
+  /**
+   * Tresc wstawiona z zewnatrz - dzis wylacznie z sekcji B20 ("Share to feed"
+   * na stronie tokena i po jego utworzeniu).
+   *
+   * DLACZEGO PRZEZ ADRES, A NIE PRZEZ STAN: te dwie strony sa SERWEROWE
+   * i nie dziela stanu z feedem. Adres jest jedynym kanalem, ktory laczy
+   * dwie osobne trasy bez wciagania globalnego magazynu dla jednej rzeczy.
+   */
+  const shareParam = searchParams.get('share');
   const [userStats, setUserStats] = useState<{[key: string]: Stats & { totalPoints: number }}>({});
   // `hoveredElement` bylo ustawiane przy kazdym najechaniu na nazwe uzytkownika w
   // feedzie, ale nikt tej wartosci nie czytal - podpowiedz "Click to view profile"
@@ -786,6 +795,51 @@ function BaseChatContent() {
 
   const chainId = useChainId();
   
+  /**
+   * ===== TOKEN WRZUCONY NA FEED Z SEKCJI B20 =====
+   *
+   * Ktos tworzy token na /b20/create albo oglada go na /b20/[adres] i chce
+   * o nim powiedziec. Dotad musialby przepisac adres recznie - a adres B20 ma
+   * czterdziesci znakow i nikt tego nie robi. Przycisk "Share to feed" przynosi
+   * gotowa tresc tutaj.
+   *
+   * TRESC JEST SZKICEM, NIE WPISEM: ladue do pola, ktore czlowiek widzi i moze
+   * zmienic, a nie do gotowego posta. Nic nie zostaje wyslane bez jego reki.
+   *
+   * Nadpisujemy TYLKO puste pole. Kto zaczal juz cos pisac i trafil tu z linkiem,
+   * nie ma prawa stracic swojego tekstu - to ta sama zasada, ktora rzadzi
+   * zaczatkami Askow (znikaja, gdy tylko ktos zacznie pisac).
+   *
+   * Parametr znika z adresu po zuzyciu (`replace`, nie `push`), inaczej
+   * odswiezenie strony wstawialoby ten sam szkic drugi raz, a przycisk "wstecz"
+   * wracalby do stanu, ktorego juz nie ma.
+   */
+  const shareUsedRef = useRef(false);
+  useEffect(() => {
+    if (!shareParam || shareUsedRef.current) return;
+    shareUsedRef.current = true;
+
+    // Format: "SYMBOL|Nazwa|0xadres". Rozbijamy recznie, bo nazwa moze zawierac
+    // spacje i przecinki, a kreska pionowa w nazwie tokena sie nie zdarza.
+    const parts = shareParam.split('|');
+    const symbol = (parts[0] || '').trim();
+    const name = (parts[1] || '').trim();
+    const tokenAddress = (parts[2] || '').trim();
+
+    if (/^0x[0-9a-fA-F]{40}$/.test(tokenAddress)) {
+      const label = symbol ? `$${symbol}` : 'this token';
+      const title = name && symbol ? `${name} (${label})` : label;
+      setNewPost((current) =>
+        current.trim() === ''
+          ? `${title} is live on Base.\n\nmysphere.fun/b20/${tokenAddress.toLowerCase()}`
+          : current
+      );
+      setMobileComposerOpen(true);
+    }
+
+    router.replace('/basechat', { scroll: false });
+  }, [shareParam, router]);
+
   // Obsługa komunikatu powitalnego dla użytkowników z linku referalowego
   useEffect(() => {
     if (welcomeParam === 'true' && address) {
