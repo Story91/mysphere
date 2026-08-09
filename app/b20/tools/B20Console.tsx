@@ -11,7 +11,7 @@ import {
   predictB20Address,
   type B20Variant,
   type VanityHit,
-} from '../utils/b20/addressing';
+} from '../../utils/b20/addressing';
 
 /**
  * Konsola B20: kopalnia adresow i budowniczy zobowiazan do memo.

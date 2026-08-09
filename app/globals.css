@@ -888,3 +888,27 @@ h1, h2, h3, h4, h5, h6 {
     transform: none;
   }
 }
+
+/* ===========================================================================
+   RYNEK B20 - wejscie wiersza listy
+   ===========================================================================
+   Lista ma do 60 wierszy naraz i odswieza sie sama co 45 s. Kaskada jest wiec
+   KROTKA i skonczona: 18 ms odstepu, obcięta na dwunastym wierszu (patrz
+   B20Board.tsx). Dluzszy odstep zamienilby liste tokenow w pokaz i kazal
+   czekac na tresc, po ktora czlowiek przyszedl.
+
+   Ruch idzie WYLACZNIE po transform i opacity, wiec nie przelicza ukladu
+   szescdziesieciu wierszy naraz - a to jedyny powod, dla ktorego ta animacja
+   jest w ogole dopuszczalna przy takiej liczbie elementow. */
+.b20-row {
+  opacity: 0;
+  transform: translateY(4px);
+  animation: b20-row-in 180ms var(--ease-out-strong) forwards;
+}
+@keyframes b20-row-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .b20-row { opacity: 1; transform: none; animation: none; }
+}
