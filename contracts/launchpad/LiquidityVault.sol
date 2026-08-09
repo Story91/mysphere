@@ -10,15 +10,18 @@ import {
     PoolStateReader
 } from "./interfaces/IPoolManagerV4.sol";
 import {IB20Asset} from "./interfaces/IB20Asset.sol";
+import {B20LaunchHook, HOOK_ALL_MASK, HOOK_REQUIRED_FLAGS} from "./B20LaunchHook.sol";
 import {TickMath} from "./lib/TickMath.sol";
 import {LiquidityAmounts} from "./lib/LiquidityAmounts.sol";
 import {FullMath} from "./lib/FullMath.sol";
 
 interface ILiquidityVault {
-    function seed(address token, address creator, PoolKey calldata key, uint160 expectedSqrtPriceX96)
+    function seed(address token, address creator, PoolKey calldata key, uint160 sqrtPriceX96)
         external
         payable
         returns (uint128 liquidity, uint256 amount0, uint256 amount1, uint256 toDead);
+
+    function HOOK() external view returns (address);
 }
 
 /**
@@ -120,6 +123,32 @@ contract LiquidityVault is IUnlockCallback {
     address public immutable FEE_RECIPIENT;
     uint16 public immutable PROTOCOL_SHARE_BPS;
 
+    /**
+     * Nasz hook. Wdrazany PRZEZ TEN KONTRAKT, w konstruktorze, pod adresem
+     * wykopanym wczesniej offline.
+     *
+     * ---------------------------------------------------------------------
+     * DLACZEGO TO VAULT WDRAZA HOOKA, A NIE ODWROTNIE
+     * ---------------------------------------------------------------------
+     * Bo inaczej zaleznosc jest kolem. Hook musi wiedziec, kto ma prawo otworzyc
+     * pule (vault), a vault musi znac adres hooka, bo ten adres wchodzi do
+     * `PoolKey`. Przy dwoch osobnych deployach jedna strona zawsze wskazuje na
+     * adres przewidziany, a nie istniejacy - i konczy sie setterem.
+     *
+     * Kolo lamie sie tak: hook nie przyjmuje adresu vaulta, tylko bierze
+     * `msg.sender`. Jego kod tworzacy nie zalezy wiec od niczego, czego jeszcze
+     * nie ma, a caly lancuch adresow da sie policzyc offline PRZED pierwsza
+     * transakcja:
+     *
+     *   adres wdrazajacego + nonce  ->  adres launchpada
+     *   adres launchpada  + nonce 1 ->  adres vaulta        (CREATE, bez argumentow w adresie)
+     *   adres vaulta + salt + kod   ->  adres hooka         (CREATE2, kopany)
+     *
+     * Wiazanie powstaje w JEDNEJ transakcji i sprawdza sie dwoma odczytami:
+     * `vault.HOOK()` i `hook.VAULT()`.
+     */
+    address public immutable HOOK;
+
     /* ---------------------------------------------------------------------- */
     /*  STAN                                                                   */
     /* ---------------------------------------------------------------------- */
@@ -128,9 +157,9 @@ contract LiquidityVault is IUnlockCallback {
      * Pozycja LP jednego tokena. Piec pol = 224 bity = JEDEN slot.
      *
      * Czego tu NIE MA: `poolId` (to keccak klucza, wiec przechowywanie byloby
-     * drugim zrodlem prawdy) ani calego `PoolKey` (currency0 i hooks sa u nas
-     * z definicji zerowe - trzymanie ich w pamieci pozwalaloby kiedys wpisac
-     * tam cos innego).
+     * drugim zrodlem prawdy) ani calego `PoolKey` - `currency0` jest u nas
+     * z definicji zerowe, a `hooks` to `HOOK`, ktory jest `immutable`. Trzymanie
+     * ich w pamieci na token pozwalaloby kiedys wpisac tam cos innego.
      */
     struct Position {
         uint24 fee;
@@ -183,13 +212,15 @@ contract LiquidityVault is IUnlockCallback {
 
     error ZeroAddress();
     error ProtocolShareTooHigh();
+    error BadHookAddress();
+    error HookConfigMismatch();
+    error PoolStateUnreadable();
     error NotLaunchpad();
     error NotPoolManager();
     error NotUnlocking();
     error AlreadySeeded();
     error NotSeeded();
     error BadPoolKey();
-    error PriceMoved();
     error ZeroLiquidity();
     error NotEnoughToken();
     error UnexpectedDelta();
@@ -229,12 +260,41 @@ contract LiquidityVault is IUnlockCallback {
     /*  KONSTRUKTOR                                                            */
     /* ---------------------------------------------------------------------- */
 
-    constructor(address feeRecipient_, uint16 protocolShareBps_) {
+    /**
+     * @param hookSalt_ salt CREATE2 wykopany przez `scripts/mineHookAddress.ts`.
+     *
+     * ZLY SALT WYWALA WDROZENIE, A NIE PIERWSZY AWANS. To jest cala tresc
+     * dwoch asercji ponizej i jedyny powod, dla ktorego one tu sa.
+     *
+     * Bez sprawdzenia bitow adresu deploy przeszedlby, launchpad zaczalby
+     * przyjmowac pieniadze, a `HookAddressNotValid` odpadloby dopiero przy
+     * PIERWSZYM awansie - czyli po zebraniu 3 ETH od ludzi, w kontrakcie,
+     * ktorego nie da sie ani poprawic, ani zatrzymac. Sprawdzenie kosztuje
+     * jedna operacje bitowa.
+     */
+    constructor(address feeRecipient_, uint16 protocolShareBps_, bytes32 hookSalt_) {
         if (feeRecipient_ == address(0)) revert ZeroAddress();
         if (protocolShareBps_ > MAX_PROTOCOL_SHARE_BPS) revert ProtocolShareTooHigh();
         LAUNCHPAD = msg.sender;
         FEE_RECIPIENT = feeRecipient_;
         PROTOCOL_SHARE_BPS = protocolShareBps_;
+
+        address hook = address(new B20LaunchHook{salt: hookSalt_}(feeRecipient_, protocolShareBps_));
+
+        // v4 czyta uprawnienia hooka z dolnych 14 bitow jego adresu. Nie zgadzaja
+        // sie - kazda pula z tym hookiem odpada na `HookAddressNotValid`.
+        if (uint160(hook) & HOOK_ALL_MASK != HOOK_REQUIRED_FLAGS) {
+            revert BadHookAddress();
+        }
+
+        // Hook dostaje odbiorce oplaty i udzial protokolu wlasnymi argumentami
+        // (patrz uzasadnienie w jego konstruktorze), wiec da sie je przekrecic
+        // niezaleznie od tego, co ma vault. Tu sie to zamyka: dwa "60/40"
+        // w jednym systemie nie przejda przez deploy.
+        if (B20LaunchHook(payable(hook)).FEE_RECIPIENT() != feeRecipient_) revert HookConfigMismatch();
+        if (B20LaunchHook(payable(hook)).PROTOCOL_SHARE_BPS() != protocolShareBps_) revert HookConfigMismatch();
+
+        HOOK = hook;
     }
 
     /**
@@ -259,7 +319,7 @@ contract LiquidityVault is IUnlockCallback {
             currency1: token,
             fee: p.fee,
             tickSpacing: p.tickSpacing,
-            hooks: address(0)
+            hooks: HOOK
         });
     }
 
@@ -284,13 +344,29 @@ contract LiquidityVault is IUnlockCallback {
      * z krzywej. Ile go trzeba, liczy pula; nadmiar idzie na adres martwy.
      *
      * Ile tokena dostalismy, czytamy z `balanceOf(address(this))`, a nie
-     * z parametru. Powod: w chwili `seed` ten kontrakt NIE MOZE trzymac tego
-     * tokena z zadnego innego tytulu - `harvest` wymaga `seeded[token]`, ktore
-     * jeszcze nie jest ustawione, wiec saldo jest dokladnie tym, co przyszlo
-     * z krzywej. Parametr dalby launchpadowi mozliwosc pomylenia sie o liczbe,
+     * z parametru: parametr dalby launchpadowi mozliwosc pomylenia sie o liczbe,
      * ktorej vault i tak nie moze zweryfikowac inaczej niz saldem.
+     *
+     * ---------------------------------------------------------------------
+     * CO TO SALDO NAPRAWDE ZNACZY - poprawka znaleziska #6
+     * ---------------------------------------------------------------------
+     * Poprzednia wersja tego akapitu twierdzila, ze w chwili `seed` ten kontrakt
+     * NIE MOZE trzymac tego tokena z zadnego innego tytulu. To bylo NIEPRAWDA:
+     * kazdy, kto kupil na krzywej, moze zwyklym `transfer` przyslac tu tokeny
+     * przed awansem - ani B20, ani `LaunchToken` nie maja zadnej bramki na
+     * przychodzacy transfer i miec nie moga.
+     *
+     * Prawdziwe zdanie jest slabsze, ale wystarczajace: saldo moze byc tylko
+     * WIEKSZE od tego, co przyszlo z krzywej, nigdy mniejsze. Ile tokena idzie
+     * do puli, liczy `modifyLiquidity` z plynnosci, a nie z tego salda; caly
+     * nadmiar leci na `DEAD`. Kierunek bledu jest wiec bezpieczny dla puli
+     * i dla protokolu - traci wylacznie ten, kto przyslal tokeny w prezencie.
+     *
+     * To jest ZALOZENIE, ktore nadal obowiazuje, i dlatego zostalo przepisane
+     * zamiast usuniete: gdyby ktos kiedys uzaleznil od tego salda cokolwiek
+     * poza `toDead`, powyzsze przestaje wystarczac.
      */
-    function seed(address token, address creator, PoolKey calldata key, uint160 expectedSqrtPriceX96)
+    function seed(address token, address creator, PoolKey calldata key, uint160 sqrtPriceX96)
         external
         payable
         nonReentrant
@@ -302,22 +378,44 @@ contract LiquidityVault is IUnlockCallback {
 
         // Ksztalt klucza jest tu sprawdzany, a nie zakladany. Vault ma byc
         // czytelny bez czytania launchpada: para jest natywnym ETH przeciw temu
-        // tokenowi, bez hooka. Hook mialby dostep do kazdego naszego wywolania.
-        if (key.currency0 != address(0) || key.currency1 != token || key.hooks != address(0)) {
+        // tokenowi, z NASZYM hookiem i zadnym innym.
+        if (key.currency0 != address(0) || key.currency1 != token || key.hooks != HOOK) {
             revert BadPoolKey();
         }
         if (key.tickSpacing <= 0) revert BadPoolKey();
 
-        // Cena puli sprawdzana CO DO BITU tuz przed zasileniem.
+        // ------------------------------------------------------------------
+        // PULA POWSTAJE TUTAJ, W CHWILI AWANSU - I TO JEST ZMIANA WOBEC
+        // POPRZEDNIEJ WERSJI, KTORA KASUJE TRZY ZNALEZISKA AUDYTU
+        // ------------------------------------------------------------------
+        // Przedtem launchpad inicjalizowal CZTERY pule bez hooka juz przy
+        // starcie tokena, a tu trzeba bylo sprawdzac, ktora z nich nie zostala
+        // po drodze zatruta - bo pule bez plynnosci kazdy moze przesunac cenowo
+        // za darmo. Stad bral sie `poolsMask`, `_pickCleanPool` i trzy osobne
+        // znaleziska wrogiego przegladu (#1, #2, #3).
         //
-        // To NIE jest ostroznosc na wszelki wypadek. Pula bez plynnosci daje sie
-        // przesunac: swap w takiej puli konsumuje zero wejscia i przesuwa cene
-        // az do zadanego limitu. Gdyby ktos to zrobil miedzy startem a awansem,
-        // nasze L (policzone dla ceny terminalnej) nie pasowaloby do ceny
-        // faktycznej i pula wzielaby zupelnie inny stosunek aktywow.
-        // Rownosc bitowa, bez tolerancji: pule zainicjalizowalismy sami, wiec
-        // kazda inna wartosc znaczy "ktos tu byl".
-        if (PoolStateReader.sqrtPriceX96(POOL_MANAGER, key) != expectedSqrtPriceX96) revert PriceMoved();
+        // Z hookiem w kluczu to okno nie istnieje: `beforeInitialize` odrzuca
+        // kazdego poza tym kontraktem, wiec puli z naszym hookiem NIKT OBCY
+        // NIE OTWORZY - ani wczesniej, ani w tym samym bloku. Nie ma czego
+        // zatruwac i nie ma z czego wybierac, wiec pula moze powstac dopiero
+        // teraz, jedna, i od razu z plynnoscia.
+        //
+        // Skutek uboczny wart nazwania: start tokena przestaje placic ~240k
+        // gazu za cztery `initialize`, w tym te 99% startow, ktore nigdy nie
+        // awansuja.
+        //
+        // `initialize` rewertuje `PoolAlreadyInitialized`, gdy pula juz istnieje.
+        // Nie lapiemy tego w `try/catch`: jedyna droga do takiego stanu wiedzie
+        // przez nasz wlasny `seed`, ktory jest za zapadka `seeded`, wiec rewert
+        // znaczy "w tym kodzie jest blad", a nie "ktos nas ubiegl".
+        IPoolManagerV4(POOL_MANAGER).initialize(key, sqrtPriceX96);
+
+        // Odczyt ceny ZARAZ PO wlasnym `initialize` nie jest ostroznoscia - jest
+        // jedynym miejscem, w ktorym weryfikujemy, ze w ogole POTRAFIMY czytac
+        // stan PoolManagera. Numer slotu `_pools` (6) to szczegol ukladu pamieci,
+        // nie czesc ABI. Bledne wyprowadzenie wywala tu pierwszy awans na
+        // testnecie, zamiast dac cicho zla liczbe na mainnecie.
+        if (PoolStateReader.sqrtPriceX96(POOL_MANAGER, key) != sqrtPriceX96) revert PoolStateUnreadable();
 
         // Pelny zakres, wyrownany do siatki tej puli. Symetrycznie, wiec
         // pozycja obejmuje cene biezaca z ogromnym zapasem w obie strony.
@@ -325,7 +423,7 @@ contract LiquidityVault is IUnlockCallback {
         int24 tickLower = -tickUpper;
 
         liquidity = LiquidityAmounts.getLiquidityForAmount0(
-            expectedSqrtPriceX96, TickMath.getSqrtPriceAtTick(tickUpper), msg.value
+            sqrtPriceX96, TickMath.getSqrtPriceAtTick(tickUpper), msg.value
         );
         if (liquidity == 0) revert ZeroLiquidity();
 

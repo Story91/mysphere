@@ -3,6 +3,7 @@
 const hre = require('hardhat');
 const { ethers } = hre;
 const { expect } = require('chai');
+const { deployLaunchpad } = require('./helpers/deployLaunchpad');
 
 /**
  * NIEZMIENNIKI, FUZZ I WYPLACALNOSC krzywej B20.
@@ -71,6 +72,8 @@ const FEE_BPS = 100n;
 const CREATOR_FEE_BPS = 40n;
 const WINDOW = 300;
 const GRAD_FEE = 10n ** 17n;
+/** Prog rezerwy, ponizej ktorego awans jest odmawiany - poprawka znaleziska #4. */
+const MIN_GRAD_RESERVE = 2n * 10n ** 18n;
 const GRAD_REWARD = 5n * 10n ** 16n;
 const MAX_UINT = ethers.MaxUint256;
 
@@ -128,7 +131,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
   this.timeout(20 * 60 * 1000);
 
   let deployer: any, creator: any, alice: any, bob: any, carol: any, dave: any, treasury: any;
-  let pad: any, vault: any, factory: any, pm: any;
+  let pad: any, vault: any, hook: any, factory: any, tokenFactory: any, pm: any;
   let padAddr: string;
 
   /* ===================================================================== */
@@ -347,12 +350,19 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
     factory = await installAt('MockB20Factory', B20_FACTORY);
     pm = await installAt('MockPoolManager', POOL_MANAGER);
 
-    const Pad = await ethers.getContractFactory('CurveLaunchpad');
-    pad = await Pad.deploy(FEE_BPS, CREATOR_FEE_BPS, treasury.address, 6000);
-    await pad.waitForDeployment();
-    padAddr = await pad.getAddress();
+    const TF = await ethers.getContractFactory('B20TokenFactory');
+    tokenFactory = await TF.deploy();
+    await tokenFactory.waitForDeployment();
 
-    vault = await ethers.getContractAt('LiquidityVault', await pad.VAULT());
+    ({ pad, vault, hook } = await deployLaunchpad({
+      deployer,
+      feeBps: FEE_BPS,
+      creatorFeeBps: CREATOR_FEE_BPS,
+      feeRecipient: treasury.address,
+      protocolShareBps: 6000,
+      tokenFactory: await tokenFactory.getAddress(),
+    }));
+    padAddr = await pad.getAddress();
   });
 
   /* ===================================================================== */
@@ -492,7 +502,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       s = await assertInvariants(token, t, s, 'claim');
     });
 
-    it('I-C10/I-C11: tworca nie sprzeda nigdy, a limit okna jest wspolny dla niego i dla reszty', async function () {
+    it('I-C10/I-C11: tworca nie sprzeda W TRAKCIE ZBIORKI, a limit okna jest wspolny dla niego i dla reszty', async function () {
       // Tworca kupuje w oknie - podlega temu samemu limitowi, co kazdy.
       const { token, t } = await launchToken(creator, ethers.parseEther('0.0122'), 1n);
       const cap: bigint = await pad.WINDOW_ADDR_CAP();
@@ -508,14 +518,20 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
         pad.connect(creator).sell(token, 1000n, 1n, MAX_UINT)
       ).to.be.revertedWithCustomError(pad, 'CreatorLocked');
 
-      // ...i w stanie Locked, gdzie sprzedaz dziala dla wszystkich innych.
+      // ...ale W STANIE LOCKED JUZ NIE. To jest poprawka znaleziska #5:
+      // przedtem `CreatorLocked` bylo bezwarunkowe i bez terminu waznosci, wiec
+      // tworca kazdego tokena, ktory nie doszedl do progu - czyli z definicji
+      // wiekszosci - zostawal ze swoja pozycja na zawsze. Blokada ma nie
+      // pozwolic tworcy wyjsc W TRAKCIE zbiorki; po zamknieciu krzywej zbiorki
+      // juz nie ma, bo kupno rewertuje.
       await warp(WINDOW + 1);
       await buyChecked(alice, token, t, ethers.parseEther('5'));
       expect((await pad.launchOf(token))[1]).to.equal(LOCKED);
-      await expect(
-        pad.connect(creator).sell(token, 1000n, 1n, MAX_UINT)
-      ).to.be.revertedWithCustomError(pad, 'CreatorLocked');
-      // Alice moze - blokada dotyczy tworcy, nie stanu.
+      // Ilosc musi byc realna, a nie 1000 jednostek bazowych: tyle daje zero wei
+      // po zaokragleniu w dol i krzywa slusznie odbija to jako `DustTrade`.
+      await pad.connect(creator).sell(token, await t.balanceOf(creator.address), 1n, MAX_UINT);
+      expect(await t.balanceOf(creator.address)).to.equal(0n);
+      // Alice tez moze, tak jak przedtem.
       await t.connect(alice).approve(padAddr, MAX_UINT);
       await sellChecked(alice, token, t, 10n ** 24n);
     });
@@ -909,9 +925,20 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       await buyChecked(alice, token, t, ethers.parseEther('2'));
       await buyChecked(bob, token, t, ethers.parseEther('3'));
 
-      const keys = await pad.poolKeys(token);
-      for (let i = 0; i < 4; i++) await pm.poisonPrice(plainKey(keys[i]), 123n + BigInt(i));
-      await expect(pad.graduate(token)).to.be.revertedWithCustomError(pad, 'NoCleanPool');
+      // Przedtem ten stan osiagalo sie zatruwajac wszystkie cztery pule.
+      // Zatrucie juz nie istnieje (hook-brama), wiec trwala niemoznosc awansu
+      // ma teraz JEDNA przyczyne: rezerwa zeszla ponizej progu. Test pilnuje
+      // tego samego zdania co przedtem - w najgorszym osiagalnym stanie
+      // sprzedaz MUSI dzialac.
+      const min: bigint = await pad.MIN_GRAD_RESERVE();
+      while (((await pad.launchOf(token))[2] as bigint) >= min) {
+        const bal: bigint = await t.balanceOf(alice.address);
+        await pad.connect(alice).sell(token, bal / 4n, 1n, MAX_UINT);
+      }
+      await expect(pad.graduate(token)).to.be.revertedWithCustomError(
+        pad,
+        'ReserveTooSmallToGraduate'
+      );
 
       let s = await snap(token);
       expect(s.state).to.equal(LOCKED);
@@ -1029,7 +1056,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
 
       const ethAtLock: bigint = s.eth;
       const terminal: bigint = await pad.SQRT_PRICE_TERMINAL();
-      const keys = await pad.poolKeys(token);
+      const key = await pad.poolKeyOf(token);
       // Saldo PoolManagera mierzymy PRZYROSTEM, nie wartoscia bezwzgledna:
       // atrapa siedzi pod stalym adresem i przezywa wszystkie testy w pliku,
       // wiec lezy na niej ETH z wczesniejszych awansow.
@@ -1040,7 +1067,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       s = await assertInvariants(token, t, s, 'graduate');
 
       // I-X5: cena puli tuz po zasileniu jest DOKLADNIE terminalna.
-      expect(await poolPrice(keys[0]), 'I-X5').to.equal(terminal);
+      expect(await poolPrice(key), 'I-X5').to.equal(terminal);
       expect(ev.args[7], 'Graduated.sqrtPriceX96').to.equal(terminal);
 
       // I-X4: podaz rozklada sie bez ubytku.
@@ -1085,7 +1112,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       // z zadnego adresu - a launchpad nie ma juz sciezki, ktora by je zawolala.
       expect(await vault.seeded(token)).to.equal(true);
       await expect(
-        vault.connect(alice).seed(token, creator.address, plainKey(keys[0]), terminal)
+        vault.connect(alice).seed(token, creator.address, plainKey(key), terminal)
       ).to.be.revertedWithCustomError(vault, 'NotLaunchpad');
     });
 
@@ -1096,7 +1123,12 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       // handlujacego w puli. To jest wymagany kierunek (B1) i tu go mierzymy.
       const terminal: bigint = await pad.SQRT_PRICE_TERMINAL();
 
-      for (const targetEth of ['2.5', '1.5', '0.8', '0.4', '0.15', '0.1000000001']) {
+      // Poziomy zeszly nad prog `MIN_GRAD_RESERVE`. Przedtem szly do
+      // '0.1000000001', czyli o jedno wei ponad oplate awansowa - i wlasnie ten
+      // przypadek wrogi audyt nazwal znaleziskiem #4: awans niszczyl wtedy
+      // niemal cale pozostale pokrycie, a polowa oplaty ladowala u wolajacego.
+      // Test, ktory to przechodzil, uznawal ten stan za poprawny.
+      for (const targetEth of ['2.9', '2.6', '2.3', '2.05', '2.000000001']) {
         const { token, t } = await openCurve();
         await t.connect(alice).approve(padAddr, MAX_UINT);
         let s = await snap(token);
@@ -1131,8 +1163,8 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
         expect((await ethers.provider.getBalance(POOL_MANAGER)) - pmBefore).to.equal(amount0);
 
         // Cena puli po zasileniu nadal terminalna, co do bitu.
-        const keys = await pad.poolKeys(token);
-        expect(await poolPrice(keys[0]), `I-X5 przy ${targetEth}`).to.equal(terminal);
+        const key = await pad.poolKeyOf(token);
+        expect(await poolPrice(key), `I-X5 przy ${targetEth}`).to.equal(terminal);
 
         // Token: tyle, ile pula wziela, reszta na adres martwy - bez ubytku.
         // Wartosc odniesienia to rezerwa Z CHWILI AWANSU, nie T_MIN: sprzedaze
@@ -1145,7 +1177,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       }
     });
 
-    it('awans przy SKRAJNIE malym eLp - az do jednego wei ponad oplate awansowa', async function () {
+    it('awans na calym OSIAGALNYM zakresie eLp - 15 poziomow tuz nad progiem', async function () {
       // To jest miejsce, w ktorym najlatwiej o blad o jedno wei, i jedyne,
       // w ktorym taki blad kosztuje CALA pule.
       //
@@ -1157,8 +1189,12 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       //
       // Sprawdzamy wiec caly rzad wielkosci: od 1 wei do calej zbiorki.
       const terminal: bigint = await pad.SQRT_PRICE_TERMINAL();
+      // `0n` na poczatku jest tu istotne, a nie ozdobne: warunek progu brzmi
+      // `ethReserve < MIN_GRAD_RESERVE`, wiec rezerwa DOKLADNIE rowna progowi
+      // jest pierwsza legalna wartoscia. Test ma dotknac tej granicy, a nie
+      // zatrzymac sie bezpiecznie nad nia.
       const poziomy = [
-        1n, 2n, 3n, 5n, 7n, 13n, 99n, 1000n, 65537n,
+        0n, 1n, 2n, 3n, 5n, 7n, 13n, 99n, 1000n, 65537n,
         10n ** 6n, 10n ** 9n, 12345678901n, 10n ** 12n, 10n ** 15n, 10n ** 16n
       ];
       let najmniejszy = MAX_UINT;
@@ -1170,7 +1206,12 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
         await buyChecked(alice, token, t, ethers.parseEther('5'));
         s = await assertInvariants(token, t, s, 'buy');
 
-        await sellDownTo(token, t, alice, GRAD_FEE + cel);
+        // Punktem odniesienia jest teraz PROG, a nie sama oplata awansowa:
+        // ponizej progu awansu po prostu nie ma. Zakres wielkosci `eLp` zwezil
+        // sie przez to do [1.9, 2.9] ETH i trzeba to powiedziec wprost - ale
+        // to, co ten test naprawde bada, jest nietkniete: `cel` przebiega
+        // NAJMLODSZE bity rezerwy, a bledy zaokraglen siedza wlasnie tam.
+        await sellDownTo(token, t, alice, MIN_GRAD_RESERVE + cel);
         s = await assertInvariants(token, t, s, 'sell');
 
         const eLp = s.eth - GRAD_FEE;
@@ -1191,11 +1232,15 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
         // Plynnosc zerowa oznaczalaby pule bez glebokosci - vault ma to odbic,
         // wiec jesli tu jestesmy, musi byc niezerowa.
         expect(liquidity, `L > 0 przy eLp=${eLp}`).to.be.greaterThan(0n);
-        expect(await poolPrice((await pad.poolKeys(token))[0])).to.equal(terminal);
+        expect(await poolPrice(await pad.poolKeyOf(token))).to.equal(terminal);
       }
 
-      // Test ma naprawde dotknac skrajnosci, a nie tylko okolicy.
-      expect(najmniejszy, 'najmniejszy zbadany eLp').to.be.lessThan(5n);
+      // Przedtem stalo tu `lessThan(5n)` - test schodzil do jednego wei ponad
+      // oplate awansowa. Prog `MIN_GRAD_RESERVE` odcial ten obszar CELOWO
+      // (znalezisko #4), wiec najmniejszy osiagalny `eLp` to dokladnie
+      // `MIN_GRAD_RESERVE - GRAD_FEE`. Asercja pilnuje, ze test naprawde dotknal
+      // tej granicy, a nie zatrzymal sie bezpiecznie nad nia.
+      expect(najmniejszy, 'najmniejszy zbadany eLp').to.equal(MIN_GRAD_RESERVE - GRAD_FEE);
     });
 
     it('galaz dociagniecia nie potrafi rzucic Arithmetic - 12 stanow x 9 kwot wokol granicy', async function () {
@@ -1268,59 +1313,38 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       expect(s.bal).to.equal(s.liab);
     });
 
-    it('awans wybiera pierwsza CZYSTA pule, a zatrute pomija', async function () {
-      const { token, t } = await openCurve();
-      await buyChecked(alice, token, t, ethers.parseEther('5'));
-      const keys = await pad.poolKeys(token);
-      const terminal: bigint = await pad.SQRT_PRICE_TERMINAL();
-
-      // Dwie pierwsze przesuniete cenowo - dokladnie tak, jak zrobilby to swap
-      // w pustej puli (konsumuje zero wejscia i idzie do limitu ceny).
-      await pm.poisonPrice(plainKey(keys[0]), terminal + 1n); // o JEDEN bit
-      await pm.poisonPrice(plainKey(keys[1]), terminal - 1n);
-
-      await pad.connect(bob).graduate(token);
-      const pos = await vault.positionOf(token);
-      expect(pos[0], 'wybrana trzecia warstwa').to.equal(poolIdOf(keys[2]));
-      expect(await poolPrice(keys[2])).to.equal(terminal);
-    });
-
-    it('CUDZA pula jest pomijana, nawet gdy jej cena jest DOKLADNIE terminalna', async function () {
-      // Maska "to nasza pula" i kontrola ceny to DWA niezalezne warunki i tu
-      // sie to rozdziela. Napastnik, ktory zdazyl zainicjalizowac pule pierwszy,
-      // nie moze wciagnac nas do puli, ktorej sam jest wlascicielem stanu -
-      // nawet jesli ustawi w niej dokladnie ta cene, ktorej szukamy.
-      //
-      // Zeby to w ogole dalo sie ustawic, oba kroki musza byc w JEDNYM bloku:
-      // salt zawiera `blockhash(block.number - 1)`, wiec adres tokena zmienia
-      // sie z kazdym blokiem. Stad sonda-kontrakt, ktora sama liczy salt
-      // i front-runuje wlasny start. Ta niedogodnosc testu JEST dokladnie tym,
-      // co na produkcji zamyka wektor A2 - prawdziwy napastnik nie moze byc
-      // w naszej transakcji, wiec ma jeszcze trudniej.
+    /**
+     * Tu staly dwa testy wyboru puli - "awans wybiera pierwsza CZYSTA pule"
+     * i "CUDZA pula jest pomijana, nawet gdy jej cena jest DOKLADNIE
+     * terminalna". Oba opisywaly maske `poolsMask` i `_pickCleanPool`, ktorych
+     * juz nie ma: pula jest jedna i nikt obcy nie moze jej otworzyc. W ich
+     * miejsce wchodza dwa zdania o nowym stanie rzeczy.
+     */
+    it('napastnik w TEJ SAMEJ transakcji nie otworzy naszej puli', async function () {
       const terminal: bigint = await pad.SQRT_PRICE_TERMINAL();
       const FR = await ethers.getContractFactory('PoolFrontRunner');
       const fr = await FR.deploy(padAddr);
       await fr.waitForDeployment();
 
-      const rc = await (await fr.frontRunThenLaunch(0, terminal)).wait();
+      // Sonda zna adres tokena, ktory dopiero powstanie - jest w tym samym
+      // bloku, wiec `blockhash(block.number - 1)` jej nie zatrzymuje. Mimo to
+      // brama hooka odrzuca ja na `beforeInitialize`.
+      await expect(fr.frontRunOurPool(terminal)).to.be.revertedWithCustomError(hook, 'NotVault');
+    });
+
+    it('CUDZA pula bez naszego hooka powstaje - i nie rusza naszego awansu', async function () {
+      const terminal: bigint = await pad.SQRT_PRICE_TERMINAL();
+      const FR = await ethers.getContractFactory('PoolFrontRunner');
+      const fr = await FR.deploy(padAddr);
+      await fr.waitForDeployment();
+
+      // Nie udajemy, ze da sie zakazac cudzych pul na te sama pare. Nie da sie -
+      // ani nam, ani Clankerowi. Zdanie, ktore nas obowiazuje, jest wezsze:
+      // NASZA pula ma powstac tam, gdzie miala, i z nasza cena.
+      const rc = await (await fr.frontRunForeignPoolThenLaunch(terminal + 12345n)).wait();
       const ev = pickEvent(rc, pad.interface, 'Launched');
       const token = ev.args[0] as string;
       expect(token, 'sonda przewidziala adres tokena').to.equal(await fr.lastToken());
-
-      // Warstwa 0 jest zainicjalizowana i ma WLASCIWA cene, ale nie jest nasza.
-      const przygotowane = rc.logs
-        .map((l: any) => {
-          try {
-            return pad.interface.parseLog(l);
-          } catch {
-            return null;
-          }
-        })
-        .filter((l: any) => l && l.name === 'PoolPrepared');
-      expect(przygotowane.length).to.equal(4);
-      expect(przygotowane[0].args[5], 'warstwa 0 NIE jest nasza').to.equal(false);
-      expect(przygotowane[0].args[4], 'a mimo to ma cene terminalna').to.equal(terminal);
-      expect(przygotowane[1].args[5], 'warstwa 1 jest nasza').to.equal(true);
 
       const t = await ethers.getContractAt('MockB20', token);
       await warp(WINDOW + 1);
@@ -1328,9 +1352,10 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       await pad.connect(bob).graduate(token);
 
       const pos = await vault.positionOf(token);
-      expect(pos[0], 'plynnosc poszla do NASZEJ warstwy, nie do cudzej').to.equal(
-        poolIdOf(await pad.poolKeyAt(token, 1))
+      expect(pos[0], 'plynnosc poszla do NASZEJ puli').to.equal(
+        poolIdOf(await pad.poolKeyOf(token))
       );
+      expect(await poolPrice(await pad.poolKeyOf(token))).to.equal(terminal);
     });
 
     it('graduate jest bezuprawnieniowe, ale tylko w stanie Locked', async function () {
@@ -1599,12 +1624,18 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
      * nikt nie sprawdzil na skrajnosci, sa deklaracja.
      */
     async function usePad(feeBps: number, creatorFeeBps: number, protocolShareBps: number) {
-      const Pad = await ethers.getContractFactory('CurveLaunchpad');
-      const p = await Pad.deploy(feeBps, creatorFeeBps, treasury.address, protocolShareBps);
-      await p.waitForDeployment();
-      pad = p;
-      padAddr = await p.getAddress();
-      vault = await ethers.getContractAt('LiquidityVault', await p.VAULT());
+      const deployed = await deployLaunchpad({
+        deployer,
+        feeBps,
+        creatorFeeBps,
+        feeRecipient: treasury.address,
+        protocolShareBps,
+        tokenFactory: await tokenFactory.getAddress(),
+      });
+      pad = deployed.pad;
+      vault = deployed.vault;
+      hook = deployed.hook;
+      padAddr = await deployed.pad.getAddress();
     }
 
     it('sufity sa TWARDE i obowiazuja takze wdrazajacego', async function () {
@@ -1612,27 +1643,26 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       expect(await pad.MAX_FEE_BPS()).to.equal(200n);
       expect(await vault.MAX_PROTOCOL_SHARE_BPS()).to.equal(8000n);
 
-      await expect(Pad.deploy(201, 40, treasury.address, 6000)).to.be.revertedWithCustomError(
-        pad,
-        'FeeTooHigh'
-      );
-      await expect(Pad.deploy(100, 101, treasury.address, 6000)).to.be.revertedWithCustomError(
-        pad,
-        'CreatorFeeTooHigh'
-      );
-      await expect(Pad.deploy(100, 40, ethers.ZeroAddress, 6000)).to.be.revertedWithCustomError(
-        pad,
-        'ZeroAddress'
-      );
+      const tf = await tokenFactory.getAddress();
+      // Te warunki stoja PRZED wdrozeniem vaulta, wiec salt jest bez znaczenia.
+      await expect(
+        Pad.deploy(201, 40, treasury.address, 6000, tf, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(pad, 'FeeTooHigh');
+      await expect(
+        Pad.deploy(100, 101, treasury.address, 6000, tf, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
+      await expect(
+        Pad.deploy(100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(pad, 'ZeroAddress');
       // Sufit udzialu protokolu jest PODLOGA udzialu tworcy - 8000 znaczy
       // "tworcy nie da sie zejsc ponizej 20%, nawet literowka przy deployu".
-      await expect(Pad.deploy(100, 40, treasury.address, 8001)).to.be.revertedWithCustomError(
-        vault,
-        'ProtocolShareTooHigh'
-      );
-      // Granice od strony dozwolonej naprawde przechodza.
-      await (await Pad.deploy(200, 200, treasury.address, 8000)).waitForDeployment();
-      await (await Pad.deploy(0, 0, treasury.address, 0)).waitForDeployment();
+      await expect(
+        Pad.deploy(100, 40, treasury.address, 8001, tf, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(vault, 'ProtocolShareTooHigh');
+      // Granice od strony dozwolonej naprawde przechodza - tu salt musi juz byc
+      // wykopany, bo deploy dochodzi do konstruktora vaulta.
+      await usePad(200, 200, 8000);
+      await usePad(0, 0, 0);
     });
 
     it('krzywa BEZ oplat: round-trip nadal na minusie, a _accrueFee nie dzieli przez zero', async function () {
@@ -1711,9 +1741,9 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       await buyChecked(alice, token, t, ethers.parseEther('5'));
       await pad.connect(bob).graduate(token);
 
-      const keys = await pad.poolKeys(token);
+      const key = await pad.poolKeyOf(token);
       const fee0 = ethers.parseEther('0.03');
-      await pm.setPendingFees(plainKey(keys[0]), fee0, 0n);
+      await pm.setPendingFees(plainKey(key), fee0, 0n);
       await deployer.sendTransaction({ to: POOL_MANAGER, value: fee0 });
       await vault.connect(dave).harvest(token);
 
@@ -1737,9 +1767,11 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       // ale wzor tez mozna przekrecic. Porownanie z odczytem z Base mainnet
       // (MINT_ROLE 0x154c0081...6c3686, PAUSE_ROLE 0x139c2898...816e46d) jest
       // jedyna rzecza, ktora tu cokolwiek dowodzi.
-      expect(await pad.MINT_ROLE()).to.equal(MINT_ROLE);
-      expect(await pad.PAUSE_ROLE()).to.equal(PAUSE_ROLE);
-      expect(await pad.DEFAULT_ADMIN_ROLE()).to.equal(ADMIN_ROLE);
+      // Stale zeszly do `B20TokenFactory` razem z tworzeniem tokena - to ona
+      // jest jedynym miejscem, ktore wie, czym jest B20.
+      expect(await tokenFactory.MINT_ROLE()).to.equal(MINT_ROLE);
+      expect(await tokenFactory.PAUSE_ROLE()).to.equal(PAUSE_ROLE);
+      expect(await tokenFactory.DEFAULT_ADMIN_ROLE()).to.equal(ADMIN_ROLE);
       expect(MINT_ROLE.slice(0, 10)).to.equal('0x154c0081');
       expect(MINT_ROLE.slice(-6)).to.equal('6c3686');
       expect(PAUSE_ROLE.slice(0, 10)).to.equal('0x139c2898');
@@ -1794,7 +1826,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       for (const [tryb, rola] of przypadki) {
         await factory.setSabotage(tryb);
         await expect(pad.connect(creator).launch('T', 'T', 0n, MAX_UINT))
-          .to.be.revertedWithCustomError(pad, 'RolesAlive')
+          .to.be.revertedWithCustomError(tokenFactory, 'RolesAlive')
           .withArgs(rola);
       }
       await factory.setSabotage(0);
@@ -1811,7 +1843,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       await factory.setSabotage(8);
       await expect(
         pad.connect(creator).launch('T', 'T', 0n, MAX_UINT)
-      ).to.be.revertedWithCustomError(pad, 'WrongVariant');
+      ).to.be.revertedWithCustomError(tokenFactory, 'WrongVariant');
       await factory.setSabotage(0);
     });
 
@@ -2050,8 +2082,8 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
 
     it('I-X6: harvest NIE rusza kapitalu - ani w pozycji, ani w puli', async function () {
       await pad.connect(bob).graduate(token);
-      const keys = await pad.poolKeys(token);
-      const id = poolIdOf(keys[0]);
+      const key = await pad.poolKeyOf(token);
+      const id = poolIdOf(key);
 
       const posPrzed = await vault.positionOf(token);
       const plynnoscPrzed: bigint = await pm.liquidityOf(id);
@@ -2061,7 +2093,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       // Oplaty musza miec pokrycie - w prawdziwym v4 pochodza ze swapow.
       const fee0 = ethers.parseEther('0.02');
       const fee1 = ethers.parseEther('5000');
-      await pm.setPendingFees(plainKey(keys[0]), fee0, fee1);
+      await pm.setPendingFees(plainKey(key), fee0, fee1);
       await deployer.sendTransaction({ to: POOL_MANAGER, value: fee0 });
       await t.mint(POOL_MANAGER, fee1);
 
@@ -2092,9 +2124,9 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
 
     it('kierunek wyplaty z vaulta jest zaszyty - placacy gaz nie jest odbiorca', async function () {
       await pad.connect(bob).graduate(token);
-      const keys = await pad.poolKeys(token);
+      const key = await pad.poolKeyOf(token);
       const fee0 = ethers.parseEther('0.01');
-      await pm.setPendingFees(plainKey(keys[0]), fee0, 0n);
+      await pm.setPendingFees(plainKey(key), fee0, 0n);
       await deployer.sendTransaction({ to: POOL_MANAGER, value: fee0 });
       await vault.connect(dave).harvest(token);
 
@@ -2117,9 +2149,9 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       await buyChecked(alice, drugi.token, drugi.t, ethers.parseEther('5'));
       await pad.connect(bob).graduate(drugi.token);
 
-      const keysA = await pad.poolKeys(token);
+      const keyA = await pad.poolKeyOf(token);
       const feeTok = ethers.parseEther('1000');
-      await pm.setPendingFees(plainKey(keysA[0]), 0n, feeTok);
+      await pm.setPendingFees(plainKey(keyA), 0n, feeTok);
       await t.mint(POOL_MANAGER, feeTok);
       await vault.connect(dave).harvest(token);
 

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {IB20Asset, IB20AssetFactory, B20AssetCreateParams} from "./interfaces/IB20Asset.sol";
-import {IPoolManagerV4, PoolKey, PoolStateReader} from "./interfaces/IPoolManagerV4.sol";
+import {IB20Asset} from "./interfaces/IB20Asset.sol";
+import {ITokenFactory} from "./interfaces/ITokenFactory.sol";
+import {PoolKey, PoolStateReader} from "./interfaces/IPoolManagerV4.sol";
 import {LiquidityVault, ILiquidityVault} from "./LiquidityVault.sol";
 import {FullMath} from "./lib/FullMath.sol";
 
@@ -19,9 +20,20 @@ import {FullMath} from "./lib/FullMath.sol";
  * 2. NIKT NIE RUSZY REZERWY. Nie ma tu `owner`, `pause`, `upgrade`,
  *    `delegatecall`, `rescue`, `withdraw`, `sweep`, `setFee`, `setRecipient`.
  *    Oplata i jej odbiorca sa `immutable` z twardym sufitem w konstruktorze.
- * 3. NIKT NIE JEST UWIEZIONY. W kazdym stanie poza `Graduated` sprzedaz do
- *    krzywej dziala; po `Graduated` istnieje pula. Nie ma stanu, w ktorym
- *    posiadacz nie moze wyjsc.
+ * 3. NIKT NIE JEST UWIEZIONY - Z JEDNYM NAZWANYM WYJATKIEM. W kazdym stanie
+ *    poza `Graduated` sprzedaz do krzywej dziala; po `Graduated` istnieje pula.
+ *
+ *    Wyjatek: TWORCA nie moze sprzedawac w stanie `Curve`. Poprzednia wersja
+ *    tego naglowka twierdzila, ze nie ma stanu, w ktorym posiadacz nie moze
+ *    wyjsc - i bylo to NIEPRAWDA (wrogi audyt, znalezisko #5): `CreatorLocked`
+ *    bylo bezwarunkowe i bez terminu waznosci, wiec tworca tokena, ktory nigdy
+ *    nie doszedl do progu, zostawal ze swoja pozycja na zawsze. Dotyczy to
+ *    z definicji wiekszosci tokenow.
+ *
+ *    Teraz blokada WYGASA razem z krzywa: w stanie `Locked` kupno i tak nie
+ *    dziala, wiec tworca jest juz tylko posiadaczem i sprzedaje jak kazdy.
+ *    Blokada robi dokladnie to, co ma robic - nie pozwala tworcy wyjsc
+ *    W TRAKCIE zbiorki - i ani jednej rzeczy wiecej.
  *
  * Czego ten kontrakt o sobie NIE MOWI: ze chroni przed tworca kupujacym
  * z drugiego adresu (sybil jest darmowy i zawsze bedzie), ze limit w oknie
@@ -128,10 +140,18 @@ contract CurveLaunchpad {
     /*  STALE - AWANS                                                          */
     /* ====================================================================== */
 
-    /** Pobierane raz, z `ethReserve`, przy awansie. */
+    /** Pobierane raz, z `ethReserve`, przy awansie. Dzielone po polowie: wolajacy / protokol. */
     uint256 public constant GRAD_FEE = 0.1 ether;
-    /** Polowa dla wolajacego `graduate()`, polowa dla protokolu. */
-    uint256 public constant GRAD_CALLER_REWARD = 0.05 ether;
+
+    /**
+     * Ponizej tej rezerwy krzywa NIE AWANSUJE - zostaje w `Locked` na zawsze,
+     * ze sprzedaza otwarta. Poprawka znaleziska #4 wrogiego audytu; pelne
+     * uzasadnienie stoi przy warunku w `graduate()`.
+     *
+     * Dwie trzecie zbiorki (G = 3.00 ETH). Kazda wartosc >= 2 ETH sprawia, ze
+     * `GRAD_FEE` to najwyzej 5% rezerwy, wiec skalowanie oplaty jest zbedne.
+     */
+    uint256 public constant MIN_GRAD_RESERVE = 2 ether;
 
     /**
      * sqrt(T_MIN / (R_VIRT + G)) * 2^96, gdzie G = 3 ETH.
@@ -168,60 +188,56 @@ contract CurveLaunchpad {
     uint256 public constant WINDOW_ADDR_CAP = 16_000_000e18;
 
     /* ====================================================================== */
-    /*  STALE - B20                                                            */
+    /*  FABRYKA TOKENA - JEDYNA RZECZ, KTORA ROZNI SIECI                       */
     /* ====================================================================== */
 
     /**
-     * Fabryka B20 to precompile pod stalym adresem na kazdej sieci Base.
-     * `eth_getCode` zwraca tu pustke, bo precompile zyje w oprogramowaniu wezla,
-     * a nie jako bajtkod EVM. Brak kodu NIE znaczy, ze fabryki nie ma.
+     * Kto robi token. Na Base jest to `B20TokenFactory` (precompile 0xB20f...),
+     * na sieci bez B20 - `PlainTokenFactory` (wlasny ERC-20 bez wlasciciela).
      *
-     * Adres jest `constant`, a nie parametrem konstruktora, celowo: parametr
-     * znaczylby, ze testujemy i wdrazamy dwa rozne kontrakty.
-     */
-    address public constant B20_FACTORY = 0xB20f000000000000000000000000000000000000;
-
-    /**
-     * Wariant ASSET. Wartosc odczytana z formatu adresow produkcyjnych tokenow
-     * B20 (bajt nr 10 adresu to numer wariantu; wszystkie obserwowane tokeny
-     * ASSET maja tam 0x00).
+     * Adres, a nie `constant`: to JEST rzecz, ktora ma sie roznic miedzy
+     * sieciami, i jedyna taka. Cala reszta tego kontraktu - krzywa, oplaty,
+     * prog, awans - jest identyczna wszedzie i wlasnie dlatego nie ma tu
+     * ani jednego `if (chainid == ...)`.
      *
-     * NIE jest to zalozenie przyjete na slowo: `launch` sprawdza, ze token
-     * NIE MA selektora `SEIZE_ROLE()`. Konfiskata istnieje w wariancie
-     * STABLECOIN, a w ASSET jej nie ma - potwierdzone odczytem (selektor
-     * 0x3c7e9ba5 odbija sie od precompile'a). To jest asercja, ktora POTRAFI
-     * odpasc, w odroznieniu od porownania adresu z samym soba.
+     * Fabryka nie ma nad nami zadnej wladzy: wolamy ja raz, w `launch`,
+     * a wszystko, co wraca, jest asertowane po fakcie po naszej stronie
+     * (podaz i saldo) i po jej (sufit, role). Zla fabryka nie moze nam nic
+     * zabrac - moze tylko nie dac utworzyc tokena.
      */
-    uint8 public constant VARIANT_ASSET = 0;
-
-    /**
-     * Identyfikatory rol AccessControl w B20.
-     *
-     * Wyliczone z keccak256 nazwy i ZGODNE co do bitu z wartosciami odczytanymi
-     * z mainnetu (MINT_ROLE zaczyna sie 0x154c0081 i konczy 6c3686,
-     * PAUSE_ROLE 0x139c2898 ... 816e46d). Zapisane wzorem, a nie literalem,
-     * zeby nie dalo sie ich przekrecic literowka.
-     */
-    bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
-    bytes32 public constant MINT_ROLE = keccak256("MINT_ROLE");
-    bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
+    ITokenFactory public immutable TOKEN_FACTORY;
 
     /* ====================================================================== */
     /*  STALE - UNISWAP V4                                                     */
     /* ====================================================================== */
 
-    address public constant POOL_MANAGER = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
+    // Adresu `PoolManager` juz tu NIE MA i to nie jest przeoczenie: ten kontrakt
+    // nie wola v4 ani razu. Cala styczna z pula zeszla do `LiquidityVault`,
+    // ktory jest jej wlascicielem - a adres trzymany w dwoch miejscach to dwa
+    // miejsca, w ktorych moze byc inny.
 
     /**
-     * Cztery kandydujace warstwy oplat, w kolejnosci preferencji. Przy awansie
-     * bierzemy PIERWSZA, ktorej cena jest dokladnie terminalna.
+     * JEDNA pula, jedna warstwa oplat. Poprzednia wersja inicjalizowala cztery
+     * i przy awansie wybierala pierwsza niezatruta - `poolsMask`,
+     * `_pickCleanPool`, `NoCleanPool`. Cala ta maszyneria istniala dlatego, ze
+     * pule powstawaly BEZ HOOKA, wiec kazdy obcy mogl je otworzyc albo przesunac
+     * cenowo za darmo. Wrogi audyt zrobil z tego trzy znaleziska (#1, #2, #3).
      *
-     * Klucze pul nie sa nigdzie zapisywane - sa w calosci wyznaczone przez
-     * (token, numer warstwy), bo currency0 i hooks sa u nas z definicji zerowe.
-     * Zapis czterech `PoolKey` w pamieci trwalej kosztowalby ~240k gazu na
-     * KAZDYM starcie, w tym na tych 99%, ktore nigdy nie awansuja.
+     * Z hookiem-brama pula z naszym kluczem nie moze powstac cudza reka, wiec
+     * nie ma czego wybierac. Zostaje jedna warstwa i zero stanu na token.
+     *
+     * DLACZEGO 0.3%, A NIE 1%: oplata puli sumuje sie z 1% hooka i to KUPUJACY
+     * placi obie. 1% + 1% = 2% za wymiane wypchneloby ruch do puli bez naszego
+     * hooka, ktorej i tak nie da sie zakazac. 0.3% + 1% = 1.3% stoi obok
+     * zmierzonych 1.2% Clankera, a nie dwukrotnie nad nimi.
+     *
+     * `tickSpacing = 60` jest wartoscia przypisana tej warstwie w v4 i zostal
+     * sprawdzony osobno: audyt policzyl `owed0 == eLp` co do wei dla wszystkich
+     * czterech kandydujacych rozstawow, wiec zmiana warstwy nie rusza matematyki
+     * zasilenia.
      */
-    uint256 public constant TIER_COUNT = 4;
+    uint24 public constant POOL_FEE = 3000;
+    int24 public constant POOL_TICK_SPACING = 60;
 
     /* ====================================================================== */
     /*  STAN                                                                   */
@@ -244,7 +260,6 @@ contract CurveLaunchpad {
     struct Launch {
         address creator; // 160
         State state; //   8
-        uint8 poolsMask; //   8 - bit i = warstwe i zainicjalizowalismy MY
         uint40 startedAt; //  40
         uint128 ethReserve;
         uint128 tokenReserve;
@@ -301,15 +316,6 @@ contract CurveLaunchpad {
         uint16 feeBps,
         uint16 creatorFeeBps,
         uint40 startedAt
-    );
-
-    event PoolPrepared(
-        address indexed token,
-        bytes32 indexed poolId,
-        uint24 fee,
-        int24 tickSpacing,
-        uint160 sqrtPriceX96,
-        bool initializedByUs
     );
 
     /**
@@ -378,14 +384,8 @@ contract CurveLaunchpad {
     error CurveIsLocked();
     error AlreadyGraduated();
     error NotLocked();
-    error NotB20();
-    error WrongVariant();
     error WrongTokenAddress();
-    error RolesAlive(bytes32 role);
     error SupplyMismatch();
-    error CapMismatch();
-    error PoolStateUnreadable();
-    error NoCleanPool();
     error ReserveTooSmallToGraduate();
     error Arithmetic();
     error NothingToClaim();
@@ -437,15 +437,32 @@ contract CurveLaunchpad {
      * Tak wiazanie powstaje w jednej transakcji, jest nieodwracalne i da sie
      * je sprawdzic dwoma odczytami: `launchpad.VAULT()` i `vault.LAUNCHPAD()`.
      */
-    constructor(uint16 feeBps_, uint16 creatorFeeBps_, address feeRecipient_, uint16 protocolShareBps_) {
+    constructor(
+        uint16 feeBps_,
+        uint16 creatorFeeBps_,
+        address feeRecipient_,
+        uint16 protocolShareBps_,
+        ITokenFactory tokenFactory_,
+        bytes32 hookSalt_
+    ) {
         if (feeRecipient_ == address(0)) revert ZeroAddress();
+        if (address(tokenFactory_) == address(0)) revert ZeroAddress();
         if (feeBps_ > MAX_FEE_BPS) revert FeeTooHigh();
         if (creatorFeeBps_ > feeBps_) revert CreatorFeeTooHigh();
 
         FEE_BPS = feeBps_;
         CREATOR_FEE_BPS = creatorFeeBps_;
         FEE_RECIPIENT = feeRecipient_;
-        VAULT = address(new LiquidityVault(feeRecipient_, protocolShareBps_));
+        TOKEN_FACTORY = tokenFactory_;
+        // Vault wdraza w swoim konstruktorze HOOKA, wiec `hookSalt_` przechodzi
+        // przez ten kontrakt nietkniety. Zly salt wywala TEN deploy - patrz
+        // asercje bitow adresu w konstruktorze vaulta.
+        VAULT = address(new LiquidityVault(feeRecipient_, protocolShareBps_, hookSalt_));
+    }
+
+    /** Adres hooka. Jeden odczyt, zeby dalo sie sprawdzic wiazanie z zewnatrz. */
+    function HOOK() external view returns (address) {
+        return ILiquidityVault(VAULT).HOOK();
     }
 
     /* ====================================================================== */
@@ -468,31 +485,22 @@ contract CurveLaunchpad {
         return (l.creator, l.state, l.ethReserve, l.tokenReserve, l.startedAt, l.launchId);
     }
 
-    /** (fee, tickSpacing) warstwy o numerze i. Kolejnosc = kolejnosc preferencji przy awansie. */
-    function tierAt(uint256 i) public pure returns (uint24 fee, int24 tickSpacing) {
-        if (i == 0) return (10000, 200);
-        if (i == 1) return (3000, 60);
-        if (i == 2) return (500, 10);
-        return (100, 1);
-    }
-
-    function poolKeyAt(address token, uint256 i) public pure returns (PoolKey memory) {
-        (uint24 fee, int24 tickSpacing) = tierAt(i);
-        // currency0 = natywne ETH. Adres B20 zaczyna sie od 0xb2, wiec token
-        // jest ZAWSZE currency1 - kolejnosc jest deterministyczna, nie sortujemy.
+    /**
+     * Klucz JEDYNEJ puli tego tokena.
+     *
+     * `currency0` to natywne ETH (adres 0x0), a v4 wymaga `currency0 < currency1`,
+     * wiec token jest ZAWSZE currency1 - kolejnosc jest deterministyczna
+     * i niczego nie sortujemy. Klucz nie jest nigdzie zapisywany: wynika
+     * w calosci z adresu tokena i trzech stalych.
+     */
+    function poolKeyOf(address token) public view returns (PoolKey memory) {
         return PoolKey({
             currency0: address(0),
             currency1: token,
-            fee: fee,
-            tickSpacing: tickSpacing,
-            hooks: address(0)
+            fee: POOL_FEE,
+            tickSpacing: POOL_TICK_SPACING,
+            hooks: ILiquidityVault(VAULT).HOOK()
         });
-    }
-
-    function poolKeys(address token) external pure returns (PoolKey[4] memory keys) {
-        for (uint256 i; i < TIER_COUNT; ++i) {
-            keys[i] = poolKeyAt(token, i);
-        }
     }
 
     /**
@@ -503,7 +511,7 @@ contract CurveLaunchpad {
      * decyzja - patrz `launch()`, akapit o salcie.
      */
     function tokenAddressForSalt(bytes32 salt) public view returns (address) {
-        return IB20AssetFactory(B20_FACTORY).getB20Address(VARIANT_ASSET, address(this), salt);
+        return TOKEN_FACTORY.predictToken(salt);
     }
 
     /**
@@ -597,13 +605,20 @@ contract CurveLaunchpad {
             )
         );
 
-        token = _createToken(name_, symbol_, launchId);
+        // Fabryka mintuje cala podaz TUTAJ i sama asertuje sufit oraz brak rol.
+        // Wracamy do adresu, ktory ona wylicza wlasnym wzorem - porownanie
+        // ponizej jest wiec dwiema niezaleznymi drogami do tej samej liczby.
+        token = TOKEN_FACTORY.createToken(name_, symbol_, T0, launchId, address(this), msg.sender);
+        if (token != TOKEN_FACTORY.predictToken(launchId)) revert WrongTokenAddress();
+        // Podaz sprawdzamy TAKZE po naszej stronie. Fabryka jest wymienialna,
+        // wiec jej asercje sa jej obietnica; ta jedna linia jest nasza i nie
+        // zalezy od tego, kto ja napisal.
+        if (IB20Asset(token).balanceOf(address(this)) != T0) revert SupplyMismatch();
 
         uint40 startedAt = uint40(block.timestamp);
         _launches[token] = Launch({
             creator: msg.sender,
             state: State.Curve,
-            poolsMask: 0,
             startedAt: startedAt,
             ethReserve: 0,
             tokenReserve: uint128(T0),
@@ -625,146 +640,15 @@ contract CurveLaunchpad {
             startedAt
         );
 
-        // Pule przygotowujemy MY, w tej samej transakcji, co token. Napastnik
-        // nie ma jak byc pierwszy, bo adres tokena poznaje dopiero teraz.
-        // Po `Launched`, zeby zdarzenia `PoolPrepared` opisywaly token, ktory
-        // czytajacy logi juz zna. Drugi zapis trafia w ten sam, cieply slot.
-        _launches[token].poolsMask = _preparePools(token);
-
+        // PULI TU NIE MA I TO JEST ZMIANA WOBEC POPRZEDNIEJ WERSJI.
+        //
+        // Przedtem start inicjalizowal od razu cztery pule bez hooka (~240k
+        // gazu na KAZDYM starcie, w tym na 99%, ktore nigdy nie awansuja),
+        // bo pula otwarta pozniej dalaby sie obcemu zatruc cenowo za darmo.
+        // Hook-brama zamyka to u zrodla, wiec pula powstaje dopiero przy
+        // awansie, jedna, i od razu z plynnoscia - patrz `LiquidityVault.seed`.
         if (msg.value != 0) {
             _buy(token, msg.value, minTokensOut);
-        }
-    }
-
-    /**
-     * Tworzenie tokena + WSZYSTKIE asercje post-warunkow.
-     *
-     * Kazdy falsz rewertuje caly start. Nie istnieje sciezka, w ktorej token
-     * z zywa rola trafia do rejestru krzywej.
-     *
-     * Czego tu NIE asertujemy i dlaczego - to jest wazniejsze od tego, co
-     * asertujemy:
-     *
-     * - `policyId(TRANSFER_SENDER) == 0` (blocklista). Specyfikacja tego zadala,
-     *   my tego nie robimy. Numer slotu polityki jest ENUMEM, ktorego wartosci
-     *   nie odczytalismy z lancucha. Zle zgadniety numer wskazalby na INNY slot,
-     *   ktory takze jest zerem - wiec asercja by przeszla i niczego nie
-     *   dowiodla. Asercja, ktora nie potrafi odpasc, jest teatrem i czyta sie
-     *   jak zabezpieczenie, ktorym nie jest. To, co ja zastepuje, jest
-     *   mocniejsze: `updatePolicy` wymaga DEFAULT_ADMIN_ROLE, ktorego nie ma
-     *   u nikogo (asertowane nizej) i ktorego nie da sie odtworzyc, bo
-     *   `grantRole` tez jest za ta rola.
-     * - `BURN_ROLE` / `METADATA_ROLE`. Nie wiemy, czy te selektory istnieja
-     *   w wariancie ASSET. Wywolanie nieistniejacej roli rewertuje, wiec
-     *   asercja "na wszelki wypadek" zablokowalaby kazdy start. Brak roli MINT
-     *   i brak admina i tak zamykaja wszystko, co dotyczy podazy; METADATA
-     *   pozostaje jako ryzyko, ktore ma byc NAPISANE na stronie tokena,
-     *   a nie przemilczane.
-     */
-    function _createToken(string calldata name_, string calldata symbol_, bytes32 salt)
-        private
-        returns (address token)
-    {
-        bytes memory params = abi.encode(
-            B20AssetCreateParams({
-                version: 1,
-                name: name_,
-                symbol: symbol_,
-                initialAdmin: address(0), // token bez wlasciciela OD PIERWSZEJ SEKUNDY
-                decimals: 18
-            })
-        );
-
-        // Wykonywane w oknie bootstrapu, czyli zanim bramki rol cokolwiek
-        // zablokuja. To jedyny moment, w ktorym da sie wybic podaz tokenowi,
-        // ktory nigdy nie mial administratora.
-        bytes[] memory initCalls = new bytes[](2);
-        initCalls[0] = abi.encodeWithSignature("mint(address,uint256)", address(this), T0);
-        initCalls[1] = abi.encodeWithSignature("updateSupplyCap(uint256)", T0);
-
-        // value: 0 OBOWIAZKOWO - fabryka rewertuje NonPayable() (0x6fb1b0e9)
-        // na kazde wei, mimo ze jej interfejs jest `payable`.
-        token = IB20AssetFactory(B20_FACTORY).createB20{value: 0}(VARIANT_ASSET, salt, params, initCalls);
-
-        // Adres musi zgadzac sie z tym, co fabryka sama wylicza dla NASZEGO
-        // adresu, tego salta i tego wariantu. Zamyka to podmiane zwracanego
-        // adresu i wiaze `VARIANT_ASSET` z wynikiem - bez wklejania wzoru
-        // adresu do kodu.
-        if (token != IB20AssetFactory(B20_FACTORY).getB20Address(VARIANT_ASSET, address(this), salt)) {
-            revert WrongTokenAddress();
-        }
-
-        // isB20Initialized, a NIE isB20: isB20 sprawdza sam FORMAT adresu
-        // i zwraca true takze dla tokena, ktorego nie ma.
-        if (!IB20AssetFactory(B20_FACTORY).isB20Initialized(token)) revert NotB20();
-
-        // Wariant ASSET nie ma SEIZE_ROLE - konfiskata to sprawa wariantu
-        // STABLECOIN. Nieznany selektor odbija sie od precompile'a, wiec
-        // POWODZENIE tego wywolania znaczy, ze stworzylismy zly wariant.
-        (bool seizeExists,) = token.staticcall(abi.encodeWithSignature("SEIZE_ROLE()"));
-        if (seizeExists) revert WrongVariant();
-
-        if (IB20Asset(token).totalSupply() != T0) revert SupplyMismatch();
-        if (IB20Asset(token).balanceOf(address(this)) != T0) revert SupplyMismatch();
-        // supplyCap == totalSupply domyka "nikt nie dodrukuje" na poziomie
-        // niezmiennika, a nie tylko braku roli. Dwie niezalezne przyczyny.
-        if (IB20Asset(token).supplyCap() != T0) revert CapMismatch();
-
-        // address(0) jako POSIADACZ roli tez jest sprawdzany: "rola nalezy do
-        // nikogo" i "rola nalezy do adresu zerowego" to dwa rozne stany
-        // i tylko pierwszy jest tym, o co nam chodzi.
-        _requireNoRole(token, DEFAULT_ADMIN_ROLE, address(0));
-        _requireNoRole(token, DEFAULT_ADMIN_ROLE, address(this));
-        _requireNoRole(token, DEFAULT_ADMIN_ROLE, B20_FACTORY);
-        _requireNoRole(token, DEFAULT_ADMIN_ROLE, msg.sender);
-        _requireNoRole(token, MINT_ROLE, address(this));
-        _requireNoRole(token, MINT_ROLE, msg.sender);
-        _requireNoRole(token, PAUSE_ROLE, address(this));
-        _requireNoRole(token, PAUSE_ROLE, msg.sender);
-    }
-
-    function _requireNoRole(address token, bytes32 role, address account) private view {
-        if (IB20Asset(token).hasRole(role, account)) revert RolesAlive(role);
-    }
-
-    /**
-     * Inicjalizuje cztery pule po cenie TERMINALNEJ i zwraca maske tych,
-     * ktore naprawde sa nasze.
-     *
-     * `try/catch` jest tu na `initialize`, a nie na sciezce pieniedzy: jedyne,
-     * co moze odpasc, to `PoolAlreadyInitialized`, a wtedy pula po prostu nie
-     * jest nasza i nie bedziemy do niej wkladac plynnosci.
-     *
-     * Odczyt ceny ZARAZ PO wlasnym `initialize` nie jest ostroznoscia - jest
-     * jedynym miejscem, w ktorym weryfikujemy, ze potrafimy czytac stan
-     * PoolManagera (numer slotu `_pools` to szczegol ukladu pamieci, nie ABI).
-     * Bledne wyprowadzenie wywala wiec PIERWSZY start na testnecie, a nie awans
-     * po zebraniu cudzych pieniedzy.
-     */
-    function _preparePools(address token) private returns (uint8 mask) {
-        for (uint256 i; i < TIER_COUNT; ++i) {
-            PoolKey memory key = poolKeyAt(token, i);
-            bool ours;
-
-            try IPoolManagerV4(POOL_MANAGER).initialize(key, SQRT_PRICE_TERMINAL) returns (int24 openTick) {
-                openTick; // tick startowy wynika z ceny, wiec nie niesie nowej informacji
-                if (PoolStateReader.sqrtPriceX96(POOL_MANAGER, key) != SQRT_PRICE_TERMINAL) {
-                    revert PoolStateUnreadable();
-                }
-                ours = true;
-                mask |= uint8(1 << i);
-            } catch {
-                ours = false;
-            }
-
-            emit PoolPrepared(
-                token,
-                PoolStateReader.poolId(key),
-                key.fee,
-                key.tickSpacing,
-                PoolStateReader.sqrtPriceX96(POOL_MANAGER, key),
-                ours
-            );
         }
     }
 
@@ -932,9 +816,25 @@ contract CurveLaunchpad {
 
         if (tokensIn == 0) revert ZeroAmount();
         if (minEthOut == 0) revert SlippageRequired();
-        // Blokada dotyczy adresu, o ktorym WIEMY, ze jest tworcy. Nie twierdzimy,
-        // ze zapobiega to sprzedazy tworcy z drugiego adresu - sybil jest darmowy.
-        if (msg.sender == l.creator) revert CreatorLocked();
+
+        // ------------------------------------------------------------------
+        // BLOKADA TWORCY WYGASA RAZEM Z KRZYWA - poprawka znaleziska #5
+        // ------------------------------------------------------------------
+        // Przedtem warunek brzmial `if (msg.sender == l.creator)`, bez wzgledu
+        // na stan i bez terminu waznosci. Skutek byl taki, ze tworca KAZDEGO
+        // tokena, ktory nie doszedl do progu - czyli z definicji wiekszosci -
+        // zostawal ze swoja pozycja na zawsze. Blokada dotyczy tylko sprzedazy,
+        // a nie kupna, wiec tworca, ktory "wspiera wlasny projekt" za 2 ETH,
+        // tracil te 2 ETH cicho i nieodwracalnie.
+        //
+        // Teraz blokada obowiazuje wylacznie w stanie `Curve`, czyli dokladnie
+        // wtedy, gdy ma sens: w trakcie zbiorki tworca nie moze wyjsc na glowach
+        // kupujacych. W `Locked` kupno i tak rewertuje, wiec nie ma juz zbiorki,
+        // na ktorej dalo by sie wyjsc - tworca jest zwyklym posiadaczem.
+        //
+        // Czego ta blokada NIE robi, i to sie nie zmienilo: nie zapobiega
+        // sprzedazy tworcy z drugiego adresu. Sybil jest darmowy i zawsze bedzie.
+        if (state == State.Curve && msg.sender == l.creator) revert CreatorLocked();
 
         uint256 ethReserve = l.ethReserve;
         uint256 tokenReserve = l.tokenReserve;
@@ -1003,14 +903,32 @@ contract CurveLaunchpad {
         uint256 ethReserve = l.ethReserve;
         uint256 tokenReserve = l.tokenReserve;
 
-        // Krzywa, ktora zostala odsprzedana ponizej oplaty awansowej, nie ma
-        // z czego otworzyc puli. Zostaje w Locked na zawsze - sprzedaz dziala,
-        // nikt nie jest uwieziony, po prostu nie ma czego awansowac.
-        if (ethReserve <= GRAD_FEE) revert ReserveTooSmallToGraduate();
+        // ------------------------------------------------------------------
+        // PROG REZERWY, A NIE SAMO "WIECEJ NIZ OPLATA" - poprawka znaleziska #4
+        // ------------------------------------------------------------------
+        // Przedtem warunek brzmial `ethReserve <= GRAD_FEE`, czyli awans byl
+        // legalny przy rezerwie 0.1000000001 ETH. W stanie `Locked` sprzedaze
+        // sa otwarte, wiec rezerwa moze zejsc dowolnie nisko - i wtedy stala
+        // oplata 0.1 ETH pochlaniala niemal cale pozostale pokrycie, a polowa
+        // z niej ladowala u wolajacego. Wywolanie `graduate()` bylo przez to
+        // BEZWARUNKOWO oplacalne dla bota, w najgorszym mozliwym momencie:
+        // przy rezerwie 0.2 ETH niszczylo 50% pokrycia pozostalych posiadaczy.
+        //
+        // Prog 2 ETH zamyka to jednym zdaniem zamiast skalowaniem oplaty:
+        // krzywa wyprzedana ponizej dwoch trzecich zbiorki po prostu NIE
+        // AWANSUJE. Zostaje w `Locked` - sprzedaz dziala, kazdy wychodzi po
+        // pelnej cenie krzywej, nikt nie jest uwieziony. Przy rezerwie >= 2 ETH
+        // oplata 0.1 ETH to najwyzej 5% i zadne skalowanie nie jest potrzebne.
+        //
+        // Cena tej decyzji, nazwana wprost: ktos, kto sprzeda dosc, zeby zbic
+        // rezerwe ponizej progu, trwale odbiera temu tokenowi awans. Kosztuje
+        // go to oplate w obie strony i nie daje mu nic - to jest zlosliwosc
+        // platna, nie zarobek. Poprzedni wariant dawal za to samo 0.05 ETH.
+        if (ethReserve < MIN_GRAD_RESERVE) revert ReserveTooSmallToGraduate();
 
-        // Pula wybrana PRZED zmiana stanu, zeby nieudany wybor nie zostawil
+        // Klucz liczony PRZED zmiana stanu, zeby nieudany odczyt nie zostawil
         // krzywej w stanie Graduated bez puli.
-        PoolKey memory key = _pickCleanPool(token, l.poolsMask);
+        PoolKey memory key = poolKeyOf(token);
 
         uint256 eLp = ethReserve - GRAD_FEE;
 
@@ -1039,31 +957,6 @@ contract CurveLaunchpad {
         );
     }
 
-    /**
-     * Pierwsza warstwa, ktora jest NASZA i ktorej cena jest dokladnie
-     * terminalna. Bez tolerancji, bez progu procentowego - rownosc bitowa.
-     *
-     * Dwa niezalezne warunki, bo kazdy zamyka co innego:
-     *  - maska: pule, ktorej nie zainicjalizowalismy sami, nie dotykamy w ogole;
-     *  - cena: pule bez plynnosci DA SIE przesunac. Swap w takiej puli konsumuje
-     *    zero wejscia i przesuwa cene do zadanego limitu. Specyfikacja twierdzila
-     *    tu odwrotnie ("pula bez plynnosci nie moze zmienic ceny") - to jest
-     *    nieprawda, i wlasnie dlatego ten warunek NIE jest nadmiarowy.
-     *
-     * Klucze nie sa czytane z `getPool()` w chwili awansu - sa wyliczone ze
-     * stalych. Czytamy wylacznie cene.
-     */
-    function _pickCleanPool(address token, uint8 mask) private view returns (PoolKey memory) {
-        for (uint256 i; i < TIER_COUNT; ++i) {
-            if (mask & uint8(1 << i) == 0) continue;
-            PoolKey memory key = poolKeyAt(token, i);
-            if (PoolStateReader.sqrtPriceX96(POOL_MANAGER, key) == SQRT_PRICE_TERMINAL) {
-                return key;
-            }
-        }
-        revert NoCleanPool();
-    }
-
     /* ====================================================================== */
     /*  OPLATY                                                                 */
     /* ====================================================================== */
@@ -1088,7 +981,11 @@ contract CurveLaunchpad {
             // FEE_BPS == 0 nie moze tu wystapic, bo wtedy amount == 0.
             counterpartyCut = FullMath.mulDivDown(amount, CREATOR_FEE_BPS, FEE_BPS);
         } else {
-            counterpartyCut = GRAD_CALLER_REWARD;
+            // Polowa dla wolajacego `graduate()`, reszta dla protokolu.
+            // Liczone z `amount`, a nie z osobnej stalej: dwie stale musialyby
+            // byc trzymane w zgodzie recznie, a ta jedna linia nie ma jak sie
+            // rozjechac z oplata, ktora dzieli.
+            counterpartyCut = amount / 2;
         }
         uint256 protocolCut = amount - counterpartyCut;
 
