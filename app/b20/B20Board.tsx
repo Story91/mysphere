@@ -349,54 +349,58 @@ function BoardHeadline({ snapshot, now }: { snapshot: BoardSnapshot; now: number
   const { counts } = snapshot;
   const share = counts.total > 0 ? (counts.traded / counts.total) * 100 : 0;
 
+  /**
+   * ===== POMIAR ZSZEDL DO PASKA =====
+   * Stala tu pelna karta: naglowek na dwie linijki, akapit o trzech stanach,
+   * pasek postepu i akapit o metodzie liczenia. Wszystko prawdziwe i wszystko
+   * na zlym miejscu - to byla PIERWSZA rzecz pod naglowkiem strony, wieksza od
+   * samej listy tokenow.
+   *
+   * Zgloszenie wlasciciela: "chyba nie trzeba tej sekcji, ewentualnie w malym
+   * rogu jakies statystyki, bo bez sensu to jako glowna sekcja".
+   *
+   * Teraz jest jedna linia drobnym drukiem, jak pasek liczb u clankera. Nic nie
+   * zniklo: liczby zostaly te same, metoda liczenia siedzi w `title`, czyli
+   * jest do sprawdzenia dla kogos, kto zapyta, i niewidoczna dla reszty.
+   *
+   * Awarie odczytu ZOSTAJA widoczne - one nie sa ciekawostka, tylko ostrzezeniem,
+   * ze ktoras kolumna jest niepelna.
+   */
   return (
-    <div className={`${CARD} mb-3 p-4 sm:p-5`}>
-      <h2 className="font-soft-display text-[17px] font-bold leading-tight text-soft-ink sm:text-[19px]">
-        {counts.total.toLocaleString('en-US')} B20 tokens were created on Base in the last{' '}
-        {snapshot.windowHours} hours
-      </h2>
-
-      {/* Zdanie, ktorego nie napisze zaden launchpad - bo cmentarz zabija
-          konwersje. Piszemy je, bo produkt, ktory nie chwali sie tym, czego nie
-          ma, musi tez nie chowac tego, co jest. */}
-      <p className="mt-1.5 text-[13px] leading-[1.55] text-soft-ink-muted">
-        <span className="font-semibold text-soft-ink">{counts.traded}</span> of them have been
-        traded at least once.{' '}
-        <span className="font-semibold text-soft-ink">{counts.listed}</span> opened a pool that
-        nobody has touched, and{' '}
-        <span className="font-semibold text-soft-ink">{counts.unlisted}</span> have no pool at all.
-      </p>
-
-      <div className="mt-3">
-        <div
-          className="h-2 w-full overflow-hidden rounded-pill bg-soft-sunken"
-          role="img"
-          aria-label={`${share.toFixed(1)} percent of tokens created in this window have traded`}
-        >
-          {/* Pasek w soft-primary, nie w czerwieni. To nie jest ostrzezenie,
-              tylko pomiar - i ma sie tak czytac. */}
-          <div
-            className="h-full rounded-pill bg-soft-primary transition-[width] [transition-duration:var(--dur-sheet)] ease-out-strong"
-            style={{ width: `${Math.max(share, 0.6)}%` }}
-          />
-        </div>
-        <p className="mt-1.5 text-[11.5px] tabular-nums text-soft-ink-faint">
-          {share.toFixed(1)}% of what was created here has a market.
-        </p>
-      </div>
-
-      <p className="mt-3 text-[11.5px] leading-[1.5] text-soft-ink-faint">
-        Counted from the creation events the B20 factory emits, and from the Uniswap v4 pool each
-        token opened. A token counts as traded when the pool price differs from the price it opened
-        at — in v4 that can only happen through a swap. Read at block{' '}
-        <span className="tabular-nums">{snapshot.headBlock.toLocaleString('en-US')}</span>,{' '}
-        {formatReadAge(snapshot.readAt, now)}.
+    <div className="mb-3 px-1">
+      <p
+        className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] leading-[1.5] text-soft-ink-faint"
+        title={`Counted from the creation events the B20 factory emits, and from the Uniswap v4 pool each token opened. A token counts as traded when the pool price differs from the price it opened at - in v4 that can only happen through a swap. Read at block ${snapshot.headBlock.toLocaleString(
+          'en-US'
+        )}.`}
+      >
+        <span>
+          <span className="font-semibold tabular-nums text-soft-ink">
+            {counts.total.toLocaleString('en-US')}
+          </span>{' '}
+          created in {snapshot.windowHours}h
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>
+          <span className="font-semibold tabular-nums text-soft-ink">{counts.traded}</span> traded
+          <span className="tabular-nums"> ({share.toFixed(1)}%)</span>
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>
+          <span className="tabular-nums">{counts.listed}</span> pool, never touched
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>
+          <span className="tabular-nums">{counts.unlisted}</span> no pool
+        </span>
+        <span aria-hidden="true">·</span>
+        <span>{formatReadAge(snapshot.readAt, now)}</span>
       </p>
 
       {snapshot.notes.length > 0 && (
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-1 space-y-0.5">
           {snapshot.notes.map((note) => (
-            <li key={note} className="text-[11.5px] italic leading-[1.5] text-soft-ink-faint">
+            <li key={note} className="text-[11px] italic leading-[1.45] text-soft-ink-faint">
               {note}
             </li>
           ))}

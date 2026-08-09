@@ -14,6 +14,7 @@ import { notify } from '../../utils/notify';
 // Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
 import { Avatar as CoinbaseAvatar } from '../../components/identity';
 import LinkPreview from './LinkPreview';
+import B20PostCard, { findB20Address } from './B20PostCard';
 import CommentTransactionButton from '../../components/CommentTransactionButton';
 import CommentTransactionButtonBaseCamp from './BaseCampPosts/CommentTransactionButtonBaseCamp';
 import CommentTransactionButtonCelo from '../Celo/components/CommentTransactionButtonCelo';
@@ -1942,6 +1943,9 @@ function PostList({
     const isLoadingData = isLoadingTokenData[post.id];
     // Hashtagi wyliczane raz - wczesniej ten sam parser leciał dwa razy na post
     const hashtags = extractHashtags(post.content);
+    // Adres tokena B20 z tresci - `null` w zdecydowanej wiekszosci postow,
+    // wiec to jest jedno wyrazenie regularne na post i nic wiecej.
+    const b20Address = findB20Address(post.content);
 
     // Obramowanie karty jest TAKIE SAMO dla przypietych i zwyklych postow.
     // Dziesiec kart pod soba ma czytac sie jak jedna lista, a nie jak zbior
@@ -2125,6 +2129,22 @@ function PostList({
             onUnlocked={markUnlocked}
           />
         )}
+
+        {/* ===== KARTA TOKENA B20 =====
+            Post, ktory niesie adres tokena B20, dostaje pod trescia karte
+            z logotypem, cena i przyciskiem kupna - dokladnie jak podglad linku
+            obok, i z tego samego powodu: tresc niesie adres, a interfejs go
+            rozwija.
+
+            Wykrywane z TRESCI, a nie z pola w bazie. Dzieki temu dziala takze
+            dla postow napisanych wczesniej i dla adresow wklejonych recznie,
+            a sciezka zapisu, reguly Firestore i optymistyczny post w feedzie
+            zostaja nietkniete - czyli zero nowych miejsc do rozjechania.
+
+            Nieudany odczyt nie renderuje NICZEGO (patrz B20PostCard): pusta
+            ramka pod postem wygladalaby jak zepsuty post, a nie jak nieudane
+            zapytanie - i obwinialaby autora za nasza awarie. */}
+        {b20Address && <B20PostCard address={b20Address} />}
 
         {/* Zawsze umieszczaj LinkPreview tutaj, pod treścią posta */}
         <LinkPreview content={post.content} />
