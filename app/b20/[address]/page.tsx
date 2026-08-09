@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTokenDetail, type TokenDetail } from '../../utils/b20/token';
+import { tokenInitials, uniswapBuyUrl } from '../../utils/b20/format';
 import B20Nav from '../B20Nav';
 import PriceChart from './PriceChart';
 
@@ -174,6 +175,21 @@ export default async function TokenPage({ params }: Props) {
         {/* ===== NAGLOWEK ===== */}
         <header className={`${CARD} mt-4 p-4 sm:p-5`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              {/* Awatar z GeckoTerminal, a bez niego inicjaly - pusty kwadrat
+                  czytalby sie jak nieudane ladowanie obrazka. */}
+              {t.quote?.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={t.quote.imageUrl}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-full bg-soft-sunken object-cover sm:h-16 sm:w-16"
+                />
+              ) : (
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-soft-sunken font-soft-display text-[18px] font-bold text-soft-ink-muted sm:h-16 sm:w-16">
+                  {tokenInitials(t.symbol ?? '', t.name ?? '')}
+                </span>
+              )}
             <div className="min-w-0">
               <h1 className="font-soft-display text-[24px] font-bold leading-[1.2] text-soft-ink sm:text-[30px]">
                 {t.name ?? 'Unnamed token'}
@@ -181,6 +197,7 @@ export default async function TokenPage({ params }: Props) {
               <p className="mt-0.5 font-soft-display text-[14px] font-bold text-soft-ink-muted">
                 {t.symbol ?? '—'}
               </p>
+            </div>
             </div>
             {price && (
               <div className="text-right">
@@ -196,7 +213,22 @@ export default async function TokenPage({ params }: Props) {
             {t.address}
           </p>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
+            {/* KUPNO JAKO PIERWSZA AKCJA. To sa prawdziwe pule Uniswap v4 na
+                Base, wiec kupic da sie juz dzis - brakowalo tylko drogi.
+                Przycisk pojawia sie WYLACZNIE przy tokenie z pula: bez niej
+                Uniswap odpowiedzialby "no route", czyli obiecalibysmy czynnosc
+                niemozliwa i odeslali czlowieka do cudzego bledu. */}
+            {hasMarket && (
+              <a
+                href={uniswapBuyUrl(t.address)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-pill bg-soft-primary px-5 py-2.5 font-soft-display text-[13.5px] font-bold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
+              >
+                Buy on Uniswap ↗
+              </a>
+            )}
             <a
               href={`https://basescan.org/token/${t.address}`}
               target="_blank"

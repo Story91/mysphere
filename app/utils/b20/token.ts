@@ -59,6 +59,8 @@ export type TokenQuote = {
   reserveUsd: number | null;
   /** Identyfikator puli u GT - dla v4 to bytes32, nie adres. */
   poolId: string | null;
+  /** Awatar tokena. `null` = token go nie ma; rysujemy wtedy inicjaly. */
+  imageUrl: string | null;
 };
 
 export type TokenDetail = {
@@ -192,6 +194,10 @@ async function readQuote(address: Address, notes: string[]): Promise<TokenQuote 
       reserveUsd: num(a.total_reserve_in_usd),
       // GT zwraca "base_0x…" - sam identyfikator jest za prefiksem sieci.
       poolId: poolRaw ? poolRaw.replace(/^base_/, '') : null,
+      imageUrl:
+        typeof a.image_url === 'string' && a.image_url.startsWith('http') && !a.image_url.includes('missing')
+          ? a.image_url
+          : null,
     };
   } catch {
     notes.push('Price data is unavailable right now.');

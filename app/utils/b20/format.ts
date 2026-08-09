@@ -160,3 +160,25 @@ export function formatReadAge(readAtMs: number, nowMs: number): string {
   const hours = Math.round(minutes / 60);
   return `${hours} hour${hours === 1 ? '' : 's'} ago`;
 }
+
+/**
+ * Adres wymiany na Uniswapie z wybranym tokenem po stronie wyjscia.
+ *
+ * DLACZEGO ODNOSNIK, A NIE WLASNY WIDGET: to sa prawdziwe pule Uniswap v4 na
+ * Base, wiec kupno DZIALA JUZ DZIS - brakowalo wylacznie drogi do niego.
+ * Wlasny panel wymiany znaczylby wlasna obsluge poslizgu, zatwierdzen, trasy
+ * i bledow, czyli powierzchnie, na ktorej ludzie traca pieniadze. Odnosnik
+ * daje ten sam skutek dzis i zeru ryzyka.
+ *
+ * `chain=base` jest konieczne: bez niego Uniswap otwiera sie na sieci, na
+ * ktorej portfel akurat stoi, i szuka tam tokena, ktorego tam nie ma.
+ */
+export function uniswapBuyUrl(tokenAddress: string): string {
+  return `https://app.uniswap.org/swap?chain=base&outputCurrency=${tokenAddress}`;
+}
+
+/** Inicjaly dla tokena bez obrazka. Dwa znaki, bo trzy juz sie nie miesza. */
+export function tokenInitials(symbol: string, name: string): string {
+  const source = (symbol || name || '?').replace(/[^a-zA-Z0-9]/g, '');
+  return (source.slice(0, 2) || '?').toUpperCase();
+}

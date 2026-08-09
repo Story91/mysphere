@@ -122,36 +122,53 @@ export default function B20MarketPage() {
   return (
     <div className="min-h-screen bg-soft-bg px-4 pb-24 pt-6 font-soft sm:pt-10">
       <div className="mx-auto w-full max-w-[1280px]">
-        <header className="mb-4">
+        {/* ===== FRONT DRZWI LAUNCHPADA =====
+            Wczesniej byl tu zwykly naglowek z malym przyciskiem "Make one" obok.
+            To jest RYNEK, ale przede wszystkim LAUNCHPAD - a launchpad, ktorego
+            glowna akcja jest pigulka wielkosci etykiety, nie zaprasza do niczego.
+            U clankera i lemona pierwsza rzecza na ekranie jest obietnica i dwa
+            duze przyciski; ten uklad dziala i nie ma powodu go wymyslac od nowa.
+
+            Naglowek NIE CZEKA NA SIEC. Zadna liczba tutaj nie pochodzi z odczytu
+            lancucha - te sa nizej, w karcie, ktora dolatuje Suspensem. Dzieki
+            temu pierwsza klatka jest natychmiastowa nawet przy zimnej instancji,
+            gdzie odczyt trwa okolo dwoch sekund. */}
+        <header className="mb-4 rounded-card border border-soft-line bg-soft-surface p-5 shadow-card sm:p-7">
           <p className="font-soft-display text-[11px] font-bold uppercase tracking-[0.12em] text-soft-ink-faint">
             Base · B20
           </p>
-          {/* Naglowek i przycisk w jednym wierszu na szerokim ekranie, jeden pod
-              drugim na telefonie. Nawigacja nizej ma "Create" jako pozycje, ale
-              pozycja w pasku nie jest zaproszeniem - u clankera to samo dziala
-              w dwoch miejscach naraz i dopiero drugie z nich cokolwiek robi. */}
-          <div className="mt-1 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-            <h1 className="font-soft-display text-[26px] font-bold leading-[1.2] text-soft-ink sm:text-[32px]">
-              Every B20 token on Base
-            </h1>
+
+          <h1 className="mt-1.5 font-soft-display text-[30px] font-bold leading-[1.12] text-soft-ink sm:text-[42px]">
+            Launch a token on Base
+          </h1>
+
+          {/* Jedno zdanie dla kogos, kto nie wie, co to B20. Zargon ("sol",
+              "rola", "precompile") nie ma prawa pojawic sie na wejsciu. */}
+          <p className="mt-2.5 max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-muted sm:text-[15px]">
+            B20 is Base’s own token standard, built into the network instead of deployed on top of
+            it. That makes one cheap to create and gives it a supply cap the network enforces —
+            not a promise in a description.
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-2.5">
             <Link
               href="/b20/create"
-              className="shrink-0 rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[12.5px] font-bold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] sm:mt-1"
+              className="rounded-pill bg-soft-primary px-6 py-3 font-soft-display text-[14px] font-bold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
             >
-              Make one
+              Launch your token
             </Link>
+            <a
+              href="#market"
+              className="rounded-pill border border-soft-line bg-soft-surface px-6 py-3 font-soft-display text-[14px] font-bold text-soft-ink-muted transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.97]"
+            >
+              Explore tokens
+            </a>
           </div>
-          {/* Jedno zdanie o tym, co to jest, dla kogos, kto nie wie. Zargon
-              ("sol", "rola", "precompile") nie ma prawa pojawic sie na wejsciu. */}
-          <p className="mt-2 max-w-[64ch] text-[13.5px] leading-[1.6] text-soft-ink-muted">
-            B20 is Base’s own token standard — built into the network instead of deployed on top of
-            it, so making one is cheap and hundreds appear every day. This is all of them from the
-            last day, with the one thing every other list hides: whether anybody has ever bought or
-            sold the thing.
-          </p>
         </header>
 
         <B20Nav active="market" />
+
+        <div id="market" className="scroll-mt-4" />
 
         <Suspense fallback={<BoardSkeleton />}>
           <BoardSection />

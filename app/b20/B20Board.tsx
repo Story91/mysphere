@@ -11,6 +11,8 @@ import {
   formatUsdAmount,
   formatUsdPrice,
   shortAddress,
+  tokenInitials,
+  uniswapBuyUrl,
 } from '../utils/b20/format';
 
 /**
@@ -113,6 +115,13 @@ function TokenRow({
    * wolumenu tak samo, a nie sa tym samym.
    */
   const liquidity = token.quoted ? formatUsdAmount(token.quoted.reserveUsd) : null;
+  const image = token.quoted?.imageUrl ?? null;
+  /**
+   * Kupic da sie tylko to, co ma pule. Przycisk przy tokenie bez puli
+   * prowadzilby na Uniswapa, ktory powiedzialby "no route" - czyli obiecywalby
+   * czynnosc niemozliwa i odsylal czlowieka do cudzego komunikatu bledu.
+   */
+  const canBuy = token.state === 'traded' || token.state === 'listed';
 
   return (
     <li
@@ -122,10 +131,33 @@ function TokenRow({
       // minucie. Ruch idzie po transform i opacity, wiec nie przelicza ukladu.
       style={{ animationDelay: `${Math.min(index, 12) * 18}ms` }}
     >
+      {/* Wiersz jest teraz FLEXEM, a nie jednym wielkim odnosnikiem: przycisk
+          kupna musi byc osobnym linkiem, a link w linku jest niepoprawny
+          i nieklikalny. Odnosnik do tokena zajmuje cala reszte szerokosci. */}
+      <div className="flex items-center gap-2 px-3.5 py-3 transition-colors [transition-duration:var(--dur-press)] hover:bg-soft-sunken sm:px-4">
       <Link
         href={`/b20/${token.address}`}
-        className="block px-3.5 py-3 transition-colors [transition-duration:var(--dur-press)] hover:bg-soft-sunken focus-visible:bg-soft-sunken focus-visible:outline-none sm:px-4"
+        className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-none"
       >
+        {/* ===== AWATAR =====
+            Obrazek z GeckoTerminal, a gdy go nie ma - inicjaly na lawendowym
+            polu. Pusty kwadrat wygladalby na blad ladowania; inicjaly wygladaja
+            na token bez obrazka, czyli na to, czym sa. */}
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt=""
+            loading="lazy"
+            className="h-9 w-9 shrink-0 rounded-full bg-soft-sunken object-cover"
+          />
+        ) : (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-soft-sunken font-soft-display text-[12px] font-bold text-soft-ink-muted">
+            {tokenInitials(token.symbol, token.name)}
+          </span>
+        )}
+
+        <span className="min-w-0 flex-1">
         {/* Rzad 1: kto to jest. Na waskim ekranie ticker i wiek stoja obok
             siebie, bo to jedyne dwie rzeczy czytane przed decyzja o czytaniu
             dalej. */}
@@ -223,7 +255,21 @@ function TokenRow({
             <span>unknown creator</span>
           )}
         </div>
+        </span>
       </Link>
+
+      {canBuy && (
+        <a
+          href={uniswapBuyUrl(token.address)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 rounded-pill bg-soft-primary px-3.5 py-1.5 font-soft-display text-[12px] font-bold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.96]"
+        >
+          Buy
+        </a>
+      )}
+      </div>
     </li>
   );
 }
@@ -231,6 +277,73 @@ function TokenRow({
 /* -------------------------------------------------------------------------- */
 /*  NAGLOWEK Z POMIAREM                                                        */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Panel boczny: najwiekszy wolumen w oknie.
+ *
+ * Odpowiednik "TRENDING NOW" u clankera, ale nazwany tym, czym jest.
+ * "Trending" sugeruje algorytm i nasza opinie o tym, co jest wazne - a to jest
+ * zwykle sortowanie po jednej, podanej obok liczbie. Kazdy wiersz niesie te
+ * liczbe, wiec czytelnik widzi, czym zostal uszeregowany.
+ *
+ * Pokazujemy WYLACZNIE tokeny, ktore maja cytat wolumenu. Token bez cytatu nie
+ * ma zerowego wolumenu - ma nieznany - i wpuszczenie go na koniec listy
+ * zamienialoby brak pomiaru w pomiar.
+ */
+function TopByVolume({ tokens }: { tokens: B20Token[] }) {
+  const top = useMemo(() => {
+    return tokens
+      .filter((t) => typeof t.quoted?.volume24hUsd === 'number' && t.quoted.volume24hUsd! > 0)
+      .sort((a, b) => (b.quoted!.volume24hUsd as number) - (a.quoted!.volume24hUsd as number))
+      .slice(0, 6);
+  }, [tokens]);
+
+  if (top.length === 0) return null;
+
+  return (
+    <aside className={`${CARD} p-4`}>
+      <h3 className="font-soft-display text-[13px] font-bold text-soft-ink">Most traded today</h3>
+      <p className="mt-0.5 text-[11px] leading-[1.45] text-soft-ink-faint">
+        By 24h volume, as quoted by GeckoTerminal.
+      </p>
+      <ul className="mt-3 space-y-1">
+        {top.map((t) => (
+          <li key={t.address}>
+            <Link
+              href={`/b20/${t.address}`}
+              className="flex items-baseline justify-between gap-3 rounded-lg px-2 py-2 transition-colors [transition-duration:var(--dur-press)] hover:bg-soft-sunken"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                {t.quoted?.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={t.quoted.imageUrl}
+                    alt=""
+                    loading="lazy"
+                    className="h-7 w-7 shrink-0 rounded-full bg-soft-sunken object-cover"
+                  />
+                ) : (
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-soft-sunken font-soft-display text-[10px] font-bold text-soft-ink-muted">
+                    {tokenInitials(t.symbol, t.name)}
+                  </span>
+                )}
+                <span className="min-w-0">
+                <span className="block truncate font-soft-display text-[13px] font-bold text-soft-ink">
+                  {t.symbol || '—'}
+                </span>
+                <span className="block truncate text-[11.5px] text-soft-ink-faint">{t.name}</span>
+                </span>
+              </span>
+              <span className="shrink-0 font-soft-display text-[12.5px] font-bold tabular-nums text-soft-accent-deep">
+                {formatUsdAmount(t.quoted!.volume24hUsd)}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
 
 function BoardHeadline({ snapshot, now }: { snapshot: BoardSnapshot; now: number }) {
   const { counts } = snapshot;
@@ -585,6 +698,15 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
         </div>
       )}
 
+      {/* ===== DWIE KOLUMNY OD lg =====
+          Lista w jednej waskiej kolumnie na monitorze 1280 px zostawia pol
+          ekranu pustego, a panel "najczesciej handlowane" to jedyna rzecz,
+          ktora czlowiek chce widziec BEZ przewijania listy do konca.
+
+          Na telefonie panel schodzi POD liste, a nie nad nia: kto wszedl na
+          rynek, przyszedl po liste, a nie po szesc wyroznionych pozycji. */}
+      <div className="grid gap-3 lg:grid-cols-3 lg:items-start">
+        <div className="lg:col-span-2">
       {/* --- LISTA --- */}
       <div className={`${CARD} overflow-hidden`}>
         {visible.length === 0 ? (
@@ -638,6 +760,12 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
           </button>
         </div>
       )}
+        </div>
+
+        <div className="lg:sticky lg:top-4">
+          <TopByVolume tokens={snapshot.tokens} />
+        </div>
+      </div>
 
       <p className="mt-3 px-1 text-[11px] leading-[1.5] text-soft-ink-faint">
         Prices come from the Uniswap v4 pool itself, read on Base. The dollar figures use one

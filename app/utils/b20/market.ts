@@ -409,6 +409,11 @@ type GtQuote = {
    * niz jej brak - a ta nie klamie.
    */
   reserveUsd: number | null;
+  /**
+   * Awatar tokena z GeckoTerminal. `null` znaczy, ze token go nie ma - i wtedy
+   * rysujemy zastepnik z inicjalami, a nie pusta dziure.
+   */
+  imageUrl: string | null;
 };
 
 async function fetchEthUsd(): Promise<number | null> {
@@ -459,6 +464,7 @@ async function fetchQuotes(addresses: Address[]): Promise<Map<string, GtQuote>> 
             address?: string;
             price_usd?: string | null;
             fdv_usd?: string | null;
+            image_url?: string | null;
             total_reserve_in_usd?: string | null;
             volume_usd?: { h24?: string | null };
           };
@@ -479,6 +485,12 @@ async function fetchQuotes(addresses: Address[]): Promise<Map<string, GtQuote>> 
           priceUsd: price !== null && price > 0 ? price : null,
           fdvUsd: num(a.fdv_usd),
           reserveUsd: num(a.total_reserve_in_usd),
+          // GT wpisuje literal "missing.png", gdy obrazka nie ma - to nie jest
+          // adres obrazka i nie wolno go podac dalej jako adresu.
+          imageUrl:
+            typeof a.image_url === 'string' && a.image_url.startsWith('http') && !a.image_url.includes('missing')
+              ? a.image_url
+              : null,
         });
       }
     } catch {
@@ -698,7 +710,13 @@ async function buildSnapshot(): Promise<BoardSnapshot> {
   ]);
   for (const t of traded) {
     t.quoted =
-      quotes.get(t.address) ?? { volume24hUsd: null, priceUsd: null, fdvUsd: null, reserveUsd: null };
+      quotes.get(t.address) ?? {
+        volume24hUsd: null,
+        priceUsd: null,
+        fdvUsd: null,
+        reserveUsd: null,
+        imageUrl: null,
+      };
   }
   if (ethUsd === null) {
     notes.push(
