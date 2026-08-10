@@ -746,7 +746,10 @@ export default function LaunchpadBoard() {
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
-  const [tokens, setTokens] = useState<BoardToken[]>(previewTokens);
+  // Startujemy od PUSTEJ tablicy, nie od wierszy przykladowych: pierwszy
+  // render pokazywal probki na sekunde, zanim skan dogonil prawde - wygladalo
+  // to jak stare dane. Probki wchodza dopiero, gdy UKONCZONY skan nic nie da.
+  const [tokens, setTokens] = useState<BoardToken[]>([]);
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
   const [topEarners, setTopEarners] = useState<CreatorEarnings[]>([]);
   // Kurs ETH/USD do dopiskow. Null przy braku danych - wtedy dopiski znikaja,
@@ -755,7 +758,7 @@ export default function LaunchpadBoard() {
   const [tab, setTab] = useState<BoardTab>('new');
   const [view, setView] = useState<'grid' | 'table'>('grid');
   const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState(previewTokens[0].id);
+  const [selectedId, setSelectedId] = useState<string>('');
   const [buyAmount, setBuyAmount] = useState('0.05');
   const [launchOpen, setLaunchOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -765,7 +768,9 @@ export default function LaunchpadBoard() {
   const [animationsOn, setAnimationsOn] = useState(true);
   const [busy, setBusy] = useState<BusyAction | null>(null);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
-  const [loadingBoard, setLoadingBoard] = useState(false);
+  // `true` od pierwszego renderu: zanim efekt odpali skan, rynek ma pokazywac
+  // szkielet, a nie pusty stan ani probki.
+  const [loadingBoard, setLoadingBoard] = useState(true);
   const [boardError, setBoardError] = useState<string | null>(null);
   // Skan logow doszedl do sufitu okien zanim siegnal bloku wdrozenia -
   // najstarsze starty moga byc poza widokiem i trzeba to nazwac w UI.
@@ -1663,7 +1668,7 @@ export default function LaunchpadBoard() {
 
             <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Launchpad market table">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Launchpad market</h2><p className="mt-1 text-[11px] text-black/45">{visibleTokens.length} projects in this view · {showingPreview ? 'sample rows while the first launch is indexed' : 'live event data from Base Sepolia'}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
+                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Launchpad market</h2><p className="mt-1 text-[11px] text-black/45">{tokens.length === 0 && loadingBoard ? 'reading live launches from Base Sepolia...' : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : 'live event data from Base Sepolia'}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
                 <span className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={toggleAnimations} aria-pressed={animationsOn} className={`rounded-full border px-3 py-1.5 text-[11px] font-extrabold transition-colors ${animationsOn ? 'border-soft-primary/40 bg-soft-primary/10 text-soft-primary-deep' : 'border-black/10 bg-white text-black/45'}`}>
                     {animationsOn ? 'Animations on' : 'Animations off'}
@@ -1678,7 +1683,18 @@ export default function LaunchpadBoard() {
               </div>
               {view === 'grid' ? (
                 <div className="border-t border-black/10 p-4 sm:p-5">
-                  {visibleTokens.length > 0 ? (
+                  {tokens.length === 0 && loadingBoard ? (
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+                      {Array.from({ length: 6 }, (_, index) => (
+                        <div key={index} className="animate-pulse rounded-[18px] border border-black/10 bg-white p-4">
+                          <div className="flex items-center gap-3"><span className="h-11 w-11 rounded-[16px] bg-black/8" /><span className="h-4 w-24 rounded bg-black/8" /></div>
+                          <div className="mt-5 h-4 w-32 rounded bg-black/8" />
+                          <div className="mt-3 h-1.5 w-full rounded-full bg-black/8" />
+                          <div className="mt-4 h-8 w-full rounded-full bg-black/8" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : visibleTokens.length > 0 ? (
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       {visibleTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onSelect={() => selectToken(token.id)} onTrade={() => selectToken(token.id, true)} onDetails={() => token.address && router.push(`/launchpad/${token.address}`)} />)}
                     </div>
@@ -1689,7 +1705,7 @@ export default function LaunchpadBoard() {
               ) : (
                 <div className="overflow-x-auto">
                   <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] gap-4 border-y border-black/10 bg-[#fafafd] px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/45 sm:px-5"><span>Coin</span><span>Curve</span><span>Indexed vol</span><span>Momentum</span><span>Creator</span><span /></div>
-                  {visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onSelect={() => selectToken(token.id)} onTrade={() => selectToken(token.id, true)} onDetails={() => token.address && router.push(`/launchpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
+                  {tokens.length === 0 && loadingBoard ? <div className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from Base Sepolia...</div> : visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onSelect={() => selectToken(token.id)} onTrade={() => selectToken(token.id, true)} onDetails={() => token.address && router.push(`/launchpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
                 </div>
               )}
               <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Launchpad events and current onchain state.'}</div>
