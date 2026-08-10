@@ -63,18 +63,23 @@ export async function GET(
   try {
     const upstream = await fetch(forward.toString(), {
       headers: { accept: 'application/json' },
-      // Liczniki (posiadacze, transfery) nie zmieniaja sie co sekunde. 60 s
-      // cache tnie zuzycie kredytow i chroni limit 15 req/s przy wielu kartach.
-      next: { revalidate: 60 },
+      // Liczniki (posiadacze, transfery) nie zmieniaja sie co sekunde. 5 min
+      // cache tnie zuzycie kredytow do minimum i chroni limit 15 req/s -
+      // wielu uzytkownikow ogladajacych ten sam token to JEDNO zapytanie na 5 min.
+      next: { revalidate: 300 },
     });
 
     const body = await upstream.text();
+    // Bledu (402 wyczerpane kredyty, 429 limit) NIE cache'ujemy dlugo - chcemy
+    // sprobowac ponownie, gdy kredyty wroca. Klient i tak ma wtedy fallback.
+    const ok = upstream.ok;
     return new NextResponse(body, {
       status: upstream.status,
       headers: {
         'content-type': upstream.headers.get('content-type') ?? 'application/json',
-        // Pozwalamy CDN/przegladarce trzymac odpowiedz krotko - to publiczne dane.
-        'cache-control': 'public, max-age=30, stale-while-revalidate=60',
+        'cache-control': ok
+          ? 'public, max-age=120, stale-while-revalidate=300'
+          : 'no-store',
       },
     });
   } catch (error) {

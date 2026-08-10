@@ -13,6 +13,52 @@ function proxyBase(chainId: number): string {
   return `/api/startpad/chain/${chainId}`;
 }
 
+/**
+ * CACHE ZAPYTAN - zeby nie palic kredytow Buildera.
+ *
+ * Liczba posiadaczy i transferow zmienia sie wolno, a tablica przeladowuje sie
+ * czesto (eventy na zywo, recznie, przy zmianie zakladki). Bez cache kazde
+ * przeladowanie to N nowych zapytan. Dlatego:
+ *  - trzymamy wynik per URL przez TTL (5 min) - powtorka w tym oknie = 0 zapytan;
+ *  - deduplikujemy zapytania W LOCIE - piec workerow boardu proszacych o ten sam
+ *    token robi JEDNO zapytanie, nie piec.
+ * Serwerowy proxy ma wlasny cache (revalidate), wiec to druga, tansza warstwa.
+ */
+const TTL_MS = 5 * 60 * 1000;
+const cache = new Map<string, { at: number; value: unknown }>();
+const inflight = new Map<string, Promise<unknown>>();
+
+async function cachedGet<T>(url: string): Promise<T | null> {
+  const hit = cache.get(url);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.value as T | null;
+
+  const pending = inflight.get(url);
+  if (pending) return pending as Promise<T | null>;
+
+  const task = (async () => {
+    try {
+      const res = await fetch(url, { headers: { accept: 'application/json' } });
+      if (!res.ok) {
+        // Odmowa (402/429/503...) tez cache'ujemy krotko jako `null`, zeby po
+        // wyczerpaniu kredytow nie bic w proxy raz za razem - fallback i tak dziala.
+        cache.set(url, { at: Date.now(), value: null });
+        return null;
+      }
+      const value = (await res.json()) as T;
+      cache.set(url, { at: Date.now(), value });
+      return value;
+    } catch {
+      cache.set(url, { at: Date.now(), value: null });
+      return null;
+    } finally {
+      inflight.delete(url);
+    }
+  })();
+
+  inflight.set(url, task);
+  return task as Promise<T | null>;
+}
+
 type CountersResponse = {
   token_holders_count?: string;
   transfers_count?: string;
@@ -27,18 +73,10 @@ type CountersResponse = {
  * dziala na obu sieciach; drugie na Base Sepolii oddaje 404 (zmierzone).
  */
 export async function fetchHolderCount(chainId: number, token: string): Promise<number | null> {
-  try {
-    const res = await fetch(`${proxyBase(chainId)}/tokens/${token}/counters`, {
-      headers: { accept: 'application/json' },
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as CountersResponse;
-    if (data.token_holders_count == null) return null;
-    const n = Number(data.token_holders_count);
-    return Number.isFinite(n) ? n : null;
-  } catch {
-    return null;
-  }
+  const data = await cachedGet<CountersResponse>(`${proxyBase(chainId)}/tokens/${token}/counters`);
+  if (data?.token_holders_count == null) return null;
+  const n = Number(data.token_holders_count);
+  return Number.isFinite(n) ? n : null;
 }
 
 export type IndexedHolder = {
@@ -62,27 +100,19 @@ export async function fetchTokenHolders(
   token: string,
   limit = 50
 ): Promise<IndexedHolder[]> {
-  try {
-    const res = await fetch(`${proxyBase(chainId)}/tokens/${token}/holders?limit=${limit}`, {
-      headers: { accept: 'application/json' },
-    });
-    if (!res.ok) return [];
-    const data = (await res.json()) as HoldersResponse;
-    const items = data.items ?? [];
-    const out: IndexedHolder[] = [];
-    for (const item of items) {
-      const hash = item.address?.hash;
-      if (!hash || item.value == null) continue;
-      try {
-        out.push({ address: hash.toLowerCase(), balance: BigInt(item.value) });
-      } catch {
-        // Wartosc, ktora nie jest liczba calkowita - pomijamy ten wiersz.
-      }
+  const data = await cachedGet<HoldersResponse>(`${proxyBase(chainId)}/tokens/${token}/holders?limit=${limit}`);
+  const items = data?.items ?? [];
+  const out: IndexedHolder[] = [];
+  for (const item of items) {
+    const hash = item.address?.hash;
+    if (!hash || item.value == null) continue;
+    try {
+      out.push({ address: hash.toLowerCase(), balance: BigInt(item.value) });
+    } catch {
+      // Wartosc, ktora nie jest liczba calkowita - pomijamy ten wiersz.
     }
-    return out;
-  } catch {
-    return [];
   }
+  return out;
 }
 
 /**
