@@ -36,6 +36,7 @@ import TradePanel from './TradePanel';
 import {
   fmtEth,
   fmtPrice,
+  fmtUsdPrice,
   isAddressParam,
   mcapWei,
   priceToNumber,
@@ -496,7 +497,13 @@ function StatsCard({
   // USD to zawsze dopisek, nigdy wartosc glowna - przy braku kursu (null)
   // wiersz wyglada dokladnie tak, jak przed dodaniem dopiskow.
   const rows: Array<{ label: string; value: string; usd?: string | null }> = [
-    { label: 'Price', value: `${fmtPrice(priceToNumber(priceWei))} ETH`, usd: usdSuffix(priceWei, ethUsd) },
+    {
+      label: 'Price',
+      value: `${fmtPrice(priceToNumber(priceWei))} ETH`,
+      // Cena tokena to ulamek centa - `fmtUsdPrice` pokazuje ja pelnym zapisem
+      // ($0.00000367) zamiast bezuzytecznego "<$0.01".
+      usd: ethUsd !== null ? fmtUsdPrice(priceToNumber(priceWei) * ethUsd) : null,
+    },
     { label: 'Market cap', value: `${fmtEth(mcapWei(priceWei), 3)} ETH`, usd: usdSuffix(mcapWei(priceWei), ethUsd) },
     { label: 'ETH reserve', value: `${fmtEth(core.ethReserve, 4)} ETH`, usd: usdSuffix(core.ethReserve, ethUsd) },
     { label: 'Volume', value: `${fmtEth(volumeWei, 4)} ETH`, usd: usdSuffix(volumeWei, ethUsd) },

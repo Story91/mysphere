@@ -39,16 +39,16 @@ async function cachedGet<T>(url: string): Promise<T | null> {
     try {
       const res = await fetch(url, { headers: { accept: 'application/json' } });
       if (!res.ok) {
-        // Odmowa (402/429/503...) tez cache'ujemy krotko jako `null`, zeby po
-        // wyczerpaniu kredytow nie bic w proxy raz za razem - fallback i tak dziala.
-        cache.set(url, { at: Date.now(), value: null });
+        // Bledu NIE cache'ujemy. Cache'owanie null na 60 s zatruwaloby wynik po
+        // JEDNEJ nieudanej probie (np. cold-compile trasy w dev, chwilowy 5xx) -
+        // i statystyka zostawala na fallbacku, choc kolejne zapytanie by przeszlo.
+        // Dedup "w locie" i tak chroni przed burstem, a fallback dziala od reki.
         return null;
       }
       const value = (await res.json()) as T;
       cache.set(url, { at: Date.now(), value });
       return value;
     } catch {
-      cache.set(url, { at: Date.now(), value: null });
       return null;
     } finally {
       inflight.delete(url);

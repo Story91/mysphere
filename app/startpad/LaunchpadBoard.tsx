@@ -355,9 +355,12 @@ function LaunchCard({
       )}
 
       <div className="mt-4">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="min-w-0 truncate text-[17px] font-extrabold text-[#16141b]">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-black/40"> · {raisedNote}</span>}</span>
-          <span className={`text-[11px] font-extrabold ${status.className}`}>{status.text}</span>
+        {/* flex-wrap zamiast truncate: przy duzych sumach "0.462 ETH · $865.01"
+            i "2.54 ETH to graduation" nie walcza o jedna linie - status schodzi
+            nizej, a cena i USD pokazuja sie w calosci (koniec z "$865..."). */}
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-[17px] font-extrabold text-[#16141b]">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-black/40"> · {raisedNote}</span>}</span>
+          <span className={`ml-auto shrink-0 text-[11px] font-extrabold ${status.className}`}>{status.text}</span>
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/8">
           <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${progress}%`, backgroundColor: token.accent }} />
@@ -2024,7 +2027,7 @@ export default function LaunchpadBoard() {
           .lp-flash-buy, .lp-flash-sell { animation: none; }
         }
       `}</style>
-      <div className="mx-auto w-full max-w-[1280px]">
+      <div className="mx-auto w-full max-w-[1760px]">
         <div className="lg:hidden">
           <ActivityTicker events={feedEvents} />
         </div>
@@ -2056,12 +2059,14 @@ export default function LaunchpadBoard() {
         {notice && <div className={`mb-4 flex items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] ${notice.kind === 'success' ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]' : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span>{notice.text}</span></div>}
         {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[11.5px] text-black/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-[#c76b12]'}`} aria-hidden="true" /><span suppressHydrationWarning>{loadingBoard ? `Reading Launchpad activity from ${NET}...` : `Live data unavailable. ${boardError}`}</span></div>}
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="min-w-0">
-            {/* Cztery karty w ukladzie 2x2: Top earnings stoi obok Top launches
-                i Top volume, a nie pod kreska - ranking tworcow ma byc czescia
-                pierwszego ekranu, nie ciekawostka na dole. */}
-            <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          {/* Kolejnosc wizualna ustawiona przez `order`, nie przez pozycje w
+              kodzie: rynek (tabs + tabela/grid) na samej gorze - to jest RYNEK,
+              wiec lista tokenow ma byc pierwsza, a panele statystyk pod nia. */}
+          <div className="flex min-w-0 flex-col">
+            {/* Cztery panele: na szerokim ekranie jeden rzad (xl:grid-cols-4),
+                zeby uklad ciagnal sie na cala szerokosc i wyrownal z rynkiem. */}
+            <div className="order-3 mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
               <TopLaunches tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
               <VolumePanel tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
@@ -2069,28 +2074,32 @@ export default function LaunchpadBoard() {
             </div>
 
             {kingToken && (
-              <KingOfTheHill
-                token={kingToken}
-                ethUsd={ethUsd}
-                onTrade={() => selectToken(kingToken.id, true)}
-                onDetails={() => kingToken.address && router.push(`/startpad/${kingToken.address}`)}
-              />
+              <div className="order-4">
+                <KingOfTheHill
+                  token={kingToken}
+                  ethUsd={ethUsd}
+                  onTrade={() => selectToken(kingToken.id, true)}
+                  onDetails={() => kingToken.address && router.push(`/startpad/${kingToken.address}`)}
+                />
+              </div>
             )}
 
-            {/* Portfel tworcy - tylko przy podlaczonym portfelu, nad rynkiem. */}
+            {/* Portfel tworcy - tylko przy podlaczonym portfelu. */}
             {isConnected && address && (
-              <MyTokensPanel
-                tokens={myTokens}
-                claimable={myClaimable}
-                claimBusy={busy === 'claim'}
-                ethUsd={ethUsd}
-                onClaim={() => void claimAllMine()}
-                onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)}
-                onLaunch={() => setLaunchOpen(true)}
-              />
+              <div className="order-5">
+                <MyTokensPanel
+                  tokens={myTokens}
+                  claimable={myClaimable}
+                  claimBusy={busy === 'claim'}
+                  ethUsd={ethUsd}
+                  onClaim={() => void claimAllMine()}
+                  onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)}
+                  onLaunch={() => setLaunchOpen(true)}
+                />
+              </div>
             )}
 
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="order-1 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Launch sorting">
                 {([['new', 'New'], ['trending', 'Trending'], ['about', 'About to graduate'], ['graduated', 'Graduated'], ['all', 'All']] as const).map(([value, label]) => (
                   <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`rounded-full border px-4 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>
@@ -2099,7 +2108,7 @@ export default function LaunchpadBoard() {
               <NetworkTag />
             </div>
 
-            <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market table">
+            <section className="order-2 mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market table">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
                 <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Startpad market</h2><p suppressHydrationWarning className="mt-1 text-[11px] text-black/45">{tokens.length === 0 && loadingBoard ? `reading live launches from ${NET}...` : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : `live event data from ${NET}`}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
                 <span className="flex flex-wrap items-center gap-2">
@@ -2117,7 +2126,7 @@ export default function LaunchpadBoard() {
               {view === 'grid' ? (
                 <div className="border-t border-black/10 p-4 sm:p-5">
                   {tokens.length === 0 && loadingBoard ? (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-hidden="true">
                       {Array.from({ length: 6 }, (_, index) => (
                         <div key={index} className="animate-pulse rounded-[18px] border border-black/10 bg-white p-4">
                           <div className="flex items-center gap-3"><span className="h-11 w-11 rounded-[16px] bg-black/8" /><span className="h-4 w-24 rounded bg-black/8" /></div>
@@ -2128,7 +2137,7 @@ export default function LaunchpadBoard() {
                       ))}
                     </div>
                   ) : visibleTokens.length > 0 ? (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                       {visibleTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />)}
                     </div>
                   ) : (
