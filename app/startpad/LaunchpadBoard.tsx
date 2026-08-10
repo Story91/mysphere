@@ -42,6 +42,7 @@ import {
 } from './config';
 import { pickTokenImage } from './metadata';
 import LaunchTokenModal from './LaunchTokenModal';
+import StartpadFooter from './StartpadFooter';
 import { formatUsd, useEthUsd } from './useEthUsd';
 
 const FIELD =
@@ -2040,6 +2041,8 @@ export default function LaunchpadBoard() {
 
           <LiveRail events={feedEvents} />
         </div>
+
+        <StartpadFooter />
       </div>
 
       <LaunchTokenModal

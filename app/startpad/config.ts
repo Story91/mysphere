@@ -15,6 +15,12 @@ export const LIQUIDITY_VAULT_ADDRESS =
 export const LAUNCH_HOOK_ADDRESS =
   (process.env.NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
   '0xf2EAEBceeC6Ccc168d8fe5B539F37e2d8c44e044';
+export const B20_TOKEN_FACTORY_ADDRESS =
+  (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
+  '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F';
+// Precompile B20 wbudowany w siec - ten sam adres na mainnecie i Sepolii.
+// To NIE jest nasz kontrakt, wiec nie ma zmiennej srodowiskowej.
+export const B20_PRECOMPILE_ADDRESS = '0xB20f000000000000000000000000000000000000' as const;
 
 export const launchpadAbi = [
   {
