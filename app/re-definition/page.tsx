@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { DISABLED_ROUTES } from '@/config/routeStatus';
 
 export const metadata: Metadata = {
-  // Marke dokłada template z layoutu - patrz komentarz w app/leaderboard/page.tsx.
+  // Marke doklada template z layoutu - patrz komentarz przy `title` w app/layout.tsx.
+  // (Wczesniej odsylacz szedl do app/leaderboard/page.tsx, ale /leaderboard jest
+  // scalany z /money i ten plik znika.)
   title: 'Re-Definition — money buys judgment',
   description:
     'MySphere is becoming the first feed where the buyer can be a machine and the worker is a human. One machine payment has already settled. Here is how an Ask works, and what is still missing.',
@@ -534,6 +536,16 @@ function AskCard() {
  * wiec niesc MIANOWNIK i slowo "tips". Liczba jako fakt: tak. Liczba jako dowod,
  * ze rynek dziala: nigdy.
  *
+ * === STARTPAD WSZEDL DO TABELI JAKO DWA WIERSZE, NIE JEDEN ===
+ * Modul jest nowy i dziala, ale na Base Sepolia - tam ETH nie jest pieniadzem.
+ * Jeden wiersz `live` mowilby "dziala" i przemilczal, ze zaden prawdziwy grosz
+ * przez to nie przeszedl; jeden wiersz `planned` przemilczalby, ze pelna
+ * sciezka od startu po buyback i wyplaty zostala przejechana na lancuchu.
+ * Sa wiec dwa: co stoi na testnecie i co stoi miedzy testnetem a prawdziwymi
+ * pieniedzmi (audyt zewnetrzny - bo kontrakty nie maja wlasciciela ani pauzy
+ * i bledu nie daloby sie cofnac). Zrodla prawdy: docs/LAUNCHPAD-DOSSIER.md
+ * i docs/LAUNCHPAD-STAN.md, oba aktualizowane przy kazdej zmianie launchpada.
+ *
  * NIE DOPISUJ TU WIERSZA, DOPOKI NIE ZOBACZYSZ GO W KODZIE. Ta tabela jest
  * jedynym miejscem na stronie, gdzie klamstwo nie ma sie gdzie schowac.
  */
@@ -681,6 +693,16 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
     name: 'Ask: answering without leaving the feed',
     status: 'live',
     note: 'The button on a feed card opens the answer box in place. You read the question, the amount and the clock, and you write without going anywhere. What stays on /asks is the author side of it: opening the sealed answers and resolving with a payment, which needs a wallet and a signature and sometimes two transactions. The feed does not fetch the thread behind each card, so it does not know whether you have already answered - the server does, and it says so when you send. Past the deadline or with every seat taken the button goes back to being a link, because a form that cannot be submitted is worse than no form.',
+  },
+  {
+    name: 'Startpad: launch a token',
+    status: 'live',
+    note: 'A bonding curve that closes at exactly 3.00 ETH and graduates into a Uniswap v4 pool, fees split up to 70% to the creator and never less than 30% to the protocol — the floor is in the contract, not the form. It runs on Base Sepolia, where the ETH is not real money, and the full path — launch, curve close, graduation, pool swaps, buyback and burn, claims — has been run end to end there and checked on the chain.',
+  },
+  {
+    name: 'Startpad on real money',
+    status: 'planned',
+    note: 'The contracts have no owner, no pause and no upgrade path, so a bug on mainnet would be irreversible and nobody could hand the ETH back. An external audit stands between the testnet and mainnet, and this row stays unlit until it has happened.',
   },
 ];
 
@@ -1102,9 +1124,12 @@ export default function ReDefinitionPage() {
             resolve rate an author cannot raise without paying somebody. Those exist whether or not
             anyone has used them yet, and the row above is honest that nobody has.
           </P>
+          {/* Timeline platnosci mieszka teraz w /money, w zakladce Paid -
+              /leaderboard jest scalany z ta strona i ten link nie ma prawa
+              prowadzic do trasy, ktora znika. */}
           <p className="mb-4">
             <Link
-              href="/leaderboard"
+              href="/money?tab=paid"
               className="inline-flex items-center gap-2 rounded-pill bg-soft-accent-soft px-4 py-2.5 font-soft-display text-[13.5px] font-bold text-soft-accent-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
             >
               Watch the money land →
@@ -1160,6 +1185,111 @@ export default function ReDefinitionPage() {
               className="inline-flex items-center gap-2 rounded-pill bg-soft-primary-deep px-4 py-2.5 font-soft-display text-[13.5px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
             >
               Open the curator record →
+            </Link>
+          </p>
+        </section>
+
+        {/* ---------------- Startpad ----------------
+            === DLACZEGO TA SEKCJA STOI ZARAZ PO KURATORACH ===
+            Sekcja wyzej mowi: ktos moze zmienic warunki twojego vaulta przez
+            noc. Ta mowi o module zbudowanym dokladnie przeciwko temu: warunki
+            startu tokena sa niezmienne od momentu, w ktorym je przeczytales.
+            To ta sama teza strony - pieniadz z regulami, ktorych nikt nie
+            trzyma w reku - wypowiedziana z drugiej strony. Przemilczenie
+            dzialajacego modulu byloby zanizaniem stanu, czyli tym samym
+            bledem co zawyzanie (patrz komentarz nad tabela CAPABILITIES).
+
+            === ZNACZNIK JEST KWOTA, WIEC WOLNO MU BYC BURSZTYNOWYM ===
+            3.00 ETH to prog, przy ktorym krzywa sie domyka i token graduuje -
+            jedna liczba, ktora niesie caly mechanizm. Bursztyn nalezy w tym
+            produkcie do kwot, a to jest kwota.
+
+            === PRZYCISK CELOWO FIOLETOWY, NIE BURSZTYNOWY ===
+            Ta sama zasada co przy /curators: bursztynowy przycisk prowadzi do
+            kwot, ktore naprawde przeszly miedzy ludzmi. Startpad stoi na Base
+            Sepolia, gdzie ETH nie jest pieniadzem - przycisk nie ma prawa
+            obiecywac kolorem czegos, czego strona nie obiecuje slowem.
+
+            === SKAD SA TE ZDANIA ===
+            Kazdy fakt ponizej pochodzi z docs/LAUNCHPAD-DOSSIER.md,
+            docs/LAUNCHPAD-STAN.md albo wprost z kodu app/launchpad/*
+            (wymog logo, przelacznik ochrony snajperskiej, atomowy pre-buy,
+            Top earnings liczone w wei - wszystko sprawdzone w zrodlach przed
+            napisaniem). Testnet stoi w linijce State ZANIM padnie pierwsze
+            zdanie w czasie terazniejszym - z tego samego powodu, dla ktorego
+            hero ma trzy kolumny czasow.
+
+            Adresow kontraktow tu nie ma i NIE WOLNO ich dopisac do tabeli
+            "Every contract this app touches": tamta lista celowo nie podaje
+            sieci testowych (patrz jej komentarz), a Startpad w calosci stoi
+            na Sepolii. */}
+        <section className="py-16">
+          <Marker amount="3.00 ETH" label="where the curve closes" />
+          <H2>A launch whose terms nobody can change overnight</H2>
+          <State tone="live">
+            Runs on /launchpad — Base Sepolia, where the ETH is not real money; mainnet after an
+            audit
+          </State>
+          <P>
+            <Hi>Startpad</Hi> launches an ERC-20 on a bonding curve. When the curve has collected{' '}
+            <Hi>exactly 3.00 ETH</Hi>, the token graduates: liquidity moves into a Uniswap v4 pool
+            that opens at the exact price the curve closed at, so nobody who bought the top of the
+            curve is instantly underwater. Anyone may call the graduation and is paid 0.045 ETH —
+            half of the graduation fee — for doing so, which means the step does not depend on us
+            being awake.
+          </P>
+          <P>
+            Every fee stream splits the same way: <Hi>up to 70% to the creator, never less than 30%
+            to the protocol</Hi> — the same ratio PONS pays — and the floor sits in the contract,
+            so it binds us and anyone calling the contract directly, not just users of our form.
+            Trading on the curve pays at most 1%; after graduation every swap in the pool pays 1%.
+            The creator&apos;s share can go to up to eight addresses, and it is paid in ETH, not in
+            the token.
+          </P>
+          <P>
+            A creator can point a slider at their own share and burn with it. The{' '}
+            <Hi>auto-buyback</Hi> takes 0–100% of <em>the creator&apos;s</em> pool fees, buys the
+            token and sends it to the dead address, and anyone may execute a pending buyback. An
+            earlier deployment cut the buyback from the whole fee before the split, which let a
+            creator set 100% and zero the protocol out — the version running now spends only the
+            creator&apos;s own money, because generosity paid for with somebody else&apos;s revenue
+            is not generosity.
+          </P>
+          <P>
+            Sniper protection is a default, not a law: for the first five minutes one wallet can
+            buy at most 16 million tokens, and the creator can tighten that, raise it, or{' '}
+            <Hi>switch it off entirely</Hi> — chosen at launch and immutable afterwards, like every
+            other number on the form. The creator gets no allocation: a pre-buy is a normal buy on
+            the same curve, filled <Hi>in the same transaction that creates the token</Hi>, so
+            there is no block in which a sniper can get in first. And a launch does not go out
+            without a logo — an ERC-20 has no image on chain, so the file is stored with us and
+            served through a token list only the creator the chain confirms can edit.
+          </P>
+          <P>
+            The interface holds itself to the same rule as this page. The candlestick chart is
+            built from the contract&apos;s own events and <Hi>ends at graduation</Hi>, because
+            after that trading lives in the pool and we do not draw numbers we do not have. Selling
+            keeps working after the curve locks, because the contract allows it and an interface
+            that hides a working exit is lying. &ldquo;My tokens&rdquo; collects what your launches
+            have accrued next to the claim button, and &ldquo;Top earnings&rdquo; ranks creators by
+            fees <Hi>added up to the wei from the contract&apos;s events</Hi>, not estimated.
+          </P>
+          <P>
+            The spine is the one this whole page keeps arguing for: <Hi>no owner, no pause, no
+            setters, no upgrade path</Hi> — changing any number means deploying a new contract.
+            Payouts are pull-based balances you claim, never pushed. The LP position is locked in a
+            vault forever; only the fees it earns can ever be taken out. All of it stands on Base
+            Sepolia, and the full path — launch, curve close, graduation, pool swaps, fee settle,
+            buyback and burn, claims — has been run end to end there and checked on the chain. Real
+            money waits for an external audit, for the same reason the escrow gives: with no admin
+            key, a bug is irreversible.
+          </P>
+          <p className="mb-4">
+            <Link
+              href="/launchpad"
+              className="inline-flex items-center gap-2 rounded-pill bg-soft-primary-deep px-4 py-2.5 font-soft-display text-[13.5px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
+            >
+              Open the Startpad →
             </Link>
           </p>
         </section>
