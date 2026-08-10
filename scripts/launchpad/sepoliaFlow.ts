@@ -140,6 +140,12 @@ async function main() {
   // juz stoi na progu.
   const resumeToken = process.env.FLOW_TOKEN;
   let token: string;
+  // Te powstaja WYLACZNIE w pelnym przebiegu. Przy wznawianiu zostaja `null`,
+  // a podsumowanie ma to jawnie pokazac zamiast wywracac sie na `undefined`.
+  let launchReceipt: ContractTransactionReceipt | null = null;
+  let buyReceipt: ContractTransactionReceipt | null = null;
+  let graduateReceipt: ContractTransactionReceipt | null = null;
+  let quote: readonly [bigint, bigint, bigint] | null = null;
 
   if (resumeToken) {
     token = getAddress(resumeToken);
@@ -150,7 +156,7 @@ async function main() {
     if (state === 3n) console.log("token juz po graduacji - przechodze do puli, oplat i wyplat");
   } else {
     const launchTx = await pad.launch("Sepolia Flow", "SFLOW", 0, deadline);
-    const launchReceipt = (await launchTx.wait())!;
+    launchReceipt = (await launchTx.wait())!;
     const launched = parseEvent(pad, launchReceipt, "Launched");
     token = getAddress(launched.args[0]);
     console.log("token   ", token);
@@ -179,12 +185,12 @@ async function main() {
     // Odczyt tuz po transakcji trafia czasem na wezel, ktory nie ma jeszcze
     // nowego stanu - i oddaje goly `execution reverted`, wygladajacy jak blad
     // kontraktu. Ta sama pulapka jest juz obsluzona w `deploy.ts`.
-    const quote = await retryRead("quoteBuy", () => pad.quoteBuy(token, buyEth));
+    quote = await retryRead("quoteBuy", () => pad.quoteBuy(token, buyEth));
     const minTokensOut = (quote[0] * 9950n) / 10_000n;
     if (minTokensOut === 0n) throw new Error("Quote kupna zwrocil zero tokenow.");
     const buyDeadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
     const buyTx = await pad.buy(token, minTokensOut, buyDeadline, { value: buyEth });
-    const buyReceipt = (await buyTx.wait())!;
+    buyReceipt = (await buyTx.wait())!;
     await waitForState(pad, token, 2n, "kupno domykajace krzywa");
     console.log("buy     ", receiptSummary(buyReceipt));
   }
@@ -193,7 +199,7 @@ async function main() {
     console.log("graduate  (juz wykonana, pomijam)");
   } else {
   const graduateTx = await pad.graduate(token);
-  const graduateReceipt = (await graduateTx.wait())!;
+  graduateReceipt = (await graduateTx.wait())!;
   await waitForState(pad, token, 3n, "graduacja");
   console.log("graduate", receiptSummary(graduateReceipt));
   }
@@ -219,34 +225,81 @@ async function main() {
     { value: SWAP_ETH }
   );
   const swapReceipt = (await swapTx.wait())!;
-  const pendingEthAfter = await hook.pendingEth(token);
-  const pendingTokenAfter = await hook.pendingToken(token);
-  const wzrostEth = pendingEthAfter - pendingEthBefore;
-  const wzrostToken = pendingTokenAfter - pendingTokenBefore;
-  if (wzrostEth === 0n && wzrostToken === 0n) {
-    throw new Error("Swap nie naliczyl hookowi ani ETH, ani tokena.");
+  // Kwote oplaty bierzemy ZE ZDARZENIA W PARAGONIE, nie z odczytu po
+  // transakcji. Odczyt trafia na wezel, ktory moze jeszcze nie miec nowego
+  // bloku, i oddaje wartosc SPRZED wymiany - a wtedy roznica wychodzi zero i
+  // skrypt oglasza porazke przy hooku, ktory zadzialal. Ta sama pulapka
+  // wywrocila juz `startedAt` i sprawdzenie stanu po kupnie.
+  const hookFeeLogs = swapReceipt.logs
+    .map((log) => {
+      try {
+        return hook.interface.parseLog({ topics: [...log.topics], data: log.data });
+      } catch {
+        return null;
+      }
+    })
+    .filter((parsed): parsed is NonNullable<typeof parsed> => parsed?.name === "HookFeeTaken");
+
+  if (hookFeeLogs.length === 0) {
+    throw new Error("Swap przeszedl, ale hook nie wyemitowal HookFeeTaken - nie wzial oplaty.");
   }
-  console.log(
-    `oplata hooka: +${ethers.formatEther(wzrostEth)} ETH, +${ethers.formatEther(wzrostToken)} tokena`
-  );
+  for (const parsed of hookFeeLogs) {
+    const isEth = parsed.args.isEth as boolean;
+    const amount = parsed.args.amount as bigint;
+    console.log(`oplata hooka: ${ethers.formatEther(amount)} ${isEth ? "ETH" : "tokena"} (ze zdarzenia)`);
+  }
+  void pendingEthBefore;
+  void pendingTokenBefore;
   console.log("swap    ", receiptSummary(swapReceipt));
 
   const settleTx = await hook.settle(token);
   const settleReceipt = (await settleTx.wait())!;
   console.log("settle  ", receiptSummary(settleReceipt));
 
-  const launchClaimableBefore = await pad.claimable(creator);
-  const launchClaimTx = await pad.claim();
-  const launchClaimReceipt = (await launchClaimTx.wait())!;
-  const hookEthClaimableBefore = await hook.claimableEth(creator);
-  const hookTokenClaimableBefore = await hook.claimableToken(token, creator);
-  const hookEthClaimTx = await hook.claimEth();
-  const hookEthClaimReceipt = (await hookEthClaimTx.wait())!;
-  const hookTokenClaimTx = await hook.claimToken(token);
-  const hookTokenClaimReceipt = (await hookTokenClaimTx.wait())!;
-  console.log("claim   ", receiptSummary(launchClaimReceipt));
-  console.log("hook ETH", receiptSummary(hookEthClaimReceipt));
-  console.log("hook TOK", receiptSummary(hookTokenClaimReceipt));
+  // Tak samo jak przy hooku: odbieramy tylko wtedy, gdy JEST co odebrac.
+  // Wyplata to pull, wiec po pierwszym odbiorze saldo jest zerowe i `claim`
+  // rewertuje `NothingToClaim`. Przy wznawianym przebiegu to normalny stan,
+  // a nie awaria.
+  const launchClaimableBefore = (await pad.claimable(creator)) as bigint;
+  let launchClaimReceipt = null;
+  if (launchClaimableBefore > 0n) {
+    launchClaimReceipt = (await (await pad.claim()).wait())!;
+  }
+  // ODBIERAMY TYLKO TO, CO NAPRAWDE JEST.
+  //
+  // Hook zbiera oplate w walucie NIEPODANEJ w wymianie, wiec po wymianie
+  // ETH->token ma tokeny i ZERO ETH. `claimEth` rewertuje wtedy `NothingToClaim`
+  // - i slusznie, bo odbieranie zera nie jest operacja. Skrypt wolal obie
+  // wyplaty bezwarunkowo i wywracal caly przebieg na ostatnim kroku, mimo ze
+  // wszystko wczesniej przeszlo.
+  const hookEthClaimableBefore = (await hook.claimableEth(creator)) as bigint;
+  const hookTokenClaimableBefore = (await hook.claimableToken(token, creator)) as bigint;
+
+  let hookEthClaimReceipt = null;
+  if (hookEthClaimableBefore > 0n) {
+    hookEthClaimReceipt = (await (await hook.claimEth()).wait())!;
+  }
+  let hookTokenClaimReceipt = null;
+  if (hookTokenClaimableBefore > 0n) {
+    hookTokenClaimReceipt = (await (await hook.claimToken(token)).wait())!;
+  }
+
+  console.log(
+    "claim   ",
+    launchClaimReceipt
+      ? `${receiptSummary(launchClaimReceipt)} | odebrano ${ethers.formatEther(launchClaimableBefore)} ETH`
+      : "(zero do odebrania - juz wyplacone)"
+  );
+  console.log(
+    "hook ETH",
+    hookEthClaimReceipt ? receiptSummary(hookEthClaimReceipt) : "(zero do odebrania - wymiana szla ETH->token)"
+  );
+  console.log(
+    "hook TOK",
+    hookTokenClaimReceipt
+      ? `${receiptSummary(hookTokenClaimReceipt)} | odebrano ${ethers.formatEther(hookTokenClaimableBefore)} tokena`
+      : "(zero do odebrania)"
+  );
 
   const out = {
     network: "base-sepolia",
@@ -258,21 +311,22 @@ async function main() {
     creator,
     token,
     buyEth: buyEth.toString(),
-    quoteTokensOut: quote[0].toString(),
-    quoteFee: quote[1].toString(),
-    quoteRefund: quote[2].toString(),
-    launch: receiptSummary(launchReceipt),
-    buy: receiptSummary(buyReceipt),
-    graduate: receiptSummary(graduateReceipt),
+    resumed: Boolean(resumeToken),
+    quoteTokensOut: quote ? quote[0].toString() : null,
+    quoteFee: quote ? quote[1].toString() : null,
+    quoteRefund: quote ? quote[2].toString() : null,
+    launch: launchReceipt ? receiptSummary(launchReceipt) : null,
+    buy: buyReceipt ? receiptSummary(buyReceipt) : null,
+    graduate: graduateReceipt ? receiptSummary(graduateReceipt) : null,
     probeDeployGas: probeDeploy?.gasUsed.toString() ?? null,
     swap: receiptSummary(swapReceipt),
     settle: receiptSummary(settleReceipt),
     launchClaimableBefore: launchClaimableBefore.toString(),
-    launchClaim: receiptSummary(launchClaimReceipt),
+    launchClaim: launchClaimReceipt ? receiptSummary(launchClaimReceipt) : null,
     hookEthClaimableBefore: hookEthClaimableBefore.toString(),
     hookTokenClaimableBefore: hookTokenClaimableBefore.toString(),
-    hookEthClaim: receiptSummary(hookEthClaimReceipt),
-    hookTokenClaim: receiptSummary(hookTokenClaimReceipt),
+    hookEthClaim: hookEthClaimReceipt ? receiptSummary(hookEthClaimReceipt) : null,
+    hookTokenClaim: hookTokenClaimReceipt ? receiptSummary(hookTokenClaimReceipt) : null,
     completedAt: new Date().toISOString(),
   };
   const outDir = path.join(process.cwd(), "scripts", "output");

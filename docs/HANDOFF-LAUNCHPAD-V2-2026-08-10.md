@@ -535,6 +535,51 @@ AUTH_SESSION_SECRET                          bez niego nie ma sesji SIWE, wiec
                                              nie da sie zapisac profilu
 ```
 
+## WYKONANE: pelna sciezka na Base Sepolia, 2026-08-10
+
+Wdrozenie `0x0712b9EA9bB0118f4F751Cb44553F095bF9c0844`, token
+`0xb200000000000000000000d919186714B418acff`.
+
+| etap | dowod z lancucha |
+| --- | --- |
+| start | blok 45299510, `fee 100bps / tworca 60bps` |
+| kupno 3.05 ETH | blok 45299663, rezerwa **3.0 ETH**, zwrot **0.02**, oplata **0.03** |
+| zamkniecie krzywej | blok 45299663, `tokenReserve` == `T_MIN` co do jednostki |
+| graduacja | stan `3`, pula v4 z plynnoscia `21251635231200453637758` |
+| pula | `currency0` = ETH, `currency1` = token, **hook `0xad5f...2044` w kluczu** |
+| swap na PRAWDZIWYM v4 | hook pobral **529.01 tokena** (ze zdarzenia `HookFeeTaken`) |
+| settle | blok 45300005 |
+| claim | tworca odebral **3713.23 tokena** z oplat puli |
+
+NAJWAZNIEJSZE: swap poszedl przez prawdziwy `PoolManager` v4 na Sepolii i hook
+wzial swoja czesc. Testy jednostkowe tego NIE MOGLY dowiesc - `MockPoolManager`
+nie odwzorowuje ksiegowosci delt per adres, co jest napisane wprost w naglowku
+`B20LaunchHook.test.ts`. Znak delty i rozliczenie sa potwierdzone na zywym
+Uniswapie.
+
+### Cztery bledy w skrypcie flow, wszystkie tej samej rodziny
+
+Kontrakty przeszly bez jednej poprawki. Cztery razy wywrocil sie SKRYPT i za
+kazdym razem z tego samego powodu: **czytal stan zaraz po transakcji**.
+
+1. `startedAt` z `launchOf` zamiast ze zdarzenia. `launchOf` NIE REWERTUJE dla
+   nieznanego tokena - oddaje same zera. Na wezle bez swiezego bloku dawalo to
+   `startedAt = 0`, wiec okno startowe "konczylo sie" w 1970 roku i skrypt
+   kupowal w SRODKU okna, gdzie obowiazuje `WINDOW_ADDR_CAP`.
+2. Sprawdzenie stanu po kupnie. Kupno przeszlo (rezerwa 3.0 ETH), a skrypt
+   oglosil porazke i przerwal przebieg PO wydaniu 3 ETH.
+3. Sprawdzanie `pendingEth` po swapie ETH->token. Hook bierze oplate z waluty
+   NIEPODANEJ, czyli z TOKENA - `pendingEth` slusznie zostaje zerem.
+4. Bezwarunkowe `claimEth()` i `claim()`. Wyplata jest pullem, wiec po
+   odebraniu saldo jest zerowe i kolejne wywolanie rewertuje `NothingToClaim`.
+
+Wniosek na przyszlosc: po transakcji czytaj ZDARZENIE Z PARAGONU, a nie stan
+przez RPC. `retryRead` tu nie pomaga, bo nie ma wyjatku do zlapania - wezel
+odpowiada "poprawnie", tylko nieprawde.
+
+Skrypt ma teraz `FLOW_TOKEN`, ktory pozwala wejsc od srodka - bez tego kazda
+poprawka kosztowalaby kolejne 3 ETH.
+
 ### Plan na jutrzejszy test na Sepolii
 
 1. Wdrozyc nowa wersje (`npm run launchpad:deploy:sepolia`) - dopiero ona ma
