@@ -1,5 +1,7 @@
 import { ethers, network } from "hardhat";
 import { getAddress } from "ethers";
+import { mkdirSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
 import { buildPlan, readCommonEnv, resolvePoolManager, HOOK_ALL_MASK, HOOK_REQUIRED_FLAGS } from "./plan";
 
 /**
@@ -171,6 +173,10 @@ async function main() {
   );
   await launchpad.waitForDeployment();
   const launchpadAddress = getAddress(await launchpad.getAddress());
+  // BLOK WDROZENIA. Bez niego front skanuje zdarzenia od bloku POPRZEDNIEGO
+  // wdrozenia i pokazuje pustke albo cudze tokeny - a to nie daje bledu, tylko
+  // wyglada jak "nikt jeszcze nic nie wystartowal".
+  const deployBlock = (await launchpad.deploymentTransaction()?.wait())?.blockNumber ?? 0;
   await retryRpc("launchpad code", async () => {
     const code = await ethers.provider.getCode(launchpadAddress);
     if (code === "0x") throw new Error(`Brak kodu launchpada pod ${launchpadAddress}`);
@@ -237,11 +243,50 @@ async function main() {
       creatorFeeBps: creatorFeeBps.toString(),
       protocolShareBps: protocolShareBps.toString(),
       feeRecipient,
+      deployBlock,
       deployedAt: new Date().toISOString(),
     },
     null,
     2
   ));
+
+  // ZAPIS DO PLIKU, A NIE TYLKO NA EKRAN.
+  //
+  // Pierwsza wersja tego skryptu wypisywala JSON wylacznie na konsole, a plik
+  // `scripts/output/launchpad-base-sepolia.json` byl uzupelniany RECZNIE. Po
+  // drugim wdrozeniu na dysku zostaly wiec STARE adresy, a `launchpad:env`
+  // czyta wlasnie ten plik - czyli wpisalby do frontu poprzedni launchpad.
+  // Blad byl cichy w kazdym miejscu: deploy sie udal, plik istnial, adresy
+  // wygladaly poprawnie i wskazywaly na dzialajacy kontrakt. Tyle ze nie ten.
+  const outputPath = join(process.cwd(), "scripts", "output", `launchpad-${network.name}.json`);
+  mkdirSync(dirname(outputPath), { recursive: true });
+  writeFileSync(
+    outputPath,
+    JSON.stringify(
+      {
+        chainId,
+        network: network.name,
+        deployer,
+        poolManager,
+        tokenFactory,
+        launchpad: launchpadAddress,
+        vault: vaultAddress,
+        hook: hookAddress,
+        hookSalt: plan.hookSalt,
+        feeBps: feeBps.toString(),
+        creatorFeeBps: creatorFeeBps.toString(),
+        protocolShareBps: protocolShareBps.toString(),
+        feeRecipient,
+        deployBlock,
+        deployedAt: new Date().toISOString(),
+      },
+      null,
+      2
+    ) + "
+",
+    { encoding: "utf8" }
+  );
+  console.log(`Zapisano ${outputPath}`);
   console.log("");
   console.log("Nastepny krok: `npx hardhat verify --network <siec> <adres> <argumenty>`");
   console.log("Vault i hook powstaly wewnetrznie, wiec weryfikuje sie je osobno,");

@@ -256,7 +256,7 @@ function MiniBars({ token, green = false }: { token: LaunchpadToken; green?: boo
   );
 }
 
-type ActivityItem = { id: string; symbol: string; accent: string; label: string; tone: 'launch' | 'buy' | 'sell' };
+type ActivityItem = { id: string; symbol: string; accent: string; label: string; tone: 'launch' | 'buy' | 'sell' | 'graduate' };
 
 function ActivityTicker({ events }: { events: ActivityItem[] }) {
   const items = [...events, ...events].slice(0, 16);
@@ -268,7 +268,7 @@ function ActivityTicker({ events }: { events: ActivityItem[] }) {
             <span className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-extrabold text-white" style={{ backgroundColor: event.accent }}>{event.symbol.slice(0, 1)}</span>
             <span className="pr-1 text-left leading-tight">
               <span className="block text-[10px] font-bold text-[#16141b]">{event.symbol}</span>
-              <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-[#a34b08]' : event.tone === 'buy' ? 'text-[#0b9a51]' : 'text-[#5f4ec2]'}`}>{event.label}</span>
+              <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-[#a34b08]' : event.tone === 'buy' ? 'text-[#0b9a51]' : event.tone === 'graduate' ? 'text-[#0b7a41]' : 'text-[#5f4ec2]'}`}>{event.label}</span>
             </span>
           </div>
         )) : <span className="px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-black/35">Listening for live Launchpad events...</span>}
@@ -718,6 +718,28 @@ export default function LaunchpadBoard() {
               const withoutPreview = current.filter((existing) => existing.live);
               return [row, ...withoutPreview];
             });
+            continue;
+          }
+
+          if (eventName === 'CurveLocked' || eventName === 'Graduated') {
+            const graduated = eventName === 'Graduated';
+            fresh.push({
+              id,
+              symbol: shortAddress(token),
+              accent: accentFor(token),
+              label: graduated ? 'Graduated' : 'Curve closed',
+              tone: 'graduate',
+            });
+            // Stan tokena zmienia sie TU, a nie przy nastepnym przeladowaniu
+            // tablicy. Bez tego wiersz nadal zapraszal do kupna, ktore juz
+            // rewertuje.
+            setTokens((current) =>
+              current.map((row) =>
+                row.address?.toLowerCase() === token.toLowerCase()
+                  ? { ...row, state: graduated ? 'Graduated' : 'Locked' }
+                  : row
+              )
+            );
             continue;
           }
 
