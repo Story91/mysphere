@@ -343,11 +343,17 @@ export default function TradePanel({
     }
   };
 
-  const setMaxBuy = () => {
-    if (ethBalance === null) return;
-    const max = ethBalance > GAS_HEADROOM_WEI ? ethBalance - GAS_HEADROOM_WEI : 0n;
-    setBuyAmount(formatEther(max));
+  // Wspolne wydawalne ETH: saldo minus zapas na gaz. Bez zapasu "Max" = calosc
+  // i transakcji brakuje na oplate gazu.
+  const spendableEth = () =>
+    ethBalance === null ? null : ethBalance > GAS_HEADROOM_WEI ? ethBalance - GAS_HEADROOM_WEI : 0n;
+
+  const setBuyPct = (pct: bigint) => {
+    const max = spendableEth();
+    if (max === null) return;
+    setBuyAmount(formatEther((max * pct) / 100n));
   };
+  const setMaxBuy = () => setBuyPct(100n);
 
   const setSellPct = (pct: bigint) => {
     setSellAmount(formatUnits((core.balance * pct) / 100n, decimals));
@@ -437,9 +443,9 @@ export default function TradePanel({
                 <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-black/40">ETH</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {['0.01', '0.05', '0.1'].map((amount) => (
-                  <button key={amount} type="button" onClick={() => setBuyAmount(amount)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary">
-                    {amount} ETH
+                {([25n, 50n, 100n] as const).map((pct) => (
+                  <button key={String(pct)} type="button" onClick={() => setBuyPct(pct)} disabled={ethBalance === null} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">
+                    {String(pct)}%
                   </button>
                 ))}
                 <button type="button" onClick={setMaxBuy} disabled={ethBalance === null} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">
@@ -487,11 +493,14 @@ export default function TradePanel({
                 <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 max-w-[64px] truncate text-[11px] font-extrabold text-black/40">{core.symbol}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {([25n, 50n, 75n, 100n] as const).map((pct) => (
+                {([25n, 50n, 100n] as const).map((pct) => (
                   <button key={String(pct)} type="button" onClick={() => setSellPct(pct)} disabled={core.balance === 0n} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">
                     {String(pct)}%
                   </button>
                 ))}
+                <button type="button" onClick={() => setSellPct(100n)} disabled={core.balance === 0n} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">
+                  Max
+                </button>
               </div>
               <div className="mt-3 space-y-1 rounded-xl bg-[#f8f7fc] p-3 text-[11px]">
                 <div className="flex items-center justify-between">
