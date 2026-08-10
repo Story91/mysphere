@@ -63,10 +63,10 @@ export async function GET(
   try {
     const upstream = await fetch(forward.toString(), {
       headers: { accept: 'application/json' },
-      // Liczniki (posiadacze, transfery) nie zmieniaja sie co sekunde. 5 min
-      // cache tnie zuzycie kredytow do minimum i chroni limit 15 req/s -
-      // wielu uzytkownikow ogladajacych ten sam token to JEDNO zapytanie na 5 min.
-      next: { revalidate: 300 },
+      // Liczniki (posiadacze, transfery) nie zmieniaja sie co sekunde. 60 s
+      // cache tnie zuzycie kredytow i chroni limit 15 req/s przy wielu kartach,
+      // a dane sa wciaz swieze.
+      next: { revalidate: 60 },
     });
 
     const body = await upstream.text();
@@ -78,7 +78,7 @@ export async function GET(
       headers: {
         'content-type': upstream.headers.get('content-type') ?? 'application/json',
         'cache-control': ok
-          ? 'public, max-age=120, stale-while-revalidate=300'
+          ? 'public, max-age=30, stale-while-revalidate=60'
           : 'no-store',
       },
     });
