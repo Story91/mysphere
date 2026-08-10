@@ -162,11 +162,14 @@ contract CurveLaunchpad {
      * tego w kodzie, a nie w interfejsie, jest jedyna wersja, ktora naprawde
      * obowiazuje: formularz da sie ominac, wywolujac kontrakt bezposrednio.
      *
-     * 6000 znaczy podzial 60/40 - tworca do 60% oplaty, protokol zawsze co
-     * najmniej 40%. Ten stosunek trzyma sie przy KAZDEJ oplacie: przy 1% to
-     * 0.6% dla tworcy i 0.4% dla nas, przy 5% odpowiednio 3% i 2%.
+     * 7000 znaczy podzial 70/30 - tworca do 70% oplaty, protokol zawsze co
+     * najmniej 30%. Ten stosunek trzyma sie przy KAZDEJ oplacie: przy 1% to
+     * 0.7% dla tworcy i 0.3% dla nas. Ta sama proporcja co PONS i ta sama
+     * liczba, co udzial tworcy w oplatach puli po graduacji
+     * (PROTOCOL_SHARE_BPS=3000 przy wdrozeniu) - jedna zasada w calym
+     * launchpadzie: tworca do 70%, wszedzie.
      */
-    uint16 public constant MAX_CREATOR_SHARE_BPS = 6000;
+    uint16 public constant MAX_CREATOR_SHARE_BPS = 7000;
 
     uint8 public constant MAX_FEE_RECIPIENTS = 8;
     uint16 public constant MAX_BUYBACK_BPS = 10_000;

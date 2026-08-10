@@ -21,8 +21,8 @@ const { deployLaunchpad } = require('./helpers/deployLaunchpad');
  *   launchAdvanced (2 odbiorcow, buyback 10%, metadata)
  *     -> kupno domykajace krzywa -> Locked
  *     -> graduate -> pula v4 z naszym hookiem
- *     -> wymiana w puli -> hook bierze oplate i odklada czesc na buyback
- *     -> settle -> claim (krzywa, hook)
+ *     -> wymiana w puli -> hook bierze oplate w calosci
+ *     -> settle -> podzial, ciecie buybacku z dzialki tworcy -> claim (krzywa, hook)
  *     -> executeBuyback -> tokeny spalone na 0x...dEaD
  *
  * ===========================================================================
@@ -38,7 +38,7 @@ const POOL_MANAGER = '0x498581fF718922c3f8e6A244956aF099B2652b2b';
 const DEAD = '0x000000000000000000000000000000000000dEaD';
 
 const FEE_BPS = 100n;
-const CREATOR_FEE_BPS = 60n;
+const CREATOR_FEE_BPS = 70n;
 const PROTOCOL_SHARE_BPS = 6000n;
 const HOOK_FEE_BPS = 100n;
 const BUYBACK_BPS = 1000n;
@@ -96,7 +96,7 @@ describe('Launchpad od konca do konca', function () {
 
     // ---- 1. START z pelna konfiguracja tworcy -------------------------------
     // Dwaj odbiorcy oplat: tworca 70%, partner 30%. Udzial tworcy w samej
-    // oplacie to 60 ze 100 bps, czyli gorna granica dozwolona przez kontrakt.
+    // oplacie to 70 ze 100 bps, czyli gorna granica dozwolona przez kontrakt.
     const launchRc = await (
       await pad
         .connect(creator)
@@ -145,7 +145,7 @@ describe('Launchpad od konca do konca', function () {
 
     expect((await pad.launchOf(token))[1], 'krzywa zamknieta').to.equal(2);
 
-    // Oplata z krzywej dzieli sie 60/40 miedzy tworce i protokol, a czesc
+    // Oplata z krzywej dzieli sie 70/30 miedzy tworce i protokol, a czesc
     // tworcy - 70/30 miedzy jego dwoch odbiorcow. To jest to samo `_accrueFee`,
     // ale sprawdzone na koncu lancucha, a nie w izolacji.
     const doTworcow = (curveFee * CREATOR_FEE_BPS) / FEE_BPS;
@@ -172,15 +172,23 @@ describe('Launchpad od konca do konca', function () {
     await probe.doSwap(plain(key), [false, -ethers.parseEther('1000'), 0n], {});
 
     const hookFee = (outEth * HOOK_FEE_BPS + 9_999n) / 10_000n;
-    const naBuyback = (hookFee * BUYBACK_BPS) / 10_000n;
-    expect(await hook.pendingBuybackEth(token), 'czesc oplaty odlozona na buyback').to.equal(naBuyback);
-    expect(await hook.pendingEth(token), 'reszta czeka na podzial').to.equal(hookFee - naBuyback);
+    // Buyback nie jest juz scinany przy swapie - po wymianie CALA oplata ETH
+    // czeka nierozdzielona, a ciecie na skup powstaje dopiero w settle.
+    expect(await hook.pendingEth(token), 'cala oplata czeka na podzial').to.equal(hookFee);
+    expect(await hook.pendingBuybackEth(token), 'buyback dopiero po settle').to.equal(0n);
 
     // ---- 5. SETTLE: podzial oplaty z puli ----------------------------------
-    await hook.connect(bob).settle(token);
-    const doProtokolu = ((hookFee - naBuyback) * PROTOCOL_SHARE_BPS) / 10_000n;
+    // Protokol bierze pelny udzial od calej oplaty; buyback wychodzi
+    // WYLACZNIE z dzialki tworcy, wiec jego decyzja nie scina protokolu.
+    const doProtokolu = (hookFee * PROTOCOL_SHARE_BPS) / 10_000n;
+    const dzialkaTworcy = hookFee - doProtokolu;
+    const naBuyback = (dzialkaTworcy * BUYBACK_BPS) / 10_000n;
+    await expect(hook.connect(bob).settle(token))
+      .to.emit(hook, 'HookFeeSettled')
+      .withArgs(token, doProtokolu, dzialkaTworcy - naBuyback, naBuyback, 0n, 0n);
     expect(await hook.claimableEth(treasury.address)).to.equal(doProtokolu);
-    expect(await hook.claimableEth(creator.address)).to.equal(hookFee - naBuyback - doProtokolu);
+    expect(await hook.claimableEth(creator.address)).to.equal(dzialkaTworcy - naBuyback);
+    expect(await hook.pendingBuybackEth(token), 'ciecie z dzialki tworcy odlozone na skup').to.equal(naBuyback);
 
     // ---- 6. WYPLATY: kazdy odbiera swoje -----------------------------------
     const partnerEthPrzed: bigint = await ethers.provider.getBalance(partner.address);

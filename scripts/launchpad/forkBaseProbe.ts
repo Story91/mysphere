@@ -19,9 +19,11 @@ const BASE_CHAIN_ID = 8453;
 const POOL_MANAGER = KNOWN_POOL_MANAGERS[BASE_CHAIN_ID];
 const B20_FACTORY = "0xB20f000000000000000000000000000000000000";
 
+// Parametry PRODUKCYJNE z wdrozenia 2026-08-10 (70% tworca, jak PONS) -
+// sonda ma cwiczyc dokladnie te liczby, ktore pojda na mainnet.
 const FEE_BPS = 100n;
-const CREATOR_FEE_BPS = 40n;
-const PROTOCOL_SHARE_BPS = 6000n;
+const CREATOR_FEE_BPS = 70n;
+const PROTOCOL_SHARE_BPS = 3000n;
 const WINDOW = 300;
 
 const MIN_SQRT_PRICE_PLUS_ONE = 4_295_128_740n;

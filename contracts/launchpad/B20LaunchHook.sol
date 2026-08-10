@@ -227,7 +227,7 @@ contract B20LaunchHook {
 
     event PoolOpened(address indexed token, bytes32 indexed poolId, uint24 fee, int24 tickSpacing);
     event HookFeeTaken(address indexed token, bool indexed isEth, uint256 amount);
-    event HookFeeSettled(address indexed token, uint256 ethToProtocol, uint256 ethToCreator, uint256 tokenToProtocol, uint256 tokenToCreator);
+    event HookFeeSettled(address indexed token, uint256 ethToProtocol, uint256 ethToCreator, uint256 ethToBuyback, uint256 tokenToProtocol, uint256 tokenToCreator);
     event Claimed(address indexed account, address indexed token, uint256 amount, address indexed caller);
     event BuybackConfigured(address indexed token, uint16 buybackBps);
     event AutoBuyback(address indexed token, uint256 ethIn, uint256 tokensBought, address indexed caller);
@@ -469,14 +469,16 @@ contract B20LaunchHook {
         address currency = unspecifiedIsCurrency1 ? token : address(0);
         IPoolManagerV4(POOL_MANAGER).take(currency, address(this), fee);
 
-        uint256 buybackCut = !unspecifiedIsCurrency1
-            ? FullMath.mulDivDown(fee, buybackBps[token], 10_000)
-            : 0;
+        // Buyback NIE jest odejmowany tutaj. Kiedys byl - scinany z CALEJ
+        // oplaty przed podzialem, czyli w wiekszosci z pieniedzy protokolu:
+        // tworca ustawiajac 10_000 bps zerowal przychod protokolu z puli.
+        // Od 2026-08-10 buyback jest finansowany WYLACZNIE z dzialki tworcy
+        // i liczony w `settle` - dzieki temu sciezka wymiany ma jeden zapis
+        // do pamieci, a udzial protokolu nie zalezy od decyzji tworcy.
         if (unspecifiedIsCurrency1) {
             pendingToken[token] += fee;
         } else {
-            pendingEth[token] += fee - buybackCut;
-            pendingBuybackEth[token] += buybackCut;
+            pendingEth[token] += fee;
         }
         emit HookFeeTaken(token, !unspecifiedIsCurrency1, fee);
 
@@ -580,15 +582,25 @@ contract B20LaunchHook {
         // do zebranej kwoty co do wei, a pyl z dzielenia trafia do tworcy.
         uint256 protoEth = FullMath.mulDivDown(eth, PROTOCOL_SHARE_BPS, 10_000);
         uint256 protoTok = FullMath.mulDivDown(tok, PROTOCOL_SHARE_BPS, 10_000);
-        uint256 creatorEth = eth - protoEth;
         uint256 creatorTok = tok - protoTok;
+
+        // Buyback wychodzi WYLACZNIE z dzialki tworcy, po odjeciu udzialu
+        // protokolu. `buybackBps` znaczy wiec "ile procent SWOJEJ czesci oplat
+        // tworca oddaje na skup i spalenie" - jak suwak we Flaunch. Protokol
+        // dostaje pelne PROTOCOL_SHARE_BPS niezaleznie od tej decyzji.
+        // Tylko noga ETH: skup placi ETH, wiec z oplat tokenowych nie ma czego
+        // finansowac.
+        uint256 creatorGrossEth = eth - protoEth;
+        uint256 buybackCut = FullMath.mulDivDown(creatorGrossEth, buybackBps[token], 10_000);
+        uint256 creatorEth = creatorGrossEth - buybackCut;
+        if (buybackCut != 0) pendingBuybackEth[token] += buybackCut;
 
         if (protoEth != 0) claimableEth[FEE_RECIPIENT] += protoEth;
         if (creatorEth != 0) claimableEth[creator] += creatorEth;
         if (protoTok != 0) claimableToken[token][FEE_RECIPIENT] += protoTok;
         if (creatorTok != 0) claimableToken[token][creator] += creatorTok;
 
-        emit HookFeeSettled(token, protoEth, creatorEth, protoTok, creatorTok);
+        emit HookFeeSettled(token, protoEth, creatorEth, buybackCut, protoTok, creatorTok);
     }
 
     function claimEth() external {
