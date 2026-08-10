@@ -21,6 +21,7 @@ import {
   LAUNCH_HOOK_ADDRESS,
   LAUNCHPAD_ADDRESS,
   LAUNCHPAD_CHAIN,
+  LAUNCHPAD_EXPLORER_URL,
   LAUNCH_STATE,
   launchpadAbi,
   LIQUIDITY_VAULT_ADDRESS,
@@ -48,7 +49,7 @@ import {
 } from './detailShared';
 import { useTokenHistory, type LiveLaunchpadLog } from './useTokenHistory';
 
-const EXPLORER = LAUNCHPAD_CHAIN.blockExplorers.default.url;
+const EXPLORER = LAUNCHPAD_EXPLORER_URL;
 
 /**
  * Strona tokena sklada sie z trzech NIEZALEZNYCH strumieni danych:
@@ -294,7 +295,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
 
         {coreLoading && !core && (
           <div className="mt-5 flex items-center gap-2 rounded-[20px] border border-black/10 bg-white p-5 text-[12px] text-black/55">
-            <RefreshCw className="h-4 w-4 animate-spin text-soft-primary" aria-hidden="true" /> Reading token state from Base Sepolia...
+            <RefreshCw className="h-4 w-4 animate-spin text-soft-primary" aria-hidden="true" /> Reading token state from {LAUNCHPAD_CHAIN.name}...
           </div>
         )}
         {coreError && (
@@ -526,7 +527,7 @@ function TokenNotFound({ address }: { address: string }) {
         <h1 className="mt-4 font-soft-display text-[24px] font-extrabold text-[#16141b]">Token not found</h1>
         <p className="mt-2 text-[13px] leading-[1.6] text-black/55">
           {isAddressParam(address)
-            ? 'This address is not a token launched on the MySphere launchpad on Base Sepolia.'
+            ? `This address is not a token launched on the MySphere launchpad on ${LAUNCHPAD_CHAIN.name}.`
             : 'This link does not contain a valid token address.'}
         </p>
         <Link href="/startpad" className="mt-5 inline-flex items-center gap-2 rounded-full bg-soft-primary px-5 py-2.5 text-[13px] font-extrabold text-white">

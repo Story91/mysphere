@@ -3,7 +3,7 @@ import LaunchpadBoard from './LaunchpadBoard';
 
 export const metadata: Metadata = {
   title: 'Startpad',
-  description: 'Explore token launches and buy on the Base Sepolia curve.',
+  description: 'Explore token launches and buy on the bonding curve.',
 };
 
 export default function LaunchpadPage() {

@@ -26,6 +26,7 @@ import {
 import { formatEther, formatUnits, getAbiItem, maxUint256, parseEther, parseUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
+  ACTIVE_LAUNCHPAD_NETWORK,
   CURVE_TARGET_ETH,
   erc20Abi,
   hookAbi,
@@ -33,11 +34,13 @@ import {
   LAUNCHPAD_ADDRESS,
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_DEPLOY_BLOCK,
+  LAUNCHPAD_NETWORKS,
   LAUNCH_STATE,
   LIQUIDITY_VAULT_ADDRESS,
   launchpadAbi,
   liquidityVaultAbi,
   previewTokens,
+  setLaunchpadChain,
   type LaunchpadToken,
 } from './config';
 import { pickTokenImage } from './metadata';
@@ -61,6 +64,42 @@ function toWei(value: string): bigint | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Etykieta aktywnej sieci. SSR zawsze renderuje siec domyslna (modul nie widzi
+ * localStorage), wiec kazde miejsce, ktore ja POKAZUJE, dostaje
+ * `suppressHydrationWarning` - po stronie klienta etykieta moze byc inna
+ * i to jest oczekiwane, a nie blad hydratacji.
+ */
+const NET = ACTIVE_LAUNCHPAD_NETWORK.label;
+
+/**
+ * Przelacznik sieci. Zmiana przeladowuje strone (patrz `setLaunchpadChain`) -
+ * stan handlu nie ma prawa przezyc zmiany adresow, na ktore patrzy.
+ * Do hydratacji renderujemy sam napis; select wchodzi po montazu, zeby
+ * kontrolowana wartosc nie klocila sie z HTML-em z serwera.
+ */
+function NetworkSwitch() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) {
+    return <span className="text-[11px] font-bold text-black/40">{NET}</span>;
+  }
+  return (
+    <select
+      value={ACTIVE_LAUNCHPAD_NETWORK.chain.id}
+      onChange={(event) => setLaunchpadChain(Number(event.target.value))}
+      aria-label="Launchpad network"
+      className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-extrabold text-[#16141b] outline-none transition-colors hover:border-soft-primary"
+    >
+      {Object.values(LAUNCHPAD_NETWORKS).map((net) => (
+        <option key={net.chain.id} value={net.chain.id}>
+          {net.label}{net.testnet ? ' (testnet)' : ''}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 type BoardTab = 'new' | 'trending' | 'about' | 'graduated' | 'all';
@@ -512,7 +551,7 @@ function BoardStats({ totalRaised, totalVolume, totalTrades, liveCount, ethUsd }
     <section className="rounded-[20px] border border-black/10 bg-white p-5">
       <div className="flex items-center justify-between">
         <h2 className="text-[16px] font-extrabold text-[#16141b]">Board stats</h2>
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/35">Base Sepolia</span>
+        <span suppressHydrationWarning className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/35">{NET}</span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         {rows.map((row) => (
@@ -1668,7 +1707,7 @@ export default function LaunchpadBoard() {
       await switchChainAsync({ chainId: LAUNCHPAD_CHAIN.id });
       return true;
     } catch {
-      setNotice({ kind: 'error', text: 'Switch to Base Sepolia was cancelled. Nothing was sent.' });
+      setNotice({ kind: 'error', text: `Switch to ${NET} was cancelled. Nothing was sent.` });
       return false;
     }
   };
@@ -1948,7 +1987,7 @@ export default function LaunchpadBoard() {
         </div>
 
         {notice && <div className={`mb-4 flex items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] ${notice.kind === 'success' ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]' : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span>{notice.text}</span></div>}
-        {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[11.5px] text-black/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-[#c76b12]'}`} aria-hidden="true" /><span>{loadingBoard ? 'Reading Launchpad activity from Base Sepolia...' : `Live data unavailable. ${boardError}`}</span></div>}
+        {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[11.5px] text-black/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-[#c76b12]'}`} aria-hidden="true" /><span suppressHydrationWarning>{loadingBoard ? `Reading Launchpad activity from ${NET}...` : `Live data unavailable. ${boardError}`}</span></div>}
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0">
@@ -1990,12 +2029,12 @@ export default function LaunchpadBoard() {
                   <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`rounded-full border px-4 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>
                 ))}
               </div>
-              <span className="text-[11px] font-bold text-black/40">Base Sepolia</span>
+              <NetworkSwitch />
             </div>
 
             <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market table">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Startpad market</h2><p className="mt-1 text-[11px] text-black/45">{tokens.length === 0 && loadingBoard ? 'reading live launches from Base Sepolia...' : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : 'live event data from Base Sepolia'}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
+                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Startpad market</h2><p suppressHydrationWarning className="mt-1 text-[11px] text-black/45">{tokens.length === 0 && loadingBoard ? `reading live launches from ${NET}...` : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : `live event data from ${NET}`}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
                 <span className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={toggleAnimations} aria-pressed={animationsOn} className={`rounded-full border px-3 py-1.5 text-[11px] font-extrabold transition-colors ${animationsOn ? 'border-soft-primary/40 bg-soft-primary/10 text-soft-primary-deep' : 'border-black/10 bg-white text-black/45'}`}>
                     {animationsOn ? 'Animations on' : 'Animations off'}
@@ -2032,7 +2071,7 @@ export default function LaunchpadBoard() {
               ) : (
                 <div className="overflow-x-auto">
                   <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] gap-4 border-y border-black/10 bg-[#fafafd] px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/45 sm:px-5"><span>Coin</span><span>Curve</span><span>Indexed vol</span><span>Momentum</span><span>Creator</span><span /></div>
-                  {tokens.length === 0 && loadingBoard ? <div className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from Base Sepolia...</div> : visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
+                  {tokens.length === 0 && loadingBoard ? <div suppressHydrationWarning className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from {NET}...</div> : visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
                 </div>
               )}
               <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Startpad events and current onchain state.'}</div>

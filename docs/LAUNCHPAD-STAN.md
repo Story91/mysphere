@@ -27,20 +27,36 @@ z Etherscanem jest tam zepsuty, `hardhat verify` nie przechodzi).
 
 | kontrakt | adres |
 | --- | --- |
-| `CurveLaunchpad` | `0x00965D30385984439656479dFeA2Ffef6D17e811` |
-| `LiquidityVault` | `0x57E75E0469daC2B057B1A3E0b2F6B7BeceaFCA24` |
-| `B20LaunchHook` | `0x26e719e74D73E49e29B5860728281d5d08E1A044` |
-| `PlainTokenFactory` | `0x9CB37201E062eD07B1e5A9ec5a0719a87897B184` |
+| `CurveLaunchpad` | `0x712E93401b455d226284BbA873cE13CC1492B22f` |
+| `LiquidityVault` | `0xbeC6D16d93fbD3B5237A1456A4F1434bb3e69913` |
+| `B20LaunchHook` | `0x177be4EF50d92d7B7bf381e078F7c333De5B6044` |
+| `PlainTokenFactory` | `0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A` |
 | PoolManager v4 (Uniswap) | `0x8366a39CC670B4001A1121B8F6A443A643e40951` |
-| blok wdrozenia | `33084370` |
-| `FEE_RECIPIENT` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+| blok wdrozenia | `33102326` |
+| `FEE_RECIPIENT` | `0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83` |
+
+Wdrozenie POPRZEDNIE tego samego dnia (`0x0096...e811`, blok 33084370) jest
+MARTWE: mialo `FEE_RECIPIENT` pod adresem admina zamiast adresu oplat.
+Smoke test v2 prawdziwymi transakcjami: 9/9
+(`scripts/launchpad/robinhoodSmoke.ts`, wynik w
+`scripts/output/launchpad-robinhood-smoke.json`) - launch, kupno, sprzedaz,
+claim, proporcja 70/30 potwierdzona na lancuchu.
 
 Weryfikacja przedwdrozeniowa: fork mainnetu Robinhooda 9/9
 (`npm run launchpad:fork:robinhood`) + proba krzywej prawdziwymi transakcjami
 na Robinhood TESTNET 7/7 (`scripts/launchpad/robinhoodTestnetCurve.ts`;
 testnet nie ma v4, wiec pula byla mockiem - graduacja pokryta forkiem).
-FRONT jeszcze NIE zna tych adresow - Startpad gada tylko z Sepolia;
-podpiecie Robinhooda wg specu frontendu (sufiks `_4663`).
+FRONT ZNA obie sieci: `app/startpad/config.ts` trzyma mape
+`LAUNCHPAD_NETWORKS` (Sepolia = B20, Robinhood = plain ERC-20), wybor sieci
+w localStorage (`startpad.chainId`), przelacznik w naglowku tablicy; zmiana
+sieci przeladowuje strone, zeby zaden stan nie przezyl podmiany adresow.
+Env dla Robinhooda: `NEXT_PUBLIC_LAUNCHPAD_ROBINHOOD_ADDRESS`,
+`NEXT_PUBLIC_LIQUIDITY_VAULT_ROBINHOOD_ADDRESS`,
+`NEXT_PUBLIC_LAUNCH_HOOK_ROBINHOOD_ADDRESS`,
+`NEXT_PUBLIC_TOKEN_FACTORY_ROBINHOOD_ADDRESS`,
+`NEXT_PUBLIC_LAUNCHPAD_ROBINHOOD_DEPLOY_BLOCK`.
+ZNANE OGRANICZENIE: warstwa logo/opisow (Firestore + API) byla pisana pod
+Sepolie - edycje metadanych tokenow z Robinhooda trzeba przejrzec osobno.
 
 Nowosc v3: **sniper protection jest WYLACZALNA** - `launchAdvanced` przyjmuje
 `windowCap_` do pelnego `T0`; ustawienie >= podazy krzywej znaczy "ochrona

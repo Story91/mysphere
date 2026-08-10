@@ -13,6 +13,7 @@ import {
   LAUNCH_HOOK_ADDRESS,
   LAUNCHPAD_ADDRESS,
   LAUNCHPAD_CHAIN,
+  LAUNCHPAD_EXPLORER_URL,
   LIQUIDITY_VAULT_ADDRESS,
 } from '../config';
 import { resizeImageFile } from '../logoUpload';
@@ -37,7 +38,7 @@ import {
 const FIELD =
   'w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 text-[14px] text-[#16141b] outline-none placeholder:text-black/35 focus:border-soft-primary';
 
-const EXPLORER = LAUNCHPAD_CHAIN.blockExplorers.default.url;
+const EXPLORER = LAUNCHPAD_EXPLORER_URL;
 
 type Tab = 'trades' | 'holders' | 'info';
 

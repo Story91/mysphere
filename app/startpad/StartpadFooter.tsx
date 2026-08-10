@@ -1,10 +1,13 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import {
+  ACTIVE_LAUNCHPAD_NETWORK,
   B20_PRECOMPILE_ADDRESS,
-  B20_TOKEN_FACTORY_ADDRESS,
-  LAUNCH_HOOK_ADDRESS,
-  LAUNCHPAD_ADDRESS,
-  LIQUIDITY_VAULT_ADDRESS,
+  DEFAULT_LAUNCHPAD_CHAIN_ID,
+  LAUNCHPAD_NETWORKS,
+  type LaunchpadNetwork,
 } from './config';
 
 /**
@@ -19,8 +22,6 @@ import {
  * (details/summary zamiast wlasnego akordeonu), wiec nie dorzuca ani jednego
  * hooka do i tak ciezkiego LaunchpadBoard.
  */
-
-const EXPLORER = 'https://sepolia.basescan.org/address/';
 
 function shortAddr(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -68,15 +69,36 @@ function DocSection({ title, children }: { title: string; children: React.ReactN
   );
 }
 
-const CONTRACTS: Array<{ name: string; address: string; role: string; external?: boolean }> = [
-  { name: 'CurveLaunchpad', address: LAUNCHPAD_ADDRESS, role: 'curve math, trading, fees, graduation' },
-  { name: 'LiquidityVault', address: LIQUIDITY_VAULT_ADDRESS, role: 'owns the LP position forever, harvests LP fees' },
-  { name: 'B20LaunchHook', address: LAUNCH_HOOK_ADDRESS, role: '1% swap fee after graduation, buyback accounting' },
-  { name: 'B20TokenFactory', address: B20_TOKEN_FACTORY_ADDRESS, role: 'asks the network to create each token, then verifies it' },
-  { name: 'B20 factory (network precompile)', address: B20_PRECOMPILE_ADDRESS, role: 'built into Base itself — mints the token, enforces the cap', external: true },
-];
+function contractsFor(net: LaunchpadNetwork): Array<{ name: string; address: string; role: string }> {
+  const rows = [
+    { name: 'CurveLaunchpad', address: net.launchpad, role: 'curve math, trading, fees, graduation' },
+    { name: 'LiquidityVault', address: net.vault, role: 'owns the LP position forever, harvests LP fees' },
+    { name: 'B20LaunchHook', address: net.hook, role: '1% swap fee after graduation, buyback accounting' },
+    net.tokenStandard === 'b20'
+      ? { name: 'B20TokenFactory', address: net.tokenFactory, role: 'asks the network to create each token, then verifies it' }
+      : { name: 'PlainTokenFactory', address: net.tokenFactory, role: 'deploys each token (fixed supply, no mint function), then verifies it' },
+  ];
+  if (net.tokenStandard === 'b20') {
+    rows.push({
+      name: 'B20 factory (network precompile)',
+      address: B20_PRECOMPILE_ADDRESS,
+      role: 'built into Base itself — mints the token, enforces the cap',
+    });
+  }
+  return rows;
+}
 
 export default function StartpadFooter() {
+  /**
+   * SSR renderuje siec DOMYSLNA (modul konfiguracyjny nie widzi localStorage
+   * na serwerze), a wlasciwa siec wchodzi po montazu. Bez tego kroku HTML
+   * z serwera i pierwszy render klienta roznilyby sie adresami - i React
+   * zglaszalby blad hydratacji przy kazdym wejsciu z wybranym Robinhoodem.
+   */
+  const [net, setNet] = useState<LaunchpadNetwork>(() => LAUNCHPAD_NETWORKS[DEFAULT_LAUNCHPAD_CHAIN_ID]);
+  useEffect(() => setNet(ACTIVE_LAUNCHPAD_NETWORK), []);
+  const isB20 = net.tokenStandard === 'b20';
+
   return (
     <footer className="mt-10 border-t border-black/10 pb-10 pt-8">
       {/* ===== CO TO JEST - jedno zdanie, zanim pojda szczegoly ===== */}
@@ -85,18 +107,35 @@ export default function StartpadFooter() {
           How Startpad works
         </p>
         <h2 className="mt-1 text-[19px] font-extrabold text-[#16141b]">
-          A launchpad for B20 — tokens made by the Base network itself
+          {isB20
+            ? 'A launchpad for B20 — tokens made by the Base network itself'
+            : `A launchpad on ${net.label} — tokens with no admin and a fixed supply`}
         </h2>
         <p className="mt-2 text-[13px] leading-[1.6] text-black/60">
-          Every token launched here is a <strong className="text-[#16141b]">B20</strong>: it is created
-          by a factory built into the network, born with <strong className="text-[#16141b]">no admin,
-          no pause switch and a supply cap equal to its supply</strong> — so nobody, including us, can
-          ever mint more. The launchpad sells it on a bonding curve, and at exactly{' '}
+          {isB20 ? (
+            <>
+              Every token launched here is a <strong className="text-[#16141b]">B20</strong>: it is
+              created by a factory built into the network, born with{' '}
+              <strong className="text-[#16141b]">
+                no admin, no pause switch and a supply cap equal to its supply
+              </strong>{' '}
+              — so nobody, including us, can ever mint more.
+            </>
+          ) : (
+            <>
+              Every token launched here is a plain ERC-20 deployed by the launchpad&apos;s own
+              factory, born with <strong className="text-[#16141b]">no admin, no pause switch and no
+              mint function at all</strong> — the supply is fixed by the bytecode, so nobody,
+              including us, can ever mint more.
+            </>
+          )}{' '}
+          The launchpad sells it on a bonding curve, and at exactly{' '}
           <strong className="text-[#16141b]">3.00 ETH</strong> raised the token graduates into a
           Uniswap v4 pool whose liquidity is locked forever. No admin keys, no upgrades — every rule
-          below is fixed in immutable contracts, and all payouts are claim-based, in ETH. Startpad is
-          among the first launchpads built on the B20 standard. Currently running on Base Sepolia
-          (testnet).
+          below is fixed in immutable contracts, and all payouts are claim-based, in ETH.
+          {isB20
+            ? ' Startpad is among the first launchpads built on the B20 standard. Currently running on Base Sepolia (testnet).'
+            : ` Running live on ${net.label}.`}
         </p>
       </div>
 
@@ -199,17 +238,17 @@ export default function StartpadFooter() {
           </ul>
         </DocSection>
 
-        <DocSection title="Contracts (Base Sepolia)">
+        <DocSection title={`Contracts (${net.label})`}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[460px] text-left">
               <tbody>
-                {CONTRACTS.map((contract) => (
+                {contractsFor(net).map((contract) => (
                   <tr key={contract.name} className="border-t border-black/5 first:border-t-0">
                     <td className="py-1.5 pr-4 font-bold text-[#16141b]">{contract.name}</td>
                     <td className="py-1.5 pr-4 text-black/55">{contract.role}</td>
                     <td className="py-1.5">
                       <a
-                        href={`${EXPLORER}${contract.address}`}
+                        href={`${net.explorerUrl}/address/${contract.address}`}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 font-mono text-[11.5px] font-bold text-soft-primary-deep hover:text-soft-primary"
@@ -224,15 +263,17 @@ export default function StartpadFooter() {
             </table>
           </div>
           <p className="mt-2 text-[11.5px] text-black/45">
-            The network precompile is not our contract — it is part of Base and the reason a B20 token
-            can make promises its creator cannot break.
+            {isB20
+              ? 'The network precompile is not our contract — it is part of Base and the reason a B20 token can make promises its creator cannot break.'
+              : `${net.label} has no B20 precompile, so here the same promises are kept by bytecode: the token contract simply has no function that could mint, pause or confiscate.`}
           </p>
         </DocSection>
       </div>
 
       <p className="mt-6 text-[11px] text-black/40">
-        Startpad runs on Base Sepolia (testnet) — tokens here have no real value. Nothing on this page
-        is financial advice.
+        {net.testnet
+          ? `Startpad runs on ${net.label} (testnet) — tokens here have no real value. Nothing on this page is financial advice.`
+          : `Startpad runs on ${net.label} — trades here move real ETH. Nothing on this page is financial advice.`}
       </p>
     </footer>
   );

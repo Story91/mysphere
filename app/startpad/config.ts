@@ -1,25 +1,114 @@
 import { baseSepolia } from 'viem/chains';
+import type { Chain } from 'viem';
+import { robinhoodChain } from '../basechat/Robinhood/config/RobinhoodNetworkConfig';
 
-export const LAUNCHPAD_CHAIN = baseSepolia;
-// Domyslne wartosci to wdrozenie v3 z 2026-08-10 (70% tworca / 30% protokol,
-// buyback z dzialki tworcy, sniper cap ustawialny do T0 = wylaczalny) -
-// docs/LAUNCHPAD-STAN.md. Wczesniejsze wdrozenia (0xA760..., 0x0712...,
-// 0x811d...) sa MARTWE: inne ABI albo starszy model. Fallback MUSI nadazac
-// za wdrozeniem - produkcja bez zmiennych srodowiskowych patrzy wlasnie tutaj.
-export const LAUNCHPAD_ADDRESS =
-  (process.env.NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48';
-export const LIQUIDITY_VAULT_ADDRESS =
-  (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0x35B3217b8Ada69103b801FEFe9ca16E307a649B6';
-export const LAUNCH_HOOK_ADDRESS =
-  (process.env.NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0xf2EAEBceeC6Ccc168d8fe5B539F37e2d8c44e044';
-export const B20_TOKEN_FACTORY_ADDRESS =
-  (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F';
-// Precompile B20 wbudowany w siec - ten sam adres na mainnecie i Sepolii.
-// To NIE jest nasz kontrakt, wiec nie ma zmiennej srodowiskowej.
+/**
+ * KONFIGURACJA WIELOSIECIOWA - kazda siec to osobne, pelne wdrozenie.
+ *
+ * Domyslne adresy to AKTUALNE wdrozenia (docs/LAUNCHPAD-STAN.md). Wczesniejsze
+ * (Sepolia: 0xA760..., 0x0712..., 0x811d...; Robinhood: 0x0096...e811 z
+ * odbiorca oplat pod adresem admina) sa MARTWE. Fallback MUSI nadazac za
+ * wdrozeniem - produkcja bez zmiennych srodowiskowych patrzy wlasnie tutaj.
+ *
+ * Wybor sieci zyje w localStorage i jest czytany RAZ, przy ladowaniu modulu.
+ * Zmiana sieci przeladowuje strone (patrz `setLaunchpadChain`) - dzieki temu
+ * KAZDY stan aplikacji rodzi sie juz we wlasciwej sieci i nie istnieje ani
+ * jeden tor, w ktorym polowa odczytow patrzy w stara siec, a polowa w nowa.
+ * Na serwerze (SSR) modul zawsze widzi siec domyslna; jedyne chain-zalezne
+ * elementy renderowane statycznie (stopka) czekaja z adresami na klienta.
+ */
+export type LaunchpadNetwork = {
+  chain: Chain;
+  /** Krotka etykieta do UI. */
+  label: string;
+  testnet: boolean;
+  /** 'b20' = token robi precompile sieci; 'plain' = nasz LaunchToken (ERC-20). */
+  tokenStandard: 'b20' | 'plain';
+  launchpad: `0x${string}`;
+  vault: `0x${string}`;
+  hook: `0x${string}`;
+  tokenFactory: `0x${string}`;
+  deployBlock: bigint;
+  explorerUrl: string;
+};
+
+export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
+  [baseSepolia.id]: {
+    chain: baseSepolia,
+    label: 'Base Sepolia',
+    testnet: true,
+    tokenStandard: 'b20',
+    launchpad:
+      (process.env.NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
+      '0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48',
+    vault:
+      (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
+      '0x35B3217b8Ada69103b801FEFe9ca16E307a649B6',
+    hook:
+      (process.env.NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
+      '0xf2EAEBceeC6Ccc168d8fe5B539F37e2d8c44e044',
+    tokenFactory:
+      (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
+      '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F',
+    deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'),
+    explorerUrl: 'https://sepolia.basescan.org',
+  },
+  [robinhoodChain.id]: {
+    chain: robinhoodChain,
+    label: 'Robinhood Chain',
+    testnet: false,
+    tokenStandard: 'plain',
+    launchpad:
+      (process.env.NEXT_PUBLIC_LAUNCHPAD_ROBINHOOD_ADDRESS as `0x${string}` | undefined) ??
+      '0x712E93401b455d226284BbA873cE13CC1492B22f',
+    vault:
+      (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_ROBINHOOD_ADDRESS as `0x${string}` | undefined) ??
+      '0xbeC6D16d93fbD3B5237A1456A4F1434bb3e69913',
+    hook:
+      (process.env.NEXT_PUBLIC_LAUNCH_HOOK_ROBINHOOD_ADDRESS as `0x${string}` | undefined) ??
+      '0x177be4EF50d92d7B7bf381e078F7c333De5B6044',
+    tokenFactory:
+      (process.env.NEXT_PUBLIC_TOKEN_FACTORY_ROBINHOOD_ADDRESS as `0x${string}` | undefined) ??
+      '0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A',
+    deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ROBINHOOD_DEPLOY_BLOCK ?? '33102326'),
+    explorerUrl: 'https://robinhoodchain.blockscout.com',
+  },
+};
+
+export const DEFAULT_LAUNCHPAD_CHAIN_ID = baseSepolia.id;
+const STORAGE_KEY = 'startpad.chainId';
+
+function resolveActiveNetwork(): LaunchpadNetwork {
+  if (typeof window !== 'undefined') {
+    const stored = Number(window.localStorage.getItem(STORAGE_KEY));
+    if (LAUNCHPAD_NETWORKS[stored]) return LAUNCHPAD_NETWORKS[stored];
+  }
+  return LAUNCHPAD_NETWORKS[DEFAULT_LAUNCHPAD_CHAIN_ID];
+}
+
+export const ACTIVE_LAUNCHPAD_NETWORK = resolveActiveNetwork();
+
+/**
+ * Zmiana sieci = zapis + PRZELADOWANIE. Celowo nie ma tu setState: stale
+ * modulu (adresy, chain, blok wdrozenia) sa wpiete w dziesiatki callbackow
+ * i pol pamieci komponentow; podmiana "na zywo" zostawilaby stan handlu
+ * jednej sieci naprzeciw adresow drugiej.
+ */
+export function setLaunchpadChain(chainId: number) {
+  if (!LAUNCHPAD_NETWORKS[chainId]) return;
+  window.localStorage.setItem(STORAGE_KEY, String(chainId));
+  window.location.reload();
+}
+
+export const LAUNCHPAD_CHAIN = ACTIVE_LAUNCHPAD_NETWORK.chain;
+export const LAUNCHPAD_EXPLORER_URL = ACTIVE_LAUNCHPAD_NETWORK.explorerUrl;
+export const LAUNCHPAD_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.launchpad;
+export const LIQUIDITY_VAULT_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.vault;
+export const LAUNCH_HOOK_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.hook;
+export const B20_TOKEN_FACTORY_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.tokenFactory;
+// Precompile B20 wbudowany w siec Base - ten sam adres na mainnecie i Sepolii.
+// To NIE jest nasz kontrakt, wiec nie ma zmiennej srodowiskowej. Na sieciach
+// bez B20 (tokenStandard 'plain') nie ma go wcale.
 export const B20_PRECOMPILE_ADDRESS = '0xB20f000000000000000000000000000000000000' as const;
 
 export const launchpadAbi = [
@@ -499,13 +588,11 @@ export type LaunchState = (typeof LAUNCH_STATE)[number];
 export const CURVE_TARGET_ETH = 3;
 
 /**
- * Blok wdrozenia launchpada na Base Sepolia. `getLogs` od bloku 0 na publicznym
- * RPC albo trwa wieczne, albo dostaje limit zakresu - a przed tym blokiem
- * zadnego `Launched` z definicji nie ma.
+ * Blok wdrozenia launchpada na AKTYWNEJ sieci. `getLogs` od bloku 0 na
+ * publicznym RPC albo trwa wieczne, albo dostaje limit zakresu - a przed tym
+ * blokiem zadnego `Launched` z definicji nie ma.
  */
-export const LAUNCHPAD_DEPLOY_BLOCK = BigInt(
-  process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'
-);
+export const LAUNCHPAD_DEPLOY_BLOCK = ACTIVE_LAUNCHPAD_NETWORK.deployBlock;
 
 export type LaunchpadToken = {
   id: string;
