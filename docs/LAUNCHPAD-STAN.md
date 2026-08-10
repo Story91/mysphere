@@ -16,6 +16,32 @@ Krotki obraz calosci. Szczegoly i uzasadnienia decyzji sa w
 | blok wdrozenia | `45304536` |
 | `FEE_RECIPIENT` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
 
+## Adresy - Robinhood Chain (chainId 4663, MAINNET), wdrozenie 2026-08-10
+
+Te same zrodla i parametry co Sepolia v3 (1% / 70/30 / buyback z dzialki
+tworcy), ale fabryka tokenow to `PlainTokenFactory` - Robinhood nie ma
+precompile B20, wiec token jest zwyklym ERC-20 (`LaunchToken`) z tymi samymi
+asercjami po fakcie. Wszystkie 4 kontrakty ZWERYFIKOWANE na
+robinhoodchain.blockscout.com (przez API v2 Blockscouta - endpoint zgodny
+z Etherscanem jest tam zepsuty, `hardhat verify` nie przechodzi).
+
+| kontrakt | adres |
+| --- | --- |
+| `CurveLaunchpad` | `0x00965D30385984439656479dFeA2Ffef6D17e811` |
+| `LiquidityVault` | `0x57E75E0469daC2B057B1A3E0b2F6B7BeceaFCA24` |
+| `B20LaunchHook` | `0x26e719e74D73E49e29B5860728281d5d08E1A044` |
+| `PlainTokenFactory` | `0x9CB37201E062eD07B1e5A9ec5a0719a87897B184` |
+| PoolManager v4 (Uniswap) | `0x8366a39CC670B4001A1121B8F6A443A643e40951` |
+| blok wdrozenia | `33084370` |
+| `FEE_RECIPIENT` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+
+Weryfikacja przedwdrozeniowa: fork mainnetu Robinhooda 9/9
+(`npm run launchpad:fork:robinhood`) + proba krzywej prawdziwymi transakcjami
+na Robinhood TESTNET 7/7 (`scripts/launchpad/robinhoodTestnetCurve.ts`;
+testnet nie ma v4, wiec pula byla mockiem - graduacja pokryta forkiem).
+FRONT jeszcze NIE zna tych adresow - Startpad gada tylko z Sepolia;
+podpiecie Robinhooda wg specu frontendu (sufiks `_4663`).
+
 Nowosc v3: **sniper protection jest WYLACZALNA** - `launchAdvanced` przyjmuje
 `windowCap_` do pelnego `T0`; ustawienie >= podazy krzywej znaczy "ochrona
 wylaczona", a `WINDOW_ADDR_CAP` (16M) zostal tylko wartoscia domyslna.
