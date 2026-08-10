@@ -52,6 +52,27 @@ async function retryRead<T>(label: string, read: () => Promise<T>, attempts = 8)
   throw lastError;
 }
 
+/**
+ * Czeka, az wezel POKAZE oczekiwany stan startu.
+ *
+ * `launchOf` NIE REWERTUJE dla nieznanego tokena - oddaje same zera. Odczyt
+ * wykonany zaraz po transakcji trafia wiec czasem na wezel, ktory jeszcze nie
+ * zastosowal bloku, i odpowiada "poprawnie", tylko nieprawde. `retryRead` tego
+ * nie lapie, bo NIE MA BLEDU DO ZLAPANIA.
+ *
+ * Dlatego tu nie powtarzamy przy wyjatku, tylko czekamy na KONKRETNA wartosc.
+ */
+async function waitForState(pad: any, token: string, expected: bigint, label: string, attempts = 15) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const state = (await pad.launchOf(token))[1] as bigint;
+    if (state === expected) return;
+    console.log(`czekam na stan ${expected} (${label}): widze ${state}, proba ${attempt}/${attempts}`);
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+  }
+  const state = (await pad.launchOf(token))[1] as bigint;
+  throw new Error(`${label}: po ${attempts} probach stan to ${state}, oczekiwano ${expected}.`);
+}
+
 async function waitForLaunchWindow(startedAt: bigint) {
   const target = Number(startedAt) + LAUNCH_WINDOW + 1;
   while (true) {
@@ -103,49 +124,73 @@ async function main() {
   console.log("creator  ", creator);
   console.log("buy ETH  ", ethers.formatEther(buyEth));
 
-  const launchTx = await pad.launch("Sepolia Flow", "SFLOW", 0, deadline);
-  const launchReceipt = (await launchTx.wait())!;
-  const launched = parseEvent(pad, launchReceipt, "Launched");
-  const token = getAddress(launched.args[0]);
-  console.log("token   ", token);
-  console.log("launch  ", receiptSummary(launchReceipt));
+  // ===========================================================================
+  // WZNAWIANIE: FLOW_TOKEN pomija start i kupno
+  // ===========================================================================
+  // Kupno domykajace krzywa kosztuje 3 ETH. Gdy przebieg przerwie sie PO nim -
+  // a przerywal sie, bo skrypt czytal stan zaraz po transakcji i dostawal od
+  // wezla nieaktualna odpowiedz - powtorzenie calosci znaczyloby wydanie
+  // tych 3 ETH DRUGI RAZ. Dlatego da sie wejsc od srodka, z tokenem, ktory
+  // juz stoi na progu.
+  const resumeToken = process.env.FLOW_TOKEN;
+  let token: string;
 
-  // ZNACZNIK CZASU BIERZEMY ZE ZDARZENIA, A NIE Z ODCZYTU - i to jest istota
-  // tej poprawki.
-  //
-  // Byly tu kolejno dwa bledy. Najpierw `launchOf(...)[2]`, czyli ethReserve
-  // zamiast startedAt. Potem `[4]`, czyli juz wlasciwe pole - ale odczyt lecial
-  // w tej samej sekundzie co transakcja i trafial na wezel bez swiezego stanu.
-  // `launchOf` NIE REWERTUJE dla nieznanego tokena, tylko po cichu oddaje same
-  // zera, wiec `startedAt` wychodzilo 0. Okno startowe "konczylo sie" w 1970
-  // roku, skrypt nie czekal ani sekundy i kupowal w srodku okna, gdzie
-  // obowiazuje `WINDOW_ADDR_CAP` (16 mln tokenow). Kupno za 3 ETH bierze
-  // 800 mln, wiec odbijalo sie o `WindowCap` - i to widac dopiero jako
-  // `execution reverted` przy szacowaniu gazu.
-  //
-  // Zdarzenie `Launched` niesie `startedAt` i lezy w paragonie, ktory JUZ mamy.
-  // Nie ma tam zadnego wyscigu z propagacja, bo nic nie odczytujemy ponownie.
-  const startedAt = launched.args.startedAt as bigint;
-  if (startedAt === 0n) throw new Error("Zdarzenie Launched nie ma startedAt - sprawdz ABI.");
+  if (resumeToken) {
+    token = getAddress(resumeToken);
+    const state = (await pad.launchOf(token))[1] as bigint;
+    console.log("token   ", token, `(wznowienie, stan ${state})`);
+    if (state === 0n) throw new Error("Ten launchpad nie zna tego tokena.");
+    if (state === 1n) throw new Error("Token jest jeszcze na krzywej - dokoncz kupno albo uruchom flow bez FLOW_TOKEN.");
+    if (state === 3n) console.log("token juz po graduacji - przechodze do puli, oplat i wyplat");
+  } else {
+    const launchTx = await pad.launch("Sepolia Flow", "SFLOW", 0, deadline);
+    const launchReceipt = (await launchTx.wait())!;
+    const launched = parseEvent(pad, launchReceipt, "Launched");
+    token = getAddress(launched.args[0]);
+    console.log("token   ", token);
+    console.log("launch  ", receiptSummary(launchReceipt));
 
-  await waitForLaunchWindow(startedAt);
+    // ZNACZNIK CZASU BIERZEMY ZE ZDARZENIA, A NIE Z ODCZYTU - i to jest istota
+    // tej poprawki.
+    //
+    // Byly tu kolejno dwa bledy. Najpierw `launchOf(...)[2]`, czyli ethReserve
+    // zamiast startedAt. Potem `[4]`, czyli juz wlasciwe pole - ale odczyt lecial
+    // w tej samej sekundzie co transakcja i trafial na wezel bez swiezego stanu.
+    // `launchOf` NIE REWERTUJE dla nieznanego tokena, tylko po cichu oddaje same
+    // zera, wiec `startedAt` wychodzilo 0. Okno startowe "konczylo sie" w 1970
+    // roku, skrypt nie czekal ani sekundy i kupowal w srodku okna, gdzie
+    // obowiazuje `WINDOW_ADDR_CAP` (16 mln tokenow). Kupno za 3 ETH bierze
+    // 800 mln, wiec odbijalo sie o `WindowCap` - i to widac dopiero jako
+    // `execution reverted` przy szacowaniu gazu.
+    //
+    // Zdarzenie `Launched` niesie `startedAt` i lezy w paragonie, ktory JUZ mamy.
+    // Nie ma tam zadnego wyscigu z propagacja, bo nic nie odczytujemy ponownie.
+    const startedAt = launched.args.startedAt as bigint;
+    if (startedAt === 0n) throw new Error("Zdarzenie Launched nie ma startedAt - sprawdz ABI.");
 
-  // Odczyt tuz po transakcji trafia czasem na wezel, ktory nie ma jeszcze
-  // nowego stanu - i oddaje goly `execution reverted`, wygladajacy jak blad
-  // kontraktu. Ta sama pulapka jest juz obsluzona w `deploy.ts`.
-  const quote = await retryRead("quoteBuy", () => pad.quoteBuy(token, buyEth));
-  const minTokensOut = (quote[0] * 9950n) / 10_000n;
-  if (minTokensOut === 0n) throw new Error("Quote kupna zwrocil zero tokenow.");
-  const buyDeadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
-  const buyTx = await pad.buy(token, minTokensOut, buyDeadline, { value: buyEth });
-  const buyReceipt = (await buyTx.wait())!;
-  if ((await pad.launchOf(token))[1] !== 2n) throw new Error("Kupno nie zamknelo krzywej do Locked.");
-  console.log("buy     ", receiptSummary(buyReceipt));
+    await waitForLaunchWindow(startedAt);
 
+    // Odczyt tuz po transakcji trafia czasem na wezel, ktory nie ma jeszcze
+    // nowego stanu - i oddaje goly `execution reverted`, wygladajacy jak blad
+    // kontraktu. Ta sama pulapka jest juz obsluzona w `deploy.ts`.
+    const quote = await retryRead("quoteBuy", () => pad.quoteBuy(token, buyEth));
+    const minTokensOut = (quote[0] * 9950n) / 10_000n;
+    if (minTokensOut === 0n) throw new Error("Quote kupna zwrocil zero tokenow.");
+    const buyDeadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
+    const buyTx = await pad.buy(token, minTokensOut, buyDeadline, { value: buyEth });
+    const buyReceipt = (await buyTx.wait())!;
+    await waitForState(pad, token, 2n, "kupno domykajace krzywa");
+    console.log("buy     ", receiptSummary(buyReceipt));
+  }
+
+  if (((await pad.launchOf(token))[1] as bigint) === 3n) {
+    console.log("graduate  (juz wykonana, pomijam)");
+  } else {
   const graduateTx = await pad.graduate(token);
   const graduateReceipt = (await graduateTx.wait())!;
-  if ((await pad.launchOf(token))[1] !== 3n) throw new Error("Graduacja nie ustawila stanu Graduated.");
+  await waitForState(pad, token, 3n, "graduacja");
   console.log("graduate", receiptSummary(graduateReceipt));
+  }
 
   const key = await pad.poolKeyOf(token);
   if (getAddress(key[0]) !== ethers.ZeroAddress) {
