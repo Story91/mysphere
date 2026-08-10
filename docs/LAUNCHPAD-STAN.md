@@ -144,8 +144,12 @@ Kolejnosc od najtanszych do najdrozszych; wszystko na Base Sepolia, przez UI
    jest nieodwracalny.
 2. **Weryfikacja kontraktow na Basescanie** (`npx hardhat verify`). Vault i hook
    powstaly wewnetrznie, wiec weryfikuje sie je osobno.
-3. **Decyzja o `FEE_RECIPIENT`** - dzis to ten sam adres, co deployer. Na
-   mainnecie powinien byc osobny portfel przychodow, bo jest `immutable`.
+3. **`FEE_RECIPIENT` na mainnet: ZDECYDOWANE 2026-08-10** -
+   `0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83` (osobny portfel przychodow).
+   Adres jest `immutable`, wiec wchodzi w zycie DOPIERO przy wdrozeniu
+   mainnetowym: `FEE_RECIPIENT=0x83C6... npm run launchpad:deploy:base`.
+   Sepolia zostaje na adresie deployera - testnetowe oplaty nie maja wartosci,
+   a kolejny redeploy uniewaznilby swieze adresy w env/docs/UI.
 4. **Pelna sciezka on-chain na wdrozeniu 70/30** - patrz plan testow pkt 5.
 
 **Funkcje, ktorych nie mamy, a ma je konkurencja:**
@@ -156,8 +160,14 @@ Kolejnosc od najtanszych do najdrozszych; wszystko na Base Sepolia, przez UI
    jest przypisane do adresu i nie da sie go sprzedac.
 7. **Komentarze/thread pod tokenem** (pump.fun, Zora; u Zory korona dla top
    holdera) - Firestore + istniejaca sesja SIWE, wzorzec z profilu tokena.
-8. **Wykres i handel PO graduacji** - wymaga odczytow puli v4 (Swap eventy)
-   albo embedu GeckoTerminal; dzis wykres uczciwie konczy sie na graduacji.
+8. **Wykres i handel PO graduacji** - dzis wykres uczciwie konczy sie na
+   graduacji. Plan na mainnet: darmowy embed GeckoTerminal albo DEX Screener
+   (iframe per pula/token; oba indeksuja Uniswap v4 na Base MAINNET, testnetu
+   nie indeksuja, wiec na Sepolii nie ma czego wpiac). Wykres krzywej, ktory
+   juz mamy, jest darmowy na zawsze: lightweight-charts to open source
+   TradingView (Apache 2.0, wymagana atrybucja - jest), dane sa nasze
+   z eventow. Platny TradingView (Charting Library z danymi) NIE jest
+   potrzebny.
 
 **Produkt i interfejs:**
 
