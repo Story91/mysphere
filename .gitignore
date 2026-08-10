@@ -22,6 +22,9 @@ node_modules
 
 # Hardhat files
 **/cache/solidity-files-cache.json
+# Forkowany stan Base potrafi urosnac do setek megabajtow i jest odtwarzalny
+# jednym `npm run launchpad:fork:base` - nie ma po co siedziec w historii.
+/cache/
 **/artifacts/
 
 # TypeChain files

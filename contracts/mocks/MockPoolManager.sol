@@ -6,6 +6,7 @@ import {
     IUnlockCallback,
     PoolKey,
     ModifyLiquidityParams,
+    SwapParams,
     PoolStateReader
 } from "../launchpad/interfaces/IPoolManagerV4.sol";
 import {TickMath} from "../launchpad/lib/TickMath.sol";
@@ -14,6 +15,21 @@ import {FullMath} from "../launchpad/lib/FullMath.sol";
 interface IMockToken {
     function transfer(address to, uint256 amount) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
+}
+
+/** Tylko te dwa wywolania zwrotne, bo tylko takie uprawnienia ma nasz hook. */
+interface IMockHooks {
+    function beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96)
+        external
+        returns (bytes4);
+
+    function afterSwap(
+        address sender,
+        PoolKey calldata key,
+        SwapParams calldata params,
+        int256 delta,
+        bytes calldata hookData
+    ) external returns (bytes4, int128);
 }
 
 /**
@@ -87,6 +103,7 @@ contract MockPoolManager is IPoolManagerV4 {
     error PoolNotInitialized();
     error CurrencyNotSettled();
     error TickMisaligned();
+    error BadHookResponse();
 
     event Initialize(bytes32 indexed poolId, uint160 sqrtPriceX96);
     event ModifyLiquidity(bytes32 indexed poolId, int256 liquidityDelta);
@@ -103,16 +120,110 @@ contract MockPoolManager is IPoolManagerV4 {
         }
     }
 
+    /**
+     * Biezace salda odblokowania. Prawdziwy v4 wystawia to przez transient
+     * storage i `exttload`; tutaj wystarczy zwykly odczyt.
+     *
+     * Istnieje dla sond testowych, ktore musza rozliczyc sie po wymianie -
+     * produkcyjny kod nie wola tego ani razu.
+     */
+    function deltas() external view returns (int256 delta0, int256 delta1) {
+        return (_delta0, _delta1);
+    }
+
     /* ---------------------------------------------------------------------- */
     /*  INICJALIZACJA                                                          */
     /* ---------------------------------------------------------------------- */
 
+    /**
+     * Hook jest wolany PRZED zapisem stanu, tak jak w oryginale - inaczej
+     * `beforeInitialize`, ktore rewertuje, zostawialoby pule zainicjalizowana.
+     *
+     * Selektor sprawdzamy, bo v4 tez go sprawdza: hook, ktory oddaje cokolwiek
+     * innego, jest odrzucany. Bez tego warunku atrapa przepuszczalaby hooka,
+     * ktorego prawdziwy PoolManager by nie przyjal.
+     */
     function initialize(PoolKey memory key, uint160 sqrtPriceX96) external returns (int24) {
         bytes32 id = PoolStateReader.poolId(key);
         if (_pools[id] != 0) revert PoolAlreadyInitialized();
+
+        if (key.hooks != address(0)) {
+            bytes4 selector = IMockHooks(key.hooks).beforeInitialize(msg.sender, key, sqrtPriceX96);
+            if (selector != IMockHooks.beforeInitialize.selector) revert BadHookResponse();
+        }
+
         _pools[id] = uint256(sqrtPriceX96);
         emit Initialize(id, sqrtPriceX96);
         return 0;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /*  WYMIANA - tyle, ile trzeba, zeby hook dalo sie przetestowac            */
+    /* ---------------------------------------------------------------------- */
+
+    /**
+     * Kwota waluty NIEPODANEJ, ktora atrapa "wyliczy" przy nastepnym `swap`.
+     *
+     * Prawdziwa pula liczy ja z krzywej tickow. Tutaj podaje ja test - i to jest
+     * WLASCIWY wybor dla tej atrapy: przedmiotem testu jest arytmetyka HOOKA,
+     * a nie AMM. Gdyby atrapa liczyla wlasna krzywa, test sprawdzalby zgodnosc
+     * hooka z atrapa zamiast z zamierzeniem.
+     */
+    uint256 public nextCounterAmount;
+
+    /** Ostatnia delta zwrocona przez hook - do asercji w testach. */
+    int128 public lastHookDelta;
+
+    function setNextCounterAmount(uint256 amount) external {
+        nextCounterAmount = amount;
+    }
+
+    /**
+     * Uproszczona wymiana. Ksieguje przeplyw obu walut i oddaje sterowanie
+     * hookowi, dokladnie w tej kolejnosci co oryginal.
+     *
+     * Ksiegowosc: `_delta0`/`_delta1` znacza "ile pula jest winna swiatu na
+     * zewnatrz". Hook, ktory wola `take`, zabiera czesc tego dlugu dla siebie,
+     * a wymieniajacemu zostaje reszta - dzieki temu jeden licznik wystarcza
+     * i nie trzeba modelowac sald per adres.
+     */
+    function swap(PoolKey memory key, SwapParams memory params, bytes calldata hookData)
+        external
+        returns (int256 swapDelta)
+    {
+        if (!_unlocked) revert NotUnlocked();
+        bytes32 id = PoolStateReader.poolId(key);
+        if (_pools[id] == 0) revert PoolNotInitialized();
+
+        uint256 specified =
+            params.amountSpecified < 0 ? uint256(-params.amountSpecified) : uint256(params.amountSpecified);
+        uint256 counter = nextCounterAmount;
+
+        // Znak z punktu widzenia wymieniajacego: ujemny = placi, dodatni = dostaje.
+        int128 amt0;
+        int128 amt1;
+        if (params.amountSpecified < 0) {
+            // exactInput: podane jest WEJSCIE
+            (amt0, amt1) = params.zeroForOne
+                ? (-int128(int256(specified)), int128(int256(counter)))
+                : (int128(int256(counter)), -int128(int256(specified)));
+        } else {
+            // exactOutput: podane jest WYJSCIE
+            (amt0, amt1) = params.zeroForOne
+                ? (-int128(int256(counter)), int128(int256(specified)))
+                : (int128(int256(specified)), -int128(int256(counter)));
+        }
+
+        _delta0 += amt0;
+        _delta1 += amt1;
+        swapDelta = (int256(amt0) << 128) | int256(uint256(uint128(amt1)));
+
+        if (key.hooks != address(0)) {
+            (bytes4 selector, int128 hookDelta) =
+                IMockHooks(key.hooks).afterSwap(msg.sender, key, params, swapDelta, hookData);
+            if (selector != IMockHooks.afterSwap.selector) revert BadHookResponse();
+            lastHookDelta = hookDelta;
+        }
     }
 
     /**

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useAccount, useSwitchChain, useChainId } from 'wagmi';
-import { base } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 import { campMainnetChain } from '@/app/contracts/CampMainnet';
 import { ENABLE_CAMP_MAINNET } from '@/config/camp';
@@ -20,6 +20,15 @@ const baseEntry = {
   name: 'Base',
   shortName: 'BASE',
   iconUrl: '/logotypy/Base_basemark_blue.png', // Ikona dla sieci Base
+  color: '#0052FF',
+  bgWhite: false,
+} as const;
+
+const baseSepoliaEntry = {
+  id: baseSepolia.id,
+  name: 'Base Sepolia',
+  shortName: 'SEP',
+  iconUrl: '/logotypy/Base_basemark_blue.png',
   color: '#0052FF',
   bgWhite: false,
 } as const;
@@ -81,7 +90,7 @@ const robinhoodEntry = {
 } as const;
 
 // Kolejność: Base, Camp Mainnet, Linea, Celo, Ethereum, World Chain, Robinhood Chain
-const networks = [baseEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry] as const;
+const networks = [baseEntry, baseSepoliaEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry] as const;
 type Network = (typeof networks)[number];
 
 /**
@@ -279,4 +288,4 @@ export function NetworkSwitcher() {
       )}
     </div>
   );
-} 
+}

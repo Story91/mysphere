@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import { base } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 import { createContext, useContext, useState, useMemo } from 'react';
 import { createConfig, http, fallback, cookieStorage, createStorage } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
@@ -65,9 +65,10 @@ const queryClient = new QueryClient({
  * Wagmi Configuration (bez Base Sepolia)
  * PL: Przygotowane dwie gałęzie konfiguracji, aby uniknąć błędu typów dla 484
  */
-const CHAINS_BASE = [base, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain] as const;
+const CHAINS_BASE = [base, baseSepolia, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain] as const;
 const TRANSPORTS_BASE = {
   [base.id]: http('https://mainnet.base.org'),
+  [baseSepolia.id]: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org'),
   [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
   [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
   [celoChain.id]: http('https://forno.celo.org'),

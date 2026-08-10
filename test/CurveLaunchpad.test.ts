@@ -3,6 +3,7 @@
 const hre = require('hardhat');
 const { ethers } = hre;
 const { expect } = require('chai');
+const { deployLaunchpad } = require('./helpers/deployLaunchpad');
 
 /**
  * Testy CurveLaunchpad + LiquidityVault.
@@ -45,8 +46,9 @@ const WINDOW = 300;
 const MAX_UINT = ethers.MaxUint256;
 
 describe('CurveLaunchpad', function () {
+  this.timeout(120_000);
   let deployer: any, creator: any, alice: any, bob: any, treasury: any;
-  let pad: any, vault: any, factory: any, pm: any;
+  let pad: any, vault: any, hook: any, factory: any, tokenFactory: any, pm: any;
 
   /** Podklada bajtkod atrapy pod adres, ktory kontrakt ma wpisany jako stala. */
   async function installAt(name: string, address: string) {
@@ -80,7 +82,7 @@ describe('CurveLaunchpad', function () {
   }
 
   /**
-   * `poolKeys` oddaje ethersowy `Result`, ktory jest tylko do odczytu - a jako
+   * `poolKeyOf` oddaje ethersowy `Result`, ktory jest tylko do odczytu - a jako
    * argument struktury ethers probuje go modyfikowac. Kopiujemy do zwyklej
    * tablicy.
    */
@@ -114,11 +116,21 @@ describe('CurveLaunchpad', function () {
     factory = await installAt('MockB20Factory', B20_FACTORY);
     pm = await installAt('MockPoolManager', POOL_MANAGER);
 
-    const Pad = await ethers.getContractFactory('CurveLaunchpad');
-    pad = await Pad.deploy(FEE_BPS, CREATOR_FEE_BPS, treasury.address, 6000);
-    await pad.waitForDeployment();
+    // Fabryka tokena jest teraz osobnym kontraktem - to ona wola precompile
+    // i to ona asertuje role oraz sufit podazy. Launchpad zna ja tylko przez
+    // `ITokenFactory`, wiec sabotaz atrapy odbija sie TU, a nie w launchpadzie.
+    const TF = await ethers.getContractFactory('B20TokenFactory');
+    tokenFactory = await TF.deploy();
+    await tokenFactory.waitForDeployment();
 
-    vault = await ethers.getContractAt('LiquidityVault', await pad.VAULT());
+    ({ pad, vault, hook } = await deployLaunchpad({
+      deployer,
+      feeBps: FEE_BPS,
+      creatorFeeBps: CREATOR_FEE_BPS,
+      feeRecipient: treasury.address,
+      protocolShareBps: 6000,
+      tokenFactory: await tokenFactory.getAddress(),
+    }));
   });
 
   /* ===================================================================== */
@@ -131,20 +143,63 @@ describe('CurveLaunchpad', function () {
       expect(await pad.VAULT()).to.equal(await vault.getAddress());
     });
 
+    it('wiaze hook z vaultem i nadaje mu adres o wlasciwych bitach', async function () {
+      expect(await hook.VAULT()).to.equal(await vault.getAddress());
+      expect(await vault.HOOK()).to.equal(await hook.getAddress());
+      expect(await pad.HOOK()).to.equal(await hook.getAddress());
+
+      // To jest warunek, ktory v4 sprawdza przy kazdej puli.
+      expect(await hook.hasValidHookAddress()).to.equal(true);
+      const flags = BigInt(await hook.getAddress()) & (await hook.ALL_HOOK_MASK());
+      expect(flags).to.equal(await hook.HOOK_FLAGS());
+    });
+
+    it('hook dostaje te sama konfiguracje oplat, co vault', async function () {
+      expect(await hook.FEE_RECIPIENT()).to.equal(await vault.FEE_RECIPIENT());
+      expect(await hook.PROTOCOL_SHARE_BPS()).to.equal(await vault.PROTOCOL_SHARE_BPS());
+    });
+
+    it('zly salt hooka wywala WDROZENIE, a nie pierwszy awans', async function () {
+      // Salt, ktorego nikt nie kopal - adres hooka prawie na pewno nie bedzie
+      // mial wymaganych bitow. To jest cala roznica miedzy bledem wykrytym
+      // przy deployu a bledem wykrytym po zebraniu cudzych pieniedzy.
+      const Pad = await ethers.getContractFactory('CurveLaunchpad');
+      await expect(
+        Pad.deploy(
+          POOL_MANAGER,
+          100,
+          40,
+          treasury.address,
+          6000,
+          await tokenFactory.getAddress(),
+          ethers.ZeroHash
+        )
+      ).to.be.revertedWithCustomError(vault, 'BadHookAddress');
+    });
+
     it('odrzuca oplate ponad sufit i oplate tworcy ponad calosc', async function () {
       const Pad = await ethers.getContractFactory('CurveLaunchpad');
-      await expect(Pad.deploy(201, 40, treasury.address, 6000)).to.be.revertedWithCustomError(
-        pad,
-        'FeeTooHigh'
-      );
-      await expect(Pad.deploy(100, 101, treasury.address, 6000)).to.be.revertedWithCustomError(
-        pad,
-        'CreatorFeeTooHigh'
-      );
-      await expect(Pad.deploy(100, 40, ethers.ZeroAddress, 6000)).to.be.revertedWithCustomError(
-        pad,
-        'ZeroAddress'
-      );
+      const tf = await tokenFactory.getAddress();
+      // Te warunki stoja PRZED wdrozeniem vaulta, wiec salt jest tu bez znaczenia.
+      await expect(
+        Pad.deploy(POOL_MANAGER, 101, 40, treasury.address, 6000, tf, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(pad, 'FeeTooHigh');
+      await expect(
+        Pad.deploy(POOL_MANAGER, 100, 101, treasury.address, 6000, tf, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
+      // Podloga protokolu obowiazuje TAKZE wdrazajacego: 61 ze 100 to juz 61%,
+      // czyli ponad `MAX_CREATOR_SHARE_BPS`. Bez tego warunku domyslna
+      // konfiguracja mogla by oddac cala oplate tworcy, a sufit w `_launch`
+      // pilnowalby juz tylko startow wywolanych recznie.
+      await expect(
+        Pad.deploy(POOL_MANAGER, 100, 61, treasury.address, 6000, tf, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
+      await expect(
+        Pad.deploy(POOL_MANAGER, 100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(pad, 'ZeroAddress');
+      await expect(
+        Pad.deploy(POOL_MANAGER, 100, 40, treasury.address, 6000, ethers.ZeroAddress, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(pad, 'ZeroAddress');
     });
 
     it('nie ma zadnego settera', async function () {
@@ -180,21 +235,22 @@ describe('CurveLaunchpad', function () {
       expect(l[3]).to.equal(T0);
     });
 
-    it('przygotowuje cztery pule po cenie terminalnej', async function () {
+    it('NIE tworzy zadnej puli - pula powstaje dopiero przy awansie', async function () {
       const token = await launch(creator);
-      const keys = await pad.poolKeys(token);
-      expect(keys.length).to.equal(4);
-      const terminal = await pad.SQRT_PRICE_TERMINAL();
-      for (let i = 0; i < 4; i++) {
-        expect(keys[i][0]).to.equal(ethers.ZeroAddress);
-        expect(keys[i][1]).to.equal(token);
-        expect(keys[i][4]).to.equal(ethers.ZeroAddress);
-      }
-      // Odczyt ceny idzie ta sama sciezka, co w awansie: extsload + slot 6.
-      const id = poolIdOf(keys[0]);
-      const slot = ethers.keccak256(ethers.solidityPacked(['bytes32', 'uint256'], [id, 6]));
-      const raw = await pm.extsload(slot);
-      expect(BigInt(raw) & ((1n << 160n) - 1n)).to.equal(terminal);
+      const key = await pad.poolKeyOf(token);
+
+      expect(key[0]).to.equal(ethers.ZeroAddress); // currency0 = natywne ETH
+      expect(key[1]).to.equal(token);
+      expect(key[2]).to.equal(await pad.POOL_FEE());
+      expect(key[3]).to.equal(await pad.POOL_TICK_SPACING());
+      expect(key[4]).to.equal(await hook.getAddress());
+
+      // Slot ceny jest PUSTY. Poprzednia wersja inicjalizowala tu cztery pule;
+      // z hookiem-brama nie ma powodu, bo nikt obcy tej puli nie otworzy.
+      const slot = ethers.keccak256(
+        ethers.solidityPacked(['bytes32', 'uint256'], [poolIdOf(key), 6])
+      );
+      expect(BigInt(await pm.extsload(slot))).to.equal(0n);
     });
 
     it('kurs startowy to 7.5e-10 ETH/token', async function () {
@@ -206,6 +262,120 @@ describe('CurveLaunchpad', function () {
       const a = await launch(creator);
       const b = await launch(creator);
       expect(a).to.not.equal(b);
+    });
+
+    it('launchAdvanced zapisuje fee split, wielu odbiorcow, metadata i pre-buy', async function () {
+      const metadata = 'ipfs://mysphere/advanced-token.json';
+      const tx = await pad.connect(creator).launchAdvanced(
+        'Advanced',
+        'ADV',
+        1n,
+        (await time()) + 600,
+        100,
+        // 60 ze 100 to dokladnie 60% - gorna granica udzialu tworcy. Bylo tu
+        // `200, 200`, czyli oplata 2% i CALA oplata dla tworcy; jedno przekracza
+        // dzisiejszy `MAX_FEE_BPS`, drugie `MAX_CREATOR_SHARE_BPS`.
+        60,
+        1000,
+        ethers.parseEther('16000000'),
+        [alice.address, bob.address],
+        [6000, 4000],
+        metadata,
+        { value: ethers.parseEther('0.0122') }
+      );
+      const rc = await tx.wait();
+      const event = rc.logs
+        .map((log: any) => {
+          try {
+            return pad.interface.parseLog(log);
+          } catch {
+            return null;
+          }
+        })
+        .find((parsed: any) => parsed && parsed.name === 'Launched');
+      const token = event.args[0] as string;
+
+      expect(await pad.metadataURI(token)).to.equal(metadata);
+      expect(await pad.launchBuybackBps(token)).to.equal(1000n);
+      expect(await pad.launchWindowCap(token)).to.equal(ethers.parseEther('16000000'));
+      expect(await pad.feeConfigOf(token)).to.deep.equal([100n, 60n, 2n]);
+      expect(await pad.feeReceiverOf(token, 0)).to.deep.equal([alice.address, 6000n]);
+      expect(await pad.feeReceiverOf(token, 1)).to.deep.equal([bob.address, 4000n]);
+      expect(await ethers.getContractAt('MockB20', token).then((asset: any) => asset.balanceOf(creator.address))).to.be.greaterThan(0n);
+
+      const aliceBefore = await pad.claimable(alice.address);
+      const bobBefore = await pad.claimable(bob.address);
+      const quote = await pad.quoteBuy(token, ethers.parseEther('0.01'));
+      await pad.connect(bob).buy(token, 1n, (await time()) + 600, { value: ethers.parseEther('0.01') });
+      // Do odbiorcow idzie UDZIAL TWORCY, czyli 60 ze 100 bps oplaty - nie cala
+      // oplata. Reszta nalezy do protokolu i jest sprawdzana osobnym testem.
+      const creatorPool = ((quote[1] as bigint) * 60n) / 100n;
+      expect((await pad.claimable(alice.address)) - aliceBefore).to.equal((creatorPool * 6000n) / 10_000n);
+      expect((await pad.claimable(bob.address)) - bobBefore).to.equal(creatorPool - (creatorPool * 6000n) / 10_000n);
+    });
+
+    it('oplata ma sufit 1%, a PROTOKOL zawsze zostaje z co najmniej 40% tej oplaty', async function () {
+      const cap = ethers.parseEther('16000000');
+      const deadline = BigInt((await time()) + 600);
+      const advanced = (name: string, symbol: string, feeBps: number, creatorFeeBps: number) =>
+        pad
+          .connect(creator)
+          .launchAdvanced(name, symbol, 0n, deadline, feeBps, creatorFeeBps, 0, cap, [creator.address], [10000], '');
+
+      // Sufity czytane z kontraktu, nie przepisane - inaczej ten test przestaje
+      // pilnowac czegokolwiek w chwili, gdy ktos je zmieni.
+      expect(await pad.MAX_FEE_BPS()).to.equal(100n);
+      expect(await pad.MAX_CREATOR_SHARE_BPS()).to.equal(6000n);
+
+      await expect(advanced('Over', 'OVR', 101, 0)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      // To jest CALA stawka tej zmiany: tworca nie moze wziac calej oplaty.
+      await expect(advanced('Greedy', 'GRD', 100, 100)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      await expect(advanced('Edge', 'EDG', 100, 61)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      // Podloga trzyma sie takze przy nizszej oplacie: 50 bps -> najwyzej 30.
+      await expect(advanced('Half', 'HLF', 50, 31)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      await expect(advanced('HalfOk', 'HOK', 50, 30)).to.not.be.reverted;
+
+      // `windowCap == 0` przechodzilo walidacje, a potem KAZDE kupno w oknie
+      // startowym odbijalo sie o `WindowCap` - start dalo sie w ten sposob
+      // zamurowac, nie lamiac ani jednej asercji.
+      await expect(
+        pad
+          .connect(creator)
+          .launchAdvanced('Zero', 'ZRO', 0n, deadline, 100, 60, 0, 0, [creator.address], [10000], '')
+      ).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+
+      const rc = await (await advanced('Cap', 'CAP', 100, 60)).wait();
+      const token = rc.logs
+        .map((log: any) => {
+          try {
+            return pad.interface.parseLog(log);
+          } catch {
+            return null;
+          }
+        })
+        .find((parsed: any) => parsed && parsed.name === 'Launched').args[0] as string;
+
+      expect(await pad.feeConfigOf(token)).to.deep.equal([100n, 60n, 1n]);
+      // Poza zakresem nazwany blad, a nie goly `Panic(0x32)`.
+      await expect(pad.feeReceiverOf(token, 1)).to.be.revertedWithCustomError(pad, 'InvalidFeeReceiver');
+
+      // Dowod na pieniadzach, nie na mapie: po kupnie tworca i protokol maja
+      // realne salda w stosunku 60/40, a ich suma to CALA oplata.
+      const ethIn = ethers.parseEther('0.01');
+      const quote = await pad.quoteBuy(token, ethIn);
+      const fee = quote[1] as bigint;
+      expect(fee).to.equal((ethIn * 100n + 9_999n) / 10_000n);
+
+      const creatorBefore = await pad.claimable(creator.address);
+      const treasuryBefore = await pad.claimable(treasury.address);
+      await pad.connect(alice).buy(token, 1n, (await time()) + 600, { value: ethIn });
+      const creatorGain = ((await pad.claimable(creator.address)) as bigint) - (creatorBefore as bigint);
+      const treasuryGain = ((await pad.claimable(treasury.address)) as bigint) - (treasuryBefore as bigint);
+
+      expect(creatorGain).to.equal((fee * 60n) / 100n);
+      expect(treasuryGain).to.equal(fee - creatorGain);
+      expect(treasuryGain).to.be.greaterThan(0n);
+      expect(creatorGain + treasuryGain).to.equal(fee);
     });
 
     it('dev-buy idzie ta sama sciezka, co wszyscy - i podlega limitowi okna', async function () {
@@ -229,6 +399,9 @@ describe('CurveLaunchpad', function () {
     });
 
     it('kazda asercja post-warunkow potrafi wywrocic start', async function () {
+      // Asercje zeszly do `B20TokenFactory` razem z tworzeniem tokena, wiec
+      // rewert niesie teraz JEJ blad. Sam start wywala sie tak samo - i o to
+      // chodzi: przeniesienie kodu nie moze zmienic tego, co przechodzi.
       const cases: [number, string][] = [
         [1, 'RolesAlive'],
         [2, 'SupplyMismatch'],
@@ -240,7 +413,7 @@ describe('CurveLaunchpad', function () {
         await factory.setSabotage(mode);
         await expect(
           pad.connect(creator).launch('T', 'T', 0n, (await time()) + 600)
-        ).to.be.revertedWithCustomError(pad, err);
+        ).to.be.revertedWithCustomError(tokenFactory, err);
       }
       await factory.setSabotage(0);
     });
@@ -323,12 +496,21 @@ describe('CurveLaunchpad', function () {
       expect(dc).to.equal((q[1] * CREATOR_FEE_BPS) / FEE_BPS);
     });
 
-    it('tworca nie moze sprzedac na krzywej', async function () {
+    it('tworca sprzedaje na krzywej NA TYCH SAMYCH ZASADACH, co kazdy', async function () {
+      // Byla tu asercja `CreatorLocked`. Blokada zostala usunieta swiadomie:
+      // nie dzialala na tworce sprzedajacego z drugiego adresu, wiec karala
+      // wylacznie tego, kto uzyl jednego. Patrz naglowek kontraktu, punkt 3.
       await pad.connect(creator).buy(token, 1, (await time()) + 600, { value: ethers.parseEther('0.5') });
       await t.connect(creator).approve(await pad.getAddress(), MAX_UINT);
-      await expect(
-        pad.connect(creator).sell(token, 1000n, 1, (await time()) + 600)
-      ).to.be.revertedWithCustomError(pad, 'CreatorLocked');
+
+      const saldo: bigint = await t.balanceOf(creator.address);
+      expect(saldo).to.be.greaterThan(0n);
+      const przed: bigint = await ethers.provider.getBalance(creator.address);
+      await pad.connect(creator).sell(token, saldo, 1n, (await time()) + 600);
+
+      expect(await t.balanceOf(creator.address)).to.equal(0n);
+      // Wyszedl z realnym ETH, a nie tylko "transakcja przeszla".
+      expect(await ethers.provider.getBalance(creator.address)).to.be.greaterThan(przed);
     });
 
     it('wyplacalnosc: odsprzedaz calej podazy w obiegu nie przekracza rezerwy', async function () {
@@ -467,8 +649,18 @@ describe('CurveLaunchpad', function () {
       // Jawne `bigint`: ethers oddaje te wartosci jako `any`, a bez adnotacji
       // TypeScript zwezal jedna z nich do `number` i odmawial odejmowania.
       const ethReserve: bigint = l[2];
-      const gradFee: bigint = await pad.GRAD_FEE();
+      // Oplata awansowa jest UDZIALEM w rezerwie, nie stala kwota - odczytujemy
+      // ja z kontraktu dla biezacego stanu, zamiast wpisywac liczbe.
+      const [gradFee]: [bigint, bigint] = await pad.gradFeeOf(token);
       const terminal = await pad.SQRT_PRICE_TERMINAL();
+
+      // Saldo PoolManagera mierzymy PRZYROSTEM, nie wartoscia bezwzgledna.
+      // Atrapa siedzi pod stalym adresem i przezywa cala sesje testowa, wiec
+      // przy uruchomieniu wielu plikow naraz lezy juz na niej ETH z awansow
+      // z poprzednich plikow. Wersja bezwzgledna przechodzila w pojedynczym
+      // pliku i padala w calym przebiegu - czyli byla zielona z niewlasciwego
+      // powodu.
+      const pmBefore = await ethers.provider.getBalance(POOL_MANAGER);
 
       await expect(pad.connect(bob).graduate(token)).to.emit(pad, 'Graduated');
 
@@ -479,11 +671,12 @@ describe('CurveLaunchpad', function () {
       expect(await t.balanceOf(await pad.getAddress())).to.equal(0n);
 
       // ETH w puli = rezerwa minus oplata awansowa, z dokladnoscia do pyla wei.
-      const pmBal = await ethers.provider.getBalance(POOL_MANAGER);
-      expect(pmBal).to.be.greaterThan(ethReserve - gradFee - 10n);
-      expect(pmBal).to.be.lessThanOrEqual(ethReserve - gradFee);
+      const pmDelta = (await ethers.provider.getBalance(POOL_MANAGER)) - pmBefore;
+      expect(pmDelta).to.be.greaterThan(ethReserve - gradFee - 10n);
+      expect(pmDelta).to.be.lessThanOrEqual(ethReserve - gradFee);
 
       // Nadmiar tokena poszedl na adres martwy - to NIE jest spalenie.
+      // Saldo tego tokena na `DEAD` jest wlasne, bo token powstal w tym tescie.
       expect(await t.balanceOf(DEAD)).to.be.greaterThan(0n);
       expect(await t.totalSupply()).to.equal(T0);
 
@@ -500,7 +693,10 @@ describe('CurveLaunchpad', function () {
     });
 
     it('nagroda dla wolajacego jest ksiegowana, nie pushowana', async function () {
-      const reward = await pad.GRAD_CALLER_REWARD();
+      // Polowa oplaty awansowej. Liczona z niej, a nie z osobnej stalej -
+      // dwie stale musialyby byc trzymane w zgodzie recznie. `gradFeeOf` oddaje
+      // obie liczby naraz, wiec test sprawdza takze to, ze one sie zgadzaja.
+      const [, reward]: [bigint, bigint] = await pad.gradFeeOf(token);
       await pad.connect(bob).graduate(token);
       expect(await pad.claimable(bob.address)).to.equal(reward);
       const before = await ethers.provider.getBalance(bob.address);
@@ -521,23 +717,89 @@ describe('CurveLaunchpad', function () {
       await expect(pad.graduate(token)).to.be.revertedWithCustomError(pad, 'AlreadyGraduated');
     });
 
-    it('zatruta pula najwyzszego tieru: awans schodzi na nastepny', async function () {
-      const keys = await pad.poolKeys(token);
-      await pm.poisonPrice(plainKey(keys[0]), 123456789n);
+    /**
+     * Tu stały dwa testy zatruwania puli - "zatruta pula najwyzszego tieru,
+     * awans schodzi na nastepny" i "wszystkie cztery zatrute: NoCleanPool".
+     * Oba opisywaly zachowanie, ktorego JUZ NIE MA, bo nie ma juz czterech pul
+     * ani wyboru miedzy nimi. W ich miejsce wchodzi test przyczyny: puli
+     * z naszym hookiem obcy nie otworzy, wiec nie ma czego zatruwac.
+     */
+    it('OBCY NIE OTWORZY puli z naszym hookiem - to kasuje znaleziska #1, #2 i #3', async function () {
+      const key = await pad.poolKeyOf(token);
+      await expect(
+        pm.connect(alice).initialize(plainKey(key), await pad.SQRT_PRICE_TERMINAL())
+      ).to.be.revertedWithCustomError(hook, 'NotVault');
+
+      // Ten sam adres tokena, ale bez naszego hooka w kluczu - taka pula
+      // powstaje bez przeszkod i jest CUDZA. Nie udajemy, ze da sie tego
+      // zakazac: nie da sie, u nikogo. Nasza pula pozostaje nietknieta.
+      const foreign = [key[0], key[1], key[2], key[3], ethers.ZeroAddress];
+      await pm.connect(alice).initialize(foreign, 123456789n);
+
       await pad.connect(bob).graduate(token);
       const pos = await vault.positionOf(token);
-      expect(pos[0]).to.equal(poolIdOf(keys[1]));
+      expect(pos[0]).to.equal(poolIdOf(key));
     });
 
-    it('wszystkie cztery zatrute: NoCleanPool, krzywa zostaje w Locked, sprzedaz dziala', async function () {
-      const keys = await pad.poolKeys(token);
-      for (let i = 0; i < 4; i++) await pm.poisonPrice(plainKey(keys[i]), 987654321n);
-      await expect(pad.connect(bob).graduate(token)).to.be.revertedWithCustomError(pad, 'NoCleanPool');
-
-      const l = await pad.launchOf(token);
-      expect(l[1]).to.equal(2n); // wciaz Locked
+    it('krzywa wyprzedana nisko NADAL awansuje, a oplata skaluje sie z rezerwa - znalezisko #4', async function () {
+      // ------------------------------------------------------------------
+      // TEN TEST ODWROCIL SIE WZGLEDEM POPRZEDNIEJ WERSJI - i to jest sedno
+      // ------------------------------------------------------------------
+      // Przedtem sprawdzal, ze przy rezerwie ponizej 2 ETH `graduate()`
+      // REWERTUJE. Prog faktycznie zamykal znalezisko #4 (stala oplata 0.1 ETH
+      // zzerala polowe pokrycia przy rezerwie 0.2 ETH), ale placil za to cena,
+      // ktorej nikt nie policzyl: zejscie pod prog kosztowalo 72.7M tokena,
+      // czyli 7.3% podazy kupione na starcie krzywej za 0.059 ETH i sprzedane
+      // w stanie Locked za 1.00 ETH. Nie trzeba bylo do tego napastnika -
+      // wystarczyl pierwszy kupujacy realizujacy zysk, a on ma najwiekszy powod,
+      // zeby wyjsc wlasnie na progu. Skutkiem bylo TRWALE odebranie tokenowi
+      // awansu, bo kupno w Locked rewertuje i rezerwy nikt juz nie odbuduje.
+      //
+      // Teraz oplata jest udzialem w rezerwie, wiec nie ma wysokosci, przy
+      // ktorej robi sie grozna - i progu nie ma. Test sprawdza obie polowy tej
+      // zmiany: ze awans PRZECHODZI i ze oplata jest mala.
       await t.connect(alice).approve(await pad.getAddress(), MAX_UINT);
-      await pad.connect(alice).sell(token, (await t.balanceOf(alice.address)) / 2n, 1, (await time()) + 600);
+      const cel = ethers.parseEther('0.2');
+      while (((await pad.launchOf(token))[2] as bigint) >= cel) {
+        const bal: bigint = await t.balanceOf(alice.address);
+        await pad.connect(alice).sell(token, bal / 4n, 1, (await time()) + 600);
+      }
+
+      const rezerwa: bigint = (await pad.launchOf(token))[2];
+      const [fee, reward]: [bigint, bigint] = await pad.gradFeeOf(token);
+
+      // 3% rezerwy, a nie stale 0.1 ETH. Przy tej rezerwie stara wersja
+      // zabralaby okolo polowy pokrycia - to jest cala tresc znaleziska #4.
+      expect(fee).to.equal((rezerwa * 300n) / 10_000n);
+      expect(fee * 20n).to.be.lessThanOrEqual(rezerwa); // <= 5%, sufit MAX_GRAD_FEE_BPS
+      expect(reward).to.equal(fee / 2n);
+
+      // I - w odroznieniu od poprzedniej wersji - awans po prostu dziala.
+      await expect(pad.connect(bob).graduate(token)).to.emit(pad, 'Graduated');
+      expect((await pad.launchOf(token))[1]).to.equal(3n); // Graduated
+      expect(await pad.claimable(bob.address)).to.equal(reward);
+      expect(await pad.claimable(treasury.address)).to.be.greaterThanOrEqual(fee - reward);
+    });
+
+    it('rezerwa zbita do pyla nie awansuje, ale nikt nie jest uwieziony', async function () {
+      // Jedyny pozostaly przypadek, w ktorym awans odpada: `gradFee` zaokragla
+      // sie w dol do zera i `eLp` bylby cala rezerwa albo zerem. Nie ma wtedy
+      // z czego otworzyc puli - vault i tak odbilby to na `ZeroLiquidity`,
+      // a `ReserveTooSmallToGraduate` jest o jedno wywolanie wczesniej i mowi,
+      // o co chodzi. Krzywa zostaje w Locked ze sprzedaza otwarta.
+      await t.connect(alice).approve(await pad.getAddress(), MAX_UINT);
+      while (((await pad.launchOf(token))[2] as bigint) > 0n) {
+        const bal: bigint = await t.balanceOf(alice.address);
+        if (bal === 0n) break;
+        await pad.connect(alice).sell(token, bal, 1, (await time()) + 600);
+      }
+
+      expect((await pad.launchOf(token))[2]).to.equal(0n);
+      await expect(pad.connect(bob).graduate(token)).to.be.revertedWithCustomError(
+        pad,
+        'ReserveTooSmallToGraduate'
+      );
+      expect((await pad.launchOf(token))[1]).to.equal(2n); // nadal Locked
     });
   });
 
@@ -558,9 +820,9 @@ describe('CurveLaunchpad', function () {
     });
 
     it('nie da sie zasilic drugi raz ani z obcego adresu', async function () {
-      const keys = await pad.poolKeys(token);
+      const key = await pad.poolKeyOf(token);
       await expect(
-        vault.connect(alice).seed(token, creator.address, plainKey(keys[0]), await pad.SQRT_PRICE_TERMINAL())
+        vault.connect(alice).seed(token, creator.address, plainKey(key), await pad.SQRT_PRICE_TERMINAL())
       ).to.be.revertedWithCustomError(vault, 'NotLaunchpad');
     });
 
@@ -590,10 +852,10 @@ describe('CurveLaunchpad', function () {
 
     it('harvest zbiera oplaty LP i dzieli je 60/40, wyplata jest pullem', async function () {
       const pos = await vault.positionOf(token);
-      const keys = await pad.poolKeys(token);
+      const key = await pad.poolKeyOf(token);
       const fee0 = ethers.parseEther('0.01');
       const fee1 = ethers.parseEther('1000');
-      await pm.setPendingFees(plainKey(keys[0]), fee0, fee1);
+      await pm.setPendingFees(plainKey(key), fee0, fee1);
       // Pula musi miec z czego wyplacic - w prawdziwym v4 te srodki pochodza
       // ze swapow; tutaj wstrzykujemy je wprost.
       await deployer.sendTransaction({ to: POOL_MANAGER, value: fee0 });

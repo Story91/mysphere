@@ -51,6 +51,22 @@ struct ModifyLiquidityParams {
     bytes32 salt;
 }
 
+/**
+ * Parametry wymiany. Nie wolamy `swap` ani razu - ta struktura istnieje po to,
+ * zeby hook mogl przeczytac, o co chodzilo w wymianie, ktora wlasnie przeszla.
+ *
+ * ZNAK `amountSpecified` JEST TU CALA TRESCIA:
+ *   < 0  wolajacy podal WEJSCIE  ("mam tyle ETH, daj ile wyjdzie")
+ *   > 0  wolajacy podal WYJSCIE  ("chce tyle tokena, wezmij ile trzeba")
+ * Ktora waluta jest "podana", a ktora "niepodana", zalezy wiec od znaku
+ * ORAZ od kierunku - rozstrzyga to `B20LaunchHook._unspecifiedIsCurrency1`.
+ */
+struct SwapParams {
+    bool zeroForOne;
+    int256 amountSpecified;
+    uint160 sqrtPriceLimitX96;
+}
+
 interface IPoolManagerV4 {
     /** Rewertuje `PoolAlreadyInitialized`, jesli ktos byl tu przed nami. */
     function initialize(PoolKey memory key, uint160 sqrtPriceX96) external returns (int24 tick);
@@ -63,6 +79,19 @@ interface IPoolManagerV4 {
         ModifyLiquidityParams memory params,
         bytes calldata hookData
     ) external returns (int256 callerDelta, int256 feesAccrued);
+
+    /**
+     * Wymiana. NASZ kod produkcyjny nie wola tego ani razu - deklaracja istnieje
+     * dla sondy testowej, ktora musi wykonac prawdziwa wymiane na forku, zeby
+     * zmierzyc zachowanie hooka.
+     *
+     * Zwracana delta jest JUZ PO korekcie hooka: PoolManager oddaje `afterSwap`
+     * sterowanie, bierze od niego poprawke i dopiero potem ksieguje wynik
+     * wolajacemu. Wolajacy rozlicza sie wiec dokladnie z tego, co tu wraca.
+     */
+    function swap(PoolKey memory key, SwapParams memory params, bytes calldata hookData)
+        external
+        returns (int256 swapDelta);
 
     /** Natywne ETH placi sie tu wartoscia wywolania; token - przez sync + transfer + settle(). */
     function settle() external payable returns (uint256 paid);

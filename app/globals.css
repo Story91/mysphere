@@ -912,3 +912,20 @@ h1, h2, h3, h4, h5, h6 {
 @media (prefers-reduced-motion: reduce) {
   .b20-row { opacity: 1; transform: none; animation: none; }
 }
+
+/* Cienka tasma zdarzen Launchpada: ruch jest staly, ale znika po najechaniu,
+   zeby mozna bylo spokojnie przeczytac pojedynczy zakup. */
+.launchpad-marquee {
+  animation: launchpad-marquee 34s linear infinite;
+}
+.launchpad-ticker:hover .launchpad-marquee,
+.launchpad-ticker:focus-within .launchpad-marquee {
+  animation-play-state: paused;
+}
+@keyframes launchpad-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-25%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .launchpad-marquee { animation: none; }
+}

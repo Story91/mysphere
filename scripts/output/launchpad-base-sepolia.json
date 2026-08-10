@@ -1,0 +1,15 @@
+{
+  "chainId": 84532,
+  "network": "base-sepolia",
+  "poolManager": "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+  "tokenFactory": "0xe90c0c59574ec67ff34b0CfE45855d6D07B50d15",
+  "launchpad": "0x0712b9EA9bB0118f4F751Cb44553F095bF9c0844",
+  "vault": "0x56e80fA947EF10F965510E161760561c127e4bBb",
+  "hook": "0xad5f38BAC2ded467f83D1eef440B0c386acF2044",
+  "feeBps": "100",
+  "creatorFeeBps": "60",
+  "protocolShareBps": "6000",
+  "feeRecipient": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "deployBlock": 45298476,
+  "recordedAt": "2026-08-10T12:36:46.058Z"
+}
