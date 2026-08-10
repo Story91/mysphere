@@ -29,6 +29,29 @@ function parseEvent(contract: Contract, receipt: ContractTransactionReceipt, eve
   throw new Error(`Brak eventu ${eventName}.`);
 }
 
+/**
+ * Powtarza ODCZYT, gdy wezel nie ma jeszcze swiezego stanu.
+ *
+ * Rozroznienie jest tu wazne: powtarzamy wylacznie odczyty. Transakcji nie
+ * wolno powtarzac na slepo - druga proba to druga transakcja i drugie
+ * wydane ETH.
+ */
+async function retryRead<T>(label: string, read: () => Promise<T>, attempts = 8): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await read();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        console.log(`oczekuje na propagacje RPC (${label}, ${attempt}/${attempts - 1})`);
+        await new Promise((resolve) => setTimeout(resolve, 2_000));
+      }
+    }
+  }
+  throw lastError;
+}
+
 async function waitForLaunchWindow(startedAt: bigint) {
   const target = Number(startedAt) + LAUNCH_WINDOW + 1;
   while (true) {
@@ -84,13 +107,22 @@ async function main() {
   const launchReceipt = (await launchTx.wait())!;
   const launched = parseEvent(pad, launchReceipt, "Launched");
   const token = getAddress(launched.args[0]);
+  // `launchOf` oddaje (creator, state, ethReserve, tokenReserve, startedAt,
+  // launchId). Bylo tu `[2]`, czyli ethReserve - a wiec ZERO zamiast znacznika
+  // czasu. Okno startowe "konczylo sie" wtedy w 1970 roku i skrypt kupowal
+  // NATYCHMIAST po starcie, czyli w srodku okna, gdzie obowiazuje limit
+  // `WINDOW_ADDR_CAP` (16 mln tokenow). Kupno za 3 ETH bierze 800 mln, wiec
+  // odbijaloby sie o `WindowCap`.
   const launchState = await pad.launchOf(token);
   console.log("token   ", token);
   console.log("launch  ", receiptSummary(launchReceipt));
 
-  await waitForLaunchWindow(launchState[2]);
+  await waitForLaunchWindow(launchState[4]);
 
-  const quote = await pad.quoteBuy(token, buyEth);
+  // Odczyt tuz po transakcji trafia czasem na wezel, ktory nie ma jeszcze
+  // nowego stanu - i oddaje goly `execution reverted`, wygladajacy jak blad
+  // kontraktu. Ta sama pulapka jest juz obsluzona w `deploy.ts`.
+  const quote = await retryRead("quoteBuy", () => pad.quoteBuy(token, buyEth));
   const minTokensOut = (quote[0] * 9950n) / 10_000n;
   if (minTokensOut === 0n) throw new Error("Quote kupna zwrocil zero tokenow.");
   const buyDeadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
