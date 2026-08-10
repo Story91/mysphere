@@ -1134,6 +1134,26 @@ export default function LaunchTokenModal({
 
         {/* -------------------------------- TRESC ------------------------------- */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+          {/* ZLA SIEC W PORTFELU. Klik "Launch" i tak przelacza automatycznie
+              (ensureSepolia -> switchChainAsync), ale przy dwoch sieciach lepiej
+              POWIEDZIEC to wyraznie, niz liczyc, ze podpowie o tym jedna linijka
+              w podsumowaniu. Mowimy tez, jak zmienic SAM launchpad na inna siec
+              (przelacznik obok Launch), zeby nie mylic "sieci portfela" z
+              "sieci launchpada". */}
+          {phase === 'form' && isConnected && !onSepolia && (
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#f3c58a] bg-[#fff8ed] px-3.5 py-3">
+              <Globe className="mt-0.5 h-4 w-4 shrink-0 text-[#c76b12]" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12.5px] font-extrabold text-[#8c4a0b]">Your wallet is on another network</p>
+                <p className="mt-0.5 text-[11.5px] leading-[1.45] text-[#a34b08]">
+                  Startpad is set to <span className="font-bold">{LAUNCHPAD_CHAIN.name}</span>. Clicking
+                  Launch will ask your wallet to switch there — approve it in your wallet. To point
+                  Startpad at a different network instead, use the network switch next to the Launch
+                  button.
+                </p>
+              </div>
+            </div>
+          )}
           {phase === 'success' && launched ? (
             <div className="mx-auto flex max-w-[420px] flex-col items-center py-6 text-center">
               <CheckCircle2 className="h-14 w-14 text-[#18bd64]" aria-hidden="true" />
