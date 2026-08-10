@@ -80,6 +80,12 @@ type BoardToken = LaunchpadToken & {
   lastTradeAt?: number;
   /** Nowy `seq` restartuje animacje blysku; pola nie trzeba czyscic. */
   flash?: { tone: 'buy' | 'sell'; seq: number };
+  /**
+   * Zarobki NALICZONE tworcy z tego jednego tokena (wei). Ta sama liczba,
+   * ktora Top earnings sumuje per tworca - tu trzymana per token, zeby sekcja
+   * "My tokens" nie musiala liczyc niczego od nowa.
+   */
+  creatorAccruedWei?: bigint;
 };
 
 /**
@@ -246,15 +252,14 @@ function LaunchCard({
   animationsOn,
   ethUsd,
   onTrade,
-  onSelect,
-  onDetails,
+  onOpen,
 }: {
   token: BoardToken;
   animationsOn: boolean;
   ethUsd: number | null;
   onTrade: () => void;
-  onSelect: () => void;
-  onDetails: () => void;
+  /** Klik w nazwe/symbol = strona tokena. Nie ma juz samego "zaznaczenia". */
+  onOpen: () => void;
 }) {
   const progress = curvePercent(token);
   const status = curveStatusLabel(token);
@@ -278,10 +283,10 @@ function LaunchCard({
     <div className="relative flex flex-col rounded-[18px] border border-black/10 bg-white p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
       {animationsOn && <TradeFlash flash={token.flash} rounded="rounded-[18px]" />}
       {/* Wiersz podgladowy jest proba ukladu, nie rynkiem - nic na nim nie klika. */}
-      {sample ? (
+      {sample || !token.address ? (
         <div className="flex min-w-0 items-start gap-3">{header}</div>
       ) : (
-        <button type="button" onClick={onSelect} className="flex min-w-0 items-start gap-3 text-left">{header}</button>
+        <button type="button" onClick={onOpen} className="flex min-w-0 items-start gap-3 text-left">{header}</button>
       )}
 
       <div className="mt-4">
@@ -301,8 +306,8 @@ function LaunchCard({
       {!sample && (
         <div className="mt-4 flex items-center gap-2">
           <button type="button" onClick={onTrade} className="flex-1 rounded-full bg-soft-primary px-3 py-2 text-[12px] font-extrabold text-white">Trade</button>
-          {/* Bez adresu "Details" prowadziloby na /launchpad/undefined. */}
-          {token.address && <button type="button" onClick={onDetails} className="rounded-full border border-black/15 bg-white px-3 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">Details</button>}
+          {/* Bez adresu "Details" prowadziloby na /startpad/undefined. */}
+          {token.address && <button type="button" onClick={onOpen} className="rounded-full border border-black/15 bg-white px-3 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">Details</button>}
         </div>
       )}
     </div>
@@ -354,7 +359,67 @@ function KingOfTheHill({ token, ethUsd, onTrade, onDetails }: { token: BoardToke
   );
 }
 
-type ActivityItem = { id: string; symbol: string; accent: string; label: string; tone: 'launch' | 'buy' | 'sell' | 'graduate' };
+type ActivityItem = {
+  id: string;
+  /** Adres tokena - klucz do doklejenia logo i symbolu z tablicy rynku. */
+  address?: string;
+  symbol: string;
+  accent: string;
+  label: string;
+  tone: 'launch' | 'buy' | 'sell' | 'graduate';
+  logoUrl?: string;
+};
+
+/**
+ * Ciemniejszy odcien akcentu do gradientu glifu. Akcenty sa zawsze zapisem
+ * #rrggbb (patrz ACCENTS), wiec proste skalowanie kanalow wystarcza - a przy
+ * nietypowym wejsciu oddajemy kolor bez zmian zamiast produkowac smieci.
+ */
+function darkenAccent(hex: string, factor = 0.55): string {
+  const raw = hex.replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(raw)) return hex;
+  const channel = (offset: number) =>
+    Math.round(parseInt(raw.slice(offset, offset + 2), 16) * factor)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${channel(0)}${channel(2)}${channel(4)}`;
+}
+
+const FEED_TONE_DOT: Record<ActivityItem['tone'], string> = {
+  buy: '#18bd64',
+  sell: '#c76b12',
+  launch: '#7c6bda',
+  graduate: '#0b9a51',
+};
+
+/**
+ * Glif tasmy zdarzen: logo tokena, gdy je znamy, inaczej kolko z gradientem
+ * akcentu i inicjalem symbolu. Kierunek buy/sell siedzi w malej kropce na
+ * rogu - kolor glifu nalezy do TOKENA, nie do kierunku transakcji.
+ */
+function FeedGlyph({ item }: { item: ActivityItem }) {
+  return (
+    <span className="relative h-7 w-7 shrink-0" aria-hidden="true">
+      <span
+        className="flex h-full w-full items-center justify-center overflow-hidden rounded-full text-[9px] font-extrabold text-white ring-1 ring-black/10"
+        style={{ background: `linear-gradient(135deg, ${item.accent}, ${darkenAccent(item.accent)})` }}
+      >
+        {item.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.logoUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" loading="lazy" />
+        ) : (
+          // Symbol z zywego feedu bywa skroconym adresem - inicjal "0" nic by
+          // nie mowil, wiec przedrostek 0x schodzi przed wyborem litery.
+          item.symbol.replace(/^0x/i, '').slice(0, 1).toUpperCase()
+        )}
+      </span>
+      <span
+        className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white"
+        style={{ backgroundColor: FEED_TONE_DOT[item.tone] }}
+      />
+    </span>
+  );
+}
 
 /**
  * Szyna zdarzen na zywo - PIONOWA i przyklejona z boku rynku.
@@ -379,7 +444,7 @@ function LiveRail({ events }: { events: ActivityItem[] }) {
           : 'text-[#5f4ec2]';
 
   return (
-    <aside className="hidden lg:block" aria-label="Live Launchpad events">
+    <aside className="hidden lg:block" aria-label="Live Startpad events">
       <div className="sticky top-4 rounded-[20px] border border-black/10 bg-white">
         <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
           <h2 className="text-[13px] font-extrabold text-[#16141b]">Live tape</h2>
@@ -397,7 +462,7 @@ function LiveRail({ events }: { events: ActivityItem[] }) {
             <ul className="divide-y divide-black/5">
               {events.slice(0, 30).map((event) => (
                 <li key={event.id} className="flex items-center gap-2.5 px-4 py-2.5">
-                  <span className="h-6 w-6 shrink-0 rounded-lg" style={{ backgroundColor: event.accent }} aria-hidden="true" />
+                  <FeedGlyph item={event} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12px] font-extrabold text-[#16141b]">{event.symbol}</span>
                     <span className={`block text-[10.5px] font-bold ${toneClass(event.tone)}`}>{event.label}</span>
@@ -415,17 +480,17 @@ function LiveRail({ events }: { events: ActivityItem[] }) {
 function ActivityTicker({ events }: { events: ActivityItem[] }) {
   const items = [...events, ...events].slice(0, 16);
   return (
-    <div className="launchpad-ticker -mx-4 overflow-hidden border-b border-black/10 bg-white sm:-mx-6" aria-label="Live Launchpad events">
+    <div className="launchpad-ticker -mx-4 overflow-hidden border-b border-black/10 bg-white sm:-mx-6" aria-label="Live Startpad events">
       <div className={`${events.length ? 'launchpad-marquee' : ''} flex min-h-[38px] min-w-max items-center gap-1.5 px-2 py-1.5`}>
         {items.length ? items.map((event, index) => (
           <div key={`${event.id}-${index}`} className="flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-extrabold text-white" style={{ backgroundColor: event.accent }}>{event.symbol.slice(0, 1)}</span>
+            <FeedGlyph item={event} />
             <span className="pr-1 text-left leading-tight">
               <span className="block text-[10px] font-bold text-[#16141b]">{event.symbol}</span>
               <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-[#a34b08]' : event.tone === 'buy' ? 'text-[#0b9a51]' : event.tone === 'graduate' ? 'text-[#0b7a41]' : 'text-[#5f4ec2]'}`}>{event.label}</span>
             </span>
           </div>
-        )) : <span className="px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-black/35">Listening for live Launchpad events...</span>}
+        )) : <span className="px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-black/35">Listening for live Startpad events...</span>}
       </div>
     </div>
   );
@@ -461,7 +526,7 @@ function BoardStats({ totalRaised, totalVolume, totalTrades, liveCount, ethUsd }
   );
 }
 
-function TopLaunches({ tokens, onSelect }: { tokens: BoardToken[]; onSelect: (id: string) => void }) {
+function TopLaunches({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token: BoardToken) => void }) {
   const top = [...tokens].sort((a, b) => b.raised - a.raised).slice(0, 3);
   return (
     <section className="rounded-[20px] border border-black/10 bg-white p-5">
@@ -470,20 +535,29 @@ function TopLaunches({ tokens, onSelect }: { tokens: BoardToken[]; onSelect: (id
         <TrendingUp className="h-4 w-4 text-[#7c6bda]" aria-hidden="true" />
       </div>
       <div className="mt-5 grid grid-cols-3 gap-3">
-        {top.map((token) => (
-          <button key={token.id} type="button" onClick={() => onSelect(token.id)} className="group min-w-0 text-center">
-            <span className="mx-auto block w-fit transition-transform group-hover:-translate-y-1"><TokenGlyph token={token} large /></span>
-            <span className="mt-2 block truncate text-[12px] font-extrabold text-[#16141b]">{token.symbol}</span>
-            <span className="mt-1 block truncate text-[11px] text-black/50">{formatEth(token.raised)}</span>
-          </button>
-        ))}
+        {top.map((token) => {
+          const body = (
+            <>
+              <span className="mx-auto block w-fit transition-transform group-hover:-translate-y-1"><TokenGlyph token={token} large /></span>
+              <span className="mt-2 block truncate text-[12px] font-extrabold text-[#16141b]">{token.symbol}</span>
+              <span className="mt-1 block truncate text-[11px] text-black/50">{formatEth(token.raised)}</span>
+            </>
+          );
+          // Wiersze przykladowe nie maja adresu - nie ma dokad nawigowac.
+          return token.address ? (
+            <button key={token.id} type="button" onClick={() => onOpen(token)} className="group min-w-0 text-center">{body}</button>
+          ) : (
+            <div key={token.id} className="min-w-0 text-center">{body}</div>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-function VolumePanel({ tokens, onSelect }: { tokens: BoardToken[]; onSelect: (id: string) => void }) {
+function VolumePanel({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token: BoardToken) => void }) {
   const top = [...tokens].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0)).slice(0, 3);
+  const rowClass = 'grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-3 py-2 text-left';
   return (
     <section className="rounded-[20px] border border-black/10 bg-white p-5">
       <div className="flex items-center justify-between">
@@ -494,13 +568,21 @@ function VolumePanel({ tokens, onSelect }: { tokens: BoardToken[]; onSelect: (id
         <span>Coin</span><span>Volume</span><span>Trades</span>
       </div>
       <div className="mt-2 divide-y divide-black/10">
-        {top.map((token) => (
-          <button key={token.id} type="button" onClick={() => onSelect(token.id)} className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-3 py-2 text-left">
-            <span className="flex min-w-0 items-center gap-2"><TokenGlyph token={token} /><span className="truncate text-[12px] font-extrabold text-[#16141b]">{token.symbol}</span></span>
-            <span className="text-[12px] font-bold text-[#16141b]">{formatEth(token.volume ?? 0)}</span>
-            <span className="text-[12px] font-bold text-black/60">{token.trades ?? 0}</span>
-          </button>
-        ))}
+        {top.map((token) => {
+          const cells = (
+            <>
+              <span className="flex min-w-0 items-center gap-2"><TokenGlyph token={token} /><span className="truncate text-[12px] font-extrabold text-[#16141b]">{token.symbol}</span></span>
+              <span className="text-[12px] font-bold text-[#16141b]">{formatEth(token.volume ?? 0)}</span>
+              <span className="text-[12px] font-bold text-black/60">{token.trades ?? 0}</span>
+            </>
+          );
+          // Wiersze przykladowe nie maja adresu - nie ma dokad nawigowac.
+          return token.address ? (
+            <button key={token.id} type="button" onClick={() => onOpen(token)} className={rowClass}>{cells}</button>
+          ) : (
+            <div key={token.id} className={rowClass}>{cells}</div>
+          );
+        })}
       </div>
     </section>
   );
@@ -520,7 +602,7 @@ function TopEarnings({ rows, ethUsd }: { rows: CreatorEarnings[]; ethUsd: number
         <h2 className="text-[16px] font-extrabold text-[#16141b]">Top earnings</h2>
         <Crown className="h-4 w-4 text-[#d99a1b]" aria-hidden="true" />
       </div>
-      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-black/40">Creator earnings accrued on-chain</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-black/40">Creator-side fees accrued on-chain - protocol share excluded, claims separate</p>
       {rows.length === 0 ? (
         <p className="mt-4 text-[11.5px] leading-[1.5] text-black/45">
           No creator fees indexed yet. Every curve trade and pool swap accrues a creator share that shows up here.
@@ -567,20 +649,132 @@ function TopEarnings({ rows, ethUsd }: { rows: CreatorEarnings[]; ethUsd: number
   );
 }
 
+/** Salda do wyplaty podlaczonego portfela - trzy zrodla, kazde per KONTO. */
+type MyClaimable = { launch: bigint; hookEth: bigint; vaultEth: bigint };
+
+/**
+ * Portfel tworcy: tokeny wystartowane z podlaczonego adresu. Zarobki sa per
+ * token (naliczenia z loadBoard, te same co w Top earnings), ale wyplata jest
+ * per KONTO - launchpad, hook i vault prowadza jedno saldo ETH na adres -
+ * dlatego Claim stoi w naglowku sekcji, a nie przy wierszach.
+ */
+function MyTokensPanel({
+  tokens,
+  claimable,
+  claimBusy,
+  ethUsd,
+  onClaim,
+  onOpen,
+  onLaunch,
+}: {
+  tokens: BoardToken[];
+  claimable: MyClaimable | null;
+  claimBusy: boolean;
+  ethUsd: number | null;
+  onClaim: () => void;
+  onOpen: (token: BoardToken) => void;
+  onLaunch: () => void;
+}) {
+  const totalClaimable = claimable ? claimable.launch + claimable.hookEth + claimable.vaultEth : 0n;
+  const claimEth = Number(formatEther(totalClaimable));
+  const claimNote = usdNote(claimEth, ethUsd);
+  return (
+    <section className="mt-5 rounded-[20px] border border-black/10 bg-white p-5" aria-label="My tokens">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-[16px] font-extrabold text-[#16141b]">
+            <WalletCards className="h-4 w-4 text-soft-primary" aria-hidden="true" /> My tokens
+          </h2>
+          <p className="mt-1 text-[11px] text-black/45">Launches created by your connected wallet · earnings accrue on-chain</p>
+        </div>
+        {totalClaimable > 0n && (
+          <span className="flex items-center gap-2.5 rounded-full bg-[#f0fff5] py-1.5 pl-3.5 pr-1.5">
+            <span className="text-[12px] font-extrabold text-[#08753d]">
+              {claimEth.toFixed(4)} ETH claimable{claimNote && <span className="font-bold text-[#08753d]/70"> · {claimNote}</span>}
+            </span>
+            <button
+              type="button"
+              disabled={claimBusy}
+              onClick={onClaim}
+              className="rounded-full bg-[#0b9a51] px-3.5 py-1.5 text-[11px] font-extrabold text-white disabled:opacity-60"
+            >
+              {claimBusy ? 'Claiming...' : 'Claim'}
+            </button>
+          </span>
+        )}
+      </div>
+      {tokens.length === 0 ? (
+        <div className="mt-4 flex flex-col items-center gap-3 rounded-xl bg-[#fafafd] px-4 py-8 text-center">
+          <p className="text-[13px] font-bold text-black/50">You have not launched anything yet</p>
+          <button type="button" onClick={onLaunch} className="inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[12px] font-extrabold text-white">
+            <Plus className="h-4 w-4" aria-hidden="true" /> Launch
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2 divide-y divide-black/5">
+          {tokens.map((token) => {
+            const progress = curvePercent(token);
+            const earnedEth = Number(formatEther(token.creatorAccruedWei ?? 0n));
+            const earnedNote = usdNote(earnedEth, ethUsd);
+            return (
+              <div key={token.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 sm:flex-nowrap">
+                <button type="button" onClick={() => onOpen(token)} className="flex min-w-0 flex-1 basis-[220px] items-center gap-3 text-left">
+                  <TokenGlyph token={token} />
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-[14px] font-extrabold text-[#16141b]">{token.symbol}</span>
+                      <StatePill state={token.state} />
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11.5px] text-black/50">{token.name}</span>
+                  </span>
+                </button>
+                <div className="w-full shrink-0 sm:w-[170px]">
+                  <div className="flex items-baseline justify-between gap-2 text-[11px]">
+                    <span className="font-extrabold text-[#16141b]">{formatEth(token.raised)}</span>
+                    <span className="text-black/40">{progress}%</span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/8">
+                    <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${progress}%`, backgroundColor: token.accent }} />
+                  </div>
+                </div>
+                <div className="w-[92px] shrink-0">
+                  <span className="block text-[12px] font-bold text-[#16141b]">{formatEth(token.volume ?? 0)}</span>
+                  <span className="block text-[10px] text-black/40">volume</span>
+                </div>
+                <div className="w-[118px] shrink-0">
+                  <span className="block text-[12px] font-extrabold text-[#0b9a51]">{earnedEth.toFixed(4)} ETH</span>
+                  <span className="block text-[10px] text-black/40">{earnedNote ? `${earnedNote} accrued` : 'accrued earnings'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpen(token)}
+                  className="ml-auto shrink-0 rounded-full p-2 text-black/40 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]"
+                  aria-label={`Open ${token.symbol} page`}
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function LaunchTableRow({
   token,
   animationsOn,
   ethUsd,
   onTrade,
-  onSelect,
-  onDetails,
+  onOpen,
 }: {
   token: BoardToken;
   animationsOn: boolean;
   ethUsd: number | null;
   onTrade: () => void;
-  onSelect: () => void;
-  onDetails: () => void;
+  /** Klik w nazwe/symbol = strona tokena. Nie ma juz samego "zaznaczenia". */
+  onOpen: () => void;
 }) {
   const status = curveStatusLabel(token);
   const sample = !token.live;
@@ -598,10 +792,10 @@ function LaunchTableRow({
   return (
     <div className="relative grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] items-center gap-4 border-t border-black/10 px-4 py-3.5 text-left transition-colors hover:bg-[#fff8fc] sm:px-5">
       {animationsOn && <TradeFlash flash={token.flash} rounded="rounded-none" />}
-      {sample ? (
+      {sample || !token.address ? (
         <div className="flex min-w-0 items-center gap-3">{coinCell}</div>
       ) : (
-        <button type="button" onClick={onSelect} className="flex min-w-0 items-center gap-3 text-left">{coinCell}</button>
+        <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-3 text-left">{coinCell}</button>
       )}
       <div><span className="block text-[14px] font-extrabold text-[#16141b]">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-black/40"> · {raisedNote}</span>}</span><span className={`mt-1 block text-[11px] font-bold ${status.className}`}>{status.text}</span></div>
       <div><span className="block text-[14px] font-bold text-[#16141b]">{formatEth(token.volume ?? 0)}{volNote && <span className="text-[11px] font-bold text-black/40"> · {volNote}</span>}</span><span className="mt-1 block text-[11px] text-black/45">indexed volume</span></div>
@@ -610,7 +804,7 @@ function LaunchTableRow({
       {sample ? (
         <span />
       ) : (
-        <span className="flex items-center gap-1.5"><button type="button" onClick={onTrade} className="rounded-full border border-black/15 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] shadow-sm transition-colors hover:border-[#7c6bda] hover:text-[#5f4ec2]">Trade</button>{token.address && <button type="button" onClick={onDetails} className="rounded-full p-2 text-black/40 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]" aria-label={`Open ${token.symbol} details`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></button>}</span>
+        <span className="flex items-center gap-1.5"><button type="button" onClick={onTrade} className="rounded-full border border-black/15 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] shadow-sm transition-colors hover:border-[#7c6bda] hover:text-[#5f4ec2]">Trade</button>{token.address && <button type="button" onClick={onOpen} className="rounded-full p-2 text-black/40 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]" aria-label={`Open ${token.symbol} details`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></button>}</span>
       )}
     </div>
   );
@@ -662,7 +856,7 @@ function TradePanel({
   // ETH pozostaje wartoscia glowna wyceny; dopisek USD znika przy braku kursu.
   const sellQuoteNote = sellQuote === null ? null : usdNote(Number(formatEther(sellQuote)), ethUsd);
   const claimRows = details ? [
-    { label: 'Launchpad fees', value: formatEther(details.launchClaimable), amount: details.launchClaimable, source: 'launch' as const },
+    { label: 'Startpad fees (curve)', value: formatEther(details.launchClaimable), amount: details.launchClaimable, source: 'launch' as const },
     { label: 'Hook ETH', value: formatEther(details.hookEthClaimable), amount: details.hookEthClaimable, source: 'hookEth' as const },
     { label: 'Hook token', value: formatUnits(details.hookTokenClaimable, decimals), amount: details.hookTokenClaimable, source: 'hookToken' as const },
     { label: 'Vault ETH', value: formatEther(details.vaultEthClaimable), amount: details.vaultEthClaimable, source: 'vaultEth' as const },
@@ -720,6 +914,9 @@ const SOLD_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Sold' });
 // Rozliczenia oplat puli po graduacji emituje HOOK, nie launchpad - stad
 // drugi adres w skanie. Tablicy zarobkow wystarczy pole `ethToCreator`.
 const HOOK_FEE_SETTLED_EVENT = getAbiItem({ abi: hookAbi, name: 'HookFeeSettled' });
+// Kazde naliczenie co do wei per ODBIORCA - jedyne zrodlo, ktore rozlicza
+// takze splity miedzy odbiorcow fee. kind 1 = strona tworcy oplaty handlowej.
+const FEE_ACCRUED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'FeeAccrued' });
 
 const ACCENTS = ['#8b78e6', '#5fa78c', '#d78a55', '#5b8bd9', '#d9628a', '#4fa3a8'];
 
@@ -780,6 +977,9 @@ export default function LaunchpadBoard() {
   const [sellQuote, setSellQuote] = useState<bigint | null>(null);
   const [details, setDetails] = useState<TokenDetails | null>(null);
   const [gradReward, setGradReward] = useState<bigint | null>(null);
+  // Salda do wyplaty podlaczonego portfela - jedno saldo ETH per adres w
+  // launchpadzie, hooku i vaulcie. Null znaczy "brak odczytu", nie zero.
+  const [myClaimable, setMyClaimable] = useState<MyClaimable | null>(null);
   // Licznik blyskow. `Date.now()` nie wystarcza: dwa eventy w tej samej
   // milisekundzie daloby ten sam `key` i animacja by sie nie zrestartowala.
   const flashSeq = useRef(0);
@@ -826,11 +1026,13 @@ export default function LaunchpadBoard() {
       const launched = new Map<Address, { name: string; symbol: string; creator: Address; startedAt: number }>();
       const buyers = new Map<Address, Set<Address>>();
       const activity = new Map<Address, { volume: number; trades: number }>();
-      // Surowce tablicy zarobkow: suma feeEth per token (krzywa) i suma
-      // ethToCreator per token (rozliczenia hooka). Wei w bigint - na number
-      // przechodzimy dopiero przy wyswietlaniu.
-      const curveFees = new Map<Address, bigint>();
+      // Surowce tablicy zarobkow. Wei w bigint - na number przechodzimy
+      // dopiero przy wyswietlaniu.
       const hookCreatorEth = new Map<Address, bigint>();
+      // FeeAccrued kind 1: dokladne naliczenia strony tworcy per ODBIORCA
+      // per token. Klucz lowercase; accountDisplay trzyma forme z checksumem.
+      const creatorSideEarned = new Map<string, Map<Address, bigint>>();
+      const accountDisplay = new Map<string, Address>();
       // Okna ida od NAJNOWSZEGO wstecz, wiec kolejnosc napotkania nie jest
       // chronologia - kazdy wpis niesie klucz (blok, logIndex) do posortowania.
       const priceEntries = new Map<Address, Array<{ order: number; price: number }>>();
@@ -859,7 +1061,7 @@ export default function LaunchpadBoard() {
         // podwoilby liczbe requestow do publicznego RPC.
         const logs = await readClient.getLogs({
           address: [LAUNCHPAD_ADDRESS as Address, LAUNCH_HOOK_ADDRESS as Address],
-          events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT],
+          events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT, FEE_ACCRUED_EVENT],
           fromBlock,
           toBlock,
         });
@@ -878,8 +1080,6 @@ export default function LaunchpadBoard() {
             const set = buyers.get(token) ?? new Set<Address>();
             set.add(log.args.buyer as Address);
             buyers.set(token, set);
-            const feeEth = log.args.feeEth as bigint | undefined;
-            if (feeEth) curveFees.set(token, (curveFees.get(token) ?? 0n) + feeEth);
             const ethNet = Number(formatEther(log.args.ethNet as bigint));
             const current = activity.get(token) ?? { volume: 0, trades: 0 };
             activity.set(token, { volume: current.volume + ethNet, trades: current.trades + 1 });
@@ -889,8 +1089,6 @@ export default function LaunchpadBoard() {
             const set = buyers.get(token) ?? new Set<Address>();
             set.add(log.args.seller as Address);
             buyers.set(token, set);
-            const feeEth = log.args.feeEth as bigint | undefined;
-            if (feeEth) curveFees.set(token, (curveFees.get(token) ?? 0n) + feeEth);
             const ethOut = Number(formatEther(log.args.ethOut as bigint));
             const current = activity.get(token) ?? { volume: 0, trades: 0 };
             activity.set(token, { volume: current.volume + ethOut, trades: current.trades + 1 });
@@ -902,6 +1100,21 @@ export default function LaunchpadBoard() {
             // wiec ethToCreator sumujemy wprost - bez odtwarzania podzialu.
             const ethToCreator = log.args.ethToCreator as bigint | undefined;
             if (ethToCreator) hookCreatorEth.set(token, (hookCreatorEth.get(token) ?? 0n) + ethToCreator);
+          } else if (log.eventName === 'FeeAccrued') {
+            // kind 1 = strona TWORCY oplaty handlowej, per faktyczny ODBIORCA.
+            // To rozlicza splity miedzy odbiorcow co do wei - w przeciwienstwie
+            // do mnozenia feeEth przez konfiguracje, ktore przypisywalo cala
+            // dzialke tworcy jego adresowi.
+            const kind = Number(log.args.kind ?? 255);
+            const accountAddr = log.args.account as Address | undefined;
+            const amount = log.args.amount as bigint | undefined;
+            if (kind === 1 && accountAddr && amount) {
+              const accountKey = accountAddr.toLowerCase();
+              accountDisplay.set(accountKey, accountAddr);
+              const perToken = creatorSideEarned.get(accountKey) ?? new Map<Address, bigint>();
+              perToken.set(token, (perToken.get(token) ?? 0n) + amount);
+              creatorSideEarned.set(accountKey, perToken);
+            }
           }
         }
         if (fromBlock === LAUNCHPAD_DEPLOY_BLOCK) break;
@@ -924,7 +1137,7 @@ export default function LaunchpadBoard() {
         rawFeed
           .sort((a, b) => b.order - a.order)
           .slice(0, 24)
-          .map((item) => ({ ...item, symbol: launched.get(item.token)?.symbol ?? shortAddress(item.token), accent: accentFor(item.token) }))
+          .map((item) => ({ ...item, address: item.token, symbol: launched.get(item.token)?.symbol ?? shortAddress(item.token), accent: accentFor(item.token) }))
       );
 
       const addresses = [...launched.keys()];
@@ -938,22 +1151,9 @@ export default function LaunchpadBoard() {
         })),
       });
 
-      // Udzial tworcy w oplacie krzywej jest PER TOKEN (launchAdvanced pozwala
-      // go obnizyc), wiec liczymy z feeConfigOf, a nie ze stalej kontraktu.
-      // Gdy odczyt padnie, pomijamy czesc krzywej tego tokena zamiast zgadywac.
-      const feeConfigs = await readClient
-        .multicall({
-          allowFailure: true,
-          contracts: addresses.map((token) => ({
-            address: LAUNCHPAD_ADDRESS as Address,
-            abi: launchpadAbi,
-            functionName: 'feeConfigOf' as const,
-            args: [token] as const,
-          })),
-        })
-        .catch(() => null);
-
-      const earningsByCreator = new Map<string, CreatorEarnings>();
+      // token -> (tworca, czy graduowany) - potrzebne do przypisania oplat
+      // hooka wlasciwemu kontu w tablicy zarobkow.
+      const tokenMeta = new Map<Address, { creator: Address; graduated: boolean }>();
       const live: BoardToken[] = [];
       addresses.forEach((token, index) => {
         const result = states[index];
@@ -970,25 +1170,16 @@ export default function LaunchpadBoard() {
         // Stan 0 znaczy "launchpad nie zna tego adresu". Zdarzenie z innego
         // wdrozenia pod tym samym adresem tablicy nie ma prawa tu wejsc.
         if (state === 0) return;
+        tokenMeta.set(token, { creator, graduated: LAUNCH_STATE[state] === 'Graduated' });
 
-        // Zarobki NALICZONE tworcy: czesc oplat krzywej wg konfiguracji tokena
-        // plus ethToCreator z rozliczen hooka. To accrual, nie wyplata -
-        // wyplata idzie osobnym claimem i tablica tego nie udaje.
-        let creatorWei = hookCreatorEth.get(token) ?? 0n;
-        const feeTotal = curveFees.get(token) ?? 0n;
-        const feeConfig = feeConfigs?.[index];
-        if (feeTotal > 0n && feeConfig?.status === 'success') {
-          const [feeBps, creatorFeeBps] = feeConfig.result as readonly [number, number, bigint];
-          // Start bez oplaty (feeBps 0) nie ma czego dzielic - i nie wolno
-          // nim dzielic.
-          if (feeBps > 0) creatorWei += (feeTotal * BigInt(creatorFeeBps)) / BigInt(feeBps);
-        }
-        const creatorKey = creator.toLowerCase();
-        const earned = earningsByCreator.get(creatorKey) ?? { creator, totalWei: 0n, tokenCount: 0, graduated: false };
-        earned.totalWei += creatorWei;
-        earned.tokenCount += 1;
-        if (LAUNCH_STATE[state] === 'Graduated') earned.graduated = true;
-        earningsByCreator.set(creatorKey, earned);
+        // Zarobki NALICZONE tworcy z JEGO wlasnego tokena: dokladne wpisy
+        // FeeAccrued (kind 1) na jego adres + ethToCreator z rozliczen hooka.
+        // Gdy tworca skierowal czesc oplat do innych odbiorcow, ich czesc
+        // tu NIE wchodzi - to sa "twoje zarobki", nie "zarobki wszystkich".
+        // To accrual, nie wyplata - wyplata idzie osobnym claimem.
+        const creatorWei =
+          (hookCreatorEth.get(token) ?? 0n) +
+          (creatorSideEarned.get(creator.toLowerCase())?.get(token) ?? 0n);
 
         const history = (priceEntries.get(token) ?? [])
           .sort((a, b) => a.order - b.order)
@@ -1012,6 +1203,7 @@ export default function LaunchpadBoard() {
           live: true,
           startedAt: Number(startedAt),
           prices: history,
+          creatorAccruedWei: creatorWei,
         });
       });
 
@@ -1021,11 +1213,36 @@ export default function LaunchpadBoard() {
         setTopEarners([]);
         return;
       }
-      // Do tablicy wchodza tylko tworcy z niezerowym naliczeniem - wiersz
+      // Tablica zarobkow per KONTO (nie per tworca tokena): FeeAccrued kind 1
+      // trafia do faktycznych odbiorcow (splity!), a ethToCreator z hooka do
+      // tworcy tokena. Dzieki temu liczby zgadzaja sie co do wei z tym, co
+      // kontrakt naprawde naliczyl kazdemu adresowi.
+      const earningsByAccount = new Map<string, CreatorEarnings & { tokens: Set<Address> }>();
+      const addEarned = (accountKey: string, display: Address, token: Address, wei: bigint) => {
+        if (wei <= 0n) return;
+        const entry =
+          earningsByAccount.get(accountKey) ??
+          ({ creator: display, totalWei: 0n, tokenCount: 0, graduated: false, tokens: new Set<Address>() } as CreatorEarnings & { tokens: Set<Address> });
+        entry.totalWei += wei;
+        entry.tokens.add(token);
+        if (tokenMeta.get(token)?.graduated) entry.graduated = true;
+        earningsByAccount.set(accountKey, entry);
+      };
+      for (const [accountKey, perToken] of creatorSideEarned) {
+        for (const [token, wei] of perToken) {
+          if (!tokenMeta.has(token)) continue;
+          addEarned(accountKey, accountDisplay.get(accountKey) ?? (accountKey as Address), token, wei);
+        }
+      }
+      for (const [token, wei] of hookCreatorEth) {
+        const meta = tokenMeta.get(token);
+        if (meta) addEarned(meta.creator.toLowerCase(), meta.creator, token, wei);
+      }
+      // Do tablicy wchodza tylko konta z niezerowym naliczeniem - wiersz
       // "0.0000 ETH" niczego by nie mowil i tylko udawal ranking.
       setTopEarners(
-        [...earningsByCreator.values()]
-          .filter((entry) => entry.totalWei > 0n)
+        [...earningsByAccount.values()]
+          .map((entry) => ({ ...entry, tokenCount: entry.tokens.size }))
           .sort((a, b) => (b.totalWei > a.totalWei ? 1 : b.totalWei < a.totalWei ? -1 : 0))
           .slice(0, 5)
       );
@@ -1084,7 +1301,7 @@ export default function LaunchpadBoard() {
 
           if (eventName === 'Launched') {
             const symbol = (decoded.args?.symbol as string) ?? shortAddress(token);
-            fresh.push({ id, symbol, accent: accentFor(token), label: 'Launched', tone: 'launch' });
+            fresh.push({ id, address: token, symbol, accent: accentFor(token), label: 'Launched', tone: 'launch' });
             setTokens((current) => {
               if (current.some((row) => row.address?.toLowerCase() === token.toLowerCase())) return current;
               const row: BoardToken = {
@@ -1119,6 +1336,7 @@ export default function LaunchpadBoard() {
             const graduated = eventName === 'Graduated';
             fresh.push({
               id,
+              address: token,
               symbol: shortAddress(token),
               accent: accentFor(token),
               label: graduated ? 'Graduated' : 'Curve closed',
@@ -1148,6 +1366,7 @@ export default function LaunchpadBoard() {
             : null;
           fresh.push({
             id,
+            address: token,
             symbol: shortAddress(token),
             accent: accentFor(token),
             label: `${isBuy ? 'Buy' : 'Sell'} ${eth === undefined ? '' : formatEth(Number(formatEther(eth)))}`.trim(),
@@ -1282,6 +1501,61 @@ export default function LaunchpadBoard() {
     return curveTokens.reduce((best, token) => (token.raised > best.raised ? token : best));
   }, [tokens]);
 
+  // Tokeny wystartowane z podlaczonego portfela - sekcja "My tokens" widzi
+  // tylko zywe wiersze, bo probki nie maja prawdziwego tworcy.
+  const myTokens = useMemo(() => {
+    if (!address) return [];
+    const mine = address.toLowerCase();
+    return tokens.filter((token) => token.live && token.creator.toLowerCase() === mine);
+  }, [address, tokens]);
+
+  // Tasma zdarzen zna tylko adres tokena; logo i czytelny symbol doklejamy
+  // z tablicy rynku przy renderze, wiec pozniejsze dociagniecie profili
+  // (Firestore) samo poprawia juz wyswietlone wpisy.
+  const feedEvents = useMemo(() => {
+    const byAddress = new Map<string, BoardToken>();
+    for (const token of tokens) {
+      if (token.address) byAddress.set(token.address.toLowerCase(), token);
+    }
+    return activityFeed.map((event) => {
+      const known = event.address ? byAddress.get(event.address.toLowerCase()) : undefined;
+      if (!known) return event;
+      return {
+        ...event,
+        logoUrl: known.logoUrl ?? event.logoUrl,
+        // Zywy feed wpisuje skrocony adres zamiast symbolu - gdy token jest
+        // juz na tablicy, pokazujemy jego prawdziwy ticker.
+        symbol: event.symbol.startsWith('0x') ? known.symbol : event.symbol,
+      };
+    });
+  }, [activityFeed, tokens]);
+
+  /**
+   * Trzy odczyty saldo-do-wyplaty dla podlaczonego adresu. Wzorzec z
+   * `refreshDetails`: rownolegle ready, a kazdy blad czysci stan zamiast
+   * zostawiac stara liczbe udajaca aktualna.
+   */
+  const refreshMyClaimable = useCallback(async () => {
+    if (!readClient || !address) {
+      setMyClaimable(null);
+      return;
+    }
+    try {
+      const [launch, hookEth, vaultEth] = await Promise.all([
+        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [address] }),
+        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [address] }),
+        readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [address] }),
+      ]);
+      setMyClaimable({ launch: launch as bigint, hookEth: hookEth as bigint, vaultEth: vaultEth as bigint });
+    } catch {
+      setMyClaimable(null);
+    }
+  }, [address, readClient]);
+
+  useEffect(() => {
+    void refreshMyClaimable();
+  }, [refreshMyClaimable]);
+
   const refreshDetails = useCallback(async () => {
     if (!readClient || !selected?.address) {
       setDetails(null);
@@ -1369,7 +1643,10 @@ export default function LaunchpadBoard() {
     };
   }, [details, readClient, selected?.address, sellAmount]);
 
-  const selectToken = (id: string, openTrade = false) => {
+  // Klik w nazwe nawiguje na strone tokena, wiec "zaznaczenie" istnieje juz
+  // tylko jako otwarcie modala handlu - stad parametr openTrade bez wartosci
+  // domyslnej: kazde wywolanie mowi wprost, po co zaznacza.
+  const selectToken = (id: string, openTrade: boolean) => {
     setSelectedId(id);
     setTradeOpen(openTrade);
   };
@@ -1579,6 +1856,45 @@ export default function LaunchpadBoard() {
       await readClient.waitForTransactionReceipt({ hash });
       setNotice({ kind: 'success', text: `Claim confirmed. ${hash.slice(0, 10)}...` });
       await refreshDetails();
+      await refreshMyClaimable();
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message.split('\n')[0] : String(error) });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * Wyplata sekcji "My tokens": po kolei kazde niezerowe zrodlo (launchpad,
+   * hook, vault). Trzy oddzielne kontrakty nie maja wspolnego multicalla,
+   * wiec portfel poprosi o podpis raz na zrodlo - w zamian jeden przycisk
+   * oproznia wszystko. Wzorzec transakcji ten sam co w `claim` wyzej.
+   */
+  const claimAllMine = async () => {
+    if (!address || !walletClient || !readClient || !myClaimable) {
+      setNotice({ kind: 'error', text: 'Connect a wallet before claiming.' });
+      return;
+    }
+    const calls = [
+      ...(myClaimable.launch > 0n ? [{ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claim' as const }] : []),
+      ...(myClaimable.hookEth > 0n ? [{ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimEth' as const }] : []),
+      ...(myClaimable.vaultEth > 0n ? [{ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimEth' as const }] : []),
+    ];
+    if (calls.length === 0) {
+      setNotice({ kind: 'error', text: 'Nothing to claim right now.' });
+      return;
+    }
+    if (!(await ensureSepolia())) return;
+    setBusy('claim');
+    setNotice(null);
+    try {
+      for (const call of calls) {
+        const hash = await walletClient.writeContract({ ...call, args: [], chain: LAUNCHPAD_CHAIN, account: address } as any);
+        await readClient.waitForTransactionReceipt({ hash });
+      }
+      setNotice({ kind: 'success', text: `Claim confirmed across ${calls.length} ${calls.length === 1 ? 'source' : 'sources'}.` });
+      await refreshMyClaimable();
+      await refreshDetails();
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message.split('\n')[0] : String(error) });
     } finally {
@@ -1609,23 +1925,20 @@ export default function LaunchpadBoard() {
       `}</style>
       <div className="mx-auto w-full max-w-[1280px]">
         <div className="lg:hidden">
-          <ActivityTicker events={activityFeed} />
+          <ActivityTicker events={feedEvents} />
         </div>
 
+        {/* Naglowek bez napisu i badge'a: zostaje wyszukiwarka (rosnie) i
+            przycisk Launch po prawej. Na telefonie wyszukiwarka schodzi pod
+            spod, a gorny wiersz trzyma sam przycisk przy prawej krawedzi. */}
         <div className="relative overflow-hidden py-5 sm:py-7">
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-soft-primary/[0.06] blur-3xl" />
-          <div className="relative flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <span className="font-soft-display text-[28px] font-extrabold tracking-[-0.02em] text-soft-primary-deep">MySphere <span className="text-soft-ink-muted">Launchpad</span></span>
-              <label className="relative hidden w-[300px] sm:block">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" aria-hidden="true" />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${FIELD} rounded-full bg-[#f3f3f5] pl-10`} placeholder="Search coins, creators" aria-label="Search coins and creators" />
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="hidden items-center gap-1.5 text-[12px] font-bold text-[#16141b] sm:inline-flex"><Zap className="h-4 w-4 text-soft-primary" aria-hidden="true" /> Launchpad mode</span>
-              <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-white shadow-[0_6px_16px_rgba(124,107,218,0.22)] transition-transform active:scale-[0.97]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
-            </div>
+          <div className="relative flex items-center gap-4">
+            <label className="relative hidden min-w-0 flex-1 max-w-[560px] sm:block">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" aria-hidden="true" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${FIELD} rounded-full bg-[#f3f3f5] pl-10`} placeholder="Search coins, creators" aria-label="Search coins and creators" />
+            </label>
+            <button type="button" onClick={() => setLaunchOpen(true)} className="ml-auto inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-white shadow-[0_6px_16px_rgba(124,107,218,0.22)] transition-transform active:scale-[0.97]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
           </div>
           <label className="relative mt-4 block sm:hidden">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" aria-hidden="true" />
@@ -1643,8 +1956,8 @@ export default function LaunchpadBoard() {
                 pierwszego ekranu, nie ciekawostka na dole. */}
             <div className="grid gap-4 sm:grid-cols-2">
               <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
-              <TopLaunches tokens={tokens} onSelect={(id) => selectToken(id)} />
-              <VolumePanel tokens={tokens} onSelect={(id) => selectToken(id)} />
+              <TopLaunches tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
+              <VolumePanel tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
               <TopEarnings rows={topEarners} ethUsd={ethUsd} />
             </div>
 
@@ -1653,7 +1966,20 @@ export default function LaunchpadBoard() {
                 token={kingToken}
                 ethUsd={ethUsd}
                 onTrade={() => selectToken(kingToken.id, true)}
-                onDetails={() => kingToken.address && router.push(`/launchpad/${kingToken.address}`)}
+                onDetails={() => kingToken.address && router.push(`/startpad/${kingToken.address}`)}
+              />
+            )}
+
+            {/* Portfel tworcy - tylko przy podlaczonym portfelu, nad rynkiem. */}
+            {isConnected && address && (
+              <MyTokensPanel
+                tokens={myTokens}
+                claimable={myClaimable}
+                claimBusy={busy === 'claim'}
+                ethUsd={ethUsd}
+                onClaim={() => void claimAllMine()}
+                onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)}
+                onLaunch={() => setLaunchOpen(true)}
               />
             )}
 
@@ -1666,9 +1992,9 @@ export default function LaunchpadBoard() {
               <span className="text-[11px] font-bold text-black/40">Base Sepolia</span>
             </div>
 
-            <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Launchpad market table">
+            <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market table">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Launchpad market</h2><p className="mt-1 text-[11px] text-black/45">{tokens.length === 0 && loadingBoard ? 'reading live launches from Base Sepolia...' : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : 'live event data from Base Sepolia'}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
+                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Startpad market</h2><p className="mt-1 text-[11px] text-black/45">{tokens.length === 0 && loadingBoard ? 'reading live launches from Base Sepolia...' : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : 'live event data from Base Sepolia'}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
                 <span className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={toggleAnimations} aria-pressed={animationsOn} className={`rounded-full border px-3 py-1.5 text-[11px] font-extrabold transition-colors ${animationsOn ? 'border-soft-primary/40 bg-soft-primary/10 text-soft-primary-deep' : 'border-black/10 bg-white text-black/45'}`}>
                     {animationsOn ? 'Animations on' : 'Animations off'}
@@ -1696,7 +2022,7 @@ export default function LaunchpadBoard() {
                     </div>
                   ) : visibleTokens.length > 0 ? (
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      {visibleTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onSelect={() => selectToken(token.id)} onTrade={() => selectToken(token.id, true)} onDetails={() => token.address && router.push(`/launchpad/${token.address}`)} />)}
+                      {visibleTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />)}
                     </div>
                   ) : (
                     <div className="py-14 text-center text-[13px] text-black/50">No launches in this view.</div>
@@ -1705,14 +2031,14 @@ export default function LaunchpadBoard() {
               ) : (
                 <div className="overflow-x-auto">
                   <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] gap-4 border-y border-black/10 bg-[#fafafd] px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/45 sm:px-5"><span>Coin</span><span>Curve</span><span>Indexed vol</span><span>Momentum</span><span>Creator</span><span /></div>
-                  {tokens.length === 0 && loadingBoard ? <div className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from Base Sepolia...</div> : visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onSelect={() => selectToken(token.id)} onTrade={() => selectToken(token.id, true)} onDetails={() => token.address && router.push(`/launchpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
+                  {tokens.length === 0 && loadingBoard ? <div className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from Base Sepolia...</div> : visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
                 </div>
               )}
-              <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Launchpad events and current onchain state.'}</div>
+              <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Startpad events and current onchain state.'}</div>
             </section>
           </div>
 
-          <LiveRail events={activityFeed} />
+          <LiveRail events={feedEvents} />
         </div>
       </div>
 
@@ -1735,7 +2061,7 @@ export default function LaunchpadBoard() {
             <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">Curve trade</p><h2 className="mt-1 text-[21px] font-extrabold text-[#16141b]">{selected.symbol} market</h2></div><button type="button" onClick={() => setTradeOpen(false)} className="rounded-full p-2 text-black/40 hover:bg-black/5 hover:text-[#16141b]" aria-label="Close dialog"><X className="h-5 w-5" aria-hidden="true" /></button></div>
             <div className="mt-5 flex items-center gap-3"><TokenGlyph token={selected} large /><div><div className="flex items-center gap-2"><span className="text-[16px] font-extrabold text-[#16141b]">{selected.symbol}</span><StatePill state={selected.state} /></div><p className="mt-1 text-[12px] text-black/45">{selected.name} · {curvePercent(selected)}% of curve</p></div></div>
             {selected.live ? <TradePanel token={selected} details={details} side={tradeSide} setSide={setTradeSide} buyAmount={buyAmount} setBuyAmount={setBuyAmount} sellAmount={sellAmount} setSellAmount={setSellAmount} sellQuote={sellQuote} gradReward={gradReward} busy={busy} ethUsd={ethUsd} onBuy={buy} onSell={sell} onGraduate={graduate} onSettle={settle} onHarvest={harvest} onClaim={claim} isConnected={isConnected} /> : <div className="mt-5 flex items-start gap-2 rounded-xl bg-[#f5f5f7] p-3 text-[11.5px] leading-[1.45] text-black/55"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><span>This is a sample row. Launch a token to activate the live trade panel.</span></div>}
-            <div className="mt-5 flex items-center justify-between border-t border-black/10 pt-4 text-[11px] text-black/45"><span>{selected.holders} holders · {selected.trades ?? 0} trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => router.push(`/launchpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
+            <div className="mt-5 flex items-center justify-between border-t border-black/10 pt-4 text-[11px] text-black/45"><span>{selected.holders} holders · {selected.trades ?? 0} trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => router.push(`/startpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
           </section>
         </div>
       )}

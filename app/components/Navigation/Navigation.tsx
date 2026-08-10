@@ -34,15 +34,12 @@ type NavLink = {
 const LINK_THEME: Record<string, { suffix: string }> = {
   MySphere: { suffix: 'text-fuchsia-700' },
   'Re-Definition': { suffix: 'text-soft-info' },
-  // Zielen zarezerwowana w tej aplikacji dla rozliczonych pieniedzy - ten sam
-  // kolor niesie kwota na paragonie i w rankingu.
-  Paid: { suffix: 'text-emerald-700' },
   // Firmowy niebieski Base zostaje niezmieniony - to znak sieci, nie ozdobnik.
   MyBase: { suffix: 'text-[#0052FF]' },
   MyCamp: { suffix: 'text-soft-accent-deep' },
   MyAgents: { suffix: 'text-cyan-700' },
   MyClaw: { suffix: 'text-red-600' },
-  Launchpad: { suffix: 'text-soft-primary-deep' },
+  Startpad: { suffix: 'text-soft-primary-deep' },
 };
 
 /**
@@ -164,16 +161,21 @@ export default function Navigation() {
     // NAZWA: "Money", nie "Wallet" i nie "Portfolio". Portfel jest w prawym
     // rogu tej samej belki i pokazuje salda tokenow; ta strona nie zna zadnych
     // sald ani kursow i nie ma udawac, ze zna. "Portfolio" obiecywaloby wycene.
+    //
+    // "Paid" nie ma juz wlasnego wpisu: publiczna tasma i ranking rozliczonych
+    // platnosci mieszkaja jako zakladka na /money (?tab=paid). Powod scalenia:
+    // skarga "za duzo pozycji w nawigacji", a obie strony mowia o pieniadzach -
+    // roznia sie tylko tym, CZYJE pokazuja. /leaderboard przekierowuje tam
+    // serwerowo, karta OG zostala pod starym adresem.
     { href: '/money', label: 'Money' },
     { href: '/base', label: 'MyBase' },
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
-    { href: '/leaderboard', label: 'Paid' },
-    // "Curators" TUZ ZA "Paid", bo obie strony sa tym samym rodzajem rzeczy:
-    // publicznym zapisem faktow z data, ktorego nie da sie przepisac. Paid
-    // zapisuje pieniadze, ktore przeszly miedzy ludzmi; Curators zapisuje
-    // zmiany parametrow skarbcow Morpho (prowizja, kurator, notowanie).
+    // "Curators" to publiczny zapis faktow z data, ktorego nie da sie
+    // przepisac: zmiany parametrow skarbcow Morpho (prowizja, kurator,
+    // notowanie). Stal tuz za "Paid", ktore bylo tym samym rodzajem rzeczy -
+    // Paid mieszka teraz jako zakladka na /money, patrz komentarz wyzej.
     //
     // DLACZEGO W OGOLE W BELCE: to samo zgloszenie co przy /asks - "nie widac
     // nic co wdrozylismy, skad oni maja wiedziec co robic". Strona, do ktorej
@@ -192,7 +194,7 @@ export default function Navigation() {
     // strona, do ktorej prowadzi wylacznie wpisanie adresu z palca, z punktu
     // widzenia uzytkownika nie istnieje. Sama zbudowana i niepodlinkowana byla
     // dokladnie tym bledem, ktory na tej liscie naprawialismy juz dwa razy.
-    { href: '/launchpad', label: 'Launchpad' },
+    { href: '/startpad', label: 'Startpad' },
     { href: '/b20', label: 'B20' },
     // "How" TUZ PRZED manifestem, bo odpowiadaja na dwa rozne pytania i to
     // pierwsze jest pilniejsze. /re-definition mowi, DLACZEGO ten produkt
@@ -215,11 +217,12 @@ export default function Navigation() {
   const isActiveLink = (href: string) => pathname === href || !!pathname?.startsWith(href + '/');
 
   return (
-    <div className="group/top-nav sticky top-0 z-50 md:h-3">
-    {/* Belka jest zwykla biala powierzchnia z jedna linia na dole. Wczesniej
-        byla ciemnym szklem (#0052FF/10 + backdrop-blur-xl + dwie czarne
-        nakladki) - jedynym ciemnym elementem nad lawendowym feedem. */}
-    <header className="w-full bg-soft-surface border-b border-soft-line md:absolute md:left-0 md:top-0 md:[@media(hover:hover)]:-translate-y-[calc(100%-12px)] md:transition-transform md:[transition-duration:var(--dur-dropdown)] md:ease-out-strong md:group-hover/top-nav:translate-y-0 md:group-focus-within/top-nav:translate-y-0">
+    <div className="sticky top-0 z-50">
+    {/* Belka jest zwykla biala powierzchnia z jedna linia na dole. Byla tu
+        wersja chowana za gorna krawedzia z 12-px paskiem wysuwanym na hover -
+        wycofana na zadanie: pasek nie zapowiadal, ze cokolwiek sie wysunie,
+        wiec nawigacja wygladala na zepsuta. Belka stoi na stale. */}
+    <header className="w-full bg-soft-surface border-b border-soft-line">
       {/* Obie nakladki zostaja - to ta sama siatka i to samo przyciemnienie,
           przemalowane na lawende. Siatka schodzi do ledwie widocznego sladu
           faktury, a czarny gradient staje sie miekkim zejsciem bieli w kolor

@@ -143,7 +143,9 @@ export default async function PostPage({ params }: Props) {
 
         <p className="mt-8 text-center font-soft text-[12.5px] leading-relaxed text-soft-ink-faint">
           MySphere is a feed where money moves between people, not just posts.{' '}
-          <Link href="/leaderboard" className="font-semibold text-soft-primary-deep underline underline-offset-2">
+          {/* Paid zyje jako zakladka na /money - link celuje wprost w nia,
+              zeby nie placic przekierowania ze starego /leaderboard. */}
+          <Link href="/money?tab=paid" className="font-semibold text-soft-primary-deep underline underline-offset-2">
             See what has been paid
           </Link>
           .

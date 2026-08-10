@@ -43,6 +43,14 @@ const IPFS_GATEWAY = process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? 'https://ipfs.io/ip
  * jednym miejscu jest pewniejsze niz pamietanie o nim w kazdym widoku - a ten
  * string pochodzi od obcego tworcy i trafia prosto do DOM-u.
  */
+/**
+ * data: przepuszczamy WYLACZNIE dla obrazkow rastrowych z base64. SVG celowo
+ * odpada - to XML ze skryptami i w innych kontekstach niz <img> umie je
+ * wykonac; raster nie ma czego wykonywac. To jest kanal "logo z uploadu",
+ * ktore zyje tylko w naszym Firestore i tylko na naszej stronie.
+ */
+const DATA_IMAGE_PREFIX = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
+
 export function resolveMediaUrl(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
@@ -53,6 +61,8 @@ export function resolveMediaUrl(value: string | null | undefined): string | null
     if (path === '') return null;
     return `${IPFS_GATEWAY}${path}`;
   }
+
+  if (DATA_IMAGE_PREFIX.test(trimmed)) return trimmed;
 
   try {
     const parsed = new URL(trimmed);

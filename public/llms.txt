@@ -14,7 +14,8 @@ public URL, its own metadata and its own generated share card.
 - Posts, comments and likes in the feed.
 - Tips across the seven networks above, each one a real settled transaction.
 - A receipt page per tip at `/tip/{txHash}`, showing amount, sender, recipient and network.
-- A public leaderboard of settled payments at `/leaderboard`. 187 of them, every line with
+- A public leaderboard of settled payments at `/money?tab=paid` (the old `/leaderboard`
+  redirects there). 187 of them, every line with
   a hash. All 187 are tips, which is a like with a price on it — not one is payment for
   work somebody was asked to deliver. See "Numbers" below before quoting the figure.
 - A strip of up to four open Asks above the posts in the feed: question, budget, seats and
@@ -122,8 +123,8 @@ never carried real money.
 
 - [Feed](https://mysphere.fun/basechat): the product. Posts, tips, comments, pinned posts.
   `https://mysphere.fun/` redirects here.
-- [Leaderboard](https://mysphere.fun/leaderboard): who got paid, from settled payments only.
-  No points, no activity score.
+- [Leaderboard](https://mysphere.fun/money?tab=paid): who got paid, from settled payments
+  only. No points, no activity score. The old `/leaderboard` URL redirects here.
 - [Open asks](https://mysphere.fun/asks): questions with a budget, a number of seats and a
   deadline. Answers stay sealed until the author resolves.
 - [How it works](https://mysphere.fun/how): the instruction. Seven things a person can do

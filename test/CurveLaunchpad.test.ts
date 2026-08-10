@@ -344,6 +344,17 @@ describe('CurveLaunchpad', function () {
           .launchAdvanced('Zero', 'ZRO', 0n, deadline, 100, 60, 0, 0, [creator.address], [10000], '')
       ).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
 
+      // Od 2026-08-10 sufitem windowCap jest T0, nie WINDOW_ADDR_CAP:
+      // pelna podaz znaczy "sniper protection wylaczona" i MUSI przechodzic,
+      // a ponad T0 dalej odpada (domkniety zakres wielkosci).
+      const t0 = await pad.T0();
+      await expect(
+        pad.connect(creator).launchAdvanced('NoCap', 'NCP', 0n, deadline, 100, 70, 0, t0, [creator.address], [10000], '')
+      ).to.not.be.reverted;
+      await expect(
+        pad.connect(creator).launchAdvanced('OverCap', 'OCP', 0n, deadline, 100, 70, 0, t0 + 1n, [creator.address], [10000], '')
+      ).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+
       const rc = await (await advanced('Cap', 'CAP', 100, 70)).wait();
       const token = rc.logs
         .map((log: any) => {

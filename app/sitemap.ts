@@ -26,7 +26,12 @@ const BASE_URL = 'https://mysphere.fun';
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: 'daily' | 'weekly' | 'monthly' }[] = [
   { path: '/basechat', priority: 1, changeFrequency: 'daily' },
   { path: '/re-definition', priority: 0.9, changeFrequency: 'weekly' },
-  { path: '/leaderboard', priority: 0.8, changeFrequency: 'daily' },
+  // Paid mieszka jako zakladka na /money - stary /leaderboard tylko
+  // przekierowuje, a sitemapa nie ma prawa zapraszac crawlera na
+  // przekierowanie (ten sam powod, dla ktorego filtrujemy isRouteDisabled).
+  // Query w URL-u jest legalne w sitemapie; /money bez query zostaje poza nia,
+  // bo bez portfela nie pokazuje niczego i ma noindex.
+  { path: '/money?tab=paid', priority: 0.8, changeFrequency: 'daily' },
   // /how i /curators sa jedynymi stronami, ktore ktos moze SZUKAC z zewnatrz:
   // pierwsza odpowiada "co da sie tu zrobic", druga jest publicznym zapisem
   // zmian prowizji i kuratorow w skarbcach Morpho na Base - czyli pytaniem,

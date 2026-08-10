@@ -4,23 +4,31 @@ Krotki obraz calosci. Szczegoly i uzasadnienia decyzji sa w
 `HANDOFF-LAUNCHPAD-V2-2026-08-10.md`. Dokument dla uzytkownikow:
 `LAUNCHPAD-DOSSIER.md` (AKTUALIZOWAC przy kazdej zmianie launchpada).
 
-## Adresy - Base Sepolia (chainId 84532), wdrozenie 2026-08-10 14:42 UTC
+## Adresy - Base Sepolia (chainId 84532), wdrozenie v3 z 2026-08-10
 
 | kontrakt | adres |
 | --- | --- |
-| `CurveLaunchpad` | `0x811d6dE17E2D021A564Bc699e353ead7FE7258ba` |
-| `LiquidityVault` | `0x21F2c3506170cb670102B6fB5be6b6dbDb73b88b` |
-| `B20LaunchHook` | `0xfaEF39f75aACC1271D7173748245A69CBD09e044` |
-| `B20TokenFactory` | `0x8Fa00F989b59a3F279e5DCD75450d21A21733442` |
+| `CurveLaunchpad` | `0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48` |
+| `LiquidityVault` | `0x35B3217b8Ada69103b801FEFe9ca16E307a649B6` |
+| `B20LaunchHook` | `0xf2EAEBceeC6Ccc168d8fe5B539F37e2d8c44e044` |
+| `B20TokenFactory` | `0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F` |
 | PoolManager v4 (Uniswap) | `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` |
-| blok wdrozenia | `45302335` |
+| blok wdrozenia | `45304536` |
 | `FEE_RECIPIENT` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
-| salt hooka | `0x...1848` (bity `0x2044` potwierdzone przy wdrozeniu) |
+
+Nowosc v3: **sniper protection jest WYLACZALNA** - `launchAdvanced` przyjmuje
+`windowCap_` do pelnego `T0`; ustawienie >= podazy krzywej znaczy "ochrona
+wylaczona", a `WINDOW_ADDR_CAP` (16M) zostal tylko wartoscia domyslna.
+
+Tokeny demo na v3 (z logo w Firestore): NOVA `0xb200...16E3` (klasyk, pelna
+ochrona), TPRSM `0xb200...2171` (ochrona OFF - pre-buy 62M tokenow przeszedl,
+buyback 50%), ECHO `0xb200...48A9` (2 odbiorcow oplat 60/40, cap 8M).
 
 Wdrozenia POPRZEDNIE sa MARTWE i nie wolno ich uzywac:
 - `0xA760...4F97` - stare ABI, bez `launchAdvanced`;
-- `0x0712...0844` (rano 2026-08-10) - stary model oplat: 60/40, buyback
-  scinany z CALEJ oplaty puli przed podzialem, 5-polowy `HookFeeSettled`.
+- `0x0712...0844` (rano 2026-08-10) - stary model oplat 60/40, stary buyback;
+- `0x811d...58ba` (popoludnie 2026-08-10, v2) - model 70/30 juz TAK, ale
+  sniper cap zabity na 16M; zastapione przez v3 tego samego dnia.
 
 ## Model oplat - USTALONY NA STALE W KODZIE (decyzje z 2026-08-10)
 
@@ -185,10 +193,10 @@ Kolejnosc od najtanszych do najdrozszych; wszystko na Base Sepolia, przez UI
 ## Zmienne na Vercelu
 
 ```text
-NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS        0x811d6dE17E2D021A564Bc699e353ead7FE7258ba
-NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS  0x21F2c3506170cb670102B6fB5be6b6dbDb73b88b
-NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS      0xfaEF39f75aACC1271D7173748245A69CBD09e044
-NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK           45302335
+NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS        0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48
+NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS  0x35B3217b8Ada69103b801FEFe9ca16E307a649B6
+NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS      0xf2EAEBceeC6Ccc168d8fe5B539F37e2d8c44e044
+NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK           45304536
 ```
 
 Fallbacki w `app/launchpad/config.ts` wskazuja juz to wdrozenie, wiec brak

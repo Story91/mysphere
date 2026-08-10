@@ -4,8 +4,9 @@
 > launchpada — kontraktów, opłat, adresów lub UI, jeśli zmienia zachowanie opisane
 > tutaj. Stan wdrożenia i adresy: `docs/LAUNCHPAD-STAN.md`.
 >
-> Last updated: 2026-08-10 (evening) · deployment `0x811d...58ba` (Base Sepolia)
+> Last updated: 2026-08-10 (v3) · deployment `0x4Cc0...1A48` (Base Sepolia)
 > · creator-first split 70/30 · buyback funded from the creator's share
+> · sniper protection is optional (creator can disable it at launch)
 
 MySphere Launchpad launches ERC-20 tokens on a bonding curve. When the curve
 collects **exactly 3.00 ETH**, the token *graduates*: liquidity moves into a
@@ -42,7 +43,7 @@ tokenReserve = k`. Spot price = `(0.75 ETH + ethReserve) / tokenReserve`.
 | Starting market cap | 0.75 ETH |
 | Graduation trigger | reserve = **3.00 ETH exactly** |
 | Market cap at graduation | 18.75 ETH (**25×**) |
-| Sniper window | first 5 minutes: per-wallet buy cap (default 16M tokens, creator can lower it) |
+| Sniper window | first 5 minutes: per-wallet buy cap — default 16M tokens; the creator can lower it, raise it, or **disable protection entirely** (cap = full supply) |
 | Creator allocation | **none** — a pre-buy is a normal buy on the same curve, in the same launch transaction |
 | Creator fee ceiling | **70% of every fee stream** — same ratio as PONS, everywhere |
 
@@ -105,7 +106,7 @@ Three fee streams, one ratio — **the creator gets up to 70%, everywhere**:
 | Creator share of that fee | 0–70% | 70% |
 | Fee receivers | up to 8 addresses, shares sum to 100% | creator |
 | Auto-buyback (slice of the creator's pool-fee share) | 0–100% | 0% |
-| Sniper cap (first 5 min, per wallet) | up to 16M tokens | 16M |
+| Sniper cap (first 5 min, per wallet) | any amount up to full supply (= protection off) | 16M |
 | Pre-buy | any ETH amount, same curve & fee as everyone | 0 |
 
 Nothing on this list has a setter. Changing any of it means launching a new

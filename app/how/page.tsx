@@ -18,8 +18,8 @@ import Link from 'next/link';
  * nawet jako zapowiedz. Zapowiedzi sa na /re-definition, w tabeli ze statusami.
  *
  * === "DZIALA" TO NIE TO SAMO CO "KTOS PRZEZ TO PRZESZEDL" ===
- * Dwa kroki opisuja rzeczy, ktore dzialaja i przez ktore NIKT jeszcze nie
- * przeszedl, i oba musza to mowic W SWOIM KROKU, a nie w gwiazdce na dole:
+ * Trzy kroki opisuja rzeczy, ktore dzialaja i przez ktore NIKT jeszcze nie
+ * przeszedl, i kazdy musi to mowic W SWOIM KROKU, a nie w gwiazdce na dole:
  *
  *   krok 05 (escrow)  Kontrakt na Base stoi i ma zweryfikowane zrodlo, ale
  *                     eth_getLogs od bloku wdrozenia nie zwraca ani jednego
@@ -29,6 +29,18 @@ import Link from 'next/link';
  *                     settleExpiredAsk), ale ta noga nie przeszla na zadnej
  *                     prawdziwej sieci - wymaga terminu + 48h, czego nie da
  *                     sie przewinac. Jedyny dowod to test jednostkowy.
+ *   krok 09 (graduacja)  Pelna sciezka launch -> pula -> wyplaty przeszla
+ *                     na Sepolii na TYCH SAMYCH zrodlach, ale z mniejszym
+ *                     celem zbiorki (mini-stack testowy). Na wdrozeniu
+ *                     produkcyjnym zadna krzywa nie doszla jeszcze do
+ *                     3.00 ETH, wiec nikt nie graduowal naprawde.
+ *
+ * === STARTPAD JEST NA TESTNECIE I KAZDY JEGO KROK TO MOWI ===
+ * Naglowek strony obiecuje, ze wszystko tu kosztuje prawdziwe pieniadze.
+ * Kroki 08-10 (Startpad) sa wyjatkiem: chodza na Base Sepolia, gdzie ETH
+ * jest z kranika. Udawanie, ze faucetowy ETH to pieniadz, byloby dokladnie
+ * tym klamstwem, przed ktorym ta strona sie broni - wiec pigulka kosztu
+ * mowi "Test ETH", a pierwszy akapit kroku 08 mowi to wprost.
  *
  * Instrukcja, ktora przemilcza pustke po drugiej stronie przycisku, klamie
  * przez sugestie kolejki, ktorej nie ma. Czlowiek, ktory bedzie pierwszy, ma
@@ -45,11 +57,11 @@ export const metadata = {
   // Marke doklada `title.template` z layoutu glownego.
   title: 'How it works',
   description:
-    'What you can do on MySphere today: post onchain, tip in USDC, sell part of a post, ask a question with a budget, collect what you are owed, and look up what a vault curator changed.',
+    'What you can do on MySphere today: post onchain, tip in USDC, sell part of a post, ask a question with a budget, launch a token on the Startpad curve, collect what you are owed, and look up what a vault curator changed.',
   openGraph: {
     title: 'How MySphere works',
     description:
-      'Post onchain, tip in USDC, put part of a post behind a payment, ask a question with a budget and seats. Every amount settles onchain with a hash.',
+      'Post onchain, tip in USDC, put part of a post behind a payment, ask a question with a budget and seats, launch a token on a bonding curve. Every amount settles onchain with a hash.',
     type: 'article',
   },
 };
@@ -57,7 +69,7 @@ export const metadata = {
 /* ------------------------------------------------------------------ */
 
 /**
- * === OSIEM KROKOW W JEDNYM MIEJSCU ===
+ * === JEDENASCIE KROKOW W JEDNYM MIEJSCU ===
  *
  * Tytul, numer i CENA kazdego kroku sa tu, a nie w JSX-ie ponizej, z jednego
  * powodu: skorowidz na gorze strony i naglowek samego kroku musza podawac to
@@ -111,8 +123,9 @@ const STEPS: StepMeta[] = [
     id: 'ask',
     title: 'Ask a question and put money on it',
     cost: 'You set the budget',
-    // Jedyna prawdziwa kwota na calej stronie - i jedyne miejsce, ktore
-    // dostaje bursztyn. Reszta linii kosztu jest tekstem, nie liczba.
+    // Jedyna kwota w walucie w liniach kosztu - i jedyne miejsce, ktore
+    // dostaje bursztyn. Stawka "1% per trade" w kroku 09 jest procentem,
+    // nie kwota, wiec bursztynu nie dostaje.
     note: (
       <>
         From <span className="font-semibold tabular-nums text-soft-accent-deep">$0.50</span> per seat
@@ -134,7 +147,35 @@ const STEPS: StepMeta[] = [
     note: 'The amount is already yours',
   },
   /**
-   * === OSMY KROK LAMIE ZASADE KOLEJNOSCI I ROBI TO SWIADOMIE ===
+   * === TRZY KROKI STARTPADA ===
+   * Kolejnosc niesie zaleznosc, tak jak w calej tablicy: bez startu (08)
+   * nie ma czym handlowac (09), bez handlu nie ma oplat do odebrania (10).
+   * Wszystkie trzy chodza na Base Sepolia - uzasadnienie pigulki "Test ETH"
+   * stoi w komentarzu naglowkowym pliku.
+   */
+  {
+    n: '08',
+    id: 'launch',
+    title: 'Launch a token on Startpad',
+    cost: 'Test ETH',
+    note: 'Runs on Base Sepolia — faucet ETH, not real money',
+  },
+  {
+    n: '09',
+    id: 'trade',
+    title: 'Trade a token on its curve',
+    cost: '1% per trade',
+    note: 'Taken in ETH on every buy and sell',
+  },
+  {
+    n: '10',
+    id: 'earn',
+    title: 'Collect what your token earned',
+    cost: 'Gas only',
+    note: 'Paid in ETH, never in the token',
+  },
+  /**
+   * === JEDENASTY KROK LAMIE ZASADE KOLEJNOSCI I ROBI TO SWIADOMIE ===
    * Numery na tej stronie znacza zaleznosc: bez portfela nie napiszesz posta,
    * bez posta nie sprzedasz jego czesci. Ten krok nie zalezy od NICZEGO - da
    * sie go zrobic przed krokiem 01, bez portfela i bez podpisu.
@@ -142,11 +183,11 @@ const STEPS: StepMeta[] = [
    * Mimo to stoi na koncu, a nie na poczatku. Instrukcja zaczynajaca sie od
    * czytania cudzego rejestru odpowiadalaby na pytanie, ktorego nikt nie ma
    * przy pierwszym wejsciu. Sam krok mowi wprost, ze nie potrzebuje niczego
-   * z poprzednich siedmiu - to jest tansze niz przenumerowanie calej strony
-   * po to, zeby numer niosl dwie rozne rzeczy naraz.
+   * z poprzednich dziesieciu - to jest tansze niz przenumerowanie calej
+   * strony po to, zeby numer niosl dwie rozne rzeczy naraz.
    */
   {
-    n: '08',
+    n: '11',
     id: 'curators',
     title: 'Look up what changed in a vault',
     cost: 'Free',
@@ -164,7 +205,7 @@ function Step({ meta, children }: { meta: StepMeta; children: React.ReactNode })
             Tam sekcje sa stanami tej samej kwoty, nie krokami, wiec numer nic
             by nie niosl. Tutaj to instrukcja i kolejnosc naprawde ma znaczenie:
             bez portfela nie napiszesz posta, bez posta nie sprzedasz jego czesci.
-            Jedyny wyjatek to krok 08 - uzasadnienie stoi przy nim w tablicy STEPS.
+            Jedyny wyjatek to krok 11 - uzasadnienie stoi przy nim w tablicy STEPS.
 
             Stala szerokosc rynny: kazdy naglowek zaczyna sie na tym samym
             pionie, wiec wzrok schodzacy po stronie ma po czym isc. */}
@@ -184,7 +225,7 @@ function Step({ meta, children }: { meta: StepMeta; children: React.ReactNode })
 /**
  * Akapit. `lead` dostaje PIERWSZY akapit kroku i tylko on.
  *
- * Siedem krokow po cztery akapity jednego rozmiaru to sciana. Pierwszy akapit
+ * Jedenascie krokow po kilka akapitow jednego rozmiaru to sciana. Pierwszy akapit
  * niesie sens calego kroku, wiec dostaje wiekszy stopien i ciemniejszy tusz -
  * kto czyta strone naglowkami, dostaje z niej cala tresc, a nie same tytuly.
  */
@@ -231,21 +272,21 @@ function Cost({ lead, children }: { lead: string; children: React.ReactNode }) {
 }
 
 /**
- * Skorowidz siedmiu krokow z cena kazdego z nich.
+ * Skorowidz wszystkich krokow z cena kazdego z nich.
  *
  * Strona odpowiada na pytanie "co moge tu zrobic i ile to kosztuje". Do dzis
- * odpowiadala na nie w siedmiu miejscach oddalonych od siebie o ekran, wiec
+ * odpowiadala na nie w miejscach oddalonych od siebie o ekran, wiec
  * calosci nie dalo sie zobaczyc naraz - a to wlasnie calosc jest odpowiedzia.
  * Ten blok mowi ja na jednym ekranie, a kazdy wiersz jest kotwica do kroku.
  */
 function StepIndex() {
   return (
     <nav
-      aria-label="The eight steps"
+      aria-label="The eleven steps"
       className="mt-10 rounded-card border border-soft-line bg-soft-surface p-4 shadow-card sm:p-5"
     >
       <p className="mb-2 font-soft text-[11px] font-bold uppercase tracking-[0.16em] text-soft-ink-faint">
-        Eight steps, and what each one costs
+        Eleven steps, and what each one costs
       </p>
       <ol>
         {STEPS.map((step) => (
@@ -374,7 +415,7 @@ export default function HowPage() {
               timeline of money that actually moved between two people. Names
               and faces on both ends, and a transaction on every line.
             </P>
-            <Go href="/leaderboard">See what people paid each other</Go>
+            <Go href="/money?tab=paid">See what people paid each other</Go>
           </Step>
 
           {/* ---------------------------------------------------------- */}
@@ -497,9 +538,101 @@ export default function HowPage() {
           </Step>
 
           {/* ---------------------------------------------------------- */}
-          {/* Krok bez portfela i bez podpisu - jedyny taki na tej stronie.
-              Uzasadnienie jego miejsca w kolejnosci stoi przy STEPS[7]. */}
           <Step meta={STEPS[7]}>
+            <P lead>
+              <Hi>Startpad</Hi> launches a token on a bonding curve: one
+              transaction mints the whole billion-token supply straight onto
+              the curve, and nobody — you included — gets any of it for free.
+              It runs on <Hi>Base Sepolia</Hi>, the test network, so the ETH
+              you sign with here comes from a faucet and is not real money.
+            </P>
+            <P>
+              A <Hi>logo is required</Hi> before the launch button works.
+              Upload a file and we store it — an ERC-20 has no image onchain,
+              and a token without one is a grey circle on every list forever.
+            </P>
+            <P>
+              Want the first tokens? Add a <Hi>pre-buy</Hi> and it executes
+              inside the launch transaction itself — same curve, same 1% fee
+              as anyone after you, with no block in between where somebody
+              else could buy first.
+            </P>
+            <P>
+              Everything else is fixed at launch and has no setter afterwards:
+              your share of the 1% trading fee — anything up to <Hi>70%</Hi>,
+              paid to up to 8 addresses you name, with the contract keeping at
+              least 30% for the protocol whatever the form says — and a{' '}
+              <Hi>buyback</Hi> slider, which takes part of your own share and
+              spends it on buying your token back and burning it. Changing any
+              of it later means launching a new token.
+            </P>
+            <P>
+              <Hi>Sniper protection</Hi> is on by default: for the first 5
+              minutes one wallet can buy at most 16 million tokens. At launch
+              — and only at launch — you can tighten that cap or switch the
+              protection off entirely.
+            </P>
+            <Go href="/startpad">Open Startpad</Go>
+          </Step>
+
+          {/* ---------------------------------------------------------- */}
+          <Step meta={STEPS[8]}>
+            <P lead>
+              Every token page has a candlestick chart built from onchain
+              events and a buy-and-sell panel next to it. The preview shows
+              what you get before you sign, and each trade pays a 1% fee in
+              ETH — up to 70% of it goes to the token&apos;s creator.
+            </P>
+            <P>
+              The curve is the other side of every trade: a fixed formula, no
+              order book, nobody to wait for. Buys move the price up, sells
+              move it down, and the contract can always pay — selling every
+              circulating token back returns exactly the ETH it holds.
+            </P>
+            <P>
+              At exactly <Hi>3.00 ETH</Hi> in the reserve the curve locks.
+              Buys stop; <Hi>selling keeps working</Hi>, so nobody is trapped
+              at the top. From then on anyone may call <Hi>graduate()</Hi> —
+              the caller earns 0.045 ETH for it — and the liquidity moves into
+              a Uniswap v4 pool that opens at the exact price the curve closed
+              at, locked there forever.
+            </P>
+            <P>
+              Worth knowing before you chase that: <Hi>no token has graduated
+              on the live deployment yet</Hi>. The full path — launch to pool
+              to payout — has run end-to-end on the same code, but against a
+              smaller test target. The first curve to reach 3.00 ETH here will
+              be the first, and whoever fills it goes first.
+            </P>
+          </Step>
+
+          {/* ---------------------------------------------------------- */}
+          <Step meta={STEPS[9]}>
+            <P lead>
+              <Hi>My tokens</Hi>, on the Startpad page, lists every token you
+              launched and what its fees have credited you so far, counted to
+              the wei — up to 70% of the 1% on every curve trade, and after
+              graduation up to 70% of the 1% on every pool swap.
+            </P>
+            <P>
+              Claims are pull-based and paid in <Hi>ETH</Hi>, never in the
+              token. Nothing is pushed and nothing can be withheld: the
+              contracts have no owner, no pause and no setter, so nobody —
+              including us — stands between the balance and your claim.
+            </P>
+            <P>
+              If you set a buyback at launch, that slice comes out of this
+              money — your share, not the protocol&apos;s. Anyone may trigger
+              the purchase, and the bought tokens go to the dead address,
+              provably out of circulation.
+            </P>
+            <Go href="/startpad">Open My tokens</Go>
+          </Step>
+
+          {/* ---------------------------------------------------------- */}
+          {/* Krok bez portfela i bez podpisu - jedyny taki na tej stronie.
+              Uzasadnienie jego miejsca w kolejnosci stoi przy STEPS[10]. */}
+          <Step meta={STEPS[10]}>
             <P lead>
               A Morpho vault has a curator: whoever sets its fee and decides
               what it lends against. They can raise that fee, or hand the vault

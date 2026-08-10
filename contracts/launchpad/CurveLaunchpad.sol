@@ -291,10 +291,14 @@ contract CurveLaunchpad {
 
     uint256 public constant LAUNCH_WINDOW = 300;
     /**
-     * 2% podazy krzywej, NA ADRES, w oknie startowym. Jest to jednoczesnie
-     * limit dev-buya: tworca jest w oknie zwyklym adresem, jedna stala, zero
-     * wyjatkow. Kupno ponad limit REWERTUJE, a nie przycina - wolajacy nie
-     * dostaje cichej podmiany intencji.
+     * DOMYSLNY limit na adres w oknie startowym: 2% podazy krzywej. Dotyczy
+     * takze dev-buya - tworca jest w oknie zwyklym adresem.
+     *
+     * Od 2026-08-10 to jest WYLACZNIE domyslna wartosc (`launch()` bez
+     * konfiguracji), a nie sufit: `launchAdvanced` przyjmuje `windowCap_`
+     * do pelnego T0. Ustawienie >= podazy krzywej znaczy "ochrona wylaczona"
+     * i formularz mowi to wprost. Sufit T0 zostaje w walidacji tylko po to,
+     * zeby wielkosc miala domkniety zakres.
      */
     uint256 public constant WINDOW_ADDR_CAP = 16_000_000e18;
 
@@ -824,7 +828,7 @@ contract CurveLaunchpad {
         if (uint256(creatorFeeBps_) * 10_000 > uint256(feeBps_) * MAX_CREATOR_SHARE_BPS) {
             revert InvalidFeeConfig();
         }
-        if (buybackBps_ > MAX_BUYBACK_BPS || windowCap_ > WINDOW_ADDR_CAP) revert InvalidFeeConfig();
+        if (buybackBps_ > MAX_BUYBACK_BPS || windowCap_ > T0) revert InvalidFeeConfig();
         // Sufit bez PODLOGI zostawial dziure: `windowCap_ == 0` przechodzilo, a
         // potem KAZDE kupno w oknie startowym odbijalo sie o `WindowCap`, bo
         // `0 + out > 0`. Start dawalo sie w ten sposob zamurowac na cale okno,

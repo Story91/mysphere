@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createPublicClient, http, type Address } from 'viem';
-import { erc20Abi, LAUNCHPAD_CHAIN } from '../../../launchpad/config';
-import { resolveMediaUrl } from '../../../launchpad/metadata';
+import { erc20Abi, LAUNCHPAD_CHAIN } from '../../../startpad/config';
+import { resolveMediaUrl } from '../../../startpad/metadata';
 import { listProfiles } from '../profileStore';
 
 /**
@@ -56,7 +56,11 @@ export async function GET() {
           client.readContract({ address, abi: erc20Abi, functionName: 'symbol' }),
           client.readContract({ address, abi: erc20Abi, functionName: 'decimals' }),
         ]);
-        const logoURI = resolveMediaUrl(profile.logoUrl);
+        // Token lista idzie do OBCYCH odbiorcow (portfele, agregatory) -
+        // standard oczekuje URI do pobrania, nie wklejonych bajtow. Logo
+        // z uploadu (data:) zyje tylko w naszym interfejsie i tu odpada.
+        const resolved = resolveMediaUrl(profile.logoUrl);
+        const logoURI = resolved && !resolved.startsWith('data:') ? resolved : null;
         return {
           chainId: LAUNCHPAD_CHAIN.id,
           address,
@@ -74,7 +78,7 @@ export async function GET() {
   );
 
   const list = {
-    name: 'MySphere Launchpad',
+    name: 'MySphere Startpad',
     timestamp: new Date().toISOString(),
     version: { major: 1, minor: 0, patch: 0 },
     keywords: ['mysphere', 'launchpad', 'base'],

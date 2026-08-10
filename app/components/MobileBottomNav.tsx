@@ -58,7 +58,13 @@ const POZYCJE = [
     ),
   },
   {
-    href: '/leaderboard',
+    // Paid mieszka teraz jako zakladka na /money - link prowadzi wprost do
+    // niej, zamiast przez przekierowanie ze starego /leaderboard. Uboczny
+    // skutek: pathname nie niesie query, wiec przy otwartej zakladce Paid
+    // podswietla sie pigulka "Money" (ta sama strona), a nie ta. To wybor:
+    // rozroznienie wymagaloby useSearchParams, a ten hook w komponencie
+    // montowanym na kazdej stronie wymusza granice Suspense w calej aplikacji.
+    href: '/money?tab=paid',
     label: 'Paid',
     icon: (
       <>
