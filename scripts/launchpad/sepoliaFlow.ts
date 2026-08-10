@@ -107,17 +107,28 @@ async function main() {
   const launchReceipt = (await launchTx.wait())!;
   const launched = parseEvent(pad, launchReceipt, "Launched");
   const token = getAddress(launched.args[0]);
-  // `launchOf` oddaje (creator, state, ethReserve, tokenReserve, startedAt,
-  // launchId). Bylo tu `[2]`, czyli ethReserve - a wiec ZERO zamiast znacznika
-  // czasu. Okno startowe "konczylo sie" wtedy w 1970 roku i skrypt kupowal
-  // NATYCHMIAST po starcie, czyli w srodku okna, gdzie obowiazuje limit
-  // `WINDOW_ADDR_CAP` (16 mln tokenow). Kupno za 3 ETH bierze 800 mln, wiec
-  // odbijaloby sie o `WindowCap`.
-  const launchState = await pad.launchOf(token);
   console.log("token   ", token);
   console.log("launch  ", receiptSummary(launchReceipt));
 
-  await waitForLaunchWindow(launchState[4]);
+  // ZNACZNIK CZASU BIERZEMY ZE ZDARZENIA, A NIE Z ODCZYTU - i to jest istota
+  // tej poprawki.
+  //
+  // Byly tu kolejno dwa bledy. Najpierw `launchOf(...)[2]`, czyli ethReserve
+  // zamiast startedAt. Potem `[4]`, czyli juz wlasciwe pole - ale odczyt lecial
+  // w tej samej sekundzie co transakcja i trafial na wezel bez swiezego stanu.
+  // `launchOf` NIE REWERTUJE dla nieznanego tokena, tylko po cichu oddaje same
+  // zera, wiec `startedAt` wychodzilo 0. Okno startowe "konczylo sie" w 1970
+  // roku, skrypt nie czekal ani sekundy i kupowal w srodku okna, gdzie
+  // obowiazuje `WINDOW_ADDR_CAP` (16 mln tokenow). Kupno za 3 ETH bierze
+  // 800 mln, wiec odbijalo sie o `WindowCap` - i to widac dopiero jako
+  // `execution reverted` przy szacowaniu gazu.
+  //
+  // Zdarzenie `Launched` niesie `startedAt` i lezy w paragonie, ktory JUZ mamy.
+  // Nie ma tam zadnego wyscigu z propagacja, bo nic nie odczytujemy ponownie.
+  const startedAt = launched.args.startedAt as bigint;
+  if (startedAt === 0n) throw new Error("Zdarzenie Launched nie ma startedAt - sprawdz ABI.");
+
+  await waitForLaunchWindow(startedAt);
 
   // Odczyt tuz po transakcji trafia czasem na wezel, ktory nie ma jeszcze
   // nowego stanu - i oddaje goly `execution reverted`, wygladajacy jak blad
