@@ -45,6 +45,12 @@ export const robinhoodChain = defineChain({
     },
   },
   contracts: {
+    // Kanoniczny Multicall3 - ZMIERZONE eth_getCode 2026-08-10 (3808 B).
+    // Bez tego wpisu viem odmawia batchowania odczytow bledem
+    // "does not support contract multicall3" i caly board pada na starcie.
+    multicall3: {
+      address: '0xcA11bde05977b3631167028862bE2a173976CA11',
+    },
     // Kontrakt postow nie jest jeszcze wdrozony na tej sieci - patrz
     // RobinhoodPostContract.ts (adres z NEXT_PUBLIC_ROBINHOOD_POST_CONTRACT).
   },

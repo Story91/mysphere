@@ -83,22 +83,46 @@ const NET = ACTIVE_LAUNCHPAD_NETWORK.label;
 function NetworkSwitch() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const active = ACTIVE_LAUNCHPAD_NETWORK;
   if (!mounted) {
     return <span className="text-[11px] font-bold text-black/40">{NET}</span>;
   }
   return (
-    <select
-      value={ACTIVE_LAUNCHPAD_NETWORK.chain.id}
-      onChange={(event) => setLaunchpadChain(Number(event.target.value))}
-      aria-label="Launchpad network"
-      className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-extrabold text-[#16141b] outline-none transition-colors hover:border-soft-primary"
-    >
-      {Object.values(LAUNCHPAD_NETWORKS).map((net) => (
-        <option key={net.chain.id} value={net.chain.id}>
-          {net.label}{net.testnet ? ' (testnet)' : ''}
-        </option>
-      ))}
-    </select>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-2 pr-1 ${active.pillClass}`}>
+      {active.logo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={active.logo} alt="" className="h-4 w-4 rounded-full" />
+      )}
+      <select
+        value={active.chain.id}
+        onChange={(event) => setLaunchpadChain(Number(event.target.value))}
+        aria-label="Launchpad network"
+        className="bg-transparent text-[11px] font-extrabold outline-none [color:inherit] [&>option]:bg-white [&>option]:text-[#16141b]"
+      >
+        {Object.values(LAUNCHPAD_NETWORKS).map((net) => (
+          <option key={net.chain.id} value={net.chain.id}>
+            {net.label}{net.testnet ? ' (testnet)' : ''}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
+/** Pastylka aktywnej sieci - sama etykieta, w barwach marki lancucha. */
+function NetworkTag() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const net = mounted ? ACTIVE_LAUNCHPAD_NETWORK : null;
+  if (!net) return <span className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/35">{NET}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${net.pillClass}`}>
+      {net.logo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={net.logo} alt="" className="h-3.5 w-3.5 rounded-full" />
+      )}
+      {net.label}
+    </span>
   );
 }
 
@@ -551,7 +575,7 @@ function BoardStats({ totalRaised, totalVolume, totalTrades, liveCount, ethUsd }
     <section className="rounded-[20px] border border-black/10 bg-white p-5">
       <div className="flex items-center justify-between">
         <h2 className="text-[16px] font-extrabold text-[#16141b]">Board stats</h2>
-        <span suppressHydrationWarning className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/35">{NET}</span>
+        <NetworkTag />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         {rows.map((row) => (
@@ -1968,17 +1992,23 @@ export default function LaunchpadBoard() {
           <ActivityTicker events={feedEvents} />
         </div>
 
-        {/* Naglowek bez napisu i badge'a: zostaje wyszukiwarka (rosnie) i
-            przycisk Launch po prawej. Na telefonie wyszukiwarka schodzi pod
-            spod, a gorny wiersz trzyma sam przycisk przy prawej krawedzi. */}
+        {/* Naglowek: StartPad po lewej, wyszukiwarka (rosnie) w srodku,
+            przelacznik sieci + Launch po prawej. Na telefonie wyszukiwarka
+            schodzi pod spod, gorny wiersz trzyma napis i przyciski. */}
         <div className="relative overflow-hidden py-5 sm:py-7">
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-soft-primary/[0.06] blur-3xl" />
           <div className="relative flex items-center gap-4">
+            <h1 className="shrink-0 text-[20px] font-extrabold tracking-tight text-[#16141b]">
+              Start<span className="text-soft-primary">Pad</span>
+            </h1>
             <label className="relative hidden min-w-0 flex-1 max-w-[560px] sm:block">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" aria-hidden="true" />
               <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${FIELD} rounded-full bg-[#f3f3f5] pl-10`} placeholder="Search coins, creators" aria-label="Search coins and creators" />
             </label>
-            <button type="button" onClick={() => setLaunchOpen(true)} className="ml-auto inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-white shadow-[0_6px_16px_rgba(124,107,218,0.22)] transition-transform active:scale-[0.97]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
+            <span className="ml-auto flex items-center gap-2">
+              <NetworkSwitch />
+              <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-white shadow-[0_6px_16px_rgba(124,107,218,0.22)] transition-transform active:scale-[0.97]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
+            </span>
           </div>
           <label className="relative mt-4 block sm:hidden">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" aria-hidden="true" />
@@ -2029,7 +2059,7 @@ export default function LaunchpadBoard() {
                   <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`rounded-full border px-4 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>
                 ))}
               </div>
-              <NetworkSwitch />
+              <NetworkTag />
             </div>
 
             <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market table">

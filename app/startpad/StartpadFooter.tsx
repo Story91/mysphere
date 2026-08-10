@@ -103,7 +103,11 @@ export default function StartpadFooter() {
     <footer className="mt-10 border-t border-black/10 pb-10 pt-8">
       {/* ===== CO TO JEST - jedno zdanie, zanim pojda szczegoly ===== */}
       <div className="max-w-[72ch]">
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">
+        <p className={`flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] ${net.accentTextClass}`}>
+          {net.logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={net.logo} alt="" className="h-3.5 w-3.5 rounded-full" />
+          )}
           How Startpad works
         </p>
         <h2 className="mt-1 text-[19px] font-extrabold text-[#16141b]">
