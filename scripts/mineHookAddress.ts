@@ -1,16 +1,9 @@
 import { ethers } from "hardhat";
-import {
-  concat,
-  getAddress,
-  getCreateAddress,
-  getCreate2Address,
-  keccak256,
-  toBeHex,
-  zeroPadValue,
-} from "ethers";
+import { getAddress } from "ethers";
+import { buildPlan, readCommonEnv, resolvePoolManager, HOOK_REQUIRED_FLAGS } from "./launchpad/plan";
 
 /**
- * KOPALNIA ADRESU HOOKA.
+ * KOPALNIA ADRESU HOOKA - sam podglad, bez wdrazania.
  *
  * ===========================================================================
  * PO CO
@@ -18,130 +11,83 @@ import {
  * Uniswap v4 czyta uprawnienia hooka z DOLNYCH 14 BITOW jego adresu i odrzuca
  * kazda pule, ktorej hook ma tam cokolwiek innego (`HookAddressNotValid`).
  * Adresu nie da sie wiec wybrac - trzeba go WYKOPAC: szukamy salta CREATE2,
- * dla ktorego wyliczony adres ma dokladnie bity `HOOK_REQUIRED_FLAGS`.
- *
- * Trafien jest srednio jedno na 2^14 = 16 384 prob, wiec to sekundy, a nie
- * godziny. Kopanie jest tu formalnoscia, ale formalnoscia BLOKUJACA: bez salta
- * nie da sie wdrozyc launchpada.
+ * dla ktorego wyliczony adres ma dokladnie `HOOK_REQUIRED_FLAGS`.
  *
  * ===========================================================================
- * LANCUCH ADRESOW - I DLACZEGO DA SIE GO POLICZYC PRZED PIERWSZA TRANSAKCJA
+ * KIEDY UZYWAC TEGO, A KIEDY deploy.ts
  * ===========================================================================
- *   wdrazajacy + nonce      -> launchpad   (CREATE, adres nie zalezy od argumentow)
- *   launchpad  + nonce 1    -> vault       (CREATE, pierwsze `new` w konstruktorze)
- *   vault + salt + initCode -> hook        (CREATE2, to kopiemy)
+ * Do WDROZENIA sluzy `scripts/launchpad/deploy.ts`, ktory kopie i wdraza
+ * w jednym przebiegu - i tylko tak salt na pewno przezyje do transakcji.
  *
- * Kluczowa wlasnosc: adres kontraktu tworzonego przez CREATE NIE ZALEZY od
- * argumentow konstruktora. Dlatego salt hooka, ktory jest argumentem
- * konstruktora launchpada, nie zmienia adresu launchpada ani vaulta - i kolo
- * zaleznosci sie nie zamyka.
+ * Ten skrypt istnieje do PODGLADU: zobaczyc adresy, zanim cokolwiek pojdzie
+ * na siec, albo odtworzyc plan po fakcie. Rachunek stoi w `launchpad/plan.ts`
+ * i jest ten sam dla obu, wiec nie ma jak sie rozjechac.
  *
- * Konstruktor hooka bierze `(feeRecipient, protocolShareBps)`, a te WCHODZA
- * do kodu tworzacego, wiec musza byc znane tutaj i musza byc identyczne z tymi,
- * ktore pojda do launchpada. Rozjazd wychwyci `LiquidityVault` przy wdrozeniu
- * (`HookConfigMismatch`), ale lepiej nie doprowadzac - stad wypis na koncu.
+ * OSTRZEZENIE, ktore trzeba przeczytac: salt jest wazny wylacznie dla trojki
+ * (wdrazajacy, nonce, argumenty konstruktora hooka). Kazda transakcja wyslana
+ * z tego adresu po wykopaniu - takze wdrozenie fabryki tokena - podnosi nonce
+ * i uniewaznia wynik.
  *
  * ===========================================================================
  * UZYCIE
  * ===========================================================================
- *   npx hardhat run scripts/mineHookAddress.ts --network base
+ *   FEE_RECIPIENT=0x... npx hardhat run scripts/mineHookAddress.ts --network base
  *
- * Zmienne srodowiskowe (wszystkie opcjonalne poza pierwsza):
- *   FEE_RECIPIENT        adres odbiorcy oplat protokolu
- *   PROTOCOL_SHARE_BPS   udzial protokolu w oplatach LP i hooka (domyslnie 6000)
+ *   FEE_RECIPIENT        (wymagane) adres odbiorcy oplat protokolu
+ *   PROTOCOL_SHARE_BPS   udzial protokolu (domyslnie 6000)
+ *   POOL_MANAGER         adres v4 PoolManager; wymagany poza sprawdzonymi sieciami
  *   DEPLOYER             adres, ktory wysle transakcje (domyslnie signer[0])
- *   DEPLOYER_NONCE       nonce tej transakcji (domyslnie odczytany z sieci)
+ *   DEPLOYER_NONCE       nonce tej transakcji (domyslnie `pending` z sieci)
  */
-
-/** Musi zgadzac sie z `HOOK_ALL_MASK` w `contracts/launchpad/B20LaunchHook.sol`. */
-const HOOK_ALL_MASK = (1n << 14n) - 1n;
-
-/**
- * Musi zgadzac sie z `HOOK_REQUIRED_FLAGS` tamze:
- * BEFORE_INITIALIZE (13) | AFTER_SWAP (6) | AFTER_SWAP_RETURNS_DELTA (2).
- */
-const HOOK_REQUIRED_FLAGS = (1n << 13n) | (1n << 6n) | (1n << 2n);
-
-/** Po tylu probach bez trafienia cos jest nie tak z zalozeniami, a nie ze szczesciem. */
-const MAX_ATTEMPTS = 20_000_000;
 
 async function main() {
-  const feeRecipient = process.env.FEE_RECIPIENT;
-  if (!feeRecipient) {
-    throw new Error("FEE_RECIPIENT jest wymagany - to adres, ktory bedzie odbieral oplaty protokolu.");
-  }
-  const protocolShareBps = BigInt(process.env.PROTOCOL_SHARE_BPS ?? "6000");
-  if (protocolShareBps > 8000n) {
-    // Ten sam sufit, co MAX_PROTOCOL_SHARE_BPS w LiquidityVault. Sprawdzamy tu,
-    // zeby nie kopac przez minute pod deploy, ktory i tak zrewertuje.
-    throw new Error(`PROTOCOL_SHARE_BPS=${protocolShareBps} przekracza sufit 8000 (podloga 20% dla tworcy).`);
-  }
+  const { feeRecipient, protocolShareBps } = readCommonEnv();
 
   const signers = await ethers.getSigners();
   const deployer = getAddress(process.env.DEPLOYER ?? signers[0].address);
+  const chainId = Number((await ethers.provider.getNetwork()).chainId);
+  const { address: poolManager, source: pmSource } = resolvePoolManager(chainId);
+
   const nonce =
     process.env.DEPLOYER_NONCE !== undefined
       ? Number(process.env.DEPLOYER_NONCE)
-      : await ethers.provider.getTransactionCount(deployer);
+      : await ethers.provider.getTransactionCount(deployer, "pending");
 
-  // --- lancuch adresow ---
-  const launchpad = getCreateAddress({ from: deployer, nonce });
-  // Vault jest PIERWSZYM kontraktem tworzonym przez launchpad. Nonce kontraktu
-  // startuje od 1 (EIP-161), a nie od 0 - to jest miejsce, w ktorym najlatwiej
-  // sie pomylic i wykopac salt pod adres, ktory nigdy nie powstanie.
-  const vault = getCreateAddress({ from: launchpad, nonce: 1 });
-
-  // --- kod tworzacy hooka razem z argumentami ---
-  const hookArtifact = await ethers.getContractFactory("B20LaunchHook");
-  const initCode = concat([
-    hookArtifact.bytecode,
-    ethers.AbiCoder.defaultAbiCoder().encode(
-      ["address", "uint16"],
-      [feeRecipient, protocolShareBps]
-    ),
-  ]);
-  const initCodeHash = keccak256(initCode);
-
+  console.log("siec            ", `chainId ${chainId}`);
   console.log("wdrazajacy      ", deployer);
   console.log("nonce           ", nonce);
-  console.log("launchpad bedzie", launchpad);
-  console.log("vault bedzie    ", vault);
-  console.log("initCodeHash    ", initCodeHash);
+  console.log("PoolManager     ", poolManager, `[${pmSource}]`);
+  console.log("feeRecipient    ", feeRecipient);
+  console.log("protocolShareBps", protocolShareBps.toString());
   console.log("szukane bity    ", `0x${HOOK_REQUIRED_FLAGS.toString(16)}`);
   console.log("");
 
   const started = Date.now();
-  for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    const salt = zeroPadValue(toBeHex(i), 32);
-    const candidate = getCreate2Address(vault, salt, initCodeHash);
+  const plan = await buildPlan({ poolManager, feeRecipient, protocolShareBps, deployer, nonce });
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
 
-    if ((BigInt(candidate) & HOOK_ALL_MASK) === HOOK_REQUIRED_FLAGS) {
-      const seconds = ((Date.now() - started) / 1000).toFixed(1);
-      console.log(`ZNALEZIONE po ${i + 1} probach (${seconds}s)`);
-      console.log("");
-      console.log("hookSalt        ", salt);
-      console.log("hook bedzie     ", candidate);
-      console.log("");
-      console.log("Konstruktor launchpada:");
-      console.log(`  feeBps            <ustal>`);
-      console.log(`  creatorFeeBps     <ustal>`);
-      console.log(`  feeRecipient      ${getAddress(feeRecipient)}`);
-      console.log(`  protocolShareBps  ${protocolShareBps}`);
-      console.log(`  tokenFactory      <adres B20TokenFactory albo PlainTokenFactory>`);
-      console.log(`  hookSalt          ${salt}`);
-      console.log("");
-      console.log("UWAGA: salt jest wazny WYLACZNIE dla tej trojki");
-      console.log("(wdrazajacy, nonce, argumenty hooka). Zmiana ktoregokolwiek");
-      console.log("z nich - takze wyslanie po drodze innej transakcji z tego");
-      console.log("adresu - uniewaznia wynik i trzeba kopac od nowa.");
-      return;
-    }
-  }
-
-  throw new Error(
-    `Brak trafienia w ${MAX_ATTEMPTS} probach. Przy 1/16384 to jest niemozliwe ` +
-      `statystycznie - sprawdz, czy HOOK_REQUIRED_FLAGS tutaj zgadza sie z kontraktem.`
-  );
+  console.log(`ZNALEZIONE po ${plan.attempts} probach (${seconds}s)`);
+  console.log("");
+  console.log("initCodeHash    ", plan.initCodeHash);
+  console.log("hookSalt        ", plan.hookSalt);
+  console.log("launchpad bedzie", plan.launchpad);
+  console.log("vault bedzie    ", plan.vault);
+  console.log("hook bedzie     ", plan.hook);
+  console.log("");
+  console.log("Konstruktor launchpada, po kolei:");
+  console.log(`  poolManager       ${poolManager}`);
+  console.log(`  feeBps            <ustal, sufit 100 = 1%>`);
+  console.log(`  creatorFeeBps     <ustal, <= feeBps>`);
+  console.log(`  feeRecipient      ${feeRecipient}`);
+  console.log(`  protocolShareBps  ${protocolShareBps}`);
+  console.log(`  tokenFactory      <B20TokenFactory albo PlainTokenFactory>`);
+  console.log(`  hookSalt          ${plan.hookSalt}`);
+  console.log("");
+  console.log("UWAGA: salt jest wazny WYLACZNIE dla tej trojki (wdrazajacy, nonce,");
+  console.log("argumenty hooka). Zmiana ktoregokolwiek - takze wyslanie po drodze");
+  console.log("innej transakcji z tego adresu - uniewaznia wynik.");
+  console.log("Dlatego do wdrozenia uzywaj scripts/launchpad/deploy.ts, ktory kopie");
+  console.log("i wysyla w jednym przebiegu.");
 }
 
 main().catch((error) => {

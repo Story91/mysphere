@@ -21,7 +21,17 @@ interface ILiquidityVault {
         payable
         returns (uint128 liquidity, uint256 amount0, uint256 amount1, uint256 toDead);
 
+    function seedWithConfig(
+        address token,
+        address creator,
+        PoolKey calldata key,
+        uint160 sqrtPriceX96,
+        uint16 buybackBps
+    ) external payable returns (uint128 liquidity, uint256 amount0, uint256 amount1, uint256 toDead);
+
     function HOOK() external view returns (address);
+
+    function POOL_MANAGER() external view returns (address);
 }
 
 /**
@@ -81,12 +91,38 @@ contract LiquidityVault is IUnlockCallback {
     /* ---------------------------------------------------------------------- */
 
     /**
-     * Uniswap v4 PoolManager na Base mainnet. 24 009 bajtow kodu, sprawdzone
-     * `eth_getCode`. Stala, a nie parametr konstruktora: parametr znaczy, ze
-     * wdrozony kontrakt moze wskazywac na cokolwiek, a caly sens tego pliku
-     * polega na tym, ze wiadomo, gdzie leza pieniadze.
+     * Znany adres Uniswap v4 PoolManager na Base mainnet - 24 009 bajtow kodu,
+     * sprawdzone `eth_getCode`. NIE jest to juz wartosc uzywana przez kontrakt,
+     * tylko punkt odniesienia dla skryptu wdrozeniowego i dla kazdego, kto
+     * sprawdza wdrozenie na Base po fakcie: `vault.POOL_MANAGER()` ma tu byc
+     * rowne temu.
      */
-    address public constant POOL_MANAGER = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
+    address public constant POOL_MANAGER_BASE_MAINNET = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
+
+    /**
+     * PoolManager tej sieci. `immutable`, a NIE `constant` - zmiana wobec
+     * poprzedniej wersji, w ktorej staly tu na sztywno bajty adresu Base.
+     *
+     * Powod, dla ktorego to bylo `constant`, byl dobry: ma byc wiadomo, gdzie
+     * leza pieniadze, bez zaufania do tego, kto wdrazal. Skutek juz nie byl:
+     * kontraktu nie dalo sie wdrozyc na ZADNA inna siec bez edycji zrodla,
+     * a edycja zrodla hooka uniewaznia wykopany salt. Base Sepolia i Robinhood
+     * byly przez to niedostepne, mimo ze caly `ITokenFactory` powstal wlasnie
+     * po to, zeby byly - naglowek `CurveLaunchpad` twierdzil, ze fabryka jest
+     * JEDYNA rzecza rozniaca sieci, i bylo to nieprawda.
+     *
+     * To, co gwarantowala stala, zastepuja tu trzy rzeczy naraz:
+     *  1. asercja `extcodesize > 0` ponizej - adres bez kodu wywala WDROZENIE,
+     *     a nie pierwszy awans po zebraniu cudzych pieniedzy;
+     *  2. jedno zrodlo: vault i hook dostaja ten sam adres z tej samej zmiennej,
+     *     wiec nie da sie ich rozjechac;
+     *  3. `immutable` - po wdrozeniu nie ma settera i nigdy nie bedzie.
+     *
+     * Czego to NIE gwarantuje i trzeba nazwac: adres z kodem, ale nie ten,
+     * przechodzi te asercje. Broni przed literowka i przed adresem pustym,
+     * nie przed zla wola wdrazajacego. Na to jest odczyt po wdrozeniu.
+     */
+    address public immutable POOL_MANAGER;
 
     /**
      * Smietnik na nadmiar tokena (~45.33M sztuk, 4.53% podazy).
@@ -212,6 +248,7 @@ contract LiquidityVault is IUnlockCallback {
 
     error ZeroAddress();
     error ProtocolShareTooHigh();
+    error PoolManagerHasNoCode();
     error BadHookAddress();
     error HookConfigMismatch();
     error PoolStateUnreadable();
@@ -272,14 +309,30 @@ contract LiquidityVault is IUnlockCallback {
      * ktorego nie da sie ani poprawic, ani zatrzymac. Sprawdzenie kosztuje
      * jedna operacje bitowa.
      */
-    constructor(address feeRecipient_, uint16 protocolShareBps_, bytes32 hookSalt_) {
+    constructor(address poolManager_, address feeRecipient_, uint16 protocolShareBps_, bytes32 hookSalt_) {
         if (feeRecipient_ == address(0)) revert ZeroAddress();
         if (protocolShareBps_ > MAX_PROTOCOL_SHARE_BPS) revert ProtocolShareTooHigh();
+
+        // Adres bez kodu wywala WDROZENIE. Bez tego literowka w adresie
+        // PoolManagera przeszlaby przez deploy, launchpad zaczalby przyjmowac
+        // pieniadze, a `initialize` odbiloby sie od pustego adresu dopiero przy
+        // pierwszym awansie - w kontrakcie, ktorego nie da sie ani poprawic,
+        // ani zatrzymac. Dokladnie ten sam powod, dla ktorego bity adresu hooka
+        // sprawdzamy tutaj, a nie w `seed`.
+        if (poolManager_ == address(0)) revert ZeroAddress();
+        uint256 pmCodeSize;
+        assembly {
+            pmCodeSize := extcodesize(poolManager_)
+        }
+        if (pmCodeSize == 0) revert PoolManagerHasNoCode();
+
+        POOL_MANAGER = poolManager_;
         LAUNCHPAD = msg.sender;
         FEE_RECIPIENT = feeRecipient_;
         PROTOCOL_SHARE_BPS = protocolShareBps_;
 
-        address hook = address(new B20LaunchHook{salt: hookSalt_}(feeRecipient_, protocolShareBps_));
+        address hook =
+            address(new B20LaunchHook{salt: hookSalt_}(poolManager_, feeRecipient_, protocolShareBps_));
 
         // v4 czyta uprawnienia hooka z dolnych 14 bitow jego adresu. Nie zgadzaja
         // sie - kazda pula z tym hookiem odpada na `HookAddressNotValid`.
@@ -293,6 +346,12 @@ contract LiquidityVault is IUnlockCallback {
         // w jednym systemie nie przejda przez deploy.
         if (B20LaunchHook(payable(hook)).FEE_RECIPIENT() != feeRecipient_) revert HookConfigMismatch();
         if (B20LaunchHook(payable(hook)).PROTOCOL_SHARE_BPS() != protocolShareBps_) revert HookConfigMismatch();
+        // PoolManager tez. Hook wola `take` na SWOIM adresie, wiec rozjazd
+        // znaczylby, ze oplata hooka jest sciagana z innej ksiegowosci niz ta,
+        // w ktorej stoi nasza plynnosc - i wyszloby to dopiero na pierwszej
+        // wymianie. Argument idzie z tej samej zmiennej, wiec dzis nie ma jak
+        // sie rozjechac; asercja pilnuje tego, zeby nie zaczelo byc inaczej.
+        if (B20LaunchHook(payable(hook)).POOL_MANAGER() != poolManager_) revert HookConfigMismatch();
 
         HOOK = hook;
     }
@@ -372,7 +431,28 @@ contract LiquidityVault is IUnlockCallback {
         nonReentrant
         returns (uint128 liquidity, uint256 amount0, uint256 amount1, uint256 toDead)
     {
+        return _seed(token, creator, key, sqrtPriceX96, 0);
+    }
+
+    function seedWithConfig(
+        address token,
+        address creator,
+        PoolKey calldata key,
+        uint160 sqrtPriceX96,
+        uint16 buybackBps_
+    ) external payable nonReentrant returns (uint128 liquidity, uint256 amount0, uint256 amount1, uint256 toDead) {
+        return _seed(token, creator, key, sqrtPriceX96, buybackBps_);
+    }
+
+    function _seed(
+        address token,
+        address creator,
+        PoolKey calldata key,
+        uint160 sqrtPriceX96,
+        uint16 buybackBps_
+    ) internal returns (uint128 liquidity, uint256 amount0, uint256 amount1, uint256 toDead) {
         if (msg.sender != LAUNCHPAD) revert NotLaunchpad();
+        if (buybackBps_ > 10_000) revert BadPoolKey();
         if (seeded[token]) revert AlreadySeeded();
         if (token == address(0) || creator == address(0)) revert ZeroAddress();
 
@@ -383,6 +463,8 @@ contract LiquidityVault is IUnlockCallback {
             revert BadPoolKey();
         }
         if (key.tickSpacing <= 0) revert BadPoolKey();
+
+        B20LaunchHook(payable(HOOK)).configureToken(token, buybackBps_);
 
         // ------------------------------------------------------------------
         // PULA POWSTAJE TUTAJ, W CHWILI AWANSU - I TO JEST ZMIANA WOBEC

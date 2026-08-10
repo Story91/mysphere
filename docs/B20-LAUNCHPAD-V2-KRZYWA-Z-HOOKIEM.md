@@ -55,9 +55,26 @@ Zostale trzy zostaly naprawione wprost:
 
 | # | naprawa |
 |---|---|
-| 4 | `MIN_GRAD_RESERVE = 2 ETH`. Ponizej progu krzywa nie awansuje, zostaje w `Locked` ze sprzedaza otwarta. Przedtem awans przy rezerwie 0.2 ETH niszczyl 50% pokrycia, a polowa oplaty szla do wolajacego - bot robil to zawsze. |
+| 4 | `GRAD_FEE_BPS = 300`: oplata awansowa to 3% rezerwy, nie stale 0.1 ETH. Przy 0.2 ETH zabiera 0.006 ETH zamiast 0.1 ETH, wiec nie ma wysokosci rezerwy, przy ktorej zzera pokrycie. Progu `MIN_GRAD_RESERVE` nie ma - patrz nizej, dlaczego zostal cofniety. |
 | 5 | `CreatorLocked` wygasa razem z krzywa: obowiazuje w `Curve`, nie w `Locked`. Przedtem tworca kazdego tokena bez graduacji - czyli wiekszosci - zostawal z pozycja na zawsze. Naglowek kontraktu poprawiony, bo obiecywal cos przeciwnego. |
 | 6 | Komentarz o saldzie tokena w `seed` przepisany na zdanie prawdziwe: saldo moze byc tylko WIEKSZE od tego, co przyszlo z krzywej, a nadmiar i tak idzie na `DEAD`. |
+
+### Dlaczego prog 2 ETH zostal cofniety
+
+Pierwsza poprawka znaleziska #4 byla progiem: `MIN_GRAD_RESERVE = 2 ETH`,
+ponizej ktorego awans nie przechodzil. Znalezisko zamykala, ale placila cena
+wieksza od naprawianej szkody. Zejscie pod prog kosztowalo sprzedaz 7.3% podazy -
+kupionej na starcie krzywej za 0.059 ETH, a wartej w stanie `Locked` 1.00 ETH.
+Robil to wiec zwykly wczesny kupujacy realizujacy zysk, nie napastnik, a skutkiem
+bylo TRWALE odebranie tokenowi awansu: kupno w `Locked` rewertuje, wiec rezerwa
+nie miala jak wrocic nad prog. Token tracil wtedy pule, hooka i oplaty LP -
+czyli caly przychod protokolu umieral dokladnie w tych tokenach, ktore doszly
+do progu.
+
+Oplata procentowa zamyka #4 bez tej ceny, wiec prog jest zbedny i zostal
+usuniety. `ReserveTooSmallToGraduate` zostaje i rewertuje przy
+`eLp < MIN_LP_ETH`, czyli ponizej `0.01 ETH` trafiajacego do puli. (Wczesniej
+stalo tu `eLp == 0` - to bylo niezgodne z kodem, patrz `MIN_LP_ETH`.)
 
 Uboczny zysk z bramy: start tokena nie placi juz ~240k gazu za cztery
 `initialize`, w tym te 99% startow, ktore nigdy nie awansuja.
@@ -131,8 +148,7 @@ W `CurveLaunchpad` nie ma ani jednego `if (chainid == ...)`.
 | `T_MIN` | 200 000 000 | prog graduacji (na tokenie, nie na ETH) |
 | `R_VIRT` | 0.75 ETH | daje zbiorke `G = 3.00 ETH` dokladnie |
 | `FEE_BPS` | 100 (1%) | z tego `CREATOR_FEE_BPS` 40 dla tworcy |
-| `GRAD_FEE` | 0.1 ETH | polowa dla wolajacego `graduate()`, polowa dla protokolu |
-| `MIN_GRAD_RESERVE` | 2 ETH | **nowe** - ponizej progu awansu nie ma |
+| `GRAD_FEE_BPS` | 300 (3% rezerwy) | polowa dla wolajacego `graduate()`, polowa dla protokolu; sufit `MAX_GRAD_FEE_BPS` = 500; odczyt przez `gradFeeOf(token)` |
 | `POOL_FEE` | 3000 (0.3%) | **zmiana** z 10000 |
 | `POOL_TICK_SPACING` | 60 | |
 | `HOOK_FEE_BPS` | 100 (1%) | **nowe**, sufit `MAX_HOOK_FEE_BPS` = 200 |
@@ -164,31 +180,30 @@ Hook nie dzieli oplaty od razu: ksieguje do `pendingEth`/`pendingToken`
 protokol/tworca. Podzial przy naliczaniu wymagalby odczytu tworcy z vaulta
 **wewnatrz kazdej wymiany**.
 
-## 8. Co jest NIEPOTWIERDZONE i musi zostac zamkniete przed mainnetem
+## 8. Co bylo niepotwierdzone i zostalo zamkniete
 
-To jest najwazniejsza sekcja tego dokumentu.
+Sekcja zostala zamknieta przez `npm run launchpad:fork:base`, uruchomione
+10 sierpnia 2026 na forku Base z prawdziwym PoolManagerem, oraz przez
+`eth_call` ze state override do prawdziwego precompile B20. Pelny zapis jest w
+`scripts/output/launchpad-base-fork-probe.json`.
 
-1. **Znak delty zwracanej przez `afterSwap`.** Ze zrodel v4 wynika, ze wartosc
-   dodatnia uznaje hooka - ale to jest **wyprowadzone, nie zmierzone**.
-   `MockPoolManager` ma jeden licznik na walute, w ktorym uznanie hooka i jego
-   `take` wzajemnie sie znosza, wiec testy lokalne tego **nie dowodza**.
-   Kierunek bledu jest bezpieczny (zla wartosc wywala wymiane na
-   `CurrencyNotSettled`, a nie kradnie), ale to jest punkt §6.1 poprzedniego
-   dokumentu i zamyka go wylacznie **fork Base z prawdziwym PoolManagerem**.
-2. **`POOLS_SLOT = 6`** - dzis potwierdzony odczytem z zywej puli, ale to
-   szczegol ukladu pamieci, nie czesc ABI. Oslonieta odczytem ceny zaraz po
-   wlasnym `initialize` w `seed`.
-3. **`transfer` na `0xdEaD` (O3)** - jesli B20 to odrzuca, `seed` rewertuje
-   i **zaden token nigdy nie awansuje**. Jedno wywolanie na Sepolii to
-   rozstrzyga.
-4. **Semantyka `staticcall` nieznanego selektora `SEIZE_ROLE()`** - jesli
-   precompile odpowiada sukcesem zamiast rewertem, kazdy `launch` rewertuje
-   `WrongVariant`. Fail-closed, ale to blokada totalna.
-5. **`abi.encode(struct)` vs krotka dla `params` (O10)** - atrapa dekoduje
-   strukture, produkcja moze chciec krotki.
-6. **Realny gaz `launch`** - pomiar z atrap (~1.15M) jest zniekształcony:
-   atrapa `createB20` wdraza pelny kontrakt (~965k), prawdziwy precompile to
-   ~212k.
+1. **Znak delty `afterSwap`** jest potwierdzony na prawdziwym v4 dla obu
+   kierunkow: exactInput zwrocil `delta0 = -1000000000000000` i
+   `delta1 = 52623570549883768351813`, a exactOutput zwrocil
+   `delta0 = -19007623657658` i `delta1 = 1000000000000000000000`.
+   Dodatnia delta tokena zostala rozliczona przez `take`, a wymiana domknela
+   sie bez `CurrencyNotSettled`.
+2. **`POOLS_SLOT = 6`** zostal potwierdzony przez odczyt ceny prawdziwego
+   PoolManagera zaraz po wlasnym `initialize` w `seed`.
+3. **`transfer` na `0xdEaD` (O3)** przeszedl na prawdziwym B20 ASSET;
+   `deadBalance = 1`.
+4. **`staticcall` nieznanego selektora `SEIZE_ROLE()`** zwrocil failure,
+   wiec asercja wariantu ASSET jest zgodna z zachowaniem precompile.
+5. **`abi.encode(struct)` dla `params` (O10)** zadzialalo na prawdziwym B20;
+   po inicjalizacji `totalSupply` wyniosl `1000000000000000000000000000`.
+6. **Gaz z prawdziwego B20** zostal zmierzony: `B20TokenFactory.createToken`
+   z postwarunkami kosztowal `249290` gas, sonda create + transfer DEAD
+   `242215` gas, a pelny `CurveLaunchpad.launch` `322676` gas.
 
 ## 9. Stan robot
 
@@ -201,7 +216,9 @@ Produkcja: `interfaces/ITokenFactory.sol`, `factories/B20TokenFactory.sol`,
 Atrapy i narzedzia: `mocks/MockPoolManager.sol` (wola hooka w obu miejscach,
 sprawdza selektory, umie `swap`), `mocks/LaunchpadProbes.sol` (`PoolFrontRunner`
 przepisany na dowod, ze bramy nie da sie wyprzedzic; nowy `SwapProbe`),
-`scripts/mineHookAddress.ts`, `test/helpers/deployLaunchpad.ts`.
+`mocks/LaunchpadForkProbes.sol`, `scripts/mineHookAddress.ts`,
+`scripts/launchpad/forkBaseProbe.ts`, `scripts/output/launchpad-base-fork-probe.json`,
+`test/helpers/deployLaunchpad.ts`.
 
 Testy: `CurveLaunchpad.test.ts` (35), `CurveLaunchpadInvariants.test.ts`,
 `B20LaunchHook.test.ts` (12, nowy), `PlainTokenFactory.test.ts` (11, nowy -
@@ -220,14 +237,13 @@ zapamietac, bo oba byly ZIELONE w pojedynczym pliku:
   z przewidzianym.
 
 **Nastepne kroki, w tej kolejnosci:**
-1. Fork Base z prawdziwym `0x498581fF…` - szesc punktow z sekcji 8.
-2. Skrypt wdrozeniowy + Base Sepolia, jedna pelna sciezka: start → kupno →
-   prog → graduacja → pula z hookiem → `settle` → `claim`.
-3. Audyt hooka. To jest nowy kontrakt z prawdziwymi pieniedzmi.
-4. Frontend w ksztalcie Ponsa: tablice `Graduated` / `Explore` z filtrami,
+1. Skrypt wdrozeniowy + Base Sepolia, jedna pelna sciezka: start -> kupno ->
+   prog -> graduacja -> pula z hookiem -> `settle` -> `claim`.
+2. Audyt hooka. To jest nowy kontrakt z prawdziwymi pieniedzmi.
+3. Frontend w ksztalcie Ponsa: tablice `Graduated` / `Explore` z filtrami,
    pasek postepu do progu, widget kupna na krzywej, ostatnie transakcje,
    posiadacze, obraz i opis tokena, panel `claim` dla tworcy.
-5. Port na Robinhood Chain: `PlainTokenFactory` + drugi zestaw adresow.
+4. Port na Robinhood Chain: `PlainTokenFactory` + drugi zestaw adresow.
 
 **Czego swiadomie nie zrobiono:** frontendu (decyzja: kontrakty od konca do
 konca najpierw - widget kupna i pasek graduacji nie maja o co pytac, dopoki

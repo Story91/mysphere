@@ -31,7 +31,7 @@ const { deployLaunchpad } = require('./helpers/deployLaunchpad');
  *   I-C7  quoteBuy slabo rosnaca; cena rosnie po kupnie, maleje po sprzedazy
  *   I-C8  ethReserve maleje WYLACZNIE w sell i w awansie
  *   I-C9  nie ma stanu, w ktorym posiadacz nie moze wyjsc
- *   I-C10 tworca nie sprzedal ani jednej sztuki
+ *   I-C10 tworca handluje na TYCH SAMYCH zasadach, co kazdy (blokady nie ma)
  *   I-C11 windowBought[token][a] <= WINDOW_ADDR_CAP w oknie
  *   I-G1  balance >= totalLiabilities  (tu mocniej: RowNOSC, gdy nie bylo dotacji)
  *   I-G2  suma oplat naliczonych == wyplacone + claimable
@@ -71,10 +71,24 @@ const R_VIRT = 750000000000000000n;
 const FEE_BPS = 100n;
 const CREATOR_FEE_BPS = 40n;
 const WINDOW = 300;
-const GRAD_FEE = 10n ** 17n;
-/** Prog rezerwy, ponizej ktorego awans jest odmawiany - poprawka znaleziska #4. */
-const MIN_GRAD_RESERVE = 2n * 10n ** 18n;
-const GRAD_REWARD = 5n * 10n ** 16n;
+/**
+ * Oplata awansowa jest UDZIALEM w rezerwie, nie stala kwota - i to jest zmiana
+ * wobec poprzedniej wersji tego pliku, w ktorej staly tu `GRAD_FEE = 0.1 ETH`,
+ * `MIN_GRAD_RESERVE = 2 ETH` i `GRAD_REWARD = 0.05 ETH`.
+ *
+ * Prog usunieto, bo kosztowal wiecej, niz naprawial: zejscie pod niego wymagalo
+ * sprzedania 7.3% podazy, kupionej na starcie krzywej za 0.059 ETH i wartej
+ * w stanie Locked 1.00 ETH. Robil to wiec zwykly wczesny kupujacy realizujacy
+ * zysk, a skutkiem bylo TRWALE odebranie tokenowi awansu. Pelne uzasadnienie
+ * stoi przy `GRAD_FEE_BPS` w kontrakcie.
+ *
+ * Te dwie funkcje sa JEDYNYM zrodlem prawdy o oplacie w tym pliku - liczba
+ * przepisana w kilkunastu miejscach rozjechalaby sie przy pierwszej zmianie.
+ */
+const GRAD_FEE_BPS = 300n;
+const gradFeeOf = (reserve: bigint) => (reserve * GRAD_FEE_BPS) / 10_000n;
+/** Ten sam podzial, co `_accrueFee` dla `kind != 0`: polowa dla wolajacego. */
+const gradRewardOf = (reserve: bigint) => gradFeeOf(reserve) / 2n;
 const MAX_UINT = ethers.MaxUint256;
 
 /** Stany z enuma `State` w kontrakcie. */
@@ -502,7 +516,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       s = await assertInvariants(token, t, s, 'claim');
     });
 
-    it('I-C10/I-C11: tworca nie sprzeda W TRAKCIE ZBIORKI, a limit okna jest wspolny dla niego i dla reszty', async function () {
+    it('I-C10/I-C11: tworca handluje jak kazdy, a limit okna jest wspolny dla niego i dla reszty', async function () {
       // Tworca kupuje w oknie - podlega temu samemu limitowi, co kazdy.
       const { token, t } = await launchToken(creator, ethers.parseEther('0.0122'), 1n);
       const cap: bigint = await pad.WINDOW_ADDR_CAP();
@@ -513,17 +527,19 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       expect(await pad.windowBought(token, creator.address)).to.be.lessThanOrEqual(cap);
 
       await t.connect(creator).approve(padAddr, MAX_UINT);
-      // I-C10 w stanie Curve
-      await expect(
-        pad.connect(creator).sell(token, 1000n, 1n, MAX_UINT)
-      ).to.be.revertedWithCustomError(pad, 'CreatorLocked');
 
-      // ...ale W STANIE LOCKED JUZ NIE. To jest poprawka znaleziska #5:
-      // przedtem `CreatorLocked` bylo bezwarunkowe i bez terminu waznosci, wiec
-      // tworca kazdego tokena, ktory nie doszedl do progu - czyli z definicji
-      // wiekszosci - zostawal ze swoja pozycja na zawsze. Blokada ma nie
-      // pozwolic tworcy wyjsc W TRAKCIE zbiorki; po zamknieciu krzywej zbiorki
-      // juz nie ma, bo kupno rewertuje.
+      // TWORCA SPRZEDAJE JAK KAZDY, TAKZE W STANIE `Curve`.
+      //
+      // Byly tu kolejno dwie wersje blokady i obie tworzyly asymetrie w
+      // przeciwne strony: najpierw tworca nie mogl wyjsc NIGDY (a wiekszosc
+      // tokenow nie dochodzi do progu), potem nie mogl w `Curve`, ale mogl
+      // jako JEDYNY w `Locked`, gdy nikt nie mogl juz kupic. Zadna z nich nie
+      // dotykala tworcy sprzedajacego z drugiego adresu - a tylko taki jest
+      // problemem. Patrz naglowek `CurveLaunchpad`, punkt 3.
+      const przedSprzedaza: bigint = await t.balanceOf(creator.address);
+      await sellChecked(creator, token, t, przedSprzedaza / 2n);
+      expect(await t.balanceOf(creator.address)).to.be.lessThan(przedSprzedaza);
+
       await warp(WINDOW + 1);
       await buyChecked(alice, token, t, ethers.parseEther('5'));
       expect((await pad.launchOf(token))[1]).to.equal(LOCKED);
@@ -623,7 +639,10 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
 
         // Awans wchodzi do slownika fuzzera, a nie stoi w osobnym tescie:
         // ma byc sprawdzony po DOWOLNEJ historii krzywej, nie po jednej ladnej.
-        if (s.state === LOCKED && next() % 100n < 15n && s.eth > GRAD_FEE) {
+        // Warunek `gradFeeOf(s.eth) > 0` zastapil `s.eth > GRAD_FEE`: awans
+        // odpada juz tylko wtedy, gdy oplata zaokragla sie do zera, czyli gdy
+        // rezerwa jest pylem i puli i tak nie ma z czego otworzyc.
+        if (s.state === LOCKED && next() % 100n < 15n && gradFeeOf(s.eth) > 0n) {
           await pad.connect(who).graduate(token);
           s = await assertInvariants(token, t, s, 'graduate');
           graduated = true;
@@ -926,15 +945,28 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       await buyChecked(bob, token, t, ethers.parseEther('3'));
 
       // Przedtem ten stan osiagalo sie zatruwajac wszystkie cztery pule.
-      // Zatrucie juz nie istnieje (hook-brama), wiec trwala niemoznosc awansu
-      // ma teraz JEDNA przyczyne: rezerwa zeszla ponizej progu. Test pilnuje
-      // tego samego zdania co przedtem - w najgorszym osiagalnym stanie
-      // sprzedaz MUSI dzialac.
-      const min: bigint = await pad.MIN_GRAD_RESERVE();
-      while (((await pad.launchOf(token))[2] as bigint) >= min) {
-        const bal: bigint = await t.balanceOf(alice.address);
-        await pad.connect(alice).sell(token, bal / 4n, 1n, MAX_UINT);
+      // Zatrucie juz nie istnieje (hook-brama), a prog `MIN_GRAD_RESERVE` -
+      // druga dawna przyczyna - zostal usuniety razem ze stala oplata. Zostala
+      // JEDNA: rezerwa zbita do zera, czyli `eLp == 0`. Zeby tam dojsc, obaj
+      // posiadacze musza wyjsc do konca - i wlasnie to jest tresc tego testu:
+      // w najgorszym osiagalnym stanie sprzedaz MUSI dzialac.
+      for (const kto of [alice, bob]) {
+        const bal: bigint = await t.balanceOf(kto.address);
+        if (bal > 0n) await pad.connect(kto).sell(token, bal, 1n, MAX_UINT);
       }
+      // Zaokraglenia sprzedazy dzialaja na korzysc krzywej, wiec rezerwa
+      // schodzi do PYLU, nie zawsze dokladnie do zera.
+      const pyl = (await pad.launchOf(token))[2] as bigint;
+      expect(pyl, 'rezerwa zeszla do pylu').to.be.lessThan(10n);
+
+      // Ten rewert stoi na progu `MIN_LP_ETH`, nie na `eLp == 0`. Przedtem
+      // warunek brzmial `eLp == 0` i TEN TEST GO PRZEWROCIL: oplata 3% z pylu
+      // zaokragla sie do zera, wiec `eLp` bylo rowne rezerwie i niezerowe,
+      // plynnosc z kilku wei tez wychodzila niezerowa - i awans PRZECHODZIL,
+      // otwierajac wieczna pule z pylem w srodku.
+      expect(pyl, 'pyl jest ponizej progu plynnosci').to.be.lessThan(
+        await pad.MIN_LP_ETH()
+      );
       await expect(pad.graduate(token)).to.be.revertedWithCustomError(
         pad,
         'ReserveTooSmallToGraduate'
@@ -1081,16 +1113,16 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       expect(sum, 'I-X4 pula + dead + posiadacze == T0').to.equal(T0);
 
       // Do puli poszlo CALE ETH poza pylem; oplata awansowa zostala jako salda.
-      const eLp = ethAtLock - GRAD_FEE;
+      const eLp = ethAtLock - gradFeeOf(ethAtLock);
       // Rzutujemy OPERANDY, nie wynik: ethers oddaje salda jako `any`,
       // a `any - any` ma w TypeScripcie typ `number`, nie `bigint`.
       const doPuli = ((await ethers.provider.getBalance(POOL_MANAGER)) as bigint) - (pmBefore as bigint);
       expect(doPuli, 'ETH w puli <= eLp').to.be.lessThanOrEqual(eLp);
       expect(eLp - doPuli, 'pyl ETH').to.be.lessThan(100n);
 
-      // Nagroda i udzial protokolu z GRAD_FEE - suma co do wei.
-      expect(await pad.claimable(carol.address)).to.equal(GRAD_REWARD);
-      const protoFromGrad = GRAD_FEE - GRAD_REWARD;
+      // Nagroda i udzial protokolu z oplaty awansowej - suma co do wei.
+      expect(await pad.claimable(carol.address)).to.equal(gradRewardOf(ethAtLock));
+      const protoFromGrad = gradFeeOf(ethAtLock) - gradRewardOf(ethAtLock);
       expect(await pad.claimable(treasury.address)).to.be.greaterThanOrEqual(protoFromGrad);
 
       // I-X1: zapadka. Nic juz nie przejdzie.
@@ -1123,12 +1155,13 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       // handlujacego w puli. To jest wymagany kierunek (B1) i tu go mierzymy.
       const terminal: bigint = await pad.SQRT_PRICE_TERMINAL();
 
-      // Poziomy zeszly nad prog `MIN_GRAD_RESERVE`. Przedtem szly do
-      // '0.1000000001', czyli o jedno wei ponad oplate awansowa - i wlasnie ten
-      // przypadek wrogi audyt nazwal znaleziskiem #4: awans niszczyl wtedy
-      // niemal cale pozostale pokrycie, a polowa oplaty ladowala u wolajacego.
-      // Test, ktory to przechodzil, uznawal ten stan za poprawny.
-      for (const targetEth of ['2.9', '2.6', '2.3', '2.05', '2.000000001']) {
+      // Poziomy schodza teraz DUZO nizej niz dawny prog 2 ETH, bo progu nie ma.
+      // To nie jest rozluznienie testu, tylko jego sedno: znalezisko #4 mowilo,
+      // ze przy niskiej rezerwie stala oplata 0.1 ETH zzera pokrycie. Oplata
+      // procentowa ma przy 0.2 ETH zabrac 3%, tak samo jak przy 2.9 ETH -
+      // i asercja `amount0 + dust == eLp` ponizej pilnuje tego przy KAZDYM
+      // poziomie, wiec regresja do stalej oplaty wywalilaby dolne poziomy.
+      for (const targetEth of ['2.9', '2.6', '2.3', '2.05', '1.0', '0.2']) {
         const { token, t } = await openCurve();
         await t.connect(alice).approve(padAddr, MAX_UINT);
         let s = await snap(token);
@@ -1137,9 +1170,9 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
 
         await sellDownTo(token, t, alice, ethers.parseEther(targetEth));
         s = await assertInvariants(token, t, s, 'sell');
-        expect(s.eth, `rezerwa dla celu ${targetEth}`).to.be.greaterThan(GRAD_FEE);
+        expect(s.eth, `rezerwa dla celu ${targetEth}`).to.be.greaterThan(0n);
 
-        const eLp = s.eth - GRAD_FEE;
+        const eLp = s.eth - gradFeeOf(s.eth);
         // Po sprzedazach w stanie Locked na krzywej jest WIECEJ tokena niz
         // T_MIN - i cala ta nadwyzka idzie do puli albo na adres martwy.
         const tokAtGrad = s.tok;
@@ -1189,10 +1222,13 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       //
       // Sprawdzamy wiec caly rzad wielkosci: od 1 wei do calej zbiorki.
       const terminal: bigint = await pad.SQRT_PRICE_TERMINAL();
-      // `0n` na poczatku jest tu istotne, a nie ozdobne: warunek progu brzmi
-      // `ethReserve < MIN_GRAD_RESERVE`, wiec rezerwa DOKLADNIE rowna progowi
-      // jest pierwsza legalna wartoscia. Test ma dotknac tej granicy, a nie
-      // zatrzymac sie bezpiecznie nad nia.
+      // Progu juz nie ma, wiec nie ma tez granicy, przy ktorej trzeba usiasc.
+      // `BAZA` jest teraz zwyklym, NISKIM punktem zaczepienia - wystarczajaco
+      // niskim, zeby `eLp` bylo o rzad wielkosci mniejsze od pelnej zbiorki,
+      // i wystarczajaco wysokim, zeby plynnosc wyszla niezerowa. To, co ten
+      // test naprawde bada, siedzi w `cel`: przebiega on NAJMLODSZE bity
+      // rezerwy, a bledy zaokraglen mieszkaja wlasnie tam.
+      const BAZA = ethers.parseEther('0.2');
       const poziomy = [
         0n, 1n, 2n, 3n, 5n, 7n, 13n, 99n, 1000n, 65537n,
         10n ** 6n, 10n ** 9n, 12345678901n, 10n ** 12n, 10n ** 15n, 10n ** 16n
@@ -1206,15 +1242,10 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
         await buyChecked(alice, token, t, ethers.parseEther('5'));
         s = await assertInvariants(token, t, s, 'buy');
 
-        // Punktem odniesienia jest teraz PROG, a nie sama oplata awansowa:
-        // ponizej progu awansu po prostu nie ma. Zakres wielkosci `eLp` zwezil
-        // sie przez to do [1.9, 2.9] ETH i trzeba to powiedziec wprost - ale
-        // to, co ten test naprawde bada, jest nietkniete: `cel` przebiega
-        // NAJMLODSZE bity rezerwy, a bledy zaokraglen siedza wlasnie tam.
-        await sellDownTo(token, t, alice, MIN_GRAD_RESERVE + cel);
+        await sellDownTo(token, t, alice, BAZA + cel);
         s = await assertInvariants(token, t, s, 'sell');
 
-        const eLp = s.eth - GRAD_FEE;
+        const eLp = s.eth - gradFeeOf(s.eth);
         expect(eLp, `cel ${cel}`).to.be.greaterThan(0n);
         if (eLp < najmniejszy) najmniejszy = eLp;
 
@@ -1235,12 +1266,13 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
         expect(await poolPrice(await pad.poolKeyOf(token))).to.equal(terminal);
       }
 
-      // Przedtem stalo tu `lessThan(5n)` - test schodzil do jednego wei ponad
-      // oplate awansowa. Prog `MIN_GRAD_RESERVE` odcial ten obszar CELOWO
-      // (znalezisko #4), wiec najmniejszy osiagalny `eLp` to dokladnie
-      // `MIN_GRAD_RESERVE - GRAD_FEE`. Asercja pilnuje, ze test naprawde dotknal
-      // tej granicy, a nie zatrzymal sie bezpiecznie nad nia.
-      expect(najmniejszy, 'najmniejszy zbadany eLp').to.equal(MIN_GRAD_RESERVE - GRAD_FEE);
+      // Asercja pilnuje, ze petla naprawde zeszla na `BAZA`, a nie utknela
+      // wyzej przez `sellDownTo`, ktore trafia w cel od GORY. Nie zadamy tu
+      // rownosci co do wei: `sellDownTo` szuka po ILOSCI TOKENA, wiec ostatni
+      // krok moze zostawic pyl ponad celem. Zadamy tego, co ten test ma
+      // dowiesc - ze zbadany `eLp` lezy w dolnym rzedzie wielkosci.
+      expect(najmniejszy, 'najmniejszy zbadany eLp').to.be.lessThan(BAZA);
+      expect(najmniejszy, 'najmniejszy zbadany eLp').to.be.greaterThan(BAZA / 2n);
     });
 
     it('galaz dociagniecia nie potrafi rzucic Arithmetic - 12 stanow x 9 kwot wokol granicy', async function () {
@@ -1288,7 +1320,11 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       }
     });
 
-    it('rezerwa ponizej oplaty awansowej: awans odmawia, ale sprzedaz dziala dalej', async function () {
+    it('rezerwa 0.05 ETH - kiedys martwy punkt, dzis zwykly awans z mala oplata', async function () {
+      // Ten test byl ODWROTNY: sprawdzal, ze przy rezerwie ponizej stalej
+      // oplaty 0.1 ETH awans odmawia. Odwrocenie go jest cala tresc zmiany
+      // "stala oplata -> procent rezerwy": rezerwa 0.05 ETH nie jest juz
+      // stanem, w ktorym token traci awans NA ZAWSZE. Oplata schodzi z nia.
       const { token, t } = await openCurve();
       await t.connect(alice).approve(padAddr, MAX_UINT);
       let s = await snap(token);
@@ -1297,20 +1333,24 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
 
       await sellDownTo(token, t, alice, ethers.parseEther('0.05'));
       s = await assertInvariants(token, t, s, 'sell');
-      expect(s.eth).to.be.lessThanOrEqual(GRAD_FEE);
+      const rezerwa = s.eth;
+      expect(rezerwa, 'rezerwa pod dawna stala oplata').to.be.lessThan(ethers.parseEther('0.1'));
 
-      await expect(pad.connect(bob).graduate(token)).to.be.revertedWithCustomError(
-        pad,
-        'ReserveTooSmallToGraduate'
+      // Kontrakt i test licza oplate osobno i musza sie zgodzic co do wei.
+      const [feeZKontraktu, nagrodaZKontraktu] = await pad.gradFeeOf(token);
+      expect(feeZKontraktu).to.equal(gradFeeOf(rezerwa));
+      expect(nagrodaZKontraktu).to.equal(gradRewardOf(rezerwa));
+
+      await pad.connect(bob).graduate(token);
+      s = await assertInvariants(token, t, s, 'graduate');
+      expect(s.state).to.equal(GRADUATED);
+      expect(await pad.claimable(bob.address)).to.equal(gradRewardOf(rezerwa));
+
+      // Sedno znaleziska #4: oplata NIE zjada pokrycia. Przy 0.05 ETH zabiera
+      // 3%, tak samo jak przy 3 ETH - stara stala zabralaby tu ponad 100%.
+      expect(feeZKontraktu * 100n, 'oplata to najwyzej 3% rezerwy').to.be.lessThanOrEqual(
+        rezerwa * 3n
       );
-
-      // Nikt nie jest uwieziony: reszta pozycji nadal wychodzi.
-      const rest: bigint = await t.balanceOf(alice.address);
-      const q = await pad.quoteSell(token, rest);
-      expect(q[0]).to.be.greaterThan(0n);
-      await sellChecked(alice, token, t, rest);
-      s = await assertInvariants(token, t, s, 'sell');
-      expect(s.bal).to.equal(s.liab);
     });
 
     /**
@@ -1367,8 +1407,9 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       );
       await buyChecked(alice, token, t, ethers.parseEther('5'));
       // Adres, ktory nie ma z tym tokenem nic wspolnego, awansuje go i dostaje nagrode.
+      const rezerwa = (await pad.launchOf(token))[2] as bigint;
       await pad.connect(dave).graduate(token);
-      expect(await pad.claimable(dave.address)).to.equal(GRAD_REWARD);
+      expect(await pad.claimable(dave.address)).to.equal(gradRewardOf(rezerwa));
     });
   });
 
@@ -1640,28 +1681,31 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
 
     it('sufity sa TWARDE i obowiazuja takze wdrazajacego', async function () {
       const Pad = await ethers.getContractFactory('CurveLaunchpad');
-      expect(await pad.MAX_FEE_BPS()).to.equal(200n);
+      expect(await pad.MAX_FEE_BPS()).to.equal(100n);
       expect(await vault.MAX_PROTOCOL_SHARE_BPS()).to.equal(8000n);
 
       const tf = await tokenFactory.getAddress();
       // Te warunki stoja PRZED wdrozeniem vaulta, wiec salt jest bez znaczenia.
       await expect(
-        Pad.deploy(201, 40, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 101, 40, treasury.address, 6000, tf, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(pad, 'FeeTooHigh');
       await expect(
-        Pad.deploy(100, 101, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 101, treasury.address, 6000, tf, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
       await expect(
-        Pad.deploy(100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(pad, 'ZeroAddress');
       // Sufit udzialu protokolu jest PODLOGA udzialu tworcy - 8000 znaczy
       // "tworcy nie da sie zejsc ponizej 20%, nawet literowka przy deployu".
       await expect(
-        Pad.deploy(100, 40, treasury.address, 8001, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 40, treasury.address, 8001, tf, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(vault, 'ProtocolShareTooHigh');
       // Granice od strony dozwolonej naprawde przechodza - tu salt musi juz byc
       // wykopany, bo deploy dochodzi do konstruktora vaulta.
-      await usePad(200, 200, 8000);
+      // Granica DOZWOLONA to dzis (100, 60): sufit oplaty i sufit udzialu
+      // tworcy. Stalo tu `(200, 200)`, czyli oplata 2% i cala oplata dla
+      // tworcy - jedno lamie `MAX_FEE_BPS`, drugie `MAX_CREATOR_SHARE_BPS`.
+      await usePad(100, 60, 8000);
       await usePad(0, 0, 0);
     });
 
@@ -1710,29 +1754,48 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       // Awans ma wlasna, niezalezna od FEE_BPS sciezke podzialu.
       await buyChecked(bob, token, t, ethers.parseEther('5'));
       s = await snap(token);
+      // Rezerwa MUSI byc zapamietana przed awansem: po nim jest zerowa,
+      // a `assertInvariants` nadpisuje `s`.
+      const rezerwaPrzedAwansem = s.eth;
       await pad.connect(dave).graduate(token);
       s = await assertInvariants(token, t, s, 'graduate');
-      expect(await pad.claimable(dave.address)).to.equal(GRAD_REWARD);
-      expect(await pad.claimable(treasury.address)).to.equal(GRAD_FEE - GRAD_REWARD);
+      expect(await pad.claimable(dave.address)).to.equal(gradRewardOf(rezerwaPrzedAwansem));
+      expect(await pad.claimable(treasury.address)).to.equal(
+        gradFeeOf(rezerwaPrzedAwansem) - gradRewardOf(rezerwaPrzedAwansem)
+      );
     });
 
-    it('cala oplata handlowa dla tworcy: protokol nie dostaje z handlu nic', async function () {
-      await usePad(200, 200, 6000);
+    it('MAKSYMALNY udzial tworcy: protokol i tak nie schodzi ponizej swoich 40%', async function () {
+      // Ten test badal kiedys konfiguracje "cala oplata dla tworcy, protokol
+      // z handlu nie dostaje nic". Taka konfiguracja jest dzis NIEMOZLIWA -
+      // `MAX_CREATOR_SHARE_BPS` odrzuca ja w konstruktorze i w `_launch`.
+      // Test pilnuje wiec tego, co ja zastapilo: nawet na SUFICIE udzialu
+      // tworcy protokol zabiera swoja czesc kazdej oplaty handlowej.
+      await usePad(100, 60, 6000);
       const { token, t } = await openCurve();
       let s = await snap(token);
       const r = await buyChecked(alice, token, t, ethers.parseEther('1'));
       s = await assertInvariants(token, t, s, 'buy');
 
-      expect(r.fee, 'oplata 2%').to.equal(ethers.parseEther('0.02'));
-      expect(await pad.claimable(creator.address)).to.equal(r.fee);
-      expect(await pad.claimable(treasury.address), 'protokol z handlu: zero').to.equal(0n);
+      expect(r.fee, 'oplata 1%').to.equal(ethers.parseEther('0.01'));
+      const doTworcy = (r.fee * 60n) / 100n;
+      expect(await pad.claimable(creator.address), 'tworca: 60% oplaty').to.equal(doTworcy);
+      expect(await pad.claimable(treasury.address), 'protokol: reszta, nigdy zero').to.equal(
+        r.fee - doTworcy
+      );
+      expect(await pad.claimable(treasury.address)).to.be.greaterThan(0n);
 
-      // ...ale przy awansie protokol i tak dostaje swoja polowe oplaty awansowej.
+      // Przy awansie protokol dostaje DODATKOWO polowe oplaty awansowej.
+      // Liczymy PRZYROST, bo z handlu ma juz swoje.
       await buyChecked(bob, token, t, ethers.parseEther('5'));
       s = await snap(token);
+      const rezerwaPrzedAwansem = s.eth;
+      const przedAwansem: bigint = await pad.claimable(treasury.address);
       await pad.connect(dave).graduate(token);
       s = await assertInvariants(token, t, s, 'graduate');
-      expect(await pad.claimable(treasury.address)).to.equal(GRAD_FEE - GRAD_REWARD);
+      expect(((await pad.claimable(treasury.address)) as bigint) - przedAwansem).to.equal(
+        gradFeeOf(rezerwaPrzedAwansem) - gradRewardOf(rezerwaPrzedAwansem)
+      );
     });
 
     it('udzial protokolu w oplatach LP rowny zeru: tworca bierze wszystko', async function () {
@@ -1935,8 +1998,9 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
 
       // Sonda zbiera saldo, awansujac krzywe (nagroda 0.05 ETH do claimable).
       await probe.doBuy(token, ethers.parseEther('5'), 1n);
+      const rezerwa = (await pad.launchOf(token))[2] as bigint;
       await probe.doGraduate(token);
-      expect(await pad.claimable(probeAddr)).to.equal(GRAD_REWARD);
+      expect(await pad.claimable(probeAddr)).to.equal(gradRewardOf(rezerwa));
 
       // 1. Re-wejscie w `claim` z `receive()` w trakcie wyplaty.
       await probe.arm(1, token);
@@ -1978,8 +2042,9 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       // Awans wolany przez kontrakt, ktory nie przyjmuje ETH. Nagroda jest
       // KSIEGOWANA, nie pushowana - inaczej taki wolajacy zablokowalby awans
       // wszystkim, a to jest dokladnie ten rodzaj zakladnika, ktorego nie chcemy.
+      const rezerwa = (await pad.launchOf(token))[2] as bigint;
       await zly.doGraduate(token);
-      expect(await pad.claimable(zlyAddr)).to.equal(GRAD_REWARD);
+      expect(await pad.claimable(zlyAddr)).to.equal(gradRewardOf(rezerwa));
       expect((await pad.launchOf(token))[1]).to.equal(GRADUATED);
 
       // Jego wlasna wyplata odpada...
@@ -1989,7 +2054,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
         'EthTransferFailed'
       );
       // ...ale saldo zostaje jego i nikomu innemu nie przeszkadza.
-      expect(await pad.claimable(zlyAddr)).to.equal(GRAD_REWARD);
+      expect(await pad.claimable(zlyAddr)).to.equal(gradRewardOf(rezerwa));
       const before = await ethers.provider.getBalance(treasury.address);
       await pad.connect(alice).claimFor(treasury.address);
       expect(await ethers.provider.getBalance(treasury.address)).to.be.greaterThan(before);

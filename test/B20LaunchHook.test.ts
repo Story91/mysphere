@@ -25,6 +25,7 @@ const { deployLaunchpad } = require('./helpers/deployLaunchpad');
  */
 
 const B20_FACTORY = '0xB20f000000000000000000000000000000000000';
+const DEAD = '0x000000000000000000000000000000000000dEaD';
 const POOL_MANAGER = '0x498581fF718922c3f8e6A244956aF099B2652b2b';
 
 const FEE_BPS = 100n;
@@ -205,6 +206,55 @@ describe('B20LaunchHook', function () {
       expect(await hook.pendingToken(token)).to.equal(0n);
       expect(await ethers.provider.getBalance(await hook.getAddress())).to.equal(fee);
       expect(await ethers.provider.getBalance(await probe.getAddress())).to.equal(out - fee);
+    });
+
+    it('auto buyback bierze skonfigurowana czesc ETH i omija fee od wlasnego swapa', async function () {
+      const launchTx = await pad.connect(creator).launchAdvanced(
+        'Buyback',
+        'BBK',
+        0n,
+        (await now()) + 600,
+        100,
+        40,
+        1000,
+        ethers.parseEther('16000000'),
+        [creator.address],
+        [10000],
+        ''
+      );
+      const launchRc = await launchTx.wait();
+      const launchEvent = launchRc.logs
+        .map((l: any) => {
+          try {
+            return pad.interface.parseLog(l);
+          } catch {
+            return null;
+          }
+        })
+        .find((l: any) => l && l.name === 'Launched');
+      const buybackToken = launchEvent.args[0] as string;
+      const buybackAsset = await ethers.getContractAt('MockB20', buybackToken);
+      await hre.network.provider.send('evm_increaseTime', [WINDOW + 1]);
+      await hre.network.provider.send('evm_mine');
+      await pad.connect(alice).buy(buybackToken, 1n, (await now()) + 600, { value: ethers.parseEther('5') });
+      await pad.connect(bob).graduate(buybackToken);
+      const buybackKey = await pad.poolKeyOf(buybackToken);
+
+      const outEth = ethers.parseEther('0.01');
+      await pm.setNextCounterAmount(outEth);
+      await buybackAsset.mint(await probe.getAddress(), ethers.parseEther('1000'));
+      await probe.doSwap(plain(buybackKey), [false, -ethers.parseEther('1000'), 0n], {});
+
+      const hookFee = feeOf(outEth);
+      const buybackEth = (hookFee * 1000n) / 10_000n;
+      expect(await hook.pendingBuybackEth(buybackToken)).to.equal(buybackEth);
+      const boughtTokens = ethers.parseEther('123');
+      await pm.setNextCounterAmount(boughtTokens);
+      const deadBefore = await buybackAsset.balanceOf(DEAD);
+      await hook.executeBuyback(buybackToken, 1n, (await now()) + 600);
+      expect(await hook.buybackTokens(buybackToken)).to.equal(boughtTokens);
+      expect(await buybackAsset.balanceOf(DEAD)).to.equal(deadBefore + boughtTokens);
+      expect(await hook.pendingBuybackEth(buybackToken)).to.equal(0n);
     });
 
     it('exactOutput: oplata schodzi z WEJSCIA, czyli kupujacy placi wiecej', async function () {

@@ -1,0 +1,32 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "observedBlock": 45277715,
+  "observedAt": "2026-08-10T01:01:58.000Z",
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "feeRecipient": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "poolManager": "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+  "tokenFactory": "0x40020b0322F69606cB3Ce53cD99f62bB43c0d578",
+  "launchpad": "0xA760fBB82dd3018dFf3f34ACF1BA133725164F97",
+  "vault": "0x50BbeB61BdB286d55371abE8cA3fE413eE1831F2",
+  "hook": "0x127ecd2c013EadFbcF8f03a258b8616B5d716044",
+  "hookSalt": "0x000000000000000000000000000000000000000000000000000000000000036d",
+  "feeBps": "100",
+  "creatorFeeBps": "40",
+  "protocolShareBps": "6000",
+  "verification": {
+    "launchpadCodeBytes": 9957,
+    "vaultCodeBytes": 9068,
+    "hookCodeBytes": 4279,
+    "hookValid": true,
+    "feeRecipientMatches": true,
+    "poolManagerMatches": true
+  },
+  "status": "deployed_and_binding_verified",
+  "fullFlowStatus": "blocked_until_deployer_has_testnet_eth_for_curve_buy",
+  "notes": [
+    "The first deployment process hit an RPC propagation race while reading VAULT(); onchain code and bindings were verified afterwards.",
+    "deploy.ts now retries runtime-code and VAULT/HOOK reads.",
+    "The deployer balance observed after deployment was 0.000751413911767939 ETH; the curve-closing buy needs approximately 3 ETH plus gas."
+  ]
+}

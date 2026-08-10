@@ -46,6 +46,7 @@ const WINDOW = 300;
 const MAX_UINT = ethers.MaxUint256;
 
 describe('CurveLaunchpad', function () {
+  this.timeout(120_000);
   let deployer: any, creator: any, alice: any, bob: any, treasury: any;
   let pad: any, vault: any, hook: any, factory: any, tokenFactory: any, pm: any;
 
@@ -164,7 +165,15 @@ describe('CurveLaunchpad', function () {
       // przy deployu a bledem wykrytym po zebraniu cudzych pieniedzy.
       const Pad = await ethers.getContractFactory('CurveLaunchpad');
       await expect(
-        Pad.deploy(100, 40, treasury.address, 6000, await tokenFactory.getAddress(), ethers.ZeroHash)
+        Pad.deploy(
+          POOL_MANAGER,
+          100,
+          40,
+          treasury.address,
+          6000,
+          await tokenFactory.getAddress(),
+          ethers.ZeroHash
+        )
       ).to.be.revertedWithCustomError(vault, 'BadHookAddress');
     });
 
@@ -173,16 +182,23 @@ describe('CurveLaunchpad', function () {
       const tf = await tokenFactory.getAddress();
       // Te warunki stoja PRZED wdrozeniem vaulta, wiec salt jest tu bez znaczenia.
       await expect(
-        Pad.deploy(201, 40, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 101, 40, treasury.address, 6000, tf, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(pad, 'FeeTooHigh');
       await expect(
-        Pad.deploy(100, 101, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 101, treasury.address, 6000, tf, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
+      // Podloga protokolu obowiazuje TAKZE wdrazajacego: 61 ze 100 to juz 61%,
+      // czyli ponad `MAX_CREATOR_SHARE_BPS`. Bez tego warunku domyslna
+      // konfiguracja mogla by oddac cala oplate tworcy, a sufit w `_launch`
+      // pilnowalby juz tylko startow wywolanych recznie.
+      await expect(
+        Pad.deploy(POOL_MANAGER, 100, 61, treasury.address, 6000, tf, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
       await expect(
-        Pad.deploy(100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(pad, 'ZeroAddress');
       await expect(
-        Pad.deploy(100, 40, treasury.address, 6000, ethers.ZeroAddress, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 40, treasury.address, 6000, ethers.ZeroAddress, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(pad, 'ZeroAddress');
     });
 
@@ -246,6 +262,120 @@ describe('CurveLaunchpad', function () {
       const a = await launch(creator);
       const b = await launch(creator);
       expect(a).to.not.equal(b);
+    });
+
+    it('launchAdvanced zapisuje fee split, wielu odbiorcow, metadata i pre-buy', async function () {
+      const metadata = 'ipfs://mysphere/advanced-token.json';
+      const tx = await pad.connect(creator).launchAdvanced(
+        'Advanced',
+        'ADV',
+        1n,
+        (await time()) + 600,
+        100,
+        // 60 ze 100 to dokladnie 60% - gorna granica udzialu tworcy. Bylo tu
+        // `200, 200`, czyli oplata 2% i CALA oplata dla tworcy; jedno przekracza
+        // dzisiejszy `MAX_FEE_BPS`, drugie `MAX_CREATOR_SHARE_BPS`.
+        60,
+        1000,
+        ethers.parseEther('16000000'),
+        [alice.address, bob.address],
+        [6000, 4000],
+        metadata,
+        { value: ethers.parseEther('0.0122') }
+      );
+      const rc = await tx.wait();
+      const event = rc.logs
+        .map((log: any) => {
+          try {
+            return pad.interface.parseLog(log);
+          } catch {
+            return null;
+          }
+        })
+        .find((parsed: any) => parsed && parsed.name === 'Launched');
+      const token = event.args[0] as string;
+
+      expect(await pad.metadataURI(token)).to.equal(metadata);
+      expect(await pad.launchBuybackBps(token)).to.equal(1000n);
+      expect(await pad.launchWindowCap(token)).to.equal(ethers.parseEther('16000000'));
+      expect(await pad.feeConfigOf(token)).to.deep.equal([100n, 60n, 2n]);
+      expect(await pad.feeReceiverOf(token, 0)).to.deep.equal([alice.address, 6000n]);
+      expect(await pad.feeReceiverOf(token, 1)).to.deep.equal([bob.address, 4000n]);
+      expect(await ethers.getContractAt('MockB20', token).then((asset: any) => asset.balanceOf(creator.address))).to.be.greaterThan(0n);
+
+      const aliceBefore = await pad.claimable(alice.address);
+      const bobBefore = await pad.claimable(bob.address);
+      const quote = await pad.quoteBuy(token, ethers.parseEther('0.01'));
+      await pad.connect(bob).buy(token, 1n, (await time()) + 600, { value: ethers.parseEther('0.01') });
+      // Do odbiorcow idzie UDZIAL TWORCY, czyli 60 ze 100 bps oplaty - nie cala
+      // oplata. Reszta nalezy do protokolu i jest sprawdzana osobnym testem.
+      const creatorPool = ((quote[1] as bigint) * 60n) / 100n;
+      expect((await pad.claimable(alice.address)) - aliceBefore).to.equal((creatorPool * 6000n) / 10_000n);
+      expect((await pad.claimable(bob.address)) - bobBefore).to.equal(creatorPool - (creatorPool * 6000n) / 10_000n);
+    });
+
+    it('oplata ma sufit 1%, a PROTOKOL zawsze zostaje z co najmniej 40% tej oplaty', async function () {
+      const cap = ethers.parseEther('16000000');
+      const deadline = BigInt((await time()) + 600);
+      const advanced = (name: string, symbol: string, feeBps: number, creatorFeeBps: number) =>
+        pad
+          .connect(creator)
+          .launchAdvanced(name, symbol, 0n, deadline, feeBps, creatorFeeBps, 0, cap, [creator.address], [10000], '');
+
+      // Sufity czytane z kontraktu, nie przepisane - inaczej ten test przestaje
+      // pilnowac czegokolwiek w chwili, gdy ktos je zmieni.
+      expect(await pad.MAX_FEE_BPS()).to.equal(100n);
+      expect(await pad.MAX_CREATOR_SHARE_BPS()).to.equal(6000n);
+
+      await expect(advanced('Over', 'OVR', 101, 0)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      // To jest CALA stawka tej zmiany: tworca nie moze wziac calej oplaty.
+      await expect(advanced('Greedy', 'GRD', 100, 100)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      await expect(advanced('Edge', 'EDG', 100, 61)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      // Podloga trzyma sie takze przy nizszej oplacie: 50 bps -> najwyzej 30.
+      await expect(advanced('Half', 'HLF', 50, 31)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      await expect(advanced('HalfOk', 'HOK', 50, 30)).to.not.be.reverted;
+
+      // `windowCap == 0` przechodzilo walidacje, a potem KAZDE kupno w oknie
+      // startowym odbijalo sie o `WindowCap` - start dalo sie w ten sposob
+      // zamurowac, nie lamiac ani jednej asercji.
+      await expect(
+        pad
+          .connect(creator)
+          .launchAdvanced('Zero', 'ZRO', 0n, deadline, 100, 60, 0, 0, [creator.address], [10000], '')
+      ).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+
+      const rc = await (await advanced('Cap', 'CAP', 100, 60)).wait();
+      const token = rc.logs
+        .map((log: any) => {
+          try {
+            return pad.interface.parseLog(log);
+          } catch {
+            return null;
+          }
+        })
+        .find((parsed: any) => parsed && parsed.name === 'Launched').args[0] as string;
+
+      expect(await pad.feeConfigOf(token)).to.deep.equal([100n, 60n, 1n]);
+      // Poza zakresem nazwany blad, a nie goly `Panic(0x32)`.
+      await expect(pad.feeReceiverOf(token, 1)).to.be.revertedWithCustomError(pad, 'InvalidFeeReceiver');
+
+      // Dowod na pieniadzach, nie na mapie: po kupnie tworca i protokol maja
+      // realne salda w stosunku 60/40, a ich suma to CALA oplata.
+      const ethIn = ethers.parseEther('0.01');
+      const quote = await pad.quoteBuy(token, ethIn);
+      const fee = quote[1] as bigint;
+      expect(fee).to.equal((ethIn * 100n + 9_999n) / 10_000n);
+
+      const creatorBefore = await pad.claimable(creator.address);
+      const treasuryBefore = await pad.claimable(treasury.address);
+      await pad.connect(alice).buy(token, 1n, (await time()) + 600, { value: ethIn });
+      const creatorGain = ((await pad.claimable(creator.address)) as bigint) - (creatorBefore as bigint);
+      const treasuryGain = ((await pad.claimable(treasury.address)) as bigint) - (treasuryBefore as bigint);
+
+      expect(creatorGain).to.equal((fee * 60n) / 100n);
+      expect(treasuryGain).to.equal(fee - creatorGain);
+      expect(treasuryGain).to.be.greaterThan(0n);
+      expect(creatorGain + treasuryGain).to.equal(fee);
     });
 
     it('dev-buy idzie ta sama sciezka, co wszyscy - i podlega limitowi okna', async function () {
@@ -366,12 +496,21 @@ describe('CurveLaunchpad', function () {
       expect(dc).to.equal((q[1] * CREATOR_FEE_BPS) / FEE_BPS);
     });
 
-    it('tworca nie moze sprzedac na krzywej', async function () {
+    it('tworca sprzedaje na krzywej NA TYCH SAMYCH ZASADACH, co kazdy', async function () {
+      // Byla tu asercja `CreatorLocked`. Blokada zostala usunieta swiadomie:
+      // nie dzialala na tworce sprzedajacego z drugiego adresu, wiec karala
+      // wylacznie tego, kto uzyl jednego. Patrz naglowek kontraktu, punkt 3.
       await pad.connect(creator).buy(token, 1, (await time()) + 600, { value: ethers.parseEther('0.5') });
       await t.connect(creator).approve(await pad.getAddress(), MAX_UINT);
-      await expect(
-        pad.connect(creator).sell(token, 1000n, 1, (await time()) + 600)
-      ).to.be.revertedWithCustomError(pad, 'CreatorLocked');
+
+      const saldo: bigint = await t.balanceOf(creator.address);
+      expect(saldo).to.be.greaterThan(0n);
+      const przed: bigint = await ethers.provider.getBalance(creator.address);
+      await pad.connect(creator).sell(token, saldo, 1n, (await time()) + 600);
+
+      expect(await t.balanceOf(creator.address)).to.equal(0n);
+      // Wyszedl z realnym ETH, a nie tylko "transakcja przeszla".
+      expect(await ethers.provider.getBalance(creator.address)).to.be.greaterThan(przed);
     });
 
     it('wyplacalnosc: odsprzedaz calej podazy w obiegu nie przekracza rezerwy', async function () {
@@ -510,7 +649,9 @@ describe('CurveLaunchpad', function () {
       // Jawne `bigint`: ethers oddaje te wartosci jako `any`, a bez adnotacji
       // TypeScript zwezal jedna z nich do `number` i odmawial odejmowania.
       const ethReserve: bigint = l[2];
-      const gradFee: bigint = await pad.GRAD_FEE();
+      // Oplata awansowa jest UDZIALEM w rezerwie, nie stala kwota - odczytujemy
+      // ja z kontraktu dla biezacego stanu, zamiast wpisywac liczbe.
+      const [gradFee]: [bigint, bigint] = await pad.gradFeeOf(token);
       const terminal = await pad.SQRT_PRICE_TERMINAL();
 
       // Saldo PoolManagera mierzymy PRZYROSTEM, nie wartoscia bezwzgledna.
@@ -553,8 +694,9 @@ describe('CurveLaunchpad', function () {
 
     it('nagroda dla wolajacego jest ksiegowana, nie pushowana', async function () {
       // Polowa oplaty awansowej. Liczona z niej, a nie z osobnej stalej -
-      // dwie stale musialyby byc trzymane w zgodzie recznie.
-      const reward = (await pad.GRAD_FEE()) / 2n;
+      // dwie stale musialyby byc trzymane w zgodzie recznie. `gradFeeOf` oddaje
+      // obie liczby naraz, wiec test sprawdza takze to, ze one sie zgadzaja.
+      const [, reward]: [bigint, bigint] = await pad.gradFeeOf(token);
       await pad.connect(bob).graduate(token);
       expect(await pad.claimable(bob.address)).to.equal(reward);
       const before = await ethers.provider.getBalance(bob.address);
@@ -599,25 +741,65 @@ describe('CurveLaunchpad', function () {
       expect(pos[0]).to.equal(poolIdOf(key));
     });
 
-    it('krzywa wyprzedana ponizej progu NIE awansuje, a sprzedaz dziala - znalezisko #4', async function () {
-      // Sprzedaz w stanie Locked schodzi ponizej MIN_GRAD_RESERVE. Przedtem
-      // `graduate()` bylo tu legalne i palilo 0.1 ETH z resztki pokrycia,
-      // z czego polowa szla do wolajacego.
+    it('krzywa wyprzedana nisko NADAL awansuje, a oplata skaluje sie z rezerwa - znalezisko #4', async function () {
+      // ------------------------------------------------------------------
+      // TEN TEST ODWROCIL SIE WZGLEDEM POPRZEDNIEJ WERSJI - i to jest sedno
+      // ------------------------------------------------------------------
+      // Przedtem sprawdzal, ze przy rezerwie ponizej 2 ETH `graduate()`
+      // REWERTUJE. Prog faktycznie zamykal znalezisko #4 (stala oplata 0.1 ETH
+      // zzerala polowe pokrycia przy rezerwie 0.2 ETH), ale placil za to cena,
+      // ktorej nikt nie policzyl: zejscie pod prog kosztowalo 72.7M tokena,
+      // czyli 7.3% podazy kupione na starcie krzywej za 0.059 ETH i sprzedane
+      // w stanie Locked za 1.00 ETH. Nie trzeba bylo do tego napastnika -
+      // wystarczyl pierwszy kupujacy realizujacy zysk, a on ma najwiekszy powod,
+      // zeby wyjsc wlasnie na progu. Skutkiem bylo TRWALE odebranie tokenowi
+      // awansu, bo kupno w Locked rewertuje i rezerwy nikt juz nie odbuduje.
+      //
+      // Teraz oplata jest udzialem w rezerwie, wiec nie ma wysokosci, przy
+      // ktorej robi sie grozna - i progu nie ma. Test sprawdza obie polowy tej
+      // zmiany: ze awans PRZECHODZI i ze oplata jest mala.
       await t.connect(alice).approve(await pad.getAddress(), MAX_UINT);
-      const min: bigint = await pad.MIN_GRAD_RESERVE();
-      while (((await pad.launchOf(token))[2] as bigint) >= min) {
+      const cel = ethers.parseEther('0.2');
+      while (((await pad.launchOf(token))[2] as bigint) >= cel) {
         const bal: bigint = await t.balanceOf(alice.address);
         await pad.connect(alice).sell(token, bal / 4n, 1, (await time()) + 600);
       }
 
+      const rezerwa: bigint = (await pad.launchOf(token))[2];
+      const [fee, reward]: [bigint, bigint] = await pad.gradFeeOf(token);
+
+      // 3% rezerwy, a nie stale 0.1 ETH. Przy tej rezerwie stara wersja
+      // zabralaby okolo polowy pokrycia - to jest cala tresc znaleziska #4.
+      expect(fee).to.equal((rezerwa * 300n) / 10_000n);
+      expect(fee * 20n).to.be.lessThanOrEqual(rezerwa); // <= 5%, sufit MAX_GRAD_FEE_BPS
+      expect(reward).to.equal(fee / 2n);
+
+      // I - w odroznieniu od poprzedniej wersji - awans po prostu dziala.
+      await expect(pad.connect(bob).graduate(token)).to.emit(pad, 'Graduated');
+      expect((await pad.launchOf(token))[1]).to.equal(3n); // Graduated
+      expect(await pad.claimable(bob.address)).to.equal(reward);
+      expect(await pad.claimable(treasury.address)).to.be.greaterThanOrEqual(fee - reward);
+    });
+
+    it('rezerwa zbita do pyla nie awansuje, ale nikt nie jest uwieziony', async function () {
+      // Jedyny pozostaly przypadek, w ktorym awans odpada: `gradFee` zaokragla
+      // sie w dol do zera i `eLp` bylby cala rezerwa albo zerem. Nie ma wtedy
+      // z czego otworzyc puli - vault i tak odbilby to na `ZeroLiquidity`,
+      // a `ReserveTooSmallToGraduate` jest o jedno wywolanie wczesniej i mowi,
+      // o co chodzi. Krzywa zostaje w Locked ze sprzedaza otwarta.
+      await t.connect(alice).approve(await pad.getAddress(), MAX_UINT);
+      while (((await pad.launchOf(token))[2] as bigint) > 0n) {
+        const bal: bigint = await t.balanceOf(alice.address);
+        if (bal === 0n) break;
+        await pad.connect(alice).sell(token, bal, 1, (await time()) + 600);
+      }
+
+      expect((await pad.launchOf(token))[2]).to.equal(0n);
       await expect(pad.connect(bob).graduate(token)).to.be.revertedWithCustomError(
         pad,
         'ReserveTooSmallToGraduate'
       );
-
-      // Nikt nie jest uwieziony: krzywa zostaje w Locked, sprzedaz dziala dalej.
-      expect((await pad.launchOf(token))[1]).to.equal(2n);
-      await pad.connect(alice).sell(token, (await t.balanceOf(alice.address)) / 2n, 1, (await time()) + 600);
+      expect((await pad.launchOf(token))[1]).to.equal(2n); // nadal Locked
     });
   });
 

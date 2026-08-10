@@ -83,6 +83,28 @@ describe('PlainTokenFactory (siec bez B20)', function () {
       expect(await t.decimals()).to.equal(18n);
     });
 
+    it('ten sam salt od DWOCH wolajacych daje dwa rozne adresy', async function () {
+      // To jest test na grief, nie na porzadek. Salt launchpada (`launchId`)
+      // sklada sie z danych, ktore w tym samym bloku zna kazdy. Dopoki adres
+      // wynikal tylko z (fabryka, salt), napastnik mogl wywolac fabryke
+      // PIERWSZY z cudzym saltem, zajac adres i wywalic cudzy `launch()` -
+      // a `creatorNonce` nie rosnie przy rewercie, wiec grief byl powtarzalny.
+      const salt = ethers.id('ten-sam-salt');
+
+      const forAlice = await factory.connect(alice).predictToken(salt);
+      const forBob = await factory.connect(bob).predictToken(salt);
+      expect(forAlice).to.not.equal(forBob);
+      expect(await factory.predictTokenFor(alice.address, salt)).to.equal(forAlice);
+
+      // Napastnik zajmuje SWOJ adres tym saltem...
+      await factory.connect(bob).createToken('Grief', 'GRF', T0, salt, bob.address, bob.address);
+      expect(await ethers.provider.getCode(forBob)).to.not.equal('0x');
+
+      // ...a ofiara i tak przechodzi, bo jej przestrzen saltow jest inna.
+      await factory.connect(alice).createToken('Ofiara', 'OFR', T0, salt, alice.address, alice.address);
+      expect(await ethers.provider.getCode(forAlice)).to.not.equal('0x');
+    });
+
     it('cala podaz idzie na jeden adres, a sufit rowna sie podazy', async function () {
       const salt = ethers.id('salt-2');
       const addr = await factory.predictToken(salt);

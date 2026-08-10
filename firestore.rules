@@ -33,6 +33,33 @@ service cloud.firestore {
     // pozwala, a sciezki sa rozlaczne, wiec obie sekcje wspolistnieja.
 
     // ========================================================================
+    // PROFILE TOKENOW LAUNCHPADA
+    // ========================================================================
+    // docId = adres tokena, lowercase. Trzyma WYLACZNIE warstwe edytowalna:
+    // logo, opis i linki. Cena, rezerwa, stan krzywej i oplaty pochodza z
+    // lancucha i nigdy stad nie sa czytane.
+    //
+    // ZAPIS JEST ZAMKNIETY DLA PRZEGLADARKI I TO JEST CELOWE. Prawo do tokena
+    // ma tylko jego tworca, a sprawdzic to da sie wylacznie odczytem
+    // `launchOf(token).creator` z lancucha - regula Firestore tego nie potrafi.
+    // Zapisuje wiec serwer, przez firebase-admin (admin SDK omija te reguly),
+    // po sprawdzeniu sesji SIWE ORAZ tworcy z lancucha:
+    // app/api/launchpad/token/route.ts.
+    //
+    // UWAGA, KTORA KOSZTOWALA JUZ JEDEN BLAD W TYM PLIKU: samo napisanie
+    // `allow write: if false` NIE zamyka zapisu. Na koncu pliku stoi regula
+    // ogolna `allow read, write: if !hasOwnRules(collection)`, a Firestore
+    // wpuszcza, gdy pozwala JAKAKOLWIEK pasujaca regula. Dopoki nazwa kolekcji
+    // nie znajdzie sie na liscie w `hasOwnRules`, ponizsze `if false` jest
+    // martwe i kazdy anonimowy klient pisze tu bezposrednio, omijajac bramke
+    // z sesja SIWE i sprawdzeniem tworcy z lancucha.
+    // `launchpadTokens` JEST na tej liscie - patrz `hasOwnRules` nizej.
+    match /launchpadTokens/{tokenAddress} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ========================================================================
     // REJESTR AGENTOW
     // ========================================================================
     // docId = adres wlasciciela, lowercase. Dzieki temu dopasowanie autora
@@ -503,7 +530,8 @@ service cloud.firestore {
         'premiumContent',
         'tips',
         'curatorWatch',
-        'curatorChanges'
+        'curatorChanges',
+        'launchpadTokens'
       ];
     }
 

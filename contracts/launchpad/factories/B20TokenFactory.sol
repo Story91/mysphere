@@ -65,8 +65,31 @@ contract B20TokenFactory is ITokenFactory {
         return TOKEN_DECIMALS;
     }
 
+    /**
+     * Salt UZYTY NAPRAWDE. Wiaze salt z wolajacym i to jest zabezpieczenie,
+     * a nie porzadkowanie.
+     *
+     * ATAK, KTORY TO ZAMYKA: `createToken` jest bezuprawnieniowe, a salt
+     * launchpada (`launchId`) sklada sie z danych, ktore w tym samym bloku zna
+     * kazdy. Napastnik widzacy oczekujace `launch()` mogl wywolac te fabryke
+     * PIERWSZY z tym samym saltem, zajac adres i wywalic cudzy start.
+     * `creatorNonce` nie rosnie przy rewercie, wiec grief byl powtarzalny.
+     */
+    function _effectiveSalt(address deployer, bytes32 salt) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(deployer, salt));
+    }
+
+    /** Adres, jaki dostanie `deployer` dla tego salta. */
+    function predictTokenFor(address deployer, bytes32 salt) public view returns (address) {
+        return IB20AssetFactory(B20_FACTORY).getB20Address(
+            VARIANT_ASSET,
+            address(this),
+            _effectiveSalt(deployer, salt)
+        );
+    }
+
     function predictToken(bytes32 salt) external view returns (address) {
-        return IB20AssetFactory(B20_FACTORY).getB20Address(VARIANT_ASSET, address(this), salt);
+        return predictTokenFor(msg.sender, salt);
     }
 
     /**
@@ -119,13 +142,13 @@ contract B20TokenFactory is ITokenFactory {
 
         // value: 0 OBOWIAZKOWO - fabryka rewertuje NonPayable() (0x6fb1b0e9)
         // na kazde wei, mimo ze jej interfejs jest `payable`.
-        token = IB20AssetFactory(B20_FACTORY).createB20{value: 0}(VARIANT_ASSET, salt, params, initCalls);
+        token = IB20AssetFactory(B20_FACTORY).createB20{value: 0}(VARIANT_ASSET, _effectiveSalt(msg.sender, salt), params, initCalls);
 
         // Adres musi zgadzac sie z tym, co fabryka sama wylicza dla NASZEGO
         // adresu, tego salta i tego wariantu. Zamyka to podmiane zwracanego
         // adresu i wiaze `VARIANT_ASSET` z wynikiem - bez wklejania wzoru
         // adresu do kodu.
-        if (token != IB20AssetFactory(B20_FACTORY).getB20Address(VARIANT_ASSET, address(this), salt)) {
+        if (token != IB20AssetFactory(B20_FACTORY).getB20Address(VARIANT_ASSET, address(this), _effectiveSalt(msg.sender, salt))) {
             revert WrongTokenAddress();
         }
 

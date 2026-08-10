@@ -30,7 +30,15 @@
     "poczekaj, az Firebase pokaze je jako Enabled, DOPIERO POTEM dopisz",
     "`orderBy` i stronicowanie w getMoneyLedger.ts. Pola sortowania roznia sie",
     "miedzy kolekcjami: `tips` trzyma czas w `timestamp`, `unlocks` w",
-    "`unlockedAt` - to nie jest literowka."
+    "`unlockedAt` - to nie jest literowka.",
+    "",
+    "=== DWA OSTATNIE (launchpadTokens) NIE SA JESZCZE WDROZONE ===",
+    "Pod app/api/launchpad/profileStore.ts. `listProfiles` robi",
+    "where(chainId) + orderBy(updatedAt desc), wiec bez indeksu konczy sie",
+    "FAILED_PRECONDITION - a kod lapie wyjatek i oddaje PUSTA liste, czyli",
+    "token lista bez ani jednego tokena i zadnego bledu w logu. Jesli",
+    "/api/launchpad/tokenlist zwraca pustke mimo istniejacych profili,",
+    "sprawdz TO NAJPIERW."
   ],
   "indexes": [
     {
@@ -270,6 +278,23 @@
       "fields": [
         { "fieldPath": "walletAddress", "order": "ASCENDING" },
         { "fieldPath": "unlockedAt", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "launchpadTokens",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "chainId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "launchpadTokens",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "creator", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
     }
   ],

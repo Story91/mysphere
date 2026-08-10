@@ -47,7 +47,26 @@ function mineHookSalt(vault: string, initCodeHash: string) {
  * Adres hooka, ktory powstanie, gdy `deployer` wysle teraz wdrozenie launchpada.
  * Zwraca takze salt, bo obie rzeczy wynikaja z tego samego rachunku.
  */
-async function predictHook(deployer: any, feeRecipient: string, protocolShareBps: number | bigint) {
+/**
+ * Adres, pod ktorym testy trzymaja `MockPoolManager`.
+ *
+ * To NIE jest wartosc zaszyta w kontrakcie - od czasu, gdy `POOL_MANAGER` jest
+ * `immutable`, kontrakt nie wie o zadnym adresie z gory. Testy nadal instaluja
+ * atrape przez `hardhat_setCode` pod adresem Base mainnet, wiec ta stala jest
+ * domyslna WYLACZNIE dla nich i zgadza sie z tym, co robi ich `beforeEach`.
+ *
+ * Konstruktor vaulta wymaga `extcodesize > 0`, wiec atrapa musi stac PRZED
+ * wdrozeniem launchpada. Gdy nie stoi, deploy odpada na `PoolManagerHasNoCode`
+ * - i to jest wlasciwy komunikat, a nie zagadka.
+ */
+const DEFAULT_POOL_MANAGER = '0x498581fF718922c3f8e6A244956aF099B2652b2b';
+
+async function predictHook(
+  deployer: any,
+  feeRecipient: string,
+  protocolShareBps: number | bigint,
+  poolManager: string = DEFAULT_POOL_MANAGER
+) {
   // `getNonce('pending')`, a NIE `getTransactionCount(addr)`. Ten drugi domyslnie
   // pyta o blok `latest`, wiec nie liczy transakcji juz wyslanych, a jeszcze
   // niezablokowanych - i wtedy przewidziany adres launchpada jest o jeden za
@@ -62,7 +81,10 @@ async function predictHook(deployer: any, feeRecipient: string, protocolShareBps
   const Hook = await ethers.getContractFactory('B20LaunchHook');
   const initCode = ethers.concat([
     Hook.bytecode,
-    ethers.AbiCoder.defaultAbiCoder().encode(['address', 'uint16'], [feeRecipient, protocolShareBps]),
+    ethers.AbiCoder.defaultAbiCoder().encode(
+      ['address', 'address', 'uint16'],
+      [poolManager, feeRecipient, protocolShareBps]
+    ),
   ]);
 
   const mined = mineHookSalt(vault, ethers.keccak256(initCode));
@@ -76,14 +98,18 @@ type DeployArgs = {
   feeRecipient: string;
   protocolShareBps: number | bigint;
   tokenFactory: string;
+  /** Domyslnie adres, pod ktorym `beforeEach` testow instaluje `MockPoolManager`. */
+  poolManager?: string;
 };
 
 /** Wdraza launchpad (a przez niego vault i hook) i oddaje wszystkie trzy. */
 async function deployLaunchpad(args: DeployArgs) {
-  const predicted = await predictHook(args.deployer, args.feeRecipient, args.protocolShareBps);
+  const poolManager = args.poolManager ?? DEFAULT_POOL_MANAGER;
+  const predicted = await predictHook(args.deployer, args.feeRecipient, args.protocolShareBps, poolManager);
 
   const Pad = await ethers.getContractFactory('CurveLaunchpad');
   const pad = await Pad.connect(args.deployer).deploy(
+    poolManager,
     args.feeBps,
     args.creatorFeeBps,
     args.feeRecipient,
@@ -111,6 +137,7 @@ async function deployLaunchpad(args: DeployArgs) {
 }
 
 module.exports = {
+  DEFAULT_POOL_MANAGER,
   HOOK_ALL_MASK,
   HOOK_REQUIRED_FLAGS,
   mineHookSalt,

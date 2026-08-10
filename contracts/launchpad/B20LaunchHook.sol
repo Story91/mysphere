@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {IPoolManagerV4, PoolKey, SwapParams, BalanceDeltaLib} from "./interfaces/IPoolManagerV4.sol";
+import {IPoolManagerV4, PoolKey, SwapParams, BalanceDeltaLib, PoolStateReader} from "./interfaces/IPoolManagerV4.sol";
 import {FullMath} from "./lib/FullMath.sol";
 
 interface IVaultCreatorView {
     function creatorOf(address token) external view returns (address);
+    function poolKeyOf(address token) external view returns (PoolKey memory);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -128,7 +129,25 @@ contract B20LaunchHook {
     /*  STALE                                                                  */
     /* ====================================================================== */
 
-    address public constant POOL_MANAGER = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
+    /**
+     * PoolManager tej sieci. `immutable`, a NIE `constant` - i to jest zmiana
+     * wobec poprzedniej wersji.
+     *
+     * Przedtem staly tu na sztywno bajty adresu Base mainnet. Doktryna byla
+     * dobra ("ma byc wiadomo, gdzie leza pieniadze"), ale skutek juz nie: kod
+     * nie dawal sie wdrozyc NA ZADNA inna siec bez edycji zrodla, a edycja
+     * zrodla hooka zmienia jego kod tworzacy, czyli uniewaznia wykopany salt.
+     * Testy tego nie pokazywaly, bo `hardhat_setCode` wstawia atrape pod ten
+     * sam adres - zielona suita nie mowila o przenosnosci nic.
+     *
+     * Cena tej zmiany jest nazwana wprost: wdrazajacy moze teraz wpisac zly
+     * adres. Zamykaja to dwie rzeczy, obie w konstruktorze `LiquidityVault`:
+     * asercja `extcodesize > 0` (adres bez kodu wywala deploy) oraz to, ze
+     * vault i hook dostaja TEN SAM adres z jednego zrodla i nie da sie ich
+     * rozjechac. Reszta jest do sprawdzenia jednym odczytem po wdrozeniu:
+     * `hook.POOL_MANAGER() == vault.POOL_MANAGER()`.
+     */
+    address public immutable POOL_MANAGER;
 
     /**
      * Nasz udzial w wymianie: 1%. Sufit w KODZIE, nie w konfiguracji - ma
@@ -142,6 +161,31 @@ contract B20LaunchHook {
      */
     uint16 public constant HOOK_FEE_BPS = 100;
     uint16 public constant MAX_HOOK_FEE_BPS = 200;
+    uint160 private constant MIN_SQRT_PRICE_X96 = 4_295_128_740;
+
+    /**
+     * O ile najwyzej wolno przesunac PIERWIASTEK ceny w jednym auto-buybacku.
+     *
+     * ===========================================================================
+     * TO JEST OBRONA PRZED KANAPKA, A NIE STROJENIE
+     * ===========================================================================
+     * `executeBuyback` jest bezuprawnieniowe i `minTokensOut` podaje WOLAJACY.
+     * Dopoki wymiana szla z `sqrtPriceLimitX96 = MIN_SQRT_PRICE_X96`, czyli bez
+     * zadnej granicy ceny, napastnik mogl wywolac ja z `minTokensOut = 1`
+     * wewnatrz kanapki: najpierw wypycha cene w gore, potem nasz buyback kupuje
+     * po tej cenie za CALE `pendingBuybackEth`, a kupione tokeny ida na `DEAD`.
+     * Pieniadze protokolu i tworcy wychodzily do napastnika, a spalenie bylo
+     * bez wartosci. Skrypt keepera wymagal recznego minimum wlasnie dlatego -
+     * ale nikt nie musi uzywac naszego skryptu.
+     *
+     * Granica liczona jest TUTAJ, z ceny odczytanej w tej samej transakcji, wiec
+     * nie da sie jej podac z zewnatrz.
+     *
+     * UWAGA NA KWADRAT: to jest limit na PIERWIASTKU ceny. 500 bps na
+     * pierwiastku to okolo 9.75% na samej cenie, bo (1 - 0.05)^2 = 0.9025.
+     */
+    uint16 private constant MAX_BUYBACK_SLIPPAGE_BPS = 500;
+    address private constant DEAD = address(0x000000000000000000000000000000000000dEaD);
 
     /** Udzial protokolu w tym, co wezmie hook. Reszta idzie do tworcy tokena. */
     uint16 public immutable PROTOCOL_SHARE_BPS;
@@ -169,6 +213,9 @@ contract B20LaunchHook {
      */
     mapping(address => uint256) public pendingEth;
     mapping(address => uint256) public pendingToken;
+    mapping(address => uint16) public buybackBps;
+    mapping(address => uint256) public pendingBuybackEth;
+    mapping(address => uint256) public buybackTokens;
 
     /** Rozdzielone i gotowe do odbioru. Bez clawbacku, przedawnienia i escheatu. */
     mapping(address => uint256) public claimableEth;
@@ -182,6 +229,8 @@ contract B20LaunchHook {
     event HookFeeTaken(address indexed token, bool indexed isEth, uint256 amount);
     event HookFeeSettled(address indexed token, uint256 ethToProtocol, uint256 ethToCreator, uint256 tokenToProtocol, uint256 tokenToCreator);
     event Claimed(address indexed account, address indexed token, uint256 amount, address indexed caller);
+    event BuybackConfigured(address indexed token, uint16 buybackBps);
+    event AutoBuyback(address indexed token, uint256 ethIn, uint256 tokensBought, address indexed caller);
 
     /* ====================================================================== */
     /*  BLEDY                                                                  */
@@ -199,8 +248,16 @@ contract B20LaunchHook {
     error TokenTransferFailed();
     error FeeOverflow();
     error Reentrancy();
+    error Expired();
+    error Slippage();
+    error NothingToBuyback();
+    error NotUnlocking();
 
     uint256 private _lock = 1;
+    uint8 private _buybackAction;
+    address private _buybackToken;
+    uint256 private _buybackEth;
+    uint256 private _buybackMinOut;
 
     modifier nonReentrant() {
         if (_lock != 1) revert Reentrancy();
@@ -211,6 +268,11 @@ contract B20LaunchHook {
 
     modifier onlyPoolManager() {
         if (msg.sender != POOL_MANAGER) revert NotPoolManager();
+        _;
+    }
+
+    modifier onlyVault() {
+        if (msg.sender != VAULT) revert NotVault();
         _;
     }
 
@@ -233,16 +295,20 @@ contract B20LaunchHook {
      * (`returndatasize == 0`), czyli caly deploy rewertuje.
      *
      * Argumenty sa wiec konieczne. Kosztuja tyle, ze wchodza do kodu
-     * tworzacego i zmieniaja adres CREATE2 - ale to nie jest problem, bo obie
-     * wartosci sa znane offline, zanim cokolwiek stanie na lancuchu; kopalnia
-     * bierze je na wejsciu. Rozjazd z vaultem zamyka ASERCJA po drugiej
+     * tworzacego i zmieniaja adres CREATE2 - ale to nie jest problem, bo
+     * wszystkie trzy wartosci (PoolManager, odbiorca oplaty, udzial protokolu)
+     * sa znane offline, zanim cokolwiek stanie na lancuchu; kopalnia bierze je
+     * na wejsciu. Skutek, o ktorym trzeba pamietac przy wdrazaniu: ZMIANA
+     * KTOREJKOLWIEK z nich uniewaznia wykopany salt i trzeba kopac od nowa. Rozjazd z vaultem zamyka ASERCJA po drugiej
      * stronie: `LiquidityVault` sprawdza zaraz po wdrozeniu, ze hook oddaje
      * dokladnie te wartosci, ktore ma sam.
      */
-    constructor(address feeRecipient_, uint16 protocolShareBps_) {
+    constructor(address poolManager_, address feeRecipient_, uint16 protocolShareBps_) {
+        if (poolManager_ == address(0)) revert ZeroAddress();
         if (feeRecipient_ == address(0)) revert ZeroAddress();
         if (HOOK_FEE_BPS > MAX_HOOK_FEE_BPS) revert FeeTooHigh();
 
+        POOL_MANAGER = poolManager_;
         VAULT = msg.sender;
         FEE_RECIPIENT = feeRecipient_;
         PROTOCOL_SHARE_BPS = protocolShareBps_;
@@ -258,6 +324,44 @@ contract B20LaunchHook {
      * nie zmienia zadnego wyliczenia.
      */
     receive() external payable {}
+
+    function configureToken(address token, uint16 buybackBps_) external onlyVault {
+        if (token == address(0) || buybackBps_ > 10_000) revert BadPoolShape();
+        buybackBps[token] = buybackBps_;
+        emit BuybackConfigured(token, buybackBps_);
+    }
+
+    function executeBuyback(address token, uint256 minTokensOut, uint256 deadline)
+        external
+        nonReentrant
+        returns (uint256 tokensOut)
+    {
+        if (block.timestamp > deadline) revert Expired();
+        uint256 ethIn = pendingBuybackEth[token];
+        if (ethIn == 0) revert NothingToBuyback();
+
+        pendingBuybackEth[token] = 0;
+        _buybackAction = 1;
+        _buybackToken = token;
+        _buybackEth = ethIn;
+        _buybackMinOut = minTokensOut;
+        bytes memory ret = IPoolManagerV4(POOL_MANAGER).unlock(abi.encode(token, ethIn, minTokensOut));
+        _buybackAction = 0;
+        _buybackToken = address(0);
+        _buybackEth = 0;
+        _buybackMinOut = 0;
+
+        uint256 spentEth;
+        (tokensOut, spentEth) = abi.decode(ret, (uint256, uint256));
+        if (tokensOut < minTokensOut) revert Slippage();
+        // Niewydane ETH wraca do puli buybacku, a nie znika w saldzie hooka.
+        if (spentEth < ethIn) pendingBuybackEth[token] += ethIn - spentEth;
+        buybackTokens[token] += tokensOut;
+        _safeTransfer(token, DEAD, tokensOut);
+        // W zdarzeniu WYDANE ETH, nie zamowione - inaczej przy wymianie
+        // czesciowej zdarzenie klamaloby o kwocie.
+        emit AutoBuyback(token, spentEth, tokensOut, msg.sender);
+    }
 
     /* ====================================================================== */
     /*  BRAMA                                                                  */
@@ -332,6 +436,11 @@ contract B20LaunchHook {
     ) external onlyPoolManager returns (bytes4, int128) {
         address token = key.currency1;
 
+        // Wlasny buyback przechodzi przez te sama pule i ten sam hook. Nie
+        // naliczamy oplaty od operacji protokolowej, zeby buyback nie tworzyl
+        // nieskonczonej petli oplat i nie kupowal sam siebie.
+        if (_buybackAction != 0) return (this.afterSwap.selector, int128(0));
+
         bool unspecifiedIsCurrency1 = _unspecifiedIsCurrency1(params);
         int128 moved = unspecifiedIsCurrency1 ? BalanceDeltaLib.amount1(delta) : BalanceDeltaLib.amount0(delta);
 
@@ -360,14 +469,62 @@ contract B20LaunchHook {
         address currency = unspecifiedIsCurrency1 ? token : address(0);
         IPoolManagerV4(POOL_MANAGER).take(currency, address(this), fee);
 
+        uint256 buybackCut = !unspecifiedIsCurrency1
+            ? FullMath.mulDivDown(fee, buybackBps[token], 10_000)
+            : 0;
         if (unspecifiedIsCurrency1) {
             pendingToken[token] += fee;
         } else {
-            pendingEth[token] += fee;
+            pendingEth[token] += fee - buybackCut;
+            pendingBuybackEth[token] += buybackCut;
         }
         emit HookFeeTaken(token, !unspecifiedIsCurrency1, fee);
 
         return (this.afterSwap.selector, int128(int256(fee)));
+    }
+
+    function unlockCallback(bytes calldata data) external returns (bytes memory) {
+        if (msg.sender != POOL_MANAGER) revert NotPoolManager();
+        if (_buybackAction != 1) revert NotUnlocking();
+
+        (address token, uint256 ethIn, uint256 minTokensOut) = abi.decode(data, (address, uint256, uint256));
+        if (token != _buybackToken || ethIn != _buybackEth || minTokensOut != _buybackMinOut) revert BadPoolShape();
+
+        PoolKey memory key = IVaultCreatorView(VAULT).poolKeyOf(token);
+
+        // Granica ceny z ceny BIEZACEJ, odczytanej w tej samej transakcji.
+        // Kupujemy ETH -> token, czyli `zeroForOne`, wiec cena idzie W DOL i
+        // granica musi lezec ponizej spotu. Patrz MAX_BUYBACK_SLIPPAGE_BPS.
+        uint160 spot = PoolStateReader.sqrtPriceX96(POOL_MANAGER, key);
+        if (spot == 0) revert BadPoolShape();
+        uint160 limit = uint160((uint256(spot) * (10_000 - MAX_BUYBACK_SLIPPAGE_BPS)) / 10_000);
+        // v4 wymaga granicy OSTRO powyzej minimum; przy skrajnie niskiej cenie
+        // powyzsze mnozenie moze zejsc do samego dna.
+        if (limit <= MIN_SQRT_PRICE_X96) limit = MIN_SQRT_PRICE_X96 + 1;
+
+        int256 delta = IPoolManagerV4(POOL_MANAGER).swap(
+            key,
+            SwapParams({zeroForOne: true, amountSpecified: -int256(ethIn), sqrtPriceLimitX96: limit}),
+            ""
+        );
+        int128 amount0 = BalanceDeltaLib.amount0(delta);
+        int128 amount1 = BalanceDeltaLib.amount1(delta);
+
+        if (amount0 < 0) {
+            IPoolManagerV4(POOL_MANAGER).settle{value: uint256(uint128(-amount0))}();
+        } else if (amount0 > 0) {
+            IPoolManagerV4(POOL_MANAGER).take(address(0), address(this), uint256(uint128(amount0)));
+        }
+        if (amount1 < 0) revert BadPoolShape();
+        uint256 bought = uint256(uint128(amount1));
+        if (bought < minTokensOut) revert Slippage();
+        if (bought != 0) IPoolManagerV4(POOL_MANAGER).take(token, address(this), bought);
+        // Przy granicy ceny wymiana moze byc CZESCIOWA, wiec wydane ETH nie
+        // musi rownac sie `ethIn`. Oddajemy prawdziwa kwote, zeby wolajacy
+        // dopisal reszte z powrotem do `pendingBuybackEth` - inaczej ta reszta
+        // zostalaby na kontrakcie poza ksiegowaniem.
+        uint256 spent = amount0 < 0 ? uint256(uint128(-amount0)) : 0;
+        return abi.encode(bought, spent);
     }
 
     /**
@@ -475,6 +632,11 @@ contract B20LaunchHook {
 
         (bool ok, bytes memory ret) =
             token.call(abi.encodeWithSignature("transfer(address,uint256)", account, amount));
+        if (!ok || (ret.length != 0 && !abi.decode(ret, (bool)))) revert TokenTransferFailed();
+    }
+
+    function _safeTransfer(address token, address to, uint256 amount) private {
+        (bool ok, bytes memory ret) = token.call(abi.encodeWithSignature("transfer(address,uint256)", to, amount));
         if (!ok || (ret.length != 0 && !abi.decode(ret, (bool)))) revert TokenTransferFailed();
     }
 

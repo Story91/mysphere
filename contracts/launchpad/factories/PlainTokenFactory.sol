@@ -68,16 +68,49 @@ contract PlainTokenFactory is ITokenFactory, ILaunchTokenConfig {
         return (p.name, p.symbol, p.supply, p.mintTo);
     }
 
-    function predictToken(bytes32 salt) public view returns (address) {
+    /**
+     * Salt UZYTY NAPRAWDE. Wiaze salt z wolajacym i to jest zabezpieczenie,
+     * a nie porzadkowanie.
+     *
+     * ATAK, KTORY TO ZAMYKA: `createToken` jest bezuprawnieniowe, a salt
+     * launchpada (`launchId`) sklada sie z danych, ktore w tym samym bloku zna
+     * kazdy. Napastnik widzacy oczekujace `launch()` mogl wywolac te fabryke
+     * PIERWSZY z tym samym saltem, zajac adres CREATE2 i wywalic cudzy start.
+     * `creatorNonce` nie rosnie przy rewercie, wiec grief byl powtarzalny co
+     * blok za jedna tania transakcje.
+     *
+     * Po wmieszaniu `msg.sender` napastnik moze zajac wylacznie adres, ktory
+     * i tak nalezy do jego wlasnej przestrzeni saltow.
+     */
+    function _effectiveSalt(address deployer, bytes32 salt) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(deployer, salt));
+    }
+
+    /** Adres, jaki dostanie `deployer` dla tego salta. */
+    function predictTokenFor(address deployer, bytes32 salt) public view returns (address) {
         return address(
             uint160(
                 uint256(
                     keccak256(
-                        abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(type(LaunchToken).creationCode))
+                        abi.encodePacked(
+                            bytes1(0xff),
+                            address(this),
+                            _effectiveSalt(deployer, salt),
+                            keccak256(type(LaunchToken).creationCode)
+                        )
                     )
                 )
             )
         );
+    }
+
+    /**
+     * Adres dla WOLAJACEGO. Launchpad wola to ze swojego kontraktu, wiec
+     * dostaje swoja przestrzen; kto pyta z zewnatrz o cudzy adres, ma
+     * `predictTokenFor`.
+     */
+    function predictToken(bytes32 salt) public view returns (address) {
+        return predictTokenFor(msg.sender, salt);
     }
 
     function createToken(
@@ -91,7 +124,7 @@ contract PlainTokenFactory is ITokenFactory, ILaunchTokenConfig {
         if (supply == 0) revert ZeroSupply();
 
         _pending = Pending({name: name, symbol: symbol, supply: supply, mintTo: mintTo});
-        token = address(new LaunchToken{salt: salt}());
+        token = address(new LaunchToken{salt: _effectiveSalt(msg.sender, salt)}());
         // Kasujemy natychmiast. Zwrot gazu jest tu skutkiem ubocznym - powodem
         // jest to, zeby miedzy startami nie zostawal stan, ktory cokolwiek znaczy.
         delete _pending;

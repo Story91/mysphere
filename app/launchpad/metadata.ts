@@ -1,0 +1,142 @@
+/**
+ * Obrazki tokenow: skad je bierzemy i dlaczego akurat stamtad.
+ *
+ * ===========================================================================
+ * ERC-20 NIE MA LOGO. TO NIE JEST NASZE NIEDOPATRZENIE - TAK WYGLADA STANDARD
+ * ===========================================================================
+ * Kontrakt tokena zna `name`, `symbol` i `decimals`. Nic wiecej. Zaden portfel
+ * nie czyta naszego `metadataURI`, bo nie ma powodu wiedziec, ze on istnieje.
+ *
+ * Logo pojawia sie w portfelach z INNYCH zrodel:
+ *   - token lists w standardzie Uniswapa (my wystawiamy swoja pod
+ *     /api/launchpad/tokenlist);
+ *   - repozytoria assetow portfeli i agregatorow;
+ *   - osobne zgloszenie w eksploratorze bloku.
+ *
+ * Dlatego obrazek trzymamy w postaci, ktora da sie podac dalej KAZDEMU z tych
+ * odbiorcow, zamiast liczyc na to, ze ktos zajrzy do naszego kontraktu.
+ *
+ * ===========================================================================
+ * DLACZEGO IPFS, A NIE ZWYKLY URL
+ * ===========================================================================
+ * Adres `ipfs://<cid>` jest adresem TRESCI - cid to skrot pliku. Kto poda inny
+ * plik, dostanie inny cid, wiec logo nie da sie po cichu podmienic po starcie.
+ * Przy `https://` obrazek moze podmienic wlasciciel serwera, ktory nie musi byc
+ * tworca tokena - i nikt tego nie zauwazy.
+ *
+ * Cena IPFS jest realna i trzeba ja nazwac: tresc zyje, dopoki ktos ja pinuje.
+ * Dlatego `https://` NIE jest zakazane - jest gorsza, ale dzialajaca opcja dla
+ * kogos, kto nie ma czym pinowac.
+ */
+
+/**
+ * Brama IPFS. Zmienna srodowiskowa, bo bramy padaja i limituja ruch, a przy
+ * takim zdarzeniu chcemy zmienic jedna wartosc, a nie deployowac kod.
+ */
+const IPFS_GATEWAY = process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? 'https://ipfs.io/ipfs/';
+
+/**
+ * Zamienia `ipfs://` na adres przez brame. Wszystko inne przepuszcza tylko
+ * wtedy, gdy jest bezpieczne do wstawienia w `src` albo `href`.
+ *
+ * `javascript:` i `data:` odpadaja tutaj, a nie w komponencie. Sprawdzenie w
+ * jednym miejscu jest pewniejsze niz pamietanie o nim w kazdym widoku - a ten
+ * string pochodzi od obcego tworcy i trafia prosto do DOM-u.
+ */
+export function resolveMediaUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+
+  if (trimmed.startsWith('ipfs://')) {
+    const path = trimmed.slice('ipfs://'.length).replace(/^ipfs\//, '');
+    if (path === '') return null;
+    return `${IPFS_GATEWAY}${path}`;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'https:' ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
+export type TokenMetadata = {
+  image: string | null;
+  description: string | null;
+  /** URI, ktorego nie umiemy rozpakowac - pokazujemy jako odnosnik, nie udajemy. */
+  link: string | null;
+};
+
+const DATA_JSON_PREFIX = 'data:application/json;base64,';
+
+function decodeBase64(value: string): string | null {
+  try {
+    if (typeof atob === 'function') return atob(value);
+    return Buffer.from(value, 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Rozpakowuje `metadataURI` z lancucha.
+ *
+ * Obslugujemy dwa ksztalty, ktore sami tworzymy albo widujemy:
+ *   - `data:application/json;base64,...` - z naszego formularza, bez backendu;
+ *   - `ipfs://` i `https://` - JSON lezy poza lancuchem i musi go pobrac ten,
+ *     kto tego potrzebuje (my robimy to po stronie serwera, patrz tokenlist).
+ *
+ * Czego NIE robimy: nie pobieramy tu niczego sieciowo. Ta funkcja jest czysta,
+ * zeby dalo sie jej uzyc w renderze bez zawieszania widoku na cudzej bramie.
+ */
+export function parseMetadataUri(uri: string | null | undefined): TokenMetadata {
+  const empty: TokenMetadata = { image: null, description: null, link: null };
+  if (!uri) return empty;
+  const trimmed = uri.trim();
+  if (trimmed === '') return empty;
+
+  if (!trimmed.startsWith(DATA_JSON_PREFIX)) {
+    return { image: null, description: null, link: resolveMediaUrl(trimmed) };
+  }
+
+  const decoded = decodeBase64(trimmed.slice(DATA_JSON_PREFIX.length));
+  if (decoded === null) return empty;
+
+  try {
+    const parsed = JSON.parse(decoded) as { image?: unknown; description?: unknown };
+    return {
+      image: resolveMediaUrl(typeof parsed.image === 'string' ? parsed.image : null),
+      description: typeof parsed.description === 'string' ? parsed.description.slice(0, 280) : null,
+      link: null,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+/**
+ * Ktore logo wygrywa, gdy sa dwa.
+ *
+ * Kolejnosc jest decyzja, nie przypadkiem: NAJPIERW to, co tworca ustawil po
+ * starcie (i co przeszlo przez nasza bramke z podpisem), POTEM niezmienne
+ * `metadataURI` z lancucha.
+ *
+ * Odwrotna kolejnosc brzmi bezpieczniej, ale znaczylaby, ze literowka w logo
+ * jest nie do poprawienia do konca istnienia tokena - `metadataURI` ustawia sie
+ * RAZ, przy starcie, i nie ma settera. Interfejs pokazuje, ktore zrodlo
+ * zadzialalo, zeby ta zamiana nie byla niewidoczna.
+ */
+export function pickTokenImage(input: {
+  profileLogoUrl?: string | null;
+  metadataUri?: string | null;
+}): { url: string | null; source: 'profile' | 'chain' | null } {
+  const fromProfile = resolveMediaUrl(input.profileLogoUrl);
+  if (fromProfile) return { url: fromProfile, source: 'profile' };
+
+  const fromChain = parseMetadataUri(input.metadataUri).image;
+  if (fromChain) return { url: fromChain, source: 'chain' };
+
+  return { url: null, source: null };
+}

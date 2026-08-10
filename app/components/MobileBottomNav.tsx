@@ -106,10 +106,8 @@ export default function MobileBottomNav() {
 
   return (
     <>
-      <nav
-        aria-label="Sections"
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-soft-line bg-soft-surface/95 backdrop-blur-xl lg:hidden"
-      >
+      <div className="group/bottom-nav fixed bottom-0 left-0 right-0 z-40 lg:hidden md:max-lg:[@media(hover:hover)]:translate-y-[calc(100%-14px)] md:max-lg:transition-transform md:max-lg:[transition-duration:var(--dur-dropdown)] md:max-lg:ease-out-strong md:max-lg:group-hover/bottom-nav:translate-y-0 md:max-lg:group-focus-within/bottom-nav:translate-y-0">
+      <nav aria-label="Sections" className="border-t border-soft-line bg-soft-surface/95 backdrop-blur-xl">
         <div className="flex items-center justify-around p-4">
           {POZYCJE.map((poz) => {
             // `startsWith` z ukosnikiem, zeby /asks nie zapalalo sie na
@@ -151,9 +149,10 @@ export default function MobileBottomNav() {
           })}
         </div>
       </nav>
+      </div>
 
       {/* Miejsce pod pasek, zeby nie zaslanial konca tresci. */}
-      <div className="h-20 lg:h-0" />
+      <div className="h-20 md:max-lg:h-[14px] lg:h-0" />
     </>
   );
 }

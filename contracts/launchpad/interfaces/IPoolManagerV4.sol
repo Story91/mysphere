@@ -80,6 +80,19 @@ interface IPoolManagerV4 {
         bytes calldata hookData
     ) external returns (int256 callerDelta, int256 feesAccrued);
 
+    /**
+     * Wymiana. NASZ kod produkcyjny nie wola tego ani razu - deklaracja istnieje
+     * dla sondy testowej, ktora musi wykonac prawdziwa wymiane na forku, zeby
+     * zmierzyc zachowanie hooka.
+     *
+     * Zwracana delta jest JUZ PO korekcie hooka: PoolManager oddaje `afterSwap`
+     * sterowanie, bierze od niego poprawke i dopiero potem ksieguje wynik
+     * wolajacemu. Wolajacy rozlicza sie wiec dokladnie z tego, co tu wraca.
+     */
+    function swap(PoolKey memory key, SwapParams memory params, bytes calldata hookData)
+        external
+        returns (int256 swapDelta);
+
     /** Natywne ETH placi sie tu wartoscia wywolania; token - przez sync + transfer + settle(). */
     function settle() external payable returns (uint256 paid);
 
