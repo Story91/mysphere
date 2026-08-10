@@ -247,8 +247,10 @@ export default async function ProfilePage({ params }: Props) {
           >
             Open the feed
           </Link>
+          {/* Paid zyje jako zakladka na /money - link celuje wprost w nia,
+              zeby nie placic przekierowania ze starego /leaderboard. */}
           <Link
-            href="/leaderboard"
+            href="/money?tab=paid"
             className="rounded-pill bg-soft-surface px-5 py-3 font-soft text-[14px] font-semibold text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
             Who got paid this week

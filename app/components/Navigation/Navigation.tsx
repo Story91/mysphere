@@ -34,9 +34,6 @@ type NavLink = {
 const LINK_THEME: Record<string, { suffix: string }> = {
   MySphere: { suffix: 'text-fuchsia-700' },
   'Re-Definition': { suffix: 'text-soft-info' },
-  // Zielen zarezerwowana w tej aplikacji dla rozliczonych pieniedzy - ten sam
-  // kolor niesie kwota na paragonie i w rankingu.
-  Paid: { suffix: 'text-emerald-700' },
   // Firmowy niebieski Base zostaje niezmieniony - to znak sieci, nie ozdobnik.
   MyBase: { suffix: 'text-[#0052FF]' },
   MyCamp: { suffix: 'text-soft-accent-deep' },
@@ -164,16 +161,21 @@ export default function Navigation() {
     // NAZWA: "Money", nie "Wallet" i nie "Portfolio". Portfel jest w prawym
     // rogu tej samej belki i pokazuje salda tokenow; ta strona nie zna zadnych
     // sald ani kursow i nie ma udawac, ze zna. "Portfolio" obiecywaloby wycene.
+    //
+    // "Paid" nie ma juz wlasnego wpisu: publiczna tasma i ranking rozliczonych
+    // platnosci mieszkaja jako zakladka na /money (?tab=paid). Powod scalenia:
+    // skarga "za duzo pozycji w nawigacji", a obie strony mowia o pieniadzach -
+    // roznia sie tylko tym, CZYJE pokazuja. /leaderboard przekierowuje tam
+    // serwerowo, karta OG zostala pod starym adresem.
     { href: '/money', label: 'Money' },
     { href: '/base', label: 'MyBase' },
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
-    { href: '/leaderboard', label: 'Paid' },
-    // "Curators" TUZ ZA "Paid", bo obie strony sa tym samym rodzajem rzeczy:
-    // publicznym zapisem faktow z data, ktorego nie da sie przepisac. Paid
-    // zapisuje pieniadze, ktore przeszly miedzy ludzmi; Curators zapisuje
-    // zmiany parametrow skarbcow Morpho (prowizja, kurator, notowanie).
+    // "Curators" to publiczny zapis faktow z data, ktorego nie da sie
+    // przepisac: zmiany parametrow skarbcow Morpho (prowizja, kurator,
+    // notowanie). Stal tuz za "Paid", ktore bylo tym samym rodzajem rzeczy -
+    // Paid mieszka teraz jako zakladka na /money, patrz komentarz wyzej.
     //
     // DLACZEGO W OGOLE W BELCE: to samo zgloszenie co przy /asks - "nie widac
     // nic co wdrozylismy, skad oni maja wiedziec co robic". Strona, do ktorej
