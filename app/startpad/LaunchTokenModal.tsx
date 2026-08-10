@@ -565,10 +565,30 @@ export default function LaunchTokenModal({
     if (!Number.isFinite(buyPct) || buyPct < 0 || buyPct > 100) return fail('Auto-buyback must be between 0 and 100%.');
     const buybackBps = Math.round(buyPct * 100);
 
+    const preBuyWei = preBuyEth.trim() === '' || Number(preBuyEth) === 0 ? 0n : toWei(preBuyEth);
+    if (preBuyWei === null) return fail('Pre-buy must be zero or more ETH, written as a decimal number.');
+
+    // Ile tokenow kupi pre-buy po cenie startowej (ethReserve=0). Ta sama
+    // formula, co podglad; sluzy do sprawdzenia, czy pre-buy zmiesci sie pod
+    // capem snajperskim, zanim tworca zaplaci za gaz.
+    const preBuyEthNum = Number(preBuyEth) || 0;
+    const preBuyNet = preBuyEthNum * (1 - feeBps / 10_000);
+    const preBuyTokens = preBuyNet > 0 ? (curve.t0 * preBuyNet) / (curve.rVirt + preBuyNet) : 0;
+
     // Kontrakt v3 przyjmuje windowCap az do T0 - cap rowny podazy krzywej
-    // znaczy "ochrona wylaczona". Przelacznik OFF wysyla dokladnie T0.
+    // znaczy "ochrona wylaczona".
+    //
+    // OCHRONA SNAJPERSKA OBEJMUJE TWORCE: `_buy` liczy cap takze dla pre-buya
+    // (CurveLaunchpad.sol, "Obejmuje tworce"). Dlatego:
+    //  - Quick launch NIE ustawia capa (T0) - to sciezka "po prostu wypusc",
+    //    a pre-buy 0.1 ETH to ~116M tokenow, wiec domyslny cap 16M cofalby
+    //    kazdy start z realnym pre-buyem. Konfiguracja snajpera zyje w Creator
+    //    setup, gdzie jest widoczna i mozna ja dostroic do pre-buya.
+    //  - Creator setup respektuje przelacznik, ale gdy pre-buy przekracza cap,
+    //    odmawiamy TU z jasnym powodem zamiast pozwolic na goly rewert WindowCap.
+    const sniperActive = mode === 'creator' && sniperOn;
     let windowCap: bigint;
-    if (!sniperOn) {
+    if (!sniperActive) {
       windowCap = t0Wei;
     } else {
       const parsedCap = toWei(sniperCapTokens);
@@ -576,11 +596,16 @@ export default function LaunchTokenModal({
       if (parsedCap > t0Wei) {
         return fail(`Per-wallet cap cannot exceed ${curve.t0.toLocaleString('en-US')} tokens.`);
       }
+      // Margines 2% na zaokraglenia miedzy nasza formula a kontraktem.
+      if (preBuyTokens > 0 && preBuyTokens * 1.02 > Number(formatEther(parsedCap))) {
+        return fail(
+          `Your ${preBuyEthNum} ETH pre-buy is about ${Math.round(preBuyTokens).toLocaleString('en-US')} tokens, ` +
+            `above the ${Number(formatEther(parsedCap)).toLocaleString('en-US')} per-wallet cap. ` +
+            `Raise the cap or lower the pre-buy — the cap applies to you too for the first 5 minutes.`
+        );
+      }
       windowCap = parsedCap;
     }
-
-    const preBuyWei = preBuyEth.trim() === '' || Number(preBuyEth) === 0 ? 0n : toWei(preBuyEth);
-    if (preBuyWei === null) return fail('Pre-buy must be zero or more ETH, written as a decimal number.');
 
     // Lista do wyslania: "you" z reszta procentow ZAWSZE pierwsze, potem
     // wiersze dodane przyciskiem Add. Gdy dodani zjedli cale 100%, wiersza
@@ -643,6 +668,7 @@ export default function LaunchTokenModal({
     buybackPct,
     creatorSharePct,
     curve.t0,
+    curve.rVirt,
     launchDescription,
     launchFeePct,
     launchImage,
@@ -650,6 +676,7 @@ export default function LaunchTokenModal({
     launchName,
     limits,
     links,
+    mode,
     preBuyEth,
     sniperCapTokens,
     sniperOn,

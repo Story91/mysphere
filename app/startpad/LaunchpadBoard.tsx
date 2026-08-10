@@ -24,7 +24,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { formatEther, formatUnits, getAbiItem, maxUint256, parseEther, parseUnits, zeroAddress, type Address } from 'viem';
-import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
+import { useAccount, useBalance, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
   ACTIVE_LAUNCHPAD_NETWORK,
   CURVE_TARGET_ETH,
@@ -917,6 +917,21 @@ function TradePanel({
 }) {
   const decimals = details?.decimals ?? 18;
   const balance = details ? formatUnits(details.balance, decimals) : '0';
+
+  // Saldo ETH portfela do procentow i Max po stronie kupna. Zostawiamy trocheе
+  // na gaz przy Max - inaczej Max = calosc i transakcja nie ma z czego zaplacic.
+  const { address: walletAddress } = useAccount();
+  const { data: ethBalance } = useBalance({ address: walletAddress, chainId: LAUNCHPAD_CHAIN.id });
+  const GAS_HEADROOM_WEI = 5_000_000_000_000_000n; // ~0.005 ETH
+  const setBuyFraction = (numerator: bigint, denominator: bigint) => {
+    if (!ethBalance) return;
+    const spendable = ethBalance.value > GAS_HEADROOM_WEI ? ethBalance.value - GAS_HEADROOM_WEI : 0n;
+    setBuyAmount(formatEther((spendable * numerator) / denominator));
+  };
+  const setSellFraction = (numerator: bigint, denominator: bigint) => {
+    if (!details) return;
+    setSellAmount(formatUnits((details.balance * numerator) / denominator, decimals));
+  };
   // ETH pozostaje wartoscia glowna wyceny; dopisek USD znika przy braku kursu.
   const sellQuoteNote = sellQuote === null ? null : usdNote(Number(formatEther(sellQuote)), ethUsd);
   const claimRows = details ? [
@@ -943,10 +958,17 @@ function TradePanel({
     {canSell && (effectiveSide === 'buy' ? <>
       <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-[#16141b]">ETH amount</span><span className="text-[11px] text-black/45">0.5% slippage buffer</span></div>
       <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-black/40">ETH</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-white disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
-      <div className="mt-2 flex gap-1.5">{['0.01', '0.05', '0.1'].map((amount) => <button key={amount} type="button" onClick={() => setBuyAmount(amount)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary">{amount} ETH</button>)}</div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!ethBalance} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
+        <button type="button" disabled={!ethBalance} onClick={() => setBuyFraction(1n, 1n)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">Max</button>
+      </div>
     </> : <>
       <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-[#16141b]">Token amount</span><span className="text-[11px] text-black/45">Balance {Number(balance).toFixed(4)}</span></div>
       <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={sellAmount} onChange={(event) => setSellAmount(event.target.value)} className={`${FIELD} pr-16`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-extrabold text-black/40">{token.symbol}</span></div><button type="button" disabled={busy === 'sell' || busy === 'approve'} onClick={onSell} className="inline-flex items-center gap-2 rounded-xl bg-[#16141b] px-4 text-[13px] font-extrabold text-white disabled:opacity-60">{busy === 'approve' ? 'Approving...' : busy === 'sell' ? 'Selling...' : 'Sell'}<ArrowDownToLine className="h-4 w-4" aria-hidden="true" /></button></div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!details || details.balance === 0n} onClick={() => setSellFraction(BigInt(pct), 100n)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
+        <button type="button" disabled={!details || details.balance === 0n} onClick={() => setSellFraction(1n, 1n)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">Max</button>
+      </div>
       <div className="mt-2 flex items-center justify-between text-[11px] text-black/45"><span>Estimated output</span><span className="font-extrabold text-[#16141b]">{sellQuote === null ? '--' : `${formatEther(sellQuote)} ETH`}{sellQuoteNote && <span className="font-bold text-black/45"> · {sellQuoteNote}</span>}</span></div>
     </>)}
 
