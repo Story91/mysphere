@@ -37,10 +37,11 @@ import { buildPlan, readCommonEnv, resolvePoolManager, HOOK_ALL_MASK, HOOK_REQUI
  *
  * Zmienne srodowiskowe:
  *   FEE_RECIPIENT       (wymagane) odbiorca oplat protokolu
- *   PROTOCOL_SHARE_BPS  udzial protokolu w oplatach LP i hooka (domyslnie 6000)
+ *   PROTOCOL_SHARE_BPS  udzial protokolu w oplatach LP i hooka (domyslnie 3000,
+ *                       czyli 70% dla tworcy - decyzja z 2026-08-10, jak PONS)
  *   FEE_BPS             oplata krzywej w bps (domyslnie 100 = 1%, sufit 100)
- *   CREATOR_FEE_BPS     czesc FEE_BPS dla tworcy (domyslnie 60 = 0.6%,
- *                       najwyzej 60% z FEE_BPS - reszta nalezy do protokolu)
+ *   CREATOR_FEE_BPS     czesc FEE_BPS dla tworcy (domyslnie 70 = 0.7%,
+ *                       najwyzej 70% z FEE_BPS - reszta nalezy do protokolu)
  *   TOKEN_FACTORY       adres istniejacej fabryki; bez tego wdrazamy nowa
  *   FACTORY_KIND        `b20` (domyslnie na Base) albo `plain` (poza Base)
  *   POOL_MANAGER        adres v4 PoolManager; wymagany poza sprawdzonymi sieciami
@@ -69,14 +70,14 @@ async function retryRpc<T>(label: string, read: () => Promise<T>, attempts = 8):
 async function main() {
   const { feeRecipient, protocolShareBps } = readCommonEnv();
   const feeBps = BigInt(process.env.FEE_BPS ?? "100");
-  const creatorFeeBps = BigInt(process.env.CREATOR_FEE_BPS ?? "60");
+  const creatorFeeBps = BigInt(process.env.CREATOR_FEE_BPS ?? "70");
 
   // Sufity powtorzone z kontraktu. Nie zastepuja tamtych - odbijaja pomylke
   // ZANIM kosztuje ona gaz i zanim zaczniemy kopac.
   if (feeBps > 100n) throw new Error(`FEE_BPS=${feeBps} przekracza MAX_FEE_BPS=100.`);
-  // Podloga protokolu z kontraktu: tworca najwyzej 60% oplaty.
-  if (creatorFeeBps * 10_000n > feeBps * 6_000n) {
-    throw new Error(`CREATOR_FEE_BPS=${creatorFeeBps} przekracza 60% z FEE_BPS=${feeBps}.`);
+  // Podloga protokolu z kontraktu: tworca najwyzej 70% oplaty.
+  if (creatorFeeBps * 10_000n > feeBps * 7_000n) {
+    throw new Error(`CREATOR_FEE_BPS=${creatorFeeBps} przekracza 70% z FEE_BPS=${feeBps}.`);
   }
   if (creatorFeeBps > feeBps) throw new Error(`CREATOR_FEE_BPS=${creatorFeeBps} > FEE_BPS=${feeBps}.`);
 
@@ -282,8 +283,7 @@ async function main() {
       },
       null,
       2
-    ) + "
-",
+    ) + "\n",
     { encoding: "utf8" }
   );
   console.log(`Zapisano ${outputPath}`);

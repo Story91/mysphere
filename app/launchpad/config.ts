@@ -1,15 +1,20 @@
 import { baseSepolia } from 'viem/chains';
 
 export const LAUNCHPAD_CHAIN = baseSepolia;
+// Domyslne wartosci to wdrozenie z 2026-08-10 15:42 UTC (70% tworca / 30%
+// protokol, buyback z dzialki tworcy) - docs/LAUNCHPAD-STAN.md. Wczesniejsze
+// wdrozenia (0xA760...4F97, 0x0712...0844) sa MARTWE: inne ABI albo stary
+// model oplat. Fallback MUSI nadazac za wdrozeniem - produkcja bez zmiennych
+// srodowiskowych patrzy wlasnie tutaj.
 export const LAUNCHPAD_ADDRESS =
   (process.env.NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0xA760fBB82dd3018dFf3f34ACF1BA133725164F97';
+  '0x811d6dE17E2D021A564Bc699e353ead7FE7258ba';
 export const LIQUIDITY_VAULT_ADDRESS =
   (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0x50BbeB61BdB286d55371abE8cA3fE413eE1831F2';
+  '0x21F2c3506170cb670102B6fB5be6b6dbDb73b88b';
 export const LAUNCH_HOOK_ADDRESS =
   (process.env.NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0x127ecd2c013EadFbcF8f03a258b8616B5d716044';
+  '0xfaEF39f75aACC1271D7173748245A69CBD09e044';
 
 export const launchpadAbi = [
   {
@@ -456,7 +461,7 @@ export const hookAbi = [
   { type: 'error', name: 'NothingToBuyback', inputs: [] },
   { type: 'function', name: 'claimEth', stateMutability: 'nonpayable', inputs: [], outputs: [] },
   { type: 'function', name: 'claimToken', stateMutability: 'nonpayable', inputs: [{ name: 'token', type: 'address' }], outputs: [] },
-  { type: 'event', name: 'HookFeeSettled', inputs: [{ name: 'token', type: 'address', indexed: true }, { name: 'ethToProtocol', type: 'uint256', indexed: false }, { name: 'ethToCreator', type: 'uint256', indexed: false }, { name: 'tokenToProtocol', type: 'uint256', indexed: false }, { name: 'tokenToCreator', type: 'uint256', indexed: false }] },
+  { type: 'event', name: 'HookFeeSettled', inputs: [{ name: 'token', type: 'address', indexed: true }, { name: 'ethToProtocol', type: 'uint256', indexed: false }, { name: 'ethToCreator', type: 'uint256', indexed: false }, { name: 'ethToBuyback', type: 'uint256', indexed: false }, { name: 'tokenToProtocol', type: 'uint256', indexed: false }, { name: 'tokenToCreator', type: 'uint256', indexed: false }] },
 ] as const;
 
 /**
@@ -477,7 +482,7 @@ export const CURVE_TARGET_ETH = 3;
  * zadnego `Launched` z definicji nie ma.
  */
 export const LAUNCHPAD_DEPLOY_BLOCK = BigInt(
-  process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45277715'
+  process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45302335'
 );
 
 export type LaunchpadToken = {

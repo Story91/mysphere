@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -9,8 +10,8 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Copy,
+  Crown,
   ExternalLink,
-  Flame,
   Layers3,
   Plus,
   RefreshCw,
@@ -22,7 +23,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { decodeEventLog, encodeEventTopics, formatEther, formatUnits, getAbiItem, maxUint256, parseEther, parseUnits, zeroAddress, type Address } from 'viem';
+import { formatEther, formatUnits, getAbiItem, maxUint256, parseEther, parseUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
   CURVE_TARGET_ETH,
@@ -40,71 +41,11 @@ import {
   type LaunchpadToken,
 } from './config';
 import { pickTokenImage } from './metadata';
+import LaunchTokenModal from './LaunchTokenModal';
+import { formatUsd, useEthUsd } from './useEthUsd';
 
 const FIELD =
   'w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 text-[14px] text-[#16141b] outline-none transition-colors placeholder:text-black/35 focus:border-[#7c6bda]';
-const LABEL = 'mb-1.5 block text-[12px] font-extrabold text-[#16141b]';
-const HINT = 'mt-1 block text-[11px] leading-[1.4] text-black/45';
-
-/**
- * Sufity sa TYMI SAMYMI liczbami, co w `CurveLaunchpad`. Interfejs czyta je z
- * lancucha przy starcie i dopiero gdy odczyt nie wyjdzie, spada na te wartosci
- * - zeby formularz nie obiecywal konfiguracji, ktorej kontrakt odrzuci.
- */
-const FALLBACK_MAX_FEE_BPS = 100;
-/**
- * Ile z oplaty wolno oddac tworcy. Reszta nalezy do protokolu i tego NIE
- * pilnuje formularz - pilnuje kontrakt (`MAX_CREATOR_SHARE_BPS`). Tutaj jest
- * po to, zeby suwak nie proponowal wartosci, ktora i tak odpadnie.
- */
-const FALLBACK_MAX_CREATOR_SHARE_BPS = 6000;
-const FALLBACK_MAX_RECIPIENTS = 8;
-/** `WINDOW_ADDR_CAP` w calych tokenach: 16 000 000 z podazy 1 000 000 000. */
-const FALLBACK_WINDOW_CAP_TOKENS = 16_000_000;
-const TOTAL_SUPPLY_TOKENS = 1_000_000_000;
-/** `LAUNCH_WINDOW` to 300 sekund; tu tylko jego nazwa dla czlowieka. */
-const LAUNCH_WINDOW_LABEL = '5 minutes';
-
-type FeeReceiverRow = { account: string; share: string };
-
-/**
- * Konfiguracja startu w postaci, ktora da sie podac do `launchAdvanced` bez
- * dalszej interpretacji. `null` znaczy: formularz nie przechodzi walidacji.
- */
-type AdvancedArgs = {
-  feeBps: number;
-  creatorFeeBps: number;
-  buybackBps: number;
-  windowCap: bigint;
-  accounts: Address[];
-  shares: number[];
-  metadataURI: string;
-  preBuyWei: bigint;
-};
-
-function toBase64(value: string) {
-  const bytes = new TextEncoder().encode(value);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
-/**
- * Metadane ida NA LANCUCH jako `string`, wiec kazdy znak kosztuje gaz. Gdy
- * tworca poda wlasny URI, uzywamy go bez zmian; gdy poda tylko opis i obrazek,
- * skladamy z tego maly `data:` URI, ktory czyta sie bez naszego backendu.
- */
-function buildMetadataUri(explicit: string, name: string, description: string, image: string) {
-  const trimmed = explicit.trim();
-  if (trimmed) return trimmed;
-  const desc = description.trim();
-  const img = image.trim();
-  if (!desc && !img) return '';
-  const payload: Record<string, string> = { name: name.trim() };
-  if (desc) payload.description = desc;
-  if (img) payload.image = img;
-  return `data:application/json;base64,${toBase64(JSON.stringify(payload))}`;
-}
 
 /**
  * `parseEther` rzuca na wszystkim, co nie jest zapisem dziesietnym - a
@@ -121,13 +62,37 @@ function toWei(value: string): bigint | null {
   }
 }
 
-function isAddressLike(value: string) {
-  return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
-}
-
-type Filter = 'all' | 'curve' | 'graduated';
+type BoardTab = 'new' | 'trending' | 'about' | 'graduated' | 'all';
 type TradeSide = 'buy' | 'sell';
-type BusyAction = 'launch' | 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest' | 'claim';
+type BusyAction = 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest' | 'claim';
+
+/**
+ * Wiersz tablicy. Rozszerza typ z `config.ts` o pola, ktore zyja TYLKO w tym
+ * widoku: `startedAt` do sortowania "New", historie cen do sparkline'a i stan
+ * blysku po transakcji. `config.ts` jest nietykalny, wiec rozszerzenie stoi tu.
+ */
+type BoardToken = LaunchpadToken & {
+  /** Sekundy uniksowe z eventu `Launched` - podstawa sortowania "New". */
+  startedAt?: number;
+  /** Ostatnie ceny spot w ETH/token, chronologicznie, maks 12 pozycji. */
+  prices?: number[];
+  /** Kiedy ostatnio handlowano (ms) - "goracy" token skacze w Trending. */
+  lastTradeAt?: number;
+  /** Nowy `seq` restartuje animacje blysku; pola nie trzeba czyscic. */
+  flash?: { tone: 'buy' | 'sell'; seq: number };
+};
+
+/**
+ * Wiersz tablicy "Top earnings". Kwota w wei (bigint), bo to suma surowych
+ * pol eventow - na number przechodzimy dopiero przy formatowaniu, zeby nie
+ * gubic precyzji po drodze.
+ */
+type CreatorEarnings = {
+  creator: Address;
+  totalWei: bigint;
+  tokenCount: number;
+  graduated: boolean;
+};
 
 type TokenDetails = {
   decimals: number;
@@ -160,6 +125,30 @@ function formatEth(value: number) {
   return `${value.toFixed(value >= 1 ? 2 : 3)} ETH`;
 }
 
+/**
+ * Dopisek USD obok kwoty ETH. ETH jest zawsze wartoscia glowna, USD tylko
+ * echem - dlatego null (brak kursu albo zero) znaczy "nic nie dopisuj",
+ * a nie "$0.00", ktore wygladaloby jak prawdziwa wycena.
+ */
+function usdNote(eth: number, ethUsd: number | null): string | null {
+  if (ethUsd === null || !Number.isFinite(eth) || eth <= 0) return null;
+  return formatUsd(eth * ethUsd);
+}
+
+/**
+ * Wirtualna rezerwa krzywej w ETH - stala `R_VIRT` kontraktu. Cena spot po
+ * transakcji to (R_VIRT + ethReserve) / tokenReserve, i DOKLADNIE te rezerwy
+ * niesie kazdy event `Bought`/`Sold`, wiec historia cen nie wymaga ani jednego
+ * dodatkowego odczytu.
+ */
+const R_VIRT_ETH = 0.75;
+
+function spotPriceFromReserves(ethReserveAfter: bigint, tokenReserveAfter: bigint): number {
+  const tokens = Number(formatEther(tokenReserveAfter));
+  if (tokens <= 0) return 0;
+  return (R_VIRT_ETH + Number(formatEther(ethReserveAfter))) / tokens;
+}
+
 function TokenGlyph({ token, large = false }: { token: LaunchpadToken; large?: boolean }) {
   return (
     <div
@@ -189,49 +178,6 @@ function TokenGlyph({ token, large = false }: { token: LaunchpadToken; large?: b
   );
 }
 
-/**
- * Kafel rynku. Uklad kart jest tu ZAMIAST gestej tabeli, ktora ma dzis kazdy
- * launchpad - ta sama informacja, ale czytana wzrokiem, a nie skanowana
- * kolumnami. Tabela zostaje jako druga zakladka dla kogos, kto porownuje
- * dziesiatki pozycji naraz.
- */
-function LaunchCard({ token, onTrade, onSelect, onDetails }: { token: LaunchpadToken; onTrade: () => void; onSelect: () => void; onDetails: () => void }) {
-  const progress = curvePercent(token);
-  return (
-    <div className="flex flex-col rounded-[18px] border border-black/10 bg-white p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
-      <button type="button" onClick={onSelect} className="flex min-w-0 items-start gap-3 text-left">
-        <TokenGlyph token={token} />
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-[15px] font-extrabold text-[#16141b]">{token.symbol}</span>
-            <StatePill state={token.state} />
-          </span>
-          <span className="mt-1 block truncate text-[12px] text-black/50">{token.name}</span>
-        </span>
-      </button>
-
-      <div className="mt-4">
-        <div className="flex items-baseline justify-between">
-          <span className="text-[17px] font-extrabold text-[#16141b]">{formatEth(token.raised)}</span>
-          <span className="text-[11px] font-extrabold text-[#12a451]">{progress}%</span>
-        </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/8">
-          <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${progress}%`, backgroundColor: token.accent }} />
-        </div>
-        <div className="mt-2 flex items-center justify-between text-[11px] text-black/45">
-          <span>{formatEth(token.volume ?? 0)} vol</span>
-          <span>{token.holders} holders · {token.age}</span>
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-center gap-2">
-        <button type="button" onClick={onTrade} className="flex-1 rounded-full bg-soft-primary px-3 py-2 text-[12px] font-extrabold text-white">Trade</button>
-        <button type="button" onClick={onDetails} className="rounded-full border border-black/15 bg-white px-3 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">Details</button>
-      </div>
-    </div>
-  );
-}
-
 function StatePill({ state }: { state: LaunchpadToken['state'] }) {
   const meta = {
     Curve: { label: 'Curve', className: 'bg-[#edeaff] text-[#5f4ec2]' },
@@ -241,18 +187,170 @@ function StatePill({ state }: { state: LaunchpadToken['state'] }) {
   return <span className={`rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${meta.className}`}>{meta.label}</span>;
 }
 
-function MiniBars({ token, green = false }: { token: LaunchpadToken; green?: boolean }) {
-  const heights = [28, 34, 31, 43, 50, 45, 57, 54, 72, 65, 82, 94];
+function SamplePill() {
+  return <span className="rounded-full bg-black/8 px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-black/50">Sample</span>;
+}
+
+/**
+ * Mini-wykres z PRAWDZIWYCH cen po kolejnych transakcjach tokena. Gdy danych
+ * jest mniej niz dwie, nie rysujemy nic - zmyslony pasek wygladalby jak rynek,
+ * ktorego nie ma.
+ */
+function Sparkline({ prices }: { prices: number[] }) {
+  if (prices.length < 2) return null;
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min;
+  const up = prices[prices.length - 1] >= prices[0];
+  const points = prices
+    .map((price, index) => {
+      const x = (index / (prices.length - 1)) * 60;
+      const y = range === 0 ? 14 : 26 - ((price - min) / range) * 24;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
   return (
-    <span className="flex h-8 w-16 items-end gap-[2px]" aria-hidden="true">
-      {heights.map((height, index) => (
-        <span
-          key={`${token.id}-${index}`}
-          className="min-w-0 flex-1 rounded-t-sm"
-          style={{ height: `${height}%`, backgroundColor: green ? '#18bd64' : token.accent }}
-        />
-      ))}
-    </span>
+    <svg viewBox="0 0 60 28" className="h-7 w-16 shrink-0" aria-hidden="true">
+      <polyline points={points} fill="none" stroke={up ? '#18bd64' : '#c76b12'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Blysk po transakcji - nakladka z wlasnym `key`, zeby nowy seq restartowal animacje. */
+function TradeFlash({ flash, rounded }: { flash: BoardToken['flash']; rounded: string }) {
+  if (!flash) return null;
+  return (
+    <span
+      key={flash.seq}
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-0 z-10 ${rounded} ${flash.tone === 'buy' ? 'lp-flash-buy' : 'lp-flash-sell'}`}
+    />
+  );
+}
+
+function curveStatusLabel(token: LaunchpadToken) {
+  if (token.state === 'Graduated') return { text: 'Graduated to pool', className: 'text-[#0b9a51]' };
+  if (token.state === 'Locked') return { text: 'Awaiting graduation', className: 'text-[#705fd0]' };
+  const toGo = Math.max(0, token.target - token.raised);
+  return { text: `${toGo.toFixed(2)} ETH to graduation`, className: 'text-[#c76b12]' };
+}
+
+/**
+ * Kafel rynku. Uklad kart jest tu ZAMIAST gestej tabeli, ktora ma dzis kazdy
+ * launchpad - ta sama informacja, ale czytana wzrokiem, a nie skanowana
+ * kolumnami. Tabela zostaje jako druga zakladka dla kogos, kto porownuje
+ * dziesiatki pozycji naraz.
+ */
+function LaunchCard({
+  token,
+  animationsOn,
+  ethUsd,
+  onTrade,
+  onSelect,
+  onDetails,
+}: {
+  token: BoardToken;
+  animationsOn: boolean;
+  ethUsd: number | null;
+  onTrade: () => void;
+  onSelect: () => void;
+  onDetails: () => void;
+}) {
+  const progress = curvePercent(token);
+  const status = curveStatusLabel(token);
+  const sample = !token.live;
+  const raisedNote = usdNote(token.raised, ethUsd);
+  const volNote = usdNote(token.volume ?? 0, ethUsd);
+  const header = (
+    <>
+      <TokenGlyph token={token} />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="truncate text-[15px] font-extrabold text-[#16141b]">{token.symbol}</span>
+          <StatePill state={token.state} />
+          {sample && <SamplePill />}
+        </span>
+        <span className="mt-1 block truncate text-[12px] text-black/50">{token.name}</span>
+      </span>
+    </>
+  );
+  return (
+    <div className="relative flex flex-col rounded-[18px] border border-black/10 bg-white p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+      {animationsOn && <TradeFlash flash={token.flash} rounded="rounded-[18px]" />}
+      {/* Wiersz podgladowy jest proba ukladu, nie rynkiem - nic na nim nie klika. */}
+      {sample ? (
+        <div className="flex min-w-0 items-start gap-3">{header}</div>
+      ) : (
+        <button type="button" onClick={onSelect} className="flex min-w-0 items-start gap-3 text-left">{header}</button>
+      )}
+
+      <div className="mt-4">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="min-w-0 truncate text-[17px] font-extrabold text-[#16141b]">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-black/40"> · {raisedNote}</span>}</span>
+          <span className={`text-[11px] font-extrabold ${status.className}`}>{status.text}</span>
+        </div>
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/8">
+          <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${progress}%`, backgroundColor: token.accent }} />
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-black/45">
+          <span className="min-w-0 truncate">{formatEth(token.volume ?? 0)}{volNote ? ` (${volNote})` : ''} vol · {token.holders} holders · {token.age}</span>
+          <Sparkline prices={token.prices ?? []} />
+        </div>
+      </div>
+
+      {!sample && (
+        <div className="mt-4 flex items-center gap-2">
+          <button type="button" onClick={onTrade} className="flex-1 rounded-full bg-soft-primary px-3 py-2 text-[12px] font-extrabold text-white">Trade</button>
+          {/* Bez adresu "Details" prowadziloby na /launchpad/undefined. */}
+          {token.address && <button type="button" onClick={onDetails} className="rounded-full border border-black/15 bg-white px-3 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">Details</button>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Krol wzgorza: zywy token na krzywej z najwyzsza rezerwa, czyli najblizszy
+ * graduacji. Jedna wyrozniona karta zamiast rownorzednej siatki - lider ma byc
+ * widoczny od progu, jak na kazdym wspolczesnym launchpadzie.
+ */
+function KingOfTheHill({ token, ethUsd, onTrade, onDetails }: { token: BoardToken; ethUsd: number | null; onTrade: () => void; onDetails: () => void }) {
+  const progress = curvePercent(token);
+  const toGo = Math.max(0, token.target - token.raised);
+  const raisedNote = usdNote(token.raised, ethUsd);
+  const volNote = usdNote(token.volume ?? 0, ethUsd);
+  return (
+    <section className="relative mt-5 overflow-hidden rounded-[20px] border border-soft-primary/30 bg-white p-4 sm:p-5" aria-label="King of the hill">
+      <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-soft-primary/[0.08] blur-2xl" />
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <TokenGlyph token={token} large />
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">
+              <Crown className="h-3.5 w-3.5" aria-hidden="true" /> King of the hill
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="text-[17px] font-extrabold text-[#16141b]">{token.symbol}</span>
+              <StatePill state={token.state} />
+            </div>
+            <p className="mt-0.5 truncate text-[12px] text-black/50">{token.name} · {token.holders} holders · {formatEth(token.volume ?? 0)}{volNote ? ` (${volNote})` : ''} vol · {token.age}</p>
+          </div>
+        </div>
+        <div className="w-full sm:w-[240px]">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate text-[15px] font-extrabold text-[#16141b]">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-black/45"> · {raisedNote}</span>}</span>
+            <span className="text-[11px] font-extrabold text-[#c76b12]">{toGo.toFixed(2)} ETH to go</span>
+          </div>
+          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-black/8">
+            <div className="h-full rounded-full bg-soft-primary transition-[width] duration-500" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onTrade} className="rounded-full bg-soft-primary px-4 py-2.5 text-[12px] font-extrabold text-white">Trade</button>
+          {token.address && <button type="button" onClick={onDetails} className="rounded-full border border-black/15 bg-white px-4 py-2.5 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">Details</button>}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -333,22 +431,37 @@ function ActivityTicker({ events }: { events: ActivityItem[] }) {
   );
 }
 
-function SummaryCard({ title, value, detail, accent, icon }: { title: string; value: string; detail: string; accent: string; icon: React.ReactNode }) {
+/**
+ * Jedna zwarta karta zamiast dwoch duzych kafli - te same liczby, mniej
+ * pikseli. Zadna informacja z poprzedniego naglowka nie znika.
+ */
+function BoardStats({ totalRaised, totalVolume, totalTrades, liveCount, ethUsd }: { totalRaised: number; totalVolume: number; totalTrades: number; liveCount: number; ethUsd: number | null }) {
+  const rows = [
+    { icon: <CircleDollarSign className="h-4 w-4 text-[#8f45df]" aria-hidden="true" />, label: 'Curve reserve', value: formatEth(totalRaised), sub: usdNote(totalRaised, ethUsd) },
+    { icon: <TrendingUp className="h-4 w-4 text-[#24a3ee]" aria-hidden="true" />, label: 'Indexed volume', value: formatEth(totalVolume), sub: usdNote(totalVolume, ethUsd) },
+    { icon: <BarChart3 className="h-4 w-4 text-[#18bd64]" aria-hidden="true" />, label: 'Trades', value: totalTrades.toLocaleString('en-US'), sub: null },
+    { icon: <Zap className="h-4 w-4 text-soft-primary" aria-hidden="true" />, label: 'Active curves', value: String(liveCount), sub: null },
+  ];
   return (
-    <section className="relative overflow-hidden rounded-[20px] border border-black/10 bg-white p-5" style={{ background: `linear-gradient(135deg, #fff 0%, ${accent} 150%)` }}>
-      <div className="flex items-center gap-3">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full border border-black/10 bg-white text-[#16141b] shadow-sm">{icon}</span>
-        <div>
-          <p className="text-[13px] font-bold text-[#16141b]">{title}</p>
-          <p className="mt-1 font-soft-display text-[28px] font-extrabold leading-none text-[#111016]">{value}</p>
-          <p className="mt-2 text-[11px] font-semibold text-black/50">{detail}</p>
-        </div>
+    <section className="rounded-[20px] border border-black/10 bg-white p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[16px] font-extrabold text-[#16141b]">Board stats</h2>
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/35">Base Sepolia</span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        {rows.map((row) => (
+          <div key={row.label} className="rounded-xl bg-[#fafafd] p-3">
+            <span className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.06em] text-black/40">{row.icon}{row.label}</span>
+            <span className="mt-1.5 block truncate font-soft-display text-[18px] font-extrabold leading-none text-[#111016]">{row.value}</span>
+            {row.sub && <span className="mt-1 block truncate text-[10.5px] font-bold text-black/40">{row.sub}</span>}
+          </div>
+        ))}
       </div>
     </section>
   );
 }
 
-function TopLaunches({ tokens, onSelect }: { tokens: LaunchpadToken[]; onSelect: (id: string) => void }) {
+function TopLaunches({ tokens, onSelect }: { tokens: BoardToken[]; onSelect: (id: string) => void }) {
   const top = [...tokens].sort((a, b) => b.raised - a.raised).slice(0, 3);
   return (
     <section className="rounded-[20px] border border-black/10 bg-white p-5">
@@ -369,7 +482,7 @@ function TopLaunches({ tokens, onSelect }: { tokens: LaunchpadToken[]; onSelect:
   );
 }
 
-function VolumePanel({ tokens, onSelect }: { tokens: LaunchpadToken[]; onSelect: (id: string) => void }) {
+function VolumePanel({ tokens, onSelect }: { tokens: BoardToken[]; onSelect: (id: string) => void }) {
   const top = [...tokens].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0)).slice(0, 3);
   return (
     <section className="rounded-[20px] border border-black/10 bg-white p-5">
@@ -393,22 +506,112 @@ function VolumePanel({ tokens, onSelect }: { tokens: LaunchpadToken[]; onSelect:
   );
 }
 
-function LaunchTableRow({ token, onTrade, onSelect, onDetails }: { token: LaunchpadToken; onTrade: () => void; onSelect: () => void; onDetails: () => void }) {
-  const progress = curvePercent(token);
+/**
+ * Tablica tworcow wg zarobkow NALICZONYCH na lancuchu: udzial w oplacie
+ * krzywej (wg konfiguracji kazdego tokena) plus `ethToCreator` z rozliczen
+ * hooka po graduacji. Naliczone to nie wyplacone - wyplata idzie osobnym
+ * claimem, wiec podpis mowi "accrued" i niczego wiecej nie obiecuje.
+ */
+function TopEarnings({ rows, ethUsd }: { rows: CreatorEarnings[]; ethUsd: number | null }) {
+  const explorer = LAUNCHPAD_CHAIN.blockExplorers?.default?.url ?? 'https://sepolia.basescan.org';
   return (
-    <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] items-center gap-4 border-t border-black/10 px-4 py-3.5 text-left transition-colors hover:bg-[#fff8fc] sm:px-5">
-      <button type="button" onClick={onSelect} className="flex min-w-0 items-center gap-3 text-left">
-        <TokenGlyph token={token} />
-        <span className="min-w-0">
-          <span className="flex flex-wrap items-center gap-2"><span className="truncate text-[14px] font-extrabold text-[#16141b]">{token.symbol}</span><StatePill state={token.state} /></span>
-          <span className="mt-1 flex items-center gap-2 truncate text-[12px] text-black/50"><span>{token.name}</span><span aria-hidden="true">•</span><span>{token.age}</span></span>
-        </span>
-      </button>
-      <div><span className="block text-[14px] font-extrabold text-[#16141b]">{formatEth(token.raised)}</span><span className="mt-1 block text-[11px] font-bold text-[#12a451]">{progress}% of curve</span></div>
-      <div><span className="block text-[14px] font-bold text-[#16141b]">{formatEth(token.volume ?? 0)}</span><span className="mt-1 block text-[11px] text-black/45">indexed volume</span></div>
-      <div className="flex items-center gap-2"><MiniBars token={token} green={token.state === 'Graduated'} /><span className="text-[11px] font-bold text-black/45">{token.holders} holders</span></div>
+    <section className="rounded-[20px] border border-black/10 bg-white p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[16px] font-extrabold text-[#16141b]">Top earnings</h2>
+        <Crown className="h-4 w-4 text-[#d99a1b]" aria-hidden="true" />
+      </div>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-black/40">Creator earnings accrued on-chain</p>
+      {rows.length === 0 ? (
+        <p className="mt-4 text-[11.5px] leading-[1.5] text-black/45">
+          No creator fees indexed yet. Every curve trade and pool swap accrues a creator share that shows up here.
+        </p>
+      ) : (
+        <div className="mt-3 divide-y divide-black/5">
+          {rows.map((row, index) => {
+            const eth = Number(formatEther(row.totalWei));
+            const note = usdNote(eth, ethUsd);
+            const first = index === 0;
+            return (
+              <div key={row.creator} className={`flex items-center gap-2.5 py-2 ${first ? '-mx-2 rounded-xl bg-[#fff8ed] px-2' : ''}`}>
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${first ? 'bg-[#f3c58a] text-[#8c4a0b]' : 'bg-black/5 text-black/50'}`}>
+                  {first ? <Crown className="h-3.5 w-3.5" aria-hidden="true" /> : index + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <a
+                    href={`${explorer}/address/${row.creator}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[12px] font-extrabold text-[#16141b] hover:text-soft-primary-deep"
+                  >
+                    {shortAddress(row.creator)}
+                    <ExternalLink className="h-3 w-3 text-black/30" aria-hidden="true" />
+                  </a>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-black/45">
+                    <span>{row.tokenCount} {row.tokenCount === 1 ? 'token' : 'tokens'}</span>
+                    {row.graduated && <span className="rounded-full bg-[#edfff4] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.05em] text-[#0b9a51]">Graduated</span>}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block text-[12px] font-extrabold text-[#16141b]">{eth.toFixed(4)} ETH</span>
+                  {note && <span className="block text-[10.5px] font-bold text-black/40">{note}</span>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="mt-3 border-t border-black/5 pt-2.5 text-[10.5px] leading-[1.5] text-black/40">
+        Curve fees split per each token&apos;s own config; pool fees settle through the hook. Auto-buybacks come out of the creator&apos;s share only.
+      </p>
+    </section>
+  );
+}
+
+function LaunchTableRow({
+  token,
+  animationsOn,
+  ethUsd,
+  onTrade,
+  onSelect,
+  onDetails,
+}: {
+  token: BoardToken;
+  animationsOn: boolean;
+  ethUsd: number | null;
+  onTrade: () => void;
+  onSelect: () => void;
+  onDetails: () => void;
+}) {
+  const status = curveStatusLabel(token);
+  const sample = !token.live;
+  const raisedNote = usdNote(token.raised, ethUsd);
+  const volNote = usdNote(token.volume ?? 0, ethUsd);
+  const coinCell = (
+    <>
+      <TokenGlyph token={token} />
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-center gap-2"><span className="truncate text-[14px] font-extrabold text-[#16141b]">{token.symbol}</span><StatePill state={token.state} />{sample && <SamplePill />}</span>
+        <span className="mt-1 flex items-center gap-2 truncate text-[12px] text-black/50"><span>{token.name}</span><span aria-hidden="true">•</span><span>{token.age}</span></span>
+      </span>
+    </>
+  );
+  return (
+    <div className="relative grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] items-center gap-4 border-t border-black/10 px-4 py-3.5 text-left transition-colors hover:bg-[#fff8fc] sm:px-5">
+      {animationsOn && <TradeFlash flash={token.flash} rounded="rounded-none" />}
+      {sample ? (
+        <div className="flex min-w-0 items-center gap-3">{coinCell}</div>
+      ) : (
+        <button type="button" onClick={onSelect} className="flex min-w-0 items-center gap-3 text-left">{coinCell}</button>
+      )}
+      <div><span className="block text-[14px] font-extrabold text-[#16141b]">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-black/40"> · {raisedNote}</span>}</span><span className={`mt-1 block text-[11px] font-bold ${status.className}`}>{status.text}</span></div>
+      <div><span className="block text-[14px] font-bold text-[#16141b]">{formatEth(token.volume ?? 0)}{volNote && <span className="text-[11px] font-bold text-black/40"> · {volNote}</span>}</span><span className="mt-1 block text-[11px] text-black/45">indexed volume</span></div>
+      <div className="flex items-center gap-2"><Sparkline prices={token.prices ?? []} /><span className="text-[11px] font-bold text-black/45">{token.holders} holders</span></div>
       <div><span className="block text-[14px] font-bold text-[#16141b]">{shortAddress(token.creator)}</span><span className="mt-1 block text-[11px] text-black/45">creator</span></div>
-      <span className="flex items-center gap-1.5"><button type="button" onClick={onTrade} className="rounded-full border border-black/15 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] shadow-sm transition-colors hover:border-[#7c6bda] hover:text-[#5f4ec2]">{token.live ? 'Trade' : 'View'}</button>{token.live && <button type="button" onClick={onDetails} className="rounded-full p-2 text-black/40 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]" aria-label={`Open ${token.symbol} details`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></button>}</span>
+      {sample ? (
+        <span />
+      ) : (
+        <span className="flex items-center gap-1.5"><button type="button" onClick={onTrade} className="rounded-full border border-black/15 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] shadow-sm transition-colors hover:border-[#7c6bda] hover:text-[#5f4ec2]">Trade</button>{token.address && <button type="button" onClick={onDetails} className="rounded-full p-2 text-black/40 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]" aria-label={`Open ${token.symbol} details`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></button>}</span>
+      )}
     </div>
   );
 }
@@ -425,6 +628,7 @@ function TradePanel({
   sellQuote,
   gradReward,
   busy,
+  ethUsd,
   onBuy,
   onSell,
   onGraduate,
@@ -444,6 +648,7 @@ function TradePanel({
   sellQuote: bigint | null;
   gradReward: bigint | null;
   busy: BusyAction | null;
+  ethUsd: number | null;
   onBuy: () => void;
   onSell: () => void;
   onGraduate: () => void;
@@ -454,6 +659,8 @@ function TradePanel({
 }) {
   const decimals = details?.decimals ?? 18;
   const balance = details ? formatUnits(details.balance, decimals) : '0';
+  // ETH pozostaje wartoscia glowna wyceny; dopisek USD znika przy braku kursu.
+  const sellQuoteNote = sellQuote === null ? null : usdNote(Number(formatEther(sellQuote)), ethUsd);
   const claimRows = details ? [
     { label: 'Launchpad fees', value: formatEther(details.launchClaimable), amount: details.launchClaimable, source: 'launch' as const },
     { label: 'Hook ETH', value: formatEther(details.hookEthClaimable), amount: details.hookEthClaimable, source: 'hookEth' as const },
@@ -462,19 +669,28 @@ function TradePanel({
     { label: 'Vault token', value: formatUnits(details.vaultTokenClaimable, decimals), amount: details.vaultTokenClaimable, source: 'vaultToken' as const },
   ] : [];
 
+  // Kupno rewertuje poza stanem Curve (`CurveIsLocked`/`AlreadyGraduated`),
+  // a sprzedaz na krzywej dziala takze w Locked - panel odzwierciedla kontrakt,
+  // zamiast pozwalac na klik konczacy sie surowym bledem viem.
+  const canBuy = token.state === 'Curve';
+  const canSell = token.state === 'Curve' || token.state === 'Locked';
+  const effectiveSide: TradeSide = side === 'buy' && !canBuy ? 'sell' : side;
+
   return <>
-    <div className="mt-5 flex items-center gap-1 rounded-xl bg-[#f4f1ff] p-1">
-      {(['buy', 'sell'] as const).map((item) => <button key={item} type="button" onClick={() => setSide(item)} className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${side === item ? 'bg-white text-soft-primary-deep shadow-sm' : 'text-black/45'}`}>{item === 'buy' ? 'Buy with ETH' : 'Sell token'}</button>)}
-    </div>
-    {side === 'buy' ? <>
-      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-[#16141b]">ETH amount</span><span className="text-[11px] text-black/45">5 bps slippage buffer</span></div>
+    {canSell && <div className="mt-5 flex items-center gap-1 rounded-xl bg-[#f4f1ff] p-1">
+      {(canBuy ? (['buy', 'sell'] as const) : (['sell'] as const)).map((item) => <button key={item} type="button" onClick={() => setSide(item)} className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${effectiveSide === item ? 'bg-white text-soft-primary-deep shadow-sm' : 'text-black/45'}`}>{item === 'buy' ? 'Buy with ETH' : 'Sell token'}</button>)}
+    </div>}
+    {!canBuy && canSell && <p className="mt-2 text-[11px] leading-[1.4] text-black/50">Buying closed — the curve is full. Selling stays open until the pool opens.</p>}
+    {!canSell && <p className="mt-5 rounded-xl bg-[#f4f1ff] p-3 text-[11px] leading-[1.4] text-black/55">Curve trading ended at graduation — swaps happen in the Uniswap v4 pool now.</p>}
+    {canSell && (effectiveSide === 'buy' ? <>
+      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-[#16141b]">ETH amount</span><span className="text-[11px] text-black/45">0.5% slippage buffer</span></div>
       <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-black/40">ETH</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-white disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
       <div className="mt-2 flex gap-1.5">{['0.01', '0.05', '0.1'].map((amount) => <button key={amount} type="button" onClick={() => setBuyAmount(amount)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary">{amount} ETH</button>)}</div>
     </> : <>
       <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-[#16141b]">Token amount</span><span className="text-[11px] text-black/45">Balance {Number(balance).toFixed(4)}</span></div>
       <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={sellAmount} onChange={(event) => setSellAmount(event.target.value)} className={`${FIELD} pr-16`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-extrabold text-black/40">{token.symbol}</span></div><button type="button" disabled={busy === 'sell' || busy === 'approve'} onClick={onSell} className="inline-flex items-center gap-2 rounded-xl bg-[#16141b] px-4 text-[13px] font-extrabold text-white disabled:opacity-60">{busy === 'approve' ? 'Approving...' : busy === 'sell' ? 'Selling...' : 'Sell'}<ArrowDownToLine className="h-4 w-4" aria-hidden="true" /></button></div>
-      <div className="mt-2 flex items-center justify-between text-[11px] text-black/45"><span>Estimated output</span><span className="font-extrabold text-[#16141b]">{sellQuote === null ? '--' : `${formatEther(sellQuote)} ETH`}</span></div>
-    </>}
+      <div className="mt-2 flex items-center justify-between text-[11px] text-black/45"><span>Estimated output</span><span className="font-extrabold text-[#16141b]">{sellQuote === null ? '--' : `${formatEther(sellQuote)} ETH`}{sellQuoteNote && <span className="font-bold text-black/45"> · {sellQuoteNote}</span>}</span></div>
+    </>)}
 
     {token.state === 'Locked' && <div className="mt-5 rounded-xl border border-[#f3c58a] bg-[#fff8ed] p-3"><div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#c76b12]" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[#8c4a0b]">Ready for graduation</p><p className="mt-1 text-[11px] leading-[1.4] text-black/55">Anyone can open the pool. Caller reward: {gradReward === null ? '--' : `${formatEther(gradReward)} ETH`}.</p></div><button type="button" disabled={busy === 'graduate'} onClick={onGraduate} className="rounded-full bg-[#c76b12] px-3 py-2 text-[11px] font-extrabold text-white disabled:opacity-50">{busy === 'graduate' ? 'Opening...' : 'Graduate'}</button></div></div>}
 
@@ -501,6 +717,9 @@ const MAX_LOG_WINDOWS = 64;
 const LAUNCHED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Launched' });
 const BOUGHT_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Bought' });
 const SOLD_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Sold' });
+// Rozliczenia oplat puli po graduacji emituje HOOK, nie launchpad - stad
+// drugi adres w skanie. Tablicy zarobkow wystarczy pole `ethToCreator`.
+const HOOK_FEE_SETTLED_EVENT = getAbiItem({ abi: hookAbi, name: 'HookFeeSettled' });
 
 const ACCENTS = ['#8b78e6', '#5fa78c', '#d78a55', '#5b8bd9', '#d9628a', '#4fa3a8'];
 
@@ -518,57 +737,68 @@ function formatAge(startedAt: number) {
   return `${Math.floor(seconds / 86_400)} d`;
 }
 
+/** Jak dlugo po transakcji token liczy sie jako "goracy" w Trending. */
+const HOT_TRADE_WINDOW_MS = 90_000;
+
 export default function LaunchpadBoard() {
+  const router = useRouter();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
-  const [tokens, setTokens] = useState(previewTokens);
+  const [tokens, setTokens] = useState<BoardToken[]>(previewTokens);
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [topEarners, setTopEarners] = useState<CreatorEarnings[]>([]);
+  // Kurs ETH/USD do dopiskow. Null przy braku danych - wtedy dopiski znikaja,
+  // a ETH zostaje jedyna (i zawsze prawdziwa) wartoscia na ekranie.
+  const { usd: ethUsd } = useEthUsd();
+  const [tab, setTab] = useState<BoardTab>('new');
   const [view, setView] = useState<'grid' | 'table'>('grid');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(previewTokens[0].id);
   const [buyAmount, setBuyAmount] = useState('0.05');
   const [launchOpen, setLaunchOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
-  const [launchName, setLaunchName] = useState('');
-  const [launchSymbol, setLaunchSymbol] = useState('');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [launchImage, setLaunchImage] = useState('');
-  const [launchDescription, setLaunchDescription] = useState('');
-  const [launchMetadataUri, setLaunchMetadataUri] = useState('');
-  const [launchFeePct, setLaunchFeePct] = useState('1');
-  const [creatorSharePct, setCreatorSharePct] = useState('60');
-  const [buybackPct, setBuybackPct] = useState('0');
-  const [sniperCapTokens, setSniperCapTokens] = useState(String(FALLBACK_WINDOW_CAP_TOKENS));
-  const [preBuyEth, setPreBuyEth] = useState('0');
-  const [receivers, setReceivers] = useState<FeeReceiverRow[]>([{ account: '', share: '100' }]);
-  // `null` = jeszcze nie sprawdzone. `false` = wdrozony launchpad zna tylko
-  // stare ABI i rozszerzonego startu NIE WOLNO pokazac jako dzialajacego.
-  const [advancedSupported, setAdvancedSupported] = useState<boolean | null>(null);
-  const [limits, setLimits] = useState({
-    maxFeeBps: FALLBACK_MAX_FEE_BPS,
-    maxCreatorShareBps: FALLBACK_MAX_CREATOR_SHARE_BPS,
-    maxRecipients: FALLBACK_MAX_RECIPIENTS,
-    windowCapTokens: FALLBACK_WINDOW_CAP_TOKENS,
-  });
-  // Stale krzywej sluza WYLACZNIE do podgladu pre-buya. Liczba wiazaca jest
-  // zawsze ta z lancucha - tu pokazujemy szacunek, nie obietnice.
-  const [curve, setCurve] = useState({ t0: TOTAL_SUPPLY_TOKENS, rVirt: 0.75 });
-  // Oplata puli po graduacji nalezy do HOOKA i jest ustalona przy jego
-  // wdrozeniu - tworca jej nie wybiera. Czytamy ja, zeby estymator nie
-  // zgadywal, ile z niej zostaje tworcy.
-  const [hookSplit, setHookSplit] = useState({ feeBps: 100, protocolShareBps: 6000 });
+  // Domyslnie wlaczone; wybor uzytkownika przezywa odswiezenie strony.
+  // Odczyt w efekcie, nie w inicjalizatorze - localStorage nie istnieje na
+  // serwerze, a rozjazd SSR/klient konczy sie bledem hydratacji.
+  const [animationsOn, setAnimationsOn] = useState(true);
   const [busy, setBusy] = useState<BusyAction | null>(null);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [loadingBoard, setLoadingBoard] = useState(false);
   const [boardError, setBoardError] = useState<string | null>(null);
+  // Skan logow doszedl do sufitu okien zanim siegnal bloku wdrozenia -
+  // najstarsze starty moga byc poza widokiem i trzeba to nazwac w UI.
+  const [scanTruncated, setScanTruncated] = useState(false);
   const [tradeSide, setTradeSide] = useState<TradeSide>('buy');
   const [sellAmount, setSellAmount] = useState('0');
   const [sellQuote, setSellQuote] = useState<bigint | null>(null);
   const [details, setDetails] = useState<TokenDetails | null>(null);
   const [gradReward, setGradReward] = useState<bigint | null>(null);
+  // Licznik blyskow. `Date.now()` nie wystarcza: dwa eventy w tej samej
+  // milisekundzie daloby ten sam `key` i animacja by sie nie zrestartowala.
+  const flashSeq = useRef(0);
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem('launchpad-animations') === '0') setAnimationsOn(false);
+    } catch {
+      // Prywatny tryb przegladarki potrafi rzucac na localStorage - wtedy
+      // zostaje domyslne "wlaczone" i nic wiecej sie nie dzieje.
+    }
+  }, []);
+
+  const toggleAnimations = () => {
+    setAnimationsOn((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem('launchpad-animations', next ? '1' : '0');
+      } catch {
+        // Brak zapisu znaczy tylko tyle, ze wybor nie przezyje odswiezenia.
+      }
+      return next;
+    });
+  };
 
   // Odczyty tablicy sa PRZYPIETE do sieci launchpada. Bez tego tablica gasnie,
   // gdy portfel stoi na innym lancuchu - a to jest widok publiczny i ma sie
@@ -579,7 +809,8 @@ export default function LaunchpadBoard() {
    * Odtwarza tablice z lancucha: `Launched` daje liste tokenow, `Bought` -
    * unikalnych kupujacych, a `launchOf` aktualny stan i rezerwe. Zaden
    * zewnetrzny indekser nie widzi tych tokenow przed awansem, wiec to jest
-   * jedyne zrodlo.
+   * jedyne zrodlo. Z tych samych eventow spisujemy historie cen: rezerwy PO
+   * transakcji daja dokladna cene spot, bez ani jednego dodatkowego odczytu.
    */
   const loadBoard = useCallback(async () => {
     if (!readClient) return;
@@ -589,15 +820,41 @@ export default function LaunchpadBoard() {
       const latest = await readClient.getBlockNumber();
       const launched = new Map<Address, { name: string; symbol: string; creator: Address; startedAt: number }>();
       const buyers = new Map<Address, Set<Address>>();
-      const activity = new Map<Address, { volume: number; trades: number; lastPrice: number }>();
-      const rawFeed: Array<{ id: string; token: Address; label: string; tone: ActivityItem['tone'] }> = [];
+      const activity = new Map<Address, { volume: number; trades: number }>();
+      // Surowce tablicy zarobkow: suma feeEth per token (krzywa) i suma
+      // ethToCreator per token (rozliczenia hooka). Wei w bigint - na number
+      // przechodzimy dopiero przy wyswietlaniu.
+      const curveFees = new Map<Address, bigint>();
+      const hookCreatorEth = new Map<Address, bigint>();
+      // Okna ida od NAJNOWSZEGO wstecz, wiec kolejnosc napotkania nie jest
+      // chronologia - kazdy wpis niesie klucz (blok, logIndex) do posortowania.
+      const priceEntries = new Map<Address, Array<{ order: number; price: number }>>();
+      // Ten sam klucz (blok, logIndex) co przy cenach: okna ida od najnowszego
+      // wstecz, ale WEWNATRZ okna logi sa od najstarszego - bez sortowania
+      // tasma pokazywalaby najstarsze wpisy najnowszego okna jako "najswiezsze".
+      const rawFeed: Array<{ id: string; token: Address; label: string; tone: ActivityItem['tone']; order: number }> = [];
+      const orderOf = (log: { blockNumber: bigint | null; logIndex: number | null }) =>
+        Number(log.blockNumber ?? 0n) * 10_000 + Number(log.logIndex ?? 0);
+
+      const pushPrice = (token: Address, log: { blockNumber: bigint | null; logIndex: number | null }, ethReserveAfter?: bigint, tokenReserveAfter?: bigint) => {
+        if (ethReserveAfter === undefined || tokenReserveAfter === undefined || tokenReserveAfter <= 0n) return;
+        const list = priceEntries.get(token) ?? [];
+        list.push({
+          order: Number(log.blockNumber ?? 0n) * 10_000 + Number(log.logIndex ?? 0),
+          price: spotPriceFromReserves(ethReserveAfter, tokenReserveAfter),
+        });
+        priceEntries.set(token, list);
+      };
 
       let toBlock = latest;
       for (let window = 0; window < MAX_LOG_WINDOWS && toBlock >= LAUNCHPAD_DEPLOY_BLOCK; window += 1) {
         const fromBlock = toBlock > LAUNCHPAD_DEPLOY_BLOCK + LOG_WINDOW ? toBlock - LOG_WINDOW : LAUNCHPAD_DEPLOY_BLOCK;
+        // Dwa adresy w jednym strzale: launchpad emituje handel na krzywej,
+        // hook rozliczenia oplat puli. Osobny skan hooka w tych samych oknach
+        // podwoilby liczbe requestow do publicznego RPC.
         const logs = await readClient.getLogs({
-          address: LAUNCHPAD_ADDRESS as Address,
-          events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT],
+          address: [LAUNCHPAD_ADDRESS as Address, LAUNCH_HOOK_ADDRESS as Address],
+          events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT],
           fromBlock,
           toBlock,
         });
@@ -611,38 +868,59 @@ export default function LaunchpadBoard() {
               creator: log.args.creator as Address,
               startedAt: Number(log.args.startedAt ?? 0),
             });
-            rawFeed.push({ id: `${log.transactionHash}-launch`, token, label: 'Launched', tone: 'launch' });
+            rawFeed.push({ id: `${log.transactionHash}-launch`, token, label: 'Launched', tone: 'launch', order: orderOf(log) });
           } else if (log.eventName === 'Bought') {
             const set = buyers.get(token) ?? new Set<Address>();
             set.add(log.args.buyer as Address);
             buyers.set(token, set);
+            const feeEth = log.args.feeEth as bigint | undefined;
+            if (feeEth) curveFees.set(token, (curveFees.get(token) ?? 0n) + feeEth);
             const ethNet = Number(formatEther(log.args.ethNet as bigint));
-            const tokensOut = Number(formatEther(log.args.tokensOut as bigint));
-            const current = activity.get(token) ?? { volume: 0, trades: 0, lastPrice: 0 };
-            activity.set(token, { volume: current.volume + ethNet, trades: current.trades + 1, lastPrice: tokensOut > 0 ? ethNet / tokensOut : current.lastPrice });
-            rawFeed.push({ id: `${log.transactionHash}-buy`, token, label: `Buy ${formatEth(ethNet)}`, tone: 'buy' });
-          } else {
+            const current = activity.get(token) ?? { volume: 0, trades: 0 };
+            activity.set(token, { volume: current.volume + ethNet, trades: current.trades + 1 });
+            pushPrice(token, log, log.args.ethReserveAfter as bigint | undefined, log.args.tokenReserveAfter as bigint | undefined);
+            rawFeed.push({ id: `${log.transactionHash}-buy`, token, label: `Buy ${formatEth(ethNet)}`, tone: 'buy', order: orderOf(log) });
+          } else if (log.eventName === 'Sold') {
             const set = buyers.get(token) ?? new Set<Address>();
             set.add(log.args.seller as Address);
             buyers.set(token, set);
+            const feeEth = log.args.feeEth as bigint | undefined;
+            if (feeEth) curveFees.set(token, (curveFees.get(token) ?? 0n) + feeEth);
             const ethOut = Number(formatEther(log.args.ethOut as bigint));
-            const tokensIn = Number(formatEther(log.args.tokensIn as bigint));
-            const current = activity.get(token) ?? { volume: 0, trades: 0, lastPrice: 0 };
-            activity.set(token, { volume: current.volume + ethOut, trades: current.trades + 1, lastPrice: tokensIn > 0 ? ethOut / tokensIn : current.lastPrice });
-            rawFeed.push({ id: `${log.transactionHash}-sell`, token, label: `Sell ${formatEth(ethOut)}`, tone: 'sell' });
+            const current = activity.get(token) ?? { volume: 0, trades: 0 };
+            activity.set(token, { volume: current.volume + ethOut, trades: current.trades + 1 });
+            pushPrice(token, log, log.args.ethReserveAfter as bigint | undefined, log.args.tokenReserveAfter as bigint | undefined);
+            rawFeed.push({ id: `${log.transactionHash}-sell`, token, label: `Sell ${formatEth(ethOut)}`, tone: 'sell', order: orderOf(log) });
+          } else if (log.eventName === 'HookFeeSettled') {
+            // Hook rozlicza tworcy jego czesc oplat puli JUZ PO potraceniu
+            // auto-buybacku (buyback schodzi wylacznie z dzialki tworcy),
+            // wiec ethToCreator sumujemy wprost - bez odtwarzania podzialu.
+            const ethToCreator = log.args.ethToCreator as bigint | undefined;
+            if (ethToCreator) hookCreatorEth.set(token, (hookCreatorEth.get(token) ?? 0n) + ethToCreator);
           }
         }
         if (fromBlock === LAUNCHPAD_DEPLOY_BLOCK) break;
         toBlock = fromBlock - 1n;
       }
 
+      // Petla mogla skonczyc sie z powodu SUFITU OKIEN, a nie dojscia do bloku
+      // wdrozenia. Wtedy starsze starty sa poza skanem i musimy to POWIEDZIEC -
+      // cicho zniknely token wyglada jak skasowany, a jest tylko nieodczytany.
+      setScanTruncated(toBlock >= LAUNCHPAD_DEPLOY_BLOCK);
+
       if (launched.size === 0) {
         setActivityFeed([]);
         setTokens(previewTokens);
+        setTopEarners([]);
         return;
       }
 
-      setActivityFeed(rawFeed.slice(0, 24).map((item) => ({ ...item, symbol: launched.get(item.token)?.symbol ?? shortAddress(item.token), accent: accentFor(item.token) })));
+      setActivityFeed(
+        rawFeed
+          .sort((a, b) => b.order - a.order)
+          .slice(0, 24)
+          .map((item) => ({ ...item, symbol: launched.get(item.token)?.symbol ?? shortAddress(item.token), accent: accentFor(item.token) }))
+      );
 
       const addresses = [...launched.keys()];
       const states = await readClient.multicall({
@@ -655,7 +933,23 @@ export default function LaunchpadBoard() {
         })),
       });
 
-      const live: LaunchpadToken[] = [];
+      // Udzial tworcy w oplacie krzywej jest PER TOKEN (launchAdvanced pozwala
+      // go obnizyc), wiec liczymy z feeConfigOf, a nie ze stalej kontraktu.
+      // Gdy odczyt padnie, pomijamy czesc krzywej tego tokena zamiast zgadywac.
+      const feeConfigs = await readClient
+        .multicall({
+          allowFailure: true,
+          contracts: addresses.map((token) => ({
+            address: LAUNCHPAD_ADDRESS as Address,
+            abi: launchpadAbi,
+            functionName: 'feeConfigOf' as const,
+            args: [token] as const,
+          })),
+        })
+        .catch(() => null);
+
+      const earningsByCreator = new Map<string, CreatorEarnings>();
+      const live: BoardToken[] = [];
       addresses.forEach((token, index) => {
         const result = states[index];
         const meta = launched.get(token);
@@ -671,6 +965,30 @@ export default function LaunchpadBoard() {
         // Stan 0 znaczy "launchpad nie zna tego adresu". Zdarzenie z innego
         // wdrozenia pod tym samym adresem tablicy nie ma prawa tu wejsc.
         if (state === 0) return;
+
+        // Zarobki NALICZONE tworcy: czesc oplat krzywej wg konfiguracji tokena
+        // plus ethToCreator z rozliczen hooka. To accrual, nie wyplata -
+        // wyplata idzie osobnym claimem i tablica tego nie udaje.
+        let creatorWei = hookCreatorEth.get(token) ?? 0n;
+        const feeTotal = curveFees.get(token) ?? 0n;
+        const feeConfig = feeConfigs?.[index];
+        if (feeTotal > 0n && feeConfig?.status === 'success') {
+          const [feeBps, creatorFeeBps] = feeConfig.result as readonly [number, number, bigint];
+          // Start bez oplaty (feeBps 0) nie ma czego dzielic - i nie wolno
+          // nim dzielic.
+          if (feeBps > 0) creatorWei += (feeTotal * BigInt(creatorFeeBps)) / BigInt(feeBps);
+        }
+        const creatorKey = creator.toLowerCase();
+        const earned = earningsByCreator.get(creatorKey) ?? { creator, totalWei: 0n, tokenCount: 0, graduated: false };
+        earned.totalWei += creatorWei;
+        earned.tokenCount += 1;
+        if (LAUNCH_STATE[state] === 'Graduated') earned.graduated = true;
+        earningsByCreator.set(creatorKey, earned);
+
+        const history = (priceEntries.get(token) ?? [])
+          .sort((a, b) => a.order - b.order)
+          .map((entry) => entry.price)
+          .slice(-12);
         live.push({
           id: token,
           address: token,
@@ -683,18 +1001,29 @@ export default function LaunchpadBoard() {
           holders: buyers.get(token)?.size ?? 0,
           volume: activity.get(token)?.volume ?? 0,
           trades: activity.get(token)?.trades ?? 0,
-          lastPrice: activity.get(token)?.lastPrice ?? 0,
+          lastPrice: history[history.length - 1] ?? 0,
           age: formatAge(Number(startedAt)),
           accent: accentFor(token),
           live: true,
+          startedAt: Number(startedAt),
+          prices: history,
         });
       });
 
       if (live.length === 0) {
         setActivityFeed([]);
         setTokens(previewTokens);
+        setTopEarners([]);
         return;
       }
+      // Do tablicy wchodza tylko tworcy z niezerowym naliczeniem - wiersz
+      // "0.0000 ETH" niczego by nie mowil i tylko udawal ranking.
+      setTopEarners(
+        [...earningsByCreator.values()]
+          .filter((entry) => entry.totalWei > 0n)
+          .sort((a, b) => (b.totalWei > a.totalWei ? 1 : b.totalWei < a.totalWei ? -1 : 0))
+          .slice(0, 5)
+      );
       live.sort((a, b) => b.raised - a.raised);
       setTokens(live);
       setSelectedId((current) => (live.some((token) => token.id === current) ? current : live[0].id));
@@ -753,7 +1082,7 @@ export default function LaunchpadBoard() {
             fresh.push({ id, symbol, accent: accentFor(token), label: 'Launched', tone: 'launch' });
             setTokens((current) => {
               if (current.some((row) => row.address?.toLowerCase() === token.toLowerCase())) return current;
-              const row: LaunchpadToken = {
+              const row: BoardToken = {
                 id: token,
                 address: token,
                 name: (decoded.args?.name as string) ?? symbol,
@@ -768,6 +1097,10 @@ export default function LaunchpadBoard() {
                 live: true,
                 volume: 0,
                 trades: 0,
+                // Event niesie `startedAt`, ale tutaj wystarczy zegar - blok
+                // wlasnie sie pojawil, a dokladna wartosc przyjdzie z loadBoard.
+                startedAt: Math.floor(Date.now() / 1000),
+                prices: [],
               };
               // Wiersze podgladowe znikaja przy pierwszym prawdziwym starcie -
               // mieszanie ich z zywymi danymi bylo by mylace.
@@ -804,6 +1137,10 @@ export default function LaunchpadBoard() {
           const isBuy = eventName === 'Bought';
           const eth = (isBuy ? decoded.args?.ethNet : decoded.args?.ethOut) as bigint | undefined;
           const reserveAfter = decoded.args?.ethReserveAfter as bigint | undefined;
+          const tokenReserveAfter = decoded.args?.tokenReserveAfter as bigint | undefined;
+          const price = reserveAfter !== undefined && tokenReserveAfter !== undefined && tokenReserveAfter > 0n
+            ? spotPriceFromReserves(reserveAfter, tokenReserveAfter)
+            : null;
           fresh.push({
             id,
             symbol: shortAddress(token),
@@ -812,6 +1149,8 @@ export default function LaunchpadBoard() {
             tone: isBuy ? 'buy' : 'sell',
           });
 
+          flashSeq.current += 1;
+          const seq = flashSeq.current;
           setTokens((current) =>
             current.map((row) => {
               if (row.address?.toLowerCase() !== token.toLowerCase()) return row;
@@ -820,6 +1159,12 @@ export default function LaunchpadBoard() {
                 raised: reserveAfter === undefined ? row.raised : Number(formatEther(reserveAfter)),
                 trades: (row.trades ?? 0) + 1,
                 volume: (row.volume ?? 0) + (eth === undefined ? 0 : Number(formatEther(eth))),
+                prices: price === null ? row.prices : [...(row.prices ?? []), price].slice(-12),
+                lastPrice: price ?? row.lastPrice,
+                lastTradeAt: Date.now(),
+                // Blysk wygasa po stronie CSS; pola nie czyscimy, bo kolejny
+                // seq i tak restartuje animacje od zera.
+                flash: { tone: isBuy ? 'buy' : 'sell', seq },
               };
             })
           );
@@ -885,14 +1230,36 @@ export default function LaunchpadBoard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokens.slice(0, 60).map((token) => token.address ?? '').join(',')]);
 
+  /**
+   * Zakladki sortujace zamiast filtrow. Kazda oddaje NOWA tablice, wiec
+   * `sort` nigdy nie przestawia stanu w miejscu.
+   */
   const visibleTokens = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return tokens.filter((token) => {
-      const matchesFilter = filter === 'all' || (filter === 'curve' ? token.state === 'Curve' : token.state === 'Graduated');
-      const matchesSearch = !normalized || `${token.name} ${token.symbol} ${token.creator}`.toLowerCase().includes(normalized);
-      return matchesFilter && matchesSearch;
-    });
-  }, [filter, query, tokens]);
+    const matches = tokens.filter((token) => !normalized || `${token.name} ${token.symbol} ${token.creator}`.toLowerCase().includes(normalized));
+    switch (tab) {
+      case 'new':
+        return [...matches].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+      case 'trending': {
+        const rows = [...matches].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0));
+        if (animationsOn) {
+          // Swiezo handlowany token skacze na gore. Celowo ulotne: sortowanie
+          // odswieza sie przy kazdym evencie, a po cichym kwadransie wraca
+          // porzadek po wolumenie - bez zadnego timera.
+          const now = Date.now();
+          const heat = (row: BoardToken) => (row.lastTradeAt && now - row.lastTradeAt < HOT_TRADE_WINDOW_MS ? row.lastTradeAt : 0);
+          rows.sort((a, b) => heat(b) - heat(a) || (b.volume ?? 0) - (a.volume ?? 0));
+        }
+        return rows;
+      }
+      case 'about':
+        return matches.filter((token) => token.state === 'Curve').sort((a, b) => b.raised - a.raised);
+      case 'graduated':
+        return matches.filter((token) => token.state === 'Graduated');
+      default:
+        return matches;
+    }
+  }, [animationsOn, query, tab, tokens]);
 
   const selected = tokens.find((token) => token.id === selectedId) ?? visibleTokens[0] ?? tokens[0];
   const onSepolia = chainId === LAUNCHPAD_CHAIN.id;
@@ -901,6 +1268,14 @@ export default function LaunchpadBoard() {
   const totalVolume = tokens.reduce((sum, token) => sum + (token.volume ?? 0), 0);
   const totalTrades = tokens.reduce((sum, token) => sum + (token.trades ?? 0), 0);
   const showingPreview = !tokens.some((token) => token.live);
+
+  // Krol wzgorza istnieje tylko wsrod ZYWYCH krzywych - wiersz podgladowy na
+  // tronie wygladalby jak prawdziwy lider rynku, ktorego nie ma.
+  const kingToken = useMemo(() => {
+    const curveTokens = tokens.filter((token) => token.live && token.state === 'Curve');
+    if (curveTokens.length === 0) return null;
+    return curveTokens.reduce((best, token) => (token.raised > best.raised ? token : best));
+  }, [tokens]);
 
   const refreshDetails = useCallback(async () => {
     if (!readClient || !selected?.address) {
@@ -968,15 +1343,25 @@ export default function LaunchpadBoard() {
   useEffect(() => {
     setSellQuote(null);
     if (!details || !selected?.address || details.decimals < 0 || sellAmount === '0' || Number(sellAmount) <= 0) return;
+    // Flaga anulowania obejmuje odpowiedz W LOCIE: bez niej spozniony `.then`
+    // ze starego tokena/kwoty nadpisalby swiezsza wycene po przelaczeniu.
+    let cancelled = false;
     try {
       const amount = parseUnits(sellAmount, details.decimals);
       void readClient
         ?.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [selected.address as Address, amount] })
-        .then((quote) => setSellQuote(quote[0]))
-        .catch(() => setSellQuote(null));
+        .then((quote) => {
+          if (!cancelled) setSellQuote(quote[0]);
+        })
+        .catch(() => {
+          if (!cancelled) setSellQuote(null);
+        });
     } catch {
       setSellQuote(null);
     }
+    return () => {
+      cancelled = true;
+    };
   }, [details, readClient, selected?.address, sellAmount]);
 
   const selectToken = (id: string, openTrade = false) => {
@@ -984,194 +1369,15 @@ export default function LaunchpadBoard() {
     setTradeOpen(openTrade);
   };
 
-  /**
-   * Czy pod `LAUNCHPAD_ADDRESS` stoi wersja znajaca `launchAdvanced`.
-   *
-   * Sprawdzamy to ODCZYTEM `MAX_BUYBACK_BPS` - stalej, ktora pojawila sie
-   * razem z rozszerzonym startem. Na starszym wdrozeniu ten odczyt odpada,
-   * bo pod tym selektorem nie ma kodu. To jedyna uczciwa droga: samo ABI po
-   * naszej stronie nie mowi nic o tym, co naprawde jest w lancuchu, a wyslanie
-   * `launchAdvanced` "na probe" kosztowaloby tworce gaz za rewert.
-   */
+  // Escape zamyka modal handlu - ten sam wzorzec, co w LaunchTokenModal.
   useEffect(() => {
-    if (!readClient) return;
-    let cancelled = false;
-    const read = (
-      functionName:
-        | 'MAX_BUYBACK_BPS'
-        | 'MAX_FEE_BPS'
-        | 'MAX_CREATOR_SHARE_BPS'
-        | 'MAX_FEE_RECIPIENTS'
-        | 'WINDOW_ADDR_CAP'
-        | 'T0'
-        | 'R_VIRT',
-    ) => readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName });
-
-    void (async () => {
-      try {
-        const [t0, rVirt] = await Promise.all([read('T0'), read('R_VIRT')]);
-        if (!cancelled) {
-          setCurve({ t0: Number(formatEther(t0 as bigint)), rVirt: Number(formatEther(rVirt as bigint)) });
-        }
-      } catch {
-        // Stare wdrozenie tez ma te stale; gdy odczyt padnie, zostaja domyslne.
-      }
-      try {
-        const [feeBps, protocolShareBps] = await Promise.all([
-          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'HOOK_FEE_BPS' }),
-          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'PROTOCOL_SHARE_BPS' }),
-        ]);
-        if (!cancelled) setHookSplit({ feeBps: Number(feeBps), protocolShareBps: Number(protocolShareBps) });
-      } catch {
-        // Podglad oplaty puli jest dodatkiem; brak odczytu go nie unieważnia.
-      }
-      try {
-        await read('MAX_BUYBACK_BPS');
-        const [maxFee, maxCreatorShare, maxRecipients, windowCap] = await Promise.all([
-          read('MAX_FEE_BPS'),
-          // Podloga protokolu pojawila sie razem z rozszerzonym startem, wiec
-          // na starszej wersji ten odczyt nie istnieje - stad `catch`.
-          read('MAX_CREATOR_SHARE_BPS').catch(() => FALLBACK_MAX_CREATOR_SHARE_BPS),
-          read('MAX_FEE_RECIPIENTS'),
-          read('WINDOW_ADDR_CAP'),
-        ]);
-        if (cancelled) return;
-        const capTokens = Math.floor(Number(formatEther(windowCap as bigint)));
-        setLimits({
-          maxFeeBps: Number(maxFee),
-          maxCreatorShareBps: Number(maxCreatorShare),
-          maxRecipients: Number(maxRecipients),
-          windowCapTokens: capTokens,
-        });
-        setLaunchFeePct((Number(maxFee) / 100).toString());
-        setCreatorSharePct((Number(maxCreatorShare) / 100).toString());
-        setSniperCapTokens(String(capTokens));
-        setAdvancedSupported(true);
-      } catch {
-        if (!cancelled) setAdvancedSupported(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
+    if (!tradeOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTradeOpen(false);
     };
-  }, [readClient]);
-
-  /**
-   * Ta sama walidacja, co w `_launch`, tylko wykonana ZANIM tworca zaplaci za
-   * gaz. Gdy cokolwiek sie nie zgadza, zwracamy powod po ludzku zamiast pozwolic
-   * kontraktowi odbic transakcje golym `InvalidFeeConfig`.
-   */
-  const advanced = useMemo<{ args: AdvancedArgs | null; error: string | null }>(() => {
-    const fail = (error: string) => ({ args: null, error });
-
-    const feePct = Number(launchFeePct);
-    if (!Number.isFinite(feePct) || feePct < 0) return fail('Trading fee must be a number.');
-    const feeBps = Math.round(feePct * 100);
-    if (feeBps > limits.maxFeeBps) {
-      return fail(`Trading fee is capped at ${(limits.maxFeeBps / 100).toFixed(2)}% until the higher cap is audited.`);
-    }
-
-    const maxCreatorPct = limits.maxCreatorShareBps / 100;
-    const creatorPct = Number(creatorSharePct);
-    if (!Number.isFinite(creatorPct) || creatorPct < 0 || creatorPct > maxCreatorPct) {
-      return fail(`Creator split must be between 0 and ${maxCreatorPct}% — the rest belongs to the protocol.`);
-    }
-    // Zaokraglenie W DOL. W gore potrafiloby przekroczyc podloge protokolu o
-    // jeden punkt bazowy i wywalic transakcje na `InvalidFeeConfig`.
-    const creatorFeeBps = Math.min(feeBps, Math.floor((feeBps * creatorPct) / 100));
-
-    const buyPct = Number(buybackPct);
-    if (!Number.isFinite(buyPct) || buyPct < 0 || buyPct > 100) return fail('Auto-buyback must be between 0 and 100%.');
-    const buybackBps = Math.round(buyPct * 100);
-
-    const windowCap = toWei(sniperCapTokens);
-    const capTokens = Number(sniperCapTokens);
-    if (windowCap === null || windowCap <= 0n) return fail('Per-wallet cap must be a positive number of tokens.');
-    if (capTokens > limits.windowCapTokens) {
-      return fail(`Per-wallet cap cannot exceed ${limits.windowCapTokens.toLocaleString('en-US')} tokens.`);
-    }
-
-    const preBuyWei = preBuyEth.trim() === '' || Number(preBuyEth) === 0 ? 0n : toWei(preBuyEth);
-    if (preBuyWei === null) return fail('Pre-buy must be zero or more ETH, written as a decimal number.');
-
-    if (receivers.length === 0) return fail('Add at least one fee receiver.');
-    if (receivers.length > limits.maxRecipients) return fail(`At most ${limits.maxRecipients} fee receivers.`);
-
-    const accounts: Address[] = [];
-    const shares: number[] = [];
-    let shareTotal = 0;
-    for (const row of receivers) {
-      const account = row.account.trim() === '' ? address : (row.account.trim() as Address);
-      if (!account) return fail('Connect a wallet, or type the receiver address in full.');
-      if (!isAddressLike(account)) return fail('Every fee receiver needs a valid address.');
-      const sharePct = Number(row.share);
-      if (!Number.isFinite(sharePct) || sharePct <= 0) return fail('Every fee receiver needs a share above zero.');
-      const shareBps = Math.round(sharePct * 100);
-      if (shareBps === 0) return fail('A share that rounds down to zero would be rejected on chain.');
-      accounts.push(account as Address);
-      shares.push(shareBps);
-      shareTotal += shareBps;
-    }
-    // Kontrakt wymaga DOKLADNIE 10 000 bps. Zaokraglamy ostatni udzial, zeby
-    // "33.33 / 33.33 / 33.34" nie wywalalo sie na jednym punkcie bazowym.
-    const drift = 10_000 - shareTotal;
-    if (Math.abs(drift) > receivers.length) return fail('Fee receiver shares must add up to 100%.');
-    shares[shares.length - 1] += drift;
-    if (shares[shares.length - 1] <= 0) return fail('Fee receiver shares must add up to 100%.');
-
-    return {
-      args: {
-        feeBps,
-        creatorFeeBps,
-        buybackBps,
-        windowCap,
-        accounts,
-        shares,
-        metadataURI: buildMetadataUri(launchMetadataUri, launchName, launchDescription, launchImage),
-        preBuyWei,
-      },
-      error: null,
-    };
-  }, [
-    address,
-    buybackPct,
-    creatorSharePct,
-    launchDescription,
-    launchFeePct,
-    launchImage,
-    launchMetadataUri,
-    launchName,
-    limits,
-    preBuyEth,
-    receivers,
-    sniperCapTokens,
-  ]);
-
-  /**
-   * Ile tworca zarobi, gdy rynek zrobi dany wolumen. Noga krzywej jest pewna
-   * co do wzoru (`_accrueFee`); noga puli jest gorna granica, bo auto-buyback
-   * zabiera swoja czesc TYLKO z oplat po stronie ETH.
-   */
-  const estimate = useMemo(() => {
-    const creatorFeeBps = advanced.args?.creatorFeeBps ?? 0;
-    const poolCreatorBps = (hookSplit.feeBps * (10_000 - hookSplit.protocolShareBps)) / 10_000;
-    return [10, 100, 1_000].map((volume) => ({
-      volume,
-      curve: (volume * creatorFeeBps) / 10_000,
-      pool: (volume * poolCreatorBps) / 10_000,
-    }));
-  }, [advanced.args, hookSplit]);
-
-  /** Podglad dev-buya po cenie startowej krzywej. Szacunek, nie gwarancja. */
-  const preBuyPreview = useMemo(() => {
-    const eth = Number(preBuyEth);
-    if (!Number.isFinite(eth) || eth <= 0) return null;
-    const feeBps = advanced.args?.feeBps ?? limits.maxFeeBps;
-    const net = eth * (1 - feeBps / 10_000);
-    const tokens = (curve.t0 * net) / (curve.rVirt + net);
-    return { tokens, share: (tokens / curve.t0) * 100 };
-  }, [advanced.args, curve, limits.maxFeeBps, preBuyEth]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tradeOpen]);
 
   const ensureSepolia = async () => {
     if (onSepolia) return true;
@@ -1181,113 +1387,6 @@ export default function LaunchpadBoard() {
     } catch {
       setNotice({ kind: 'error', text: 'Switch to Base Sepolia was cancelled. Nothing was sent.' });
       return false;
-    }
-  };
-
-  const launch = async () => {
-    if (!address || !walletClient || !readClient) {
-      setNotice({ kind: 'error', text: 'Connect a wallet first.' });
-      return;
-    }
-    if (!launchName.trim() || !launchSymbol.trim()) {
-      setNotice({ kind: 'error', text: 'Add a name and symbol before launching.' });
-      return;
-    }
-    const useAdvanced = advancedOpen && advancedSupported === true;
-    if (useAdvanced && advanced.error) {
-      setNotice({ kind: 'error', text: advanced.error });
-      return;
-    }
-    const preBuyWei = preBuyEth.trim() === '' || Number(preBuyEth) === 0 ? 0n : toWei(preBuyEth);
-    if (preBuyWei === null) {
-      setNotice({ kind: 'error', text: 'Pre-buy must be zero or more ETH, written as a decimal number.' });
-      return;
-    }
-    if (!(await ensureSepolia())) return;
-    setBusy('launch');
-    setNotice(null);
-    try {
-      const name = launchName.trim();
-      const symbol = launchSymbol.trim().toUpperCase();
-      const deadline = BigInt(Math.floor(Date.now() / 1000) + 900);
-      // Pre-buy jedzie TA SAMA transakcja, co start, wiec miedzy stworzeniem
-      // krzywej a tym kupnem nie da sie wcisnac cudzej wymiany. Krzywa startowa
-      // jest deterministyczna, wiec `1` spelnia wymog `SlippageRequired`, nie
-      // udajac przy tym ochrony, ktorej ten jeden przypadek nie potrzebuje.
-      const minTokensOut = preBuyWei > 0n ? 1n : 0n;
-      const hash = useAdvanced && advanced.args
-        ? await walletClient.writeContract({
-            address: LAUNCHPAD_ADDRESS as Address,
-            abi: launchpadAbi,
-            functionName: 'launchAdvanced',
-            args: [
-              name,
-              symbol,
-              minTokensOut,
-              deadline,
-              advanced.args.feeBps,
-              advanced.args.creatorFeeBps,
-              advanced.args.buybackBps,
-              advanced.args.windowCap,
-              advanced.args.accounts,
-              advanced.args.shares,
-              advanced.args.metadataURI,
-            ],
-            value: preBuyWei,
-            chain: LAUNCHPAD_CHAIN,
-            account: address,
-          })
-        : await walletClient.writeContract({
-            address: LAUNCHPAD_ADDRESS as Address,
-            abi: launchpadAbi,
-            functionName: 'launch',
-            args: [name, symbol, minTokensOut, deadline],
-            value: preBuyWei,
-            chain: LAUNCHPAD_CHAIN,
-            account: address,
-          });
-      const receipt = await readClient.waitForTransactionReceipt({ hash });
-      if (receipt.status !== 'success') throw new Error('The launch transaction reverted.');
-      // Dev-buy emituje takze `Bought` i `FeeAccrued` z tego samego adresu,
-      // wiec pierwszy log launchpada nie musi byc `Launched`. Szukamy po temacie.
-      const launchedTopic = encodeEventTopics({ abi: launchpadAbi, eventName: 'Launched' })[0];
-      const log = receipt.logs.find(
-        (entry) => entry.address.toLowerCase() === LAUNCHPAD_ADDRESS.toLowerCase() && entry.topics[0] === launchedTopic,
-      );
-      if (!log) throw new Error('Launch confirmed, but its event was not readable yet.');
-      const decoded = decodeEventLog({ abi: launchpadAbi, eventName: 'Launched', data: log.data, topics: log.topics });
-      const tokenAddress = decoded.args.token as `0x${string}`;
-      const newToken: LaunchpadToken = {
-        id: tokenAddress,
-        address: tokenAddress,
-        name: decoded.args.name as string,
-        symbol: decoded.args.symbol as string,
-        // Pelny adres, nie skrocony - skracaniem zajmuje sie warstwa widoku,
-        // a podwojne skrocenie dawaloby smiec.
-        creator: address,
-        state: 'Curve',
-        raised: 0,
-        target: CURVE_TARGET_ETH,
-        holders: 0,
-        age: 'just now',
-        accent: accentFor(tokenAddress),
-        live: true,
-      };
-      setTokens((current) => [newToken, ...current]);
-      setSelectedId(newToken.id);
-      setLaunchOpen(false);
-      setLaunchName('');
-      setLaunchSymbol('');
-      setLaunchImage('');
-      setLaunchDescription('');
-      setLaunchMetadataUri('');
-      setPreBuyEth('0');
-      setNotice({ kind: 'success', text: `${newToken.symbol} is live on the curve. ${hash.slice(0, 10)}...` });
-      void loadBoard();
-    } catch (error) {
-      setNotice({ kind: 'error', text: error instanceof Error ? error.message.split('\n')[0] : String(error) });
-    } finally {
-      setBusy(null);
     }
   };
 
@@ -1484,6 +1583,25 @@ export default function LaunchpadBoard() {
 
   return (
     <main className="min-h-screen bg-[#fcfcfd] px-4 pb-24 pt-0 font-soft sm:px-6">
+      {/* Blysk kart zyje razem z tym widokiem - globals.css jest poza zakresem
+          tego komponentu, a te trzy reguly nie przydadza sie nigdzie indziej.
+          `forwards` zostawia nakladke przezroczysta po wygasnieciu, wiec nie
+          trzeba jej zdejmowac ze stanu. */}
+      <style>{`
+        .lp-flash-buy { animation: lp-flash-buy 0.9s ease-out forwards; }
+        .lp-flash-sell { animation: lp-flash-sell 0.9s ease-out forwards; }
+        @keyframes lp-flash-buy {
+          0% { box-shadow: 0 0 0 2px rgba(24, 189, 100, 0.65), 0 8px 28px rgba(24, 189, 100, 0.3); }
+          100% { box-shadow: 0 0 0 2px rgba(24, 189, 100, 0), 0 8px 28px rgba(24, 189, 100, 0); }
+        }
+        @keyframes lp-flash-sell {
+          0% { box-shadow: 0 0 0 2px rgba(199, 107, 18, 0.6), 0 8px 28px rgba(199, 107, 18, 0.3); }
+          100% { box-shadow: 0 0 0 2px rgba(199, 107, 18, 0), 0 8px 28px rgba(199, 107, 18, 0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .lp-flash-buy, .lp-flash-sell { animation: none; }
+        }
+      `}</style>
       <div className="mx-auto w-full max-w-[1280px]">
         <div className="lg:hidden">
           <ActivityTicker events={activityFeed} />
@@ -1515,177 +1633,93 @@ export default function LaunchpadBoard() {
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <div className="grid gap-4">
-            <SummaryCard title="Total curve reserve" value={formatEth(totalRaised)} detail={`${liveCount} active launches on Base Sepolia`} accent="#d6b7ff" icon={<CircleDollarSign className="h-6 w-6 text-[#8f45df]" />} />
-            <SummaryCard title="Indexed volume" value={formatEth(totalVolume)} detail={`${totalTrades} trades reconstructed from chain`} accent="#bce2ff" icon={<TrendingUp className="h-6 w-6 text-[#24a3ee]" />} />
-          </div>
-          <TopLaunches tokens={tokens} onSelect={(id) => selectToken(id)} />
-          <VolumePanel tokens={tokens} onSelect={(id) => selectToken(id)} />
-        </div>
+            {/* Cztery karty w ukladzie 2x2: Top earnings stoi obok Top launches
+                i Top volume, a nie pod kreska - ranking tworcow ma byc czescia
+                pierwszego ekranu, nie ciekawostka na dole. */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
+              <TopLaunches tokens={tokens} onSelect={(id) => selectToken(id)} />
+              <VolumePanel tokens={tokens} onSelect={(id) => selectToken(id)} />
+              <TopEarnings rows={topEarners} ethUsd={ethUsd} />
+            </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Launch filters">
-            {([['all', 'All'], ['curve', 'On curve'], ['graduated', 'Graduated']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value)} className={`rounded-full border px-4 py-2 text-[12px] font-extrabold transition-colors ${filter === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>)}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-black/40">Base Sepolia</span>
-            <button type="button" onClick={() => setFilter('curve')} className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary"><Flame className="h-3.5 w-3.5 text-soft-primary" aria-hidden="true" /> Trending</button>
-          </div>
-        </div>
+            {kingToken && (
+              <KingOfTheHill
+                token={kingToken}
+                ethUsd={ethUsd}
+                onTrade={() => selectToken(kingToken.id, true)}
+                onDetails={() => kingToken.address && router.push(`/launchpad/${kingToken.address}`)}
+              />
+            )}
 
-        <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Launchpad market table">
-          <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-5">
-            <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Launchpad market</h2><p className="mt-1 text-[11px] text-black/45">{visibleTokens.length} projects in this view · {showingPreview ? 'preview rows while the first launch is indexed' : 'live event data from Base Sepolia'}</p></div>
-            <span className="flex items-center gap-2">
-              <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="tablist" aria-label="Market layout">
-                {(['grid', 'table'] as const).map((mode) => (
-                  <button key={mode} type="button" role="tab" aria-selected={view === mode} onClick={() => setView(mode)} className={`px-3 py-1.5 text-[11px] font-extrabold capitalize transition-colors ${view === mode ? 'bg-soft-primary text-white' : 'bg-white text-[#16141b] hover:text-soft-primary-deep'}`}>{mode}</button>
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Launch sorting">
+                {([['new', 'New'], ['trending', 'Trending'], ['about', 'About to graduate'], ['graduated', 'Graduated'], ['all', 'All']] as const).map(([value, label]) => (
+                  <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`rounded-full border px-4 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>
                 ))}
-              </span>
-              <span className="hidden items-center gap-1.5 rounded-full bg-soft-info-soft px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-soft-info sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-[#18bd64]" /> Testnet</span>
-            </span>
-          </div>
-          {view === 'grid' ? (
-            <div className="border-t border-black/10 p-4 sm:p-5">
-              {visibleTokens.length > 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {visibleTokens.map((token) => <LaunchCard key={token.id} token={token} onSelect={() => selectToken(token.id)} onTrade={() => selectToken(token.id, true)} onDetails={() => window.location.assign(`/launchpad/${token.address}`)} />)}
+              </div>
+              <span className="text-[11px] font-bold text-black/40">Base Sepolia</span>
+            </div>
+
+            <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Launchpad market table">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
+                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Launchpad market</h2><p className="mt-1 text-[11px] text-black/45">{visibleTokens.length} projects in this view · {showingPreview ? 'sample rows while the first launch is indexed' : 'live event data from Base Sepolia'}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
+                <span className="flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={toggleAnimations} aria-pressed={animationsOn} className={`rounded-full border px-3 py-1.5 text-[11px] font-extrabold transition-colors ${animationsOn ? 'border-soft-primary/40 bg-soft-primary/10 text-soft-primary-deep' : 'border-black/10 bg-white text-black/45'}`}>
+                    {animationsOn ? 'Animations on' : 'Animations off'}
+                  </button>
+                  <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="tablist" aria-label="Market layout">
+                    {(['grid', 'table'] as const).map((mode) => (
+                      <button key={mode} type="button" role="tab" aria-selected={view === mode} onClick={() => setView(mode)} className={`px-3 py-1.5 text-[11px] font-extrabold capitalize transition-colors ${view === mode ? 'bg-soft-primary text-white' : 'bg-white text-[#16141b] hover:text-soft-primary-deep'}`}>{mode}</button>
+                    ))}
+                  </span>
+                  <span className="hidden items-center gap-1.5 rounded-full bg-soft-info-soft px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-soft-info sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-[#18bd64]" /> Testnet</span>
+                </span>
+              </div>
+              {view === 'grid' ? (
+                <div className="border-t border-black/10 p-4 sm:p-5">
+                  {visibleTokens.length > 0 ? (
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {visibleTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onSelect={() => selectToken(token.id)} onTrade={() => selectToken(token.id, true)} onDetails={() => token.address && router.push(`/launchpad/${token.address}`)} />)}
+                    </div>
+                  ) : (
+                    <div className="py-14 text-center text-[13px] text-black/50">No launches in this view.</div>
+                  )}
                 </div>
               ) : (
-                <div className="py-14 text-center text-[13px] text-black/50">No launches match this search.</div>
+                <div className="overflow-x-auto">
+                  <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] gap-4 border-y border-black/10 bg-[#fafafd] px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/45 sm:px-5"><span>Coin</span><span>Curve</span><span>Indexed vol</span><span>Momentum</span><span>Creator</span><span /></div>
+                  {visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onSelect={() => selectToken(token.id)} onTrade={() => selectToken(token.id, true)} onDetails={() => token.address && router.push(`/launchpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
+                </div>
               )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] gap-4 border-y border-black/10 bg-[#fafafd] px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/45 sm:px-5"><span>Coin</span><span>Curve</span><span>Indexed vol</span><span>Momentum</span><span>Creator</span><span /></div>
-              {visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} onSelect={() => selectToken(token.id)} onTrade={() => selectToken(token.id, true)} onDetails={() => window.location.assign(`/launchpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches match this search.</div>}
-            </div>
-          )}
-          <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Preview rows remain visible until the first deployed Launchpad event is found.' : 'Every row is reconstructed from Launchpad events and current onchain state.'}</div>
-        </section>
+              <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Launchpad events and current onchain state.'}</div>
+            </section>
           </div>
 
           <LiveRail events={activityFeed} />
         </div>
       </div>
 
-      {(launchOpen || tradeOpen) && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#16141b]/35 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setLaunchOpen(false); setTradeOpen(false); } }}>
-          <section className={`w-full ${launchOpen ? 'max-w-[620px]' : 'max-w-[440px]'} max-h-[88vh] overflow-y-auto rounded-[22px] border border-black/10 bg-white p-5 shadow-[0_24px_80px_rgba(0,0,0,0.2)]`} role="dialog" aria-modal="true" aria-label={launchOpen ? 'Launch token' : 'Trade token'}>
-            <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">{launchOpen ? 'New launch' : 'Curve trade'}</p><h2 className="mt-1 text-[21px] font-extrabold text-[#16141b]">{launchOpen ? 'Put an idea on curve.' : `${selected?.symbol ?? 'Token'} market`}</h2></div><button type="button" onClick={() => { setLaunchOpen(false); setTradeOpen(false); }} className="rounded-full p-2 text-black/40 hover:bg-black/5 hover:text-[#16141b]" aria-label="Close dialog"><X className="h-5 w-5" aria-hidden="true" /></button></div>
-            {launchOpen ? <>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <label className="block"><span className={LABEL}>Name</span><input value={launchName} onChange={(event) => setLaunchName(event.target.value)} className={FIELD} placeholder="Lumen Commons" /></label>
-                <label className="block"><span className={LABEL}>Symbol</span><input value={launchSymbol} onChange={(event) => setLaunchSymbol(event.target.value.toUpperCase().slice(0, 10))} className={`${FIELD} uppercase`} placeholder="LUMEN" /></label>
-              </div>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="block"><span className={LABEL}>Image URL</span><input value={launchImage} onChange={(event) => setLaunchImage(event.target.value)} className={FIELD} placeholder="https://..." /></label>
-                <label className="block">
-                  <span className={LABEL}>Pre-buy (ETH)</span>
-                  <input inputMode="decimal" value={preBuyEth} onChange={(event) => setPreBuyEth(event.target.value)} className={FIELD} placeholder="0" />
-                  <span className={HINT}>{preBuyPreview ? `≈ ${preBuyPreview.tokens.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${launchSymbol || 'tokens'} · ${preBuyPreview.share.toFixed(2)}% of supply` : 'Buys on the same curve, with the same fee and cap as everyone else.'}</span>
-                </label>
-              </div>
-              <label className="mt-3 block"><span className={LABEL}>Description</span><textarea rows={2} value={launchDescription} onChange={(event) => setLaunchDescription(event.target.value)} className={FIELD} placeholder="What is this token for?" /></label>
+      <LaunchTokenModal
+        open={launchOpen}
+        onClose={() => setLaunchOpen(false)}
+        onLaunched={(token) => {
+          // `startedAt` dopisujemy tutaj, bo kontrakt modalu oddaje czysty
+          // `LaunchpadToken` - bez tego swiezy start ladowalby na koncu "New".
+          setTokens((current) => [{ ...token, startedAt: Math.floor(Date.now() / 1000), prices: [] }, ...current.filter((existing) => existing.live)]);
+          setSelectedId(token.id);
+          setLaunchOpen(false);
+          void loadBoard();
+        }}
+      />
 
-              <button type="button" onClick={() => setAdvancedOpen((current) => !current)} className="mt-4 inline-flex w-full items-center justify-between rounded-xl border border-black/10 bg-[#fbfbfd] px-3.5 py-3 text-[12.5px] font-extrabold text-[#16141b] hover:border-soft-primary/40" aria-expanded={advancedOpen}>
-                <span className="inline-flex items-center gap-2"><Layers3 className="h-4 w-4 text-soft-primary" aria-hidden="true" /> Creator setup: fees, receivers, buyback, sniper cap</span>
-                <span className="text-[11px] font-bold text-black/45">{advancedOpen ? 'Hide' : 'Show'}</span>
-              </button>
-
-              {advancedOpen && (
-                <div className="mt-3 space-y-4 rounded-2xl border border-black/10 bg-[#fbfbfd] p-4">
-                  {advancedSupported === null && <p className="text-[11.5px] text-black/50">Checking what the deployed launchpad supports...</p>}
-                  {advancedSupported === false && (
-                    <div className="flex items-start gap-2 rounded-xl bg-[#d78a55]/12 p-3 text-[11.5px] leading-[1.45] text-[#7a4a1d]">
-                      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                      <span>The launchpad at this address predates advanced config, so these fields cannot be sent yet. Your launch will use the default fee and cap until the new version is deployed.</span>
-                    </div>
-                  )}
-                  <fieldset disabled={advancedSupported !== true} className="space-y-4 disabled:opacity-55">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="block">
-                        <span className={LABEL}>Trading fee ({Number(launchFeePct || 0).toFixed(2)}%)</span>
-                        <input type="range" min={0.1} max={limits.maxFeeBps / 100} step={0.05} value={launchFeePct} onChange={(event) => setLaunchFeePct(event.target.value)} className="w-full accent-[#7c6bda]" />
-                        <span className={HINT}>Paid by traders on every buy AND every sell. Capped at {(limits.maxFeeBps / 100).toFixed(2)}%, the same rate Clanker and PONS charge. Fixed forever once launched.</span>
-                      </label>
-                      <label className="block">
-                        <span className={LABEL}>Your share of that fee ({Number(creatorSharePct || 0).toFixed(0)}%)</span>
-                        <input type="range" min={0} max={limits.maxCreatorShareBps / 100} step={5} value={creatorSharePct} onChange={(event) => setCreatorSharePct(event.target.value)} className="w-full accent-[#7c6bda]" />
-                        <span className={HINT}>{Number(creatorSharePct || 0).toFixed(0)}% to your receivers, {(100 - Number(creatorSharePct || 0)).toFixed(0)}% to MySphere. The protocol floor is enforced by the contract, not this form.</span>
-                      </label>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="block">
-                        <span className={LABEL}><Flame className="mr-1 inline h-3.5 w-3.5 text-[#d78a55]" aria-hidden="true" />Auto-buyback (%)</span>
-                        <input type="range" min={0} max={100} step={5} value={buybackPct} onChange={(event) => setBuybackPct(event.target.value)} className="w-full accent-[#d78a55]" />
-                        <span className={HINT}>{buybackPct}% of the pool hook&apos;s ETH fee buys your token back and burns it.</span>
-                      </label>
-                      <label className="block">
-                        <span className={LABEL}><ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-soft-primary" aria-hidden="true" />Per-wallet cap (tokens)</span>
-                        <input inputMode="numeric" value={sniperCapTokens} onChange={(event) => setSniperCapTokens(event.target.value)} className={FIELD} />
-                        <span className={HINT}>Sniper protection during the first {LAUNCH_WINDOW_LABEL}. Max {limits.windowCapTokens.toLocaleString('en-US')}.</span>
-                      </label>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className={LABEL}>Fee receivers</span>
-                        <button type="button" onClick={() => setReceivers((rows) => (rows.length >= limits.maxRecipients ? rows : [...rows, { account: '', share: '0' }]))} className="inline-flex items-center gap-1 text-[11px] font-extrabold text-soft-primary-deep disabled:opacity-40" disabled={receivers.length >= limits.maxRecipients}>
-                          <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Add
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        {receivers.map((row, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <input value={row.account} onChange={(event) => setReceivers((rows) => rows.map((item, position) => (position === index ? { ...item, account: event.target.value } : item)))} className={`${FIELD} flex-1`} placeholder={index === 0 ? 'you (leave empty)' : '0x...'} />
-                            <input inputMode="decimal" value={row.share} onChange={(event) => setReceivers((rows) => rows.map((item, position) => (position === index ? { ...item, share: event.target.value } : item)))} className={`${FIELD} w-[86px] text-right`} aria-label="Share in percent" />
-                            <span className="text-[12px] font-bold text-black/40">%</span>
-                            <button type="button" onClick={() => setReceivers((rows) => (rows.length === 1 ? rows : rows.filter((_, position) => position !== index)))} disabled={receivers.length === 1} className="rounded-full p-1.5 text-black/35 hover:bg-black/5 hover:text-[#16141b] disabled:opacity-30" aria-label="Remove receiver">
-                              <X className="h-4 w-4" aria-hidden="true" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <span className={HINT}>Shares must add up to 100%. Up to {limits.maxRecipients} addresses.</span>
-                    </div>
-
-                    <label className="block">
-                      <span className={LABEL}>Metadata URI (optional)</span>
-                      <input value={launchMetadataUri} onChange={(event) => setLaunchMetadataUri(event.target.value)} className={FIELD} placeholder="ipfs://... — overrides image and description" />
-                    </label>
-
-                    <div className="rounded-xl border border-black/10 bg-white p-3">
-                      <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.1em] text-soft-primary-deep"><CircleDollarSign className="h-3.5 w-3.5" aria-hidden="true" /> What you earn</p>
-                      <table className="mt-2 w-full text-[12px]">
-                        <thead><tr className="text-left text-[10.5px] uppercase tracking-[0.08em] text-black/40"><th className="pb-1 font-bold">Volume</th><th className="pb-1 text-right font-bold">On curve</th><th className="pb-1 text-right font-bold">In pool</th></tr></thead>
-                        <tbody>
-                          {estimate.map((row) => (
-                            <tr key={row.volume} className="border-t border-black/5">
-                              <td className="py-1.5 text-black/55">{row.volume} ETH</td>
-                              <td className="py-1.5 text-right font-extrabold text-[#16141b]">{row.curve.toFixed(3)} ETH</td>
-                              <td className="py-1.5 text-right font-extrabold text-[#16141b]">{row.pool.toFixed(3)} ETH</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <span className={HINT}>Curve earnings are exact for the fee you picked. Pool earnings assume the hook&apos;s {(hookSplit.feeBps / 100).toFixed(2)}% swap fee and your {((10_000 - hookSplit.protocolShareBps) / 100).toFixed(0)}% share of it, before any auto-buyback is taken out.</span>
-                    </div>
-                  </fieldset>
-                  {advancedSupported === true && advanced.error && (
-                    <p className="rounded-xl bg-[#d9628a]/12 px-3 py-2 text-[11.5px] font-bold text-[#8d2748]">{advanced.error}</p>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-4 flex items-start gap-2 rounded-xl bg-soft-primary/10 p-3 text-[11.5px] leading-[1.45] text-black/60"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><span>One transaction creates the token and starts its Base Sepolia curve. You get no free supply — a pre-buy is a normal buy on the same curve.</span></div>
-              <div className="mt-5 flex items-center justify-between gap-3"><span className="text-[11px] text-black/45">{advancedOpen && advancedSupported === true ? 'Launching with your creator setup' : 'Launching with protocol defaults'} · {isConnected ? (onSepolia ? 'Base Sepolia ready' : 'Wallet will switch to Sepolia') : 'Connect wallet from the main navigation'}</span><button type="button" disabled={busy === 'launch' || !isConnected || (advancedOpen && advancedSupported === true && advanced.error !== null)} onClick={launch} className="inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-white disabled:opacity-60">{busy === 'launch' ? 'Launching...' : 'Launch on curve'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
-            </> : selected ? <>
-              <div className="mt-5 flex items-center gap-3"><TokenGlyph token={selected} large /><div><div className="flex items-center gap-2"><span className="text-[16px] font-extrabold text-[#16141b]">{selected.symbol}</span><StatePill state={selected.state} /></div><p className="mt-1 text-[12px] text-black/45">{selected.name} · {curvePercent(selected)}% of curve</p></div></div>
-              {selected.live ? <TradePanel token={selected} details={details} side={tradeSide} setSide={setTradeSide} buyAmount={buyAmount} setBuyAmount={setBuyAmount} sellAmount={sellAmount} setSellAmount={setSellAmount} sellQuote={sellQuote} gradReward={gradReward} busy={busy} onBuy={buy} onSell={sell} onGraduate={graduate} onSettle={settle} onHarvest={harvest} onClaim={claim} isConnected={isConnected} /> : <div className="mt-5 flex items-start gap-2 rounded-xl bg-[#f5f5f7] p-3 text-[11.5px] leading-[1.45] text-black/55"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><span>This is a preview row. Launch a token to activate the live trade panel.</span></div>}
-              <div className="mt-5 flex items-center justify-between border-t border-black/10 pt-4 text-[11px] text-black/45"><span>{selected.holders} holders · {selected.trades ?? 0} trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => window.location.assign(`/launchpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
-            </> : null}
+      {tradeOpen && selected && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#16141b]/35 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setTradeOpen(false); }}>
+          <section className="max-h-[88vh] w-full max-w-[440px] overflow-y-auto rounded-[22px] border border-black/10 bg-white p-5 shadow-[0_24px_80px_rgba(0,0,0,0.2)]" role="dialog" aria-modal="true" aria-label="Trade token">
+            <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">Curve trade</p><h2 className="mt-1 text-[21px] font-extrabold text-[#16141b]">{selected.symbol} market</h2></div><button type="button" onClick={() => setTradeOpen(false)} className="rounded-full p-2 text-black/40 hover:bg-black/5 hover:text-[#16141b]" aria-label="Close dialog"><X className="h-5 w-5" aria-hidden="true" /></button></div>
+            <div className="mt-5 flex items-center gap-3"><TokenGlyph token={selected} large /><div><div className="flex items-center gap-2"><span className="text-[16px] font-extrabold text-[#16141b]">{selected.symbol}</span><StatePill state={selected.state} /></div><p className="mt-1 text-[12px] text-black/45">{selected.name} · {curvePercent(selected)}% of curve</p></div></div>
+            {selected.live ? <TradePanel token={selected} details={details} side={tradeSide} setSide={setTradeSide} buyAmount={buyAmount} setBuyAmount={setBuyAmount} sellAmount={sellAmount} setSellAmount={setSellAmount} sellQuote={sellQuote} gradReward={gradReward} busy={busy} ethUsd={ethUsd} onBuy={buy} onSell={sell} onGraduate={graduate} onSettle={settle} onHarvest={harvest} onClaim={claim} isConnected={isConnected} /> : <div className="mt-5 flex items-start gap-2 rounded-xl bg-[#f5f5f7] p-3 text-[11.5px] leading-[1.45] text-black/55"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><span>This is a sample row. Launch a token to activate the live trade panel.</span></div>}
+            <div className="mt-5 flex items-center justify-between border-t border-black/10 pt-4 text-[11px] text-black/45"><span>{selected.holders} holders · {selected.trades ?? 0} trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => router.push(`/launchpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
           </section>
         </div>
       )}

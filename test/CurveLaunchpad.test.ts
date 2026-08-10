@@ -187,12 +187,12 @@ describe('CurveLaunchpad', function () {
       await expect(
         Pad.deploy(POOL_MANAGER, 100, 101, treasury.address, 6000, tf, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
-      // Podloga protokolu obowiazuje TAKZE wdrazajacego: 61 ze 100 to juz 61%,
+      // Podloga protokolu obowiazuje TAKZE wdrazajacego: 71 ze 100 to juz 71%,
       // czyli ponad `MAX_CREATOR_SHARE_BPS`. Bez tego warunku domyslna
       // konfiguracja mogla by oddac cala oplate tworcy, a sufit w `_launch`
       // pilnowalby juz tylko startow wywolanych recznie.
       await expect(
-        Pad.deploy(POOL_MANAGER, 100, 61, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 71, treasury.address, 6000, tf, ethers.ZeroHash)
       ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
       await expect(
         Pad.deploy(POOL_MANAGER, 100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash)
@@ -272,10 +272,10 @@ describe('CurveLaunchpad', function () {
         1n,
         (await time()) + 600,
         100,
-        // 60 ze 100 to dokladnie 60% - gorna granica udzialu tworcy. Bylo tu
+        // 70 ze 100 to dokladnie 70% - gorna granica udzialu tworcy. Bylo tu
         // `200, 200`, czyli oplata 2% i CALA oplata dla tworcy; jedno przekracza
         // dzisiejszy `MAX_FEE_BPS`, drugie `MAX_CREATOR_SHARE_BPS`.
-        60,
+        70,
         1000,
         ethers.parseEther('16000000'),
         [alice.address, bob.address],
@@ -298,7 +298,7 @@ describe('CurveLaunchpad', function () {
       expect(await pad.metadataURI(token)).to.equal(metadata);
       expect(await pad.launchBuybackBps(token)).to.equal(1000n);
       expect(await pad.launchWindowCap(token)).to.equal(ethers.parseEther('16000000'));
-      expect(await pad.feeConfigOf(token)).to.deep.equal([100n, 60n, 2n]);
+      expect(await pad.feeConfigOf(token)).to.deep.equal([100n, 70n, 2n]);
       expect(await pad.feeReceiverOf(token, 0)).to.deep.equal([alice.address, 6000n]);
       expect(await pad.feeReceiverOf(token, 1)).to.deep.equal([bob.address, 4000n]);
       expect(await ethers.getContractAt('MockB20', token).then((asset: any) => asset.balanceOf(creator.address))).to.be.greaterThan(0n);
@@ -307,14 +307,14 @@ describe('CurveLaunchpad', function () {
       const bobBefore = await pad.claimable(bob.address);
       const quote = await pad.quoteBuy(token, ethers.parseEther('0.01'));
       await pad.connect(bob).buy(token, 1n, (await time()) + 600, { value: ethers.parseEther('0.01') });
-      // Do odbiorcow idzie UDZIAL TWORCY, czyli 60 ze 100 bps oplaty - nie cala
+      // Do odbiorcow idzie UDZIAL TWORCY, czyli 70 ze 100 bps oplaty - nie cala
       // oplata. Reszta nalezy do protokolu i jest sprawdzana osobnym testem.
-      const creatorPool = ((quote[1] as bigint) * 60n) / 100n;
+      const creatorPool = ((quote[1] as bigint) * 70n) / 100n;
       expect((await pad.claimable(alice.address)) - aliceBefore).to.equal((creatorPool * 6000n) / 10_000n);
       expect((await pad.claimable(bob.address)) - bobBefore).to.equal(creatorPool - (creatorPool * 6000n) / 10_000n);
     });
 
-    it('oplata ma sufit 1%, a PROTOKOL zawsze zostaje z co najmniej 40% tej oplaty', async function () {
+    it('oplata ma sufit 1%, a PROTOKOL zawsze zostaje z co najmniej 30% tej oplaty', async function () {
       const cap = ethers.parseEther('16000000');
       const deadline = BigInt((await time()) + 600);
       const advanced = (name: string, symbol: string, feeBps: number, creatorFeeBps: number) =>
@@ -325,15 +325,15 @@ describe('CurveLaunchpad', function () {
       // Sufity czytane z kontraktu, nie przepisane - inaczej ten test przestaje
       // pilnowac czegokolwiek w chwili, gdy ktos je zmieni.
       expect(await pad.MAX_FEE_BPS()).to.equal(100n);
-      expect(await pad.MAX_CREATOR_SHARE_BPS()).to.equal(6000n);
+      expect(await pad.MAX_CREATOR_SHARE_BPS()).to.equal(7000n);
 
       await expect(advanced('Over', 'OVR', 101, 0)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
       // To jest CALA stawka tej zmiany: tworca nie moze wziac calej oplaty.
       await expect(advanced('Greedy', 'GRD', 100, 100)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
-      await expect(advanced('Edge', 'EDG', 100, 61)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
-      // Podloga trzyma sie takze przy nizszej oplacie: 50 bps -> najwyzej 30.
-      await expect(advanced('Half', 'HLF', 50, 31)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
-      await expect(advanced('HalfOk', 'HOK', 50, 30)).to.not.be.reverted;
+      await expect(advanced('Edge', 'EDG', 100, 71)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      // Podloga trzyma sie takze przy nizszej oplacie: 50 bps -> najwyzej 35.
+      await expect(advanced('Half', 'HLF', 50, 36)).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
+      await expect(advanced('HalfOk', 'HOK', 50, 35)).to.not.be.reverted;
 
       // `windowCap == 0` przechodzilo walidacje, a potem KAZDE kupno w oknie
       // startowym odbijalo sie o `WindowCap` - start dalo sie w ten sposob
@@ -344,7 +344,7 @@ describe('CurveLaunchpad', function () {
           .launchAdvanced('Zero', 'ZRO', 0n, deadline, 100, 60, 0, 0, [creator.address], [10000], '')
       ).to.be.revertedWithCustomError(pad, 'InvalidFeeConfig');
 
-      const rc = await (await advanced('Cap', 'CAP', 100, 60)).wait();
+      const rc = await (await advanced('Cap', 'CAP', 100, 70)).wait();
       const token = rc.logs
         .map((log: any) => {
           try {
@@ -355,12 +355,12 @@ describe('CurveLaunchpad', function () {
         })
         .find((parsed: any) => parsed && parsed.name === 'Launched').args[0] as string;
 
-      expect(await pad.feeConfigOf(token)).to.deep.equal([100n, 60n, 1n]);
+      expect(await pad.feeConfigOf(token)).to.deep.equal([100n, 70n, 1n]);
       // Poza zakresem nazwany blad, a nie goly `Panic(0x32)`.
       await expect(pad.feeReceiverOf(token, 1)).to.be.revertedWithCustomError(pad, 'InvalidFeeReceiver');
 
       // Dowod na pieniadzach, nie na mapie: po kupnie tworca i protokol maja
-      // realne salda w stosunku 60/40, a ich suma to CALA oplata.
+      // realne salda w stosunku 70/30, a ich suma to CALA oplata.
       const ethIn = ethers.parseEther('0.01');
       const quote = await pad.quoteBuy(token, ethIn);
       const fee = quote[1] as bigint;
@@ -372,7 +372,7 @@ describe('CurveLaunchpad', function () {
       const creatorGain = ((await pad.claimable(creator.address)) as bigint) - (creatorBefore as bigint);
       const treasuryGain = ((await pad.claimable(treasury.address)) as bigint) - (treasuryBefore as bigint);
 
-      expect(creatorGain).to.equal((fee * 60n) / 100n);
+      expect(creatorGain).to.equal((fee * 70n) / 100n);
       expect(treasuryGain).to.equal(fee - creatorGain);
       expect(treasuryGain).to.be.greaterThan(0n);
       expect(creatorGain + treasuryGain).to.equal(fee);

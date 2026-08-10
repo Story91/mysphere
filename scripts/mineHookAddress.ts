@@ -34,7 +34,7 @@ import { buildPlan, readCommonEnv, resolvePoolManager, HOOK_REQUIRED_FLAGS } fro
  *   FEE_RECIPIENT=0x... npx hardhat run scripts/mineHookAddress.ts --network base
  *
  *   FEE_RECIPIENT        (wymagane) adres odbiorcy oplat protokolu
- *   PROTOCOL_SHARE_BPS   udzial protokolu (domyslnie 6000)
+ *   PROTOCOL_SHARE_BPS   udzial protokolu (domyslnie 3000 - patrz readCommonEnv w plan.ts)
  *   POOL_MANAGER         adres v4 PoolManager; wymagany poza sprawdzonymi sieciami
  *   DEPLOYER             adres, ktory wysle transakcje (domyslnie signer[0])
  *   DEPLOYER_NONCE       nonce tej transakcji (domyslnie `pending` z sieci)

@@ -172,7 +172,9 @@ export function readCommonEnv() {
   if (!feeRecipient) {
     throw new Error("FEE_RECIPIENT jest wymagany - to adres, ktory bedzie odbieral oplaty protokolu.");
   }
-  const protocolShareBps = BigInt(process.env.PROTOCOL_SHARE_BPS ?? "6000");
+  // 3000 = 70% dla tworcy na puli i w oplatach LP - decyzja z 2026-08-10
+  // (spojna z MAX_CREATOR_SHARE_BPS=7000 na krzywej; proporcja jak PONS).
+  const protocolShareBps = BigInt(process.env.PROTOCOL_SHARE_BPS ?? "3000");
   // Ten sam sufit, co MAX_PROTOCOL_SHARE_BPS w LiquidityVault.
   if (protocolShareBps > 8000n) {
     throw new Error(`PROTOCOL_SHARE_BPS=${protocolShareBps} przekracza sufit 8000 (podloga 20% dla tworcy).`);

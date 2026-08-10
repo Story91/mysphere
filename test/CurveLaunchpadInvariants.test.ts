@@ -1702,10 +1702,10 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       ).to.be.revertedWithCustomError(vault, 'ProtocolShareTooHigh');
       // Granice od strony dozwolonej naprawde przechodza - tu salt musi juz byc
       // wykopany, bo deploy dochodzi do konstruktora vaulta.
-      // Granica DOZWOLONA to dzis (100, 60): sufit oplaty i sufit udzialu
+      // Granica DOZWOLONA to dzis (100, 70): sufit oplaty i sufit udzialu
       // tworcy. Stalo tu `(200, 200)`, czyli oplata 2% i cala oplata dla
       // tworcy - jedno lamie `MAX_FEE_BPS`, drugie `MAX_CREATOR_SHARE_BPS`.
-      await usePad(100, 60, 8000);
+      await usePad(100, 70, 8000);
       await usePad(0, 0, 0);
     });
 
@@ -1765,21 +1765,21 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       );
     });
 
-    it('MAKSYMALNY udzial tworcy: protokol i tak nie schodzi ponizej swoich 40%', async function () {
+    it('MAKSYMALNY udzial tworcy: protokol i tak nie schodzi ponizej swoich 30%', async function () {
       // Ten test badal kiedys konfiguracje "cala oplata dla tworcy, protokol
       // z handlu nie dostaje nic". Taka konfiguracja jest dzis NIEMOZLIWA -
       // `MAX_CREATOR_SHARE_BPS` odrzuca ja w konstruktorze i w `_launch`.
       // Test pilnuje wiec tego, co ja zastapilo: nawet na SUFICIE udzialu
       // tworcy protokol zabiera swoja czesc kazdej oplaty handlowej.
-      await usePad(100, 60, 6000);
+      await usePad(100, 70, 6000);
       const { token, t } = await openCurve();
       let s = await snap(token);
       const r = await buyChecked(alice, token, t, ethers.parseEther('1'));
       s = await assertInvariants(token, t, s, 'buy');
 
       expect(r.fee, 'oplata 1%').to.equal(ethers.parseEther('0.01'));
-      const doTworcy = (r.fee * 60n) / 100n;
-      expect(await pad.claimable(creator.address), 'tworca: 60% oplaty').to.equal(doTworcy);
+      const doTworcy = (r.fee * 70n) / 100n;
+      expect(await pad.claimable(creator.address), 'tworca: 70% oplaty').to.equal(doTworcy);
       expect(await pad.claimable(treasury.address), 'protokol: reszta, nigdy zero').to.equal(
         r.fee - doTworcy
       );

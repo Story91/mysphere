@@ -246,8 +246,20 @@ describe('B20LaunchHook', function () {
       await probe.doSwap(plain(buybackKey), [false, -ethers.parseEther('1000'), 0n], {});
 
       const hookFee = feeOf(outEth);
-      const buybackEth = (hookFee * 1000n) / 10_000n;
+      // Buyback nie jest juz scinany przy swapie - po wymianie CALA oplata ETH
+      // czeka nierozdzielona, a ciecie na skup powstaje dopiero w settle,
+      // z dzialki tworcy. Dzieki temu udzial protokolu nie zalezy od buybacku.
+      expect(await hook.pendingBuybackEth(buybackToken)).to.equal(0n);
+      expect(await hook.pendingEth(buybackToken)).to.equal(hookFee);
+
+      await hook.settle(buybackToken);
+      const protoEth = (hookFee * PROTOCOL_SHARE_BPS) / 10_000n;
+      const creatorGrossEth = hookFee - protoEth;
+      const buybackEth = (creatorGrossEth * 1000n) / 10_000n;
       expect(await hook.pendingBuybackEth(buybackToken)).to.equal(buybackEth);
+      expect(await hook.claimableEth(treasury.address)).to.equal(protoEth);
+      expect(await hook.claimableEth(creator.address)).to.equal(creatorGrossEth - buybackEth);
+
       const boughtTokens = ethers.parseEther('123');
       await pm.setNextCounterAmount(boughtTokens);
       const deadBefore = await buybackAsset.balanceOf(DEAD);
@@ -295,9 +307,13 @@ describe('B20LaunchHook', function () {
       const pending: bigint = await hook.pendingToken(token);
       expect(pending).to.be.greaterThan(0n);
 
-      await expect(hook.connect(alice).settle(token)).to.emit(hook, 'HookFeeSettled');
-
       const proto = (pending * PROTOCOL_SHARE_BPS) / 10000n;
+      // Event ma 6 pol - ethToBuyback stoi na pozycji 3 i tu jest zerem,
+      // bo oplata przyszla w tokenie, a buyback finansuje sie tylko z ETH.
+      await expect(hook.connect(alice).settle(token))
+        .to.emit(hook, 'HookFeeSettled')
+        .withArgs(token, 0n, 0n, 0n, proto, pending - proto);
+
       expect(await hook.claimableToken(token, treasury.address)).to.equal(proto);
       expect(await hook.claimableToken(token, creator.address)).to.equal(pending - proto);
       // Obie nogi sumuja sie do calosci CO DO WEI - nie gubimy pyla i nie tworzymy go.

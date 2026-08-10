@@ -1,28 +1,28 @@
 {
-  "ranAt": "2026-08-10T00:17:45.972Z",
+  "ranAt": "2026-08-10T15:05:26.140Z",
   "rpc": "https://mainnet.base.org",
-  "forkBlock": 49765722,
+  "forkBlock": 49792353,
   "pool": {
-    "token": "0x5cEaa8438f5FBB3AD8b2819D78822d5d5Bf868a5",
-    "launchGas": "766651",
-    "buyGas": "153610",
-    "graduateGas": "448774",
-    "swapExactInputGas": "314048",
-    "swapExactOutputGas": "147118",
-    "tokenFactoryGas": "1501456",
-    "padDeployGas": "5245457"
+    "token": "0x19f0116346AD49Ea4324aAb4E8fb4592040dc636",
+    "launchGas": "888666",
+    "buyGas": "163612",
+    "graduateGas": "456173",
+    "swapExactInputGas": "316423",
+    "swapExactOutputGas": "149523",
+    "tokenFactoryGas": "1543912",
+    "padDeployGas": "7217628"
   },
   "b20": {
-    "tokenFromFactory": "0xb20000000000000000000080D03331797F978266",
-    "factoryGasEstimate": "249290",
-    "token": "0xb200000000000000000000a26C14217CBb079df3",
+    "tokenFromFactory": "0xb20000000000000000000023620a2A71636020eC",
+    "factoryGasEstimate": "249823",
+    "token": "0xB200000000000000000000356eC17C9ea41C0049",
     "totalSupply": "1000000000000000000000000000",
     "deadBalance": "1",
     "seizeRoleStaticcallSucceeded": false,
     "deadTransferSucceeded": true,
     "probeGasEstimate": "242215",
-    "fullLaunchGasMeasured": "322676",
-    "fullLaunchToken": "0xb200000000000000000000B7967eA04Eb2a1b823"
+    "fullLaunchGasMeasured": "445026",
+    "fullLaunchToken": "0xb2000000000000000000007F53c087B208eB2316"
   },
   "checks": [
     {
@@ -33,27 +33,27 @@
     {
       "name": "hook ma wymagane bity v4",
       "ok": true,
-      "detail": "0xb5aDa08A380Dc708EbdE0f005a565616B9db6044"
+      "detail": "0xcd5a3C7Dd848ea5FA864B7C27acEf44e76e56044"
     },
     {
       "name": "launch na forku przechodzi bez tworzenia puli",
       "ok": true,
-      "detail": "token 0x5cEaa8438f5FBB3AD8b2819D78822d5d5Bf868a5, gas 766651"
+      "detail": "token 0x19f0116346AD49Ea4324aAb4E8fb4592040dc636, gas 888666"
     },
     {
       "name": "kupno domyka krzywa do Locked",
       "ok": true,
-      "detail": "gas 153610"
+      "detail": "gas 163612"
     },
     {
       "name": "graduate przechodzi przez prawdziwy initialize/modifyLiquidity",
       "ok": true,
-      "detail": "gas 448774, liquidity 21251635231200453637758"
+      "detail": "gas 456173, liquidity 21251635231200453637758"
     },
     {
       "name": "POOLS_SLOT=6 czyta cene prawdziwego PoolManagera",
       "ok": true,
-      "detail": "poolId 0xdd53e857ccdf1b3862bbe14148460d66bbb1035cc90803abd1c2af9b5efe2def"
+      "detail": "poolId 0x1211a7e05b3040b06c195b28ac489835afbbc9d17b007daf90ad45c1dd066842"
     },
     {
       "name": "sciezka seed wysyla nadmiar tokena na 0xdEaD",
@@ -63,12 +63,12 @@
     {
       "name": "afterSwap dodatnia delta hooka domyka exactInput na prawdziwym v4",
       "ok": true,
-      "detail": "delta0 -1000000000000000, delta1 52623570549883768351813, gas 314048"
+      "detail": "delta0 -1000000000000000, delta1 52623570549883768351813, gas 316423"
     },
     {
       "name": "afterSwap dodatnia delta hooka domyka exactOutput na prawdziwym v4",
       "ok": true,
-      "detail": "delta0 -19007623657658, delta1 1000000000000000000000, gas 147118"
+      "detail": "delta0 -19007623657658, delta1 1000000000000000000000, gas 149523"
     },
     {
       "name": "B20 factory jest precompile bez kodu EVM",
@@ -78,17 +78,17 @@
     {
       "name": "B20TokenFactory.createToken przechodzi na prawdziwym precompile",
       "ok": true,
-      "detail": "token 0xb20000000000000000000080D03331797F978266"
+      "detail": "token 0xb20000000000000000000023620a2A71636020eC"
     },
     {
       "name": "realny gaz B20TokenFactory.createToken + postwarunki",
       "ok": true,
-      "detail": "249290 gas"
+      "detail": "249823 gas"
     },
     {
       "name": "abi.encode(struct) dla params przechodzi na prawdziwym B20",
       "ok": true,
-      "detail": "token 0xb200000000000000000000a26C14217CBb079df3, totalSupply 1000000000000000000000000000"
+      "detail": "token 0xB200000000000000000000356eC17C9ea41C0049, totalSupply 1000000000000000000000000000"
     },
     {
       "name": "SEIZE_ROLE() na ASSET nie istnieje",
@@ -108,12 +108,12 @@
     {
       "name": "B20 fabryka przyjmuje parametry pelnego launchu",
       "ok": true,
-      "detail": "token 0xb200000000000000000000B7967eA04Eb2a1b823"
+      "detail": "token 0xb2000000000000000000007F53c087B208eB2316"
     },
     {
       "name": "realny gaz CurveLaunchpad.launch z B20",
       "ok": true,
-      "detail": "322676 gas, token 0xb200000000000000000000B7967eA04Eb2a1b823"
+      "detail": "445026 gas, token 0xb2000000000000000000007F53c087B208eB2316"
     }
   ]
 }

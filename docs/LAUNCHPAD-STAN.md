@@ -1,33 +1,46 @@
-# Launchpad - stan na 2026-08-10
+# Launchpad - stan na 2026-08-10 (wieczor, wdrozenie 70/30)
 
 Krotki obraz calosci. Szczegoly i uzasadnienia decyzji sa w
-`HANDOFF-LAUNCHPAD-V2-2026-08-10.md`.
+`HANDOFF-LAUNCHPAD-V2-2026-08-10.md`. Dokument dla uzytkownikow:
+`LAUNCHPAD-DOSSIER.md` (AKTUALIZOWAC przy kazdej zmianie launchpada).
 
-## Adresy - Base Sepolia (chainId 84532)
+## Adresy - Base Sepolia (chainId 84532), wdrozenie 2026-08-10 14:42 UTC
 
 | kontrakt | adres |
 | --- | --- |
-| `CurveLaunchpad` | `0x0712b9EA9bB0118f4F751Cb44553F095bF9c0844` |
-| `LiquidityVault` | `0x56e80fA947EF10F965510E161760561c127e4bBb` |
-| `B20LaunchHook` | `0xad5f38BAC2ded467f83D1eef440B0c386acF2044` |
-| `B20TokenFactory` | `0xe90c0c59574ec67ff34b0CfE45855d6D07B50d15` |
+| `CurveLaunchpad` | `0x811d6dE17E2D021A564Bc699e353ead7FE7258ba` |
+| `LiquidityVault` | `0x21F2c3506170cb670102B6fB5be6b6dbDb73b88b` |
+| `B20LaunchHook` | `0xfaEF39f75aACC1271D7173748245A69CBD09e044` |
+| `B20TokenFactory` | `0x8Fa00F989b59a3F279e5DCD75450d21A21733442` |
 | PoolManager v4 (Uniswap) | `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` |
-| blok wdrozenia | `45298476` |
+| blok wdrozenia | `45302335` |
 | `FEE_RECIPIENT` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+| salt hooka | `0x...1848` (bity `0x2044` potwierdzone przy wdrozeniu) |
 
-Poprzednie wdrozenie `0xA760...4F97` jest MARTWE - ma stare ABI, bez
-`launchAdvanced`, bez auto-buybacku i ze starym modelem oplat. Nie uzywac.
+Wdrozenia POPRZEDNIE sa MARTWE i nie wolno ich uzywac:
+- `0xA760...4F97` - stare ABI, bez `launchAdvanced`;
+- `0x0712...0844` (rano 2026-08-10) - stary model oplat: 60/40, buyback
+  scinany z CALEJ oplaty puli przed podzialem, 5-polowy `HookFeeSettled`.
 
-## Model oplat - USTALONY NA STALE W KODZIE
+## Model oplat - USTALONY NA STALE W KODZIE (decyzje z 2026-08-10)
 
-- oplata handlowa: **1%** (`MAX_FEE_BPS = 100`), pobierana od kazdego kupna
-  i kazdej sprzedazy na krzywej;
-- podzial: **60% tworca / 40% protokol** (`MAX_CREATOR_SHARE_BPS = 6000`);
+- oplata handlowa na krzywej: **1%** (`MAX_FEE_BPS = 100`), od kazdego kupna
+  i kazdej sprzedazy;
+- podzial na krzywej: **do 70% tworca / min 30% protokol**
+  (`MAX_CREATOR_SHARE_BPS = 7000`; domyslnie przy `launch()` pelne 70%);
 - podloga protokolu jest w KONTRAKCIE, nie w formularzu - obowiazuje takze
   wdrazajacego i kazdego, kto wywola kontrakt bezposrednio;
-- oplata puli po graduacji: **1%** od kazdego swapa, dzielona 60/40 miedzy
-  protokol i tworce (`PROTOCOL_SHARE_BPS = 6000` w hooku);
-- graduacja przy **3.00 ETH** w rezerwie, poczatkowy market cap **0.75 ETH**,
+- oplata puli po graduacji: **1%** od kazdego swapa, podzial **70% tworca /
+  30% protokol** (`PROTOCOL_SHARE_BPS = 3000` w hooku i vaulcie; ta sama
+  proporcja co PONS);
+- **auto-buyback z DZIALKI TWORCY**: `buybackBps` znaczy "ile procent SWOJEJ
+  czesci oplat puli tworca oddaje na skup i spalenie". Cieciе liczy sie w
+  `settle`, tylko po stronie ETH; protokol dostaje pelne 30% niezaleznie od
+  buybacku; kupione tokeny ida na `0xdEaD`. (Wczesniej buyback szedl z calej
+  oplaty przed podzialem - tworca ustawiajac 100% zerowal przychod protokolu;
+  naprawione ta wersja.) `HookFeeSettled` ma teraz 6 pol (`ethToBuyback`);
+- graduacja przy **3.00 ETH** w rezerwie, oplata graduacyjna 3% rezerwy
+  (polowa dla wolajacego `graduate()`), poczatkowy market cap **0.75 ETH**,
   przy graduacji **18.75 ETH** (25x).
 
 Zmiana ktorejkolwiek z tych liczb wymaga NOWEGO WDROZENIA - nie ma setterow.
@@ -68,12 +81,60 @@ PUSTA liste i nie zglasza bledu.
 
 ## Co dziala - potwierdzone
 
-- pelna sciezka na Base Sepolia: start -> kupno 3.05 ETH -> zamkniecie krzywej
-  -> graduacja -> pula v4 -> swap -> settle -> claim;
-- swap przez PRAWDZIWY PoolManager v4, hook pobral 529 tokena, tworca odebral
-  3713 tokena z oplat puli;
-- flagi hooka zgodne co do bitu z `v4-core/Hooks.sol` (`0x2044`);
-- 122 testy lokalne, `tsc`, `lint`, `build`, cztery trasy launchpada.
+- pelna sciezka az po buyback ZWERYFIKOWANA dla modelu 70/30 dwiema drogami,
+  bo salda (2.63 ETH) nie starczalo na zbiorke 3.05 na produkcyjnym stacku:
+  1) fork Base MAINNET (`npm run launchpad:fork:base`, parametry 100/70/3000):
+     launch -> Locked -> graduate przez prawdziwy initialize/modifyLiquidity
+     -> odczyt ceny z prawdziwego PoolManagera -> afterSwap exactInput
+     i exactOutput - wszystkie kontrole zielone;
+  2) TESTOWY mini-stack na Sepolii (TE SAME zrodla, tylko R_VIRT=0.0125 =>
+     zbiorka 0.05 ETH; adresy ponizej): launchAdvanced(70%, buyback 50%) ->
+     okno snajperskie -> domkniecie krzywej CO DO WEI (kupno 0.08, refund
+     0.0295) -> graduate -> swap ETH->token i token->ETH w prawdziwej puli ->
+     settle: `HookFeeSettled` 30/70 co do wei, `ethToBuyback` = dokladnie
+     polowa dzialki tworcy -> `executeBuyback`: 37 062 MINIG skupione przez
+     prawdziwa pule i spalone na 0xdEaD -> harvest/claimy. UI graduowanego
+     tokena sprawdzone w przegladarce (badge, wykres ze znacznikiem graduacji,
+     pula, settle/harvest).
+  Mini-stack (TEST-ONLY, nie podpinac frontu): launchpad
+  `0xC0f5BC2821Bd9edf910DD180E4533f66141e869d`, vault `0xc7B5...e79D`,
+  hook `0xF90f...2044`, blok 45303095, token MINIG
+  `0xb200...2240`. Sanity na PRODUKCYJNYM stacku: token PRISM
+  `0xB2000000000000000000008deE74A32F0F1ACC13` - launchAdvanced 100/70,
+  kupno, sprzedaz, claimable zgodne;
+- wdrozenie wieczorne przeszlo 15/15 kontroli powdrozeniowych skryptu
+  (wiazania launchpad<->vault<->hook, bity `0x2044`, stale 100/70/3000);
+- 64 testy launchpada (w tym nowa semantyka buybacku i granice 70%) +
+  inwarianty krzywej, `tsc`, `lint`, `build`;
+- nowy interfejs: strona tokena z wykresem swiecowym (lightweight-charts,
+  OHLC z eventow), panel kup/sprzedaj na stronie tokena (sprzedaz dziala
+  takze w stanie Locked - zgodnie z kontraktem), taby Trades/Holders/Info,
+  board z tabami New/Trending/About to graduate/Graduated, King of the Hill,
+  animacje na zywo z przelacznikiem, modal startu Quick/Creator setup
+  z atomowym pre-buyem; smoke-test E2E w headless Chromium przechodzi.
+
+## Plan testow - co sprawdzic na wdrozeniu 70/30
+
+Kolejnosc od najtanszych do najdrozszych; wszystko na Base Sepolia, przez UI
+(nie skryptem), bo to UI bylo przebudowane:
+
+1. **Start przez modal** (Quick): nazwa+symbol+obrazek, pre-buy 0.001 ETH ->
+   token widoczny na boardzie w "New", strona tokena otwiera sie, wykres ma
+   punkt startowy, holders pokazuje krzywa + dev.
+2. **Start przez Creator setup**: fee 1%, udzial tworcy 70%, 2 odbiorcow
+   (60/40), buyback 50%, cap 1M -> `feeConfigOf` na stronie tokena zgadza sie.
+3. **Handel na stronie tokena**: kupno 0.01 ETH (podglad quoteBuy == wynik),
+   sprzedaz 50% salda (approve -> sell), wykres i taby aktualizuja sie na zywo.
+4. **Claim tworcy**: po handlu `claimable` rosnie (70% z 1%); claim przechodzi.
+5. **Pelna sciezka az po pule** - WYMAGA ~3.1 ETH na Sepolii (dzis deployer ma
+   2.63): kupno do 3.00 -> stan Locked (sprzedaz nadal dziala w UI!) ->
+   graduate z nagroda -> swap w puli -> settle (HookFeeSettled: 30% protokol,
+   ciecie buybacku z dzialki tworcy) -> executeBuyback (tokeny na dEaD) ->
+   harvest/claimy z vaulta. Do czasu zasilenia portfela pokrywaja to testy
+   jednostkowe (64 + inwarianty).
+6. **Regresja starego wdrozenia**: wejscie na strone tokena z wdrozenia
+   `0x0712...` (np. SFLOW) - strona ma pokazac "Token not found" (nowy
+   kontrakt go nie zna), a nie surowy blad.
 
 ## Co zostalo do zrobienia
 
@@ -85,28 +146,44 @@ PUSTA liste i nie zglasza bledu.
    powstaly wewnetrznie, wiec weryfikuje sie je osobno.
 3. **Decyzja o `FEE_RECIPIENT`** - dzis to ten sam adres, co deployer. Na
    mainnecie powinien byc osobny portfel przychodow, bo jest `immutable`.
+4. **Pelna sciezka on-chain na wdrozeniu 70/30** - patrz plan testow pkt 5.
 
 **Funkcje, ktorych nie mamy, a ma je konkurencja:**
 
-4. **Start zaplanowany na przyszlosc** (Flaunch ma). Wymaga pola `startsAt`
+5. **Start zaplanowany na przyszlosc** (Flaunch ma). Wymaga pola `startsAt`
    w `Launch` i warunku w `_buy` - czyli zmiany w kontrakcie.
-5. **Zbywalny NFT ze strumieniem przychodu** (Flaunch ma). U nas prawo do oplat
+6. **Zbywalny NFT ze strumieniem przychodu** (Flaunch ma). U nas prawo do oplat
    jest przypisane do adresu i nie da sie go sprzedac.
+7. **Komentarze/thread pod tokenem** (pump.fun, Zora; u Zory korona dla top
+   holdera) - Firestore + istniejaca sesja SIWE, wzorzec z profilu tokena.
+8. **Wykres i handel PO graduacji** - wymaga odczytow puli v4 (Swap eventy)
+   albo embedu GeckoTerminal; dzis wykres uczciwie konczy sie na graduacji.
 
 **Produkt i interfejs:**
 
-6. Wystawienie na produkcji - zmienne na Vercelu, patrz nizej.
-7. Zgloszenie token listy do agregatorow, zeby logo trafilo poza nasz interfejs.
-8. Keeper jako usluga - dzis jest skryptem uruchamianym recznie.
+9. Wystawienie na produkcji - zmienne na Vercelu, patrz nizej.
+10. Zgloszenie token listy do agregatorow, zeby logo trafilo poza nasz interfejs.
+11. Keeper jako usluga - dzis jest skryptem uruchamianym recznie. Uwaga: w
+    dry-runie `pendingBuybackEth` pokazuje stan sprzed `settle` - po zmianie
+    modelu ciecie powstaje dopiero przy settle, wiec dry-run moze pokazac 0
+    mimo zaleglego buybacku.
+12. **Indekser-lite** (Cloud Function: rejestr tokenow, wolumen 24h, snapshot
+    holderow) - skan eventow z przegladarki przestanie wystarczac, gdy lancuch
+    odjedzie od bloku wdrozenia o ~120k blokow (board mowi wtedy "older
+    launches exist beyond the indexed range").
 
 ## Zmienne na Vercelu
 
 ```text
-NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS        0x0712b9EA9bB0118f4F751Cb44553F095bF9c0844
-NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS  0x56e80fA947EF10F965510E161760561c127e4bBb
-NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS      0xad5f38BAC2ded467f83D1eef440B0c386acF2044
-NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK           45298476
+NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS        0x811d6dE17E2D021A564Bc699e353ead7FE7258ba
+NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS  0x21F2c3506170cb670102B6fB5be6b6dbDb73b88b
+NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS      0xfaEF39f75aACC1271D7173748245A69CBD09e044
+NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK           45302335
 ```
+
+Fallbacki w `app/launchpad/config.ts` wskazuja juz to wdrozenie, wiec brak
+zmiennych nie jest krytyczny - ale zmienne i tak ustawic, zeby zmiana adresow
+nie wymagala deployu frontu.
 
 Opcjonalnie `NEXT_PUBLIC_IPFS_GATEWAY` (domyslnie `https://ipfs.io/ipfs/`).
 
