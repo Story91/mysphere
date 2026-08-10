@@ -2131,15 +2131,7 @@ export default function LaunchpadBoard() {
         </div>
 
         {/* POD gridem, na CALA szerokosc - Live tape juz nie zweza tych sekcji.
-            Panele zostaja 2x2 (na szerokim ekranie po prostu wieksze), a King
-            i My tokens ciagna sie od krawedzi do krawedzi. */}
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
-          <TopLaunches tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
-          <VolumePanel tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
-          <TopEarnings rows={topEarners} ethUsd={ethUsd} />
-        </div>
-
+            King zaraz pod rynkiem (wyroznienie), potem panele 2x2, potem My tokens. */}
         {kingToken && (
           <KingOfTheHill
             token={kingToken}
@@ -2148,6 +2140,13 @@ export default function LaunchpadBoard() {
             onDetails={() => kingToken.address && router.push(`/startpad/${kingToken.address}`)}
           />
         )}
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
+          <TopLaunches tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
+          <VolumePanel tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
+          <TopEarnings rows={topEarners} ethUsd={ethUsd} />
+        </div>
 
         {isConnected && address && (
           <MyTokensPanel
