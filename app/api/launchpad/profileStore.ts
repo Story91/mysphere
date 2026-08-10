@@ -86,6 +86,24 @@ function cleanUrl(value: unknown): string | null {
   }
 }
 
+/**
+ * LOGO z uploadu: przychodzi jako data URL po przeskalowaniu w przegladarce
+ * i zyje wylacznie w naszym interfejsie (tokenlista dalej dostaje tylko
+ * https/ipfs). Wpuszczamy WYLACZNIE rastrowe typy z base64 - SVG odpada,
+ * bo to XML ze skryptami. Limit dlugosci trzyma dokument z dala od sufitu
+ * 1 MB Firestore i tnie wektor "wgram 5 MB smiecia".
+ */
+const DATA_IMAGE_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
+const MAX_DATA_IMAGE_LENGTH = 200_000;
+
+function cleanLogo(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length <= MAX_DATA_IMAGE_LENGTH && DATA_IMAGE_RE.test(trimmed)) return trimmed;
+  }
+  return cleanUrl(value);
+}
+
 function cleanText(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -119,7 +137,7 @@ export async function saveProfile(input: {
     address: tokenDocId(input.address),
     chainId: input.chainId,
     creator: tokenDocId(input.creator),
-    logoUrl: cleanUrl(input.profile.logoUrl),
+    logoUrl: cleanLogo(input.profile.logoUrl),
     description: cleanText(input.profile.description, MAX_DESCRIPTION_LENGTH),
     website: cleanUrl(input.profile.website),
     twitter: cleanText(input.profile.twitter, MAX_NAME_LENGTH),

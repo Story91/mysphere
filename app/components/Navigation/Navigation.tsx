@@ -42,7 +42,7 @@ const LINK_THEME: Record<string, { suffix: string }> = {
   MyCamp: { suffix: 'text-soft-accent-deep' },
   MyAgents: { suffix: 'text-cyan-700' },
   MyClaw: { suffix: 'text-red-600' },
-  Launchpad: { suffix: 'text-soft-primary-deep' },
+  Startpad: { suffix: 'text-soft-primary-deep' },
 };
 
 /**
@@ -192,7 +192,7 @@ export default function Navigation() {
     // strona, do ktorej prowadzi wylacznie wpisanie adresu z palca, z punktu
     // widzenia uzytkownika nie istnieje. Sama zbudowana i niepodlinkowana byla
     // dokladnie tym bledem, ktory na tej liscie naprawialismy juz dwa razy.
-    { href: '/launchpad', label: 'Launchpad' },
+    { href: '/launchpad', label: 'Startpad' },
     { href: '/b20', label: 'B20' },
     // "How" TUZ PRZED manifestem, bo odpowiadaja na dwa rozne pytania i to
     // pierwsze jest pilniejsze. /re-definition mowi, DLACZEGO ten produkt

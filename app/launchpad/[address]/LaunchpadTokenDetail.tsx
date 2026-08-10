@@ -278,7 +278,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
       <div className="mx-auto w-full max-w-[1280px]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/launchpad" className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Launchpad market
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Startpad market
           </Link>
           <button
             type="button"
@@ -394,7 +394,8 @@ function TokenHeader({
           <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-soft-primary font-soft-display text-[22px] font-extrabold text-white">
             {image.url ? (
               // Logo pochodzi od obcego tworcy - metadata.ts przepuszcza
-              // wylacznie https i ipfs, a przy padzie obrazka zostaje inicjal.
+              // wylacznie https, ipfs i rastrowe data:image z uploadu,
+              // a przy padzie obrazka zostaje inicjal.
               // eslint-disable-next-line @next/next/no-img-element
               <img src={image.url} alt="" className="absolute inset-0 h-full w-full object-cover" referrerPolicy="no-referrer" loading="lazy" />
             ) : (
@@ -529,7 +530,7 @@ function TokenNotFound({ address }: { address: string }) {
             : 'This link does not contain a valid token address.'}
         </p>
         <Link href="/launchpad" className="mt-5 inline-flex items-center gap-2 rounded-full bg-soft-primary px-5 py-2.5 text-[13px] font-extrabold text-white">
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to the Launchpad market
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to the Startpad market
         </Link>
       </div>
     </main>

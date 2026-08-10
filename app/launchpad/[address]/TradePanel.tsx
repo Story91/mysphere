@@ -372,7 +372,7 @@ export default function TradePanel({
   // kursu tokena, ktorego swiezo wystartowany rynek po prostu nie ma.
   // Dopisek dopiero od niezerowej kwoty: "0 · $0.00" to szum, nie informacja.
   const claimRows: Array<{ label: string; value: string; amount: bigint; source: ClaimSource; usd?: string | null }> = [
-    { label: 'Launchpad fees (ETH)', value: fmtEth(core.launchClaimable), amount: core.launchClaimable, source: 'launch', usd: core.launchClaimable > 0n ? usdSuffix(core.launchClaimable, ethUsd) : null },
+    { label: 'Startpad fees (ETH)', value: fmtEth(core.launchClaimable), amount: core.launchClaimable, source: 'launch', usd: core.launchClaimable > 0n ? usdSuffix(core.launchClaimable, ethUsd) : null },
     { label: 'Hook ETH', value: fmtEth(core.hookEthClaimable), amount: core.hookEthClaimable, source: 'hookEth', usd: core.hookEthClaimable > 0n ? usdSuffix(core.hookEthClaimable, ethUsd) : null },
     { label: `Hook ${core.symbol}`, value: fmtTokens(core.hookTokenClaimable, decimals), amount: core.hookTokenClaimable, source: 'hookToken' },
     { label: 'Vault ETH', value: fmtEth(core.vaultEthClaimable), amount: core.vaultEthClaimable, source: 'vaultEth', usd: core.vaultEthClaimable > 0n ? usdSuffix(core.vaultEthClaimable, ethUsd) : null },

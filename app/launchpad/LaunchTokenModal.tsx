@@ -15,7 +15,7 @@
  * zablokowania przycisku.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -26,6 +26,7 @@ import {
   ExternalLink,
   Flame,
   Globe,
+  ImagePlus,
   Layers3,
   Minus,
   Plus,
@@ -47,6 +48,7 @@ import {
 } from './config';
 import { formatUsd, useEthUsd } from './useEthUsd';
 import { resolveMediaUrl } from './metadata';
+import { resizeImageFile } from './logoUpload';
 
 const FIELD =
   'w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 text-[14px] text-[#16141b] outline-none transition-colors placeholder:text-black/35 focus:border-[#7c6bda]';
@@ -97,7 +99,12 @@ function shortAddress(value: string) {
   return value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
 }
 
-type FeeReceiverRow = { account: string; share: string };
+/**
+ * Wiersz DODANY do listy odbiorcow oplat. Udzial "you" nie jest osobnym
+ * wierszem stanu - liczy sie zawsze jako reszta do 100%, wiec nie umie sie
+ * rozjechac z suma.
+ */
+type AddedReceiver = { account: string; share: number };
 
 /**
  * Konfiguracja startu w postaci, ktora da sie podac do `launchAdvanced` bez
@@ -329,9 +336,28 @@ export default function LaunchTokenModal({
   const [creatorSharePct, setCreatorSharePct] = useState(String(FALLBACK_MAX_CREATOR_SHARE_BPS / 100));
   const [buybackPct, setBuybackPct] = useState('0');
   const [sniperCapTokens, setSniperCapTokens] = useState(String(FALLBACK_WINDOW_CAP_TOKENS));
+  // Kontrakt v3 przyjmuje windowCap az do T0; wylaczenie ochrony znaczy
+  // "wyslij dokladnie T0", a nie "pomin pole".
+  const [sniperOn, setSniperOn] = useState(true);
   const [preBuyEth, setPreBuyEth] = useState('0');
-  const [receivers, setReceivers] = useState<FeeReceiverRow[]>([{ account: '', share: '100' }]);
+  const [addedReceivers, setAddedReceivers] = useState<AddedReceiver[]>([]);
+  const [receiverDraft, setReceiverDraft] = useState({ account: '', share: '' });
+  const [receiverDraftError, setReceiverDraftError] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Logo jest WYMAGANE: albo plik z uploadu (data URL po zmniejszeniu), albo
+  // URL, ktory realnie zaladowal sie jako obrazek. Data URL nigdy nie idzie
+  // na lancuch - zyje tylko w profilu Firestore.
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
+  const [logoFileError, setLogoFileError] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoDragOver, setLogoDragOver] = useState(false);
+  // Cykl zycia URL-a logo: probujemy go ZALADOWAC jak przegladarka odbiorcy.
+  const [urlStatus, setUrlStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  // Zapis profilu po starcie moze odpasc (np. brak sesji SIWE) i NIE moze
+  // uniewaznic sukcesu startu - stad osobna, nieblokujaca notka.
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
 
   // `null` = jeszcze nie sprawdzone. `false` = wdrozony launchpad zna tylko
   // stare ABI i rozszerzonego startu NIE WOLNO pokazac jako dzialajacego.
@@ -345,6 +371,10 @@ export default function LaunchTokenModal({
   // Stale krzywej sluza WYLACZNIE do podgladu pre-buya. Liczba wiazaca jest
   // zawsze ta z lancucha - tu pokazujemy szacunek, nie obietnice.
   const [curve, setCurve] = useState({ t0: TOTAL_SUPPLY_TOKENS, rVirt: 0.75 });
+  // T0 w wei - dokladna wartosc windowCap przy wylaczonej ochronie. Porownania
+  // robimy na bigintach, zeby float nie zgubil koncowki i nie odbil sie na
+  // lancuchu o jeden wei.
+  const [t0Wei, setT0Wei] = useState<bigint>(parseEther(String(TOTAL_SUPPLY_TOKENS)));
   // Oplata puli po graduacji nalezy do HOOKA i jest ustalona przy jego
   // wdrozeniu - tworca jej nie wybiera. Czytamy ja, zeby estymator nie
   // zgadywal, ile z niej zostaje tworcy.
@@ -391,6 +421,7 @@ export default function LaunchTokenModal({
         const [t0, rVirt] = await Promise.all([read('T0'), read('R_VIRT')]);
         if (!cancelled) {
           setCurve({ t0: Number(formatEther(t0 as bigint)), rVirt: Number(formatEther(rVirt as bigint)) });
+          setT0Wei(t0 as bigint);
         }
       } catch {
         // Stare wdrozenie tez ma te stale; gdy odczyt padnie, zostaja domyslne.
@@ -462,6 +493,51 @@ export default function LaunchTokenModal({
   }, [open, readClient, advancedSupported]);
 
   /**
+   * URL logo sprawdzamy tak, jak sprawdzi go przegladarka odbiorcy: probujac
+   * ZALADOWAC obrazek. Sam ksztalt adresu nie mowi nic o tym, czy pod nim jest
+   * grafika - a URL, ktory nie przechodzi, ma znaczyc "brak logo", nie "moze
+   * sie uda".
+   */
+  useEffect(() => {
+    const trimmed = launchImage.trim();
+    if (trimmed === '') {
+      setUrlStatus('idle');
+      return;
+    }
+    const resolved = resolveMediaUrl(trimmed);
+    // data: wklejone w pole URL odrzucamy - upload ma wlasna sciezke z limitem
+    // rozmiaru i walidacja typu.
+    if (resolved === null || trimmed.startsWith('data:')) {
+      setUrlStatus('invalid');
+      return;
+    }
+    setUrlStatus('checking');
+    let finished = false;
+    let timeout = 0;
+    // Debounce: probe dopiero, gdy uzytkownik przestal pisac - inaczej kazda
+    // litera adresu odpalalaby pobranie obrazka.
+    const debounce = window.setTimeout(() => {
+      const probe = new Image();
+      const finish = (ok: boolean) => {
+        if (finished) return;
+        finished = true;
+        window.clearTimeout(timeout);
+        setUrlStatus(ok ? 'valid' : 'invalid');
+      };
+      timeout = window.setTimeout(() => finish(false), 5000);
+      probe.onload = () => finish(true);
+      probe.onerror = () => finish(false);
+      probe.referrerPolicy = 'no-referrer';
+      probe.src = resolved;
+    }, 450);
+    return () => {
+      finished = true;
+      window.clearTimeout(debounce);
+      window.clearTimeout(timeout);
+    };
+  }, [launchImage]);
+
+  /**
    * Ta sama walidacja, co w `_launch`, tylko wykonana ZANIM tworca zaplaci za
    * gaz. Gdy cokolwiek sie nie zgadza, zwracamy powod po ludzku zamiast
    * pozwolic kontraktowi odbic transakcje golym `InvalidFeeConfig`.
@@ -489,38 +565,53 @@ export default function LaunchTokenModal({
     if (!Number.isFinite(buyPct) || buyPct < 0 || buyPct > 100) return fail('Auto-buyback must be between 0 and 100%.');
     const buybackBps = Math.round(buyPct * 100);
 
-    const windowCap = toWei(sniperCapTokens);
-    const capTokens = Number(sniperCapTokens);
-    if (windowCap === null || windowCap <= 0n) return fail('Per-wallet cap must be a positive number of tokens.');
-    if (capTokens > limits.windowCapTokens) {
-      return fail(`Per-wallet cap cannot exceed ${limits.windowCapTokens.toLocaleString('en-US')} tokens.`);
+    // Kontrakt v3 przyjmuje windowCap az do T0 - cap rowny podazy krzywej
+    // znaczy "ochrona wylaczona". Przelacznik OFF wysyla dokladnie T0.
+    let windowCap: bigint;
+    if (!sniperOn) {
+      windowCap = t0Wei;
+    } else {
+      const parsedCap = toWei(sniperCapTokens);
+      if (parsedCap === null || parsedCap <= 0n) return fail('Per-wallet cap must be a positive number of tokens.');
+      if (parsedCap > t0Wei) {
+        return fail(`Per-wallet cap cannot exceed ${curve.t0.toLocaleString('en-US')} tokens.`);
+      }
+      windowCap = parsedCap;
     }
 
     const preBuyWei = preBuyEth.trim() === '' || Number(preBuyEth) === 0 ? 0n : toWei(preBuyEth);
     if (preBuyWei === null) return fail('Pre-buy must be zero or more ETH, written as a decimal number.');
 
-    if (receivers.length === 0) return fail('Add at least one fee receiver.');
-    if (receivers.length > limits.maxRecipients) return fail(`At most ${limits.maxRecipients} fee receivers.`);
-
+    // Lista do wyslania: "you" z reszta procentow ZAWSZE pierwsze, potem
+    // wiersze dodane przyciskiem Add. Gdy dodani zjedli cale 100%, wiersza
+    // "you" nie wysylamy - udzial 0 bps kontrakt odrzuca.
     const accounts: Address[] = [];
     const shares: number[] = [];
-    let shareTotal = 0;
-    for (const row of receivers) {
-      const account = row.account.trim() === '' ? address : (row.account.trim() as Address);
-      if (!account) return fail('Connect a wallet, or type the receiver address in full.');
-      if (!isAddressLike(account)) return fail('Every fee receiver needs a valid address.');
-      const sharePct = Number(row.share);
-      if (!Number.isFinite(sharePct) || sharePct <= 0) return fail('Every fee receiver needs a share above zero.');
-      const shareBps = Math.round(sharePct * 100);
-      if (shareBps === 0) return fail('A share that rounds down to zero would be rejected on chain.');
-      accounts.push(account as Address);
-      shares.push(shareBps);
-      shareTotal += shareBps;
+    let addedBps = 0;
+    for (const row of addedReceivers) {
+      if (!isAddressLike(row.account)) return fail('Every fee receiver needs a valid address.');
+      const shareBps = Math.round(row.share * 100);
+      if (shareBps <= 0) return fail('Every fee receiver needs a share above zero.');
+      addedBps += shareBps;
     }
-    // Kontrakt wymaga DOKLADNIE 10 000 bps. Zaokraglamy ostatni udzial, zeby
-    // "33.33 / 33.33 / 33.34" nie wywalalo sie na jednym punkcie bazowym.
-    const drift = 10_000 - shareTotal;
-    if (Math.abs(drift) > receivers.length) return fail('Fee receiver shares must add up to 100%.');
+    if (addedBps > 10_000) return fail('Fee receiver shares cannot exceed 100% in total.');
+    const youBps = 10_000 - addedBps;
+    if (youBps > 0) {
+      if (!address) return fail('Connect a wallet - your remaining share needs an address.');
+      accounts.push(address as Address);
+      shares.push(youBps);
+    }
+    for (const row of addedReceivers) {
+      accounts.push(row.account.trim() as Address);
+      shares.push(Math.round(row.share * 100));
+    }
+    if (accounts.length === 0) return fail('Add at least one fee receiver.');
+    if (accounts.length > limits.maxRecipients) return fail(`At most ${limits.maxRecipients} fee receivers.`);
+    // Suma jest z konstrukcji 10 000, ale zaokraglenia domykamy jak dawniej -
+    // kontrakt wymaga DOKLADNIE 10 000 bps, a "33.33 + 33.33 + 33.34" potrafi
+    // sie rozjechac o punkt bazowy.
+    const drift = 10_000 - shares.reduce((sum, value) => sum + value, 0);
+    if (Math.abs(drift) > accounts.length) return fail('Fee receiver shares must add up to 100%.');
     shares[shares.length - 1] += drift;
     if (shares[shares.length - 1] <= 0) return fail('Fee receiver shares must add up to 100%.');
 
@@ -532,15 +623,26 @@ export default function LaunchTokenModal({
         windowCap,
         accounts,
         shares,
-        metadataURI: buildMetadataUri(launchMetadataUri, launchName, launchDescription, launchImage, links),
+        // Na lancuch idzie WYLACZNIE URL, ktory realnie zaladowal sie jako
+        // obrazek. Data URL z uploadu zostaje w profilu Firestore - na
+        // lancuchu kosztowalby gaz za kazdy znak base64.
+        metadataURI: buildMetadataUri(
+          launchMetadataUri,
+          launchName,
+          launchDescription,
+          urlStatus === 'valid' ? launchImage : '',
+          links,
+        ),
         preBuyWei,
       },
       error: null,
     };
   }, [
     address,
+    addedReceivers,
     buybackPct,
     creatorSharePct,
+    curve.t0,
     launchDescription,
     launchFeePct,
     launchImage,
@@ -549,8 +651,10 @@ export default function LaunchTokenModal({
     limits,
     links,
     preBuyEth,
-    receivers,
     sniperCapTokens,
+    sniperOn,
+    t0Wei,
+    urlStatus,
   ]);
 
   /**
@@ -586,13 +690,19 @@ export default function LaunchTokenModal({
   /*  WALIDACJA PRZY POLU - prezentacja; brama pozostaje w `advanced`     */
   /* ------------------------------------------------------------------ */
 
-  const previewImage = resolveMediaUrl(launchImage);
+  // Podglad: upload wygrywa z URL-em, bo to on pojdzie do profilu tokena.
+  const previewImage = logoDataUrl ?? (urlStatus === 'valid' ? resolveMediaUrl(launchImage) : null);
+  const hasLogo = logoDataUrl !== null || urlStatus === 'valid';
   const nameError = launchName.trim() === '' ? 'Name is required.' : null;
   const symbolError = launchSymbol.trim() === '' ? 'Ticker is required.' : null;
   // Obrazek trafia do NIEZMIENNEGO metadataURI - literowka zostalaby na
   // zawsze, wiec zly zapis blokuje start zamiast po cichu przejsc.
   const imageError =
-    launchImage.trim() !== '' && previewImage === null ? 'Use an https:// or ipfs:// link — anything else will not render.' : null;
+    launchImage.trim() !== '' && (resolveMediaUrl(launchImage) === null || launchImage.trim().startsWith('data:'))
+      ? 'Use an https:// or ipfs:// link — anything else will not render.'
+      : urlStatus === 'invalid'
+        ? 'This link did not load as an image within 5 seconds.'
+        : null;
   const linkErrors: Partial<Record<keyof LinkFields, string>> = {};
   (Object.keys(links) as Array<keyof LinkFields>).forEach((key) => {
     if (links[key].trim() !== '' && !isHttpsLink(links[key])) linkErrors[key] = 'Must start with https://';
@@ -606,8 +716,22 @@ export default function LaunchTokenModal({
   const feeBpsNow = Math.round((Number(launchFeePct) || 0) * 100);
   const creatorPctNow = Math.max(0, Math.min(limits.maxCreatorShareBps / 100, Number(creatorSharePct) || 0));
   const protocolFloorPct = 100 - limits.maxCreatorShareBps / 100;
-  const shareTotalPct = receivers.reduce((sum, row) => sum + (Number(row.share) || 0), 0);
-  const shareTotalOk = Math.abs(Math.round(shareTotalPct * 100) - 10_000) <= receivers.length;
+  // Udzial "you" jest RESZTA po dodanych wierszach, nie osobnym polem - wiec
+  // suma nie umie odjechac od 100%, dopoki Add pilnuje sufitu.
+  const addedShareBps = addedReceivers.reduce((sum, row) => sum + Math.round(row.share * 100), 0);
+  const youShareBps = Math.max(0, 10_000 - addedShareBps);
+  const receiverTotalPct = (addedShareBps + youShareBps) / 100;
+  const receiverTotalOk = Math.round(receiverTotalPct * 100) === 10_000;
+
+  // Jeden pasek = 100% oplaty puli: [protokol staly][ty][buyback]. Buyback
+  // schodzi WYLACZNIE z dzialki tworcy, wiec suwak NA ZYWO zweza segment "ty",
+  // a segment protokolu stoi w miejscu.
+  const protocolPoolPct = hookSplit.protocolShareBps / 100;
+  const creatorPoolSlicePct = 100 - protocolPoolPct;
+  const buybackShare = Math.max(0, Math.min(100, Number(buybackPct) || 0));
+  const buybackPoolPct = (creatorPoolSlicePct * buybackShare) / 100;
+  const youPoolPct = creatorPoolSlicePct - buybackPoolPct;
+  const fmtPct = (value: number) => (Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1));
 
   const previewRaised = useMemo(() => {
     const eth = Number(preBuyEth);
@@ -629,7 +753,13 @@ export default function LaunchTokenModal({
         ? 'Add a token name.'
         : symbolError
           ? 'Add a ticker symbol.'
-          : imageError ?? anyLinkError ?? preBuyError ?? (advancedSupported === true ? advanced.error : null);
+          : !hasLogo
+            ? logoBusy
+              ? 'Processing the logo...'
+              : urlStatus === 'checking'
+                ? 'Checking the logo URL...'
+                : 'Add a logo first.'
+            : imageError ?? anyLinkError ?? preBuyError ?? (advancedSupported === true ? advanced.error : null);
 
   const ensureSepolia = async () => {
     if (onSepolia) return true;
@@ -655,7 +785,13 @@ export default function LaunchTokenModal({
     setLaunchFeePct((limits.maxFeeBps / 100).toString());
     setCreatorSharePct((limits.maxCreatorShareBps / 100).toString());
     setSniperCapTokens(String(limits.windowCapTokens));
-    setReceivers([{ account: '', share: '100' }]);
+    setSniperOn(true);
+    setAddedReceivers([]);
+    setReceiverDraft({ account: '', share: '' });
+    setReceiverDraftError(null);
+    setLogoDataUrl(null);
+    setLogoFileError(null);
+    setProfileNotice(null);
     setTouched({});
     setNotice(null);
     setMode('quick');
@@ -682,6 +818,59 @@ export default function LaunchTokenModal({
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, busy, phase]);
+
+  /** Plik -> data URL przez resizeImageFile; blad pokazujemy przy polu. */
+  const handleLogoFile = async (file: File | null | undefined) => {
+    if (!file) return;
+    setLogoFileError(null);
+    setLogoBusy(true);
+    try {
+      setLogoDataUrl(await resizeImageFile(file));
+    } catch (error) {
+      setLogoFileError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+
+  /**
+   * Add waliduje wiersz roboczy PRZED dodaniem - lista nizej trzyma juz tylko
+   * czyste wpisy, a udzial "you" sam kurczy sie o to, co oddali inni.
+   */
+  const addReceiver = () => {
+    const account = receiverDraft.account.trim();
+    if (!isAddressLike(account)) {
+      setReceiverDraftError('Enter a full 0x address.');
+      return;
+    }
+    const duplicate =
+      addedReceivers.some((row) => row.account.toLowerCase() === account.toLowerCase()) ||
+      (address !== undefined && account.toLowerCase() === address.toLowerCase());
+    if (duplicate) {
+      setReceiverDraftError('This address is already on the list.');
+      return;
+    }
+    const share = Number(receiverDraft.share);
+    const shareBps = Math.round(share * 100);
+    if (!Number.isFinite(share) || share <= 0 || shareBps <= 0) {
+      setReceiverDraftError('Share must be above zero.');
+      return;
+    }
+    const currentBps = addedReceivers.reduce((sum, row) => sum + Math.round(row.share * 100), 0);
+    if (currentBps + shareBps > 10_000) {
+      setReceiverDraftError('Shares cannot exceed 100% in total.');
+      return;
+    }
+    // Wiersz "you" liczy sie do limitu odbiorcow tylko, gdy cos mu zostaje.
+    const nextCount = addedReceivers.length + 1 + (currentBps + shareBps < 10_000 ? 1 : 0);
+    if (nextCount > limits.maxRecipients) {
+      setReceiverDraftError(`At most ${limits.maxRecipients} fee receivers.`);
+      return;
+    }
+    setAddedReceivers((rows) => [...rows, { account, share }]);
+    setReceiverDraft({ account: '', share: '' });
+    setReceiverDraftError(null);
+  };
 
   const launch = async () => {
     if (!address || !walletClient || !readClient) {
@@ -779,6 +968,31 @@ export default function LaunchTokenModal({
       // Board dostaje wiersz OD RAZU po potwierdzeniu - nawet gdy tworca
       // zamknie modal, nie czekajac na ekran sukcesu.
       onLaunched(newToken);
+      // Logo i opis ida do profilu Firestore OSOBNYM zadaniem - start juz sie
+      // udal i zaden blad zapisu nie ma prawa go cofnac ani przykryc ekranu
+      // sukcesu. Brak sesji SIWE (401/403) to normalny przypadek, nie awaria.
+      const profileLogoUrl = logoDataUrl ?? (urlStatus === 'valid' ? launchImage.trim() : null);
+      if (profileLogoUrl !== null || launchDescription.trim() !== '') {
+        void fetch('/api/launchpad/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: tokenAddress,
+            logoUrl: profileLogoUrl,
+            description: launchDescription.trim(),
+          }),
+        })
+          .then((response) => {
+            if (response.status === 401 || response.status === 403) {
+              setProfileNotice('Sign in on the token page to attach the logo.');
+            } else if (!response.ok) {
+              setProfileNotice('The logo was not attached — you can add it on the token page.');
+            }
+          })
+          .catch(() => {
+            setProfileNotice('The logo was not attached — you can add it on the token page.');
+          });
+      }
       setLaunched({
         address: tokenAddress,
         name: newToken.name,
@@ -799,8 +1013,10 @@ export default function LaunchTokenModal({
   const markTouched = (field: string) => setTouched((current) => ({ ...current, [field]: true }));
   const showError = (field: string, error: string | null) => (touched[field] && error ? error : null);
 
+  // Chipy zostaja przy malych wartosciach + domyslnej z lancucha; sufit pola
+  // to od v3 cale T0, nie 16M.
   const capChips = [1_000_000, 4_000_000, 8_000_000, limits.windowCapTokens].filter(
-    (value, index, all) => value <= limits.windowCapTokens && all.indexOf(value) === index,
+    (value, index, all) => value <= curve.t0 && all.indexOf(value) === index,
   );
   const feePresets = [25, 50, 75, 100].filter((bps) => bps <= limits.maxFeeBps);
   const setFeeBps = (bps: number) => {
@@ -917,6 +1133,11 @@ export default function LaunchTokenModal({
                 </button>
               </div>
               <p className="mt-2 text-[11px] text-black/40">Tx {launched.hash.slice(0, 10)}...</p>
+              {profileNotice && (
+                <p className="mt-3 w-full rounded-xl border border-[#f3c58a] bg-[#fff8ed] px-3.5 py-2.5 text-left text-[12px] leading-[1.45] text-[#a34b08]">
+                  {profileNotice}
+                </p>
+              )}
               <div className="mt-6 flex w-full flex-col gap-2 sm:flex-row">
                 <Link
                   href={`/launchpad/${launched.address}`}
@@ -984,8 +1205,70 @@ export default function LaunchTokenModal({
                       </label>
                     </div>
 
+                    <div>
+                      <span className={LABEL}>Logo — required</span>
+                      {/* Dropzone jako button: klawiatura i czytnik dostaja to
+                          samo wejscie, co mysz z przeciaganiem. */}
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          setLogoDragOver(true);
+                        }}
+                        onDragLeave={() => setLogoDragOver(false)}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          setLogoDragOver(false);
+                          void handleLogoFile(event.dataTransfer.files?.[0]);
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-xl border border-dashed px-3.5 py-3 text-left transition-colors ${
+                          logoDragOver ? 'border-soft-primary bg-soft-primary/[0.06]' : 'border-black/15 bg-white hover:border-soft-primary'
+                        }`}
+                      >
+                        {logoDataUrl ? (
+                          // Data URL powstal u nas z resizeImageFile - to nasz
+                          // wlasny raster, nie cudzy adres.
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={logoDataUrl} alt="Token logo preview" className="h-11 w-11 shrink-0 rounded-[14px] object-cover" />
+                        ) : (
+                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#f4f1ff] text-soft-primary">
+                            <ImagePlus className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                        )}
+                        <span className="min-w-0">
+                          <span className="block text-[12.5px] font-extrabold text-[#16141b]">
+                            {logoBusy ? 'Processing image...' : logoDataUrl ? 'Logo ready — click to replace' : 'Drop an image or click to browse'}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] text-black/45">PNG, JPEG or WebP — resized to 256 px.</span>
+                        </span>
+                      </button>
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(event) => {
+                          void handleLogoFile(event.target.files?.[0]);
+                          // Ten sam plik wybrany drugi raz ma znow odpalic
+                          // onChange - bez zerowania input go polknie.
+                          event.target.value = '';
+                        }}
+                      />
+                      {logoDataUrl && (
+                        <button type="button" onClick={() => setLogoDataUrl(null)} className="mt-1.5 text-[11px] font-extrabold text-[#8d2748]">
+                          Remove uploaded logo
+                        </button>
+                      )}
+                      {logoFileError ? (
+                        <span className={FIELD_ERROR}>{logoFileError}</span>
+                      ) : (
+                        <span className={HINT}>Uploads live in the token profile on this site. Paste a URL below to also store it onchain.</span>
+                      )}
+                    </div>
+
                     <label className="block">
-                      <span className={LABEL}>Image URL</span>
+                      <span className={LABEL}>Logo URL — alternative</span>
                       <input
                         value={launchImage}
                         onChange={(event) => setLaunchImage(event.target.value)}
@@ -994,6 +1277,12 @@ export default function LaunchTokenModal({
                       />
                       {imageError ? (
                         <span className={FIELD_ERROR}>{imageError}</span>
+                      ) : urlStatus === 'checking' ? (
+                        <span className={HINT}>Loading the image to make sure it renders...</span>
+                      ) : urlStatus === 'valid' ? (
+                        <span className="mt-1 block text-[11px] font-bold text-[#0b9a51]">
+                          Image loads. Stored onchain forever — ipfs:// links cannot be swapped out later.
+                        </span>
                       ) : (
                         <span className={HINT}>Stored onchain forever — ipfs:// links cannot be swapped out later.</span>
                       )}
@@ -1114,7 +1403,7 @@ export default function LaunchTokenModal({
                     <fieldset disabled={advancedSupported !== true} className="space-y-4 disabled:opacity-55">
                       <SectionCard
                         icon={<CircleDollarSign className="h-4 w-4 text-soft-primary" aria-hidden="true" />}
-                        title="Trading fee"
+                        title="Curve fee split"
                         aside={
                           <span className="font-soft-display text-[18px] font-extrabold text-soft-primary-deep">
                             {(feeBpsNow / 100).toFixed(2)}%
@@ -1195,7 +1484,7 @@ export default function LaunchTokenModal({
                           </div>
                           <span className={HINT}>
                             {protocolFloorPct.toFixed(0)}% floor belongs to the protocol — enforced by the contract, not this
-                            form.
+                            form. The curve has no buyback; that lives in the pool split below.
                           </span>
                         </div>
                       </SectionCard>
@@ -1206,74 +1495,91 @@ export default function LaunchTokenModal({
                         aside={
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10.5px] font-extrabold ${
-                              shareTotalOk ? 'bg-[#edfff4] text-[#0b9a51]' : 'bg-[#d9628a]/12 text-[#8d2748]'
+                              receiverTotalOk ? 'bg-[#edfff4] text-[#0b9a51]' : 'bg-[#d9628a]/12 text-[#8d2748]'
                             }`}
                           >
-                            {shareTotalOk && <Check className="h-3 w-3" aria-hidden="true" />}
-                            Total {shareTotalPct.toLocaleString('en-US', { maximumFractionDigits: 2 })}%
+                            {receiverTotalOk && <Check className="h-3 w-3" aria-hidden="true" />}
+                            Total: {receiverTotalPct.toLocaleString('en-US', { maximumFractionDigits: 2 })}% / 100%
                           </span>
                         }
                       >
-                        <div className="space-y-2">
-                          {receivers.map((row, index) => {
-                            const badAccount = row.account.trim() !== '' && !isAddressLike(row.account);
-                            const badShare = !Number.isFinite(Number(row.share)) || Number(row.share) <= 0;
-                            return (
-                              <div key={index} className="flex items-center gap-2">
-                                <input
-                                  value={row.account}
-                                  onChange={(event) =>
-                                    setReceivers((rows) =>
-                                      rows.map((item, position) => (position === index ? { ...item, account: event.target.value } : item)),
-                                    )
-                                  }
-                                  className={`${FIELD} flex-1 ${badAccount ? 'border-[#d9628a]' : ''}`}
-                                  placeholder={index === 0 ? 'you — leave empty for your wallet' : '0x...'}
-                                  aria-label={`Receiver ${index + 1} address`}
-                                />
-                                <input
-                                  inputMode="decimal"
-                                  value={row.share}
-                                  onChange={(event) =>
-                                    setReceivers((rows) =>
-                                      rows.map((item, position) => (position === index ? { ...item, share: event.target.value } : item)),
-                                    )
-                                  }
-                                  className={`${FIELD} w-[80px] text-right ${badShare ? 'border-[#d9628a]' : ''}`}
-                                  aria-label={`Receiver ${index + 1} share in percent`}
-                                />
-                                <span className="text-[12px] font-bold text-black/40">%</span>
-                                <button
-                                  type="button"
-                                  onClick={() => setReceivers((rows) => (rows.length === 1 ? rows : rows.filter((_, position) => position !== index)))}
-                                  disabled={receivers.length === 1}
-                                  className="rounded-full p-1.5 text-black/35 hover:bg-black/5 hover:text-[#16141b] disabled:opacity-30"
-                                  aria-label="Remove receiver"
-                                >
-                                  <X className="h-4 w-4" aria-hidden="true" />
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="mt-2 flex items-center justify-between">
-                          <span className={HINT}>Shares must add up to 100%. Up to {limits.maxRecipients} addresses.</span>
+                        {/* Wiersz roboczy: szeroki adres, waski procent. Add
+                            waliduje ZANIM cokolwiek trafi na liste ponizej. */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={receiverDraft.account}
+                            onChange={(event) => setReceiverDraft((draft) => ({ ...draft, account: event.target.value }))}
+                            className={`${FIELD} min-w-0 flex-1 font-mono text-[13px]`}
+                            placeholder="0x..."
+                            aria-label="New receiver address"
+                          />
+                          <input
+                            inputMode="decimal"
+                            value={receiverDraft.share}
+                            onChange={(event) => setReceiverDraft((draft) => ({ ...draft, share: event.target.value }))}
+                            className={`${FIELD} w-20 text-right`}
+                            placeholder="10"
+                            aria-label="New receiver share in percent"
+                          />
+                          <span className="text-[12px] font-bold text-black/40">%</span>
                           <button
                             type="button"
-                            onClick={() => setReceivers((rows) => (rows.length >= limits.maxRecipients ? rows : [...rows, { account: '', share: '0' }]))}
-                            disabled={receivers.length >= limits.maxRecipients}
-                            className="inline-flex shrink-0 items-center gap-1 text-[11px] font-extrabold text-soft-primary-deep disabled:opacity-40"
+                            onClick={addReceiver}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-black/15 bg-white px-3 py-2 text-[11px] font-extrabold text-soft-primary-deep hover:border-soft-primary"
                           >
-                            <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Add receiver
+                            <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Add
                           </button>
                         </div>
+                        {receiverDraftError && <span className={FIELD_ERROR}>{receiverDraftError}</span>}
+
+                        <ul className="mt-3 space-y-1.5">
+                          {youShareBps > 0 && (
+                            <li className="flex items-center justify-between rounded-xl bg-[#fbfbfd] px-3 py-2 text-[12px]">
+                              <span className="min-w-0 truncate font-bold text-[#16141b]">
+                                You{' '}
+                                <span className="font-mono text-[11px] font-normal text-black/45">
+                                  {address ? shortAddress(address) : 'connected wallet'}
+                                </span>
+                              </span>
+                              <span className="ml-2 shrink-0 font-extrabold text-[#16141b]">
+                                {(youShareBps / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%
+                              </span>
+                            </li>
+                          )}
+                          {addedReceivers.map((row, index) => (
+                            <li
+                              key={`${row.account}-${index}`}
+                              className="flex items-center justify-between gap-2 rounded-xl bg-[#fbfbfd] px-3 py-2 text-[12px]"
+                            >
+                              <span className="min-w-0 truncate font-mono text-[11.5px] text-[#16141b]">{shortAddress(row.account)}</span>
+                              <span className="flex shrink-0 items-center gap-1.5">
+                                <span className="font-extrabold text-[#16141b]">
+                                  {row.share.toLocaleString('en-US', { maximumFractionDigits: 2 })}%
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setAddedReceivers((rows) => rows.filter((_, position) => position !== index))}
+                                  className="rounded-full p-1 text-black/35 hover:bg-black/5 hover:text-[#16141b]"
+                                  aria-label={`Remove receiver ${shortAddress(row.account)}`}
+                                >
+                                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        <span className={HINT}>
+                          The first receiver is you — your share is whatever the others leave. Up to {limits.maxRecipients}{' '}
+                          addresses, paid out in ETH.
+                        </span>
                       </SectionCard>
 
                       <SectionCard
                         icon={<Flame className="h-4 w-4 text-[#d78a55]" aria-hidden="true" />}
-                        title="Auto-buyback"
-                        aside={<span className="font-soft-display text-[18px] font-extrabold text-[#a35c1a]">{Number(buybackPct) || 0}%</span>}
+                        title="Pool fee split (after graduation)"
+                        aside={<span className="font-soft-display text-[18px] font-extrabold text-[#a35c1a]">{fmtPct(buybackShare)}%</span>}
                       >
+                        <span className={LABEL}>Auto-buyback — % of your slice</span>
                         <input
                           type="range"
                           min={0}
@@ -1282,39 +1588,76 @@ export default function LaunchTokenModal({
                           value={buybackPct}
                           onChange={(event) => setBuybackPct(event.target.value)}
                           className="w-full accent-[#d78a55]"
-                          aria-label="Auto-buyback percentage"
+                          aria-label="Auto-buyback percentage of your pool fee share"
                         />
+                        {/* Jeden pasek = 100% oplaty puli. Segment protokolu
+                            stoi; suwak buybacku NA ZYWO zweza segment "you". */}
+                        <div className="mt-3 flex h-3 w-full overflow-hidden rounded-full bg-black/10">
+                          <div className="h-full bg-black/35" style={{ width: `${protocolPoolPct}%` }} aria-hidden="true" />
+                          <div className="h-full bg-soft-primary transition-[width]" style={{ width: `${youPoolPct}%` }} aria-hidden="true" />
+                          <div className="h-full bg-[#d78a55] transition-[width]" style={{ width: `${buybackPoolPct}%` }} aria-hidden="true" />
+                        </div>
+                        <div className="mt-1.5 flex items-center justify-between text-[11px] font-bold">
+                          <span className="text-black/50">Protocol {fmtPct(protocolPoolPct)}% — fixed</span>
+                          <span className="text-soft-primary-deep">You {fmtPct(youPoolPct)}%</span>
+                          <span className="text-[#a35c1a]">Buyback {fmtPct(buybackPoolPct)}%</span>
+                        </div>
                         <span className={HINT}>
-                          {Number(buybackPct) || 0}% of YOUR fee share buys back and burns your token after graduation —
-                          the protocol share is untouched. The rest of your share is paid out to your receivers.
+                          You keep {fmtPct(youPoolPct)}% of every pool fee, {fmtPct(buybackPoolPct)}% buys &amp; burns your
+                          token. The buyback comes out of YOUR slice — the protocol&apos;s {fmtPct(protocolPoolPct)}% is
+                          untouched.
                         </span>
                       </SectionCard>
 
                       <SectionCard
                         icon={<ShieldCheck className="h-4 w-4 text-soft-primary" aria-hidden="true" />}
                         title="Sniper protection"
+                        aside={
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={sniperOn}
+                            onClick={() => setSniperOn((current) => !current)}
+                            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${sniperOn ? 'bg-soft-primary' : 'bg-black/20'}`}
+                            aria-label="Toggle sniper protection"
+                          >
+                            <span
+                              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left] ${sniperOn ? 'left-[22px]' : 'left-0.5'}`}
+                              aria-hidden="true"
+                            />
+                          </button>
+                        }
                       >
-                        <label className="block">
-                          <span className={LABEL}>Per-wallet cap (tokens)</span>
-                          <input
-                            inputMode="numeric"
-                            value={sniperCapTokens}
-                            onChange={(event) => setSniperCapTokens(event.target.value)}
-                            className={FIELD}
-                          />
-                        </label>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {capChips.map((value) => (
-                            <button key={value} type="button" onClick={() => setSniperCapTokens(String(value))} className={CHIP}>
-                              {value / 1_000_000}M{value === limits.windowCapTokens ? ' (max)' : ''}
-                            </button>
-                          ))}
-                        </div>
-                        <span className={HINT}>
-                          Applies only during the first {LAUNCH_WINDOW_LABEL} after launch — one wallet cannot buy more than
-                          this. Max {limits.windowCapTokens.toLocaleString('en-US')} of {TOTAL_SUPPLY_TOKENS.toLocaleString('en-US')}{' '}
-                          tokens. Your pre-buy plays by the same rule.
-                        </span>
+                        {sniperOn ? (
+                          <>
+                            <label className="block">
+                              <span className={LABEL}>Per-wallet cap (tokens)</span>
+                              <input
+                                inputMode="numeric"
+                                value={sniperCapTokens}
+                                onChange={(event) => setSniperCapTokens(event.target.value)}
+                                className={FIELD}
+                              />
+                            </label>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {capChips.map((value) => (
+                                <button key={value} type="button" onClick={() => setSniperCapTokens(String(value))} className={CHIP}>
+                                  {value / 1_000_000}M{value === limits.windowCapTokens ? ' (default)' : ''}
+                                </button>
+                              ))}
+                            </div>
+                            <span className={HINT}>
+                              Applies only during the first {LAUNCH_WINDOW_LABEL} after launch — one wallet cannot buy more
+                              than this. Default {limits.windowCapTokens.toLocaleString('en-US')}, up to{' '}
+                              {curve.t0.toLocaleString('en-US')} tokens. Your pre-buy plays by the same rule.
+                            </span>
+                          </>
+                        ) : (
+                          <p className="flex items-start gap-2 rounded-xl bg-[#d9628a]/10 p-3 text-[11.5px] font-bold leading-[1.45] text-[#8d2748]">
+                            <Flame className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                            Anyone — including you — can buy the whole curve at launch.
+                          </p>
+                        )}
                       </SectionCard>
 
                       <SectionCard

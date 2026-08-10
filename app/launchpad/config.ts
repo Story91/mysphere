@@ -1,20 +1,20 @@
 import { baseSepolia } from 'viem/chains';
 
 export const LAUNCHPAD_CHAIN = baseSepolia;
-// Domyslne wartosci to wdrozenie z 2026-08-10 15:42 UTC (70% tworca / 30%
-// protokol, buyback z dzialki tworcy) - docs/LAUNCHPAD-STAN.md. Wczesniejsze
-// wdrozenia (0xA760...4F97, 0x0712...0844) sa MARTWE: inne ABI albo stary
-// model oplat. Fallback MUSI nadazac za wdrozeniem - produkcja bez zmiennych
-// srodowiskowych patrzy wlasnie tutaj.
+// Domyslne wartosci to wdrozenie v3 z 2026-08-10 (70% tworca / 30% protokol,
+// buyback z dzialki tworcy, sniper cap ustawialny do T0 = wylaczalny) -
+// docs/LAUNCHPAD-STAN.md. Wczesniejsze wdrozenia (0xA760..., 0x0712...,
+// 0x811d...) sa MARTWE: inne ABI albo starszy model. Fallback MUSI nadazac
+// za wdrozeniem - produkcja bez zmiennych srodowiskowych patrzy wlasnie tutaj.
 export const LAUNCHPAD_ADDRESS =
   (process.env.NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0x811d6dE17E2D021A564Bc699e353ead7FE7258ba';
+  '0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48';
 export const LIQUIDITY_VAULT_ADDRESS =
   (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0x21F2c3506170cb670102B6fB5be6b6dbDb73b88b';
+  '0x35B3217b8Ada69103b801FEFe9ca16E307a649B6';
 export const LAUNCH_HOOK_ADDRESS =
   (process.env.NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-  '0xfaEF39f75aACC1271D7173748245A69CBD09e044';
+  '0xf2EAEBceeC6Ccc168d8fe5B539F37e2d8c44e044';
 
 export const launchpadAbi = [
   {
@@ -362,6 +362,22 @@ export const launchpadAbi = [
   /* -------------------------------------------------------------------- */
 
   {
+    // Kazde naliczenie oplaty, co do wei, per ODBIORCA. kind: 0 = protokol
+    // z oplaty handlowej, 1 = odbiorcy tworcy z oplaty handlowej, 2 = protokol
+    // z oplaty graduacyjnej, 3 = wolajacy graduate(). Jedyne zrodlo, ktore
+    // rozlicza takze splity miedzy odbiorcow fee - sumy per konto zgadzaja sie
+    // z claimable() co do wei (minus wyplaty z eventu Claimed).
+    // Sygnatura zweryfikowana z CurveLaunchpad.sol.
+    type: 'event',
+    name: 'FeeAccrued',
+    inputs: [
+      { name: 'token', type: 'address', indexed: true },
+      { name: 'account', type: 'address', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+      { name: 'kind', type: 'uint8', indexed: false },
+    ],
+  },
+  {
     type: 'event',
     name: 'LaunchConfigured',
     inputs: [
@@ -482,7 +498,7 @@ export const CURVE_TARGET_ETH = 3;
  * zadnego `Launched` z definicji nie ma.
  */
 export const LAUNCHPAD_DEPLOY_BLOCK = BigInt(
-  process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45302335'
+  process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'
 );
 
 export type LaunchpadToken = {

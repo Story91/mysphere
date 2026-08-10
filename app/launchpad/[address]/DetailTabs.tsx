@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownRight,
   ArrowUpRight,
   ExternalLink,
+  ImagePlus,
   RefreshCw,
   Users,
 } from 'lucide-react';
@@ -14,7 +15,8 @@ import {
   LAUNCHPAD_CHAIN,
   LIQUIDITY_VAULT_ADDRESS,
 } from '../config';
-import { parseMetadataUri, resolveMediaUrl } from '../metadata';
+import { resizeImageFile } from '../logoUpload';
+import { parseMetadataUri, pickTokenImage, resolveMediaUrl } from '../metadata';
 import {
   DEAD_ADDRESS,
   fmtEth,
@@ -89,6 +91,10 @@ export default function DetailTabs({
 }) {
   const [tab, setTab] = useState<Tab>('trades');
   const [visible, setVisible] = useState(PAGE_SIZE);
+
+  // Jedno zrodlo logo dla tabel: profil tworcy wygrywa z lancuchem - ta sama
+  // regula co w naglowku strony, zeby jedna strona nie pokazywala dwoch logo.
+  const logoUrl = pickTokenImage({ profileLogoUrl: profile?.logoUrl, metadataUri: core.config.metadataURI }).url;
 
   const holders = useMemo<HolderRow[]>(() => {
     const rows: HolderRow[] = [];
@@ -167,7 +173,10 @@ export default function DetailTabs({
                   <span>Side</span>
                   <span>Account</span>
                   <span className="text-right">ETH</span>
-                  <span className="text-right">{core.symbol}</span>
+                  <span className="flex items-center justify-end gap-1.5">
+                    <SymbolGlyph url={logoUrl} symbol={core.symbol} />
+                    {core.symbol}
+                  </span>
                   <span className="text-right">Price</span>
                   <span />
                 </div>
@@ -235,7 +244,10 @@ export default function DetailTabs({
                   </div>
                   <div className="shrink-0 text-right">
                     <span className="block text-[12.5px] font-extrabold text-[#16141b]">{(holder.pctBps / 100).toFixed(2)}%</span>
-                    <span className="block text-[10.5px] text-black/45">{fmtTokens(holder.balance, core.decimals)} {core.symbol}</span>
+                    <span className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] text-black/45">
+                      <SymbolGlyph url={logoUrl} symbol={core.symbol} />
+                      {fmtTokens(holder.balance, core.decimals)} {core.symbol}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -352,6 +364,24 @@ export default function DetailTabs({
 }
 
 /**
+ * Male logo tokena przy symbolu w tabelach. Fallback to inicjal, bo obrazek
+ * pochodzi od obcego tworcy i moze nie wstac - pusta dziura przy kazdym
+ * wierszu wygladalaby na blad interfejsu, kolorowy inicjal nie.
+ */
+function SymbolGlyph({ url, symbol }: { url: string | null; symbol: string }) {
+  return (
+    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-soft-primary text-[8px] font-extrabold leading-none text-white">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" loading="lazy" />
+      ) : (
+        symbol.slice(0, 1)
+      )}
+    </span>
+  );
+}
+
+/**
  * Edytor profilu tworcy - ta sama logika, co w poprzedniej wersji strony:
  * zapis przez POST /api/launchpad/token, serwer sprawdza sesje SIWE i tworce
  * odczytanego z lancucha. Tu tylko przenosiny do taba Info.
@@ -369,13 +399,35 @@ function ProfileEditor({
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [websiteDraft, setWebsiteDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [resizing, setResizing] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLogoDraft(profile?.logoUrl ?? '');
     setDescriptionDraft(profile?.description ?? '');
     setWebsiteDraft(profile?.website ?? '');
   }, [profile]);
+
+  // Plik NIE wychodzi z przegladarki w oryginale: resizeImageFile skaluje go
+  // lokalnie do malego data URL i dopiero ten string idzie tym samym POST-em,
+  // co zwykly adres logo. Dzieki temu upload nie potrzebuje zadnego storage.
+  const pickFile = async (file: File | null) => {
+    if (!file) return;
+    setNotice(null);
+    setResizing(true);
+    try {
+      setLogoDraft(await resizeImageFile(file));
+    } catch (cause) {
+      setNotice({ kind: 'error', text: cause instanceof Error ? cause.message : 'Could not read that image.' });
+    } finally {
+      setResizing(false);
+    }
+  };
+
+  // Podglad pokazuje ROBOCZE logo (w tym swiezo wgrany plik), nie zapisane -
+  // tworca ma widziec, co zapisze, zanim kliknie Save.
+  const preview = resolveMediaUrl(logoDraft) ?? resolveMediaUrl(profile?.logoUrl);
 
   const save = async () => {
     setBusy(true);
@@ -388,7 +440,12 @@ function ProfileEditor({
       });
       const payload = (await response.json()) as { profile?: TokenProfileView; error?: string };
       if (!response.ok) {
-        setNotice({ kind: 'error', text: payload.error ?? 'Saving the profile failed.' });
+        // 401 to brak sesji SIWE - mowimy, jaki jest pierwszy krok, zamiast
+        // powtarzac ogolny komunikat serwera o edycji profilu.
+        setNotice({
+          kind: 'error',
+          text: response.status === 401 ? 'Sign in with your wallet first' : payload.error ?? 'Saving the profile failed.',
+        });
         return;
       }
       if (payload.profile) {
@@ -410,11 +467,48 @@ function ProfileEditor({
         <a href="/api/launchpad/tokenlist" className="font-bold text-soft-primary-deep hover:text-soft-primary">our token list</a>, which wallets and aggregators can import.
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Logo URL</span>
-          <input value={logoDraft} onChange={(event) => setLogoDraft(event.target.value)} className={FIELD} placeholder="ipfs://... or https://..." />
-          <span className="mt-1 block text-[10.5px] text-black/45">ipfs:// is safer — its address is the file&apos;s hash, so nobody can swap the image later.</span>
-        </label>
+        <div>
+          <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Logo</span>
+          <div className="flex items-center gap-2">
+            {logoDraft.startsWith('data:') ? (
+              // Data URL w polu tekstowym to sciana base64 - zamiast niej
+              // czytelna plakietka z mozliwoscia cofniecia do pola URL.
+              <div className={`${FIELD} flex items-center justify-between gap-2`}>
+                <span className="truncate text-black/55">Uploaded image (stored with the profile)</span>
+                <button type="button" onClick={() => setLogoDraft('')} className="shrink-0 text-[11px] font-extrabold text-soft-primary-deep hover:text-soft-primary">
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <input value={logoDraft} onChange={(event) => setLogoDraft(event.target.value)} className={FIELD} placeholder="ipfs://... or https://..." aria-label="Logo URL" />
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                // Reset wartosci pozwala wybrac ten sam plik drugi raz,
+                // np. po Clear - inaczej onChange by nie odpalil.
+                event.target.value = '';
+                void pickFile(file);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={resizing}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-3 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary disabled:opacity-60"
+            >
+              {resizing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />}
+              Upload
+            </button>
+          </div>
+          <span className="mt-1 block text-[10.5px] text-black/45">
+            ipfs:// is safer — its address is the file&apos;s hash, so nobody can swap the image later. Uploaded files are resized in your browser and shown only on this site.
+          </span>
+        </div>
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Website</span>
           <input value={websiteDraft} onChange={(event) => setWebsiteDraft(event.target.value)} className={FIELD} placeholder="https://..." />
@@ -432,7 +526,7 @@ function ProfileEditor({
           {busy ? 'Saving...' : 'Save profile'}
         </button>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        {profile?.logoUrl && <img src={resolveMediaUrl(profile.logoUrl) ?? ''} alt="" className="h-10 w-10 rounded-xl object-cover" referrerPolicy="no-referrer" />}
+        {preview && <img src={preview} alt="" className="h-10 w-10 rounded-xl object-cover" referrerPolicy="no-referrer" />}
       </div>
     </div>
   );
