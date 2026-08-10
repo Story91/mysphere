@@ -30,6 +30,12 @@ export type LaunchpadNetwork = {
   tokenFactory: `0x${string}`;
   deployBlock: bigint;
   explorerUrl: string;
+  /** Sciezka logo sieci w /public; brak = bez logo. */
+  logo?: string;
+  /** Tailwind pastylki z nazwa sieci - w barwach marki danego lancucha. */
+  pillClass: string;
+  /** Tailwind akcentu tekstowego (naglowki, eyebrow w stopce). */
+  accentTextClass: string;
 };
 
 export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
@@ -52,6 +58,8 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'),
     explorerUrl: 'https://sepolia.basescan.org',
+    pillClass: 'border-black/10 bg-white text-black/50',
+    accentTextClass: 'text-soft-primary-deep',
   },
   [robinhoodChain.id]: {
     chain: robinhoodChain,
@@ -72,6 +80,11 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       '0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ROBINHOOD_DEPLOY_BLOCK ?? '33102326'),
     explorerUrl: 'https://robinhoodchain.blockscout.com',
+    // Barwy marki Robinhooda: jaskrawa zielen #00C805 na czerni - te same,
+    // ktorych uzywa sciezka postowania w basechat (RobinhoodPostingConfig).
+    logo: '/robin.webp',
+    pillClass: 'border-[#00C805]/50 bg-black text-[#00C805]',
+    accentTextClass: 'text-[#00b104]',
   },
 };
 
