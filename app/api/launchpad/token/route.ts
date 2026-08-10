@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, http, type Address } from 'viem';
-import { LAUNCHPAD_ADDRESS, LAUNCHPAD_CHAIN, launchpadAbi } from '../../../launchpad/config';
+import { LAUNCHPAD_ADDRESS, LAUNCHPAD_CHAIN, launchpadAbi } from '../../../startpad/config';
 import { sessionAddress } from '../../asks/identity';
 import { getProfiles, isProfileStoreAvailable, saveProfile, tokenDocId } from '../profileStore';
 

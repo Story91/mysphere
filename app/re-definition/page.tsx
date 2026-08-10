@@ -1212,7 +1212,7 @@ export default function ReDefinitionPage() {
 
             === SKAD SA TE ZDANIA ===
             Kazdy fakt ponizej pochodzi z docs/LAUNCHPAD-DOSSIER.md,
-            docs/LAUNCHPAD-STAN.md albo wprost z kodu app/launchpad/*
+            docs/LAUNCHPAD-STAN.md albo wprost z kodu app/startpad/*
             (wymog logo, przelacznik ochrony snajperskiej, atomowy pre-buy,
             Top earnings liczone w wei - wszystko sprawdzone w zrodlach przed
             napisaniem). Testnet stoi w linijce State ZANIM padnie pierwsze
@@ -1227,7 +1227,7 @@ export default function ReDefinitionPage() {
           <Marker amount="3.00 ETH" label="where the curve closes" />
           <H2>A launch whose terms nobody can change overnight</H2>
           <State tone="live">
-            Runs on /launchpad — Base Sepolia, where the ETH is not real money; mainnet after an
+            Runs on /startpad — Base Sepolia, where the ETH is not real money; mainnet after an
             audit
           </State>
           <P>
@@ -1286,7 +1286,7 @@ export default function ReDefinitionPage() {
           </P>
           <p className="mb-4">
             <Link
-              href="/launchpad"
+              href="/startpad"
               className="inline-flex items-center gap-2 rounded-pill bg-soft-primary-deep px-4 py-2.5 font-soft-display text-[13.5px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
             >
               Open the Startpad →

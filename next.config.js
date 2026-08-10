@@ -165,6 +165,11 @@ const nextConfig = {
       // Regula jest nie tylko szkodliwa, ale i zbedna: skoro matcher ignoruje
       // wielkosc liter, /docs/ i tak trafia w te sama trase co /Docs/.
       ...buildRedirects(),
+      // Startpad mieszkal pod /launchpad do 2026-08-10. Stare linki (posty,
+      // PR-y, zakladki) maja dalej trafiac na strone, nie w 404. Zrodlo i cel
+      // roznia sie caly czas, wiec pulapka petli z /Docs tu nie wystepuje.
+      { source: '/launchpad', destination: '/startpad', permanent: false },
+      { source: '/launchpad/:path*', destination: '/startpad/:path*', permanent: false },
       {
         source: '/:path*',
         has: [

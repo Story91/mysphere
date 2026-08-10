@@ -306,7 +306,7 @@ function LaunchCard({
       {!sample && (
         <div className="mt-4 flex items-center gap-2">
           <button type="button" onClick={onTrade} className="flex-1 rounded-full bg-soft-primary px-3 py-2 text-[12px] font-extrabold text-white">Trade</button>
-          {/* Bez adresu "Details" prowadziloby na /launchpad/undefined. */}
+          {/* Bez adresu "Details" prowadziloby na /startpad/undefined. */}
           {token.address && <button type="button" onClick={onOpen} className="rounded-full border border-black/15 bg-white px-3 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">Details</button>}
         </div>
       )}
@@ -1956,8 +1956,8 @@ export default function LaunchpadBoard() {
                 pierwszego ekranu, nie ciekawostka na dole. */}
             <div className="grid gap-4 sm:grid-cols-2">
               <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
-              <TopLaunches tokens={tokens} onOpen={(token) => token.address && router.push(`/launchpad/${token.address}`)} />
-              <VolumePanel tokens={tokens} onOpen={(token) => token.address && router.push(`/launchpad/${token.address}`)} />
+              <TopLaunches tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
+              <VolumePanel tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
               <TopEarnings rows={topEarners} ethUsd={ethUsd} />
             </div>
 
@@ -1966,7 +1966,7 @@ export default function LaunchpadBoard() {
                 token={kingToken}
                 ethUsd={ethUsd}
                 onTrade={() => selectToken(kingToken.id, true)}
-                onDetails={() => kingToken.address && router.push(`/launchpad/${kingToken.address}`)}
+                onDetails={() => kingToken.address && router.push(`/startpad/${kingToken.address}`)}
               />
             )}
 
@@ -1978,7 +1978,7 @@ export default function LaunchpadBoard() {
                 claimBusy={busy === 'claim'}
                 ethUsd={ethUsd}
                 onClaim={() => void claimAllMine()}
-                onOpen={(token) => token.address && router.push(`/launchpad/${token.address}`)}
+                onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)}
                 onLaunch={() => setLaunchOpen(true)}
               />
             )}
@@ -2022,7 +2022,7 @@ export default function LaunchpadBoard() {
                     </div>
                   ) : visibleTokens.length > 0 ? (
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      {visibleTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/launchpad/${token.address}`)} />)}
+                      {visibleTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />)}
                     </div>
                   ) : (
                     <div className="py-14 text-center text-[13px] text-black/50">No launches in this view.</div>
@@ -2031,7 +2031,7 @@ export default function LaunchpadBoard() {
               ) : (
                 <div className="overflow-x-auto">
                   <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] gap-4 border-y border-black/10 bg-[#fafafd] px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/45 sm:px-5"><span>Coin</span><span>Curve</span><span>Indexed vol</span><span>Momentum</span><span>Creator</span><span /></div>
-                  {tokens.length === 0 && loadingBoard ? <div className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from Base Sepolia...</div> : visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/launchpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
+                  {tokens.length === 0 && loadingBoard ? <div className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from Base Sepolia...</div> : visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
                 </div>
               )}
               <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Startpad events and current onchain state.'}</div>
@@ -2061,7 +2061,7 @@ export default function LaunchpadBoard() {
             <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">Curve trade</p><h2 className="mt-1 text-[21px] font-extrabold text-[#16141b]">{selected.symbol} market</h2></div><button type="button" onClick={() => setTradeOpen(false)} className="rounded-full p-2 text-black/40 hover:bg-black/5 hover:text-[#16141b]" aria-label="Close dialog"><X className="h-5 w-5" aria-hidden="true" /></button></div>
             <div className="mt-5 flex items-center gap-3"><TokenGlyph token={selected} large /><div><div className="flex items-center gap-2"><span className="text-[16px] font-extrabold text-[#16141b]">{selected.symbol}</span><StatePill state={selected.state} /></div><p className="mt-1 text-[12px] text-black/45">{selected.name} · {curvePercent(selected)}% of curve</p></div></div>
             {selected.live ? <TradePanel token={selected} details={details} side={tradeSide} setSide={setTradeSide} buyAmount={buyAmount} setBuyAmount={setBuyAmount} sellAmount={sellAmount} setSellAmount={setSellAmount} sellQuote={sellQuote} gradReward={gradReward} busy={busy} ethUsd={ethUsd} onBuy={buy} onSell={sell} onGraduate={graduate} onSettle={settle} onHarvest={harvest} onClaim={claim} isConnected={isConnected} /> : <div className="mt-5 flex items-start gap-2 rounded-xl bg-[#f5f5f7] p-3 text-[11.5px] leading-[1.45] text-black/55"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><span>This is a sample row. Launch a token to activate the live trade panel.</span></div>}
-            <div className="mt-5 flex items-center justify-between border-t border-black/10 pt-4 text-[11px] text-black/45"><span>{selected.holders} holders · {selected.trades ?? 0} trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => router.push(`/launchpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
+            <div className="mt-5 flex items-center justify-between border-t border-black/10 pt-4 text-[11px] text-black/45"><span>{selected.holders} holders · {selected.trades ?? 0} trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => router.push(`/startpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
           </section>
         </div>
       )}

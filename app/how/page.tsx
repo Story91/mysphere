@@ -572,7 +572,7 @@ export default function HowPage() {
               — and only at launch — you can tighten that cap or switch the
               protection off entirely.
             </P>
-            <Go href="/launchpad">Open Startpad</Go>
+            <Go href="/startpad">Open Startpad</Go>
           </Step>
 
           {/* ---------------------------------------------------------- */}
@@ -626,7 +626,7 @@ export default function HowPage() {
               the purchase, and the bought tokens go to the dead address,
               provably out of circulation.
             </P>
-            <Go href="/launchpad">Open My tokens</Go>
+            <Go href="/startpad">Open My tokens</Go>
           </Step>
 
           {/* ---------------------------------------------------------- */}

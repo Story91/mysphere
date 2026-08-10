@@ -1140,7 +1140,7 @@ export default function LaunchTokenModal({
               )}
               <div className="mt-6 flex w-full flex-col gap-2 sm:flex-row">
                 <Link
-                  href={`/launchpad/${launched.address}`}
+                  href={`/startpad/${launched.address}`}
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-soft-primary px-4 py-3 text-[13px] font-extrabold text-white"
                 >
                   View token page

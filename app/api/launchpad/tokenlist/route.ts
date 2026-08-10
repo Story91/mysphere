@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createPublicClient, http, type Address } from 'viem';
-import { erc20Abi, LAUNCHPAD_CHAIN } from '../../../launchpad/config';
-import { resolveMediaUrl } from '../../../launchpad/metadata';
+import { erc20Abi, LAUNCHPAD_CHAIN } from '../../../startpad/config';
+import { resolveMediaUrl } from '../../../startpad/metadata';
 import { listProfiles } from '../profileStore';
 
 /**
