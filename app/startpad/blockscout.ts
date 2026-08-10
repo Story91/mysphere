@@ -72,11 +72,32 @@ type CountersResponse = {
  * Uzywamy `/tokens/{addr}/counters`, a NIE `/tokens/{addr}` - to pierwsze
  * dziala na obu sieciach; drugie na Base Sepolii oddaje 404 (zmierzone).
  */
-export async function fetchHolderCount(chainId: number, token: string): Promise<number | null> {
-  const data = await cachedGet<CountersResponse>(`${proxyBase(chainId)}/tokens/${token}/counters`);
-  if (data?.token_holders_count == null) return null;
-  const n = Number(data.token_holders_count);
+function toCount(raw: string | undefined): number | null {
+  if (raw == null) return null;
+  const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+export type TokenCounters = {
+  /** Liczba posiadaczy wg indeksu; `null` = indeks milczy. */
+  holders: number | null;
+  /** Liczba WSZYSTKICH transferow tokena (nie tylko naszych transakcji krzywej). */
+  transfers: number | null;
+};
+
+/**
+ * Oba liczniki tokena jednym zapytaniem `/counters`. To ten sam URL, ktory
+ * wola `fetchHolderCount`, wiec przy wlaczonym cache liczba posiadaczy i liczba
+ * transferow dziela JEDNO zapytanie - dodanie statystyki transferow nie kosztuje
+ * ani jednego kredytu wiecej.
+ */
+export async function fetchTokenCounters(chainId: number, token: string): Promise<TokenCounters> {
+  const data = await cachedGet<CountersResponse>(`${proxyBase(chainId)}/tokens/${token}/counters`);
+  return { holders: toCount(data?.token_holders_count), transfers: toCount(data?.transfers_count) };
+}
+
+export async function fetchHolderCount(chainId: number, token: string): Promise<number | null> {
+  return (await fetchTokenCounters(chainId, token)).holders;
 }
 
 export type IndexedHolder = {
