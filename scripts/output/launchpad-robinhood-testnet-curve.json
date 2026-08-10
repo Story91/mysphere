@@ -1,0 +1,46 @@
+{
+  "ranAt": "2026-08-10T19:58:01.451Z",
+  "chainId": 46630,
+  "admin": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "pad": "0xdAe0dd6EE87a8d7eE7575dD9904A72fA9CA6600d",
+  "poolManagerMock": "0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6",
+  "token": "0xA576A2DD6CC657806de73BD3F4121DB7CF79158D",
+  "costEth": "0.002099970833472433",
+  "checks": [
+    {
+      "name": "stack wdrozony na zywym testnecie",
+      "ok": true,
+      "detail": "pad 0xdAe0dd6EE87a8d7eE7575dD9904A72fA9CA6600d, PM(mock) 0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6"
+    },
+    {
+      "name": "launch przechodzi",
+      "ok": true,
+      "detail": "token 0xA576A2DD6CC657806de73BD3F4121DB7CF79158D, gas 899078"
+    },
+    {
+      "name": "kupno na krzywej",
+      "ok": true,
+      "detail": "5252268.02482890339010027 CPRB, gas 162977"
+    },
+    {
+      "name": "sprzedaz na krzywej",
+      "ok": true,
+      "detail": "quote 0.001965361302162291 ETH, gas 99714"
+    },
+    {
+      "name": "oplaty naliczone (tworca+protokol)",
+      "ok": true,
+      "detail": "0.000059852134365276 ETH"
+    },
+    {
+      "name": "claim wyplaca ETH",
+      "ok": true,
+      "detail": "gas 42632"
+    },
+    {
+      "name": "kontrakt trzyma dokladnie rezerwe + nieodebrane oplaty",
+      "ok": true,
+      "detail": "saldo 0.001974786563472433, ethReserve 0.001974786563472433"
+    }
+  ]
+}
