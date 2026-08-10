@@ -19,12 +19,12 @@ function proxyBase(chainId: number): string {
  * Liczba posiadaczy i transferow zmienia sie wolno, a tablica przeladowuje sie
  * czesto (eventy na zywo, recznie, przy zmianie zakladki). Bez cache kazde
  * przeladowanie to N nowych zapytan. Dlatego:
- *  - trzymamy wynik per URL przez TTL (5 min) - powtorka w tym oknie = 0 zapytan;
+ *  - trzymamy wynik per URL przez TTL (60 s) - powtorka w tym oknie = 0 zapytan;
  *  - deduplikujemy zapytania W LOCIE - piec workerow boardu proszacych o ten sam
  *    token robi JEDNO zapytanie, nie piec.
  * Serwerowy proxy ma wlasny cache (revalidate), wiec to druga, tansza warstwa.
  */
-const TTL_MS = 5 * 60 * 1000;
+const TTL_MS = 60 * 1000;
 const cache = new Map<string, { at: number; value: unknown }>();
 const inflight = new Map<string, Promise<unknown>>();
 
