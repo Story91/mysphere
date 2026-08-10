@@ -335,6 +335,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               <div className="min-w-0 lg:col-start-1 lg:row-start-2">
                 <DetailTabs
                   core={core}
+                  tokenAddress={tokenAddress}
                   ethUsd={ethUsd}
                   trades={history.trades}
                   balances={history.balances}
