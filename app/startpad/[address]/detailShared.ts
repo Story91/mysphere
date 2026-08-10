@@ -223,7 +223,22 @@ export function fmtPrice(value: number): string {
   if (value >= 1) return value.toFixed(2);
   if (value >= 0.01) return value.toFixed(4);
   if (value >= 0.000001) return value.toFixed(8);
-  return value.toExponential(2);
+  // Ceny tokenow z krzywej sa rzedu 1e-9 ETH. `toExponential` dawal tu "1.96e-9"
+  // - notacja naukowa, ktora wyglada jak blad, a nie jak cena. Zamiast tego
+  // pelny zapis dziesietny z 3 cyframi znaczacymi (uzytkownik woli dlugi, ale
+  // czytelny). `toLocaleString` NIE uzywa notacji naukowej.
+  return value.toLocaleString('en-US', { maximumSignificantDigits: 3, useGrouping: false });
+}
+
+/**
+ * Cena w USD dla malych wartosci. `formatUsd` scina wszystko ponizej centa do
+ * "<$0.01", a cena tokena jest zwykle duzo mniejsza - wiec tutaj pokazujemy
+ * pelny zapis dziesietny z 3 cyframi znaczacymi, spojnie z `fmtPrice`.
+ */
+export function fmtUsdPrice(usd: number): string {
+  if (!Number.isFinite(usd) || usd <= 0) return '--';
+  if (usd >= 0.01) return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${usd.toLocaleString('en-US', { maximumSignificantDigits: 3, useGrouping: false })}`;
 }
 
 export function fmtEth(value: bigint, maxFractionDigits = 5): string {
