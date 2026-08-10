@@ -15,8 +15,34 @@ import {
 } from "ethers";
 import { buildPlan, KNOWN_POOL_MANAGERS } from "./plan";
 
-const BASE_CHAIN_ID = 8453;
-const POOL_MANAGER = KNOWN_POOL_MANAGERS[BASE_CHAIN_ID];
+/**
+ * Cel forka. Sciezka puli (launch -> Locked -> graduate -> swapy) jest
+ * identyczna na kazdej sieci z v4, wiec jeden skrypt obsluguje obie; roznia
+ * sie tylko RPC i tym, czy siec ma precompile B20 (sekcja B20 idzie WPROST
+ * po RPC, nie po forku - Hardhat nie emuluje precompile'i, wiec na forku
+ * ta czesc i tak by klamala).
+ */
+const FORK_TARGETS = {
+  base: {
+    chainId: 8453,
+    rpc: process.env.BASE_RPC_URL || "https://mainnet.base.org",
+    hasB20: true,
+    outFile: "launchpad-base-fork-probe.json",
+  },
+  robinhood: {
+    chainId: 4663,
+    rpc: process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
+    hasB20: false,
+    outFile: "launchpad-robinhood-fork-probe.json",
+  },
+} as const;
+
+const TARGET_NAME = (process.env.FORK_CHAIN ?? "base") as keyof typeof FORK_TARGETS;
+if (!(TARGET_NAME in FORK_TARGETS)) {
+  throw new Error(`FORK_CHAIN=${TARGET_NAME} - znam tylko [${Object.keys(FORK_TARGETS).join(", ")}].`);
+}
+const TARGET = FORK_TARGETS[TARGET_NAME];
+const POOL_MANAGER = KNOWN_POOL_MANAGERS[TARGET.chainId];
 const B20_FACTORY = "0xB20f000000000000000000000000000000000000";
 
 // Parametry PRODUKCYJNE z wdrozenia 2026-08-10 (70% tworca, jak PONS) -
@@ -43,7 +69,7 @@ async function resetToBaseFork(rpcUrl: string) {
   if (network.name !== "hardhat") {
     throw new Error(
       `Ten skrypt musi isc po lokalnym forku Hardhata, a nie po --network ${network.name}. ` +
-        "Uruchom: npm run launchpad:fork:base"
+        "Uruchom: npm run launchpad:fork:base albo npm run launchpad:fork:robinhood"
     );
   }
 
@@ -123,7 +149,7 @@ async function runRealPoolPath(checks: Check[]) {
   const pmCode = await ethers.provider.getCode(POOL_MANAGER);
   add(
     checks,
-    "Base fork ma prawdziwy PoolManager",
+    `fork ${TARGET_NAME} ma prawdziwy PoolManager`,
     pmCode !== "0x" && (pmCode.length - 2) / 2 === 24_009,
     `${POOL_MANAGER}, ${(pmCode.length - 2) / 2} B kodu`
   );
@@ -243,8 +269,8 @@ async function runRealPoolPath(checks: Check[]) {
 async function runB20PrecompileCall(checks: Check[], rpcUrl: string) {
   const provider = new JsonRpcProvider(rpcUrl);
   const chainId = Number((await provider.getNetwork()).chainId);
-  if (chainId !== BASE_CHAIN_ID) {
-    throw new Error(`BASE_RPC_URL wskazuje chainId ${chainId}, oczekiwalem ${BASE_CHAIN_ID}.`);
+  if (chainId !== TARGET.chainId) {
+    throw new Error(`RPC wskazuje chainId ${chainId}, oczekiwalem ${TARGET.chainId} (${TARGET_NAME}).`);
   }
 
   const b20Code = await provider.getCode(B20_FACTORY);
@@ -468,10 +494,10 @@ async function runB20PrecompileCall(checks: Check[], rpcUrl: string) {
 }
 
 async function main() {
-  const rpcUrl = process.env.BASE_RPC_URL || "https://mainnet.base.org";
+  const rpcUrl = TARGET.rpc;
   const checks: Check[] = [];
 
-  console.log("BASE RPC", rpcUrl.replace(/([?&](?:key|api_key|apikey)=)[^&]+/gi, "$1***"));
+  console.log(`FORK ${TARGET_NAME} (chainId ${TARGET.chainId}), RPC`, rpcUrl.replace(/([?&](?:key|api_key|apikey)=)[^&]+/gi, "$1***"));
   await resetToBaseFork(rpcUrl);
 
   const forkBlock = await ethers.provider.getBlockNumber();
@@ -480,11 +506,15 @@ async function main() {
 
   const pool = await runRealPoolPath(checks);
   console.log("");
-  const b20 = await runB20PrecompileCall(checks, rpcUrl);
+  // Sekcja B20 idzie WPROST po RPC (state override), nie po forku. Na sieci
+  // bez precompile'a nie ma czego sondowac - pomijamy zamiast udawac.
+  const b20 = TARGET.hasB20 ? await runB20PrecompileCall(checks, rpcUrl) : null;
 
   const failed = checks.filter((c) => !c.ok);
   const result = {
     ranAt: new Date().toISOString(),
+    chain: TARGET_NAME,
+    chainId: TARGET.chainId,
     rpc: rpcUrl.replace(/([?&](?:key|api_key|apikey)=)[^&]+/gi, "$1***"),
     forkBlock,
     pool,
@@ -494,7 +524,7 @@ async function main() {
 
   const outDir = path.join(process.cwd(), "scripts", "output");
   fs.mkdirSync(outDir, { recursive: true });
-  const outFile = path.join(outDir, "launchpad-base-fork-probe.json");
+  const outFile = path.join(outDir, TARGET.outFile);
   fs.writeFileSync(outFile, `${JSON.stringify(result, null, 2)}\n`);
 
   console.log("");

@@ -25,6 +25,7 @@
     "launchpad:deploy:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploy.ts --network base-sepolia",
     "launchpad:deploy:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploy.ts --network base",
     "launchpad:fork:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/forkBaseProbe.ts",
+    "launchpad:fork:robinhood": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json FORK_CHAIN=robinhood hardhat run scripts/launchpad/forkBaseProbe.ts",
     "launchpad:flow:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/sepoliaFlow.ts --network base-sepolia",
     "launchpad:watch:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/watchFlow.ts --network base-sepolia",
     "launchpad:record:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/recordDeployment.ts --network base-sepolia",

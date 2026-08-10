@@ -8,7 +8,7 @@
 > · creator-first split 70/30 · buyback funded from the creator's share
 > · sniper protection is optional (creator can disable it at launch)
 
-MySphere Launchpad launches ERC-20 tokens on a bonding curve. When the curve
+MySphere Launchpad launches **B20 tokens** (Base's network-native, ERC-20-compatible standard — created by the network's factory precompile, born admin-less with supply cap = total supply) on a bonding curve. When the curve
 collects **exactly 3.00 ETH**, the token *graduates*: liquidity moves into a
 **Uniswap v4 pool** with a custom fee hook. There are **no admin keys, no pause,
 no upgrades** — every rule below is fixed in immutable contracts. All payouts are
@@ -133,7 +133,7 @@ token.
 | --- | --- |
 | `CurveLaunchpad` | curve math, trading, fees, graduation |
 | `LiquidityVault` | owns the v4 LP position, harvests LP fees |
-| `B20LaunchHook` | 1% swap fee, buyback accounting, 40/60 split |
-| `B20TokenFactory` | deploys tokens (vanity `0xb2...` addresses) |
+| `B20LaunchHook` | 1% swap fee, buyback accounting, 70/30 split |
+| `B20TokenFactory` | asks the network precompile to create each B20 token, then verifies supply, cap and the absence of any live role |
 
 Current addresses and deploy block: `docs/LAUNCHPAD-STAN.md`.

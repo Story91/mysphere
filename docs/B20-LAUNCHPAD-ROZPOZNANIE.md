@@ -498,6 +498,16 @@ Dowód z produkcji jest jeszcze mocniejszy. Przeczytałem 117 zdarzeń `B20Creat
 
 **Architektura stoi:** launchpad jest jedynym twórcą, adres tokena = `0xb2` + `0x00`×9 + bajt wariantu + pierwsze 9 bajtów `keccak256(abi.encode(LAUNCHPAD, salt))`. Adres tokena jest przewidywalny off-chain przed transakcją. Uwaga uboczna: dużo adresów produkcyjnych kończy się na `01` — konkurencja kopie sole pod vanity.
 
+### Fabryka działa też na Base Sepolia — zmierzone
+
+**[ODCZYT — `https://sepolia.base.org`, 2026-08-10]** Trzy wywołania, sender = nasz kontrakt launchpada ERC-20 (`0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48`, czyli KONTRAKT, nie EOA):
+
+- `getB20Address(ASSET, launchpad, 0x11×32)` → `0xB2000000000000000000003d3c29D9E0D77DBAa5` — **co do bajtu zgodne** z lokalnym wzorem `keccak256(abi.encode(sender, salt))`.
+- Pełna symulacja `createB20(ASSET, salt, {initialAdmin: address(0)}, [mint(launchpad, 1e27), updateSupplyCap(1e27)])` — **przechodzi** i zwraca ten sam adres. Kontrakt-jako-twórca i tryb admin-less działają na Sepolii identycznie jak na mainnecie.
+- `isB20(launchpad)` → `false` (sanity: precompile odpowiada poprawnie, a nie oddaje pustkę).
+
+Wniosek: cały cykl launchpada B20 da się testować na Sepolii, tam gdzie mieszka obecny Startpad. Punkt 4 z listy NIEPEWNYCH (pełny przebieg transakcyjny na Sepolii, łącznie z awansem) pozostaje do wykonania — powyższe to nadal `eth_call`, nie transakcje.
+
 ---
 
 ## 1. Tokeny bez właściciela — wymuszone kodem, nie regulaminem
