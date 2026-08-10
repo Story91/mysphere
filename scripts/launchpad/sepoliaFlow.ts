@@ -105,10 +105,16 @@ async function main() {
   const creator = getAddress(signer.address);
   const balanceBefore = await ethers.provider.getBalance(creator);
   const gasReserve = ethers.parseEther("0.02");
-  if (balanceBefore < buyEth + gasReserve) {
+  // Przy wznowieniu (`FLOW_TOKEN`) kupna JUZ NIE MA - token stoi na progu albo
+  // po graduacji. Zadanie wtedy pelnej kwoty zamykalo droge dokladnie temu,
+  // po co wznawianie powstalo: dokonczeniu przebiegu po tym, jak 3 ETH
+  // zostalo juz wydane.
+  const wymagane = process.env.FLOW_TOKEN ? gasReserve : buyEth + gasReserve;
+  if (balanceBefore < wymagane) {
     throw new Error(
-      `Za malo ETH: potrzeba co najmniej ${ethers.formatEther(buyEth + gasReserve)} ETH ` +
-        `(kupno ${ethers.formatEther(buyEth)} + rezerwa na gaz), jest ${ethers.formatEther(balanceBefore)} ETH.`
+      `Za malo ETH: potrzeba co najmniej ${ethers.formatEther(wymagane)} ETH` +
+        (process.env.FLOW_TOKEN ? " (sam gaz, wznowienie)" : ` (kupno ${ethers.formatEther(buyEth)} + rezerwa na gaz)`) +
+        `, jest ${ethers.formatEther(balanceBefore)} ETH.`
     );
   }
 
