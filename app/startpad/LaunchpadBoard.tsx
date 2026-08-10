@@ -521,7 +521,11 @@ function LiveRail({ events }: { events: ActivityItem[] }) {
             {events.length ? 'onchain' : 'waiting'}
           </span>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto">
+        {/* Wysokosc ograniczona: Live tape stoi w prawej kolumnie gridu obok
+            rynku, a wysokosc wiersza gridu = wyzsza z kolumn. Bez limitu dluga
+            tasma rozciagala grid i robila wielka pusta dziure miedzy rynkiem
+            a panelami pod spodem. 560px trzyma ja krotsza niz rynek. */}
+        <div className="max-h-[560px] overflow-y-auto">
           {events.length === 0 ? (
             <p className="px-4 py-8 text-center text-[11.5px] leading-[1.5] text-black/45">
               Nothing yet. Launches, buys and sells show up here the moment they land on chain.
@@ -2050,65 +2054,34 @@ export default function LaunchpadBoard() {
               <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-white shadow-[0_6px_16px_rgba(124,107,218,0.22)] transition-transform active:scale-[0.97]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
             </span>
           </div>
-          <label className="relative mt-4 block sm:hidden">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" aria-hidden="true" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${FIELD} rounded-full bg-[#f3f3f5] pl-10`} placeholder="Search coins, creators" aria-label="Search coins and creators" />
-          </label>
+          {/* Na telefonie search zdjety - filtry i przelacznik sieci wystarcza,
+              a pole zabieralo cala szerokosc pierwszego ekranu. Na sm+ zostaje
+              (jest w gornym wierszu obok logo). */}
         </div>
 
         {notice && <div className={`mb-4 flex items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] ${notice.kind === 'success' ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]' : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span>{notice.text}</span></div>}
         {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[11.5px] text-black/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-[#c76b12]'}`} aria-hidden="true" /><span suppressHydrationWarning>{loadingBoard ? `Reading Launchpad activity from ${NET}...` : `Live data unavailable. ${boardError}`}</span></div>}
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          {/* Kolejnosc wizualna ustawiona przez `order`, nie przez pozycje w
-              kodzie: rynek (tabs + tabela/grid) na samej gorze - to jest RYNEK,
-              wiec lista tokenow ma byc pierwsza, a panele statystyk pod nia. */}
-          <div className="flex min-w-0 flex-col">
-            {/* Cztery panele: na szerokim ekranie jeden rzad (xl:grid-cols-4),
-                zeby uklad ciagnal sie na cala szerokosc i wyrownal z rynkiem. */}
-            <div className="order-3 mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
-              <TopLaunches tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
-              <VolumePanel tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
-              <TopEarnings rows={topEarners} ethUsd={ethUsd} />
-            </div>
-
-            {kingToken && (
-              <div className="order-4">
-                <KingOfTheHill
-                  token={kingToken}
-                  ethUsd={ethUsd}
-                  onTrade={() => selectToken(kingToken.id, true)}
-                  onDetails={() => kingToken.address && router.push(`/startpad/${kingToken.address}`)}
-                />
-              </div>
-            )}
-
-            {/* Portfel tworcy - tylko przy podlaczonym portfelu. */}
-            {isConnected && address && (
-              <div className="order-5">
-                <MyTokensPanel
-                  tokens={myTokens}
-                  claimable={myClaimable}
-                  claimBusy={busy === 'claim'}
-                  ethUsd={ethUsd}
-                  onClaim={() => void claimAllMine()}
-                  onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)}
-                  onLaunch={() => setLaunchOpen(true)}
-                />
-              </div>
-            )}
-
-            <div className="order-1 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Launch sorting">
+          {/* Lewa kolumna to SAM rynek (filtry + tabela/grid). Panele statystyk,
+              King i My tokens sa POD gridem, na cala szerokosc - Live tape stoi
+              tylko obok rynku i nie zweza tego, co jest pod spodem. */}
+          <div className="min-w-0">
+            <div className="flex items-center justify-between gap-3">
+              {/* Filtry: na telefonie JEDEN pasek z przewijaniem w bok (nie zawija
+                  sie w kilka rzedow); od sm zawija normalnie. */}
+              <div className="-mx-1 flex items-center gap-2 overflow-x-auto whitespace-nowrap px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" role="tablist" aria-label="Launch sorting">
                 {([['new', 'New'], ['trending', 'Trending'], ['about', 'About to graduate'], ['graduated', 'Graduated'], ['all', 'All']] as const).map(([value, label]) => (
-                  <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`rounded-full border px-4 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>
+                  <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`shrink-0 rounded-full border px-4 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>
                 ))}
               </div>
-              <NetworkTag />
+              {/* Naklejka sieci - zbedna na telefonie (jest juz przelacznik w naglowku). */}
+              <span className="hidden shrink-0 sm:block">
+                <NetworkTag />
+              </span>
             </div>
 
-            <section className="order-2 mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market table">
+            <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market table">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
                 <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Startpad market</h2><p suppressHydrationWarning className="mt-1 text-[11px] text-black/45">{tokens.length === 0 && loadingBoard ? `reading live launches from ${NET}...` : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : `live event data from ${NET}`}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
                 <span className="flex flex-wrap items-center gap-2">
@@ -2156,6 +2129,37 @@ export default function LaunchpadBoard() {
 
           <LiveRail events={feedEvents} />
         </div>
+
+        {/* POD gridem, na CALA szerokosc - Live tape juz nie zweza tych sekcji.
+            Panele zostaja 2x2 (na szerokim ekranie po prostu wieksze), a King
+            i My tokens ciagna sie od krawedzi do krawedzi. */}
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
+          <TopLaunches tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
+          <VolumePanel tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
+          <TopEarnings rows={topEarners} ethUsd={ethUsd} />
+        </div>
+
+        {kingToken && (
+          <KingOfTheHill
+            token={kingToken}
+            ethUsd={ethUsd}
+            onTrade={() => selectToken(kingToken.id, true)}
+            onDetails={() => kingToken.address && router.push(`/startpad/${kingToken.address}`)}
+          />
+        )}
+
+        {isConnected && address && (
+          <MyTokensPanel
+            tokens={myTokens}
+            claimable={myClaimable}
+            claimBusy={busy === 'claim'}
+            ethUsd={ethUsd}
+            onClaim={() => void claimAllMine()}
+            onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)}
+            onLaunch={() => setLaunchOpen(true)}
+          />
+        )}
 
         <StartpadFooter />
       </div>
