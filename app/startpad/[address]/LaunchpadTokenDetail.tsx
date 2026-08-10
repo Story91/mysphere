@@ -28,7 +28,7 @@ import {
   liquidityVaultAbi,
 } from '../config';
 import { parseMetadataUri, pickTokenImage } from '../metadata';
-import { fetchHolderCount } from '../blockscout';
+import { fetchTokenCounters, type TokenCounters } from '../blockscout';
 import { useEthUsd } from '../useEthUsd';
 import DetailTabs from './DetailTabs';
 import PriceChart from './PriceChart';
@@ -477,21 +477,21 @@ function StatsCard({
     return count;
   }, [balances]);
 
-  // Liczba posiadaczy z BLOCKSCOUTA: pelna, nie ograniczona oknem skanu
-  // transferow. `null` -> pokazujemy liczbe z lancucha. Miekko: blad = fallback.
-  const [holdersFromIndex, setHoldersFromIndex] = useState<number | null>(null);
+  // Liczniki z BLOCKSCOUTA jednym zapytaniem: posiadacze (pelni, nie ograniczeni
+  // oknem skanu) i WSZYSTKIE transfery tokena. `null` -> fallback na lancuch.
+  const [counters, setCounters] = useState<TokenCounters>({ holders: null, transfers: null });
   useEffect(() => {
     if (!tokenAddress) return;
     let cancelled = false;
-    void fetchHolderCount(LAUNCHPAD_CHAIN.id, tokenAddress).then((count) => {
-      if (!cancelled && count !== null) setHoldersFromIndex(count);
+    void fetchTokenCounters(LAUNCHPAD_CHAIN.id, tokenAddress).then((data) => {
+      if (!cancelled) setCounters(data);
     });
     return () => {
       cancelled = true;
     };
   }, [tokenAddress]);
 
-  const holdersCount = holdersFromIndex ?? holdersFromChain;
+  const holdersCount = counters.holders ?? holdersFromChain;
 
   // USD to zawsze dopisek, nigdy wartosc glowna - przy braku kursu (null)
   // wiersz wyglada dokladnie tak, jak przed dodaniem dopiskow.
@@ -501,6 +501,11 @@ function StatsCard({
     { label: 'ETH reserve', value: `${fmtEth(core.ethReserve, 4)} ETH`, usd: usdSuffix(core.ethReserve, ethUsd) },
     { label: 'Volume', value: `${fmtEth(volumeWei, 4)} ETH`, usd: usdSuffix(volumeWei, ethUsd) },
     { label: 'Trades', value: String(trades.length) },
+    // Transfery z indeksu Blockscouta - wszystkie ruchy tokena, nie tylko nasze
+    // transakcje krzywej. Gdy indeks milczy, chowamy wiersz zamiast klamac zerem.
+    ...(counters.transfers !== null
+      ? [{ label: 'Transfers', value: String(counters.transfers) }]
+      : []),
     { label: 'Holders', value: String(holdersCount) },
     { label: 'Age', value: timeAgo(core.startedAt).replace(' ago', '') },
     { label: 'Curve fee', value: core.config.known ? `${(core.config.feeBps / 100).toFixed(2)}%` : '--' },
