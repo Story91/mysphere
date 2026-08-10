@@ -206,7 +206,13 @@ async function main() {
   const probe = await Probe.deploy(POOL_MANAGER);
   await probe.waitForDeployment();
   const probeDeploy = await probe.deploymentTransaction()?.wait();
+  // Ktora waluta niesie oplate, zalezy od KIERUNKU wymiany. Hook bierze ja z
+  // waluty NIEPODANEJ: przy exactInput ETH->token podana jest ETH, wiec oplata
+  // schodzi z TOKENA. Skrypt sprawdzal `pendingEth` i oglaszal porazke przy
+  // poprawnie dzialajacym hooku - dokladnie ta sama pomylka, ktora opisuje
+  // naglowek testu `B20LaunchHook`.
   const pendingEthBefore = await hook.pendingEth(token);
+  const pendingTokenBefore = await hook.pendingToken(token);
   const swapTx = await probe.doSwap(
     [key[0], key[1], key[2], key[3], key[4]],
     [true, -SWAP_ETH, MIN_SQRT_PRICE_PLUS_ONE],
@@ -214,7 +220,15 @@ async function main() {
   );
   const swapReceipt = (await swapTx.wait())!;
   const pendingEthAfter = await hook.pendingEth(token);
-  if (pendingEthAfter <= pendingEthBefore) throw new Error("Swap nie naliczyl pendingEth hooka.");
+  const pendingTokenAfter = await hook.pendingToken(token);
+  const wzrostEth = pendingEthAfter - pendingEthBefore;
+  const wzrostToken = pendingTokenAfter - pendingTokenBefore;
+  if (wzrostEth === 0n && wzrostToken === 0n) {
+    throw new Error("Swap nie naliczyl hookowi ani ETH, ani tokena.");
+  }
+  console.log(
+    `oplata hooka: +${ethers.formatEther(wzrostEth)} ETH, +${ethers.formatEther(wzrostToken)} tokena`
+  );
   console.log("swap    ", receiptSummary(swapReceipt));
 
   const settleTx = await hook.settle(token);
