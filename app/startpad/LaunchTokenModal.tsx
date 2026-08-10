@@ -767,7 +767,7 @@ export default function LaunchTokenModal({
       await switchChainAsync({ chainId: LAUNCHPAD_CHAIN.id });
       return true;
     } catch {
-      setNotice({ kind: 'error', text: 'Switch to Base Sepolia was cancelled. Nothing was sent.' });
+      setNotice({ kind: 'error', text: `Switch to ${LAUNCHPAD_CHAIN.name} was cancelled. Nothing was sent.` });
       return false;
     }
   };
@@ -1029,10 +1029,10 @@ export default function LaunchTokenModal({
   const summaryText =
     advancedSupported === true
       ? `Fee ${(feeBpsNow / 100).toFixed(2)}% · you keep ${creatorPctNow.toFixed(0)}% of it · ${
-          isConnected ? (onSepolia ? 'Base Sepolia ready' : 'Wallet will switch to Base Sepolia') : 'Wallet not connected'
+          isConnected ? (onSepolia ? `${LAUNCHPAD_CHAIN.name} ready` : `Wallet will switch to ${LAUNCHPAD_CHAIN.name}`) : 'Wallet not connected'
         }`
       : `Protocol default fees · ${
-          isConnected ? (onSepolia ? 'Base Sepolia ready' : 'Wallet will switch to Base Sepolia') : 'Wallet not connected'
+          isConnected ? (onSepolia ? `${LAUNCHPAD_CHAIN.name} ready` : `Wallet will switch to ${LAUNCHPAD_CHAIN.name}`) : 'Wallet not connected'
         }`;
 
   return (

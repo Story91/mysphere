@@ -4,7 +4,11 @@
 > launchpada — kontraktów, opłat, adresów lub UI, jeśli zmienia zachowanie opisane
 > tutaj. Stan wdrożenia i adresy: `docs/LAUNCHPAD-STAN.md`.
 >
-> Last updated: 2026-08-10 (v3) · deployment `0x4Cc0...1A48` (Base Sepolia)
+> Last updated: 2026-08-10 (v3) · deployments: `0x4Cc0...1A48` (Base Sepolia,
+> B20 tokens) and `0x712E...B22f` (Robinhood Chain MAINNET, plain ERC-20 tokens
+> — no B20 precompile there; same rules, all four contracts verified on
+> Blockscout, smoke-tested with real transactions; the frontend has a network
+> switcher for both)
 > · creator-first split 70/30 · buyback funded from the creator's share
 > · sniper protection is optional (creator can disable it at launch)
 

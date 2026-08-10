@@ -153,7 +153,7 @@ export default function TradePanel({
       await switchChainAsync({ chainId: LAUNCHPAD_CHAIN.id });
       return true;
     } catch {
-      setNotice({ kind: 'error', text: 'Switch to Base Sepolia was cancelled. Nothing was sent.' });
+      setNotice({ kind: 'error', text: `Switch to ${LAUNCHPAD_CHAIN.name} was cancelled. Nothing was sent.` });
       return false;
     }
   }, [chainId, switchChainAsync]);
