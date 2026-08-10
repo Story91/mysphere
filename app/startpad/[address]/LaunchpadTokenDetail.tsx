@@ -28,6 +28,7 @@ import {
   liquidityVaultAbi,
 } from '../config';
 import { parseMetadataUri, pickTokenImage } from '../metadata';
+import { fetchHolderCount } from '../blockscout';
 import { useEthUsd } from '../useEthUsd';
 import DetailTabs from './DetailTabs';
 import PriceChart from './PriceChart';
@@ -327,7 +328,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                 <div className="space-y-4 lg:sticky lg:top-4">
                   <TradePanel core={core} ethUsd={ethUsd} onAfterTx={() => void loadCore()} />
-                  <StatsCard core={core} ethUsd={ethUsd} trades={history.trades} balances={history.balances} copied={copied} onCopy={() => void copyAddress()} />
+                  <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} copied={copied} onCopy={() => void copyAddress()} />
                 </div>
               </div>
 
@@ -445,6 +446,7 @@ function TokenHeader({
 
 function StatsCard({
   core,
+  tokenAddress,
   ethUsd,
   trades,
   balances,
@@ -452,6 +454,7 @@ function StatsCard({
   onCopy,
 }: {
   core: CoreState;
+  tokenAddress: Address | null;
   ethUsd: number | null;
   trades: TradeEntry[];
   balances: Map<string, bigint>;
@@ -463,13 +466,31 @@ function StatsCard({
   // ostatnia cena krzywej - uczciwie podpisana w naglowku wykresu.
   const priceWei = core.spotPriceWei > 0n ? core.spotPriceWei : lastTrade?.priceWei ?? START_PRICE_WEI;
   const volumeWei = useMemo(() => trades.reduce((sum, trade) => sum + trade.eth, 0n), [trades]);
-  const holdersCount = useMemo(() => {
+  // Liczba posiadaczy z LANCUCHA: policzona z transferow, ktore i tak mamy.
+  // Dziala offline wzgledem Blockscouta i jest fallbackiem, gdy indeks milczy.
+  const holdersFromChain = useMemo(() => {
     let count = 0;
     for (const [holder, balance] of balances) {
       if (balance > 0n && holder !== LAUNCHPAD_ADDRESS.toLowerCase()) count += 1;
     }
     return count;
   }, [balances]);
+
+  // Liczba posiadaczy z BLOCKSCOUTA: pelna, nie ograniczona oknem skanu
+  // transferow. `null` -> pokazujemy liczbe z lancucha. Miekko: blad = fallback.
+  const [holdersFromIndex, setHoldersFromIndex] = useState<number | null>(null);
+  useEffect(() => {
+    if (!tokenAddress) return;
+    let cancelled = false;
+    void fetchHolderCount(LAUNCHPAD_CHAIN.id, tokenAddress).then((count) => {
+      if (!cancelled && count !== null) setHoldersFromIndex(count);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tokenAddress]);
+
+  const holdersCount = holdersFromIndex ?? holdersFromChain;
 
   // USD to zawsze dopisek, nigdy wartosc glowna - przy braku kursu (null)
   // wiersz wyglada dokladnie tak, jak przed dodaniem dopiskow.

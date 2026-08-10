@@ -44,6 +44,7 @@ import {
   type LaunchpadToken,
 } from './config';
 import { pickTokenImage } from './metadata';
+import { fetchHolderCounts } from './blockscout';
 import LaunchTokenModal from './LaunchTokenModal';
 import StartpadFooter from './StartpadFooter';
 import { formatUsd, useEthUsd } from './useEthUsd';
@@ -1335,6 +1336,20 @@ export default function LaunchpadBoard() {
       live.sort((a, b) => b.raised - a.raised);
       setTokens(live);
       setSelectedId((current) => (live.some((token) => token.id === current) ? current : live[0].id));
+
+      // Liczba POSIADACZY z Blockscouta - miekki dodatek scalany po fakcie.
+      // Z samego RPC nie da sie jej policzyc bez skanu wszystkich transferow;
+      // tu przychodzi z indeksu. Gdy Blockscout milczy, zostaje liczba z eventow.
+      const liveAddresses = live.filter((t) => t.address).map((t) => t.address as string);
+      void fetchHolderCounts(ACTIVE_LAUNCHPAD_NETWORK.chain.id, liveAddresses).then((counts) => {
+        if (Object.keys(counts).length === 0) return;
+        setTokens((current) =>
+          current.map((t) => {
+            const key = t.address?.toLowerCase();
+            return key && counts[key] != null ? { ...t, holders: counts[key] } : t;
+          })
+        );
+      });
     } catch (error) {
       // Tablica podgladowa zostaje na ekranie - pusty widok wygladalby jak
       // "nikt jeszcze nic nie wystartowal", a to jest awaria odczytu.
