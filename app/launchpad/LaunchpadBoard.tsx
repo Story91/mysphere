@@ -258,6 +258,62 @@ function MiniBars({ token, green = false }: { token: LaunchpadToken; green?: boo
 
 type ActivityItem = { id: string; symbol: string; accent: string; label: string; tone: 'launch' | 'buy' | 'sell' | 'graduate' };
 
+/**
+ * Szyna zdarzen na zywo - PIONOWA i przyklejona z boku rynku.
+ *
+ * To jest swiadome odejscie od ukladu, ktory ma dzis kazdy launchpad: pozioma
+ * tasma na samej gorze plus szeroka siatka pod nia. Tamten uklad zmusza do
+ * czytania zdarzen katem oka, przy okazji przewijania rynku. Tutaj zdarzenia
+ * stoja obok rynku i zostaja na ekranie, wiec da sie je czytac jako osobna
+ * rzecz - a rynek nie traci szerokosci na pasek, ktory i tak ucieka.
+ *
+ * Na telefonie pionowa szyna nie ma sensu (zabralaby cala szerokosc), wiec tam
+ * zostaje wersja pozioma.
+ */
+function LiveRail({ events }: { events: ActivityItem[] }) {
+  const toneClass = (tone: ActivityItem['tone']) =>
+    tone === 'sell'
+      ? 'text-[#a34b08]'
+      : tone === 'buy'
+        ? 'text-[#0b9a51]'
+        : tone === 'graduate'
+          ? 'text-[#0b7a41]'
+          : 'text-[#5f4ec2]';
+
+  return (
+    <aside className="hidden lg:block" aria-label="Live Launchpad events">
+      <div className="sticky top-4 rounded-[20px] border border-black/10 bg-white">
+        <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
+          <h2 className="text-[13px] font-extrabold text-[#16141b]">Live tape</h2>
+          <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-black/40">
+            <span className={`h-1.5 w-1.5 rounded-full ${events.length ? 'bg-[#18bd64]' : 'bg-black/20'}`} />
+            {events.length ? 'onchain' : 'waiting'}
+          </span>
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto">
+          {events.length === 0 ? (
+            <p className="px-4 py-8 text-center text-[11.5px] leading-[1.5] text-black/45">
+              Nothing yet. Launches, buys and sells show up here the moment they land on chain.
+            </p>
+          ) : (
+            <ul className="divide-y divide-black/5">
+              {events.slice(0, 30).map((event) => (
+                <li key={event.id} className="flex items-center gap-2.5 px-4 py-2.5">
+                  <span className="h-6 w-6 shrink-0 rounded-lg" style={{ backgroundColor: event.accent }} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12px] font-extrabold text-[#16141b]">{event.symbol}</span>
+                    <span className={`block text-[10.5px] font-bold ${toneClass(event.tone)}`}>{event.label}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 function ActivityTicker({ events }: { events: ActivityItem[] }) {
   const items = [...events, ...events].slice(0, 16);
   return (
@@ -1429,7 +1485,9 @@ export default function LaunchpadBoard() {
   return (
     <main className="min-h-screen bg-[#fcfcfd] px-4 pb-24 pt-0 font-soft sm:px-6">
       <div className="mx-auto w-full max-w-[1280px]">
-        <ActivityTicker events={activityFeed} />
+        <div className="lg:hidden">
+          <ActivityTicker events={activityFeed} />
+        </div>
 
         <div className="relative overflow-hidden py-5 sm:py-7">
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-soft-primary/[0.06] blur-3xl" />
@@ -1455,7 +1513,9 @@ export default function LaunchpadBoard() {
         {notice && <div className={`mb-4 flex items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] ${notice.kind === 'success' ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]' : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span>{notice.text}</span></div>}
         {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[11.5px] text-black/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-[#c76b12]'}`} aria-hidden="true" /><span>{loadingBoard ? 'Reading Launchpad activity from Base Sepolia...' : `Live data unavailable. ${boardError}`}</span></div>}
 
-        <div className="grid gap-4 lg:grid-cols-[1.02fr_1fr_0.98fr]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="min-w-0">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <div className="grid gap-4">
             <SummaryCard title="Total curve reserve" value={formatEth(totalRaised)} detail={`${liveCount} active launches on Base Sepolia`} accent="#d6b7ff" icon={<CircleDollarSign className="h-6 w-6 text-[#8f45df]" />} />
             <SummaryCard title="Indexed volume" value={formatEth(totalVolume)} detail={`${totalTrades} trades reconstructed from chain`} accent="#bce2ff" icon={<TrendingUp className="h-6 w-6 text-[#24a3ee]" />} />
@@ -1504,6 +1564,10 @@ export default function LaunchpadBoard() {
           )}
           <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Preview rows remain visible until the first deployed Launchpad event is found.' : 'Every row is reconstructed from Launchpad events and current onchain state.'}</div>
         </section>
+          </div>
+
+          <LiveRail events={activityFeed} />
+        </div>
       </div>
 
       {(launchOpen || tradeOpen) && (

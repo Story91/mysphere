@@ -473,6 +473,36 @@ Usuniete: warunek w `_sell`, blad `CreatorLocked`, punkt 3 naglowka przepisany.
 Testy `tworca nie moze sprzedac na krzywej` oraz `I-C10` przepisane na nowa
 regule - sprawdzaja teraz, ze tworca NAPRAWDE wychodzi z realnym ETH.
 
+### Audyt funkcji: co ma Flaunch, a czego nie mamy my
+
+Zrodlo: `docs.flaunch.gg` (2026-08-10). Porownanie funkcja po funkcji, zeby
+luki byly nazwane, a nie domyslane.
+
+| funkcja | Flaunch | my |
+| --- | --- | --- |
+| pre-buy tworcy | tak | tak |
+| limit per portfel w oknie | tak, ale CAPTCHA i **wstrzymane w API** | tak, `windowCap` egzekwowany W KONTRAKCIE |
+| wybor podzialu oplaty | tak, domyslnie 80/20 | tak, tworca do 60%, protokol min. 40% |
+| auto-buyback | tak (Progressive Bid Wall) | tak, hook kupuje i PALI na `0x...dEaD` |
+| wielu odbiorcow oplat | przez Treasury Manager | tak, do 8 adresow z udzialami |
+| **start zaplanowany na przyszlosc** | **tak** | **NIE - luka** |
+| **NFT ze strumieniem przychodu** | **tak (zbywalne)** | **NIE - luka** |
+| fixed-price fair launch | tak | nie - my mamy krzywa, to inny model z wyboru |
+
+Dwie prawdziwe luki i obie sa DECYZJA PRODUKTOWA, nie zaniedbaniem:
+
+1. **Start zaplanowany.** Wymaga pola `startsAt` w `Launch` i warunku w `_buy`.
+   Zmiana w kontrakcie, wiec do nastepnego wdrozenia - nie da sie dolozyc do
+   `0x0712...0844`.
+2. **NFT ze strumieniem przychodu.** Flaunch mintuje zbywalny NFT, ktory niesie
+   prawo do oplat. U nas prawo do oplat jest przypisane do ADRESU w
+   `_feeReceivers` i nie da sie go sprzedac. To jest funkcja na osobny etap, nie
+   poprawka.
+
+Gdzie jestesmy MOCNIEJSI: nasz limit per portfel dziala w kontrakcie, a nie w
+warstwie aplikacji (ich jest wstrzymany), podloga protokolu jest wymuszona
+kodem, nie regulaminem, a buyback nie tylko kupuje - pali.
+
 ### Pulapka przy uruchamianiu testow: NIE ROB TEGO ROWNOLEGLE Z BUILDEM
 
 Przebieg czterech plikow naraz, puszczony ROWNOCZESNIE z `npm run build`, dal
