@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Address } from 'viem';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -9,6 +10,7 @@ import {
   RefreshCw,
   Users,
 } from 'lucide-react';
+import { fetchTokenHolders, type IndexedHolder } from '../blockscout';
 import {
   LAUNCH_HOOK_ADDRESS,
   LAUNCHPAD_ADDRESS,
@@ -66,6 +68,7 @@ const BADGE_CLASS: Record<NonNullable<HolderRow['badge']>, string> = {
 
 export default function DetailTabs({
   core,
+  tokenAddress,
   ethUsd,
   trades,
   balances,
@@ -78,6 +81,7 @@ export default function DetailTabs({
   onProfileSaved,
 }: {
   core: CoreState;
+  tokenAddress: Address | null;
   /** Kurs ETH/USD do dopiskow; null = dopiski znikaja, ETH zostaje. */
   ethUsd: number | null;
   trades: TradeEntry[];
@@ -93,13 +97,32 @@ export default function DetailTabs({
   const [tab, setTab] = useState<Tab>('trades');
   const [visible, setVisible] = useState(PAGE_SIZE);
 
+  // Ranking posiadaczy z Blockscouta - pelny, nie obciety oknem skanu. Pusty
+  // (brak klucza / token nieznany) -> zostaje odtworzenie z lancucha ponizej.
+  const [indexHolders, setIndexHolders] = useState<IndexedHolder[] | null>(null);
+  useEffect(() => {
+    if (!tokenAddress) return;
+    let cancelled = false;
+    void fetchTokenHolders(LAUNCHPAD_CHAIN.id, tokenAddress).then((rows) => {
+      if (!cancelled && rows.length > 0) setIndexHolders(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tokenAddress]);
+
   // Jedno zrodlo logo dla tabel: profil tworcy wygrywa z lancuchem - ta sama
   // regula co w naglowku strony, zeby jedna strona nie pokazywala dwoch logo.
   const logoUrl = pickTokenImage({ profileLogoUrl: profile?.logoUrl, metadataUri: core.config.metadataURI }).url;
 
   const holders = useMemo<HolderRow[]>(() => {
+    // Zrodlo prawdy: Blockscout, gdy odpowiedzial. Inaczej odtworzenie z
+    // transferow, ktore mamy z lancucha - ograniczone oknem skanu, ale zawsze.
+    const source: Array<[string, bigint]> = indexHolders
+      ? indexHolders.map((h) => [h.address, h.balance] as [string, bigint])
+      : Array.from(balances.entries());
     const rows: HolderRow[] = [];
-    for (const [address, balance] of balances) {
+    for (const [address, balance] of source) {
       if (balance <= 0n) continue;
       rows.push({
         address,
@@ -110,7 +133,7 @@ export default function DetailTabs({
     }
     rows.sort((a, b) => (a.balance === b.balance ? 0 : a.balance < b.balance ? 1 : -1));
     return rows.slice(0, 20);
-  }, [balances, core.creator]);
+  }, [indexHolders, balances, core.creator]);
 
   const newestFirst = useMemo(() => [...trades].reverse(), [trades]);
 

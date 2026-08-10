@@ -7,31 +7,81 @@
  * liczbe z lancucha. Zaden odczyt stad nie ma prawa wywalic tablicy.
  */
 
+// Proxy sam doklada `/api/v2/` do adresu Blockscouta, wiec TU go nie ma -
+// inaczej sciezka bylaby podwojona i odbita przez allowliste (403).
 function proxyBase(chainId: number): string {
-  return `/api/startpad/chain/${chainId}/api/v2`;
+  return `/api/startpad/chain/${chainId}`;
 }
 
-type TokenInfo = {
-  holders_count?: string;
-  holders?: string;
+type CountersResponse = {
+  token_holders_count?: string;
+  transfers_count?: string;
 };
 
 /**
  * Liczba POSIADACZY tokena wg indeksu Blockscouta - liczba, ktorej z samego
  * RPC nie da sie policzyc bez skanowania wszystkich transferow. `null` znaczy
  * "nie wiem" (brak klucza, token nieznany, siec poza planem), nie "zero".
+ *
+ * Uzywamy `/tokens/{addr}/counters`, a NIE `/tokens/{addr}` - to pierwsze
+ * dziala na obu sieciach; drugie na Base Sepolii oddaje 404 (zmierzone).
  */
 export async function fetchHolderCount(chainId: number, token: string): Promise<number | null> {
   try {
-    const res = await fetch(`${proxyBase(chainId)}/tokens/${token}`, { headers: { accept: 'application/json' } });
+    const res = await fetch(`${proxyBase(chainId)}/tokens/${token}/counters`, {
+      headers: { accept: 'application/json' },
+    });
     if (!res.ok) return null;
-    const data = (await res.json()) as TokenInfo;
-    const raw = data.holders_count ?? data.holders;
-    if (raw == null) return null;
-    const n = Number(raw);
+    const data = (await res.json()) as CountersResponse;
+    if (data.token_holders_count == null) return null;
+    const n = Number(data.token_holders_count);
     return Number.isFinite(n) ? n : null;
   } catch {
     return null;
+  }
+}
+
+export type IndexedHolder = {
+  /** Adres posiadacza, lowercase. */
+  address: string;
+  /** Saldo w jednostkach bazowych. */
+  balance: bigint;
+};
+
+type HoldersResponse = {
+  items?: Array<{ address?: { hash?: string }; value?: string }>;
+};
+
+/**
+ * RANKING posiadaczy wg Blockscouta - prawdziwe salda, nie ograniczone oknem
+ * skanu transferow (nasze odtwarzanie z RPC widzi tylko ostatnie N blokow).
+ * Pusta lista/blad -> `[]`, UI zostaje wtedy przy swoim odczycie z lancucha.
+ */
+export async function fetchTokenHolders(
+  chainId: number,
+  token: string,
+  limit = 50
+): Promise<IndexedHolder[]> {
+  try {
+    const res = await fetch(`${proxyBase(chainId)}/tokens/${token}/holders?limit=${limit}`, {
+      headers: { accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as HoldersResponse;
+    const items = data.items ?? [];
+    const out: IndexedHolder[] = [];
+    for (const item of items) {
+      const hash = item.address?.hash;
+      if (!hash || item.value == null) continue;
+      try {
+        out.push({ address: hash.toLowerCase(), balance: BigInt(item.value) });
+      } catch {
+        // Wartosc, ktora nie jest liczba calkowita - pomijamy ten wiersz.
+      }
+    }
+    return out;
+  } catch {
+    return [];
   }
 }
 
