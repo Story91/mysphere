@@ -90,11 +90,7 @@ function NetworkSwitch() {
     return <span className="text-[11px] font-bold text-black/40">{NET}</span>;
   }
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-2 pr-1 ${active.pillClass}`}>
-      {active.logo && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={active.logo} alt="" className="h-4 w-4 rounded-full" />
-      )}
+    <span className={`inline-flex items-center rounded-full border py-1 pl-3 pr-1 ${active.pillClass}`}>
       <select
         value={active.chain.id}
         onChange={(event) => setLaunchpadChain(Number(event.target.value))}
@@ -103,7 +99,7 @@ function NetworkSwitch() {
       >
         {Object.values(LAUNCHPAD_NETWORKS).map((net) => (
           <option key={net.chain.id} value={net.chain.id}>
-            {net.label}{net.testnet ? ' (testnet)' : ''}
+            {net.label}
           </option>
         ))}
       </select>
@@ -118,11 +114,7 @@ function NetworkTag() {
   const net = mounted ? ACTIVE_LAUNCHPAD_NETWORK : null;
   if (!net) return <span className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/35">{NET}</span>;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${net.pillClass}`}>
-      {net.logo && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={net.logo} alt="" className="h-3.5 w-3.5 rounded-full" />
-      )}
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${net.pillClass}`}>
       {net.label}
     </span>
   );
