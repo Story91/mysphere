@@ -59,7 +59,7 @@
     "@registrai/kya": "file:./vendor/kya",
     "@tanstack/react-query": "^5.67.3",
     "@vercel/analytics": "^1.1.2",
-    "@vercel/blob": "^0.27.2",
+    "@vercel/blob": "^2.8.0",
     "@vercel/speed-insights": "^1.2.0",
     "@x402/core": "^2.21.0",
     "@x402/evm": "^2.21.0",
