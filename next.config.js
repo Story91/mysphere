@@ -128,6 +128,12 @@ const nextConfig = {
       });
     }
 
+    // Pliki .md dokumentacji importujemy jako surowy string (asset/source),
+    // zeby tresc zyla w plikach markdown obok kodu, a nie w escape'owanych
+    // literalach TS (blok ```mermaid ma potrojne backticki). Dotyczy WYLACZNIE
+    // plikow .md faktycznie zaimportowanych - reszta drzewa bez zmian.
+    config.module.rules.push({ test: /\.md$/, type: 'asset/source' });
+
     return config;
   },
   async rewrites() {
