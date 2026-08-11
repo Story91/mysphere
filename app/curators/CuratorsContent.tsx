@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { unstable_cache } from 'next/cache';
 import { getCuratorRecord } from '../utils/morpho/curator/read';
 import type { CuratorChange } from '../utils/morpho/curator/types';
 
@@ -56,24 +57,21 @@ import type { CuratorChange } from '../utils/morpho/curator/types';
  */
 
 /**
- * Rewalidacja co piec minut. Sprawdzenie chodzi RAZ NA DOBE, wiec czestsza
- * rewalidacja nie pokazalaby niczego nowego - ale piec minut kosztuje
- * najwyzej 61 odczytow na piec minut niezaleznie od liczby odwiedzajacych,
- * a to zdejmuje z tej strony ryzyko bycia droga.
+ * Cache na piec minut, przeniesiony z dawnego `export const revalidate = 300`.
+ *
+ * Ten plik nie jest juz strona (page.tsx), tylko komponentem renderowanym przez
+ * serwerowe /asks - a `export const revalidate` dziala WYLACZNIE w page/layout.
+ * `unstable_cache` przywraca dokladnie ten sam rachunek: odczyt rejestru
+ * najwyzej raz na piec minut, niezaleznie od ruchu. Sprawdzenie kuratorow chodzi
+ * RAZ NA DOBE, wiec 5 minut i tak nie pokaze nic nowego czesciej - ale trzyma
+ * koszt odczytow z dala od liczby odwiedzajacych.
+ *
+ * Metadane zakladki przeniesione do generateMetadata w app/asks/page.tsx
+ * (galaz ?tab=curators).
  */
-export const revalidate = 300;
-
-export const metadata = {
-  title: 'Curator record',
-  description:
-    'A dated record of what curators changed in listed Morpho vaults on Base: fee changes, curator changes, and vaults entering or leaving the listed set.',
-  openGraph: {
-    title: 'Someone can raise the fee on your vault without telling you',
-    description:
-      'A dated, public record of curator actions in listed Morpho vaults on Base. Fees, curators, listings. No opinions, no forecasts, no wallets.',
-    type: 'article',
-  },
-};
+const loadCuratorRecord = unstable_cache(async () => getCuratorRecord(), ['curators-record'], {
+  revalidate: 300,
+});
 
 /* ------------------------------------------------------------------ */
 /*  Formatowanie                                                       */
@@ -155,7 +153,7 @@ function FailedLine({ message }: { message: string }) {
         {message}
       </p>
       <a
-        href="/curators"
+        href="/asks?tab=curators"
         className="shrink-0 rounded-pill bg-soft-primary px-3.5 py-1.5 font-soft-display text-[12px] font-semibold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
       >
         Try again
@@ -287,8 +285,8 @@ function ChangeCard({ change }: { change: CuratorChange }) {
 
 /* ------------------------------------------------------------------ */
 
-export default async function CuratorsPage() {
-  const result = await getCuratorRecord();
+export default async function CuratorsContent() {
+  const result = await loadCuratorRecord();
 
   return (
     <main className="min-h-screen bg-soft-bg font-soft">

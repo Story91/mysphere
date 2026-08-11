@@ -365,6 +365,18 @@ export default function HowPage() {
           , with its status next to it.
         </p>
 
+        <p className="mt-3 max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
+          Want the deeper version — the flow, the fees, and the onchain proof for
+          each part? That is what the{' '}
+          <Link
+            href="/Docs"
+            className="font-semibold text-soft-primary-deep underline decoration-soft-line underline-offset-4 hover:text-soft-primary"
+          >
+            documentation
+          </Link>{' '}
+          is for.
+        </p>
+
         <StepIndex />
 
         <div className="mt-10">
@@ -661,7 +673,7 @@ export default function HowPage() {
               parameters, has no idea which vaults you use, and never touches a
               wallet — yours or anyone else&apos;s.
             </P>
-            <Go href="/curators">Open the curator record</Go>
+            <Go href="/asks?tab=curators">Open the curator record</Go>
           </Step>
         </div>
 

@@ -172,30 +172,20 @@ export default function Navigation() {
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
-    // "Curators" to publiczny zapis faktow z data, ktorego nie da sie
-    // przepisac: zmiany parametrow skarbcow Morpho (prowizja, kurator,
-    // notowanie). Stal tuz za "Paid", ktore bylo tym samym rodzajem rzeczy -
-    // Paid mieszka teraz jako zakladka na /money, patrz komentarz wyzej.
+    // "Curators" nie ma juz wlasnego wpisu w belce - publiczny rejestr zmian
+    // kuratorow skarbcow Morpho mieszka teraz jako zakladka na /asks
+    // (?tab=curators), tak jak "Paid" na /money. Scalone, zeby odchudzic belke;
+    // /curators przekierowuje na /asks?tab=curators.
     //
-    // DLACZEGO W OGOLE W BELCE: to samo zgloszenie co przy /asks - "nie widac
-    // nic co wdrozylismy, skad oni maja wiedziec co robic". Strona, do ktorej
-    // prowadzi wylacznie wpisanie adresu recznie, z punktu widzenia
-    // uzytkownika nie istnieje.
-    //
-    // Do dolnego paska na telefonie (MobileBottomNav) tego NIE dopisujemy.
-    // Tamten pasek trzyma cztery rzeczy, ktore sie ROBI (feed, Aski, pieniadze,
-    // profil); to jest strona, ktora sie CZYTA, i pchanie jej miedzy przyciski
-    // akcji zabraloby miejsce czemus, po co ludzie tam siegaja.
-    { href: '/curators', label: 'Curators' },
-    // "B20" obok "Curators", bo obie strony dotycza tego samego: rzeczy, ktore
-    // istnieja NA BASE i o ktorych da sie powiedziec cos sprawdzalnego.
-    //
-    // Trafia tu z tego samego powodu, dla ktorego trafily tam /asks i /curators:
-    // strona, do ktorej prowadzi wylacznie wpisanie adresu z palca, z punktu
-    // widzenia uzytkownika nie istnieje. Sama zbudowana i niepodlinkowana byla
-    // dokladnie tym bledem, ktory na tej liscie naprawialismy juz dwa razy.
+    // Startpad (krzywa launchpada) trafil do belki z tego samego powodu, co
+    // /asks: strona, do ktorej prowadzi wylacznie wpisanie adresu z palca,
+    // z punktu widzenia uzytkownika nie istnieje.
     { href: '/startpad', label: 'Startpad' },
-    { href: '/b20', label: 'B20' },
+    // "B20" jest CHWILOWO UKRYTE w belce (na zyczenie). Trasa /b20 DZIALA dalej
+    // pod adresem - NIE dodajemy jej do DISABLED_ROUTES, wiec nie jest
+    // przekierowana, tylko niepokazana w nawigacji. Powrot do belki =
+    // odkomentowanie ponizszej linii.
+    // { href: '/b20', label: 'B20' },
     // "How" TUZ PRZED manifestem, bo odpowiadaja na dwa rozne pytania i to
     // pierwsze jest pilniejsze. /re-definition mowi, DLACZEGO ten produkt
     // istnieje - i ma prawo opisywac rzeczy, ktorych jeszcze nie ma. /how mowi,
