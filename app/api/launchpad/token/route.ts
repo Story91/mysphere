@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { put } from '@vercel/blob';
 import { createPublicClient, http, type Address } from 'viem';
-import { LAUNCHPAD_ADDRESS, LAUNCHPAD_CHAIN, launchpadAbi } from '../../../startpad/config';
+import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_NETWORKS, launchpadAbi } from '../../../startpad/config';
 import { sessionAddress } from '../../asks/identity';
 import { getProfiles, isProfileStoreAvailable, saveProfile, tokenDocId } from '../profileStore';
 
@@ -34,9 +34,21 @@ const PUBLIC_CACHE = { 'Cache-Control': 'public, max-age=60, stale-while-revalid
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
-function readClient() {
+/**
+ * Route jest bezstanowy - nie wie, na ktorej sieci stoi klient (to localStorage
+ * po stronie przegladarki). Wiec siec bierzemy z pola `chainId` w zadaniu; bez
+ * niego padamy na domysl. Bez tego launch/edycja na Robinhoodzie sprawdzaly
+ * `launchOf` na Base Sepolii, dostawaly state 0 -> 404, i logo NIGDY nie
+ * trafialo do Bloba tej sieci (kubelek startpad/logos/4663 zostawal pusty).
+ */
+function resolveNetwork(chainId: unknown) {
+  const id = typeof chainId === 'number' ? chainId : Number(chainId);
+  return Number.isFinite(id) && LAUNCHPAD_NETWORKS[id] ? LAUNCHPAD_NETWORKS[id] : ACTIVE_LAUNCHPAD_NETWORK;
+}
+
+function readClient(net: typeof ACTIVE_LAUNCHPAD_NETWORK) {
   return createPublicClient({
-    chain: LAUNCHPAD_CHAIN,
+    chain: net.chain,
     transport: http(),
   });
 }
@@ -130,10 +142,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Field `address` must be a token address.' }, { status: 400, headers: NO_STORE });
   }
 
+  const net = resolveNetwork(body.chainId);
+
   let creator: string;
   try {
-    const launch = (await readClient().readContract({
-      address: LAUNCHPAD_ADDRESS as Address,
+    const launch = (await readClient(net).readContract({
+      address: net.launchpad as Address,
       abi: launchpadAbi,
       functionName: 'launchOf',
       args: [address as Address],
@@ -160,13 +174,13 @@ export async function POST(request: NextRequest) {
 
   // Logo -> Blob (CDN). Robimy to PRZED Firestore, bo obrazek ma sie zapisac
   // nawet gdy Firestore jest niedostepny (np. wyczerpany limit).
-  const logoSaved = await uploadLogoToBlob(address, LAUNCHPAD_CHAIN.id, body.logoUrl);
+  const logoSaved = await uploadLogoToBlob(address, net.chain.id, body.logoUrl);
 
   // Firestore trzyma juz TYLKO opis i linki - bez data-URL. `logoUrl: null`
   // czysci ewentualny stary data-URL przy okazji edycji.
   const saved = await saveProfile({
     address,
-    chainId: LAUNCHPAD_CHAIN.id,
+    chainId: net.chain.id,
     creator,
     profile: {
       logoUrl: null,

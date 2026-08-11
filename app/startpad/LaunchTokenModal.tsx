@@ -1017,6 +1017,7 @@ export default function LaunchTokenModal({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             address: tokenAddress,
+            chainId: LAUNCHPAD_CHAIN.id,
             logoUrl: profileLogoUrl,
             description: launchDescription.trim(),
           }),

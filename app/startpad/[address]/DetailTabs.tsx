@@ -461,7 +461,7 @@ function ProfileEditor({
       const response = await fetch('/api/launchpad/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: token, logoUrl: logoDraft, description: descriptionDraft, website: websiteDraft }),
+        body: JSON.stringify({ address: token, chainId: LAUNCHPAD_CHAIN.id, logoUrl: logoDraft, description: descriptionDraft, website: websiteDraft }),
       });
       const payload = (await response.json()) as { profile?: TokenProfileView; error?: string };
       if (!response.ok) {
