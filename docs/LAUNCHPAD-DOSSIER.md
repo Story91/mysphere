@@ -154,6 +154,38 @@ Current addresses and deploy block: `docs/LAUNCHPAD-STAN.md`.
 > contracts are immutable, so everything below ships with the **next**
 > deployment — except the two P1 items, which are runbook/comment changes.
 
+### Mainnet-candidate build — applied 2026-08-11
+
+Turning this backlog into the actual mainnet build. Verified against the full
+suite (**125 passing**: unit + invariants + a new vanity suite) and a **real
+Base-mainnet fork probe** (`launchpad:fork:base`, block 49837711).
+
+- **Applied:** `MIN_SQRT_PRICE_X96` off-by-one → `4295128739`; buyback
+  `MAX_BUYBACK_SLIPPAGE_BPS` `500 → 150` (worst-case per-execution leak ~9.75% →
+  ~3%; comment no longer oversells it as a full sandwich defense); misleading
+  comments (v4 slot / `launch` docstring / terminal-price direction / PoolKey
+  hooks) corrected.
+- **Reverted after testing:** the `quoteBuy`/`quoteSell` guard-parity fix. The
+  suite showed it contradicts the *intentional* design (quotes return the raw
+  math — 0 tokens for dust — while `buy`/`sell` enforce the guards) and broke the
+  solvency invariant probe (`quoteSell(token, 0)` when nothing is circulating).
+  Quotes stay state-parity only.
+- **Not applied (as noted):** graduation-reward ramp, dust hook-fee threshold,
+  8-receiver claim-time split — debatable or worse trade-offs.
+- **Added (feature):** `launchVanity(bytes32 vanitySalt, …)` + `predictVanityToken`
+  — user-chosen, mineable token addresses (the 4-char vanity). Default
+  `launch`/`launchAdvanced` unchanged (blockhash, unpredictable). Safe despite
+  predictability (hook gate blocks pool poisoning); front-run-safe (launchId folds
+  `msg.sender`). Covered by `test/CurveLaunchpadVanity.test.ts`.
+- **Fork-verified on real Base mainnet:** graduation through real
+  `initialize`/`modifyLiquidity`; `POOLS_SLOT=6` reads the real PoolManager price
+  (closes the P1 layout concern for Base mainnet); `afterSwap` positive delta
+  settles exactInput **and** exactOutput on real v4.
+- **Market-cap tiers:** considered, **not** added — marginal user value, biggest
+  risk to the curve math; can ship later as a separate contract.
+- **External audit:** deferred (owner's call), replaced by a harder internal
+  adversarial pass; flagged as elevated risk before mainnet.
+
 ### P1 — deployment process (before mainnet)
 
 - **[medium] v4 storage layout is validated only at the FIRST graduation, not

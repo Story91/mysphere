@@ -407,7 +407,7 @@ async function runB20PrecompileCall(checks: Check[], rpcUrl: string) {
   const fullLaunchId = keccak256(
     AbiCoder.defaultAbiCoder().encode(
       ["address", "address", "uint256", "uint256", "bytes32"],
-      [fullLaunchpadAddress, fullProbeAddress, 0n, BASE_CHAIN_ID, previousBaseBlock.hash]
+      [fullLaunchpadAddress, fullProbeAddress, 0n, BigInt(TARGET.chainId), previousBaseBlock.hash]
     )
   );
   const directFactoryCall = {
