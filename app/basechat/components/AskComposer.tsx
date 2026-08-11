@@ -192,7 +192,7 @@ export default function AskComposer({
     if (seats < 1) return 'An Ask needs at least one seat.';
     if (seats > MAX_SEATS) return `${MAX_SEATS} seats is the maximum.`;
     if (perAnswer < MIN_PER_ANSWER) {
-      return `Each answer would be worth ${formatAskMoney(perAnswer)} — below the ${formatAskMoney(
+      return `Each answer would be worth ${formatAskMoney(perAnswer)}, below the ${formatAskMoney(
         MIN_PER_ANSWER
       )} minimum. Raise the budget or cut the seats.`;
     }
@@ -403,7 +403,7 @@ export default function AskComposer({
               active={effectiveFunding === 'on-resolve'}
               onSelect={() => setFunding('on-resolve')}
               title="Pay as you accept"
-              body="Nothing moves now. You pay each answer you accept, yourself, from your own wallet. Nothing is held for the people answering — all they have is your resolve record."
+              body="Nothing moves now. You pay each answer you accept, yourself, from your own wallet. Nothing is held for the people answering; all they have is your resolve record."
             />
           </div>
         </fieldset>

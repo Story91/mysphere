@@ -990,13 +990,13 @@ function BaseChatContent() {
         
         // Pokaż komunikat o bonusie punktów za wybraną domenę
         if (selectedSuffix === 'sphere') {
-          alert('🎉 Congratulations! You earned 1500 bonus points for choosing .sphere!');
+          alert('🎉 You earned 1500 bonus points for picking .sphere!');
         } else if (selectedSuffix === 'camper') {
-          alert('🎉 Congratulations! You earned 1000 bonus points for choosing .camper!');
+          alert('🎉 You earned 1000 bonus points for picking .camper!');
         } else if (selectedSuffix === 'celo') {
-          alert('🎉 Congratulations! You earned 1250 bonus points for choosing .celo!');
+          alert('🎉 You earned 1250 bonus points for picking .celo!');
         } else if (selectedSuffix === 'world') {
-          alert('🎉 Congratulations! You earned 1250 bonus points for choosing .world!');
+          alert('🎉 You earned 1250 bonus points for picking .world!');
         }
       } else {
         toast.error('Could not save your name. Try again.');
@@ -1622,7 +1622,7 @@ function BaseChatContent() {
       });
 
       // 4. Update UI
-      toast.success('Post created successfully!', { id: toastId });
+      toast.success('Your post is up!', { id: toastId });
       resetComposer();
 
       // ✅ OPTYMALIZACJA: Usunięto refreshPosts() - oszczędność 15 Firebase reads po każdym poście!
@@ -1935,7 +1935,7 @@ function BaseChatContent() {
 
       // Show success message
       toast.dismiss(toastId);
-      toast.success('Post created successfully as a Zora token!');
+      toast.success('Your post is up as a Zora token!');
 
 
 
@@ -1960,9 +1960,9 @@ function BaseChatContent() {
         errorMessage = 'Invalid token parameters. Creating as regular post instead.';
         shouldFallback = true;
       } else if (rawMessage.includes('insufficient funds')) {
-        errorMessage = 'Insufficient funds to create the token. Please ensure you have enough ETH for gas fees.';
+        errorMessage = 'Not enough ETH for gas, so the token was not created. Top up and try again.';
       } else if (rawMessage.includes('user rejected')) {
-        errorMessage = 'Transaction was rejected by user.';
+        errorMessage = 'You cancelled the transaction in your wallet.';
       } else if (rawMessage.includes('Failed to upload')) {
         errorMessage = 'Failed to upload media or metadata. Please try again.';
       } else if (rawMessage.includes('Token name cannot be empty') ||
@@ -2004,7 +2004,7 @@ function BaseChatContent() {
           await sealPremiumContent(fallbackPostId, premiumDraft);
 
           // Update UI
-          toast.success('Post created successfully!', { id: toastId });
+          toast.success('Your post is up!', { id: toastId });
           resetComposer();
 
           // Tutaj KASUJEMY cache, zamiast dopisywac - inaczej niz w sciezkach
@@ -3011,7 +3011,7 @@ function BaseChatContent() {
               </svg>
               <div>
                 <p className="font-semibold text-lg">Welcome to BaseChat! 🎉</p>
-                <p className="text-sm opacity-90">You have been successfully registered through a referral link</p>
+                <p className="text-sm opacity-90">Your sign-up through the referral link went through</p>
               </div>
             </div>
           </motion.div>
@@ -3654,7 +3654,7 @@ function BaseChatContent() {
                                           lastUpdated: serverTimestamp()
                                         });
                                         
-                                        alert('Social links saved successfully!');
+                                        alert('Social links saved!');
                                       } catch (error) {
                                         console.error('Error saving social links:', error);
                                         alert('Error saving social links. Please try again.');
@@ -4645,7 +4645,7 @@ function BaseChatContent() {
                                   {zlaSiec
                                     ? 'Switch to Base to post.'
                                     : maPlatna
-                                      ? 'Add something above the paywall first — a line everyone can read, so people know what they are paying for.'
+                                      ? 'Add something above the paywall first: a line everyone can read, so people know what they are paying for.'
                                       : 'Write something to post.'}
                                 </p>
                               );

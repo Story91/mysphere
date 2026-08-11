@@ -179,7 +179,7 @@ export default function DetailTabs({
       )}
       {truncated && !historyError && (
         <div className="border-b border-black/10 bg-[#fbfbfd] px-4 py-2 text-[10.5px] text-black/40 sm:px-5">
-          The public RPC limits how far back one page can scan — the oldest part of this history is not shown.
+          The public RPC limits how far back one page can scan, so the oldest part of this history is not shown.
         </div>
       )}
 
@@ -312,7 +312,7 @@ export default function DetailTabs({
                       <span className="ml-1 text-[11px] font-bold text-black/40">· {usdSuffix(core.config.pendingBuybackEth, ethUsd)}</span>
                     )}
                   </p>
-                  <p className="mt-0.5 text-[10.5px] text-black/45">set aside from the creator&apos;s ETH share at settle — anyone can execute</p>
+                  <p className="mt-0.5 text-[10.5px] text-black/45">set aside from the creator&apos;s ETH share at settle; anyone can execute</p>
                 </div>
                 <div className="rounded-xl bg-[#f8f7fc] p-3">
                   <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/40">Burned so far</p>
@@ -487,7 +487,7 @@ function ProfileEditor({
     <div className="border-t border-black/10 pt-5">
       <h3 className="text-[13px] font-extrabold text-[#16141b]">Token profile (creator only)</h3>
       <p className="mt-1 text-[11.5px] leading-[1.5] text-black/50">
-        Only you can edit this — the server checks the creator on chain before saving. The logo also feeds{' '}
+        Only you can edit this. The server checks the creator on chain before saving. The logo also feeds{' '}
         <a href="/api/launchpad/tokenlist" className="font-bold text-soft-primary-deep hover:text-soft-primary">our token list</a>, which wallets and aggregators can import.
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -530,7 +530,7 @@ function ProfileEditor({
             </button>
           </div>
           <span className="mt-1 block text-[10.5px] text-black/45">
-            ipfs:// is safer — its address is the file&apos;s hash, so nobody can swap the image later. Uploaded files are resized in your browser and shown only on this site.
+            ipfs:// is safer: its address is the file&apos;s hash, so nobody can swap the image later. Uploaded files are resized in your browser and shown only on this site.
           </span>
         </div>
         <label className="block">

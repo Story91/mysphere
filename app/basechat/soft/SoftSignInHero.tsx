@@ -236,7 +236,7 @@ export default function SoftSignInHero({
         className="soft-hero-rise mx-auto mb-7 max-w-[36ch] text-[13.5px] font-semibold leading-[1.55] text-white/80 lg:mx-0 lg:max-w-[46ch] lg:text-[14.5px]"
         style={{ ['--rise-delay' as string]: '120ms' }}
       >
-        Here the only score is one that cost somebody money — and every tip settles onchain
+        Here the only score is one that cost somebody money, and every tip settles onchain
         with a hash anyone can open.
       </p>
 

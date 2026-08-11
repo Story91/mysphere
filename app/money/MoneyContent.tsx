@@ -276,7 +276,7 @@ export default function MoneyContent() {
           {/* `max-w-[52ch]` - ta sama miara wiersza co na /leaderboard i /how.
               Bez niej akapit na desktopie ciagnal sie przez cale 640px. */}
           <p className="max-w-[52ch] text-[14.5px] leading-[1.65] text-soft-ink-muted">
-            Not a token list — your wallet already does that better. This is the money that moved
+            Not a token list. Your wallet already does that better. This is the money that moved
             through MySphere: what is waiting for you, what your open Asks are holding, what people
             paid you, and what you spent. Every settled line opens its transaction.
           </p>
@@ -384,7 +384,7 @@ export default function MoneyContent() {
 
             {phase === 'ready' && ledger && (
               <p className="px-1 font-soft text-[11px] leading-relaxed text-soft-ink-faint">
-                Amounts are shown per token and never added together — this page does not know
+                Amounts are shown per token and never added together. This page does not know
                 exchange rates and will not pretend to.{' '}
                 {ledger.reads > 0 && `Reading this cost ${ledger.reads} database reads.`}
               </p>
@@ -435,7 +435,7 @@ function LoadFailed({ onRetry, what }: { onRetry: () => void; what: string }) {
         We could not read {what}
       </h3>
       <p className="mb-3 text-[12.5px] leading-[1.5] text-soft-ink-muted">
-        This is a failed read, not an empty list. There may well be money here — we just could not
+        This is a failed read, not an empty list. There may well be money here, we just could not
         reach it.
       </p>
       <button type="button" onClick={onRetry} className={`${BUTTON} bg-soft-primary text-white`}>
@@ -492,7 +492,7 @@ function NothingYet() {
         No money has moved through this wallet here yet
       </h2>
       <p className="mb-3 text-[13.5px] leading-[1.6] text-soft-ink-muted">
-        That is not a failed read — we checked and there is nothing yet. There are three ways
+        That is not a failed read: we checked and there is nothing yet. There are three ways
         something lands on this page:
       </p>
       <ul className="flex flex-col gap-2 text-[13px] leading-[1.5] text-soft-ink-muted">
@@ -500,19 +500,19 @@ function NothingYet() {
           <Link href="/asks" className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary">
             Answer an open Ask
           </Link>{' '}
-          — if the author accepts your answer, the payout waits for you at the top of this page.
+          and, if the author accepts your answer, the payout waits for you at the top of this page.
         </li>
         <li>
           <Link href="/asks" className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary">
             Post an Ask
           </Link>{' '}
-          — lock a budget in escrow and it shows up here until it is resolved.
+          to lock a budget in escrow, and it shows up here until it is resolved.
         </li>
         <li>
           <Link href="/basechat" className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary">
             Tip someone in the feed
           </Link>{' '}
-          — sent and received tips both keep their transaction here.
+          (sent and received tips both keep their transaction here).
         </li>
       </ul>
     </div>
@@ -760,7 +760,7 @@ function LockedPanel({
           We could not read your locked budgets
         </h3>
         <p className="mb-3 text-[12.5px] leading-[1.5] text-soft-ink-muted">
-          This is a failed read, not a zero. Your budgets are held by the contract, not by us — the
+          This is a failed read, not a zero. Your budgets are held by the contract, not by us. The
           money is exactly where it was, we just could not reach the chain to count it.
         </p>
         <button type="button" onClick={() => void read()} className={`${BUTTON} bg-soft-primary text-white`}>
@@ -824,7 +824,7 @@ function LockedPanel({
         <p className="text-[12.5px] leading-[1.5] text-soft-ink-muted">
           {asks.length === 0
             ? 'None of your Asks is holding money in escrow right now.'
-            : 'The contract is no longer holding anything for your Asks — those budgets have already been resolved or sent back.'}
+            : 'The contract is no longer holding anything for your Asks. Those budgets have already been resolved or sent back.'}
         </p>
       )}
 
@@ -838,7 +838,7 @@ function LockedPanel({
             {receipts.length === 1
               ? 'One budget went back to your balance in this session'
               : `${receipts.length} budgets went back to your balance in this session`}{' '}
-            — collect it at the top of this page.
+            (collect it at the top of this page).
           </p>
           <ul className="flex flex-wrap gap-x-3 gap-y-1">
             {receipts.map((receipt) => (
@@ -868,7 +868,7 @@ function LockedPanel({
           <span className="font-mono tabular-nums text-soft-ink">
             {formatAmount(promised.reduce((sum, ask) => sum + ask.budget, 0))} USDC
           </span>
-          . Nothing holds that money — it stays in your wallet until you accept an answer and pay
+          . Nothing holds that money. It stays in your wallet until you accept an answer and pay
           for it.
         </p>
       )}
@@ -925,14 +925,14 @@ function LockedAskRow({
       >
         {timing.phase === 'running' && (
           <>
-            <strong className="font-semibold text-soft-ink">Still open</strong> —{' '}
+            <strong className="font-semibold text-soft-ink">Still open</strong>:{' '}
             {formatLeft(timing.msLeft ?? 0)} until the deadline. Nothing can come back before then:
             closing an Ask early means filling every seat.
           </>
         )}
         {timing.phase === 'resolving' && (
           <>
-            <strong className="font-semibold text-soft-ink">Deadline passed</strong> — you have{' '}
+            <strong className="font-semibold text-soft-ink">Deadline passed</strong>: you have{' '}
             {formatLeft(timing.msLeft ?? 0)} left to open the answers and accept the ones you want.
             After that nobody can be paid out of this budget, and the only thing left is sending it
             back to yourself. Read them on{' '}
@@ -947,7 +947,7 @@ function LockedAskRow({
         )}
         {timing.phase === 'recoverable' && (
           <>
-            <strong className="font-semibold text-soft-ink">Expired</strong> — the deadline and the
+            <strong className="font-semibold text-soft-ink">Expired</strong>: the deadline and the
             48 hours after it are both gone, so nobody can be paid out of this budget any more. It
             can go back to you.
           </>
@@ -973,7 +973,7 @@ function LockedAskRow({
               <span className="font-mono font-semibold tabular-nums text-soft-accent-deep">
                 {formatAmount(unitsToAmount(split.toAuthor))} USDC
               </span>{' '}
-              — the budget minus the {split.feeBps / 100}% fee (
+              after the {split.feeBps / 100}% fee (
               {formatAmount(unitsToAmount(split.fee))} USDC). This does not land in your wallet: it
               becomes a balance in the contract, and collecting it into your wallet is a second
               transaction, at the top of this page.
@@ -1328,8 +1328,8 @@ function WalletPayouts({ totals }: { totals: TokenAmounts }) {
     <p className="mt-2.5 px-1 text-[11.5px] leading-[1.5] text-soft-ink-faint">
       On top of that, your Asks without escrow owed{' '}
       <span className="font-mono tabular-nums text-soft-ink">{line}</span> for the answers you
-      accepted, paid straight from your wallet. That figure is counted from the Asks themselves —
-      the proof of each individual payout sits on the answer that earned it, on{' '}
+      accepted, paid straight from your wallet. That figure is counted from the Asks themselves.
+      The proof of each individual payout sits on the answer that earned it, on{' '}
       <Link
         href="/asks"
         className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"

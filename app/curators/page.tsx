@@ -229,7 +229,7 @@ function ChangeLine({ change }: { change: CuratorChange }) {
       <span className="ml-2 text-[13px] text-soft-ink-muted">
         {change.state === 'appeared'
           ? 'Morpho started listing this vault.'
-          : 'The vault still exists — it is no longer listed.'}
+          : 'The vault still exists. It is just no longer listed.'}
       </span>
     </p>
   );
@@ -307,19 +307,19 @@ export default async function CuratorsPage() {
           A Morpho vault has a curator: the person or firm that sets its fee and
           decides what it lends against. They can raise that fee, or hand the
           vault to someone else, and nobody has to tell you. The numbers are
-          public — what is missing is anyone writing down what they used to be.
+          public. What is missing is anyone writing down what they used to be.
         </p>
 
         <p className="mb-10 max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
           So we write them down. Once a day we read the parameters of every
           listed vault on Base and keep only the differences. No opinions about
-          any curator, no predictions, and nothing about anyone&apos;s wallet —
-          a fee that went from one number to another, with the dates we saw it
-          between.
+          any curator, no predictions, and nothing about anyone&apos;s wallet.
+          Just a fee that went from one number to another, with the dates we
+          saw it between.
         </p>
 
         {!result.ok ? (
-          <FailedLine message="This record could not be read. That is a failed read, not an empty record — we cannot tell you right now whether anything changed." />
+          <FailedLine message="This record could not be read. That is a failed read, not an empty record. We cannot tell you right now whether anything changed." />
         ) : result.record.watch === null ? (
           /* ===== ZAPIS SIE NIE ZACZAL =====
              Ani jednej migawki. Nie ma tu czego pokazac i nie ma czego udawac.
@@ -330,7 +330,7 @@ export default async function CuratorsPage() {
               The record has not started yet.
             </p>
             <p className="text-[14px] leading-[1.6] text-soft-ink-muted">
-              Nothing has been checked, so there is nothing here — and an empty
+              Nothing has been checked, so there is nothing here, and an empty
               page is not evidence that no curator changed anything. The first
               check takes a baseline reading and produces no entries at all,
               because a first reading is a starting point, not an event. Entries
@@ -393,7 +393,7 @@ export default async function CuratorsPage() {
               <strong className="font-semibold text-soft-ink">Three things are recorded:</strong>{' '}
               the performance fee, who curates the vault, and whether the vault is in Morpho&apos;s
               listed set. Those are decisions somebody makes. Yield and deposits move on their own
-              every hour, so they are not decisions and are not recorded — three real events would
+              every hour, so they are not decisions and are not recorded. Three real events would
               drown in a thousand meaningless ones.
             </p>
             <p className="mb-3 text-[15px] leading-[1.7] text-soft-ink-muted">
@@ -408,7 +408,7 @@ export default async function CuratorsPage() {
               <strong className="font-semibold text-soft-ink">Dates are ranges, not moments.</strong>{' '}
               We compare one daily reading to the previous one, so we know a change happened between
               two dates and not the hour it happened. Fee and curator changes are onchain, so an
-              exact block is provable — we do not read it from the chain today, and this page says
+              exact block is provable. We do not read it from the chain today, and this page says
               &ldquo;seen between&rdquo; rather than inventing a timestamp we do not have.
             </p>
             <p className="mb-3 text-[15px] leading-[1.7] text-soft-ink-muted">

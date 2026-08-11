@@ -194,7 +194,7 @@ function MinerPanel({ sender }: { sender: Address | undefined }) {
 
       {valid && (
         <p className="mt-2 text-[12px] leading-[1.5] text-soft-ink-muted">
-          {target.length} characters — around{' '}
+          {target.length} characters, around{' '}
           <span className="font-mono tabular-nums">{expected.toLocaleString('en-US')}</span> tries on
           average.
           {target.length >= 7 && ' At this length expect to leave it running.'}
@@ -221,7 +221,7 @@ function MinerPanel({ sender }: { sender: Address | undefined }) {
 
       {!sender && (
         <p className="mt-3 text-[12.5px] text-soft-ink-muted">
-          Connect a wallet first — the address depends on who creates the token.
+          Connect a wallet first. The address depends on who creates the token.
         </p>
       )}
 
@@ -240,7 +240,7 @@ function MinerPanel({ sender }: { sender: Address | undefined }) {
         <div className="mt-3 rounded-lg border border-soft-line bg-soft-sunken p-3">
           <p className="font-mono text-[12.5px] break-all text-soft-ink">{hit.address}</p>
           <p className="mt-1.5 text-[11.5px] leading-[1.5] text-soft-ink-faint">
-            Found after {hit.attempts.toLocaleString('en-US')} tries. Keep this salt — it is the only
+            Found after {hit.attempts.toLocaleString('en-US')} tries. Keep this salt. It is the only
             thing that reproduces this address:
           </p>
           <p className="mt-1 break-all font-mono text-[11px] text-soft-ink-muted">{hit.salt}</p>
@@ -320,7 +320,7 @@ function MemoPanel({ payer }: { payer: Address | undefined }) {
       </h2>
       <p className="mt-1 text-[12.5px] leading-[1.5] text-soft-ink-muted">
         B20 transfers can carry 32 bytes. Put an invoice number there in plain text and everyone
-        reading the chain knows what you bought. Put this hash there instead and nobody does — but
+        reading the chain knows what you bought. Put this hash there instead and nobody does, but
         you can prove it later to anyone, by showing the four fields it was made from.
       </p>
 
@@ -375,7 +375,7 @@ function MemoPanel({ payer }: { payer: Address | undefined }) {
       {/* Salt jest jedyna rzecza, ktorej nie da sie odtworzyc, wiec ostrzezenie
           stoi przy wyniku, a nie w regulaminie na dole strony. */}
       <p className="mt-3 border-t border-soft-line pt-2 text-[11.5px] leading-[1.5] text-soft-ink-faint">
-        Keep the salt with the invoice. Without it the payment stays private from everyone —
+        Keep the salt with the invoice. Without it the payment stays private from everyone,
         including you.
       </p>
     </section>
