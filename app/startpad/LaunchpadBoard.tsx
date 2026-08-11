@@ -44,6 +44,7 @@ import {
   type LaunchpadToken,
 } from './config';
 import { fetchLogos } from './logos';
+import { loadSnapshot, saveSnapshot } from './snapshot';
 import { fetchHolderCounts } from './blockscout';
 import LaunchTokenModal from './LaunchTokenModal';
 import StartpadFooter from './StartpadFooter';
@@ -1169,7 +1170,9 @@ export default function LaunchpadBoard() {
 
       if (launched.size === 0) {
         setActivityFeed([]);
-        setTokens(previewTokens);
+        // Nie ZRZUCAJ dobrego stanu na mocki przy pustym skanie (chwilowa awaria
+        // RPC). Podglad tylko gdy naprawde nic nie mamy.
+        setTokens((current) => (current.some((token) => token.live) ? current : previewTokens));
         setTopEarners([]);
         return;
       }
@@ -1250,7 +1253,7 @@ export default function LaunchpadBoard() {
 
       if (live.length === 0) {
         setActivityFeed([]);
-        setTokens(previewTokens);
+        setTokens((current) => (current.some((token) => token.live) ? current : previewTokens));
         setTopEarners([]);
         return;
       }
@@ -1316,9 +1319,31 @@ export default function LaunchpadBoard() {
     }
   }, [readClient]);
 
+  // MIGAWKA: przy wejsciu pokazujemy od razu ostatni znany stan (z logami)
+  // z localStorage, a skan lancucha lecí w tle i aktualizuje. Koniec z pustym
+  // ekranem i znikajacymi logami przy kazdym odswiezeniu. Robimy to RAZ.
+  const snapshotRestored = useRef(false);
+  useEffect(() => {
+    if (snapshotRestored.current) return;
+    snapshotRestored.current = true;
+    const cached = loadSnapshot<BoardToken>(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
+    if (cached && cached.length) {
+      setTokens(cached);
+      setSelectedId((current) => current || cached[0].id);
+      setLoadingBoard(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadBoard();
   }, [loadBoard]);
+
+  // Zapis migawki przy kazdej zmianie realnych (nie-podgladowych) tokenow -
+  // lapie tez logo scalone z Bloba, wiec po reloadzie sa od razu.
+  useEffect(() => {
+    const real = tokens.filter((token) => token.live);
+    if (real.length) saveSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, real);
+  }, [tokens]);
 
   /**
    * NA ZYWO. `loadBoard` przemiata cala historie w oknach po 1900 blokow i
