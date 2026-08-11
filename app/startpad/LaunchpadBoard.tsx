@@ -607,10 +607,11 @@ function VolumePanel({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token:
 }
 
 /**
- * Tablica tworcow wg zarobkow NALICZONYCH na lancuchu: udzial w oplacie
- * krzywej (wg konfiguracji kazdego tokena) plus `ethToCreator` z rozliczen
- * hooka po graduacji. Naliczone to nie wyplacone - wyplata idzie osobnym
- * claimem, wiec podpis mowi "accrued" i niczego wiecej nie obiecuje.
+ * Tablica tworcow wg DOKLADNEGO salda do odebrania z lancucha: claimable()
+ * launchpada (udzial w oplacie krzywej) + hook.claimableEth (ethToCreator po
+ * graduacji) + vault.claimableEth - suma per adres, ta sama liczba co przycisk
+ * Claim. Nie liczymy z eventow, bo skan siega tylko okno wstecz i zanizal.
+ * "Claimable now": po odebraniu saldo spada, wiec podpis nie obiecuje sumy-zawsze.
  */
 function TopEarnings({ rows, ethUsd }: { rows: CreatorEarnings[]; ethUsd: number | null }) {
   const explorer = LAUNCHPAD_CHAIN.blockExplorers?.default?.url ?? 'https://sepolia.basescan.org';
@@ -620,7 +621,7 @@ function TopEarnings({ rows, ethUsd }: { rows: CreatorEarnings[]; ethUsd: number
         <h2 className="text-[16px] font-extrabold text-[#16141b]">Top earnings</h2>
         <Crown className="h-4 w-4 text-[#d99a1b]" aria-hidden="true" />
       </div>
-      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-black/40">Creator-side fees accrued on-chain - protocol share excluded, claims separate</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-black/40">Creator-side fees claimable on-chain now - curve + pool + vault, protocol share excluded</p>
       {rows.length === 0 ? (
         <p className="mt-4 text-[11.5px] leading-[1.5] text-black/45">
           No creator fees indexed yet. Every curve trade and pool swap accrues a creator share that shows up here.
@@ -1282,11 +1283,37 @@ export default function LaunchpadBoard() {
         const meta = tokenMeta.get(token);
         if (meta) addEarned(meta.creator.toLowerCase(), meta.creator, token, wei);
       }
-      // Do tablicy wchodza tylko konta z niezerowym naliczeniem - wiersz
-      // "0.0000 ETH" niczego by nie mowil i tylko udawal ranking.
+      // DOKLADNE saldo bije event-sume. Skan siega tylko ~okno wstecz, wiec
+      // FeeAccrued sprzed okna gubimy i ranking zanizal (uzytkownik widzial
+      // "Top earnings" mniejsze niz wlasny przycisk Claim). Bierzemy wiec
+      // claimable() + hook + vault per adres jednym multicall3 - ta sama liczba
+      // co Claim, z wliczonym vaultem po graduacji. Gdy multicall padnie
+      // (np. brak multicall3 na sieci), zostaje event-suma: lepsze cokolwiek.
+      const accountKeys = [...earningsByAccount.keys()];
+      if (accountKeys.length > 0) {
+        try {
+          const calls = accountKeys.flatMap((acc) => [
+            { address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [acc as Address] },
+            { address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [acc as Address] },
+            { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [acc as Address] },
+          ]);
+          const balances = await readClient.multicall({ contracts: calls, allowFailure: true });
+          const cell = (i: number) => (balances[i]?.status === 'success' ? (balances[i].result as bigint) : 0n);
+          accountKeys.forEach((acc, i) => {
+            const exact = cell(i * 3) + cell(i * 3 + 1) + cell(i * 3 + 2);
+            const entry = earningsByAccount.get(acc);
+            if (entry) entry.totalWei = exact;
+          });
+        } catch {
+          // Multicall padl - zostawiamy event-sume policzona wyzej.
+        }
+      }
+      // Do tablicy wchodza tylko konta z niezerowym saldem - po odebraniu
+      // wszystkiego (exact = 0) wiersz nie ma juz nic do pokazania.
       setTopEarners(
         [...earningsByAccount.values()]
           .map((entry) => ({ ...entry, tokenCount: entry.tokens.size }))
+          .filter((entry) => entry.totalWei > 0n)
           .sort((a, b) => (b.totalWei > a.totalWei ? 1 : b.totalWei < a.totalWei ? -1 : 0))
           .slice(0, 5)
       );
