@@ -250,7 +250,9 @@ Stan listy "Przed mainnetem":
   slotu PoolManagera zamknieta na realnym bajtkodzie);
 - FEE_RECIPIENT mainnet: **Safe** `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`
   (wlasciciel/podpis `0x83C6...1E83`, 1/1 - mozna pozniej na 2/3 BEZ zmiany
-  odbiorcy; odbior sprawdzony na forku Base przez `safeRecipientProbe.ts`);
+  odbiorcy; odbior POTWIERDZONY na forku Base: `safeRecipientProbe.ts` (surowy
+  call), a zlotym testem `test/CurveLaunchpadSafeRecipient.test.ts` przez REALNE
+  entrypointy - claimFor(Safe) wyplaca ETH, Safe przyjmuje token ERC20);
 - weryfikacja na Basescanie: po deployu (nizej).
 
 ### Deploy (odpalasz TY, z zasilonym kluczem)
