@@ -28,20 +28,24 @@ import {
   Globe,
   ImagePlus,
   Layers3,
+  Loader2,
   Minus,
   Plus,
   ShieldCheck,
   Sparkles,
+  Wand2,
   X,
   Zap,
 } from 'lucide-react';
-import { decodeEventLog, encodeEventTopics, formatEther, parseEther, type Address } from 'viem';
+import { decodeEventLog, encodeEventTopics, formatEther, parseEther, type Address, type Hex } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
+  B20_TOKEN_FACTORY_ADDRESS,
   CURVE_TARGET_ETH,
   LAUNCH_HOOK_ADDRESS,
   LAUNCHPAD_ADDRESS,
   LAUNCHPAD_CHAIN,
+  LAUNCHPAD_TOKEN_STANDARD,
   hookAbi,
   launchpadAbi,
   type LaunchpadToken,
@@ -49,6 +53,8 @@ import {
 import { formatUsd, useEthUsd } from './useEthUsd';
 import { resolveMediaUrl } from './metadata';
 import { resizeImageFile } from './logoUpload';
+import { expectedAttempts, HEX_SUBSTITUTES, isMineable } from '../utils/b20/addressing';
+import { mineLaunchpadVanity, predictLaunchpadVanity, type LaunchpadVanityContext } from '../utils/b20/launchpadVanity';
 
 const FIELD =
   'w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 text-[14px] text-[#16141b] outline-none transition-colors placeholder:text-black/35 focus:border-[#7c6bda]';
@@ -339,6 +345,23 @@ export default function LaunchTokenModal({
   // Kontrakt v3 przyjmuje windowCap az do T0; wylaczenie ochrony znaczy
   // "wyslij dokladnie T0", a nie "pomin pole".
   const [sniperOn, setSniperOn] = useState(true);
+  // ADRES VANITY - tylko na sieciach B20 (Base). `null` = jeszcze nie wiadomo,
+  // czy wdrozony launchpad zna `launchVanity`; `false` = stare wdrozenie, sekcja
+  // sie nie pokazuje (patrz efekt sondujacy `predictVanityToken`).
+  const [vanitySupported, setVanitySupported] = useState<boolean | null>(null);
+  const [vanityOn, setVanityOn] = useState(false);
+  const [vanityPattern, setVanityPattern] = useState('');
+  // Wynik kopania. `salt` idzie do `launchVanity`, `address` to podglad tego,
+  // co realnie powstanie. Oba zeruja sie przy zmianie portfela (creator wchodzi
+  // w preimage adresu) i przy zmianie wzorca.
+  const [vanitySalt, setVanitySalt] = useState<Hex | null>(null);
+  const [vanityAddress, setVanityAddress] = useState<Address | null>(null);
+  const [vanityMining, setVanityMining] = useState(false);
+  const [vanityAttempts, setVanityAttempts] = useState(0);
+  // Petla kopania oddaje sterowanie miedzy partiami; te refy nia steruja bez
+  // wywolywania re-renderow na kazda probe.
+  const vanityCounterRef = useRef<bigint>(0n);
+  const vanityStopRef = useRef(false);
   const [preBuyEth, setPreBuyEth] = useState('0');
   const [addedReceivers, setAddedReceivers] = useState<AddedReceiver[]>([]);
   const [receiverDraft, setReceiverDraft] = useState({ account: '', share: '' });
@@ -384,6 +407,9 @@ export default function LaunchTokenModal({
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
   const onSepolia = chainId === LAUNCHPAD_CHAIN.id;
+  // Vanity ma sens WYLACZNIE tam, gdzie token robi precompile B20 (Base). Na
+  // 'plain' (Robinhood) adresu nie da sie wykopac - sekcja nie istnieje.
+  const isB20 = LAUNCHPAD_TOKEN_STANDARD === 'b20';
 
   // Kurs ETH/USD to wylacznie DOPISEK do kwot w ETH. Przy braku kursu dopisek
   // znika w calosci - formularz nigdy nie czeka na zewnetrzne API.
@@ -491,6 +517,113 @@ export default function LaunchTokenModal({
       cancelled = true;
     };
   }, [open, readClient, advancedSupported]);
+
+  /**
+   * Czy wdrozony launchpad zna `launchVanity`. Sprawdzamy ODCZYTEM
+   * `predictVanityToken` - to widok, ktory na starszym wdrozeniu odpada (brak
+   * selektora), dokladnie jak `MAX_BUYBACK_BPS` dla launchAdvanced. Tylko na
+   * sieciach B20; na 'plain' od razu `false`, bez pytania lancucha.
+   */
+  useEffect(() => {
+    if (!open || !readClient || vanitySupported !== null) return;
+    if (!isB20) {
+      setVanitySupported(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const predicted = (await readClient.readContract({
+          address: LAUNCHPAD_ADDRESS as Address,
+          abi: launchpadAbi,
+          functionName: 'predictVanityToken',
+          // Dowolny creator i zerowy salt - liczy sie tylko, czy selektor istnieje.
+          args: [(address ?? '0x0000000000000000000000000000000000000001') as Address, `0x${'00'.repeat(32)}` as Hex],
+        })) as Address;
+        // Odpowiedz z prefiksem B20 potwierdza, ze to naprawde ta funkcja.
+        if (!cancelled) setVanitySupported(predicted.toLowerCase().startsWith('0xb2000000'));
+      } catch {
+        // Brak selektora albo blad RPC: nie orzekamy `false` na twardo dla bledu
+        // transportu, ale dla vanity wystarczy niepokazanie sekcji - nastepne
+        // otwarcie modalu sprobuje znowu (stan zyje na czas montowania).
+        if (!cancelled) setVanitySupported(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, readClient, vanitySupported, isB20, address]);
+
+  // Zmiana portfela albo wzorca uniewaznia wykopany adres: `creator` wchodzi w
+  // preimage, wiec adres policzony dla innego portfela juz nie powstanie.
+  useEffect(() => {
+    vanityStopRef.current = true;
+    setVanityMining(false);
+    setVanitySalt(null);
+    setVanityAddress(null);
+    setVanityAttempts(0);
+  }, [address, vanityPattern]);
+
+  const vanityCtx = useMemo<LaunchpadVanityContext | null>(
+    () =>
+      address
+        ? {
+            launchpad: LAUNCHPAD_ADDRESS as Address,
+            factory: B20_TOKEN_FACTORY_ADDRESS as Address,
+            creator: address as Address,
+            chainId: LAUNCHPAD_CHAIN.id,
+          }
+        : null,
+    [address],
+  );
+
+  const vanityNorm = vanityPattern.trim().toLowerCase();
+  const vanityValid = vanityNorm.length > 0 && vanityNorm.length <= 6 && isMineable(vanityNorm);
+  const vanityImpossible = [...vanityNorm].filter((c) => !isMineable(c));
+
+  /**
+   * Kopanie PARTIAMI z oddaniem sterowania miedzy nimi (setTimeout 0), zeby
+   * karta nie zamarzla. Zatrzymuje sie na trafieniu albo gdy `vanityStopRef`
+   * podniesie flage (Stop, zmiana wzorca/portfela, zamkniecie).
+   */
+  const startVanityMining = () => {
+    if (!vanityCtx || !vanityValid || vanityMining) return;
+    vanityStopRef.current = false;
+    vanityCounterRef.current = 0n;
+    setVanitySalt(null);
+    setVanityAddress(null);
+    setVanityAttempts(0);
+    setVanityMining(true);
+    const BATCH = 6_000;
+    const step = () => {
+      if (vanityStopRef.current) {
+        setVanityMining(false);
+        return;
+      }
+      const { hit, nextCounter } = mineLaunchpadVanity(vanityCtx, vanityNorm, vanityCounterRef.current, BATCH);
+      vanityCounterRef.current = nextCounter;
+      setVanityAttempts(Number(nextCounter));
+      if (hit) {
+        setVanitySalt(hit.salt);
+        setVanityAddress(hit.address);
+        setVanityMining(false);
+        return;
+      }
+      window.setTimeout(step, 0);
+    };
+    window.setTimeout(step, 0);
+  };
+
+  const stopVanityMining = () => {
+    vanityStopRef.current = true;
+    setVanityMining(false);
+  };
+
+  /** Ciasny cap rekomendowany przy vanity - ustawiany jednym kliknieciem, nie wymuszany. */
+  const applyRecommendedCap = () => {
+    setSniperOn(true);
+    setSniperCapTokens('4000000');
+  };
 
   /**
    * URL logo sprawdzamy tak, jak sprawdzi go przegladarka odbiorcy: probujac
@@ -794,7 +927,15 @@ export default function LaunchTokenModal({
               : urlStatus === 'checking'
                 ? 'Checking the logo URL...'
                 : 'Add a logo first.'
-            : imageError ?? anyLinkError ?? preBuyError ?? (advancedSupported === true ? advanced.error : null);
+            : imageError ??
+              anyLinkError ??
+              preBuyError ??
+              (vanityOn && vanitySupported === true && vanitySalt === null
+                ? vanityMining
+                  ? 'Mining your vanity address...'
+                  : 'Mine a vanity address, or turn the vanity option off.'
+                : null) ??
+              (advancedSupported === true ? advanced.error : null);
 
   const ensureSepolia = async () => {
     if (onSepolia) return true;
@@ -821,6 +962,13 @@ export default function LaunchTokenModal({
     setCreatorSharePct((limits.maxCreatorShareBps / 100).toString());
     setSniperCapTokens(String(limits.windowCapTokens));
     setSniperOn(true);
+    vanityStopRef.current = true;
+    setVanityOn(false);
+    setVanityPattern('');
+    setVanitySalt(null);
+    setVanityAddress(null);
+    setVanityMining(false);
+    setVanityAttempts(0);
     setAddedReceivers([]);
     setReceiverDraft({ account: '', share: '' });
     setReceiverDraftError(null);
@@ -925,6 +1073,14 @@ export default function LaunchTokenModal({
       setNotice({ kind: 'error', text: advanced.error });
       return;
     }
+    // Vanity jedzie TA SAMA sciezka co advanced, tylko z saltem na przodzie.
+    // Wymaga wykopanego salta; jesli tworca wlaczyl vanity, ale nie wykopal
+    // adresu, blokujemy tu zamiast wyslac zwykly start pod losowym adresem.
+    const useVanity = useAdvanced && vanityOn && vanitySupported === true;
+    if (useVanity && vanitySalt === null) {
+      setNotice({ kind: 'error', text: 'Mine a vanity address first, or turn the vanity option off.' });
+      return;
+    }
     const preBuyWei = preBuyEth.trim() === '' || Number(preBuyEth) === 0 ? 0n : toWei(preBuyEth);
     if (preBuyWei === null) {
       setNotice({ kind: 'error', text: 'Pre-buy must be zero or more ETH, written as a decimal number.' });
@@ -942,7 +1098,30 @@ export default function LaunchTokenModal({
       // jest deterministyczna, wiec `1` spelnia wymog `SlippageRequired`, nie
       // udajac przy tym ochrony, ktorej ten jeden przypadek nie potrzebuje.
       const minTokensOut = preBuyWei > 0n ? 1n : 0n;
-      const hash = useAdvanced && advanced.args
+      const hash = useVanity && advanced.args && vanitySalt
+        ? await walletClient.writeContract({
+            address: LAUNCHPAD_ADDRESS as Address,
+            abi: launchpadAbi,
+            functionName: 'launchVanity',
+            args: [
+              vanitySalt,
+              name,
+              symbol,
+              minTokensOut,
+              deadline,
+              advanced.args.feeBps,
+              advanced.args.creatorFeeBps,
+              advanced.args.buybackBps,
+              advanced.args.windowCap,
+              advanced.args.accounts,
+              advanced.args.shares,
+              advanced.args.metadataURI,
+            ],
+            value: preBuyWei,
+            chain: LAUNCHPAD_CHAIN,
+            account: address,
+          })
+        : useAdvanced && advanced.args
         ? await walletClient.writeContract({
             address: LAUNCHPAD_ADDRESS as Address,
             abi: launchpadAbi,
@@ -1739,6 +1918,140 @@ export default function LaunchTokenModal({
                           </p>
                         )}
                       </SectionCard>
+
+                      {isB20 && vanitySupported === true && (
+                        <SectionCard
+                          icon={<Wand2 className="h-4 w-4 text-soft-primary" aria-hidden="true" />}
+                          title="Vanity address"
+                          aside={
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={vanityOn}
+                              onClick={() => setVanityOn((current) => !current)}
+                              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${vanityOn ? 'bg-soft-primary' : 'bg-black/20'}`}
+                              aria-label="Toggle vanity address"
+                            >
+                              <span
+                                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left] ${vanityOn ? 'left-[22px]' : 'left-0.5'}`}
+                                aria-hidden="true"
+                              />
+                            </button>
+                          }
+                        >
+                          {!vanityOn ? (
+                            <span className={HINT}>
+                              Choose how your B20 token address ends — e.g. <span className="font-mono">cafe</span> or{' '}
+                              <span className="font-mono">b0ba</span>. It is mined in your browser (no network calls) and
+                              baked into this launch. Off by default; a random address is perfectly fine.
+                            </span>
+                          ) : !vanityCtx ? (
+                            <p className="flex items-start gap-2 rounded-xl bg-[#d9628a]/10 p-3 text-[11.5px] font-bold leading-[1.45] text-[#8d2748]">
+                              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                              Connect a wallet first — the address is tied to your creator address, so it can only be mined
+                              once we know it.
+                            </p>
+                          ) : (
+                            <>
+                              {/* OSTRZEZENIE, NIE BLOKADA (decyzja produktowa): przewidywalny
+                                  adres = snajper w mempoolu. Rekomendujemy ciasny cap jednym
+                                  kliknieciem, ale nie wymuszamy go. */}
+                              <div className="flex items-start gap-2 rounded-xl border border-[#f3c58a] bg-[#fff8ed] px-3 py-2.5 text-[11.5px] leading-[1.45] text-[#a34b08]">
+                                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#c76b12]" aria-hidden="true" />
+                                <div className="min-w-0">
+                                  <p className="font-bold">A vanity address is predictable.</p>
+                                  <p className="mt-0.5">
+                                    A sniper can see it in the mempool and have a buy ready the moment the curve opens.
+                                    Nothing is lost from the contract and your pre-buy stays atomic and first, but pair
+                                    vanity with a tight per-wallet cap so early supply reaches your community, not bots.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={applyRecommendedCap}
+                                    className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[#e0a253] bg-white px-2.5 py-1 text-[11px] font-extrabold text-[#a34b08] hover:border-[#c76b12]"
+                                  >
+                                    Apply recommended 4M cap
+                                  </button>
+                                </div>
+                              </div>
+
+                              <label className="mt-3 block">
+                                <span className={LABEL}>Address ending (hex only)</span>
+                                <input
+                                  value={vanityPattern}
+                                  onChange={(event) => setVanityPattern(event.target.value.trim().slice(0, 6))}
+                                  className={`${FIELD} font-mono lowercase`}
+                                  placeholder="cafe"
+                                  aria-label="Vanity address pattern"
+                                />
+                              </label>
+                              {vanityImpossible.length > 0 ? (
+                                <span className={FIELD_ERROR}>
+                                  {vanityImpossible.map((c) => `"${c}"`).join(', ')} not in hex.
+                                  {vanityImpossible.some((c) => HEX_SUBSTITUTES[c])
+                                    ? ` Try ${vanityImpossible
+                                        .filter((c) => HEX_SUBSTITUTES[c])
+                                        .map((c) => `${c}→${HEX_SUBSTITUTES[c]}`)
+                                        .join(', ')}.`
+                                    : ''}
+                                </span>
+                              ) : (
+                                <span className={HINT}>
+                                  Only 0-9 and a-f exist in an address. Up to 6 characters.
+                                  {vanityValid
+                                    ? ` About ${expectedAttempts(vanityNorm).toLocaleString('en-US')} tries on average — ${
+                                        vanityNorm.length <= 4 ? 'a second or two' : 'this can take a while'
+                                      }.`
+                                    : ''}
+                                </span>
+                              )}
+
+                              <div className="mt-3 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={vanityMining ? stopVanityMining : startVanityMining}
+                                  disabled={!vanityValid && !vanityMining}
+                                  className="inline-flex items-center gap-1.5 rounded-full bg-soft-primary px-3.5 py-2 text-[12px] font-extrabold text-white disabled:opacity-40"
+                                >
+                                  {vanityMining ? (
+                                    <>
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Stop
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Wand2 className="h-3.5 w-3.5" aria-hidden="true" /> Mine
+                                    </>
+                                  )}
+                                </button>
+                                {(vanityMining || vanityAttempts > 0) && (
+                                  <span className="text-[11.5px] font-bold text-black/50">
+                                    {vanityAttempts.toLocaleString('en-US')} tried
+                                  </span>
+                                )}
+                              </div>
+
+                              {vanityAddress && vanitySalt && (
+                                <div className="mt-3 rounded-xl border border-[#bfe6cf] bg-[#f2fbf6] px-3 py-2.5">
+                                  <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#0b9a51]">
+                                    <Check className="h-3.5 w-3.5" aria-hidden="true" /> Address mined
+                                  </p>
+                                  <p className="mt-1 break-all font-mono text-[12px] text-[#16141b]">
+                                    {vanityAddress.slice(0, 24)}
+                                    <span className="font-extrabold text-soft-primary-deep">
+                                      {vanityAddress.slice(24, 24 + vanityNorm.length)}
+                                    </span>
+                                    {vanityAddress.slice(24 + vanityNorm.length)}
+                                  </p>
+                                  <span className={HINT}>
+                                    This exact address launches when you press Launch. Changing your wallet or the pattern
+                                    clears it.
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </SectionCard>
+                      )}
 
                       <SectionCard
                         icon={<Layers3 className="h-4 w-4 text-black/45" aria-hidden="true" />}

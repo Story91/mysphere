@@ -135,6 +135,12 @@ export const LAUNCHPAD_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.launchpad;
 export const LIQUIDITY_VAULT_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.vault;
 export const LAUNCH_HOOK_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.hook;
 export const B20_TOKEN_FACTORY_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.tokenFactory;
+/**
+ * 'b20' = token robi precompile Base (adres vanity da sie wykopac); 'plain' =
+ * nasz ERC-20 (bez B20, wiec bez vanity). Modal startu pokazuje sekcje vanity
+ * WYLACZNIE na 'b20' - czyli Base, nigdy Robinhood.
+ */
+export const LAUNCHPAD_TOKEN_STANDARD = ACTIVE_LAUNCHPAD_NETWORK.tokenStandard;
 // Precompile B20 wbudowany w siec Base - ten sam adres na mainnecie i Sepolii.
 // To NIE jest nasz kontrakt, wiec nie ma zmiennej srodowiskowej. Na sieciach
 // bez B20 (tokenStandard 'plain') nie ma go wcale.
@@ -180,6 +186,47 @@ export const launchpadAbi = [
       { name: 'token', type: 'address' },
       { name: 'launchId', type: 'bytes32' },
     ],
+  },
+  {
+    // Start z adresem VANITY. Salt wybiera tworca, adres jest PRZEWIDYWALNY -
+    // interfejs kopie go offline (utils/b20/launchpadVanity) i wola te funkcje z
+    // gotowym `vanitySalt`. Jak launchAdvanced, tylko z saltem na przodzie.
+    // UWAGA: starsze wdrozenie moze jej NIE miec - wykrywamy odczytem
+    // `predictVanityToken`, patrz `vanitySupported` w LaunchTokenModal.
+    type: 'function',
+    name: 'launchVanity',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'vanitySalt', type: 'bytes32' },
+      { name: 'name_', type: 'string' },
+      { name: 'symbol_', type: 'string' },
+      { name: 'minTokensOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'feeBps_', type: 'uint16' },
+      { name: 'creatorFeeBps_', type: 'uint16' },
+      { name: 'buybackBps_', type: 'uint16' },
+      { name: 'windowCap_', type: 'uint256' },
+      { name: 'receiverAccounts_', type: 'address[]' },
+      { name: 'receiverSharesBps_', type: 'uint16[]' },
+      { name: 'metadataURI_', type: 'string' },
+    ],
+    outputs: [
+      { name: 'token', type: 'address' },
+      { name: 'launchId', type: 'bytes32' },
+    ],
+  },
+  {
+    // Adres, jaki dostanie `creator` dla tego `vanitySalt`. Interfejs liczy to
+    // SAM offline; ten odczyt sluzy tylko do (a) wykrycia, czy wdrozenie zna
+    // vanity, i (b) ostatecznego sprawdzenia mined-adresu przed transakcja.
+    type: 'function',
+    name: 'predictVanityToken',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'creator', type: 'address' },
+      { name: 'vanitySalt', type: 'bytes32' },
+    ],
+    outputs: [{ name: '', type: 'address' }],
   },
   {
     // KOLEJNOSC ZWROTEK MUSI ZGADZAC SIE Z CurveLaunchpad.launchOf CO DO POLA.

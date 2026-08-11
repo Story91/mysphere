@@ -203,6 +203,19 @@ dev-buy still first.
   address. Mitigation is DOCS + UX: the `launchVanity` docstring now names the
   tradeoff, and the **vanity launch UI must warn and default to a tight
   `windowCap`** (a multi-address sniper defeats a loose one).
+  - **Built (Faza 5, 2026-08-11):** the vanity UI now ships in
+    `app/startpad/LaunchTokenModal.tsx` (Creator setup mode). It mines the
+    address OFFLINE via `app/utils/b20/launchpadVanity.ts`, which composes the
+    verified B20 primitives (`_vanityLaunchId` → `_effectiveSalt` →
+    `predictB20Address`). The derivation was checked bit-for-bit against the live
+    Base-Sepolia `B20TokenFactory.predictTokenFor` by
+    `scripts/launchpad/b20AddressProbe.ts` (preimage = `abi.encode(sender,salt)`,
+    first 9 bytes) and end-to-end by `scripts/launchpad/vanityCompositionProbe.ts`.
+    The section is shown ONLY on B20 networks (never Robinhood) and ONLY when the
+    deployed launchpad answers `predictVanityToken` — so it stays hidden on the
+    current live Sepolia deploy and lights up automatically once the
+    mainnet-candidate (with `launchVanity`) is deployed. Per the owner's product
+    call it WARNS + offers a one-click tight cap (4M) but does NOT force it.
 - **Refuted:** buyback clamp reverting at the v4 price floor (unreachable,
   fail-safe), tighter-150bps partial fills (intended/documented, keeper-runbook
   note only), `pendingBuybackEth` "stranding" (funds preserved by rollback,
