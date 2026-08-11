@@ -15,14 +15,15 @@ hardhat.config.ts
 hardhat.tsconfig.json
 
 # Ignore documentation
-docs/
-# TYLKO markdown w KORZENIU repo (STATUS.md, POSTY-*.md, REDEFINICJA.md itd.).
-# NIE `*.md` bez ukosnika: to lapalo TAKZE app/Docs/_content/*.md, ktore strony
-# /Docs importuja W BUILDZIE (regula webpacka `.md` -> asset/source). Efekt:
-# CALY segment app/Docs znikal z builda na Vercelu (0 tras /Docs, 404 na
-# produkcji, choc lokalnie dzialalo - .vercelignore dziala tylko na deployu).
-# Negacja `!app/Docs/**` NIE pomogla (parser .vercelignore ignoruje `!`), wiec
-# zawezamy sam wzorzec do korzenia. Zagniezdzony markdown aplikacji zostaje.
+# OBIE reguly ZAKOTWICZONE do korzenia (wiodacy ukosnik). Bez kotwicy `docs/`
+# lapal folder o TEJ nazwie na KAZDYM poziomie - a Vercel dopasowuje bez
+# uwzgledniania wielkosci liter, wiec `docs/` usuwal CALE app/Docs (capital D)
+# razem ze stronami .tsx. Efekt: build przechodzil, ale segment /Docs nie
+# istnial -> 0 tras /Docs -> 404 na produkcji, choc lokalnie dzialalo.
+# Analogicznie `*.md` bez ukosnika wycinal app/Docs/_content/*.md (import w
+# buildzie). Zakotwiczone /docs/ i /*.md tykaja WYLACZNIE korzenia repo
+# (folder docs/ oraz notatki STATUS.md, POSTY-*.md itd.). app/Docs zostaje.
+/docs/
 /*.md
 
 # Ignore contract artifacts
