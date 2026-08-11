@@ -697,6 +697,11 @@ contract CurveLaunchpad {
         if (l.state == State.None) revert UnknownToken();
         if (l.state == State.Locked) revert CurveIsLocked();
         if (l.state == State.Graduated) revert AlreadyGraduated();
+        // PARYTET STANOW, nie straznikow wykonania - i to jest SWIADOME.
+        // Audyt zaproponowal dorzucenie tu BuyTooLarge/DustTrade, ale testy
+        // (CurveLaunchpadInvariants: "kupno za 1 wei", sonda wyplacalnosci)
+        // pokazaly, ze quoteBuy ma ODDAWAC matematyke (0 tokenow za pyl), a nie
+        // rewertowac - UI czyta z tego granice pyłu. `buy` egzekwuje strazniki.
         return _quoteBuy(l.ethReserve, l.tokenReserve, ethIn, launchFeeBps[token]);
     }
 
@@ -718,6 +723,10 @@ contract CurveLaunchpad {
         Launch memory l = _launches[token];
         if (l.state == State.None) revert UnknownToken();
         if (l.state == State.Graduated) revert AlreadyGraduated();
+        // PARYTET STANOW, nie straznikow - swiadomie (jak quoteBuy). Sonda
+        // wyplacalnosci w inwariantach wola quoteSell(token, 0), gdy nic nie jest
+        // w obiegu, i musi dostac (0, 0), a nie rewert. `sell` egzekwuje ZeroAmount
+        // i DustTrade.
         uint256 gross = FullMath.mulDivDown(R_VIRT + l.ethReserve, tokensIn, uint256(l.tokenReserve) + tokensIn);
         fee = FullMath.mulDivUp(gross, launchFeeBps[token], 10_000);
         ethOut = gross - fee;
@@ -742,8 +751,10 @@ contract CurveLaunchpad {
     /* ====================================================================== */
 
     /**
-     * Tworzy token, zabija wszystkie role, przygotowuje cztery pule i - jesli
-     * przyszlo ETH - wykonuje dev-buy TA SAMA sciezka, co wszyscy.
+     * Tworzy token, zabija wszystkie role i - jesli przyszlo ETH - wykonuje
+     * dev-buy TA SAMA sciezka, co wszyscy. PULI TU NIE MA: powstaje dopiero przy
+     * awansie (LiquidityVault._seed), jedna, za hookiem-brama. Wczesniejsza
+     * wersja inicjalizowala tu cztery pule bez hooka - opis juz nieaktualny.
      *
      * Tworca nie dostaje ani jednego tokena za darmo. Kupuje na tej samej
      * krzywej, z ta sama oplata i tym samym limitem w oknie startowym.
@@ -778,7 +789,7 @@ contract CurveLaunchpad {
         uint16[] memory shares = new uint16[](1);
         receivers[0] = msg.sender;
         shares[0] = 10_000;
-        return _launch(name_, symbol_, minTokensOut, deadline, FEE_BPS, CREATOR_FEE_BPS, 0, WINDOW_ADDR_CAP, receivers, shares, "");
+        return _launch(_defaultLaunchId(), name_, symbol_, minTokensOut, deadline, FEE_BPS, CREATOR_FEE_BPS, 0, WINDOW_ADDR_CAP, receivers, shares, "");
     }
 
     function launchAdvanced(
@@ -795,6 +806,7 @@ contract CurveLaunchpad {
         string calldata metadataURI_
     ) external payable nonReentrant returns (address token, bytes32 launchId) {
         return _launch(
+            _defaultLaunchId(),
             name_,
             symbol_,
             minTokensOut,
@@ -809,7 +821,107 @@ contract CurveLaunchpad {
         );
     }
 
+    /**
+     * START Z ADRESEM VANITY - user podaje `vanitySalt`, adres jest PRZEWIDYWALNY.
+     *
+     * Rozni sie od launchAdvanced JEDNA rzecza: launchId liczymy z podanego salta
+     * zamiast z `blockhash`, wiec adres tokena da sie WYKOPAC i pokazac PRZED
+     * transakcja (patrz predictVanityToken). Reszta - krzywa, oplaty, prog,
+     * awans, okno snajperskie - identyczna.
+     *
+     * DLACZEGO TO BEZPIECZNE mimo przewidywalnego adresu: jedyny atak, ktory
+     * przewidywalnosc otwierala (wczesniejsze zatrucie puli cudza reka po
+     * absurdalnej cenie), jest zamkniety BRAMKA HOOKA - `B20LaunchHook`
+     * `beforeInitialize` odrzuca kazdego poza vaultem, wiec puli z naszym kluczem
+     * NIKT OBCY nie otworzy, niezaleznie od tego, czy adres da sie zgadnac.
+     *
+     * DLACZEGO NIE MA GRIEFINGU: `_vanityLaunchId` wmieszuje `msg.sender`, wiec
+     * napastnik front-runujacy z tym samym `vanitySalt` liczy INNY launchId
+     * (swoim adresem) i dostaje INNY adres - nie zajmie cudzego. Ten sam salt
+     * dwa razy z tego samego adresu rewertuje czysto (adres juz zajety), wiec
+     * user po prostu wybiera inny salt.
+     *
+     * KOMPROMIS, KTORY TRZEBA NAZWAC (audyt Faza 4): przewidywalny adres znaczy,
+     * ze snajper widzi go W MEMPOOLU, ZANIM ta transakcja sie zaksieguje (salt
+     * i nadawca sa w calldacie, predictVanityToken jest czysty), i moze miec
+     * gotowe, podpisane `buy` na dokladnie ten adres na chwile po otwarciu
+     * krzywej. Domyslna sciezka (blockhash) tego nie ma. Nic nie ginie z
+     * kontraktu - dev-buy tworcy jest atomowy i pierwszy - ale wczesna podaz
+     * moze pojsc do snajperow zamiast spolecznosci. `windowCap` sam tego NIE
+     * zatrzymuje (snajper rozbija zakup na wiele adresow). Dlatego vanity nalezy
+     * laczyc z CIASNYM windowCap, a interfejs ma to powiedziec wprost. To jest
+     * CENA wybrania adresu vanity, nie blad.
+     */
+    function launchVanity(
+        bytes32 vanitySalt,
+        string calldata name_,
+        string calldata symbol_,
+        uint256 minTokensOut,
+        uint256 deadline,
+        uint16 feeBps_,
+        uint16 creatorFeeBps_,
+        uint16 buybackBps_,
+        uint256 windowCap_,
+        address[] calldata receiverAccounts_,
+        uint16[] calldata receiverSharesBps_,
+        string calldata metadataURI_
+    ) external payable nonReentrant returns (address token, bytes32 launchId) {
+        return _launch(
+            _vanityLaunchId(msg.sender, vanitySalt),
+            name_,
+            symbol_,
+            minTokensOut,
+            deadline,
+            feeBps_,
+            creatorFeeBps_,
+            buybackBps_,
+            windowCap_,
+            receiverAccounts_,
+            receiverSharesBps_,
+            metadataURI_
+        );
+    }
+
+    /**
+     * Adres, jaki dostanie `creator` dla tego `vanitySalt` na tej sieci - funkcja,
+     * ktora interfejs wola W PETLI, kopiac 4 znaki. Liczy DOKLADNIE ten sam
+     * launchId co launchVanity i pyta fabryke o adres, wiec wykopany adres zgadza
+     * sie co do bitu z tym, ktory naprawde powstanie. Deterministyczne - kopanie
+     * idzie offline (albo tanimi eth_call), bez zadnego stanu na lancuchu.
+     */
+    function predictVanityToken(address creator, bytes32 vanitySalt) external view returns (address) {
+        return TOKEN_FACTORY.predictToken(_vanityLaunchId(creator, vanitySalt));
+    }
+
+    /**
+     * Domyslny launchId: adres NIEPRZEWIDYWALNY (blockhash + nonce). Uzywany przez
+     * launch() i launchAdvanced(). Mutuje `creatorNonce`, wiec nie jest `view`.
+     * Uzasadnienie blockhash - patrz docstring launch().
+     */
+    function _defaultLaunchId() private returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                address(this),
+                msg.sender,
+                creatorNonce[msg.sender]++,
+                block.chainid,
+                blockhash(block.number - 1)
+            )
+        );
+    }
+
+    /**
+     * Vanity launchId: adres PRZEWIDYWALNY z salta usera. Bez blockhash i bez
+     * nonce - unikalnosc daje para (creator, vanitySalt), a `creator` w preimage
+     * zamyka front-run (inny wolajacy => inny adres). Te same argumenty i ta sama
+     * kolejnosc co w predictVanityToken, zeby wykopany adres zgadzal sie z wynikiem.
+     */
+    function _vanityLaunchId(address creator, bytes32 vanitySalt) private view returns (bytes32) {
+        return keccak256(abi.encode(address(this), creator, vanitySalt, block.chainid));
+    }
+
     function _launch(
+        bytes32 launchId_,
         string memory name_,
         string memory symbol_,
         uint256 minTokensOut,
@@ -846,15 +958,11 @@ contract CurveLaunchpad {
         }
         if (shareTotal != 10_000) revert InvalidFeeConfig();
 
-        launchId = keccak256(
-            abi.encode(
-                address(this),
-                msg.sender,
-                creatorNonce[msg.sender]++,
-                block.chainid,
-                blockhash(block.number - 1)
-            )
-        );
+        // launchId policzyl WOLAJACY (_defaultLaunchId albo _vanityLaunchId) i podal
+        // go wyzej. Dwie sciezki adresu: domyslna (blockhash - nieprzewidywalny)
+        // oraz vanity (salt usera - przewidywalny do wykopania). Reszta startu
+        // ponizej jest identyczna dla obu.
+        launchId = launchId_;
 
         // Fabryka mintuje cala podaz TUTAJ i sama asertuje sufit oraz brak rol.
         // Wracamy do adresu, ktory ona wylicza wlasnym wzorem - porownanie
@@ -1159,9 +1267,16 @@ contract CurveLaunchpad {
      *
      * DO PULI IDZIE CALE ETH, TOKEN JEST LUZEM. Pula otwiera sie po cenie
      * terminalnej krzywej. Jesli w stanie Locked byly sprzedaze, cena krzywej
-     * jest NIZSZA niz terminalna - zasilamy i tak po terminalnej, wiec luka jest
-     * na niekorzysc pierwszego handlujacego w puli, nie na korzysc. To jest
-     * wymagany kierunek: kazda luka w druga strone to darmowe pieniadze dla bota.
+     * jest NIZSZA niz terminalna - a mimo to zasilamy po terminalnej.
+     *
+     * KIERUNEK LUKI (poprawka opisu z audytu wewnetrznego): otwarcie POWYZEJ
+     * ceny krzywej czyni token przewartosciowanym w ETH, wiec pierwszego
+     * KUPUJACEGO odstrasza (nie ma po co kupowac drogo), a pierwszemu
+     * SPRZEDAJACEMU sprzyja - dostaje ponadkrzywa cene kosztem pozniejszych
+     * sprzedajacych i pozycji LP. Luka jest ograniczona (eLp) i zero-sumowa
+     * miedzy posiadaczami, nie tworzy pieniedzy z zewnatrz. Wariant odwrotny
+     * (otwarcie PONIZEJ krzywej) dawalby pierwszemu KUPUJACEMU darmowe pieniadze
+     * - i tego wlasnie unikamy.
      */
     function graduate(address token) external nonReentrant {
         Launch storage l = _launches[token];

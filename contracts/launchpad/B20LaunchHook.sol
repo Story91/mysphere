@@ -161,13 +161,16 @@ contract B20LaunchHook {
      */
     uint16 public constant HOOK_FEE_BPS = 100;
     uint16 public constant MAX_HOOK_FEE_BPS = 200;
-    uint160 private constant MIN_SQRT_PRICE_X96 = 4_295_128_740;
+    // v4 MIN_SQRT_PRICE = getSqrtPriceAtTick(MIN_TICK = -887272) = 4295128739.
+    // Bylo 4_295_128_740 (min+1) - poprawka nitu z audytu wewnetrznego; clamp
+    // "+1" ponizej daje wtedy min+1, czyli poprawne "ostro wieksze niz MIN".
+    uint160 private constant MIN_SQRT_PRICE_X96 = 4_295_128_739;
 
     /**
      * O ile najwyzej wolno przesunac PIERWIASTEK ceny w jednym auto-buybacku.
      *
      * ===========================================================================
-     * TO JEST OBRONA PRZED KANAPKA, A NIE STROJENIE
+     * OGRANICZA STRATE Z KANAPKI (NIE ELIMINUJE JEJ) - DLATEGO JEST CIASNE
      * ===========================================================================
      * `executeBuyback` jest bezuprawnieniowe i `minTokensOut` podaje WOLAJACY.
      * Dopoki wymiana szla z `sqrtPriceLimitX96 = MIN_SQRT_PRICE_X96`, czyli bez
@@ -181,10 +184,18 @@ contract B20LaunchHook {
      * Granica liczona jest TUTAJ, z ceny odczytanej w tej samej transakcji, wiec
      * nie da sie jej podac z zewnatrz.
      *
-     * UWAGA NA KWADRAT: to jest limit na PIERWIASTKU ceny. 500 bps na
-     * pierwiastku to okolo 9.75% na samej cenie, bo (1 - 0.05)^2 = 0.9025.
+     * CO TA GRANICA ROBI, A CZEGO NIE: ogranicza STRATE NA JEDNO WYWOLANIE, nie
+     * eliminuje kanapki. Liczona jest ze spotu w TEJ SAMEJ transakcji, wiec
+     * napastnik, ktory najpierw pcha cene, przesuwa tez punkt odniesienia -
+     * dlatego trzymamy granice CIASNO. Audyt wewnetrzny (2026-08) zalecil
+     * zejscie z 500 do 150 bps: buyback jest re-wywolywalny, wiec ciasniejsza
+     * granica to tylko czesciowe wypelnienia i ponowienia, a najgorszy wyciek
+     * na jedno wywolanie spada z ~9.75% do ~3% ceny.
+     *
+     * UWAGA NA KWADRAT: to jest limit na PIERWIASTKU ceny. 150 bps na
+     * pierwiastku to okolo 3% na samej cenie, bo (1 - 0.015)^2 = 0.9702.
      */
-    uint16 private constant MAX_BUYBACK_SLIPPAGE_BPS = 500;
+    uint16 private constant MAX_BUYBACK_SLIPPAGE_BPS = 150;
     address private constant DEAD = address(0x000000000000000000000000000000000000dEaD);
 
     /** Udzial protokolu w tym, co wezmie hook. Reszta idzie do tworcy tokena. */

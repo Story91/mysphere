@@ -32,7 +32,8 @@ pragma solidity 0.8.20;
  * struktury, wiec przestawienie pol daje inna pule, nie blad kompilacji.
  *
  * U nas ZAWSZE: currency0 = address(0) (natywne ETH), currency1 = token B20,
- * hooks = address(0). Kolejnosc walut jest deterministyczna, bo adres B20
+ * hooks = nasz B20LaunchHook (NIE address(0) - to nieaktualny opis z wersji
+ * bez hooka). Kolejnosc walut jest deterministyczna, bo adres B20
  * zaczyna sie od 0xb2, wiec zawsze przebija adres zerowy.
  */
 struct PoolKey {
@@ -137,10 +138,13 @@ library BalanceDeltaLib {
  * z kolejnosci dziedziczenia (Owned.owner=0, ProtocolFees=1..2, ERC6909=3..5,
  * PoolManager._pools=6) i zgadza sie ze stala `POOLS_SLOT` z `StateLibrary`.
  *
- * Zeby to nie bylo zalozenie, `CurveLaunchpad.launch` czyta cene ZARAZ PO
- * WLASNYM `initialize` i rewertuje, jesli nie widzi tam ceny, ktora sam
- * przed chwila ustawil. Bledne wyprowadzenie slotu wywala wiec PIERWSZY start
- * na testnecie, a nie awans po zebraniu cudzych pieniedzy.
+ * Zeby to nie bylo zalozenie, sprawdzamy odczyt ZARAZ PO WLASNYM `initialize`
+ * w `LiquidityVault._seed` (rewert `PoolStateUnreadable`, gdy slot nie oddaje
+ * ceny, ktora sam przed chwila ustawilismy). UWAGA (poprawka z audytu wewn.):
+ * `launch` NIE inicjalizuje juz zadnej puli - jedyny `initialize` jest w `_seed`,
+ * przy AWANSIE. Bledne wyprowadzenie slotu wywala wiec PIERWSZA GRADUACJE na
+ * testnecie, a nie start - dlatego runbook wdrozenia na nowa siec MUSI zawierac
+ * jedna pelna graduacje na testnecie/forku PRZED mainnetem.
  */
 library PoolStateReader {
     uint256 internal constant POOLS_SLOT = 6;
