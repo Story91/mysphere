@@ -2232,4 +2232,3 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
 
 // Ten plik musi byc modulem: bez tego `const hre` zyje w globalnej przestrzeni
 // i koliduje z identyczna deklaracja w pozostalych plikach testowych.
-export {};

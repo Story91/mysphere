@@ -890,4 +890,3 @@ describe('CurveLaunchpad', function () {
   });
 });
 
-export {};
