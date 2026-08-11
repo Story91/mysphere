@@ -596,8 +596,10 @@ export default function LaunchTokenModal({
       if (parsedCap > t0Wei) {
         return fail(`Per-wallet cap cannot exceed ${curve.t0.toLocaleString('en-US')} tokens.`);
       }
-      // Margines 2% na zaokraglenia miedzy nasza formula a kontraktem.
-      if (preBuyTokens > 0 && preBuyTokens * 1.02 > Number(formatEther(parsedCap))) {
+      // Bez marginesu: nasz estymat jest ZAWYZONY wzgledem kontraktu (kontrakt
+      // zaokragla oplate w gore -> mniej tokenow), wiec estymat <= cap gwarantuje
+      // realny wynik <= cap. Margines 2% falszywie blokowal pre-buy tuz pod capem.
+      if (preBuyTokens > 0 && preBuyTokens > Number(formatEther(parsedCap))) {
         return fail(
           `Your ${preBuyEthNum} ETH pre-buy is about ${Math.round(preBuyTokens).toLocaleString('en-US')} tokens, ` +
             `above the ${Number(formatEther(parsedCap)).toLocaleString('en-US')} per-wallet cap. ` +
@@ -692,8 +694,14 @@ export default function LaunchTokenModal({
    * zawyzaloby zarobek dokladnie o to, co tworca sam oddal na skup i spalenie.
    */
   const estimate = useMemo(() => {
-    const creatorFeeBps = advanced.args?.creatorFeeBps ?? 0;
-    const buybackBps = advanced.args?.buybackBps ?? 0;
+    // Liczymy WPROST z pol, a NIE z `advanced.args`. Inaczej dowolne
+    // niepowodzenie walidacji (np. pre-buy ponad sniper cap) zerowalo zarobki
+    // na krzywej - a krzywa zalezy TYLKO od oplaty i udzialu tworcy, nie od
+    // pre-buya. To byl bug "0 ETH on curve przy wlaczonym sniperze".
+    const feeBps = Math.round((Number(launchFeePct) || 0) * 100);
+    const creatorPct = Math.max(0, Math.min(limits.maxCreatorShareBps / 100, Number(creatorSharePct) || 0));
+    const creatorFeeBps = Math.min(feeBps, Math.floor((feeBps * creatorPct) / 100));
+    const buybackBps = Math.round((Number(buybackPct) || 0) * 100);
     const poolCreatorBps =
       ((hookSplit.feeBps * (10_000 - hookSplit.protocolShareBps)) / 10_000) * (1 - buybackBps / 10_000);
     return [10, 100, 1_000].map((volume) => ({
@@ -701,7 +709,7 @@ export default function LaunchTokenModal({
       curve: (volume * creatorFeeBps) / 10_000,
       pool: (volume * poolCreatorBps) / 10_000,
     }));
-  }, [advanced.args, hookSplit]);
+  }, [launchFeePct, creatorSharePct, buybackPct, limits.maxCreatorShareBps, hookSplit]);
 
   /** Podglad dev-buya po cenie startowej krzywej. Szacunek, nie gwarancja. */
   const preBuyPreview = useMemo(() => {
