@@ -43,8 +43,8 @@ import {
   setLaunchpadChain,
   type LaunchpadToken,
 } from './config';
-import { fetchLogos } from './logos';
-import { loadSnapshot, saveSnapshot } from './snapshot';
+import { fetchLogos, recallLogos, rememberLogos } from './logos';
+import { loadSnapshot, saveSnapshot, loadFeedSnapshot, saveFeedSnapshot } from './snapshot';
 import { fetchHolderCounts } from './blockscout';
 import LaunchTokenModal from './LaunchTokenModal';
 import StartpadFooter from './StartpadFooter';
@@ -1011,6 +1011,14 @@ export default function LaunchpadBoard() {
   // `true` od pierwszego renderu: zanim efekt odpali skan, rynek ma pokazywac
   // szkielet, a nie pusty stan ani probki.
   const [loadingBoard, setLoadingBoard] = useState(true);
+  // Spinner "Reading Launchpad activity" tylko na ZIMNYM starcie. Gdy tablica
+  // ma juz tresc, kolejne loadBoard (po tradzie/starcie) odswiezaja CICHO - bez
+  // migania belka, ktora sprawiala wrazenie ciaglego przeladowania.
+  const boardHasContentRef = useRef(false);
+  // Zabezpieczenie przed WYSCIGIEM nakladajacych sie loadBoard (mount + cichy
+  // po tradzie): kazdy przebieg dostaje numer; starszy nie nadpisuje stanu, gdy
+  // w miedzyczasie ruszyl nowszy.
+  const loadBoardSeq = useRef(0);
   const [boardError, setBoardError] = useState<string | null>(null);
   // Skan logow doszedl do sufitu okien zanim siegnal bloku wdrozenia -
   // najstarsze starty moga byc poza widokiem i trzeba to nazwac w UI.
@@ -1062,7 +1070,9 @@ export default function LaunchpadBoard() {
    */
   const loadBoard = useCallback(async () => {
     if (!readClient) return;
-    setLoadingBoard(true);
+    const runId = ++loadBoardSeq.current;
+    const stale = () => runId !== loadBoardSeq.current;
+    if (!boardHasContentRef.current) setLoadingBoard(true);
     setBoardError(null);
     try {
       const latest = await readClient.getBlockNumber();
@@ -1096,19 +1106,58 @@ export default function LaunchpadBoard() {
         priceEntries.set(token, list);
       };
 
-      let toBlock = latest;
-      for (let window = 0; window < MAX_LOG_WINDOWS && toBlock >= LAUNCHPAD_DEPLOY_BLOCK; window += 1) {
-        const fromBlock = toBlock > LAUNCHPAD_DEPLOY_BLOCK + LOG_WINDOW ? toBlock - LOG_WINDOW : LAUNCHPAD_DEPLOY_BLOCK;
-        // Dwa adresy w jednym strzale: launchpad emituje handel na krzywej,
-        // hook rozliczenia oplat puli. Osobny skan hooka w tych samych oknach
-        // podwoilby liczbe requestow do publicznego RPC.
-        const logs = await readClient.getLogs({
-          address: [LAUNCHPAD_ADDRESS as Address, LAUNCH_HOOK_ADDRESS as Address],
-          events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT, FEE_ACCRUED_EVENT],
-          fromBlock,
-          toBlock,
-        });
-        for (const log of logs) {
+      // Wszystkie okna [fromBlock,toBlock] liczymy Z GORY, potem strzelamy
+      // ROWNOLEGLE w puli po 6. Okna sa niezalezne, a przetwarzanie i tak
+      // sortuje po (blok, logIndex), wiec kolejnosc pobrania nie ma znaczenia.
+      // Zamiana ~64 sekwencyjnych RTT na ~ceil(N/6) rownoleglych scina zimny
+      // skan z ~13-30s do ~2-4s - to byla glowna przyczyna zacinania tablicy.
+      const ranges: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+      {
+        let cursor = latest;
+        for (let window = 0; window < MAX_LOG_WINDOWS && cursor >= LAUNCHPAD_DEPLOY_BLOCK; window += 1) {
+          const fromBlock = cursor > LAUNCHPAD_DEPLOY_BLOCK + LOG_WINDOW ? cursor - LOG_WINDOW : LAUNCHPAD_DEPLOY_BLOCK;
+          ranges.push({ fromBlock, toBlock: cursor });
+          if (fromBlock === LAUNCHPAD_DEPLOY_BLOCK) break;
+          cursor = fromBlock - 1n;
+        }
+      }
+      // Dwa adresy w jednym strzale: launchpad emituje handel na krzywej, hook
+      // rozliczenia oplat puli. Blad jednego okna nie wywala calego skanu.
+      const scanOne = async (r: { fromBlock: bigint; toBlock: bigint }) => {
+        const once = () =>
+          readClient.getLogs({
+            address: [LAUNCHPAD_ADDRESS as Address, LAUNCH_HOOK_ADDRESS as Address],
+            events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT, FEE_ACCRUED_EVENT],
+            fromBlock: r.fromBlock,
+            toBlock: r.toBlock,
+          });
+        try {
+          return await once();
+        } catch {
+          // Jedna proba ponowna: burst zapytan potrafi zebrac 429 z publicznego
+          // RPC, ale po chwili przechodzi. Dopiero drugi blad daje puste okno -
+          // liczby moga byc chwilowo zanizone, ale nastepny loadBoard je pogodzi.
+          try {
+            return await once();
+          } catch {
+            return [];
+          }
+        }
+      };
+      type ScanLog = {
+        eventName?: string;
+        args: Record<string, unknown>;
+        transactionHash?: string;
+        blockNumber: bigint | null;
+        logIndex: number | null;
+      };
+      const SCAN_CONCURRENCY = 4;
+      const allLogs: ScanLog[] = [];
+      for (let i = 0; i < ranges.length; i += SCAN_CONCURRENCY) {
+        const batch = (await Promise.all(ranges.slice(i, i + SCAN_CONCURRENCY).map(scanOne))) as unknown as ScanLog[][];
+        for (const logs of batch) for (const log of logs) allLogs.push(log);
+      }
+        for (const log of allLogs) {
           const token = log.args.token as Address | undefined;
           if (!token) continue;
           if (log.eventName === 'Launched') {
@@ -1160,14 +1209,13 @@ export default function LaunchpadBoard() {
             }
           }
         }
-        if (fromBlock === LAUNCHPAD_DEPLOY_BLOCK) break;
-        toBlock = fromBlock - 1n;
-      }
 
-      // Petla mogla skonczyc sie z powodu SUFITU OKIEN, a nie dojscia do bloku
-      // wdrozenia. Wtedy starsze starty sa poza skanem i musimy to POWIEDZIEC -
-      // cicho zniknely token wyglada jak skasowany, a jest tylko nieodczytany.
-      setScanTruncated(toBlock >= LAUNCHPAD_DEPLOY_BLOCK);
+      // Skan mogl uciac historie na SUFICIE OKIEN zamiast dojsc do bloku
+      // wdrozenia - ale przy scalaniu ponizej zachowujemy wiersze spoza skanu,
+      // wiec cicho niezeskanowany token juz nie znika z tablicy.
+      const lowestScanned = ranges.length ? ranges[ranges.length - 1].fromBlock : latest;
+      if (stale()) return;
+      setScanTruncated(lowestScanned > LAUNCHPAD_DEPLOY_BLOCK);
 
       if (launched.size === 0) {
         setActivityFeed([]);
@@ -1283,61 +1331,88 @@ export default function LaunchpadBoard() {
         const meta = tokenMeta.get(token);
         if (meta) addEarned(meta.creator.toLowerCase(), meta.creator, token, wei);
       }
-      // DOKLADNE saldo bije event-sume. Skan siega tylko ~okno wstecz, wiec
-      // FeeAccrued sprzed okna gubimy i ranking zanizal (uzytkownik widzial
-      // "Top earnings" mniejsze niz wlasny przycisk Claim). Bierzemy wiec
-      // claimable() + hook + vault per adres jednym multicall3 - ta sama liczba
-      // co Claim, z wliczonym vaultem po graduacji. Gdy multicall padnie
-      // (np. brak multicall3 na sieci), zostaje event-suma: lepsze cokolwiek.
-      const accountKeys = [...earningsByAccount.keys()];
-      if (accountKeys.length > 0) {
-        try {
-          const calls = accountKeys.flatMap((acc) => [
-            { address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [acc as Address] },
-            { address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [acc as Address] },
-            { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [acc as Address] },
-          ]);
-          const balances = await readClient.multicall({ contracts: calls, allowFailure: true });
-          const cell = (i: number) => (balances[i]?.status === 'success' ? (balances[i].result as bigint) : 0n);
-          accountKeys.forEach((acc, i) => {
-            const exact = cell(i * 3) + cell(i * 3 + 1) + cell(i * 3 + 2);
-            const entry = earningsByAccount.get(acc);
-            if (entry) entry.totalWei = exact;
-          });
-        } catch {
-          // Multicall padl - zostawiamy event-sume policzona wyzej.
-        }
-      }
-      // Do tablicy wchodza tylko konta z niezerowym saldem - po odebraniu
-      // wszystkiego (exact = 0) wiersz nie ma juz nic do pokazania.
-      setTopEarners(
-        [...earningsByAccount.values()]
+      // Ranking Top earnings: NAJPIERW z event-sumy (natychmiast, bez RPC),
+      // potem doprecyzowany dokladnym saldem z kontraktu W TLE. Do tablicy
+      // wchodza tylko konta z niezerowym saldem.
+      const rankTopEarners = (m: typeof earningsByAccount) =>
+        [...m.values()]
           .map((entry) => ({ ...entry, tokenCount: entry.tokens.size }))
           .filter((entry) => entry.totalWei > 0n)
           .sort((a, b) => (b.totalWei > a.totalWei ? 1 : b.totalWei < a.totalWei ? -1 : 0))
-          .slice(0, 5)
-      );
+          .slice(0, 5);
+      if (!stale()) setTopEarners(rankTopEarners(earningsByAccount));
+      const accountKeys = [...earningsByAccount.keys()];
+      if (accountKeys.length > 0) {
+        // DOKLADNE saldo = claimable() + hook + vault per adres (jeden multicall3):
+        // ta sama liczba co przycisk Claim, z vaultem po graduacji. Skan siega
+        // tylko ~okno wstecz, wiec sama event-suma zanizala ranking. Liczymy to
+        // W TLE, zeby nie blokowac pierwszego renderu tablicy.
+        void (async () => {
+          try {
+            const calls = accountKeys.flatMap((acc) => [
+              { address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [acc as Address] },
+              { address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [acc as Address] },
+              { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [acc as Address] },
+            ]);
+            const balances = await readClient.multicall({ contracts: calls, allowFailure: true });
+            const cell = (i: number) => (balances[i]?.status === 'success' ? (balances[i].result as bigint) : 0n);
+            accountKeys.forEach((acc, i) => {
+              const exact = cell(i * 3) + cell(i * 3 + 1) + cell(i * 3 + 2);
+              const entry = earningsByAccount.get(acc);
+              if (entry) entry.totalWei = exact;
+            });
+            if (!stale()) setTopEarners(rankTopEarners(earningsByAccount));
+          } catch {
+            // Multicall padl - zostaje ranking z event-sumy, juz pokazany.
+          }
+        })();
+      }
       live.sort((a, b) => b.raised - a.raised);
       // Swiezy skan NIE zna logo (logo zyje w Blobie, dochodzi ponizej async).
       // Bez przeniesienia logo ze STANU POPRZEDNIEGO (migawka/poprzedni skan)
       // logo migalyby: sa -> setTokens(live) je gubi -> fetchLogos wraca.
       // Przenosimy je po adresie, zeby nigdy nie znikaly.
+      if (stale()) return;
+      // Logo: ze STANU POPRZEDNIEGO (po adresie), a jak tam brak - z TRWALEJ
+      // pamieci (localStorage). Raz zobaczone logo juz nie zniknie.
+      const remembered = recallLogos(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
+      const nowSec = Math.floor(Date.now() / 1000);
+      const scanTruncatedNow = lowestScanned > LAUNCHPAD_DEPLOY_BLOCK;
       setTokens((current) => {
         const logoByAddr = new Map<string, string | undefined>();
         for (const token of current) if (token.address) logoByAddr.set(token.address.toLowerCase(), token.logoUrl);
-        return live.map((token) => {
-          const logo = token.address ? logoByAddr.get(token.address.toLowerCase()) : undefined;
+        const scanned = new Set<string>();
+        const merged = live.map((token) => {
+          const key = token.address?.toLowerCase();
+          if (key) scanned.add(key);
+          const logo = token.logoUrl ?? (key ? logoByAddr.get(key) ?? remembered[key] : undefined);
           return logo && !token.logoUrl ? { ...token, logoUrl: logo } : token;
         });
+        // Zachowaj wiersz w stanie, ktorego NIE ma w skanie, ALE tylko z powodem:
+        // swiezo wystartowany (RPC jeszcze nie indeksuje) LUB skan uciol historie
+        // na sufcie okien. Inaczej trzymalibysmy w nieskonczonosc tokeny z
+        // MARTWEGO wdrozenia (stary launchpad), ktorych zaden skan juz nie zwroci
+        // - to bylby nowy "ghost", gorszy niz znikajace logo.
+        const RECENT_SEC = 15 * 60;
+        const kept = current.filter((t) => {
+          if (!t.live || !t.address || scanned.has(t.address.toLowerCase())) return false;
+          const fresh = typeof t.startedAt === 'number' && nowSec - t.startedAt < RECENT_SEC;
+          return fresh || scanTruncatedNow;
+        });
+        return [...merged, ...kept];
       });
-      setSelectedId((current) => (live.some((token) => token.id === current) ? current : live[0].id));
+      boardHasContentRef.current = true;
+      // Zaznaczenie: trzymaj biezacy wybor (moze byc wierszem "kept"), a domysl
+      // ustaw tylko gdy nic nie wybrano - inaczej klikniety token spoza skanu
+      // gubilby zaznaczenie po kazdym cichym odswiezeniu.
+      setSelectedId((current) => current || live[0].id);
 
       // Liczba POSIADACZY z Blockscouta - miekki dodatek scalany po fakcie.
       // Z samego RPC nie da sie jej policzyc bez skanu wszystkich transferow;
       // tu przychodzi z indeksu. Gdy Blockscout milczy, zostaje liczba z eventow.
       const liveAddresses = live.filter((t) => t.address).map((t) => t.address as string);
       void fetchHolderCounts(ACTIVE_LAUNCHPAD_NETWORK.chain.id, liveAddresses).then((counts) => {
-        if (Object.keys(counts).length === 0) return;
+        if (stale() || Object.keys(counts).length === 0) return;
         setTokens((current) =>
           current.map((t) => {
             const key = t.address?.toLowerCase();
@@ -1369,7 +1444,13 @@ export default function LaunchpadBoard() {
       setTokens(cached);
       setSelectedId((current) => current || cached[0].id);
       setLoadingBoard(false);
+      // Mamy tresc z migawki - kolejny loadBoard odswieza CICHO, bez spinnera.
+      boardHasContentRef.current = true;
     }
+    // Live tape z migawki - pasek pokazuje sie OD RAZU zamiast pusty przez caly
+    // skan; skan i subskrypcja nadpisza go sekundy pozniej.
+    const cachedFeed = loadFeedSnapshot<ActivityItem>(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
+    if (cachedFeed && cachedFeed.length) setActivityFeed(cachedFeed);
   }, []);
 
   useEffect(() => {
@@ -1382,6 +1463,11 @@ export default function LaunchpadBoard() {
     const real = tokens.filter((token) => token.live);
     if (real.length) saveSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, real);
   }, [tokens]);
+
+  // Migawka live tape, zeby przy nastepnym wejsciu pasek byl od razu.
+  useEffect(() => {
+    if (activityFeed.length) saveFeedSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, activityFeed);
+  }, [activityFeed]);
 
   /**
    * NA ZYWO. `loadBoard` przemiata cala historie w oknach po 1900 blokow i
@@ -1541,8 +1627,9 @@ export default function LaunchpadBoard() {
     const hasAny = tokens.some((token) => token.address);
     if (!hasAny) return;
     let cancelled = false;
+    const chainId = ACTIVE_LAUNCHPAD_NETWORK.chain.id;
 
-    void fetchLogos(ACTIVE_LAUNCHPAD_NETWORK.chain.id).then((logos) => {
+    const apply = (logos: Record<string, string>) => {
       if (cancelled || Object.keys(logos).length === 0) return;
       setTokens((current) =>
         current.map((row) => {
@@ -1550,10 +1637,21 @@ export default function LaunchpadBoard() {
           return url && url !== row.logoUrl ? { ...row, logoUrl: url } : row;
         })
       );
-    });
+    };
+
+    // 1) Natychmiast z TRWALEJ pamieci - znane logo bez czekania na siec.
+    const remembered = recallLogos(chainId);
+    apply(remembered);
+    // 2) Sa adresy BEZ logo? Ktos mogl przed chwila je dodac - pomijamy 60s
+    //    cache, i probujemy jeszcze raz po 15s (Blob bywa spozniony). Gdy logo
+    //    nigdy nie dojdzie (upload bez sesji SIWE), po jednej probie odpuszczamy.
+    const missing = tokens.some((t) => t.address && !t.logoUrl && !remembered[t.address.toLowerCase()]);
+    void fetchLogos(chainId, missing ? { bust: true } : undefined).then(apply);
+    const retry = missing ? setTimeout(() => void fetchLogos(chainId, { bust: true }).then(apply), 15_000) : undefined;
 
     return () => {
       cancelled = true;
+      if (retry) clearTimeout(retry);
     };
     // Zalezy od zestawu adresow, nie od calej tablicy - inaczej wlasny setTokens
     // wywolywalby ten efekt w kolko.
@@ -1821,20 +1919,27 @@ export default function LaunchpadBoard() {
       });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The buy transaction reverted.');
-      // launchOf: [creator, state, ethReserve, tokenReserve, startedAt, launchId]
-      const onchain = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchOf', args: [selected.address] });
-      const [, state, ethReserve] = onchain;
-      setTokens((current) =>
-        current.map((token) =>
-          token.id === selected.id
-            ? { ...token, raised: Number(formatEther(ethReserve)), state: (LAUNCH_STATE[state] as LaunchpadToken['state']) ?? token.state }
-            : token,
-        ),
-      );
+      // Kupno POTWIERDZONE. Sukces i zamkniecie NAJPIERW - zaden pozniejszy
+      // odczyt nie moze wywrocic potwierdzonej transakcji w blad (to prowadzilo
+      // do ponownego, podwojnego kupna). Blad writeContract/receipt (catch)
+      // zostawia okno otwarte do ponowienia.
       setNotice({ kind: 'success', text: `Buy confirmed. ${hash.slice(0, 10)}...` });
-      // Sukces -> zamykamy okno; potwierdzenie widac w notce na tablicy. Na
-      // bledzie (catch) okno ZOSTAJE otwarte, zeby dalo sie sprobowac ponownie.
       setTradeOpen(false);
+      // Optymistyczny update wiersza (natychmiast) w try - hiccup odczytu nic nie
+      // psuje. Cichy loadBoard w tle pogodzi zarobki/holderow/rezerwy.
+      try {
+        const onchain = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchOf', args: [selected.address] });
+        const [, state, ethReserve] = onchain;
+        setTokens((current) =>
+          current.map((token) =>
+            token.id === selected.id
+              ? { ...token, raised: Number(formatEther(ethReserve)), state: (LAUNCH_STATE[state] as LaunchpadToken['state']) ?? token.state }
+              : token,
+          ),
+        );
+      } catch {
+        // Odczyt po receipt sie nie udal - loadBoard/subskrypcja pogodza stan.
+      }
       void loadBoard();
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message.split('\n')[0] : String(error) });
@@ -1888,10 +1993,25 @@ export default function LaunchpadBoard() {
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The sell transaction reverted.');
       setSellAmount('0');
+      // Sukces i zamkniecie NAJPIERW - potwierdzonego sella zaden pozniejszy
+      // odczyt nie moze wywrocic w blad.
       setNotice({ kind: 'success', text: `Sell confirmed. ${hash.slice(0, 10)}...` });
-      // Sukces -> zamykamy okno (potwierdzenie w notce). Blad zostawia otwarte.
       setTradeOpen(false);
-      await refreshDetails();
+      // Optymistyczny update wiersza w try; cichy loadBoard w tle pogodzi reszte.
+      try {
+        await refreshDetails();
+        const afterSell = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchOf', args: [selected.address as Address] });
+        const [, sellState, sellReserve] = afterSell;
+        setTokens((current) =>
+          current.map((token) =>
+            token.id === selected.id
+              ? { ...token, raised: Number(formatEther(sellReserve)), state: (LAUNCH_STATE[sellState] as LaunchpadToken['state']) ?? token.state }
+              : token,
+          ),
+        );
+      } catch {
+        // Odczyty po receipt sie nie udaly - loadBoard/subskrypcja pogodza.
+      }
       void loadBoard();
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message.split('\n')[0] : String(error) });
@@ -1917,8 +2037,13 @@ export default function LaunchpadBoard() {
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The graduation transaction reverted.');
       setNotice({ kind: 'success', text: `Pool opened. ${hash.slice(0, 10)}...` });
-      await loadBoard();
-      await refreshDetails();
+      // Optymistycznie: krzywa graduowala -> stan Graduated od razu; cichy
+      // loadBoard w tle pogodzi rezerwy/zarobki.
+      setTokens((current) =>
+        current.map((token) => (token.id === selected.id ? { ...token, state: 'Graduated' } : token)),
+      );
+      try { await refreshDetails(); } catch {}
+      void loadBoard();
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message.split('\n')[0] : String(error) });
     } finally {
@@ -2207,6 +2332,9 @@ export default function LaunchpadBoard() {
         open={launchOpen}
         onClose={() => setLaunchOpen(false)}
         onLaunched={(token) => {
+          // Trwale zapamietaj swieze logo (data-URL) po adresie - przezyje re-skan
+          // i reload, zanim (i gdyby w ogole) Blob je przejmie.
+          if (token.logoUrl && token.address) rememberLogos(ACTIVE_LAUNCHPAD_NETWORK.chain.id, { [token.address]: token.logoUrl });
           // `startedAt` dopisujemy tutaj, bo kontrakt modalu oddaje czysty
           // `LaunchpadToken` - bez tego swiezy start ladowalby na koncu "New".
           setTokens((current) => [{ ...token, startedAt: Math.floor(Date.now() / 1000), prices: [] }, ...current.filter((existing) => existing.live)]);

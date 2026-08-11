@@ -42,3 +42,33 @@ export function loadSnapshot<T>(chainId: number): T[] | null {
     return null;
   }
 }
+
+/**
+ * Migawka LIVE TAPE (ostatnie zdarzenia). Sama tasma ma byc swieza, ale przy
+ * WEJSCIU lepiej pokazac ostatni znany pasek od razu i odswiezyc, niz trzymac
+ * pusto przez caly skan. Skan i subskrypcja i tak nadpisza to sekundy pozniej.
+ */
+const FEED_KEY = (chainId: number) => `startpad.feed.${chainId}`;
+
+export function saveFeedSnapshot(chainId: number, feed: unknown[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FEED_KEY(chainId), JSON.stringify({ savedAt: Date.now(), feed: feed.slice(0, 24) }));
+  } catch {
+    // Tasma to wygoda, nie dane. Cisza.
+  }
+}
+
+export function loadFeedSnapshot<T>(chainId: number): T[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(FEED_KEY(chainId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { savedAt?: number; feed?: T[] };
+    if (!parsed.feed || !Array.isArray(parsed.feed)) return null;
+    if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > MAX_AGE_MS) return null;
+    return parsed.feed;
+  } catch {
+    return null;
+  }
+}
