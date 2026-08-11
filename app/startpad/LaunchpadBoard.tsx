@@ -87,15 +87,16 @@ function NetworkSwitch() {
   useEffect(() => setMounted(true), []);
   const active = ACTIVE_LAUNCHPAD_NETWORK;
   if (!mounted) {
-    return <span className="text-[11px] font-bold text-black/40">{NET}</span>;
+    return <span className="py-2.5 pl-3.5 pr-2 text-[12px] font-bold text-black/40">{NET}</span>;
   }
   return (
-    <span className={`inline-flex items-center rounded-full border py-1 pl-3 pr-1 ${active.pillClass}`}>
+    <span className={`inline-flex items-center gap-1.5 py-2.5 pl-3.5 pr-2 ${active.accentTextClass}`}>
+      <span className="h-2 w-2 shrink-0 rounded-full bg-current" aria-hidden="true" />
       <select
         value={active.chain.id}
         onChange={(event) => setLaunchpadChain(Number(event.target.value))}
         aria-label="Launchpad network"
-        className="bg-transparent text-[11px] font-extrabold outline-none [color:inherit] [&>option]:bg-white [&>option]:text-[#16141b]"
+        className="cursor-pointer bg-transparent text-[12px] font-extrabold outline-none [color:inherit] [&>option]:bg-white [&>option]:text-[#16141b]"
       >
         {Object.values(LAUNCHPAD_NETWORKS).map((net) => (
           <option key={net.chain.id} value={net.chain.id}>
@@ -2185,8 +2186,13 @@ export default function LaunchpadBoard() {
               <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${FIELD} rounded-full bg-[#f3f3f5] pl-10`} placeholder="Search coins, creators" aria-label="Search coins and creators" />
             </label>
             <span className="ml-auto flex items-center gap-2">
-              <NetworkSwitch />
-              <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-white shadow-[0_6px_16px_rgba(124,107,218,0.22)] transition-transform active:scale-[0.97]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
+              {/* Split-button: selektor sieci + Launch w JEDNYM pillu - spojna
+                  kontrolka zamiast dwoch osobnych, ktore sie gryzly. */}
+              <div className="inline-flex items-stretch overflow-hidden rounded-full border border-black/10 bg-white shadow-[0_6px_16px_rgba(124,107,218,0.18)]">
+                <NetworkSwitch />
+                <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-black/10" />
+                <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 bg-soft-primary px-4 text-[13px] font-extrabold text-white transition-[background-color,transform] hover:bg-soft-primary-deep active:scale-[0.98]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
+              </div>
             </span>
           </div>
           {/* Na telefonie search zdjety - filtry i przelacznik sieci wystarcza,

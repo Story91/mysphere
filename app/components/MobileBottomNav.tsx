@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -10,41 +11,30 @@ import { usePathname } from 'next/navigation';
  * Dolny pasek na /basechat nie jest nawigacja miedzy stronami - to przelacznik
  * TRZECH PANELI jednej strony (Profile / Feed / Trends), sterujacy jej stanem
  * `activeMobilePanel`. Poza feedem nie ma czego przelaczac, wiec tamten pasek
- * nie moze byc uzyty globalnie.
+ * nie moze byc uzyty globalnie. Ten pasek to zwykle LINKI - dziala wszedzie.
  *
- * Skutek byl taki, ze /asks nie mialo na telefonie ZADNEGO dolnego paska.
- * Zgloszenie: "jak wlaczam ask to znika menu na dole, ciezko przeskoczyc gdzie
- * indziej". Gorna belka byla, ale na telefonie chowa sie pod hamburgerem -
- * czyli wyjscie istnialo, tylko nie bylo widoczne.
+ * === POZYCJE ===
+ * Odbicie gornej belki w zasiegu kciuka: Feed, Asks, StartPad, Money, How.
+ * (Re-Definition zostaje w hamburgerze gornej belki - piec pozycji to komplet,
+ * ktory miesci sie przy 320px, a StartPad w srodku jest wypukly i najwazniejszy.)
  *
- * Ten pasek to zwykle LINKI, nie przelacznik stanu. Dziala wiec na kazdej
- * trasie i mozna go dolozyc wszedzie tam, gdzie ktos moze utknac.
- *
- * === DLACZEGO CZTERY POZYCJE, A NIE PIEC ===
- * Bylo tu trzy, z uzasadnieniem "przy 320px czwarta etykieta zaczyna sie
- * lamac". To ograniczenie dotyczy DLUGOSCI etykiety, nie samej liczby pozycji:
- * przy 320px pasek ma 288px wnetrza, a przycisk to max(44px, etykieta + 16px).
- * Cztery etykiety po najwyzej piec znakow ("Feed", "Asks", "Paid", "Money")
- * daja 4 x 44 = 176px, czyli 112px zapasu na odstepy. Piata pozycja albo
- * etykieta dluzsza niz piec znakow ten zapas zjada - i wtedy uzasadnienie
- * wyzej wraca w mocy.
- *
- * Czwarta pozycja to "Money" i nie jest ozdobnikiem: bez niej saldo do
- * odebrania z kontraktu escrow bylo widoczne WYLACZNIE na /asks, a na telefonie
- * dodatkowo tylko po wejsciu w tamta zakladke. Pieniadze, ktore czekaja na
- * czlowieka, nie moga byc schowane o jedno kliknięcie glebiej niz feed.
- *
- * Cztery kierunki: wrocic do feedu, zobaczyc pytania z kwota, zobaczyc
- * rozliczone platnosci wszystkich, zobaczyc WLASNE.
+ * === STARTPAD W SRODKU ===
+ * StartPad to nowosc, wiec dostaje wyrozniony, PODNIESIONY przycisk w samym
+ * srodku paska, z odznaka "New" - ma zachecac do klikniecia, nie ginac w rzedzie.
  */
 
-const POZYCJE = [
+type Poz = {
+  href: string;
+  label: string;
+  special?: boolean;
+  icon: ReactNode;
+};
+
+const POZYCJE: Poz[] = [
   {
     href: '/basechat',
     label: 'Feed',
-    icon: (
-      <path d="M3 10.5 12 3l9 7.5M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5" />
-    ),
+    icon: <path d="M3 10.5 12 3l9 7.5M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5" />,
   },
   {
     href: '/asks',
@@ -58,30 +48,37 @@ const POZYCJE = [
     ),
   },
   {
-    // Paid mieszka teraz jako zakladka na /money - link prowadzi wprost do
-    // niej, zamiast przez przekierowanie ze starego /leaderboard. Uboczny
-    // skutek: pathname nie niesie query, wiec przy otwartej zakladce Paid
-    // podswietla sie pigulka "Money" (ta sama strona), a nie ta. To wybor:
-    // rozroznienie wymagaloby useSearchParams, a ten hook w komponencie
-    // montowanym na kazdej stronie wymusza granice Suspense w calej aplikacji.
-    href: '/money?tab=paid',
-    label: 'Paid',
+    href: '/startpad',
+    label: 'StartPad',
+    special: true,
+    // Rakieta - launchpad. Wieksza i biala na fioletowym tle przycisku.
     icon: (
       <>
-        <path d="M4 19V10M10 19V5M16 19v-6M22 19H2" />
+        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+        <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
       </>
     ),
   },
   {
     href: '/money',
     label: 'Money',
-    // Banknot, a nie slupki - slupki oznaczaja w tym pasku "Paid", czyli cudze
-    // rozliczenia. Dwie strony o pieniadzach musza roznic sie KSZTALTEM, nie
-    // samym napisem: przy 11.5px etykieta czytana katem oka nie rozstrzyga.
     icon: (
       <>
         <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
         <circle cx="12" cy="12" r="2.5" />
+      </>
+    ),
+  },
+  {
+    href: '/how',
+    label: 'How',
+    // Ksiazka/przewodnik - "jak to dziala".
+    icon: (
+      <>
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
       </>
     ),
   },
@@ -90,71 +87,76 @@ const POZYCJE = [
 export default function MobileBottomNav() {
   const pathname = usePathname();
 
+  const isActive = (href: string) =>
+    pathname === href || Boolean(pathname?.startsWith(href + '/'));
+
   /**
-   * ===== KOMPONENT SAM PILNUJE, GDZIE GO NIE MA =====
-   *
-   * Dotad wstawialy go POJEDYNCZE strony - i tylko dwie z osmiu to zrobily.
-   * Na telefonie /asks i /money mialy dolny pasek, a /curators, /how,
-   * /leaderboard, /re-definition i /join nie mialy nic w zasiegu kciuka:
-   * jedynym wyjsciem byla gorna belka albo przycisk "wstecz" przegladarki.
-   * Nowa strona domyslnie ladowala w tej gorszej grupie, bo trzeba bylo
-   * PAMIETAC o dopisaniu paska.
-   *
-   * Teraz pasek stoi raz, w AppShell, a warunek widocznosci nalezy do niego
-   * samego. Kazda przyszla trasa dostaje go bez pamietania o czymkolwiek.
-   *
-   * WYJATEK: /basechat. Tamtejszy dolny pasek NIE JEST nawigacja miedzy
-   * stronami, tylko przelacznikiem trzech paneli jednej strony (Profile /
-   * Feed / Trends) sterujacym jej stanem. Dwa paski jeden na drugim to dwa
-   * rozne znaczenia tego samego miejsca na ekranie.
+   * WYJATEK: /basechat. Tamtejszy dolny pasek to przelacznik trzech paneli
+   * jednej strony, nie nawigacja miedzy stronami - dwa paski jeden na drugim
+   * to dwa rozne znaczenia tego samego miejsca na ekranie.
    */
   if (pathname === '/basechat' || pathname?.startsWith('/basechat/')) return null;
 
   return (
     <>
       <div className="group/bottom-nav fixed bottom-0 left-0 right-0 z-40 lg:hidden md:max-lg:[@media(hover:hover)]:translate-y-[calc(100%-14px)] md:max-lg:transition-transform md:max-lg:[transition-duration:var(--dur-dropdown)] md:max-lg:ease-out-strong md:max-lg:group-hover/bottom-nav:translate-y-0 md:max-lg:group-focus-within/bottom-nav:translate-y-0">
-      <nav aria-label="Sections" className="border-t border-soft-line bg-soft-surface/95 backdrop-blur-xl">
-        <div className="flex items-center justify-around p-4">
-          {POZYCJE.map((poz) => {
-            // `startsWith` z ukosnikiem, zeby /asks nie zapalalo sie na
-            // /askstore ani podobnym - a jednoczesnie zeby podtrasy liczyly sie
-            // jako ta sama sekcja.
-            const aktywna =
-              pathname === poz.href || Boolean(pathname?.startsWith(poz.href + '/'));
+        <nav aria-label="Sections" className="border-t border-soft-line bg-soft-surface/95 backdrop-blur-xl">
+          {/* items-end + overflow-visible, zeby wypukly StartPad mogl wystawac ponad pasek */}
+          <div className="flex items-end justify-around px-2 pb-3 pt-2">
+            {POZYCJE.map((poz) => {
+              const aktywna = isActive(poz.href);
 
-            return (
-              <Link
-                key={poz.href}
-                href={poz.href}
-                aria-current={aktywna ? 'page' : undefined}
-                className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-              >
-                <span className={`rounded-full p-1 ${aktywna ? 'bg-soft-sunken' : ''}`}>
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={aktywna ? '#7C6BDA' : '#8D86AB'}
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+              if (poz.special) {
+                return (
+                  <Link
+                    key={poz.href}
+                    href={poz.href}
+                    aria-current={aktywna ? 'page' : undefined}
+                    aria-label="StartPad - new"
+                    className="relative -mt-6 flex flex-col items-center"
                   >
-                    {poz.icon}
-                  </svg>
-                </span>
-                <span
-                  className={`mt-1 font-soft text-[11.5px] font-bold ${
-                    aktywna ? 'text-soft-primary-deep' : 'text-soft-ink-soft'
-                  }`}
+                    <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-soft-primary text-white shadow-[0_10px_28px_rgba(124,107,218,0.55)] ring-4 ring-soft-surface transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-95">
+                      <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        {poz.icon}
+                      </svg>
+                      <span className="absolute -right-1.5 -top-1.5 rounded-full bg-[#ff4d7d] px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-white shadow-[0_2px_6px_rgba(255,77,125,0.5)]">
+                        New
+                      </span>
+                    </span>
+                    <span className="mt-1 font-soft text-[11px] font-extrabold text-soft-primary-deep">StartPad</span>
+                  </Link>
+                );
+              }
+
+              return (
+                <Link
+                  key={poz.href}
+                  href={poz.href}
+                  aria-current={aktywna ? 'page' : undefined}
+                  className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
-                  {poz.label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+                  <span className={`rounded-full p-1 ${aktywna ? 'bg-soft-sunken' : ''}`}>
+                    <svg
+                      className="h-6 w-6"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={aktywna ? '#7C6BDA' : '#8D86AB'}
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      {poz.icon}
+                    </svg>
+                  </span>
+                  <span className={`mt-1 font-soft text-[11.5px] font-bold ${aktywna ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>
+                    {poz.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
 
       {/* Miejsce pod pasek, zeby nie zaslanial konca tresci. */}
