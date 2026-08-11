@@ -289,12 +289,18 @@ Przed odpaleniem:
 ### Zmienne Vercel po deployie (Base mainnet)
 
 ```text
-NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS         <launchpad z JSON>
-NEXT_PUBLIC_LIQUIDITY_VAULT_BASE_ADDRESS   <vault z JSON>
-NEXT_PUBLIC_LAUNCH_HOOK_BASE_ADDRESS       <hook z JSON>
-NEXT_PUBLIC_TOKEN_FACTORY_BASE_ADDRESS     <tokenFactory z JSON>
-NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK    <deployBlock z JSON>
+NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS          <launchpad z JSON>
+NEXT_PUBLIC_LIQUIDITY_VAULT_BASE_ADDRESS    <vault z JSON>
+NEXT_PUBLIC_LAUNCH_HOOK_BASE_ADDRESS        <hook z JSON>
+NEXT_PUBLIC_B20_TOKEN_FACTORY_BASE_ADDRESS  <tokenFactory z JSON>
+NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK     <deployBlock z JSON>
 ```
+
+Nazwy MUSZA byc dokladnie te - `app/startpad/config.ts` czyta je 1:1
+(`baseMainnetEntry`). Wpis sieci Base mainnet w przelaczniku pojawia sie DOPIERO,
+gdy `NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS` jest ustawione; wtedy Base mainnet staje
+sie tez sieca DOMYSLNA. Dopoki env pusty - front pokazuje tylko Sepolie/Robinhood,
+zadnej martwej sieci.
 
 ## Zmienne na Vercelu
 
