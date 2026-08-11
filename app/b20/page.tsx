@@ -35,9 +35,9 @@ import { getBoard } from '../utils/b20/market';
  */
 
 export const metadata: Metadata = {
-  title: 'B20 market — every token created on Base, and which ones actually trade',
+  title: 'B20 market: every token created on Base, and which ones actually trade',
   description:
-    'A live list of B20 tokens on Base: who made them, when, and whether anyone has ever traded them. A token with no pool has no price — we say so instead of writing $0.00.',
+    'A live list of B20 tokens on Base: who made them, when, and whether anyone has ever traded them. A token with no pool has no price, and we say so instead of writing $0.00.',
 };
 
 // Migawka zyje w pamieci instancji i ma wlasny licznik swiezosci (60 s), wiec
@@ -56,7 +56,7 @@ function BoardSkeleton() {
       <div className={`${CARD} mb-3 p-4 sm:p-5`} aria-busy="true">
         <p className="text-[13px] leading-[1.55] text-soft-ink-muted">
           Reading the creation events on Base and the pool each token opened. This takes a couple of
-          seconds the first time — nothing is cached in your browser and nothing is guessed.
+          seconds the first time. Nothing is cached in your browser and nothing is guessed.
         </p>
         <div className="mt-3 h-2 w-full overflow-hidden rounded-pill bg-soft-sunken">
           <div className="h-full w-1/4 animate-pulse rounded-pill bg-soft-primary/40" />
@@ -146,7 +146,7 @@ export default function B20MarketPage() {
               "rola", "precompile") nie ma prawa pojawic sie na wejsciu. */}
           <p className="mt-2.5 max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-muted sm:text-[15px]">
             B20 is Base’s own token standard, built into the network instead of deployed on top of
-            it. That makes one cheap to create and gives it a supply cap the network enforces —
+            it. That makes one cheap to create and gives it a supply cap the network enforces,
             not a promise in a description.
           </p>
 

@@ -121,7 +121,7 @@ export default function AskVaultPicker({
             onChange={(event) => pick(event.target.value)}
             className="mt-1.5 block w-full rounded-lg border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[14px] font-normal normal-case tracking-normal text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50"
           >
-            <option value="">No vault — this ask is not about one</option>
+            <option value="">No vault (this ask is not about one)</option>
             {phase.vaults.map((vault) => (
               <option key={vault.address} value={vault.address}>
                 {vaultLabel(vault)}

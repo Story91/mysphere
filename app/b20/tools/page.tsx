@@ -24,7 +24,7 @@ import B20Nav from '../B20Nav';
  */
 
 export const metadata: Metadata = {
-  title: 'B20 tools — mine an address, build a private receipt',
+  title: 'B20 tools: mine an address, build a private receipt',
   description:
     'Search for a B20 token address that spells something, and turn an invoice into a memo nobody can read but you can prove. Everything runs in your browser.',
 };

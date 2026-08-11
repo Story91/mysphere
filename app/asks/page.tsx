@@ -47,7 +47,7 @@ function isCuratorsTab(searchParams: SearchParams | undefined): boolean {
  * Nie zamieniaj na obietnice bezwarunkowa - patrz historia w usunietym layoucie.
  */
 const ASKS_DESCRIPTION =
-  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed — nobody can read what anyone else wrote before the author opens them. The author can lock the whole budget in an escrow contract up front, and every payout is recorded onchain next to the answer that earned it.';
+  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed: nobody can read what anyone else wrote before the author opens them. The author can lock the whole budget in an escrow contract up front, and every payout is recorded onchain next to the answer that earned it.';
 
 const CURATORS_DESCRIPTION =
   'A dated record of what curators changed in listed Morpho vaults on Base: fee changes, curator changes, and vaults entering or leaving the listed set.';

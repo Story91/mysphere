@@ -158,7 +158,7 @@ const STEPS: StepMeta[] = [
     id: 'launch',
     title: 'Launch a token on Startpad',
     cost: 'Test ETH',
-    note: 'Runs on Base Sepolia — faucet ETH, not real money',
+    note: 'Runs on Base Sepolia, where ETH comes from a faucet, not real money',
   },
   {
     n: '09',
@@ -347,14 +347,14 @@ export default function HowPage() {
         <p className="mb-4 max-w-[58ch] text-[16px] leading-[1.65] text-soft-ink-muted">
           Most feeds measure attention, which is free to give and therefore
           proves nothing. This one measures payments, which are not. Below is
-          every single thing you can do here today — what it costs, what you
+          every single thing you can do here today: what it costs, what you
           sign, and where the receipt ends up.
         </p>
 
         <p className="max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
           Nothing on this page is a plan. If it is written here, it works right
-          now — and where the thing that works has never had anyone go through
-          it, the step says so in the step. What is still being built is listed
+          now. Where the thing that works has never had anyone go through it,
+          the step says so in the step. What is still being built is listed
           on{' '}
           <Link
             href="/re-definition"
@@ -384,12 +384,12 @@ export default function HowPage() {
           <Step meta={STEPS[0]}>
             <P lead>
               Connect a wallet, then sign one message. If you do not have a
-              wallet, <Hi>Base Account</Hi> makes one with a passkey — your face
+              wallet, <Hi>Base Account</Hi> makes one with a passkey: your face
               or your fingerprint, no extension and no seed phrase to write down.
             </P>
             <P>
               The signature is not a payment and never becomes one. It exists
-              because an address typed into a box proves nothing — anyone can
+              because an address typed into a box proves nothing. Anyone can
               type yours. Signing is the only way the server can tell it is
               actually you, and it is what stands between your paid content and
               a stranger claiming to be you.
@@ -403,8 +403,8 @@ export default function HowPage() {
           <Step meta={STEPS[1]}>
             <P lead>
               Write, pick a network, post. The text is written to a contract, so
-              the post has a transaction behind it that anyone can open — it is
-              not only a row in our database.
+              the post has a transaction behind it that anyone can open. It is
+              more than a row in our database.
             </P>
             <P>
               Seven chains are wired: <Hi>Base</Hi>, Robinhood Chain, Camp,
@@ -419,7 +419,7 @@ export default function HowPage() {
           <Step meta={STEPS[2]}>
             <P lead>
               A tip is the whole thesis in one button. It costs you something,
-              so it means something — and it lands with a hash that both of you
+              so it means something. And it lands with a hash that both of you
               can open.
             </P>
             <P>
@@ -438,7 +438,7 @@ export default function HowPage() {
               people who pay see the rest.
             </P>
             <P>
-              Write something above the paywall first — a line everyone can read.
+              Write something above the paywall first, a line everyone can read.
               A locked box with no label gives nobody a reason to open it, and
               the button will ask you for it.
             </P>
@@ -460,7 +460,7 @@ export default function HowPage() {
             </P>
             <P>
               You do not have to go anywhere to start one. Above the box you
-              write posts in there is a <Hi>Post / Ask</Hi> switch — flip it to
+              write posts in there is a <Hi>Post / Ask</Hi> switch. Flip it to
               Ask and the same box turns into the question, the budget, the
               seats and the deadline. On an empty form you also get a row of
               ready-made starters (<Hi>Vault risk</Hi>,{' '}
@@ -473,7 +473,7 @@ export default function HowPage() {
             <P>
               If your question is about a Morpho vault on Base, you can attach
               the vault itself instead of pasting an address. The list only
-              contains vaults Morpho lists — anyone can deploy a vault and name
+              contains vaults Morpho lists: anyone can deploy a vault and name
               it after a curator they are not, and a picked-from-list vault
               cannot be one of those. Whoever answers sees the same fee and the
               same split of the yield you did.
@@ -481,13 +481,13 @@ export default function HowPage() {
             <P>
               You can lock the budget in an escrow contract on Base before the
               question exists. Then whoever answers can check, before writing a
-              word, that the money is really there — the contract has no owner
+              word, that the money is really there. The contract has no owner
               and no off switch, so not even we can take it back out.
             </P>
             <P>
               Worth knowing before you do it: <Hi>nobody has yet</Hi>. The
               contract is deployed, its source is public and it is holding
-              exactly nothing — no transaction has ever touched it. That is a
+              exactly nothing. No transaction has ever touched it. That is a
               working contract with no queue in front of it, not a busy one.
               Whoever goes first goes first.
             </P>
@@ -506,13 +506,13 @@ export default function HowPage() {
             <P lead>
               Pick an open Ask with a free seat and write. Check two things
               first: whether the budget is locked in escrow, and the
-              author&apos;s <Hi>resolve rate</Hi> — the share of their past Asks
+              author&apos;s <Hi>resolve rate</Hi>, the share of their past Asks
               they actually settled, counted only over ones past their deadline.
             </P>
             <P>
               You do not have to hunt for one. Open asks sit in a strip above
               the feed, with an <Hi>Open</Hi> / <Hi>Resolved</Hi> switch on it.
-              Resolved shows asks that are closed and paid — nothing to answer
+              Resolved shows asks that are closed and paid. Nothing to answer
               there, but each accepted answer carries the transaction that paid
               for it, which is the fastest way to see what this actually pays
               before you write anything.
@@ -534,7 +534,7 @@ export default function HowPage() {
             <P>
               When an author resolves an Ask you won, the contract credits you
               and you collect with one click. If your own Ask ran out of time,
-              the same page is where the budget comes back — minus the fee, and
+              the same page is where the budget comes back, minus the fee, and
               in two steps, because the contract credits you first and moves the
               money when you ask it to.
             </P>
@@ -554,34 +554,34 @@ export default function HowPage() {
             <P lead>
               <Hi>Startpad</Hi> launches a token on a bonding curve: one
               transaction mints the whole billion-token supply straight onto
-              the curve, and nobody — you included — gets any of it for free.
+              the curve, and nobody (you included) gets any of it for free.
               It runs on <Hi>Base Sepolia</Hi>, the test network, so the ETH
               you sign with here comes from a faucet and is not real money.
             </P>
             <P>
               A <Hi>logo is required</Hi> before the launch button works.
-              Upload a file and we store it — an ERC-20 has no image onchain,
+              Upload a file and we store it. An ERC-20 has no image onchain,
               and a token without one is a grey circle on every list forever.
             </P>
             <P>
               Want the first tokens? Add a <Hi>pre-buy</Hi> and it executes
-              inside the launch transaction itself — same curve, same 1% fee
+              inside the launch transaction itself: same curve, same 1% fee
               as anyone after you, with no block in between where somebody
               else could buy first.
             </P>
             <P>
               Everything else is fixed at launch and has no setter afterwards:
-              your share of the 1% trading fee — anything up to <Hi>70%</Hi>,
+              your share of the 1% trading fee (anything up to <Hi>70%</Hi>,
               paid to up to 8 addresses you name, with the contract keeping at
-              least 30% for the protocol whatever the form says — and a{' '}
+              least 30% for the protocol whatever the form says) and a{' '}
               <Hi>buyback</Hi> slider, which takes part of your own share and
               spends it on buying your token back and burning it. Changing any
               of it later means launching a new token.
             </P>
             <P>
               <Hi>Sniper protection</Hi> is on by default: for the first 5
-              minutes one wallet can buy at most 16 million tokens. At launch
-              — and only at launch — you can tighten that cap or switch the
+              minutes one wallet can buy at most 16 million tokens. At launch,
+              and only at launch, you can tighten that cap or switch the
               protection off entirely.
             </P>
             <Go href="/startpad">Open Startpad</Go>
@@ -593,26 +593,26 @@ export default function HowPage() {
               Every token page has a candlestick chart built from onchain
               events and a buy-and-sell panel next to it. The preview shows
               what you get before you sign, and each trade pays a 1% fee in
-              ETH — up to 70% of it goes to the token&apos;s creator.
+              ETH, up to 70% of which goes to the token&apos;s creator.
             </P>
             <P>
               The curve is the other side of every trade: a fixed formula, no
               order book, nobody to wait for. Buys move the price up, sells
-              move it down, and the contract can always pay — selling every
+              move it down, and the contract can always pay: selling every
               circulating token back returns exactly the ETH it holds.
             </P>
             <P>
               At exactly <Hi>3.00 ETH</Hi> in the reserve the curve locks.
               Buys stop; <Hi>selling keeps working</Hi>, so nobody is trapped
-              at the top. From then on anyone may call <Hi>graduate()</Hi> —
-              the caller earns 0.045 ETH for it — and the liquidity moves into
+              at the top. From then on anyone may call <Hi>graduate()</Hi>
+              (the caller earns 0.045 ETH for it) and the liquidity moves into
               a Uniswap v4 pool that opens at the exact price the curve closed
               at, locked there forever.
             </P>
             <P>
               Worth knowing before you chase that: <Hi>no token has graduated
-              on the live deployment yet</Hi>. The full path — launch to pool
-              to payout — has run end-to-end on the same code, but against a
+              on the live deployment yet</Hi>. The full path, launch to pool
+              to payout, has run end-to-end on the same code, but against a
               smaller test target. The first curve to reach 3.00 ETH here will
               be the first, and whoever fills it goes first.
             </P>
@@ -623,18 +623,18 @@ export default function HowPage() {
             <P lead>
               <Hi>My tokens</Hi>, on the Startpad page, lists every token you
               launched and what its fees have credited you so far, counted to
-              the wei — up to 70% of the 1% on every curve trade, and after
+              the wei: up to 70% of the 1% on every curve trade, and after
               graduation up to 70% of the 1% on every pool swap.
             </P>
             <P>
               Claims are pull-based and paid in <Hi>ETH</Hi>, never in the
               token. Nothing is pushed and nothing can be withheld: the
-              contracts have no owner, no pause and no setter, so nobody —
-              including us — stands between the balance and your claim.
+              contracts have no owner, no pause and no setter, so nobody,
+              including us, stands between the balance and your claim.
             </P>
             <P>
               If you set a buyback at launch, that slice comes out of this
-              money — your share, not the protocol&apos;s. Anyone may trigger
+              money. Your share, not the protocol&apos;s. Anyone may trigger
               the purchase, and the bought tokens go to the dead address,
               provably out of circulation.
             </P>
@@ -649,7 +649,7 @@ export default function HowPage() {
               A Morpho vault has a curator: whoever sets its fee and decides
               what it lends against. They can raise that fee, or hand the vault
               to somebody else, and nobody has to tell the people whose money is
-              in it. <Hi>Curators</Hi> is a dated record of exactly that — the
+              in it. <Hi>Curators</Hi> is a dated record of exactly that: the
               fee before, the fee after, and the dates we saw it between.
             </P>
             <P>
@@ -657,7 +657,7 @@ export default function HowPage() {
               things and only three: the fee, who curates, and whether a vault
               is on that list. Not the yield, which moves on its own every hour
               and is nobody&apos;s decision. Not what a vault lends against,
-              which we do not read — so an empty page there is not proof that a
+              which we do not read. So an empty page there is not proof that a
               vault stayed the same, and the page says so itself.
             </P>
             <P>
@@ -665,13 +665,13 @@ export default function HowPage() {
               compared with the previous one, so an entry says a change happened
               between two dates, not the hour it happened. Worth knowing before
               you open it: it started collecting recently, so it can honestly
-              have nothing in it — and when that is the case, it tells you which
+              have nothing in it. When that is the case, it tells you which
               of the two it is, an empty record or a quiet month.
             </P>
             <P>
               There is nothing about you in there. It reads public vault
               parameters, has no idea which vaults you use, and never touches a
-              wallet — yours or anyone else&apos;s.
+              wallet, yours or anyone else&apos;s.
             </P>
             <Go href="/asks?tab=curators">Open the curator record</Go>
           </Step>
@@ -690,7 +690,7 @@ export default function HowPage() {
           <div className="max-w-[64ch]">
           <P>
             <Hi>Nothing here judges answers.</Hi> Escrow settles whether the
-            money exists — locked, readable before you write. It settles nothing
+            money exists, locked and readable before you write. It settles nothing
             about who deserves it. The author still picks, and there is no
             appeal. The price of refusing to pay is a fee and a public resolve
             rate, which is a price, not a guarantee.

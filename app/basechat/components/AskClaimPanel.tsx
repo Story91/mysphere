@@ -210,7 +210,7 @@ export default function AskClaimPanel({
         </h2>
         <p className="mb-3 break-words text-[12.5px] leading-[1.5] text-soft-ink-muted">
           This is a failed read, not an empty balance. You may well have money waiting in the
-          contract — we just could not reach the chain to check.
+          contract; we just could not reach the chain to check.
         </p>
         <button type="button" onClick={() => void load()} className={`${buttonClass} bg-soft-primary text-white`}>
           Try again
@@ -313,7 +313,7 @@ export default function AskClaimPanel({
           <p className="mb-3 break-words text-[12.5px] leading-[1.5] text-soft-ink-muted">
             Accepted answers are paid by assignment, not by transfer: the money is already yours in
             the escrow contract and nobody can take it back. It reaches your wallet when you collect
-            it — there is no deadline for doing so.
+            it, and there is no deadline for doing so.
           </p>
           {onEscrowChain ? (
             <button

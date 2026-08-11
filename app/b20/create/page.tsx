@@ -33,7 +33,7 @@ import B20Nav from '../B20Nav';
  */
 
 export const metadata: Metadata = {
-  title: 'Create a B20 token on Base — two words and one signature',
+  title: 'Create a B20 token on Base: two words and one signature',
   description:
     'Make a token on Base straight from your wallet: fixed supply, nobody as admin unless you choose otherwise, and the address worked out before you sign. Nobody can buy it until someone opens a pool, and we say so instead of implying otherwise.',
 };
@@ -55,8 +55,8 @@ export default function B20CreatePage() {
               naprawde i czego nie robi. Zargon ("sol", "precompile") nie ma tu
               prawa byc - jest na /b20/tools, gdzie ktos go szuka. */}
           <p className="mt-2 max-w-[64ch] text-[13.5px] leading-[1.6] text-soft-ink-muted">
-            Two words and one signature. Base makes the token itself — the same place every token on
-            the market list comes from — so this is not a queue and not a preview. What it does not
+            Two words and one signature. Base makes the token itself (the same place every token on
+            the market list comes from), so this is not a queue and not a preview. What it does not
             do is give anyone a way to buy it: that part is not built yet, and this page says so
             rather than letting you find out afterwards.
           </p>

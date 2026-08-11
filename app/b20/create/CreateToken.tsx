@@ -372,7 +372,7 @@ export default function CreateToken() {
           <>
             <p className="mt-1.5 text-[13px] leading-[1.55] text-soft-ink-muted">
               Base included it and it went through. The token address is the one you saw before you
-              signed — it could not have been anything else.
+              signed. It could not have been anything else.
             </p>
             {/* ===== NASTEPNY KROK, A NIE KONIEC =====
                 Token bez puli nie ma ceny i nikt go nie kupi. Ekran, ktory
@@ -404,14 +404,14 @@ export default function CreateToken() {
           <p className="mt-1.5 text-[13px] leading-[1.55] text-soft-ink-muted" role="alert">
             Base included the transaction and it failed, so no token was made and this address was
             not taken. The gas is spent either way. Your name, ticker and mined address are still
-            here — go back and send it again.
+            here, so go back and send it again.
           </p>
         )}
         {landed.kind === 'unread' && (
           <>
             <p className="mt-1.5 text-[13px] leading-[1.55] text-soft-ink-muted" role="alert">
               It is signed and sent, and we could not read whether it landed. That is a failed read
-              on our side, not a failed transaction — the link below is the only answer that counts.
+              on our side, not a failed transaction. The link below is the only answer that counts.
             </p>
             <p className="mt-1 break-words font-mono text-[11px] leading-[1.45] text-soft-ink-faint">
               {landed.message}
@@ -434,7 +434,7 @@ export default function CreateToken() {
             tlumaczy, dlaczego token nie pojawi sie na zadnym wykresie. */}
         {landed.kind !== 'reverted' && (
           <p className="mt-3 text-[12.5px] leading-[1.55] text-soft-ink-muted">
-            Nobody can buy it. This transaction makes the token and nothing else — there is no pool,
+            Nobody can buy it. This transaction makes the token and nothing else: there is no pool,
             so there is no price and no chart anywhere. On our own market list it shows up as{' '}
             <span className="font-semibold text-soft-ink">no pool</span>, exactly like every other
             token in that state.
@@ -550,7 +550,7 @@ export default function CreateToken() {
                   value: false,
                   title: 'Nobody',
                   body:
-                    'No address is made admin, so nobody — including us and including you — can mint more, rename it, or freeze anyone.',
+                    'No address is made admin, so nobody (including us and including you) can mint more, rename it, or freeze anyone.',
                 },
                 {
                   value: true,
@@ -593,7 +593,7 @@ export default function CreateToken() {
           There is no supply field because the supply is fixed at{' '}
           {B20_SUPPLY_TOKENS.toLocaleString('en-US')} and the cap is set to the same number in the
           same transaction. There is no picture or description field because neither is stored on
-          the chain — anything we kept would be ours, not the token’s, and putting it here before
+          the chain. Anything we kept would be ours, not the token’s, and putting it here before
           you sign would suggest otherwise.
         </p>
 
@@ -621,7 +621,7 @@ export default function CreateToken() {
             <dd className="mt-0.5 break-all font-mono text-[11.5px] leading-[1.45] text-soft-ink">
               {predicted ?? (
                 <span className="font-soft text-soft-ink-faint">
-                  Connect a wallet — the address depends on it.
+                  Connect a wallet first. The address depends on it.
                 </span>
               )}
             </dd>
@@ -689,7 +689,7 @@ export default function CreateToken() {
           )}
           {patternOk && (
             <p className="mt-1 text-[11.5px] leading-[1.45] text-soft-ink-faint">
-              {target.length} characters — about{' '}
+              {target.length} characters, about{' '}
               <span className="tabular-nums">
                 {expectedAttempts(target).toLocaleString('en-US')}
               </span>{' '}
@@ -704,7 +704,7 @@ export default function CreateToken() {
           )}
           {/* To zdanie jest cala roznica miedzy czescia tworzenia a gadzetem. */}
           <p className="mt-1 text-[11px] leading-[1.45] text-soft-ink-faint">
-            You can create with the address above at any time — searching never blocks it.
+            You can create with the address above at any time. Searching never blocks it.
             {mining && (
               <>
                 {' '}
@@ -748,7 +748,7 @@ export default function CreateToken() {
                 <span className="font-semibold text-soft-ink">
                   You cannot raise the cap, pause transfers or take tokens back
                 </span>{' '}
-                — you chose to make nobody admin, so there is no address left that could. That
+                You chose to make nobody admin, so there is no address left that could. That
                 includes us. It also cannot be undone if you change your mind.
               </li>
             ) : (
@@ -765,7 +765,7 @@ export default function CreateToken() {
             <li>
               <span className="font-semibold text-soft-ink">Nobody can buy it.</span> This
               transaction creates the token and nothing else. Until somebody opens a pool there is no
-              price, no chart and nothing for an indexer to pick up — and we are not going to promise
+              price, no chart and nothing for an indexer to pick up, and we are not going to promise
               you one.
             </li>
           </ul>
@@ -782,8 +782,8 @@ export default function CreateToken() {
                 Base ran this transaction and returned{' '}
                 <span className="break-all font-mono text-[11.5px] text-soft-ink">
                   {sim.address}
-                </span>{' '}
-                — the same address this page worked out on its own. Two independent paths, one
+                </span>
+                , the same address this page worked out on its own. Two independent paths, one
                 answer.
               </p>
             )}
@@ -825,15 +825,15 @@ export default function CreateToken() {
                 <span className="font-soft-display font-bold tabular-nums text-soft-accent-deep">
                   {formatEthFee(fee.wei)} ETH
                 </span>{' '}
-                in network fees — {fee.gas.toLocaleString('en-US')} gas at the price Base is charging
-                right now, measured a moment ago. Nothing else leaves your wallet: this transaction
+                in network fees ({fee.gas.toLocaleString('en-US')} gas at the price Base is charging
+                right now, measured a moment ago). Nothing else leaves your wallet: this transaction
                 pays us nothing.
               </p>
             )}
             {fee.kind === 'unread' && (
               <p className="mt-2 border-t border-soft-line pt-2 text-[12.5px] leading-[1.55] text-soft-ink-muted">
                 We could not measure the network fee just now. That is a failed read, not a free
-                transaction — your wallet will show you the real number before you sign.
+                transaction. Your wallet will show you the real number before you sign.
               </p>
             )}
           </div>

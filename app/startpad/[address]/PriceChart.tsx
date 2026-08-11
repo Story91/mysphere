@@ -268,7 +268,7 @@ export default function PriceChart({
       <div className="relative mt-4">
         {state === 'Graduated' && (
           <span className="absolute left-2 top-2 z-10 rounded-full bg-[#edfff4] px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#0b9a51]">
-            Graduated — trading moved to Uniswap v4
+            Graduated: trading moved to Uniswap v4
           </span>
         )}
         {chartError ? (

@@ -687,7 +687,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'A record of what vault curators changed',
     status: 'live',
-    note: 'Money in a lending vault sits under somebody else’s decisions: they set the fee they take and they can raise it without telling anyone. the curator record — now a tab under Asks — keeps a dated record of exactly that for the vaults Morpho lists on Base — the fee before, the fee after, and who was curating. No score for anybody, no forecast, nothing about your wallet or anyone else’s, and no automatic posts in the feed. It reads one set of parameters a day, so an entry says a change happened between two dates rather than inventing an hour. It records the fee, the curator and whether a vault is listed; it does not read what a vault lends against, and it says so on the page rather than letting an empty list imply nothing happened.',
+    note: 'Money in a lending vault sits under somebody else’s decisions: they set the fee they take and they can raise it without telling anyone. The curator record, now a tab under Asks, keeps a dated record of exactly that for the vaults Morpho lists on Base: the fee before, the fee after, and who was curating. No score for anybody, no forecast, nothing about your wallet or anyone else’s, and no automatic posts in the feed. It reads one set of parameters a day, so an entry says a change happened between two dates rather than inventing an hour. It records the fee, the curator and whether a vault is listed; it does not read what a vault lends against, and it says so on the page rather than letting an empty list imply nothing happened.',
   },
   {
     name: 'Ask: answering without leaving the feed',

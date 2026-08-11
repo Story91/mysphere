@@ -43,7 +43,7 @@ type Props = { params: { id: string } };
 
 /** Jedno zdanie o stanie - to samo slownictwo co na karcie w feedzie. */
 function stateLine(status: string, deadline: number, seatsLeft: number): string {
-  if (status === 'resolved') return 'Settled — the budget has been paid out.';
+  if (status === 'resolved') return 'Settled: the budget has been paid out.';
   if (status === 'expired') return 'Closed without a payout.';
   if (deadline <= Date.now()) return 'Past its deadline, waiting on the author.';
   return seatsLeft > 0 ? `${seatsLeft} of the seats are still open.` : 'Every seat is taken.';
@@ -64,7 +64,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const question = ask.question.length > 90 ? `${ask.question.slice(0, 87)}…` : ask.question;
 
   return {
-    title: `${money} for an answer — ${question}`,
+    title: `${money} for an answer: ${question}`,
     description: `A question with a budget on MySphere. ${formatAskMoney(
       ask.budget,
       ask.token
@@ -181,7 +181,7 @@ export default async function AskPage({ params }: Props) {
         </article>
 
         <p className="mt-4 px-1 text-[11.5px] leading-[1.5] text-soft-ink-faint">
-          Answers stay sealed until the author resolves. Only the number of answers is public — never
+          Answers stay sealed until the author resolves. Only the number of answers is public, never
           their contents.
         </p>
       </div>

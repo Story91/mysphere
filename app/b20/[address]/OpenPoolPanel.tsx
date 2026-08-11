@@ -46,7 +46,7 @@ export default function OpenPoolPanel({ address }: { address: string }) {
     <div className="mt-3 border-t border-soft-line pt-3">
       <p className="text-[12.5px] leading-[1.55] text-soft-ink-muted">
         Anyone can give this token a price by opening a pool against ETH. Whoever does it puts up
-        both sides and keeps the position — we do not hold it and cannot take it.
+        both sides and keeps the position. We do not hold it and cannot take it.
       </p>
 
       <div className="mt-2.5 flex flex-wrap gap-2">

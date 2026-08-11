@@ -555,7 +555,7 @@ export default function LaunchTokenModal({
     const maxCreatorPct = limits.maxCreatorShareBps / 100;
     const creatorPct = Number(creatorSharePct);
     if (!Number.isFinite(creatorPct) || creatorPct < 0 || creatorPct > maxCreatorPct) {
-      return fail(`Creator split must be between 0 and ${maxCreatorPct}% — the rest belongs to the protocol.`);
+      return fail(`Creator split must be between 0 and ${maxCreatorPct}%. The rest belongs to the protocol.`);
     }
     // Zaokraglenie W DOL. W gore potrafiloby przekroczyc podloge protokolu o
     // jeden punkt bazowy i wywalic transakcje na `InvalidFeeConfig`.
@@ -603,7 +603,7 @@ export default function LaunchTokenModal({
         return fail(
           `Your ${preBuyEthNum} ETH pre-buy is about ${Math.round(preBuyTokens).toLocaleString('en-US')} tokens, ` +
             `above the ${Number(formatEther(parsedCap)).toLocaleString('en-US')} per-wallet cap. ` +
-            `Raise the cap or lower the pre-buy — the cap applies to you too for the first 5 minutes.`
+            `Raise the cap or lower the pre-buy; the cap applies to you too for the first 5 minutes.`
         );
       }
       windowCap = parsedCap;
@@ -734,7 +734,7 @@ export default function LaunchTokenModal({
   // zawsze, wiec zly zapis blokuje start zamiast po cichu przejsc.
   const imageError =
     launchImage.trim() !== '' && (resolveMediaUrl(launchImage) === null || launchImage.trim().startsWith('data:'))
-      ? 'Use an https:// or ipfs:// link — anything else will not render.'
+      ? 'Use an https:// or ipfs:// link. Anything else will not render.'
       : urlStatus === 'invalid'
         ? 'This link did not load as an image within 5 seconds.'
         : null;
@@ -1025,11 +1025,11 @@ export default function LaunchTokenModal({
             if (response.status === 401 || response.status === 403) {
               setProfileNotice('Sign in on the token page to attach the logo.');
             } else if (!response.ok) {
-              setProfileNotice('The logo was not attached — you can add it on the token page.');
+              setProfileNotice('The logo was not attached. You can add it on the token page.');
             }
           })
           .catch(() => {
-            setProfileNotice('The logo was not attached — you can add it on the token page.');
+            setProfileNotice('The logo was not attached. You can add it on the token page.');
           });
       }
       setLaunched({
@@ -1159,7 +1159,7 @@ export default function LaunchTokenModal({
                 <p className="text-[12.5px] font-extrabold text-[#8c4a0b]">Your wallet is on another network</p>
                 <p className="mt-0.5 text-[11.5px] leading-[1.45] text-[#a34b08]">
                   Startpad is set to <span className="font-bold">{LAUNCHPAD_CHAIN.name}</span>. Clicking
-                  Launch will ask your wallet to switch there — approve it in your wallet. To point
+                  Launch will ask your wallet to switch there, approve it when it pops up. To point
                   Startpad at a different network instead, use the network switch next to the Launch
                   button.
                 </p>
@@ -1265,7 +1265,7 @@ export default function LaunchTokenModal({
                     </div>
 
                     <div>
-                      <span className={LABEL}>Logo — required</span>
+                      <span className={LABEL}>Logo (required)</span>
                       {/* Dropzone jako button: klawiatura i czytnik dostaja to
                           samo wejscie, co mysz z przeciaganiem. */}
                       <button
@@ -1297,9 +1297,9 @@ export default function LaunchTokenModal({
                         )}
                         <span className="min-w-0">
                           <span className="block text-[12.5px] font-extrabold text-[#16141b]">
-                            {logoBusy ? 'Processing image...' : logoDataUrl ? 'Logo ready — click to replace' : 'Drop an image or click to browse'}
+                            {logoBusy ? 'Processing image...' : logoDataUrl ? 'Logo ready, click to replace' : 'Drop an image or click to browse'}
                           </span>
-                          <span className="mt-0.5 block text-[11px] text-black/45">PNG, JPEG or WebP — resized to 256 px.</span>
+                          <span className="mt-0.5 block text-[11px] text-black/45">PNG, JPEG or WebP, resized to 256 px.</span>
                         </span>
                       </button>
                       <input
@@ -1327,7 +1327,7 @@ export default function LaunchTokenModal({
                     </div>
 
                     <label className="block">
-                      <span className={LABEL}>Logo URL — alternative</span>
+                      <span className={LABEL}>Logo URL (alternative)</span>
                       <input
                         value={launchImage}
                         onChange={(event) => setLaunchImage(event.target.value)}
@@ -1340,10 +1340,10 @@ export default function LaunchTokenModal({
                         <span className={HINT}>Loading the image to make sure it renders...</span>
                       ) : urlStatus === 'valid' ? (
                         <span className="mt-1 block text-[11px] font-bold text-[#0b9a51]">
-                          Image loads. Stored onchain forever — ipfs:// links cannot be swapped out later.
+                          Image loads. It is stored onchain forever; ipfs:// links cannot be swapped out later.
                         </span>
                       ) : (
-                        <span className={HINT}>Stored onchain forever — ipfs:// links cannot be swapped out later.</span>
+                        <span className={HINT}>Stored onchain forever. An ipfs:// link cannot be swapped out later.</span>
                       )}
                     </label>
 
@@ -1405,7 +1405,7 @@ export default function LaunchTokenModal({
                     <div className="rounded-2xl border border-soft-primary/25 bg-soft-primary/[0.05] p-4">
                       <p className="flex items-center gap-2 text-[13px] font-extrabold text-[#16141b]">
                         <Zap className="h-4 w-4 text-soft-primary" aria-hidden="true" />
-                        Pre-buy — how much do you buy as the first buyer?
+                        Pre-buy: how much do you buy as the first buyer?
                       </p>
                       <div className="mt-3 flex gap-2">
                         <div className="relative flex-1">
@@ -1435,12 +1435,12 @@ export default function LaunchTokenModal({
                         <p className="mt-2 text-[12px] font-bold text-[#16141b]">
                           {preBuyPreview
                             ? `≈ ${preBuyPreview.tokens.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${launchSymbol || 'tokens'} · ${preBuyPreview.share.toFixed(2)}% of supply · for ${Number(preBuyEth)} ETH${usdSuffix(Number(preBuyEth))}`
-                            : 'No pre-buy — the curve opens to everyone at the same price.'}
+                            : 'No pre-buy. The curve opens to everyone at the same price.'}
                         </p>
                       )}
                       <p className={HINT}>
                         Atomic: the pre-buy fills in the SAME transaction that creates the token, so no sniper can front-run
-                        you. Same curve, same fee and same wallet cap as everyone else — you get no free supply.
+                        you. Same curve, same fee and same wallet cap as everyone else; you get no free supply.
                       </p>
                     </div>
                   </div>
@@ -1542,7 +1542,7 @@ export default function LaunchTokenModal({
                             <span className="text-black/50">Protocol {(100 - creatorPctNow).toFixed(0)}%</span>
                           </div>
                           <span className={HINT}>
-                            {protocolFloorPct.toFixed(0)}% floor belongs to the protocol — enforced by the contract, not this
+                            {protocolFloorPct.toFixed(0)}% floor belongs to the protocol, enforced by the contract, not this
                             form. The curve has no buyback; that lives in the pool split below.
                           </span>
                         </div>
@@ -1628,7 +1628,7 @@ export default function LaunchTokenModal({
                           ))}
                         </ul>
                         <span className={HINT}>
-                          The first receiver is you — your share is whatever the others leave. Up to {limits.maxRecipients}{' '}
+                          The first receiver is you; your share is whatever the others leave. Up to {limits.maxRecipients}{' '}
                           addresses, paid out in ETH.
                         </span>
                       </SectionCard>
@@ -1638,7 +1638,7 @@ export default function LaunchTokenModal({
                         title="Pool fee split (after graduation)"
                         aside={<span className="font-soft-display text-[18px] font-extrabold text-[#a35c1a]">{fmtPct(buybackShare)}%</span>}
                       >
-                        <span className={LABEL}>Auto-buyback — % of your slice</span>
+                        <span className={LABEL}>Auto-buyback (% of your slice)</span>
                         <input
                           type="range"
                           min={0}
@@ -1657,13 +1657,13 @@ export default function LaunchTokenModal({
                           <div className="h-full bg-[#d78a55] transition-[width]" style={{ width: `${buybackPoolPct}%` }} aria-hidden="true" />
                         </div>
                         <div className="mt-1.5 flex items-center justify-between text-[11px] font-bold">
-                          <span className="text-black/50">Protocol {fmtPct(protocolPoolPct)}% — fixed</span>
+                          <span className="text-black/50">Protocol {fmtPct(protocolPoolPct)}% (fixed)</span>
                           <span className="text-soft-primary-deep">You {fmtPct(youPoolPct)}%</span>
                           <span className="text-[#a35c1a]">Buyback {fmtPct(buybackPoolPct)}%</span>
                         </div>
                         <span className={HINT}>
                           You keep {fmtPct(youPoolPct)}% of every pool fee, {fmtPct(buybackPoolPct)}% buys &amp; burns your
-                          token. The buyback comes out of YOUR slice — the protocol&apos;s {fmtPct(protocolPoolPct)}% is
+                          token. The buyback comes out of YOUR slice; the protocol&apos;s {fmtPct(protocolPoolPct)}% is
                           untouched.
                         </span>
                       </SectionCard>
@@ -1706,7 +1706,7 @@ export default function LaunchTokenModal({
                               ))}
                             </div>
                             <span className={HINT}>
-                              Applies only during the first {LAUNCH_WINDOW_LABEL} after launch — one wallet cannot buy more
+                              Applies only during the first {LAUNCH_WINDOW_LABEL} after launch: one wallet cannot buy more
                               than this. Default {limits.windowCapTokens.toLocaleString('en-US')}, up to{' '}
                               {curve.t0.toLocaleString('en-US')} tokens. Your pre-buy plays by the same rule.
                             </span>
@@ -1734,7 +1734,7 @@ export default function LaunchTokenModal({
                         ) : (
                           <p className="flex items-start gap-2 rounded-xl bg-[#d9628a]/10 p-3 text-[11.5px] font-bold leading-[1.45] text-[#8d2748]">
                             <Flame className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                            Anyone — including you — can buy the whole curve at launch.
+                            Anyone, including you, can buy the whole curve at launch.
                           </p>
                         )}
                       </SectionCard>
@@ -1747,7 +1747,7 @@ export default function LaunchTokenModal({
                           value={launchMetadataUri}
                           onChange={(event) => setLaunchMetadataUri(event.target.value)}
                           className={FIELD}
-                          placeholder="ipfs://... — overrides image, description and links"
+                          placeholder="ipfs://... (overrides image, description and links)"
                         />
                         <span className={HINT}>
                           Leave empty to store the quick-launch fields onchain. A custom URI replaces them entirely.
@@ -1831,11 +1831,11 @@ export default function LaunchTokenModal({
                       </li>
                       <li className="flex items-start gap-2">
                         <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-soft-primary" aria-hidden="true" />
-                        Pre-buy is atomic — it fills in the launch transaction itself, before anyone else can trade.
+                        Pre-buy is atomic: it fills in the launch transaction itself, before anyone else can trade.
                       </li>
                       <li className="flex items-start gap-2">
                         <CircleDollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#0b9a51]" aria-hidden="true" />
-                        Creator earnings are paid in ETH, not tokens — claim them any time.
+                        Creator earnings are paid in ETH, not tokens. Claim them any time.
                       </li>
                     </ul>
                   </div>

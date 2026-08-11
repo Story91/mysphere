@@ -103,7 +103,7 @@ export default function FeedAnswerForm({
       console.error('[feed] Wyslanie odpowiedzi nie powiodlo sie:', caught);
       // "Nic nie zapisano" jest tu WAZNE: bez tego czlowiek nie wie, czy
       // ponowna wysylka nie zrobi drugiej odpowiedzi.
-      setError('The answer was not sent. Nothing was stored — try again.');
+      setError('The answer was not sent. Nothing was stored. Try again.');
     } finally {
       setSending(false);
     }
@@ -121,7 +121,7 @@ export default function FeedAnswerForm({
     return (
       <div className={box}>
         <p className="text-[12.5px] leading-[1.5] text-soft-ink">
-          Answer sealed. The author sees it only when they resolve — if they pick yours, it pays{' '}
+          Answer sealed. The author sees it only when they resolve. If they pick yours, it pays{' '}
           {formatAskMoney(ask.perAnswer, ask.token)}.
         </p>
         <button type="button" onClick={onClose} className={`${button} mt-2 bg-soft-primary text-white`}>
@@ -145,8 +145,8 @@ export default function FeedAnswerForm({
     return (
       <div className={box}>
         <p className="mb-2 text-[12.5px] leading-[1.5] text-soft-ink-muted">
-          Sign in once so the server knows the answer is yours. It is a signature, not a transaction —
-          it costs nothing.
+          Sign in once so the server knows the answer is yours. It is a signature, not a
+          transaction, and it costs nothing.
         </p>
         <button
           type="button"

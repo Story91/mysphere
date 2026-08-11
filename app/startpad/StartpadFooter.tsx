@@ -82,7 +82,7 @@ function contractsFor(net: LaunchpadNetwork): Array<{ name: string; address: str
     rows.push({
       name: 'B20 factory (network precompile)',
       address: B20_PRECOMPILE_ADDRESS,
-      role: 'built into Base itself — mints the token, enforces the cap',
+      role: 'built into Base itself; mints the token, enforces the cap',
     });
   }
   return rows;
@@ -112,8 +112,8 @@ export default function StartpadFooter() {
         </p>
         <h2 className="mt-1 text-[19px] font-extrabold text-[#16141b]">
           {isB20
-            ? 'A launchpad for B20 — tokens made by the Base network itself'
-            : `A launchpad on ${net.label} — tokens with no admin and a fixed supply`}
+            ? 'A launchpad for B20: tokens made by the Base network itself'
+            : `A launchpad on ${net.label}: tokens with no admin and a fixed supply`}
         </h2>
         <p className="mt-2 text-[13px] leading-[1.6] text-black/60">
           {isB20 ? (
@@ -123,19 +123,19 @@ export default function StartpadFooter() {
               <strong className="text-[#16141b]">
                 no admin, no pause switch and a supply cap equal to its supply
               </strong>{' '}
-              — so nobody, including us, can ever mint more.
+              so that nobody, including us, can ever mint more.
             </>
           ) : (
             <>
               Every token launched here is a plain ERC-20 deployed by the launchpad&apos;s own
               factory, born with <strong className="text-[#16141b]">no admin, no pause switch and no
-              mint function at all</strong> — the supply is fixed by the bytecode, so nobody,
+              mint function at all</strong>. The supply is fixed by the bytecode, so nobody,
               including us, can ever mint more.
             </>
           )}{' '}
           The launchpad sells it on a bonding curve, and at exactly{' '}
           <strong className="text-[#16141b]">3.00 ETH</strong> raised the token graduates into a
-          Uniswap v4 pool whose liquidity is locked forever. No admin keys, no upgrades — every rule
+          Uniswap v4 pool whose liquidity is locked forever. No admin keys, no upgrades: every rule
           below is fixed in immutable contracts, and all payouts are claim-based, in ETH.
           {isB20
             ? ' Startpad is among the first launchpads built on the B20 standard. Currently running on Base Sepolia (testnet).'
@@ -167,7 +167,7 @@ export default function StartpadFooter() {
                   ['Starting market cap', '0.75 ETH'],
                   ['Graduation trigger', 'reserve = 3.00 ETH exactly'],
                   ['Market cap at graduation', '18.75 ETH (25×)'],
-                  ['Creator allocation', 'none — a pre-buy is a normal buy on the same curve'],
+                  ['Creator allocation', 'none (a pre-buy is a normal buy on the same curve)'],
                 ].map(([k, v]) => (
                   <tr key={k} className="border-t border-black/5 first:border-t-0">
                     <td className="py-1.5 pr-4 text-black/55">{k}</td>
@@ -183,7 +183,7 @@ export default function StartpadFooter() {
           </p>
         </DocSection>
 
-        <DocSection title="Where every fee goes — the creator gets up to 70%, everywhere">
+        <DocSection title="Where every fee goes: the creator gets up to 70%, everywhere">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-black/10 bg-white p-3">
               <p className="text-[12px] font-extrabold text-[#16141b]">Curve trade · 1%</p>
@@ -220,12 +220,12 @@ export default function StartpadFooter() {
 
         <DocSection title="What a creator sets at launch (immutable afterwards)">
           <ul className="list-disc space-y-1 pl-5">
-            <li>Name, symbol and metadata — free text; the logo lives off-chain, editable only by the creator verified on-chain.</li>
+            <li>Name, symbol and metadata: free text. The logo lives off-chain, editable only by the creator verified on-chain.</li>
             <li>Trading fee (0–1%, default 1%) and the creator&apos;s share of it (0–70%, default 70%).</li>
-            <li>Fee receivers — up to 8 addresses, shares summing to 100%.</li>
+            <li>Fee receivers: up to 8 addresses, shares summing to 100%.</li>
             <li>Auto-buyback slice of the creator&apos;s pool-fee share (0–100%, default 0%).</li>
-            <li>Sniper cap — per-wallet buy limit for the first 5 minutes (default 16M tokens); the creator can lower it, raise it, or disable protection entirely.</li>
-            <li>Pre-buy — any ETH amount, on the same curve and fee as everyone else.</li>
+            <li>Sniper cap: per-wallet buy limit for the first 5 minutes (default 16M tokens); the creator can lower it, raise it, or disable protection entirely.</li>
+            <li>Pre-buy: any ETH amount, on the same curve and fee as everyone else.</li>
           </ul>
           <p className="mt-2 text-[11.5px] text-black/45">
             Nothing on this list has a setter. Changing any of it means launching a new token.
@@ -234,10 +234,10 @@ export default function StartpadFooter() {
 
         <DocSection title="Why you can trust it (and what to still be careful about)">
           <ul className="list-disc space-y-1 pl-5">
-            <li><strong className="text-[#16141b]">The token cannot be inflated.</strong> It is born with supply cap = total supply and no MINT role held by anyone — the launchpad verifies this on-chain in the launch transaction and reverts if it is not true.</li>
-            <li><strong className="text-[#16141b]">No roles anywhere.</strong> No owner, no pauser, no upgrader — on the token, the launchpad, the vault or the hook. The fee caps bind us too.</li>
-            <li><strong className="text-[#16141b]">LP is locked forever.</strong> The vault&apos;s only path to the pool has the liquidity change hard-coded to zero — it can harvest fees, never withdraw capital.</li>
-            <li><strong className="text-[#16141b]">Pull payments only.</strong> You claim your ETH; nothing is pushed. Anyone may pay gas to deliver your balance to you — never to themselves.</li>
+            <li><strong className="text-[#16141b]">The token cannot be inflated.</strong> It is born with supply cap = total supply and no MINT role held by anyone. The launchpad verifies this on-chain in the launch transaction and reverts if it is not true.</li>
+            <li><strong className="text-[#16141b]">No roles anywhere.</strong> No owner, no pauser, no upgrader on the token, the launchpad, the vault or the hook. The fee caps bind us too.</li>
+            <li><strong className="text-[#16141b]">LP is locked forever.</strong> The vault&apos;s only path to the pool has the liquidity change hard-coded to zero: it can harvest fees, never withdraw capital.</li>
+            <li><strong className="text-[#16141b]">Pull payments only.</strong> You claim your ETH; nothing is pushed. Anyone may pay gas to deliver your balance to you, never to themselves.</li>
             <li><strong className="text-[#16141b]">What this is not:</strong> most tokens here will never trade meaningfully, a curve token has no external chart until it graduates, and nothing on this page is a recommendation.</li>
           </ul>
         </DocSection>
@@ -268,7 +268,7 @@ export default function StartpadFooter() {
           </div>
           <p className="mt-2 text-[11.5px] text-black/45">
             {isB20
-              ? 'The network precompile is not our contract — it is part of Base and the reason a B20 token can make promises its creator cannot break.'
+              ? 'The network precompile is not our contract. It is part of Base, and the reason a B20 token can make promises its creator cannot break.'
               : `${net.label} has no B20 precompile, so here the same promises are kept by bytecode: the token contract simply has no function that could mint, pause or confiscate.`}
           </p>
         </DocSection>
@@ -276,8 +276,8 @@ export default function StartpadFooter() {
 
       <p className="mt-6 text-[11px] text-black/40">
         {net.testnet
-          ? `Startpad runs on ${net.label} (testnet) — tokens here have no real value. Nothing on this page is financial advice.`
-          : `Startpad runs on ${net.label} — trades here move real ETH. Nothing on this page is financial advice.`}
+          ? `Startpad runs on ${net.label} (testnet), so tokens here have no real value. Nothing on this page is financial advice.`
+          : `Startpad runs on ${net.label}. Trades here move real ETH. Nothing on this page is financial advice.`}
       </p>
     </footer>
   );
