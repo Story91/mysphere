@@ -224,4 +224,3 @@ describe('Launchpad od konca do konca', function () {
   });
 });
 
-export {};

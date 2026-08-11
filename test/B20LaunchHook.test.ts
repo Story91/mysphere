@@ -366,4 +366,3 @@ describe('B20LaunchHook', function () {
   });
 });
 
-export {};

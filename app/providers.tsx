@@ -67,7 +67,17 @@ const queryClient = new QueryClient({
  */
 const CHAINS_BASE = [base, baseSepolia, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain] as const;
 const TRANSPORTS_BASE = {
-  [base.id]: http('https://mainnet.base.org'),
+  // Base MAINNET: publiczny mainnet.base.org jest rate-limited (429/-32016) i
+  // tnie getLogs na 2000 blokach, a startpad odpala do 90 okien getLogs na load.
+  // Pod produkcje ustaw NEXT_PUBLIC_CDP_RPC_URL na WLASNY CDP Node RPC (masz
+  // platne CDP - klucz "Client API Key" z portalu CDP, sekcja Node/RPC): CDP
+  // obsluguje getLogs do ~50k blokow i ma wysokie limity (zmierzone). Ten sam
+  // env wlacza tez cdpApi.ts (statystyki portfela). base.org zostaje jako
+  // fallback - publicnode NIE nadaje sie, bo blokuje getLogs bez wlasnego tokenu.
+  [base.id]: fallback([
+    http(process.env.NEXT_PUBLIC_BASE_RPC_URL || process.env.NEXT_PUBLIC_CDP_RPC_URL || 'https://mainnet.base.org'),
+    http('https://mainnet.base.org'),
+  ]),
   [baseSepolia.id]: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org'),
   [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
   [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
