@@ -407,7 +407,7 @@ export default function TradePanel({
           {core.state === 'Curve'
             ? `${fmtEth(core.ethReserve)} of ${Number(formatEther(TARGET_WEI)).toFixed(2)} ETH · ${fmtEth(remaining)} ETH to graduation`
             : core.state === 'Locked'
-              ? 'The curve is closed at 3.00 ETH — anyone can open the Uniswap v4 pool below.'
+              ? 'The curve is closed at 3.00 ETH. Anyone can open the Uniswap v4 pool below.'
               : 'Liquidity lives in the Uniswap v4 pool with the launch hook attached.'}
         </p>
       </div>
@@ -428,7 +428,7 @@ export default function TradePanel({
           </div>
           {!onCurve && (
             <p className="mt-2 text-[11px] leading-[1.4] text-black/50">
-              Buying closed — the curve is full. Selling stays open until the pool is opened.
+              Buying is closed, the curve is full. Selling stays open until the pool is opened.
             </p>
           )}
 
@@ -586,7 +586,7 @@ export default function TradePanel({
           </div>
           {/* Krzywa placi w ETH, ale hook i vault po graduacji nabijaja
               takze strone tokenowa - stary opis "in ETH, not tokens" klamal. */}
-          <p className="mt-1 text-[10.5px] leading-[1.4] text-black/40">Curve fees accrue in ETH; after graduation pool fees accrue in both ETH and {core.symbol}. Claims are pull-based — nothing moves until you claim.</p>
+          <p className="mt-1 text-[10.5px] leading-[1.4] text-black/40">Curve fees accrue in ETH; after graduation pool fees accrue in both ETH and {core.symbol}. Claims are pull-based: nothing moves until you claim.</p>
           <div className="mt-2 space-y-1.5">
             {claimRows.map((row) => (
               <div key={row.label} className="flex items-center justify-between gap-2 text-[11px]">

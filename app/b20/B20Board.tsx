@@ -236,7 +236,7 @@ function TokenRow({
           // Zaden rzad liczbowy. Nie ma pustego pola, wiec nie ma czego czytac
           // jako zera.
           <p className="mt-1.5 text-[12.5px] leading-tight text-soft-ink-faint">
-            Not listed — we see no Uniswap v4 pool against ETH for this token.
+            Not listed: we see no Uniswap v4 pool against ETH for this token.
           </p>
         )}
 
@@ -679,7 +679,7 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
             }}
             className="rounded-pill bg-soft-primary px-4 py-1.5 font-soft-display text-[12.5px] font-bold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
-            {newCount} new token{newCount === 1 ? '' : 's'} — show
+            {newCount} new token{newCount === 1 ? '' : 's'} · show
           </button>
         </div>
       )}
@@ -690,7 +690,7 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
         <div className={`${CARD} mb-3 p-3.5`}>
           <p className="text-[12.5px] leading-[1.5] text-soft-ink-muted">
             The last refresh did not come back. What you see below is the reading from{' '}
-            {formatReadAge(snapshot.readAt, now)} — it is not live, and it is not zero.
+            {formatReadAge(snapshot.readAt, now)}. It is not live, and it is not zero.
           </p>
           <button
             type="button"
@@ -733,7 +733,7 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
             ) : (
               <p className="text-[13px] leading-[1.55] text-soft-ink-muted">
                 {segment === 'traded'
-                  ? 'Nothing in this window has traded yet. That is a reading, not a failure — most B20 tokens never get a single swap.'
+                  ? 'Nothing in this window has traded yet. That is a reading, not a failure: most B20 tokens never get a single swap.'
                   : 'Nothing here in this window.'}
               </p>
             )}
@@ -774,7 +774,7 @@ export default function B20Board({ initial }: { initial: BoardSnapshot }) {
       <p className="mt-3 px-1 text-[11px] leading-[1.5] text-soft-ink-faint">
         Prices come from the Uniswap v4 pool itself, read on Base. The dollar figures use one
         ETH/USD quote from GeckoTerminal, and the 24h volume column is quoted from GeckoTerminal
-        too — we do not compute volume ourselves, and where GeckoTerminal has no figure the column
+        too. We do not compute volume ourselves, and where GeckoTerminal has no figure the column
         says so instead of showing a zero.
       </p>
     </div>

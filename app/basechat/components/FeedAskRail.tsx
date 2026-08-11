@@ -539,7 +539,7 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
         openList.phase === 'failed' ? (
           <FailedLine
             onRetry={retryOpen}
-            message="Open asks could not be checked. This is a failed read, not an empty list — the posts below are unaffected."
+            message="Open asks could not be checked. This is a failed read, not an empty list. The posts below are unaffected."
           />
         ) : openShown.length > 0 ? (
           renderCards(openShown)
@@ -548,14 +548,14 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
           // podstawiamy - filtr, ktory pokazuje co innego, niz na nim pisze,
           // jest gorszy niz puste miejsce. Zdanie mowi, gdzie sa tresci.
           <QuietLine>
-            No open asks right now. Nothing to answer at this moment — resolved ones are still on
-            the record.
+            No open asks right now. Nothing to answer at this moment, but resolved ones are still
+            on the record.
           </QuietLine>
         )
       ) : resolvedList.phase === 'failed' ? (
         <FailedLine
           onRetry={retryResolved}
-          message="Resolved asks could not be loaded. This is a failed read, not an empty history — open asks and the posts below are unaffected."
+          message="Resolved asks could not be loaded. This is a failed read, not an empty history. Open asks and the posts below are unaffected."
         />
       ) : resolvedList.phase === 'loading' ? (
         // Ponowna proba po awarii NIE MOZE zwinac pasa: naglowek i filtr
@@ -572,7 +572,7 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
         */
         <div className="rounded-card border border-soft-line bg-soft-sunken p-2.5 sm:p-3">
           <p className="mb-2 px-0.5 text-[11.5px] leading-[1.45] text-soft-ink-muted">
-            Closed and paid. Nothing to answer here — each accepted answer already carries the
+            Closed and paid. Nothing to answer here: each accepted answer already carries the
             transaction that paid for it.
           </p>
           {renderCards(resolvedShown)}
@@ -582,14 +582,14 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
         // tu napisac "nikt jeszcze nie zalozyl Aska" - tego wlasnie nie wiemy.
         <FailedLine
           onRetry={retryOpen}
-          message="No resolved asks yet, and open asks could not be checked. This is a failed read, not an empty list — the posts below are unaffected."
+          message="No resolved asks yet, and open asks could not be checked. This is a failed read, not an empty list. The posts below are unaffected."
         />
       ) : openShown.length > 0 ? (
         // Historia pusta, ale otwarte SA - ktos siegnal po nia sam. "No asks
         // yet" bylo by tu klamstwem o produkcie, wiec mowimy dokladnie tyle,
         // ile wiemy, i wskazujemy druga pigulke.
         <QuietLine>
-          Nothing has been resolved yet. Asks that get closed and paid land here — the open ones are
+          Nothing has been resolved yet. Asks that get closed and paid land here; the open ones are
           under Open.
         </QuietLine>
       ) : (
@@ -597,8 +597,8 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
         // Obie listy odczytane, obie puste. To jedyny moment, w ktorym pas nie
         // ma zadnego Aska - i najlepszy, zeby powiedziec, po co on jest.
         <QuietLine>
-          No asks yet. An ask is a question with a budget, a deadline and a fixed number of seats —
-          answers stay sealed until the author resolves and pays.{' '}
+          No asks yet. An ask is a question with a budget, a deadline and a fixed number of seats.
+          Answers stay sealed until the author resolves and pays.{' '}
           <Link
             href="/asks"
             className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"

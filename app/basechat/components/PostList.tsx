@@ -688,7 +688,7 @@ function PostList({
     try {
       if (confirm('Are you sure you want to delete this post?')) {
         await deletePost(postId, address);
-        toast.success('Post deleted successfully');
+        toast.success('Post deleted');
         
         await refreshPosts();
       }
@@ -728,7 +728,7 @@ function PostList({
       const success = await pinPost(postId, address);
       
       if (success) {
-        toast.success('Post pinned successfully');
+        toast.success('Post pinned');
         // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już zaktualizował UI
         // Oszczędność: 50 Firebase reads po każdym pin
       } else {
@@ -777,7 +777,7 @@ function PostList({
       const success = await unpinPost(postId, address);
       
       if (success) {
-        toast.success('Post unpinned successfully');
+        toast.success('Post unpinned');
         // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już zaktualizował UI
         // Oszczędność: 50 Firebase reads po każdym unpin
       } else {
@@ -828,7 +828,7 @@ function PostList({
         lastEdited: serverTimestamp()
       });
       
-      toast.success('Post updated successfully');
+      toast.success('Post updated');
       
       // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już zaktualizował post
       // Oszczędność: 50 Firebase reads po każdej edycji posta
@@ -875,7 +875,7 @@ function PostList({
         [postId]: ''
       }));
       
-      toast.success('Comment added successfully');
+      toast.success('Comment added');
       
       // Optymistyczna aktualizacja UI - dodajemy komentarz lokalnie
       const updatedPosts = internalPosts.map(post => {
@@ -1031,7 +1031,7 @@ function PostList({
       // Wykonaj rzeczywistą operację w tle
       await editComment(postId, commentId, newContent);
       
-      toast.success('Comment updated successfully');
+      toast.success('Comment updated');
       
       // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już zaktualizował komentarz
       // Oszczędność: 50 Firebase reads po każdej edycji komentarza
@@ -1078,7 +1078,7 @@ function PostList({
         // Wykonaj rzeczywistą operację w tle
         await deleteComment(postId, commentId, address);
         
-        toast.success('Comment deleted successfully');
+        toast.success('Comment deleted');
         
         // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już usunął komentarz
         // Oszczędność: 50 Firebase reads po każdym usunięciu komentarza
@@ -1196,7 +1196,7 @@ function PostList({
       const success = await followUser(targetUserAddress);
       if (success) {
         setFollowingStatus(prev => ({ ...prev, [targetUserAddress]: true }));
-        toast.success('User followed successfully! (Użytkownik obserwowany!)');
+        toast.success('You now follow this user (Obserwujesz użytkownika)');
       } else {
         notify.error('Could not follow this person');
       }
@@ -1221,7 +1221,7 @@ function PostList({
       const success = await unfollowUser(targetUserAddress);
       if (success) {
         setFollowingStatus(prev => ({ ...prev, [targetUserAddress]: false }));
-        toast.success('User unfollowed successfully! (Przestałeś obserwować użytkownika!)');
+        toast.success('Unfollowed (Przestałeś obserwować użytkownika)');
       } else {
         notify.error('Could not unfollow this person');
       }
@@ -1305,7 +1305,7 @@ function PostList({
         await onRefreshPosts(updatedPosts);
       }
       
-      toast.success('Reply added successfully');
+      toast.success('Reply added');
     } catch (error) {
       console.error('Error adding reply:', error);
       toast.error('Failed to add reply');

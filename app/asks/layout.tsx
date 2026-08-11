@@ -86,7 +86,7 @@ const ASKS_DESCRIPTION =
   // JESLI KTOS KIEDYS DOPISZE NOWA KOLEKCJE Z WLASNYMI REGULAMI I ZAPOMNI
   // DOPISAC JEJ DO `hasOwnRules`, TO ZDANIE ZNOWU STANIE SIE KLAMSTWEM,
   // a tutaj nie bedzie tego widac. Sprawdzaj regule, nie komentarz.
-  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed — nobody can read what anyone else wrote before the author opens them. The author can lock the whole budget in an escrow contract up front, and every payout is recorded onchain next to the answer that earned it.';
+  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed: nobody can read what anyone else wrote before the author opens them. The author can lock the whole budget in an escrow contract up front, and every payout is recorded onchain next to the answer that earned it.';
 
 export const metadata: Metadata = {
   title: 'Open asks',

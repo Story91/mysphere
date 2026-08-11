@@ -67,14 +67,14 @@ function fmtSupply(raw: string | null, decimals: number): string | null {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const result = await getTokenDetail(params.address);
-  if (!result.ok) return { title: 'Token not found — B20' };
+  if (!result.ok) return { title: 'Token not found · B20' };
 
   const t = result.token;
   const label = t.symbol ? `${t.name ?? t.symbol} (${t.symbol})` : 'B20 token';
   const price = fmtUsd(t.quote?.priceUsd ?? null);
 
   return {
-    title: price ? `${label} — ${price}` : `${label} — B20 on Base`,
+    title: price ? `${label} · ${price}` : `${label} · B20 on Base`,
     description: `${label} is a B20 token on Base. Supply, cap, pool and price, read from the chain.`,
   };
 }

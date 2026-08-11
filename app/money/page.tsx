@@ -54,11 +54,11 @@ export function generateMetadata({ searchParams }: { searchParams: SearchParams 
   if (isPaidTab(searchParams)) {
     return {
       // Bez marki: dokłada ja `title.template` z layoutu glownego.
-      title: 'Paid — money moving',
+      title: 'Paid: money moving',
       description:
         'A public timeline of settled payments between people. Every line carries a transaction anyone can open and check. No points, no activity score.',
       openGraph: {
-        title: 'Paid — the only feed where the timeline is money',
+        title: 'Paid: the only feed where the timeline is money',
         description: 'Settled payments between people, each one verifiable onchain.',
         type: 'website',
       },

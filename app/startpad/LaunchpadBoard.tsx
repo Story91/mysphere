@@ -961,8 +961,8 @@ function TradePanel({
     {canSell && <div className="mt-5 flex items-center gap-1 rounded-xl bg-[#f4f1ff] p-1">
       {(canBuy ? (['buy', 'sell'] as const) : (['sell'] as const)).map((item) => <button key={item} type="button" onClick={() => setSide(item)} className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${effectiveSide === item ? 'bg-white text-soft-primary-deep shadow-sm' : 'text-black/45'}`}>{item === 'buy' ? 'Buy with ETH' : 'Sell token'}</button>)}
     </div>}
-    {!canBuy && canSell && <p className="mt-2 text-[11px] leading-[1.4] text-black/50">Buying closed — the curve is full. Selling stays open until the pool opens.</p>}
-    {!canSell && <p className="mt-5 rounded-xl bg-[#f4f1ff] p-3 text-[11px] leading-[1.4] text-black/55">Curve trading ended at graduation — swaps happen in the Uniswap v4 pool now.</p>}
+    {!canBuy && canSell && <p className="mt-2 text-[11px] leading-[1.4] text-black/50">Buying is closed, the curve is full. Selling stays open until the pool opens.</p>}
+    {!canSell && <p className="mt-5 rounded-xl bg-[#f4f1ff] p-3 text-[11px] leading-[1.4] text-black/55">Curve trading ended at graduation. Swaps happen in the Uniswap v4 pool now.</p>}
     {canSell && (effectiveSide === 'buy' ? <>
       <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-[#16141b]">ETH amount</span><span className="text-[11px] text-black/45">0.5% slippage buffer</span></div>
       <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-black/40">ETH</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-white disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
