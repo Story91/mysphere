@@ -44,7 +44,7 @@ const EXPLORER = LAUNCHPAD_EXPLORER_URL;
 
 type Tab = 'trades' | 'holders' | 'info';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 15;
 
 function badgeFor(address: string, creator: string): HolderRow['badge'] {
   const value = address.toLowerCase();
@@ -116,11 +116,12 @@ export default function DetailTabs({
   const logoUrl = pickTokenImage({ profileLogoUrl: profile?.logoUrl, metadataUri: core.config.metadataURI }).url;
 
   const holders = useMemo<HolderRow[]>(() => {
-    // Zrodlo prawdy: Blockscout, gdy odpowiedzial. Inaczej odtworzenie z
-    // transferow, ktore mamy z lancucha - ograniczone oknem skanu, ale zawsze.
-    const source: Array<[string, bigint]> = indexHolders
-      ? indexHolders.map((h) => [h.address, h.balance] as [string, bigint])
-      : Array.from(balances.entries());
+    // Bierzemy zrodlo z WIEKSZA liczba posiadaczy: Blockscout bywa na Base
+    // Sepolii spozniony i pokazuje mniej niz jest naprawde, a odtworzenie
+    // z lancucha lapie swiezy ruch. Wygrywa to, ktore widzi wiecej.
+    const chainRows = Array.from(balances.entries());
+    const indexRows: Array<[string, bigint]> = (indexHolders ?? []).map((h) => [h.address, h.balance]);
+    const source: Array<[string, bigint]> = indexRows.length >= chainRows.length ? indexRows : chainRows;
     const rows: HolderRow[] = [];
     for (const [address, balance] of source) {
       if (balance <= 0n) continue;

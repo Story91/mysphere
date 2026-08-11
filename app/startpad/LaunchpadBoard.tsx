@@ -1046,7 +1046,7 @@ export default function LaunchpadBoard() {
   // Kurs ETH/USD do dopiskow. Null przy braku danych - wtedy dopiski znikaja,
   // a ETH zostaje jedyna (i zawsze prawdziwa) wartoscia na ekranie.
   const { usd: ethUsd } = useEthUsd();
-  const [tab, setTab] = useState<BoardTab>('new');
+  const [tab, setTab] = useState<BoardTab>('trending');
   const [view, setView] = useState<'grid' | 'table'>('grid');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string>('');
@@ -1353,7 +1353,10 @@ export default function LaunchpadBoard() {
         setTokens((current) =>
           current.map((t) => {
             const key = t.address?.toLowerCase();
-            return key && counts[key] != null ? { ...t, holders: counts[key] } : t;
+            // MAX z liczba z eventow: Blockscout na Base Sepolii potrafi byc
+            // mocno spozniony (pokazuje 12 transferow przy 100+ realnych), wiec
+            // nie moze ZANIZAC swiezej liczby odtworzonej z lancucha.
+            return key && counts[key] != null ? { ...t, holders: Math.max(t.holders, counts[key]) } : t;
           })
         );
       });
@@ -1592,6 +1595,18 @@ export default function LaunchpadBoard() {
         return matches;
     }
   }, [animationsOn, query, tab, tokens]);
+
+  // Strona rynku pokazuje 8 pozycji naraz + przelacznik stron - okienko nie
+  // renderuje kilkudziesieciu wierszy naraz. Reset strony przy zmianie
+  // filtra/wyszukiwania/widoku, zeby nie utknac na pustej stronie.
+  const BOARD_PAGE = 8;
+  const [page, setPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(visibleTokens.length / BOARD_PAGE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedTokens = visibleTokens.slice(safePage * BOARD_PAGE, safePage * BOARD_PAGE + BOARD_PAGE);
+  useEffect(() => {
+    setPage(0);
+  }, [tab, query, view]);
 
   const selected = tokens.find((token) => token.id === selectedId) ?? visibleTokens[0] ?? tokens[0];
   const onSepolia = chainId === LAUNCHPAD_CHAIN.id;
@@ -2113,7 +2128,7 @@ export default function LaunchpadBoard() {
                     </div>
                   ) : visibleTokens.length > 0 ? (
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                      {visibleTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />)}
+                      {pagedTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />)}
                     </div>
                   ) : (
                     <div className="py-14 text-center text-[13px] text-black/50">No launches in this view.</div>
@@ -2122,7 +2137,21 @@ export default function LaunchpadBoard() {
               ) : (
                 <div className="overflow-x-auto">
                   <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] gap-4 border-y border-black/10 bg-[#fafafd] px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/45 sm:px-5"><span>Coin</span><span>Curve</span><span>Indexed vol</span><span>Momentum</span><span>Creator</span><span /></div>
-                  {tokens.length === 0 && loadingBoard ? <div suppressHydrationWarning className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from {NET}...</div> : visibleTokens.length > 0 ? visibleTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
+                  {tokens.length === 0 && loadingBoard ? <div suppressHydrationWarning className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from {NET}...</div> : visibleTokens.length > 0 ? pagedTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
+                </div>
+              )}
+              {/* Przelacznik stron - rynek pokazuje 8 naraz, reszta na kolejnych
+                  stronach; okienko nie renderuje wszystkiego na raz. */}
+              {visibleTokens.length > BOARD_PAGE && (
+                <div className="flex items-center justify-between gap-3 border-t border-black/10 px-4 py-3 sm:px-5">
+                  <span className="text-[11px] text-black/45">
+                    {safePage * BOARD_PAGE + 1}–{Math.min((safePage + 1) * BOARD_PAGE, visibleTokens.length)} of {visibleTokens.length}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <button type="button" disabled={safePage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="rounded-full border border-black/10 px-3 py-1.5 text-[11px] font-extrabold text-[#16141b] hover:border-soft-primary disabled:opacity-40">Prev</button>
+                    <span className="px-1 text-[11px] font-bold text-black/45">{safePage + 1}/{pageCount}</span>
+                    <button type="button" disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} className="rounded-full border border-black/10 px-3 py-1.5 text-[11px] font-extrabold text-[#16141b] hover:border-soft-primary disabled:opacity-40">Next</button>
+                  </span>
                 </div>
               )}
               <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Startpad events and current onchain state.'}</div>

@@ -492,7 +492,9 @@ function StatsCard({
     };
   }, [tokenAddress]);
 
-  const holdersCount = counters.holders ?? holdersFromChain;
+  // MAX z obu zrodel: Blockscout na Base Sepolii bywa spozniony i zanizalby
+  // liczbe, a odtworzenie z lancucha lapie swiezy ruch. Bierzemy wieksza.
+  const holdersCount = Math.max(holdersFromChain, counters.holders ?? 0);
 
   // USD to zawsze dopisek, nigdy wartosc glowna - przy braku kursu (null)
   // wiersz wyglada dokladnie tak, jak przed dodaniem dopiskow.

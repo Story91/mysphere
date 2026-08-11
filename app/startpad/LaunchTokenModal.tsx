@@ -1698,6 +1698,26 @@ export default function LaunchTokenModal({
                               than this. Default {limits.windowCapTokens.toLocaleString('en-US')}, up to{' '}
                               {curve.t0.toLocaleString('en-US')} tokens. Your pre-buy plays by the same rule.
                             </span>
+                            {/* Wskaznik NA ZYWO: pre-buy vs cap. Cap obejmuje tworce,
+                                wiec pre-buy ponad cap = rewert - pokazujemy to, ZANIM
+                                ktos zaplaci za gaz (najwiekszy footgun launcha). */}
+                            {preBuyPreview && (() => {
+                              const capTokens = Number(sniperCapTokens) || 0;
+                              const over = preBuyPreview.tokens > capTokens;
+                              return (
+                                <div className={`mt-2 rounded-xl border px-3 py-2.5 text-[11.5px] leading-[1.45] ${over ? 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]' : 'border-black/10 bg-[#f8f7fc] text-black/60'}`}>
+                                  <div className="flex items-center justify-between gap-2 font-bold">
+                                    <span>Your pre-buy ≈ {Math.round(preBuyPreview.tokens).toLocaleString('en-US')} tokens</span>
+                                    <span className="shrink-0">cap {capTokens.toLocaleString('en-US')}</span>
+                                  </div>
+                                  {over && (
+                                    <p className="mt-1 font-bold">
+                                      Above the per-wallet cap — the launch would revert. Raise the cap or lower the pre-buy.
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </>
                         ) : (
                           <p className="flex items-start gap-2 rounded-xl bg-[#d9628a]/10 p-3 text-[11.5px] font-bold leading-[1.45] text-[#8d2748]">
