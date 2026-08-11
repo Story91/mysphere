@@ -1002,10 +1002,9 @@ export default function LaunchpadBoard() {
   const [buyAmount, setBuyAmount] = useState('0.05');
   const [launchOpen, setLaunchOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
-  // Domyslnie wlaczone; wybor uzytkownika przezywa odswiezenie strony.
-  // Odczyt w efekcie, nie w inicjalizatorze - localStorage nie istnieje na
-  // serwerze, a rozjazd SSR/klient konczy sie bledem hydratacji.
-  const [animationsOn, setAnimationsOn] = useState(true);
+  // Animacje handlu sa ZAWSZE wlaczone - i tak byly caly czas, a przelacznik
+  // tylko zajmowal miejsce w pasku. Stala, zeby karty dalej dostawaly prop.
+  const animationsOn = true;
   const [busy, setBusy] = useState<BusyAction | null>(null);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   // `true` od pierwszego renderu: zanim efekt odpali skan, rynek ma pokazywac
@@ -1035,26 +1034,13 @@ export default function LaunchpadBoard() {
   // milisekundzie daloby ten sam `key` i animacja by sie nie zrestartowala.
   const flashSeq = useRef(0);
 
+  // Toast potwierdzenia sam znika: sukces po 4 s, blad po 7 s. Reczne
+  // zamkniecie (X) tez dziala.
   useEffect(() => {
-    try {
-      if (window.localStorage.getItem('launchpad-animations') === '0') setAnimationsOn(false);
-    } catch {
-      // Prywatny tryb przegladarki potrafi rzucac na localStorage - wtedy
-      // zostaje domyslne "wlaczone" i nic wiecej sie nie dzieje.
-    }
-  }, []);
-
-  const toggleAnimations = () => {
-    setAnimationsOn((current) => {
-      const next = !current;
-      try {
-        window.localStorage.setItem('launchpad-animations', next ? '1' : '0');
-      } catch {
-        // Brak zapisu znaczy tylko tyle, ze wybor nie przezyje odswiezenia.
-      }
-      return next;
-    });
-  };
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), notice.kind === 'success' ? 4000 : 7000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   // Odczyty tablicy sa PRZYPIETE do sieci launchpada. Bez tego tablica gasnie,
   // gdy portfel stoi na innym lancuchu - a to jest widok publiczny i ma sie
@@ -2175,8 +2161,14 @@ export default function LaunchpadBoard() {
           0% { opacity: 0; transform: translateX(-14px); }
           100% { opacity: 1; transform: none; }
         }
+        /* Toast potwierdzenia wjezdza z prawej gory i sam znika. */
+        .lp-toast-in { animation: lp-toast-in 0.25s ease-out; }
+        @keyframes lp-toast-in {
+          0% { opacity: 0; transform: translateY(-10px); }
+          100% { opacity: 1; transform: none; }
+        }
         @media (prefers-reduced-motion: reduce) {
-          .lp-flash-buy, .lp-flash-sell, .lp-ticker-in { animation: none; }
+          .lp-flash-buy, .lp-flash-sell, .lp-ticker-in, .lp-toast-in { animation: none; }
         }
       `}</style>
       <div className="mx-auto w-full max-w-[1760px]">
@@ -2210,7 +2202,7 @@ export default function LaunchpadBoard() {
               (jest w gornym wierszu obok logo). */}
         </div>
 
-        {notice && <div className={`mb-4 flex items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] ${notice.kind === 'success' ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]' : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span>{notice.text}</span></div>}
+        {notice && <div role="status" aria-live="polite" className={`lp-toast-in fixed right-4 top-4 z-[80] flex max-w-[min(92vw,360px)] items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] shadow-[0_14px_44px_rgba(0,0,0,0.18)] ${notice.kind === 'success' ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]' : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span className="min-w-0 flex-1">{notice.text}</span><button type="button" onClick={() => setNotice(null)} className="ml-1 shrink-0 opacity-50 hover:opacity-100" aria-label="Dismiss"><X className="h-3.5 w-3.5" aria-hidden="true" /></button></div>}
         {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[11.5px] text-black/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-[#c76b12]'}`} aria-hidden="true" /><span suppressHydrationWarning>{loadingBoard ? `Reading Launchpad activity from ${NET}...` : `Live data unavailable. ${boardError}`}</span></div>}
 
         {/* Rynek na CALA szerokosc - Live tape zjechal na gorny ticker, wiec nie
@@ -2236,18 +2228,11 @@ export default function LaunchpadBoard() {
                   </div>
                 </div>
                 <span className="flex flex-wrap items-center gap-2">
-                  {/* Na telefonie tylko ikonka (napis wypychal rzad do drugiej
-                      linii); od sm pelny tekst. */}
-                  <button type="button" onClick={toggleAnimations} aria-pressed={animationsOn} aria-label={animationsOn ? 'Animations on' : 'Animations off'} title={animationsOn ? 'Animations on' : 'Animations off'} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-extrabold transition-colors sm:px-3 ${animationsOn ? 'border-soft-primary/40 bg-soft-primary/10 text-soft-primary-deep' : 'border-black/10 bg-white text-black/45'}`}>
-                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span className="hidden sm:inline">{animationsOn ? 'Animations on' : 'Animations off'}</span>
-                  </button>
                   <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="tablist" aria-label="Market layout">
                     {(['grid', 'table'] as const).map((mode) => (
                       <button key={mode} type="button" role="tab" aria-selected={view === mode} onClick={() => setView(mode)} className={`px-3 py-1.5 text-[11px] font-extrabold capitalize transition-colors ${view === mode ? 'bg-soft-primary text-white' : 'bg-white text-[#16141b] hover:text-soft-primary-deep'}`}>{mode}</button>
                     ))}
                   </span>
-                  <span className="hidden items-center gap-1.5 rounded-full bg-soft-info-soft px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-soft-info sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-[#18bd64]" /> Testnet</span>
                 </span>
               </div>
               {view === 'grid' ? (
