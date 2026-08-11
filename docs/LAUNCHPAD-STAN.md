@@ -346,6 +346,16 @@ NEXT_PUBLIC_CDP_RPC_URL || mainnet.base.org`, z base.org jako fallbackiem.
 NIE uzywaj publicznego tokenu z SDK do boardu - to token wspoldzielony (bundler
 tipow), obciazanie go 90 oknami na load moze go zrate-limitowac dla wszystkich.
 
+**OBOWIAZKOWO: allowlist domeny.** `NEXT_PUBLIC_` = token wchodzi do bundla JS
+(widoczny w przegladarce). Client API Key nie rusza srodkow ani portfela (tylko
+odczyty na Twoj limit), ale bez ograniczenia da sie go zeskrobac i palic Twoj
+quota. W portalu CDP ogranicz ten Client API Key do WLASNYCH domen (produkcyjna +
+ew. preview Vercela). Wtedy zeskrobany token nie zadziala z cudzego origin. To ta
+sama ochrona co przy kluczach Google Maps/Alchemy i jest to KROK WYMAGANY, nie
+opcjonalny. Alternatywa bez wystawiania (proxy serwerowy przez `CDP_RPC_URL`)
+zostala swiadomie odrzucona na rzecz A - szybsza, zero kodu, allowlist zamyka
+ryzyko.
+
 ## Zmienne na Vercelu
 
 ```text
