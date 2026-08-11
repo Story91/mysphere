@@ -1769,6 +1769,9 @@ export default function LaunchpadBoard() {
         ),
       );
       setNotice({ kind: 'success', text: `Buy confirmed. ${hash.slice(0, 10)}...` });
+      // Sukces -> zamykamy okno; potwierdzenie widac w notce na tablicy. Na
+      // bledzie (catch) okno ZOSTAJE otwarte, zeby dalo sie sprobowac ponownie.
+      setTradeOpen(false);
       void loadBoard();
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message.split('\n')[0] : String(error) });
@@ -1823,6 +1826,8 @@ export default function LaunchpadBoard() {
       if (receipt.status !== 'success') throw new Error('The sell transaction reverted.');
       setSellAmount('0');
       setNotice({ kind: 'success', text: `Sell confirmed. ${hash.slice(0, 10)}...` });
+      // Sukces -> zamykamy okno (potwierdzenie w notce). Blad zostawia otwarte.
+      setTradeOpen(false);
       await refreshDetails();
       void loadBoard();
     } catch (error) {
