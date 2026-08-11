@@ -2083,7 +2083,9 @@ export default function LaunchpadBoard() {
 
             <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market table">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Startpad market</h2><p suppressHydrationWarning className="mt-1 text-[11px] text-black/45">{tokens.length === 0 && loadingBoard ? `reading live launches from ${NET}...` : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : `live event data from ${NET}`}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
+                {/* Podtytul to gadka opisowa - na telefonie tylko zabiera miejsce,
+                    wiec chowamy go (hidden sm:block). Na desktopie zostaje. */}
+                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Startpad market</h2><p suppressHydrationWarning className="mt-1 hidden text-[11px] text-black/45 sm:block">{tokens.length === 0 && loadingBoard ? `reading live launches from ${NET}...` : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : `live event data from ${NET}`}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
                 <span className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={toggleAnimations} aria-pressed={animationsOn} className={`rounded-full border px-3 py-1.5 text-[11px] font-extrabold transition-colors ${animationsOn ? 'border-soft-primary/40 bg-soft-primary/10 text-soft-primary-deep' : 'border-black/10 bg-white text-black/45'}`}>
                     {animationsOn ? 'Animations on' : 'Animations off'}
