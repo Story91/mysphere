@@ -56,7 +56,7 @@ export type LaunchpadNetwork = {
  */
 const baseMainnetEntry: LaunchpadNetwork = {
   chain: base,
-  label: 'Base',
+  label: 'Base B20',
   testnet: false,
   tokenStandard: 'b20',
   launchpad:
@@ -88,7 +88,7 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
   [base.id]: baseMainnetEntry,
   [baseSepolia.id]: {
     chain: baseSepolia,
-    label: 'Base Sepolia',
+    label: 'Base B20 Sepolia',
     testnet: true,
     tokenStandard: 'b20',
     launchpad:
@@ -107,12 +107,12 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     explorerUrl: 'https://sepolia.basescan.org',
     scanWindow: 1_900n, // publiczny RPC Base Sepolii tnie getLogs na 2000 blokach
     maxScanWindows: 64,
-    pillClass: 'border-black/10 bg-white text-black/50',
+    pillClass: 'border-[#0052FF]/25 bg-[#eef3ff] text-[#0052FF]',
     accentTextClass: 'text-soft-primary-deep',
   },
   [robinhoodChain.id]: {
     chain: robinhoodChain,
-    label: 'Robinhood Chain',
+    label: 'RobinHood',
     testnet: false,
     tokenStandard: 'plain',
     launchpad:
