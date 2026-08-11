@@ -17,6 +17,14 @@ hardhat.tsconfig.json
 # Ignore documentation
 docs/
 *.md
+# WYJATEK: strony /Docs importuja swoja tresc z markdownu W TRAKCIE BUILDA
+# (app/Docs/*/page.tsx: `import content from '../_content/*.md'`, regula
+# webpacka `.md` -> asset/source w next.config.js). Bez tego wyjatku `*.md`
+# wycinal te pliki TYLKO na Vercelu, przez co CALY segment app/Docs znikal z
+# builda - przechodzil bez ani jednej trasy /Docs, a produkcja dawala 404
+# (lokalnie dzialalo, bo .vercelignore obowiazuje wylacznie na deployu).
+# Negacja zostawia CALE app/Docs w deployu (tresc .md + diagramy mermaid).
+!app/Docs/**
 
 # Ignore contract artifacts
 app/spheres/artifacts/
