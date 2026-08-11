@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { put } from '@vercel/blob';
 import { createPublicClient, http, type Address } from 'viem';
 import { LAUNCHPAD_ADDRESS, LAUNCHPAD_CHAIN, launchpadAbi } from '../../../startpad/config';
 import { sessionAddress } from '../../asks/identity';
@@ -38,6 +39,51 @@ function readClient() {
     chain: LAUNCHPAD_CHAIN,
     transport: http(),
   });
+}
+
+const DATA_IMAGE_RE = /^data:image\/(png|jpeg|webp);base64,(.+)$/;
+
+/**
+ * Logo -> Vercel Blob pod deterministyczna sciezka `startpad/logos/{chainId}/{token}`.
+ * Firestore NIE trzyma juz obrazka (data-URL zabijal egress darmowego tieru);
+ * tablica czyta logo przez /api/startpad/logos (list Bloba). Zwraca true, gdy
+ * obrazek trafil do Bloba - niezaleznie od tego, czy Firestore w ogole odpowie.
+ */
+async function uploadLogoToBlob(token: string, chainId: number, input: unknown): Promise<boolean> {
+  if (typeof input !== 'string' || input.trim() === '') return false;
+  const value = input.trim();
+  let bytes: Buffer | null = null;
+  let contentType = 'image/png';
+
+  const match = DATA_IMAGE_RE.exec(value);
+  if (match) {
+    contentType = `image/${match[1]}`;
+    try { bytes = Buffer.from(match[2], 'base64'); } catch { return false; }
+  } else if (value.startsWith('https://')) {
+    try {
+      const res = await fetch(value);
+      const ct = res.headers.get('content-type') ?? '';
+      if (!res.ok || !ct.startsWith('image/')) return false;
+      contentType = ct.split(';')[0];
+      bytes = Buffer.from(await res.arrayBuffer());
+    } catch { return false; }
+  } else {
+    return false; // ipfs:// itp. - pomijamy, nie ma czego wgrac do Bloba
+  }
+
+  if (!bytes || bytes.length === 0 || bytes.length > 2_000_000) return false;
+  try {
+    await put(`startpad/logos/${chainId}/${token.toLowerCase()}`, bytes, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -112,12 +158,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Logo -> Blob (CDN). Robimy to PRZED Firestore, bo obrazek ma sie zapisac
+  // nawet gdy Firestore jest niedostepny (np. wyczerpany limit).
+  const logoSaved = await uploadLogoToBlob(address, LAUNCHPAD_CHAIN.id, body.logoUrl);
+
+  // Firestore trzyma juz TYLKO opis i linki - bez data-URL. `logoUrl: null`
+  // czysci ewentualny stary data-URL przy okazji edycji.
   const saved = await saveProfile({
     address,
     chainId: LAUNCHPAD_CHAIN.id,
     creator,
     profile: {
-      logoUrl: body.logoUrl,
+      logoUrl: null,
       description: body.description,
       website: body.website,
       twitter: body.twitter,
@@ -125,9 +177,10 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  if (!saved) {
+  // Sukces, gdy cokolwiek sie zapisalo: logo w Blobie ALBO profil w Firestore.
+  if (!saved && !logoSaved) {
     return NextResponse.json({ error: 'Saving the profile failed.' }, { status: 500, headers: NO_STORE });
   }
 
-  return NextResponse.json({ profile: saved }, { headers: NO_STORE });
+  return NextResponse.json({ profile: saved, logoSaved }, { headers: NO_STORE });
 }

@@ -43,7 +43,7 @@ import {
   setLaunchpadChain,
   type LaunchpadToken,
 } from './config';
-import { pickTokenImage } from './metadata';
+import { fetchLogos } from './logos';
 import { fetchHolderCounts } from './blockscout';
 import LaunchTokenModal from './LaunchTokenModal';
 import StartpadFooter from './StartpadFooter';
@@ -1467,48 +1467,33 @@ export default function LaunchpadBoard() {
   }, [readClient]);
 
   /**
-   * Logo, opis i linki tokenow. Lancuch ich nie zna - patrz `metadata.ts`.
-   * Brak profilu nie jest bledem i nie moze niczego wywrocic: tablica dziala
-   * bez ani jednego logo.
+   * Logo tokenow z VERCEL BLOB (przez /api/startpad/logos), NIE z Firestore.
+   * Firestore trzymal logo jako data-URL i egress zabijal darmowy limit; teraz
+   * obrazki zyja na CDN Bloba, a to jest tylko mapa token->URL. Brak logo nie
+   * jest bledem - tablica dziala bez ani jednego.
    */
   useEffect(() => {
-    // Adresy jada w query stringu, a ten ma realny sufit dlugosci (serwery i
-    // posrednicy odcinaja okolo 8 kB). 42 znaki na adres znacza, ze 200 pozycji
-    // to juz ponad 8 kB samych adresow - czyli 414 zamiast logo. Bierzemy tyle,
-    // ile widac na ekranie; reszta dociagnie sie, gdy wejdzie do widoku.
-    const live = tokens
-      .filter((token) => token.address)
-      .slice(0, 60)
-      .map((token) => token.address as Address);
-    if (live.length === 0) return;
+    const hasAny = tokens.some((token) => token.address);
+    if (!hasAny) return;
     let cancelled = false;
 
-    void (async () => {
-      try {
-        const response = await fetch(`/api/launchpad/token?addresses=${live.join(',')}`);
-        if (!response.ok) return;
-        const payload = (await response.json()) as { profiles?: Record<string, { logoUrl?: string | null }> };
-        if (cancelled || !payload.profiles) return;
-        const profiles = payload.profiles;
-        setTokens((current) =>
-          current.map((row) => {
-            const profile = row.address ? profiles[row.address.toLowerCase()] : undefined;
-            const logo = pickTokenImage({ profileLogoUrl: profile?.logoUrl }).url;
-            return logo && logo !== row.logoUrl ? { ...row, logoUrl: logo } : row;
-          })
-        );
-      } catch {
-        // Profile sa ozdoba, nie danymi rynkowymi. Cisza jest tu wlasciwa.
-      }
-    })();
+    void fetchLogos(ACTIVE_LAUNCHPAD_NETWORK.chain.id).then((logos) => {
+      if (cancelled || Object.keys(logos).length === 0) return;
+      setTokens((current) =>
+        current.map((row) => {
+          const url = row.address ? logos[row.address.toLowerCase()] : undefined;
+          return url && url !== row.logoUrl ? { ...row, logoUrl: url } : row;
+        })
+      );
+    });
 
     return () => {
       cancelled = true;
     };
-    // Celowo zalezy od LICZBY i adresow, nie od calej tablicy - inaczej wlasny
-    // `setTokens` powyzej wywolywalby ten efekt w kolko.
+    // Zalezy od zestawu adresow, nie od calej tablicy - inaczej wlasny setTokens
+    // wywolywalby ten efekt w kolko.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tokens.slice(0, 60).map((token) => token.address ?? '').join(',')]);
+  }, [tokens.map((token) => token.address ?? '').join(',')]);
 
   /**
    * Zakladki sortujace zamiast filtrow. Kazda oddaje NOWA tablice, wiec
