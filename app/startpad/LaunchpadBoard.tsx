@@ -2046,8 +2046,11 @@ export default function LaunchpadBoard() {
                   </div>
                 </div>
                 <span className="flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={toggleAnimations} aria-pressed={animationsOn} className={`rounded-full border px-3 py-1.5 text-[11px] font-extrabold transition-colors ${animationsOn ? 'border-soft-primary/40 bg-soft-primary/10 text-soft-primary-deep' : 'border-black/10 bg-white text-black/45'}`}>
-                    {animationsOn ? 'Animations on' : 'Animations off'}
+                  {/* Na telefonie tylko ikonka (napis wypychal rzad do drugiej
+                      linii); od sm pelny tekst. */}
+                  <button type="button" onClick={toggleAnimations} aria-pressed={animationsOn} aria-label={animationsOn ? 'Animations on' : 'Animations off'} title={animationsOn ? 'Animations on' : 'Animations off'} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-extrabold transition-colors sm:px-3 ${animationsOn ? 'border-soft-primary/40 bg-soft-primary/10 text-soft-primary-deep' : 'border-black/10 bg-white text-black/45'}`}>
+                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="hidden sm:inline">{animationsOn ? 'Animations on' : 'Animations off'}</span>
                   </button>
                   <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="tablist" aria-label="Market layout">
                     {(['grid', 'table'] as const).map((mode) => (
