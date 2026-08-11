@@ -8,13 +8,13 @@ Each launch mints a fixed 1,000,000,000 supply once, straight to the curve. Up t
 
 While a token is on the curve you buy and sell against a constant-product formula (details below). When the curve's ETH reserve reaches 3.00 ETH the token locks (buys revert, sells still work), and anyone can call `graduate()` to seed the pool. After that, trading happens in the v4 pool.
 
-Right now it runs in two places. Startpad is live on Base Sepolia (a testnet, the ETH there has no real value; tokens are network-native B20) and on Robinhood Chain (plain ERC-20, no B20 precompile there). It is not on Base mainnet. The full path all the way through graduation has been verified on mainnet forks and a test mini-stack, but no token on a production deployment has actually graduated yet.
+Startpad is now live on Base mainnet, deployed on 11 August 2026, and that is the default network. It also runs on Base Sepolia (a testnet, where the ETH has no real value) and on Robinhood Chain. On Base mainnet and Base Sepolia tokens use the network-native B20 standard; on Robinhood they are plain ERC-20s, because there is no B20 precompile there. The mainnet contracts are verified on BaseScan and the whole path through graduation is covered by mainnet-fork tests, but no token has been launched or graduated on the production deployment yet, since it only just went live.
 
 ## How to use it
 
-1. Open [/startpad](/startpad) and pick the network from the header switcher (Base Sepolia or Robinhood Chain).
-2. Connect a wallet with test ETH on that network.
-3. Launch with a name, symbol, and image. "Quick" uses defaults; "Creator setup" lets you set the trade fee (0-1%), your share of it (0-70%), up to 8 fee receivers, an auto-buyback slice, the first-5-minute per-wallet buy cap, and an optional atomic pre-buy.
+1. Open [/startpad](/startpad). It opens on Base mainnet by default, and the header switcher also offers Base Sepolia and Robinhood Chain.
+2. Connect a wallet funded for that network: real ETH on Base mainnet, test ETH on Base Sepolia.
+3. Launch with a name, symbol, and image. "Quick" uses defaults; "Creator setup" lets you set the trade fee (0-1%), your share of it (0-70%), up to 8 fee receivers, an auto-buyback slice, the first-5-minute per-wallet buy cap, an optional atomic pre-buy, and on B20 networks an optional vanity token address you mine in your own browser.
 4. Trade by buying or selling against the curve. The quote you see (`quoteBuy` / `quoteSell`) is what the trade returns.
 5. Claim your fees. They are pull-based. Your earnings accrue in ETH; call `claim()` to collect. Anyone can pay gas to deliver your balance to you, never to themselves.
 6. When the reserve hits 3.00 ETH, call `graduate()`. It is permissionless and pays the caller 0.045 ETH.
@@ -60,7 +60,7 @@ The 30% protocol floor is enforced in the contract, so it binds even a direct ca
 
 ## Check it onchain
 
-Everything is verifiable on the network's block explorer. On Base Sepolia the `CurveLaunchpad` is `0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48` on [sepolia.basescan.org](https://sepolia.basescan.org); on Robinhood Chain it is `0x712E93401b455d226284BbA873cE13CC1492B22f` on [robinhoodchain.blockscout.com](https://robinhoodchain.blockscout.com).
+Everything is verifiable on the network's block explorer. On Base mainnet the `CurveLaunchpad` is `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` on [basescan.org](https://basescan.org); on Base Sepolia it is `0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48` on [sepolia.basescan.org](https://sepolia.basescan.org); on Robinhood Chain it is `0x712E93401b455d226284BbA873cE13CC1492B22f` on [robinhoodchain.blockscout.com](https://robinhoodchain.blockscout.com).
 
 - Each launch emits a `Launched` event; every trade emits `Bought` / `Sold` with the reserves after.
 - Every fee accrual, to the wei per receiver, is a `FeeAccrued` event, and the sums reconcile with `claimable()`.

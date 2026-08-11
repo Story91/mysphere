@@ -21,7 +21,7 @@ Most money events in MySphere carry a transaction hash you can open in a block e
 | Robinhood tip | `robinhoodchain.blockscout.com`, search the tip id |
 | Ethereum / Celo / World / Linea / Camp tip | `etherscan.io` / `celoscan.io` / `worldscan.org` / `lineascan.build` / `basecamp.cloud` |
 | Ask funded / seat awarded / resolved / claimed | Ask escrow contract on Base (`AskFunded`, `SeatAwarded`, `AskResolved`, `Claimed` events) |
-| Startpad launch / buy / sell / graduation | Launchpad `0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48` on Base Sepolia (`sepolia.basescan.org`); Robinhood mainnet `0x712E93401b455d226284BbA873cE13CC1492B22f` on Blockscout |
+| Startpad launch / buy / sell / graduation | Launchpad `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` on Base mainnet (`basescan.org`); `0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48` on Base Sepolia (`sepolia.basescan.org`); `0x712E93401b455d226284BbA873cE13CC1492B22f` on Robinhood (Blockscout) |
 | B20 token supply cap / no admin roles | Read the token address on the explorer, total supply is fixed at launch |
 | Morpho curator change | Off-chain, dated reading of public Morpho data (no single MySphere hash) |
 
@@ -49,5 +49,5 @@ The fee rounds down, so the author's share is always the exact remainder. The tw
 ## Check it onchain
 
 - For the Ask escrow on Base (USDC), open the escrow address on `basescan.org`, call `escrowFor(author, askId)` to see the locked budget, seats and deadline, and `claimable(account)` to see a balance waiting to be collected. `FEE_RECIPIENT()` and the fee are immutable. It's also deployed on Base Sepolia (chainId 84532) for testing.
-- The Startpad launchpad, vault, hook and B20 token addresses live in `docs/LAUNCHPAD-STAN.md`. Base runs on Sepolia testnet today; Robinhood Chain is mainnet. Read a B20 token to confirm its fixed supply and that it exposes no owner/admin functions.
+- The Startpad launchpad, vault, hook and B20 token addresses live in `docs/LAUNCHPAD-STAN.md`. Startpad runs on Base mainnet (the default), Base Sepolia (a testnet), and Robinhood Chain (mainnet). Read a B20 token to confirm its fixed supply and that it exposes no owner/admin functions.
 - There's one honest limit. The Morpho curator record is verifiable only in the sense that you can read the same public Morpho data we did. It isn't a MySphere transaction, so treat its timestamp as a dated snapshot, not a hash.
