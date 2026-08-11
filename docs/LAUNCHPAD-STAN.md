@@ -232,6 +232,65 @@ Kolejnosc od najtanszych do najdrozszych; wszystko na Base Sepolia, przez UI
     odjedzie od bloku wdrozenia o ~120k blokow (board mowi wtedy "older
     launches exist beyond the indexed range").
 
+## Base mainnet - runbook wdrozenia (Faza 5, 2026-08-11)
+
+Kod idacy na mainnet to WERSJA MAINNET-CANDIDATE (fixy audytu + opcjonalne
+vanity), potwierdzona: 125 testow (jednostkowe + inwarianty + vanity) oraz
+`launchpad:fork:base` na PRAWDZIWYM PoolManagerze Base mainnet (pelna sciezka az
+do graduacji + oba znaki delty afterSwap). Szczegoly: `docs/LAUNCHPAD-DOSSIER.md`
+sekcje "Mainnet-candidate build" i "Faza 4 review".
+
+Stan listy "Przed mainnetem":
+- audyt zewnetrzny: ODLOZONY (decyzja wlasciciela), zastapiony twardsza runda
+  wewnetrzna (Faza 4: 0 confirmed) - PODNIESIONE RYZYKO, nazwane wprost;
+- pelna sciezka on-chain: pokryta forkiem Base mainnet (bramka P1 audytu dla
+  slotu PoolManagera zamknieta na realnym bajtkodzie);
+- FEE_RECIPIENT mainnet: `0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83`;
+- weryfikacja na Basescanie: po deployu (nizej).
+
+### Deploy (odpalasz TY, z zasilonym kluczem)
+
+```powershell
+# domyslne: PROTOCOL_SHARE_BPS=3000, FEE_BPS=100, CREATOR_FEE_BPS=70,
+# FACTORY_KIND=b20 (auto na Base), POOL_MANAGER=0x498581fF... (auto)
+$env:FEE_RECIPIENT="0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83"; $env:CONFIRM="tak"; npm run launchpad:deploy:base
+```
+
+Przed odpaleniem:
+- portfel deployera zasilony na gaz (~8 mln gazu lacznie: fabryka ~760k +
+  launchpad ~7.35M; na Base to grosze-dolar) i wpiety jako signer sieci `base`
+  (klucz w env wg hardhat.config);
+- `deploy.ts` robi WSZYSTKO w jednym przebiegu: fabryka -> kopanie salta hooka
+  (offline) -> launchpad (tworzy vault+hook w jednej tx) -> 15 kontroli wiazan
+  -> zapis `scripts/output/launchpad-base.json`. Salt jest wazny tylko dla tej
+  trojki (deployer, nonce, argumenty hooka), wiec NIE wysylaj nic innego z tego
+  adresu w trakcie. Gdy ktorakolwiek z 15 kontroli odpadnie, skrypt krzyczy i
+  NIE zapisuje adresow - takiego wdrozenia sie nie uzywa.
+
+### Po deployie
+
+1. **Weryfikacja na Basescanie** (`ETHERSCAN_API_KEY` w env):
+   `npx hardhat verify --network base <launchpad> <konstruktor...>`. Vault i hook
+   powstaly wewnetrznie - weryfikuje sie je OSOBNO, ich wlasnymi argumentami
+   konstruktora (skrypt wypisuje je przy deployu).
+2. **Frontend**: dodaj siec Base MAINNET (B20) do `LAUNCHPAD_NETWORKS`
+   w `app/startpad/config.ts` + przelacznik; zmienne `NEXT_PUBLIC_*` nizej.
+3. **Vanity**: ABI frontu jest RECZNE i nie ma jeszcze `launchVanity`/
+   `predictVanityToken` - UI kopania 4 znakow to osobny front task (z Fazy 4:
+   ostrzezenie snajperskie + ciasny domyslny windowCap dla vanity).
+4. **Wykres/handel po graduacji**: dopiero na mainnecie da sie wpiac embed
+   GeckoTerminal/DEX Screener (indeksuja v4 na Base MAINNET; testnetu nie).
+
+### Zmienne Vercel po deployie (Base mainnet)
+
+```text
+NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS         <launchpad z JSON>
+NEXT_PUBLIC_LIQUIDITY_VAULT_BASE_ADDRESS   <vault z JSON>
+NEXT_PUBLIC_LAUNCH_HOOK_BASE_ADDRESS       <hook z JSON>
+NEXT_PUBLIC_TOKEN_FACTORY_BASE_ADDRESS     <tokenFactory z JSON>
+NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK    <deployBlock z JSON>
+```
+
 ## Zmienne na Vercelu
 
 ```text
