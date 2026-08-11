@@ -491,14 +491,16 @@ function FeedGlyph({ item }: { item: ActivityItem }) {
 
 
 function ActivityTicker({ events }: { events: ActivityItem[] }) {
-  // Ostatnie 20 zdarzen, podwojone dla plynnej, zapetlonej tasmy (marquee).
-  const last = events.slice(0, 20);
-  const items = [...last, ...last];
+  // NIE marquee: pasek STOI z ostatnimi 20 zdarzeniami. Ruch pojawia sie tylko
+  // gdy dochodzi nowe zdarzenie - swiezy wpis (nowy key) wjezdza z lewej
+  // (`lp-ticker-in`), a istniejace chipy zostaja (ten sam key = brak reanimacji).
+  // overflow-x-auto: gdy sie nie miesci, mozna przewinac recznie.
+  const items = events.slice(0, 20);
   return (
-    <div className="launchpad-ticker -mx-4 overflow-hidden border-b border-black/10 bg-white sm:-mx-6" aria-label="Live Startpad events">
-      <div className={`${events.length ? 'launchpad-marquee' : ''} flex min-h-[38px] min-w-max items-center gap-1.5 px-2 py-1.5`}>
-        {items.length ? items.map((event, index) => (
-          <div key={`${event.id}-${index}`} className="flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+    <div className="-mx-4 overflow-x-auto border-b border-black/10 bg-white sm:-mx-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Live Startpad events">
+      <div className="flex min-h-[38px] w-max items-center gap-1.5 px-2 py-1.5">
+        {items.length ? items.map((event) => (
+          <div key={event.id} className="lp-ticker-in flex shrink-0 items-center gap-1.5 rounded-full border border-black/10 bg-white px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
             <FeedGlyph item={event} />
             <span className="pr-1 text-left leading-tight">
               <span className="block text-[10px] font-bold text-[#16141b]">{event.symbol}</span>
@@ -1985,8 +1987,16 @@ export default function LaunchpadBoard() {
           0% { box-shadow: 0 0 0 2px rgba(199, 107, 18, 0.6), 0 8px 28px rgba(199, 107, 18, 0.3); }
           100% { box-shadow: 0 0 0 2px rgba(199, 107, 18, 0), 0 8px 28px rgba(199, 107, 18, 0); }
         }
+        /* Nowy wpis na tasmie zdarzen wjezdza z lewej. Animacja gra RAZ, przy
+           montowaniu chipa - istniejace chipy (ten sam key) sie nie re-animuja,
+           wiec pasek rusza sie tylko przy realnie nowym zdarzeniu. */
+        .lp-ticker-in { animation: lp-ticker-in 0.35s ease-out; }
+        @keyframes lp-ticker-in {
+          0% { opacity: 0; transform: translateX(-14px); }
+          100% { opacity: 1; transform: none; }
+        }
         @media (prefers-reduced-motion: reduce) {
-          .lp-flash-buy, .lp-flash-sell { animation: none; }
+          .lp-flash-buy, .lp-flash-sell, .lp-ticker-in { animation: none; }
         }
       `}</style>
       <div className="mx-auto w-full max-w-[1760px]">
