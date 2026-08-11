@@ -489,68 +489,11 @@ function FeedGlyph({ item }: { item: ActivityItem }) {
   );
 }
 
-/**
- * Szyna zdarzen na zywo - PIONOWA i przyklejona z boku rynku.
- *
- * To jest swiadome odejscie od ukladu, ktory ma dzis kazdy launchpad: pozioma
- * tasma na samej gorze plus szeroka siatka pod nia. Tamten uklad zmusza do
- * czytania zdarzen katem oka, przy okazji przewijania rynku. Tutaj zdarzenia
- * stoja obok rynku i zostaja na ekranie, wiec da sie je czytac jako osobna
- * rzecz - a rynek nie traci szerokosci na pasek, ktory i tak ucieka.
- *
- * Na telefonie pionowa szyna nie ma sensu (zabralaby cala szerokosc), wiec tam
- * zostaje wersja pozioma.
- */
-function LiveRail({ events }: { events: ActivityItem[] }) {
-  const toneClass = (tone: ActivityItem['tone']) =>
-    tone === 'sell'
-      ? 'text-[#a34b08]'
-      : tone === 'buy'
-        ? 'text-[#0b9a51]'
-        : tone === 'graduate'
-          ? 'text-[#0b7a41]'
-          : 'text-[#5f4ec2]';
-
-  return (
-    <aside className="hidden lg:block" aria-label="Live Startpad events">
-      <div className="sticky top-4 rounded-[20px] border border-black/10 bg-white">
-        <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
-          <h2 className="text-[13px] font-extrabold text-[#16141b]">Live tape</h2>
-          <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-black/40">
-            <span className={`h-1.5 w-1.5 rounded-full ${events.length ? 'bg-[#18bd64]' : 'bg-black/20'}`} />
-            {events.length ? 'onchain' : 'waiting'}
-          </span>
-        </div>
-        {/* Wysokosc ograniczona: Live tape stoi w prawej kolumnie gridu obok
-            rynku, a wysokosc wiersza gridu = wyzsza z kolumn. Bez limitu dluga
-            tasma rozciagala grid i robila wielka pusta dziure miedzy rynkiem
-            a panelami pod spodem. 560px trzyma ja krotsza niz rynek. */}
-        <div className="max-h-[560px] overflow-y-auto">
-          {events.length === 0 ? (
-            <p className="px-4 py-8 text-center text-[11.5px] leading-[1.5] text-black/45">
-              Nothing yet. Launches, buys and sells show up here the moment they land on chain.
-            </p>
-          ) : (
-            <ul className="divide-y divide-black/5">
-              {events.slice(0, 30).map((event) => (
-                <li key={event.id} className="flex items-center gap-2.5 px-4 py-2.5">
-                  <FeedGlyph item={event} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-extrabold text-[#16141b]">{event.symbol}</span>
-                    <span className={`block text-[10.5px] font-bold ${toneClass(event.tone)}`}>{event.label}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </aside>
-  );
-}
 
 function ActivityTicker({ events }: { events: ActivityItem[] }) {
-  const items = [...events, ...events].slice(0, 16);
+  // Ostatnie 20 zdarzen, podwojone dla plynnej, zapetlonej tasmy (marquee).
+  const last = events.slice(0, 20);
+  const items = [...last, ...last];
   return (
     <div className="launchpad-ticker -mx-4 overflow-hidden border-b border-black/10 bg-white sm:-mx-6" aria-label="Live Startpad events">
       <div className={`${events.length ? 'launchpad-marquee' : ''} flex min-h-[38px] min-w-max items-center gap-1.5 px-2 py-1.5`}>
@@ -2047,7 +1990,10 @@ export default function LaunchpadBoard() {
         }
       `}</style>
       <div className="mx-auto w-full max-w-[1760px]">
-        <div className="lg:hidden">
+        {/* Live tape jako cienki, latajacy pasek pod nawigacja - na WSZYSTKICH
+            ekranach (wczesniej tylko mobile). Zastapil prawa kolumne, dzieki
+            czemu rynek ma cala szerokosc. */}
+        <div>
           <ActivityTicker events={feedEvents} />
         </div>
 
@@ -2077,30 +2023,28 @@ export default function LaunchpadBoard() {
         {notice && <div className={`mb-4 flex items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] ${notice.kind === 'success' ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]' : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span>{notice.text}</span></div>}
         {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[11.5px] text-black/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-[#c76b12]'}`} aria-hidden="true" /><span suppressHydrationWarning>{loadingBoard ? `Reading Launchpad activity from ${NET}...` : `Live data unavailable. ${boardError}`}</span></div>}
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          {/* Lewa kolumna to SAM rynek (filtry + tabela/grid). Panele statystyk,
-              King i My tokens sa POD gridem, na cala szerokosc - Live tape stoi
-              tylko obok rynku i nie zweza tego, co jest pod spodem. */}
-          <div className="min-w-0">
-            <div className="flex items-center justify-between gap-3">
-              {/* Filtry: na telefonie JEDEN pasek z przewijaniem w bok (nie zawija
-                  sie w kilka rzedow); od sm zawija normalnie. */}
-              <div className="-mx-1 flex items-center gap-2 overflow-x-auto whitespace-nowrap px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" role="tablist" aria-label="Launch sorting">
-                {([['new', 'New'], ['trending', 'Trending'], ['about', 'About to graduate'], ['graduated', 'Graduated'], ['all', 'All']] as const).map(([value, label]) => (
-                  <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`shrink-0 rounded-full border px-4 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>
-                ))}
-              </div>
-              {/* Naklejka sieci - zbedna na telefonie (jest juz przelacznik w naglowku). */}
-              <span className="hidden shrink-0 sm:block">
-                <NetworkTag />
-              </span>
-            </div>
-
-            <section className="mt-4 overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market table">
-              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
-                {/* Podtytul to gadka opisowa - na telefonie tylko zabiera miejsce,
-                    wiec chowamy go (hidden sm:block). Na desktopie zostaje. */}
-                <div><h2 className="text-[16px] font-extrabold text-[#16141b]">Startpad market</h2><p suppressHydrationWarning className="mt-1 hidden text-[11px] text-black/45 sm:block">{tokens.length === 0 && loadingBoard ? `reading live launches from ${NET}...` : `${visibleTokens.length} projects in this view · ${showingPreview ? 'sample rows while the first launch is indexed' : `live event data from ${NET}`}`}{scanTruncated ? ' · older launches exist beyond the indexed range' : ''}</p></div>
+        {/* Rynek na CALA szerokosc - Live tape zjechal na gorny ticker, wiec nie
+            ma juz prawej kolumny; grid tokenow wypelnia caly ekran. */}
+        <div className="min-w-0">
+            {/* Belka rynku: FILTRY zamiast tytulu/podtytulu - oszczedza pionowe
+                miejsce. Tytul "Startpad market" i opisowa gadka wylecialy; ich
+                miejsce zajmuja filtry, ktore i tak sa najwazniejsze. */}
+            <section className="overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                <div className="min-w-0">
+                  {/* Mobile: jeden przycisk-dropdown. */}
+                  <select value={tab} onChange={(event) => setTab(event.target.value as BoardTab)} aria-label="Sort launches" className="rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] outline-none sm:hidden">
+                    {([['new', 'New'], ['trending', 'Trending'], ['about', 'About to graduate'], ['graduated', 'Graduated'], ['all', 'All']] as const).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  {/* Desktop: chipy inline. */}
+                  <div className="hidden flex-wrap items-center gap-2 sm:flex" role="tablist" aria-label="Sort launches">
+                    {([['new', 'New'], ['trending', 'Trending'], ['about', 'About to graduate'], ['graduated', 'Graduated'], ['all', 'All']] as const).map(([value, label]) => (
+                      <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
                 <span className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={toggleAnimations} aria-pressed={animationsOn} className={`rounded-full border px-3 py-1.5 text-[11px] font-extrabold transition-colors ${animationsOn ? 'border-soft-primary/40 bg-soft-primary/10 text-soft-primary-deep' : 'border-black/10 bg-white text-black/45'}`}>
                     {animationsOn ? 'Animations on' : 'Animations off'}
@@ -2156,13 +2100,10 @@ export default function LaunchpadBoard() {
               )}
               <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Startpad events and current onchain state.'}</div>
             </section>
-          </div>
-
-          <LiveRail events={feedEvents} />
         </div>
 
-        {/* POD gridem, na CALA szerokosc - Live tape juz nie zweza tych sekcji.
-            King zaraz pod rynkiem (wyroznienie), potem panele 2x2, potem My tokens. */}
+        {/* Pod rynkiem, na CALA szerokosc: King (wyroznienie), potem panele 2x2,
+            potem My tokens. */}
         {kingToken && (
           <KingOfTheHill
             token={kingToken}
