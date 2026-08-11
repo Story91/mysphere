@@ -194,12 +194,15 @@ Kolejnosc od najtanszych do najdrozszych; wszystko na Base Sepolia, przez UI
    jest nieodwracalny.
 2. **Weryfikacja kontraktow na Basescanie** (`npx hardhat verify`). Vault i hook
    powstaly wewnetrznie, wiec weryfikuje sie je osobno.
-3. **`FEE_RECIPIENT` na mainnet: ZDECYDOWANE 2026-08-10** -
-   `0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83` (osobny portfel przychodow).
-   Adres jest `immutable`, wiec wchodzi w zycie DOPIERO przy wdrozeniu
-   mainnetowym: `FEE_RECIPIENT=0x83C6... npm run launchpad:deploy:base`.
-   Sepolia zostaje na adresie deployera - testnetowe oplaty nie maja wartosci,
-   a kolejny redeploy uniewaznilby swieze adresy w env/docs/UI.
+3. **`FEE_RECIPIENT` na mainnet: ZDECYDOWANE 2026-08-11** - **Safe (Gnosis)**
+   `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`, podpisywany przez wlasciciela
+   `0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83` (1/1). DLACZEGO SAFE, NIE EOA:
+   adres jest `immutable`, ale Safe pozwala POZNIEJ dodac wlascicieli / przejsc
+   na 2/3 BEZ zmiany odbiorcy (adres Safe zostaje) - EOA tak sie nie da. Odbior
+   sprawdzony na forku Base: Safe przyjmuje `claimFor -> _sendEth` (ETH), a
+   tokeny (ERC20 `transfer`) wchodza zawsze. Wchodzi w zycie DOPIERO przy deployu
+   mainnetowym. Sepolia zostaje na adresie deployera - testnetowe oplaty nie maja
+   wartosci, a kolejny redeploy uniewaznilby swieze adresy w env/docs/UI.
 4. **Pelna sciezka on-chain na wdrozeniu 70/30** - patrz plan testow pkt 5.
 
 **Funkcje, ktorych nie mamy, a ma je konkurencja:**
@@ -245,7 +248,9 @@ Stan listy "Przed mainnetem":
   wewnetrzna (Faza 4: 0 confirmed) - PODNIESIONE RYZYKO, nazwane wprost;
 - pelna sciezka on-chain: pokryta forkiem Base mainnet (bramka P1 audytu dla
   slotu PoolManagera zamknieta na realnym bajtkodzie);
-- FEE_RECIPIENT mainnet: `0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83`;
+- FEE_RECIPIENT mainnet: **Safe** `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`
+  (wlasciciel/podpis `0x83C6...1E83`, 1/1 - mozna pozniej na 2/3 BEZ zmiany
+  odbiorcy; odbior sprawdzony na forku Base przez `safeRecipientProbe.ts`);
 - weryfikacja na Basescanie: po deployu (nizej).
 
 ### Deploy (odpalasz TY, z zasilonym kluczem)
@@ -253,7 +258,7 @@ Stan listy "Przed mainnetem":
 ```powershell
 # domyslne: PROTOCOL_SHARE_BPS=3000, FEE_BPS=100, CREATOR_FEE_BPS=70,
 # FACTORY_KIND=b20 (auto na Base), POOL_MANAGER=0x498581fF... (auto)
-$env:FEE_RECIPIENT="0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83"; $env:CONFIRM="tak"; npm run launchpad:deploy:base
+$env:FEE_RECIPIENT="0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F"; $env:CONFIRM="tak"; npm run launchpad:deploy:base
 ```
 
 Przed odpaleniem:
