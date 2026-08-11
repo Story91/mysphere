@@ -321,11 +321,30 @@ NEXT_PUBLIC_B20_TOKEN_FACTORY_BASE_ADDRESS  <tokenFactory z JSON>
 NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK     <deployBlock z JSON>
 ```
 
-Nazwy MUSZA byc dokladnie te - `app/startpad/config.ts` czyta je 1:1
-(`baseMainnetEntry`). Wpis sieci Base mainnet w przelaczniku pojawia sie DOPIERO,
-gdy `NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS` jest ustawione; wtedy Base mainnet staje
-sie tez sieca DOMYSLNA. Dopoki env pusty - front pokazuje tylko Sepolie/Robinhood,
-zadnej martwej sieci.
+Te piec zmiennych jest OPCJONALNE od wdrozenia 2026-08-11: `config.ts` ma realne
+adresy Base mainnet jako fallback (`baseMainnetEntry`), wiec siec dziala i jest
+DOMYSLNA bez env. Env tylko nadpisuje (gdyby kiedys byl redeploy). Nazwy musza
+byc dokladnie te, gdy juz sie je ustawia.
+
+### Produkcyjny RPC Base - WAZNE (CDP)
+
+Board odpala do 90 okien `getLogs` na load. Publiczny `mainnet.base.org` tnie
+getLogs na 2000 blokach i rate-limituje (429/-32016); `publicnode` w ogole
+BLOKUJE getLogs bez wlasnego tokenu. Rozwiazanie: **CDP Node RPC** (masz platne
+CDP - te same `CDP_API_KEY_ID/SECRET` co onramp). Zmierzone na zywo: CDP obsluguje
+getLogs do ~50k blokow i przyjmuje ksztalt zapytania boardu (tablica adresow +
+topics).
+
+```text
+NEXT_PUBLIC_CDP_RPC_URL=https://api.developer.coinbase.com/rpc/v1/base/<TWOJ_CLIENT_API_KEY>
+```
+
+`<TWOJ_CLIENT_API_KEY>` to "Client API Key" z portalu CDP (sekcja Node/RPC) - NIE
+`CDP_API_KEY_ID`. Ten sam env wlacza tez `app/base/utils/cdpApi.ts` (statystyki
+portfela, dzis wylaczone). `providers.tsx` czyta `NEXT_PUBLIC_BASE_RPC_URL ||
+NEXT_PUBLIC_CDP_RPC_URL || mainnet.base.org`, z base.org jako fallbackiem.
+NIE uzywaj publicznego tokenu z SDK do boardu - to token wspoldzielony (bundler
+tipow), obciazanie go 90 oknami na load moze go zrate-limitowac dla wszystkich.
 
 ## Zmienne na Vercelu
 
