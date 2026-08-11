@@ -1291,7 +1291,18 @@ export default function LaunchpadBoard() {
           .slice(0, 5)
       );
       live.sort((a, b) => b.raised - a.raised);
-      setTokens(live);
+      // Swiezy skan NIE zna logo (logo zyje w Blobie, dochodzi ponizej async).
+      // Bez przeniesienia logo ze STANU POPRZEDNIEGO (migawka/poprzedni skan)
+      // logo migalyby: sa -> setTokens(live) je gubi -> fetchLogos wraca.
+      // Przenosimy je po adresie, zeby nigdy nie znikaly.
+      setTokens((current) => {
+        const logoByAddr = new Map<string, string | undefined>();
+        for (const token of current) if (token.address) logoByAddr.set(token.address.toLowerCase(), token.logoUrl);
+        return live.map((token) => {
+          const logo = token.address ? logoByAddr.get(token.address.toLowerCase()) : undefined;
+          return logo && !token.logoUrl ? { ...token, logoUrl: logo } : token;
+        });
+      });
       setSelectedId((current) => (live.some((token) => token.id === current) ? current : live[0].id));
 
       // Liczba POSIADACZY z Blockscouta - miekki dodatek scalany po fakcie.
