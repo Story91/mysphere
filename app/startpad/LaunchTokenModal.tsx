@@ -984,6 +984,10 @@ export default function LaunchTokenModal({
       if (!log) throw new Error('Launch confirmed, but its event was not readable yet.');
       const decoded = decodeEventLog({ abi: launchpadAbi, eventName: 'Launched', data: log.data, topics: log.topics });
       const tokenAddress = decoded.args.token as `0x${string}`;
+      // Logo mamy juz lokalnie (upload -> data-URL, albo URL). Podajemy je OD
+      // RAZU nowemu wierszowi, zeby token nie pojawil sie bez obrazka - Blob
+      // dociagnie sie dopiero po wygasnieciu 60 s cache'a listy logo.
+      const profileLogoUrl = logoDataUrl ?? (urlStatus === 'valid' ? launchImage.trim() : null);
       const newToken: LaunchpadToken = {
         id: tokenAddress,
         address: tokenAddress,
@@ -999,14 +1003,14 @@ export default function LaunchTokenModal({
         age: 'just now',
         accent: accentFor(tokenAddress),
         live: true,
+        logoUrl: resolveMediaUrl(profileLogoUrl) ?? undefined,
       };
       // Board dostaje wiersz OD RAZU po potwierdzeniu - nawet gdy tworca
       // zamknie modal, nie czekajac na ekran sukcesu.
       onLaunched(newToken);
-      // Logo i opis ida do profilu Firestore OSOBNYM zadaniem - start juz sie
+      // Logo i opis ida do Bloba/Firestore OSOBNYM zadaniem - start juz sie
       // udal i zaden blad zapisu nie ma prawa go cofnac ani przykryc ekranu
       // sukcesu. Brak sesji SIWE (401/403) to normalny przypadek, nie awaria.
-      const profileLogoUrl = logoDataUrl ?? (urlStatus === 'valid' ? launchImage.trim() : null);
       if (profileLogoUrl !== null || launchDescription.trim() !== '') {
         void fetch('/api/launchpad/token', {
           method: 'POST',
