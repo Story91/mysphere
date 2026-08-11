@@ -942,10 +942,12 @@ function TradePanel({
  * odrzucic szerszy zakres, wiec skanujemy WSTECZ oknami, a nie jednym strzalem
  * od bloku wdrozenia.
  */
-const LOG_WINDOW = 1_900n;
-
-/** Sufit na liczbe okien - zeby swiezo zaladowana strona nie robila setek requestow. */
-const MAX_LOG_WINDOWS = 64;
+// Rozmiar okna i sufit okien sa PER-SIEC: Base Sepolia tnie getLogs na 2000
+// blokach (male okno, wiele okien), Robinhood przyjmuje 200k na strzal (duze
+// okno, kilka okien - inaczej skan nie siegal bloku wdrozenia i tablica
+// pokazywala mocki). Patrz LAUNCHPAD_NETWORKS w config.ts.
+const LOG_WINDOW = ACTIVE_LAUNCHPAD_NETWORK.scanWindow;
+const MAX_LOG_WINDOWS = ACTIVE_LAUNCHPAD_NETWORK.maxScanWindows;
 
 const LAUNCHED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Launched' });
 const BOUGHT_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Bought' });

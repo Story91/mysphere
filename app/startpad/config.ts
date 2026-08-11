@@ -30,6 +30,15 @@ export type LaunchpadNetwork = {
   tokenFactory: `0x${string}`;
   deployBlock: bigint;
   explorerUrl: string;
+  /**
+   * Ile blokow bierze jeden `getLogs` przy odtwarzaniu rynku, i ile takich okien
+   * najwyzej. Publiczny RPC Base Sepolii tnie zapytanie na 2000 blokach, wiec tam
+   * male okno; Robinhood (Arbitrum Orbit, sub-sekundowe bloki) przyjmuje 200k
+   * blokow w jednym strzale - a bez duzego okna 64x1900 NIE SIEGA bloku
+   * wdrozenia (siec robi ~100k blokow dziennie) i tablica pokazuje same mocki.
+   */
+  scanWindow: bigint;
+  maxScanWindows: number;
   /** Sciezka logo sieci w /public; brak = bez logo. */
   logo?: string;
   /** Tailwind pastylki z nazwa sieci - w barwach marki danego lancucha. */
@@ -58,6 +67,8 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'),
     explorerUrl: 'https://sepolia.basescan.org',
+    scanWindow: 1_900n, // publiczny RPC Base Sepolii tnie getLogs na 2000 blokach
+    maxScanWindows: 64,
     pillClass: 'border-black/10 bg-white text-black/50',
     accentTextClass: 'text-soft-primary-deep',
   },
@@ -80,6 +91,11 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       '0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ROBINHOOD_DEPLOY_BLOCK ?? '33102326'),
     explorerUrl: 'https://robinhoodchain.blockscout.com',
+    // Zmierzone: RPC Robinhooda oddaje 200k blokow w jednym getLogs w ~160ms.
+    // Duze okno = 2-3 zapytania siegaja bloku wdrozenia zamiast 100 okien po 1900
+    // (ktore nawet nie docieraly do startu i pokazywaly mocki).
+    scanWindow: 100_000n,
+    maxScanWindows: 15,
     // Barwy marki Robinhooda: jaskrawa zielen #00C805 na czerni - te same,
     // ktorych uzywa sciezka postowania w basechat (RobinhoodPostingConfig).
     logo: '/robin.webp',
