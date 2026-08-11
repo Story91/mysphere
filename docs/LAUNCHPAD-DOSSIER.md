@@ -142,6 +142,14 @@ token.
 
 Current addresses and deploy block: `docs/LAUNCHPAD-STAN.md`.
 
+**Deployed to Base mainnet (chainId 8453) on 2026-08-11** — the mainnet-candidate
+build (audit fixes + vanity). `CurveLaunchpad` `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D`,
+`LiquidityVault` `0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63`, `B20LaunchHook`
+`0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044`, `B20TokenFactory`
+`0xEC7db55Bc081289820097703B3A66003092844D1`. FEE_RECIPIENT = Safe
+`0x83E2…4142F`. All 15 wiring checks passed at deploy; the frontend defaults to
+Base mainnet and the vanity UI is now live (feature-detected).
+
 ## 7. Internal audit (2026-08-11) — backlog for the next deployment
 
 > Adversarial 4-lens review (curve math · v4/hook · economics & MEV ·
@@ -203,6 +211,19 @@ dev-buy still first.
   address. Mitigation is DOCS + UX: the `launchVanity` docstring now names the
   tradeoff, and the **vanity launch UI must warn and default to a tight
   `windowCap`** (a multi-address sniper defeats a loose one).
+  - **Built (Faza 5, 2026-08-11):** the vanity UI now ships in
+    `app/startpad/LaunchTokenModal.tsx` (Creator setup mode). It mines the
+    address OFFLINE via `app/utils/b20/launchpadVanity.ts`, which composes the
+    verified B20 primitives (`_vanityLaunchId` → `_effectiveSalt` →
+    `predictB20Address`). The derivation was checked bit-for-bit against the live
+    Base-Sepolia `B20TokenFactory.predictTokenFor` by
+    `scripts/launchpad/b20AddressProbe.ts` (preimage = `abi.encode(sender,salt)`,
+    first 9 bytes) and end-to-end by `scripts/launchpad/vanityCompositionProbe.ts`.
+    The section is shown ONLY on B20 networks (never Robinhood) and ONLY when the
+    deployed launchpad answers `predictVanityToken` — so it stays hidden on the
+    current live Sepolia deploy and lights up automatically once the
+    mainnet-candidate (with `launchVanity`) is deployed. Per the owner's product
+    call it WARNS + offers a one-click tight cap (4M) but does NOT force it.
 - **Refuted:** buyback clamp reverting at the v4 price floor (unreachable,
   fail-safe), tighter-150bps partial fills (intended/documented, keeper-runbook
   note only), `pendingBuybackEth` "stranding" (funds preserved by rollback,

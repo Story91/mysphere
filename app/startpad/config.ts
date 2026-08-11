@@ -1,4 +1,4 @@
-import { baseSepolia } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 import type { Chain } from 'viem';
 import { robinhoodChain } from '../basechat/Robinhood/config/RobinhoodNetworkConfig';
 
@@ -47,7 +47,45 @@ export type LaunchpadNetwork = {
   accentTextClass: string;
 };
 
+/**
+ * Base MAINNET - wdrozenie z 2026-08-11 (docs/LAUNCHPAD-STAN.md). Fallbacki to
+ * REALNE adresy, wiec siec dziala na Vercelu nawet bez zmiennych srodowiskowych;
+ * env je tylko nadpisuje. Adresy sa `immutable`, wiec redeployu nie bedzie -
+ * jak przy Sepolii i Robinhoodzie fallback ma nadazac za wdrozeniem.
+ * FEE_RECIPIENT = Safe 0x83E2...4142F (wpiety w kontrakt na stale).
+ */
+const baseMainnetEntry: LaunchpadNetwork = {
+  chain: base,
+  label: 'Base',
+  testnet: false,
+  tokenStandard: 'b20',
+  launchpad:
+    (process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS as `0x${string}` | undefined) ??
+    '0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D',
+  vault:
+    (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_BASE_ADDRESS as `0x${string}` | undefined) ??
+    '0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63',
+  hook:
+    (process.env.NEXT_PUBLIC_LAUNCH_HOOK_BASE_ADDRESS as `0x${string}` | undefined) ??
+    '0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044',
+  tokenFactory:
+    (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_BASE_ADDRESS as `0x${string}` | undefined) ??
+    '0xEC7db55Bc081289820097703B3A66003092844D1',
+  deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK ?? '49843030'),
+  explorerUrl: 'https://basescan.org',
+  // Publiczny RPC Base mainnet tnie getLogs tak samo jak Sepolia (2000 blokow).
+  // Wieksze maxScanWindows niz na Sepolii, bo mainnet robi ~43k blokow dziennie -
+  // swiezy launchpad i tak ma plytka historie od deployBlock.
+  scanWindow: 1_900n,
+  maxScanWindows: 90,
+  // Barwy marki Base: #0052FF na bieli.
+  logo: '/logotypy/Base_square_blue.png',
+  pillClass: 'border-[#0052FF]/30 bg-white text-[#0052FF]',
+  accentTextClass: 'text-[#0052FF]',
+};
+
 export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
+  [base.id]: baseMainnetEntry,
   [baseSepolia.id]: {
     chain: baseSepolia,
     label: 'Base Sepolia',
@@ -104,7 +142,13 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
   },
 };
 
-export const DEFAULT_LAUNCHPAD_CHAIN_ID = baseSepolia.id;
+// Po wdrozeniu mainnetu (env ustawione) domyslna sieca staje sie Base mainnet;
+// do tego czasu - Base Sepolia. Dzieki temu SSR i swiezy gosc trafiaja od razu
+// na wlasciwa siec bez recznej zmiany kodu.
+// Base mainnet jest domyslna sieca od wdrozenia 2026-08-11 - swiezy gosc i SSR
+// trafiaja od razu na produkcyjny launchpad. Sepolie/Robinhood zostaja w
+// przelaczniku.
+export const DEFAULT_LAUNCHPAD_CHAIN_ID = base.id;
 const STORAGE_KEY = 'startpad.chainId';
 
 function resolveActiveNetwork(): LaunchpadNetwork {
@@ -135,6 +179,12 @@ export const LAUNCHPAD_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.launchpad;
 export const LIQUIDITY_VAULT_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.vault;
 export const LAUNCH_HOOK_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.hook;
 export const B20_TOKEN_FACTORY_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.tokenFactory;
+/**
+ * 'b20' = token robi precompile Base (adres vanity da sie wykopac); 'plain' =
+ * nasz ERC-20 (bez B20, wiec bez vanity). Modal startu pokazuje sekcje vanity
+ * WYLACZNIE na 'b20' - czyli Base, nigdy Robinhood.
+ */
+export const LAUNCHPAD_TOKEN_STANDARD = ACTIVE_LAUNCHPAD_NETWORK.tokenStandard;
 // Precompile B20 wbudowany w siec Base - ten sam adres na mainnecie i Sepolii.
 // To NIE jest nasz kontrakt, wiec nie ma zmiennej srodowiskowej. Na sieciach
 // bez B20 (tokenStandard 'plain') nie ma go wcale.
@@ -180,6 +230,47 @@ export const launchpadAbi = [
       { name: 'token', type: 'address' },
       { name: 'launchId', type: 'bytes32' },
     ],
+  },
+  {
+    // Start z adresem VANITY. Salt wybiera tworca, adres jest PRZEWIDYWALNY -
+    // interfejs kopie go offline (utils/b20/launchpadVanity) i wola te funkcje z
+    // gotowym `vanitySalt`. Jak launchAdvanced, tylko z saltem na przodzie.
+    // UWAGA: starsze wdrozenie moze jej NIE miec - wykrywamy odczytem
+    // `predictVanityToken`, patrz `vanitySupported` w LaunchTokenModal.
+    type: 'function',
+    name: 'launchVanity',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'vanitySalt', type: 'bytes32' },
+      { name: 'name_', type: 'string' },
+      { name: 'symbol_', type: 'string' },
+      { name: 'minTokensOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'feeBps_', type: 'uint16' },
+      { name: 'creatorFeeBps_', type: 'uint16' },
+      { name: 'buybackBps_', type: 'uint16' },
+      { name: 'windowCap_', type: 'uint256' },
+      { name: 'receiverAccounts_', type: 'address[]' },
+      { name: 'receiverSharesBps_', type: 'uint16[]' },
+      { name: 'metadataURI_', type: 'string' },
+    ],
+    outputs: [
+      { name: 'token', type: 'address' },
+      { name: 'launchId', type: 'bytes32' },
+    ],
+  },
+  {
+    // Adres, jaki dostanie `creator` dla tego `vanitySalt`. Interfejs liczy to
+    // SAM offline; ten odczyt sluzy tylko do (a) wykrycia, czy wdrozenie zna
+    // vanity, i (b) ostatecznego sprawdzenia mined-adresu przed transakcja.
+    type: 'function',
+    name: 'predictVanityToken',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'creator', type: 'address' },
+      { name: 'vanitySalt', type: 'bytes32' },
+    ],
+    outputs: [{ name: '', type: 'address' }],
   },
   {
     // KOLEJNOSC ZWROTEK MUSI ZGADZAC SIE Z CurveLaunchpad.launchOf CO DO POLA.

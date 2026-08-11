@@ -16,6 +16,29 @@ Krotki obraz calosci. Szczegoly i uzasadnienia decyzji sa w
 | blok wdrozenia | `45304536` |
 | `FEE_RECIPIENT` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
 
+## Adresy - Base MAINNET (chainId 8453), wdrozenie 2026-08-11
+
+Produkcja. Wersja mainnet-candidate (fixy audytu + vanity). FEE_RECIPIENT = Safe.
+Adresy sa fallbackiem w `app/startpad/config.ts` (siec dziala bez env) i sieca
+DOMYSLNA startpada od tego wdrozenia.
+
+| kontrakt | adres |
+| --- | --- |
+| `CurveLaunchpad` | `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` |
+| `LiquidityVault` | `0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63` |
+| `B20LaunchHook` | `0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044` (salt `0x…0fd4`) |
+| `B20TokenFactory` | `0xEC7db55Bc081289820097703B3A66003092844D1` |
+| PoolManager v4 (Uniswap) | `0x498581fF718922c3f8e6A244956aF099B2652b2b` |
+| blok wdrozenia | `49843030` |
+| `FEE_RECIPIENT` | `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F` (Safe) |
+| deployer | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+
+Parametry: FEE_BPS=100, CREATOR_FEE_BPS=70, PROTOCOL_SHARE_BPS=3000. Wszystkie
+15 kontroli wiazan przeszlo przy deployu (w tym `hook.FEE_RECIPIENT() == Safe`).
+Verify Basescan: launchpad + vault + hook + fabryka, kazdy wlasnymi argumentami
+konstruktora (vault: poolManager, Safe, 3000, hookSalt; hook: poolManager, Safe,
+3000; launchpad: poolManager, 100, 70, Safe, 3000, fabryka, hookSalt).
+
 ## Adresy - Robinhood Chain (chainId 4663, MAINNET), wdrozenie 2026-08-10
 
 Te same zrodla i parametry co Sepolia v3 (1% / 70/30 / buyback z dzialki
@@ -194,12 +217,15 @@ Kolejnosc od najtanszych do najdrozszych; wszystko na Base Sepolia, przez UI
    jest nieodwracalny.
 2. **Weryfikacja kontraktow na Basescanie** (`npx hardhat verify`). Vault i hook
    powstaly wewnetrznie, wiec weryfikuje sie je osobno.
-3. **`FEE_RECIPIENT` na mainnet: ZDECYDOWANE 2026-08-10** -
-   `0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83` (osobny portfel przychodow).
-   Adres jest `immutable`, wiec wchodzi w zycie DOPIERO przy wdrozeniu
-   mainnetowym: `FEE_RECIPIENT=0x83C6... npm run launchpad:deploy:base`.
-   Sepolia zostaje na adresie deployera - testnetowe oplaty nie maja wartosci,
-   a kolejny redeploy uniewaznilby swieze adresy w env/docs/UI.
+3. **`FEE_RECIPIENT` na mainnet: ZDECYDOWANE 2026-08-11** - **Safe (Gnosis)**
+   `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`, podpisywany przez wlasciciela
+   `0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83` (1/1). DLACZEGO SAFE, NIE EOA:
+   adres jest `immutable`, ale Safe pozwala POZNIEJ dodac wlascicieli / przejsc
+   na 2/3 BEZ zmiany odbiorcy (adres Safe zostaje) - EOA tak sie nie da. Odbior
+   sprawdzony na forku Base: Safe przyjmuje `claimFor -> _sendEth` (ETH), a
+   tokeny (ERC20 `transfer`) wchodza zawsze. Wchodzi w zycie DOPIERO przy deployu
+   mainnetowym. Sepolia zostaje na adresie deployera - testnetowe oplaty nie maja
+   wartosci, a kolejny redeploy uniewaznilby swieze adresy w env/docs/UI.
 4. **Pelna sciezka on-chain na wdrozeniu 70/30** - patrz plan testow pkt 5.
 
 **Funkcje, ktorych nie mamy, a ma je konkurencja:**
@@ -231,6 +257,75 @@ Kolejnosc od najtanszych do najdrozszych; wszystko na Base Sepolia, przez UI
     holderow) - skan eventow z przegladarki przestanie wystarczac, gdy lancuch
     odjedzie od bloku wdrozenia o ~120k blokow (board mowi wtedy "older
     launches exist beyond the indexed range").
+
+## Base mainnet - runbook wdrozenia (Faza 5, 2026-08-11)
+
+Kod idacy na mainnet to WERSJA MAINNET-CANDIDATE (fixy audytu + opcjonalne
+vanity), potwierdzona: 125 testow (jednostkowe + inwarianty + vanity) oraz
+`launchpad:fork:base` na PRAWDZIWYM PoolManagerze Base mainnet (pelna sciezka az
+do graduacji + oba znaki delty afterSwap). Szczegoly: `docs/LAUNCHPAD-DOSSIER.md`
+sekcje "Mainnet-candidate build" i "Faza 4 review".
+
+Stan listy "Przed mainnetem":
+- audyt zewnetrzny: ODLOZONY (decyzja wlasciciela), zastapiony twardsza runda
+  wewnetrzna (Faza 4: 0 confirmed) - PODNIESIONE RYZYKO, nazwane wprost;
+- pelna sciezka on-chain: pokryta forkiem Base mainnet (bramka P1 audytu dla
+  slotu PoolManagera zamknieta na realnym bajtkodzie);
+- FEE_RECIPIENT mainnet: **Safe** `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`
+  (wlasciciel/podpis `0x83C6...1E83`, 1/1 - mozna pozniej na 2/3 BEZ zmiany
+  odbiorcy; odbior POTWIERDZONY na forku Base: `safeRecipientProbe.ts` (surowy
+  call), a zlotym testem `test/CurveLaunchpadSafeRecipient.test.ts` przez REALNE
+  entrypointy - claimFor(Safe) wyplaca ETH, Safe przyjmuje token ERC20);
+- weryfikacja na Basescanie: po deployu (nizej).
+
+### Deploy (odpalasz TY, z zasilonym kluczem)
+
+```powershell
+# domyslne: PROTOCOL_SHARE_BPS=3000, FEE_BPS=100, CREATOR_FEE_BPS=70,
+# FACTORY_KIND=b20 (auto na Base), POOL_MANAGER=0x498581fF... (auto)
+$env:FEE_RECIPIENT="0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F"; $env:CONFIRM="tak"; npm run launchpad:deploy:base
+```
+
+Przed odpaleniem:
+- portfel deployera zasilony na gaz (~8 mln gazu lacznie: fabryka ~760k +
+  launchpad ~7.35M; na Base to grosze-dolar) i wpiety jako signer sieci `base`
+  (klucz w env wg hardhat.config);
+- `deploy.ts` robi WSZYSTKO w jednym przebiegu: fabryka -> kopanie salta hooka
+  (offline) -> launchpad (tworzy vault+hook w jednej tx) -> 15 kontroli wiazan
+  -> zapis `scripts/output/launchpad-base.json`. Salt jest wazny tylko dla tej
+  trojki (deployer, nonce, argumenty hooka), wiec NIE wysylaj nic innego z tego
+  adresu w trakcie. Gdy ktorakolwiek z 15 kontroli odpadnie, skrypt krzyczy i
+  NIE zapisuje adresow - takiego wdrozenia sie nie uzywa.
+
+### Po deployie
+
+1. **Weryfikacja na Basescanie** (`ETHERSCAN_API_KEY` w env):
+   `npx hardhat verify --network base <launchpad> <konstruktor...>`. Vault i hook
+   powstaly wewnetrznie - weryfikuje sie je OSOBNO, ich wlasnymi argumentami
+   konstruktora (skrypt wypisuje je przy deployu).
+2. **Frontend**: dodaj siec Base MAINNET (B20) do `LAUNCHPAD_NETWORKS`
+   w `app/startpad/config.ts` + przelacznik; zmienne `NEXT_PUBLIC_*` nizej.
+3. **Vanity**: ABI frontu jest RECZNE i nie ma jeszcze `launchVanity`/
+   `predictVanityToken` - UI kopania 4 znakow to osobny front task (z Fazy 4:
+   ostrzezenie snajperskie + ciasny domyslny windowCap dla vanity).
+4. **Wykres/handel po graduacji**: dopiero na mainnecie da sie wpiac embed
+   GeckoTerminal/DEX Screener (indeksuja v4 na Base MAINNET; testnetu nie).
+
+### Zmienne Vercel po deployie (Base mainnet)
+
+```text
+NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS          <launchpad z JSON>
+NEXT_PUBLIC_LIQUIDITY_VAULT_BASE_ADDRESS    <vault z JSON>
+NEXT_PUBLIC_LAUNCH_HOOK_BASE_ADDRESS        <hook z JSON>
+NEXT_PUBLIC_B20_TOKEN_FACTORY_BASE_ADDRESS  <tokenFactory z JSON>
+NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK     <deployBlock z JSON>
+```
+
+Nazwy MUSZA byc dokladnie te - `app/startpad/config.ts` czyta je 1:1
+(`baseMainnetEntry`). Wpis sieci Base mainnet w przelaczniku pojawia sie DOPIERO,
+gdy `NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS` jest ustawione; wtedy Base mainnet staje
+sie tez sieca DOMYSLNA. Dopoki env pusty - front pokazuje tylko Sepolie/Robinhood,
+zadnej martwej sieci.
 
 ## Zmienne na Vercelu
 
