@@ -28,6 +28,7 @@ import {
   liquidityVaultAbi,
 } from '../config';
 import { parseMetadataUri, pickTokenImage } from '../metadata';
+import { fetchLogos } from '../logos';
 import { fetchTokenCounters, type TokenCounters } from '../blockscout';
 import { useEthUsd } from '../useEthUsd';
 import DetailTabs from './DetailTabs';
@@ -247,19 +248,26 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     };
   }, [readClient, tokenAddress, notFound, applyLive, loadCore]);
 
-  // Profil: logo, opis, linki. Lancuch ich nie zna - patrz metadata.ts.
+  // Profil (opis, linki) z API + LOGO z Bloba (dokladnie jak tablica). Firestore
+  // trzyma logoUrl: null, wiec bez dociagniecia z Bloba detal nie mial logo w
+  // ogole - a na Robinhoodzie doszlo do tego, ze upload w ogole tam nie trafial
+  // (route bral zla siec). Czytamy logo z /api/startpad/logos dla AKTYWNEJ sieci.
   useEffect(() => {
     if (!tokenAddress || notFound) return;
     let cancelled = false;
+    const key = tokenAddress.toLowerCase();
     void (async () => {
-      try {
-        const response = await fetch(`/api/launchpad/token?addresses=${tokenAddress}`);
-        if (!response.ok) return;
-        const payload = (await response.json()) as { profiles?: Record<string, TokenProfileView> };
-        const found = payload.profiles?.[tokenAddress.toLowerCase()];
-        if (!cancelled && found) setProfile(found);
-      } catch {
-        // Brak profilu nie jest bledem - wiekszosc tokenow go nie ma.
+      const [payload, logos] = await Promise.all([
+        fetch(`/api/launchpad/token?addresses=${tokenAddress}`)
+          .then((r) => (r.ok ? (r.json() as Promise<{ profiles?: Record<string, TokenProfileView> }>) : null))
+          .catch(() => null),
+        fetchLogos(LAUNCHPAD_CHAIN.id).catch(() => ({} as Record<string, string>)),
+      ]);
+      if (cancelled) return;
+      const found = payload?.profiles?.[key];
+      const blobLogo = logos[key];
+      if (found || blobLogo) {
+        setProfile({ ...(found ?? {}), logoUrl: blobLogo ?? found?.logoUrl ?? null } as TokenProfileView);
       }
     })();
     return () => {
