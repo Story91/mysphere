@@ -48,38 +48,44 @@ export type LaunchpadNetwork = {
 };
 
 /**
- * Base MAINNET - wchodzi do przelacznika DOPIERO, gdy istnieje realny adres
- * launchpada (`NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS`), czyli po wdrozeniu
- * mainnetowym (Faza 5/6). Bez tego wpis jest `null` i sieci nie ma w UI - nie
- * pokazujemy martwej sieci, ktora odpytywalaby nieistniejacy kontrakt i rysowala
- * mocki. Po deployu ustaw na Vercelu CALA CZWORKE adresow + blok wdrozenia z
- * `launchpad-base.json`; adres jest `immutable`, wiec redeployu nie bedzie.
+ * Base MAINNET - wdrozenie z 2026-08-11 (docs/LAUNCHPAD-STAN.md). Fallbacki to
+ * REALNE adresy, wiec siec dziala na Vercelu nawet bez zmiennych srodowiskowych;
+ * env je tylko nadpisuje. Adresy sa `immutable`, wiec redeployu nie bedzie -
+ * jak przy Sepolii i Robinhoodzie fallback ma nadazac za wdrozeniem.
+ * FEE_RECIPIENT = Safe 0x83E2...4142F (wpiety w kontrakt na stale).
  */
-const baseMainnetEntry: LaunchpadNetwork | null = process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS
-  ? {
-      chain: base,
-      label: 'Base',
-      testnet: false,
-      tokenStandard: 'b20',
-      launchpad: process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS as `0x${string}`,
-      vault: process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_BASE_ADDRESS as `0x${string}`,
-      hook: process.env.NEXT_PUBLIC_LAUNCH_HOOK_BASE_ADDRESS as `0x${string}`,
-      tokenFactory: process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_BASE_ADDRESS as `0x${string}`,
-      deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK ?? '0'),
-      explorerUrl: 'https://basescan.org',
-      // Publiczny RPC Base mainnet tnie getLogs tak samo jak Sepolia (2000
-      // blokow). Wieksze maxScanWindows niz na Sepolii, bo mainnet robi ~43k
-      // blokow dziennie - swiezy launchpad i tak ma plytka historie od deployBlock.
-      scanWindow: 1_900n,
-      maxScanWindows: 90,
-      // Barwy marki Base: #0052FF na bieli.
-      logo: '/logotypy/Base_square_blue.png',
-      pillClass: 'border-[#0052FF]/30 bg-white text-[#0052FF]',
-      accentTextClass: 'text-[#0052FF]',
-    }
-  : null;
+const baseMainnetEntry: LaunchpadNetwork = {
+  chain: base,
+  label: 'Base',
+  testnet: false,
+  tokenStandard: 'b20',
+  launchpad:
+    (process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS as `0x${string}` | undefined) ??
+    '0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D',
+  vault:
+    (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_BASE_ADDRESS as `0x${string}` | undefined) ??
+    '0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63',
+  hook:
+    (process.env.NEXT_PUBLIC_LAUNCH_HOOK_BASE_ADDRESS as `0x${string}` | undefined) ??
+    '0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044',
+  tokenFactory:
+    (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_BASE_ADDRESS as `0x${string}` | undefined) ??
+    '0xEC7db55Bc081289820097703B3A66003092844D1',
+  deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK ?? '49843030'),
+  explorerUrl: 'https://basescan.org',
+  // Publiczny RPC Base mainnet tnie getLogs tak samo jak Sepolia (2000 blokow).
+  // Wieksze maxScanWindows niz na Sepolii, bo mainnet robi ~43k blokow dziennie -
+  // swiezy launchpad i tak ma plytka historie od deployBlock.
+  scanWindow: 1_900n,
+  maxScanWindows: 90,
+  // Barwy marki Base: #0052FF na bieli.
+  logo: '/logotypy/Base_square_blue.png',
+  pillClass: 'border-[#0052FF]/30 bg-white text-[#0052FF]',
+  accentTextClass: 'text-[#0052FF]',
+};
 
 export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
+  [base.id]: baseMainnetEntry,
   [baseSepolia.id]: {
     chain: baseSepolia,
     label: 'Base Sepolia',
@@ -139,17 +145,10 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
 // Po wdrozeniu mainnetu (env ustawione) domyslna sieca staje sie Base mainnet;
 // do tego czasu - Base Sepolia. Dzieki temu SSR i swiezy gosc trafiaja od razu
 // na wlasciwa siec bez recznej zmiany kodu.
-// Base mainnet dopisujemy PO deklaracji (klucze liczbowe i tak iteruja sie
-// rosnaco wg id, wiec kolejnosc nie zalezy od miejsca wpisu). Bez env - null,
-// wiec wpisu nie ma.
-if (baseMainnetEntry) {
-  LAUNCHPAD_NETWORKS[base.id] = baseMainnetEntry;
-}
-
-// Po wdrozeniu mainnetu (env ustawione) domyslna sieca staje sie Base mainnet;
-// do tego czasu - Base Sepolia. Dzieki temu SSR i swiezy gosc trafiaja od razu
-// na wlasciwa siec bez recznej zmiany kodu.
-export const DEFAULT_LAUNCHPAD_CHAIN_ID = baseMainnetEntry ? base.id : baseSepolia.id;
+// Base mainnet jest domyslna sieca od wdrozenia 2026-08-11 - swiezy gosc i SSR
+// trafiaja od razu na produkcyjny launchpad. Sepolie/Robinhood zostaja w
+// przelaczniku.
+export const DEFAULT_LAUNCHPAD_CHAIN_ID = base.id;
 const STORAGE_KEY = 'startpad.chainId';
 
 function resolveActiveNetwork(): LaunchpadNetwork {

@@ -16,6 +16,29 @@ Krotki obraz calosci. Szczegoly i uzasadnienia decyzji sa w
 | blok wdrozenia | `45304536` |
 | `FEE_RECIPIENT` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
 
+## Adresy - Base MAINNET (chainId 8453), wdrozenie 2026-08-11
+
+Produkcja. Wersja mainnet-candidate (fixy audytu + vanity). FEE_RECIPIENT = Safe.
+Adresy sa fallbackiem w `app/startpad/config.ts` (siec dziala bez env) i sieca
+DOMYSLNA startpada od tego wdrozenia.
+
+| kontrakt | adres |
+| --- | --- |
+| `CurveLaunchpad` | `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` |
+| `LiquidityVault` | `0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63` |
+| `B20LaunchHook` | `0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044` (salt `0x…0fd4`) |
+| `B20TokenFactory` | `0xEC7db55Bc081289820097703B3A66003092844D1` |
+| PoolManager v4 (Uniswap) | `0x498581fF718922c3f8e6A244956aF099B2652b2b` |
+| blok wdrozenia | `49843030` |
+| `FEE_RECIPIENT` | `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F` (Safe) |
+| deployer | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+
+Parametry: FEE_BPS=100, CREATOR_FEE_BPS=70, PROTOCOL_SHARE_BPS=3000. Wszystkie
+15 kontroli wiazan przeszlo przy deployu (w tym `hook.FEE_RECIPIENT() == Safe`).
+Verify Basescan: launchpad + vault + hook + fabryka, kazdy wlasnymi argumentami
+konstruktora (vault: poolManager, Safe, 3000, hookSalt; hook: poolManager, Safe,
+3000; launchpad: poolManager, 100, 70, Safe, 3000, fabryka, hookSalt).
+
 ## Adresy - Robinhood Chain (chainId 4663, MAINNET), wdrozenie 2026-08-10
 
 Te same zrodla i parametry co Sepolia v3 (1% / 70/30 / buyback z dzialki

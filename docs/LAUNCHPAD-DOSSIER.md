@@ -142,6 +142,14 @@ token.
 
 Current addresses and deploy block: `docs/LAUNCHPAD-STAN.md`.
 
+**Deployed to Base mainnet (chainId 8453) on 2026-08-11** — the mainnet-candidate
+build (audit fixes + vanity). `CurveLaunchpad` `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D`,
+`LiquidityVault` `0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63`, `B20LaunchHook`
+`0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044`, `B20TokenFactory`
+`0xEC7db55Bc081289820097703B3A66003092844D1`. FEE_RECIPIENT = Safe
+`0x83E2…4142F`. All 15 wiring checks passed at deploy; the frontend defaults to
+Base mainnet and the vanity UI is now live (feature-detected).
+
 ## 7. Internal audit (2026-08-11) — backlog for the next deployment
 
 > Adversarial 4-lens review (curve math · v4/hook · economics & MEV ·
