@@ -19,6 +19,7 @@ import {
   LIQUIDITY_VAULT_ADDRESS,
 } from '../config';
 import { resizeImageFile } from '../logoUpload';
+import useSiweAuth from '../../utils/auth/useSiweAuth';
 import { parseMetadataUri, pickTokenImage, resolveMediaUrl } from '../metadata';
 import {
   DEAD_ADDRESS,
@@ -427,6 +428,7 @@ function ProfileEditor({
   const [resizing, setResizing] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { isAuthenticated, signIn } = useSiweAuth();
 
   useEffect(() => {
     setLogoDraft(profile?.logoUrl ?? '');
@@ -458,18 +460,29 @@ function ProfileEditor({
     setBusy(true);
     setNotice(null);
     try {
+      // Zapis wymaga sesji SIWE (serwer sprawdza tworce z lancucha). Jak jej nie
+      // ma, NAJPIERW podpisujemy wiadomosc - to NIE transakcja i NIE kosztuje
+      // gazu, wiec dziala na kazdej sieci (tez Robinhood). Dopiero potem POST.
+      // Wczesniej edytor tylko pokazywal "Sign in first" bez zadnego sposobu, by
+      // to zrobic - stad "nie da sie zapisac logo".
+      if (!isAuthenticated) {
+        const ok = await signIn();
+        if (!ok) {
+          setNotice({ kind: 'error', text: 'Sign in with your wallet to save (just a signature, no gas). If the wallet did not prompt, click Save again.' });
+          return;
+        }
+      }
       const response = await fetch('/api/launchpad/token', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address: token, chainId: LAUNCHPAD_CHAIN.id, logoUrl: logoDraft, description: descriptionDraft, website: websiteDraft }),
       });
       const payload = (await response.json()) as { profile?: TokenProfileView; error?: string };
       if (!response.ok) {
-        // 401 to brak sesji SIWE - mowimy, jaki jest pierwszy krok, zamiast
-        // powtarzac ogolny komunikat serwera o edycji profilu.
         setNotice({
           kind: 'error',
-          text: response.status === 401 ? 'Sign in with your wallet first' : payload.error ?? 'Saving the profile failed.',
+          text: response.status === 401 ? 'Sign in with your wallet, then click Save again.' : payload.error ?? 'Saving the profile failed.',
         });
         return;
       }
