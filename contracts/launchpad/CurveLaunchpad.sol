@@ -840,6 +840,17 @@ contract CurveLaunchpad {
      * (swoim adresem) i dostaje INNY adres - nie zajmie cudzego. Ten sam salt
      * dwa razy z tego samego adresu rewertuje czysto (adres juz zajety), wiec
      * user po prostu wybiera inny salt.
+     *
+     * KOMPROMIS, KTORY TRZEBA NAZWAC (audyt Faza 4): przewidywalny adres znaczy,
+     * ze snajper widzi go W MEMPOOLU, ZANIM ta transakcja sie zaksieguje (salt
+     * i nadawca sa w calldacie, predictVanityToken jest czysty), i moze miec
+     * gotowe, podpisane `buy` na dokladnie ten adres na chwile po otwarciu
+     * krzywej. Domyslna sciezka (blockhash) tego nie ma. Nic nie ginie z
+     * kontraktu - dev-buy tworcy jest atomowy i pierwszy - ale wczesna podaz
+     * moze pojsc do snajperow zamiast spolecznosci. `windowCap` sam tego NIE
+     * zatrzymuje (snajper rozbija zakup na wiele adresow). Dlatego vanity nalezy
+     * laczyc z CIASNYM windowCap, a interfejs ma to powiedziec wprost. To jest
+     * CENA wybrania adresu vanity, nie blad.
      */
     function launchVanity(
         bytes32 vanitySalt,

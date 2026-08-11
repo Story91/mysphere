@@ -186,6 +186,28 @@ Base-mainnet fork probe** (`launchpad:fork:base`, block 49837711).
 - **External audit:** deferred (owner's call), replaced by a harder internal
   adversarial pass; flagged as elevated risk before mainnet.
 
+### Faza 4 review — 2026-08-11 (the "harder internal pass")
+
+3 adversarial lenses (vanity path · buyback/constants · fresh sweep) + an
+independent refutation of every finding. **5 raw → 0 confirmed, 2 plausible,
+3 refuted.** The immutable delta (vanity + constants) is **verified clean**: the
+verifiers explicitly confirmed no cross-creator/cross-path address collision, no
+theft, no nonce corruption, no pool poisoning, `predictVanityToken` bit-identical
+to the real launched address, reserves/invariants untouched, and the creator
+dev-buy still first.
+
+- **Only surviving item (both plausible findings, same issue):** a vanity address
+  is public/mineable the moment `launchVanity` is broadcast, so a mempool observer
+  can pre-stage snipes — a resistance the blockhash default path keeps. No fund
+  loss, no code-correctness bug; it is the cost of opting into a predictable
+  address. Mitigation is DOCS + UX: the `launchVanity` docstring now names the
+  tradeoff, and the **vanity launch UI must warn and default to a tight
+  `windowCap`** (a multi-address sniper defeats a loose one).
+- **Refuted:** buyback clamp reverting at the v4 price floor (unreachable,
+  fail-safe), tighter-150bps partial fills (intended/documented, keeper-runbook
+  note only), `pendingBuybackEth` "stranding" (funds preserved by rollback,
+  unreachable).
+
 ### P1 — deployment process (before mainnet)
 
 - **[medium] v4 storage layout is validated only at the FIRST graduation, not
