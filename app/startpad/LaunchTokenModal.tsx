@@ -542,11 +542,18 @@ export default function LaunchTokenModal({
         })) as Address;
         // Odpowiedz z prefiksem B20 potwierdza, ze to naprawde ta funkcja.
         if (!cancelled) setVanitySupported(predicted.toLowerCase().startsWith('0xb2000000'));
-      } catch {
-        // Brak selektora albo blad RPC: nie orzekamy `false` na twardo dla bledu
-        // transportu, ale dla vanity wystarczy niepokazanie sekcji - nastepne
-        // otwarcie modalu sprobuje znowu (stan zyje na czas montowania).
-        if (!cancelled) setVanitySupported(false);
+      } catch (error) {
+        // Rozroznienie jak przy advancedSupported: REVERT (brak selektora) =>
+        // stare wdrozenie, orzekamy `false`. Chwilowy blad transportu => zostaje
+        // `null`, a nastepne otwarcie modalu ponowi sonde - blip RPC nie ma prawa
+        // schowac vanity az do reloadu.
+        const text =
+          error instanceof Error
+            ? `${error.name} ${error.message} ${(error as { details?: string }).details ?? ''}`
+            : String(error);
+        if (!cancelled && /returned no data|zero data|execution reverted|reverted/i.test(text)) {
+          setVanitySupported(false);
+        }
       }
     })();
     return () => {
@@ -594,7 +601,10 @@ export default function LaunchTokenModal({
     setVanityAddress(null);
     setVanityAttempts(0);
     setVanityMining(true);
-    const BATCH = 6_000;
+    // 2000 prob na partie: predictLaunchpadVanity liczy 3 keccaki na probe (~6k
+    // keccakow/partie), wiec partia jest zblizona kosztem do minera B20 (4000x1)
+    // i czesto oddaje sterowanie - karta nie zamarza przy dluzszym wzorcu.
+    const BATCH = 2_000;
     const step = () => {
       if (vanityStopRef.current) {
         setVanityMining(false);
@@ -930,7 +940,7 @@ export default function LaunchTokenModal({
             : imageError ??
               anyLinkError ??
               preBuyError ??
-              (vanityOn && vanitySupported === true && vanitySalt === null
+              (mode === 'creator' && vanityOn && vanitySupported === true && vanitySalt === null
                 ? vanityMining
                   ? 'Mining your vanity address...'
                   : 'Mine a vanity address, or turn the vanity option off.'
@@ -1076,7 +1086,11 @@ export default function LaunchTokenModal({
     // Vanity jedzie TA SAMA sciezka co advanced, tylko z saltem na przodzie.
     // Wymaga wykopanego salta; jesli tworca wlaczyl vanity, ale nie wykopal
     // adresu, blokujemy tu zamiast wyslac zwykly start pod losowym adresem.
-    const useVanity = useAdvanced && vanityOn && vanitySupported === true;
+    // Vanity to funkcja trybu Creator; poza nim NIE dziala, nawet gdy przelacznik
+    // zostal wlaczony wczesniej. Bez tego przelaczenie na Quick z wlaczonym (ale
+    // niewykopanym) vanity zablokowaloby Launch komunikatem o kontrolce, ktorej
+    // w Quick nie widac. Wykopany adres zostaje i wraca, gdy user wroci do Creator.
+    const useVanity = useAdvanced && mode === 'creator' && vanityOn && vanitySupported === true;
     if (useVanity && vanitySalt === null) {
       setNotice({ kind: 'error', text: 'Mine a vanity address first, or turn the vanity option off.' });
       return;

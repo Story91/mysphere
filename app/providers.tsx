@@ -67,7 +67,14 @@ const queryClient = new QueryClient({
  */
 const CHAINS_BASE = [base, baseSepolia, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain] as const;
 const TRANSPORTS_BASE = {
-  [base.id]: http('https://mainnet.base.org'),
+  // Base MAINNET: publiczny mainnet.base.org jest rate-limited (429/-32016), a
+  // startpad odpala do 90 okien getLogs na load + odczyty handlu. Pod produkcje
+  // ustaw NEXT_PUBLIC_BASE_RPC_URL na wlasny endpoint (Alchemy/QuickNode);
+  // fallback na publicnode, zeby jeden RPC nie byl pojedynczym punktem awarii.
+  [base.id]: fallback([
+    http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
+    http('https://base-rpc.publicnode.com'),
+  ]),
   [baseSepolia.id]: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org'),
   [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
   [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
