@@ -106,7 +106,7 @@ export const ASK_TEMPLATES: AskTemplate[] = [
     id: 'kill-my-thesis',
     chip: 'Kill my thesis',
     question:
-      'My thesis: <write it in two sentences>. Argue the other side with evidence I can check — onchain data, docs, or a transaction. Vibes do not count.',
+      'My thesis: <write it in two sentences>. Argue the other side with evidence I can check: onchain data, docs, or a transaction. Vibes do not count.',
     budget: 5,
     seats: 3,
     durationMs: duration('24 hours'),

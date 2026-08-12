@@ -26,6 +26,7 @@ import {
   type EscrowState,
   type FundPhase,
 } from '../utils/asks/escrow';
+import { authorIdentityMismatch, sealedAnswerNotice } from '../utils/asks/visibility';
 import { normalizeAddress } from '../utils/monetization/types';
 import { getSlicedAddress } from '../utils/identity/resolver';
 import { MAX_ANSWER_LENGTH } from '../api/asks/pricing';
@@ -341,14 +342,14 @@ export default function AsksPage() {
         }
 
         if (!publicClient) {
-          throw new Error('We could not reach Base to check the escrow. Nothing was charged — try again.');
+          throw new Error('We could not reach Base to check the escrow. Nothing was charged. Try again.');
         }
 
         let signer;
         try {
           signer = await getWalletClient(config, { chainId: ESCROW_CHAIN_ID });
         } catch {
-          throw new Error('Your wallet is not ready to sign on Base. Nothing was charged — try again.');
+          throw new Error('Your wallet is not ready to sign on Base. Nothing was charged. Try again.');
         }
 
         // Identyfikator nadany PRZED transakcja: to on jest askId na lancuchu.
@@ -435,7 +436,7 @@ export default function AsksPage() {
         console.error('[asks] Zalozenie Aska nie powiodlo sie:', error);
         // Surowy komunikat Firestore nie jest zdaniem dla czlowieka. Mowimy
         // jednak wprost to, co najwazniejsze: nic nie zostalo pobrane.
-        throw new Error('The Ask was not created. Nothing was charged — try again.');
+        throw new Error('The Ask was not created. Nothing was charged. Try again.');
       }
 
       pushCreated({
@@ -493,6 +494,7 @@ export default function AsksPage() {
           <AskThread
             ask={ask}
             viewer={viewer}
+            sessionViewer={sessionAddress ?? null}
             isAuthor={isAuthor}
             isSignedIn={isAuthenticated}
             onSignIn={signIn}
@@ -513,7 +515,7 @@ export default function AsksPage() {
           </h1>
           <p className="mb-2 text-[14.5px] leading-[1.65] text-soft-ink-muted">
             An Ask is a question with a budget, a number of seats and a deadline. Answers stay
-            sealed until the author resolves — you see how many arrived, never what they say.
+            sealed until the author resolves. You see how many arrived, never what they say.
           </p>
           {/* Zdanie o tym, co DZIALA - i tylko o tym. Escrow wolno tu wymienic
               dopiero od chwili, gdy kontrakt jest naprawde podpiety (approve +
@@ -524,7 +526,7 @@ export default function AsksPage() {
           <p className="text-[12.5px] leading-[1.6] text-soft-ink-faint">
             Post one with your wallet, answer someone else&apos;s, and pay for what you accept. An
             author can lock the whole budget in an escrow contract up front, or pay each accepted
-            answer from their own wallet — every card says which one it is.{' '}
+            answer from their own wallet. Every card says which one it is.{' '}
             <Link
               href="/re-definition#ask"
               className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
@@ -573,7 +575,7 @@ export default function AsksPage() {
                   {!walletAddress
                     ? 'Connect your wallet to post an Ask.'
                     : escrowAvailable
-                      ? 'Set a budget, seats and a deadline — and choose whether to lock the budget in escrow now.'
+                      ? 'Set a budget, seats and a deadline, then choose whether to lock the budget in escrow now.'
                       : 'Set a budget, seats and a deadline. You pay only the answers you accept.'}
                 </p>
               </div>
@@ -607,8 +609,8 @@ export default function AsksPage() {
               Open asks could not be loaded
             </h2>
             <p className="mb-4 text-[13.5px] leading-[1.6] text-soft-ink-muted">
-              This is a failed read, not an empty list. There may well be open asks — we just could
-              not reach them.
+              This is a failed read, not an empty list. There may well be open asks that we simply
+              could not reach.
             </p>
             <button
               type="button"
@@ -664,7 +666,7 @@ export default function AsksPage() {
             rozliczylo", czyli nieprawde o produkcie. */}
         {phase === 'ready' && resolvedFailed && (
           <p className="mt-10 text-[13px] leading-[1.6] text-soft-ink-soft">
-            Settled asks could not be loaded. This is a failed read, not an empty history — the
+            Settled asks could not be loaded. This is a failed read, not an empty history. The
             open ones above are unaffected.
           </p>
         )}
@@ -745,6 +747,7 @@ const buttonClass =
 function AskThread({
   ask,
   viewer,
+  sessionViewer,
   isAuthor,
   isSignedIn,
   onSignIn,
@@ -753,6 +756,8 @@ function AskThread({
 }: {
   ask: Ask;
   viewer: string | null;
+  /** Adres z sesji SIWE, bez zlepienia z portfelem - do zdan o tozsamosci. */
+  sessionViewer: string | null;
   isAuthor: boolean;
   isSignedIn: boolean;
   onSignIn: () => Promise<boolean>;
@@ -881,7 +886,7 @@ function AskThread({
       await load();
     } catch (error) {
       console.error('[asks] Wyslanie odpowiedzi nie powiodlo sie:', error);
-      setSendError('The answer was not sent. Nothing was stored — try again.');
+      setSendError('The answer was not sent. Nothing was stored. Try again.');
     } finally {
       if (mountedRef.current) setSending(false);
     }
@@ -955,6 +960,22 @@ function AskThread({
    */
   const authorNeedsSignIn = isAuthor && !isSignedIn;
 
+  /**
+   * Tozsamosc patrzacego w jednym miejscu - do zdan, ktore mowia DLACZEGO
+   * czegos nie widac. Serwer pieczetuje po sesji, wiec zdania musza mowic
+   * o sesji, nie o podlaczonym portfelu.
+   */
+  const identity = {
+    signedIn: isSignedIn,
+    sessionAddress: sessionViewer,
+    walletAddress: walletAddress ?? null,
+    askAuthor: ask.author,
+  };
+  /** Portfel tworcy podlaczony, ale sesja nalezy do innego adresu. */
+  const identityMismatch = authorIdentityMismatch(identity);
+  /** Zdanie pod kazda zapieczetowana odpowiedzia - jedno na caly watek. */
+  const sealedNotice = sealedAnswerNotice(identity);
+
   function startPayout(answer: AnswerRow) {
     if (!payable || payment.isBusy) return;
     payingIdRef.current = answer.id;
@@ -1020,7 +1041,7 @@ function AskThread({
    * ktory czyta naplywajace odpowiedzi i wycofuje budzet.
    */
   const escrowBlocker: string | null = resolveWindowClosed
-    ? 'The 48-hour window for resolving after the deadline has closed. Nobody can be awarded from this escrow any more — the budget only goes back to you, minus the fee.'
+    ? 'The 48-hour window for resolving after the deadline has closed. Nobody can be awarded from this escrow any more. The budget only goes back to you, minus the fee.'
     : pickedList.length === 0
       ? 'Pick the answers you are paying for. The contract will not close an Ask with nobody paid.'
       : hasDuplicateWallet
@@ -1072,7 +1093,7 @@ function AskThread({
         await switchChainAsync({ chainId: ESCROW_CHAIN_ID });
       }
       if (!publicClient || !walletAddress) {
-        throw new Error('Your wallet is not ready to sign yet. Nothing changed — try again.');
+        throw new Error('Your wallet is not ready to sign yet. Nothing changed. Try again.');
       }
       const signer = await getWalletClient(config, { chainId: ESCROW_CHAIN_ID });
 
@@ -1138,7 +1159,7 @@ function AskThread({
       await load();
     } catch (error) {
       console.error('[asks] Rozstrzygniecie nie powiodlo sie:', error);
-      setResolveError('This Ask was not resolved. Nothing changed — try again.');
+      setResolveError('This Ask was not resolved. Nothing changed. Try again.');
     } finally {
       if (mountedRef.current) setResolving(false);
     }
@@ -1173,6 +1194,27 @@ function AskThread({
       {/* ---------- FAKTY Z LANCUCHA ---------- */}
       {escrowed && <EscrowFacts ask={ask} />}
 
+      {/* ---------- PORTFEL TWORCY, SESJA KOGOS INNEGO ----------
+          Pulapka "wszedlem ze zlego konta": API patrzy wylacznie na sesje,
+          wiec tworca z cudza sesja jest dla serwera obcy. Bez tego banera
+          widzial swoje pytanie jako cudze i zadne zdanie nie mowilo dlaczego. */}
+      {identityMismatch && (
+        <div className="mb-4 rounded-lg border border-soft-line bg-soft-sunken p-3">
+          <p className="mb-2 break-words text-[12.5px] leading-[1.5] text-soft-ink-muted">
+            The wallet you have connected created this Ask, but your signed session belongs to{' '}
+            {sessionViewer ? getSlicedAddress(sessionViewer) : 'another address'}. Sign in again
+            with this wallet to read the sealed answers and resolve.
+          </p>
+          <button
+            type="button"
+            onClick={() => void onSignIn()}
+            className={`${buttonClass} bg-soft-primary text-white`}
+          >
+            Sign in with this wallet
+          </button>
+        </div>
+      )}
+
       {/* ---------- AUTOR BEZ PODPISU ---------- */}
       {authorNeedsSignIn && (
         <div className="mb-4 rounded-lg border border-soft-line bg-soft-sunken p-3">
@@ -1196,7 +1238,7 @@ function AskThread({
           {!isSignedIn ? (
             <div className="rounded-lg border border-soft-line bg-soft-sunken p-3">
               <p className="mb-2 break-words text-[12.5px] leading-[1.5] text-soft-ink-muted">
-                Sign in with your wallet to answer. Your answer stays sealed — only the author can
+                Sign in with your wallet to answer. Your answer stays sealed. Only the author can
                 read it, and only until they resolve.
               </p>
               <button
@@ -1244,8 +1286,8 @@ function AskThread({
                   </>
                 ) : (
                   <>
-                    You write before you are paid. Nothing is held in escrow — check the author&apos;s
-                    resolve record on the card above before you spend time on this.
+                    You write before you are paid. Nothing is held in escrow, so check the
+                    author&apos;s resolve record on the card above before you spend time on this.
                   </>
                 )}
               </p>
@@ -1342,7 +1384,7 @@ function AskThread({
 
                 {answer.sealed ? (
                   <p className="break-words text-[12.5px] leading-[1.5] text-soft-ink-faint">
-                    Sealed. It exists — you just cannot read it.
+                    {sealedNotice}
                   </p>
                 ) : (
                   <p className="whitespace-pre-wrap break-words text-[13.5px] leading-[1.6] text-soft-ink">
@@ -1425,7 +1467,7 @@ function AskThread({
         <div className="mt-4 rounded-lg border border-soft-accent/40 bg-soft-accent-soft p-3">
           <p className="mb-2 break-words text-[12.5px] leading-[1.5] text-soft-accent-deep">
             The transfer is confirmed on Base but the acceptance is not recorded yet. Retrying uses
-            the same transaction — you will not pay twice.
+            the same transaction, so you will not pay twice.
           </p>
           <p className="mb-2 break-all text-[11px] text-soft-ink-muted">{proof.txHash}</p>
           <button
@@ -1493,7 +1535,7 @@ function AskThread({
             <div className="mt-3 rounded-lg border border-soft-accent/40 bg-soft-accent-soft p-3">
               <p className="mb-2 break-words text-[12.5px] leading-[1.5] text-soft-accent-deep">
                 The resolve is confirmed on Base and the money is already assigned to the answers you
-                picked, but this Ask is not marked resolved yet. Retrying only writes the record — it
+                picked, but this Ask is not marked resolved yet. Retrying only writes the record. It
                 does not send anything again.
               </p>
               <p className="mb-2 break-all text-[11px] text-soft-ink-muted">{awardProof}</p>
@@ -1515,7 +1557,7 @@ function AskThread({
         <div className="mt-4 border-t border-soft-line/70 pt-4">
           <p className="mb-2 break-words text-[11.5px] leading-[1.5] text-soft-ink-faint">
             Resolving closes this Ask and unseals every answer for everyone. You can only resolve
-            after accepting at least one answer — resolving means you paid.
+            after accepting at least one answer, because resolving means you paid.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -1653,8 +1695,8 @@ function EscrowFacts({ ask }: { ask: Ask }) {
     return (
       <div className={`${box} border-soft-line bg-soft-sunken`}>
         <p className="mb-2 break-words text-[12px] leading-[1.5] text-soft-ink-muted">
-          We could not reach the escrow contract. This is a failed read — it is not proof that
-          nothing is locked, and it is not proof that something is.
+          We could not reach the escrow contract. This is a failed read. It is not proof that
+          nothing is locked, and not proof that something is.
         </p>
         <button
           type="button"
@@ -1674,8 +1716,8 @@ function EscrowFacts({ ask }: { ask: Ask }) {
       <div className={`${box} border-soft-line bg-soft-sunken`}>
         <p className="mb-2 break-words text-[12px] leading-[1.5] text-soft-ink-muted">
           This Ask says it is escrowed, but we cannot see anything locked under it. If it was just
-          posted, the network may not have caught up yet — check again in a moment. If this stays,
-          treat it as unfunded and do not expect a locked payout.
+          posted, the network may not have caught up yet. Check again in a moment, and if this
+          stays, treat it as unfunded and do not expect a locked payout.
         </p>
         <button
           type="button"
@@ -1715,7 +1757,7 @@ function EscrowFacts({ ask }: { ask: Ask }) {
       {!rateMatches && (
         <p className="mt-2 break-words text-[12px] leading-[1.5] text-soft-accent-deep" role="alert">
           The per-answer amount on this card does not match the one locked in the contract. The
-          contract is the one that pays — believe it, not the card.
+          contract is the one that pays, so believe it, not the card.
         </p>
       )}
     </div>

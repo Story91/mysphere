@@ -166,7 +166,7 @@ export function useCreateAsk(): UseCreateAskResult {
 
         if (!publicClient) {
           throw new Error(
-            'We could not reach Base to check the escrow. Nothing was charged — try again.'
+            'We could not reach Base to check the escrow. Nothing was charged. Try again.'
           );
         }
 
@@ -175,7 +175,7 @@ export function useCreateAsk(): UseCreateAskResult {
           signer = await getWalletClient(config, { chainId: ASK_ESCROW_CHAIN_ID });
         } catch {
           throw new Error(
-            'Your wallet is not ready to sign on Base. Nothing was charged — try again.'
+            'Your wallet is not ready to sign on Base. Nothing was charged. Try again.'
           );
         }
 
@@ -258,7 +258,7 @@ export function useCreateAsk(): UseCreateAskResult {
         console.error('[asks] Zalozenie Aska nie powiodlo sie:', error);
         // Surowy komunikat Firestore nie jest zdaniem dla czlowieka. Mowimy
         // jednak wprost to, co najwazniejsze: nic nie zostalo pobrane.
-        throw new Error('The Ask was not created. Nothing was charged — try again.');
+        throw new Error('The Ask was not created. Nothing was charged. Try again.');
       }
 
       return buildAsk({

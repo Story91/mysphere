@@ -213,7 +213,7 @@ function factsSentence(facts: VaultFacts): string | null {
 
   const sentences: string[] = [];
   if (yieldParts.length > 0) {
-    sentences.push(`${opening}: ${yieldParts.join(' — ')}.`);
+    sentences.push(`${opening}: ${yieldParts.join('; ')}.`);
   }
   if (rest.length > 0) {
     sentences.push(
@@ -249,7 +249,7 @@ export function attachVaultContext(question: string, facts: VaultFacts | null): 
   // Gdy adres wszedl juz w zdanie (przez nawias z zaczatka), nie powtarzamy go
   // drugi raz - to ta sama informacja dwa razy w czterech linijkach.
   if (!filled.includes(facts.address)) {
-    blocks.push(`Vault: ${vaultLabel(facts)} — ${facts.address} (Base).`);
+    blocks.push(`Vault: ${vaultLabel(facts)}, ${facts.address} (Base).`);
   }
 
   const numbers = factsSentence(facts);
