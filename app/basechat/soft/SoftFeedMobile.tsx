@@ -88,8 +88,13 @@ export default function SoftFeedMobile({
     <div className="-mx-4 mb-3 bg-soft-bg font-soft">
       {/* Jeden rzad: zakladki feedu + kompaktowy filtr sieci. SoftTabs nosi
           wlasny padding poziomy (px-4) - tu daje go kontener, wiec padding
-          zakladek jest zerowany, zeby brzegi sie nie sumowaly. */}
-      <div className="flex items-center gap-2 px-4 pb-1.5 pt-2.5">
+          zakladek jest zerowany, zeby brzegi sie nie sumowaly.
+
+          `sticky top-0`: rzad przykleja sie do gory kolumny przy przewijaniu
+          (wzor duzych feedow), wiec zmiana zakladki albo sieci nie wymaga
+          wracania na gore listy. Tlo i z-index, zeby tresc chowala sie POD
+          pasek, a nie przezierala przez niego. */}
+      <div className="sticky top-0 z-20 flex items-center gap-2 bg-soft-bg/95 px-4 pb-1.5 pt-2.5 backdrop-blur">
         <SoftTabs
           tabs={TABS}
           activeTab={activeFeed}
