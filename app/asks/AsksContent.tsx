@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { HandCoins, Lock, PenLine } from 'lucide-react';
 import { useAccount, useChainId, useConfig, usePublicClient, useSwitchChain } from 'wagmi';
 import { getWalletClient } from 'wagmi/actions';
 import { base } from 'wagmi/chains';
@@ -509,31 +510,59 @@ export default function AsksPage() {
   return (
     <main className="min-h-screen bg-soft-bg font-soft">
       <div className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-5">
+        {/* ================= NAGLOWEK =================
+            Jeden rzad: tytul + akcja. Dwa akapity wstepu zamienily sie w jedno
+            zdanie i pasek trzech krokow - bo trzy kroki to jest CALY mechanizm
+            tego produktu, a sciana tekstu nad lista tylko odsuwala Aski w dol.
+            Szczegoly (escrow, warianty platnosci) mowia karty i kompozytor,
+            kazde o sobie. */}
         <header className="mb-7">
-          <h1 className="mb-3 font-soft-display text-[30px] font-bold leading-[1.1] tracking-[-0.02em] text-soft-ink sm:text-[38px]">
-            Open asks
-          </h1>
-          <p className="mb-2 text-[14.5px] leading-[1.65] text-soft-ink-muted">
-            An Ask is a question with a budget, a number of seats and a deadline. Answers stay
-            sealed until the author resolves. You see how many arrived, never what they say.
-          </p>
-          {/* Zdanie o tym, co DZIALA - i tylko o tym. Escrow wolno tu wymienic
-              dopiero od chwili, gdy kontrakt jest naprawde podpiety (approve +
-              fund przed zapisem, patrz handleCreate). Kluczowe jest slowo
-              "can": oba warianty istnieja i to autor wybiera, wiec zdanie nie
-              moze obiecywac escrow przy KAZDYM Asku. Kazda karta mowi o sobie
-              osobno (AskCard, sekcja `funding`). */}
-          <p className="text-[12.5px] leading-[1.6] text-soft-ink-faint">
-            Post one with your wallet, answer someone else&apos;s, and pay for what you accept. An
-            author can lock the whole budget in an escrow contract up front, or pay each accepted
-            answer from their own wallet. Every card says which one it is.{' '}
-            <Link
-              href="/re-definition#ask"
-              className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-            >
-              How an Ask works
-            </Link>
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div className="min-w-0">
+              <h1 className="font-soft-display text-[30px] font-bold leading-[1.1] tracking-[-0.02em] text-soft-ink sm:text-[38px]">
+                Open asks
+              </h1>
+              <p className="mt-2 max-w-[46ch] text-[14px] leading-[1.6] text-soft-ink-muted">
+                A question with a budget, seats and a deadline. Answers stay sealed until the
+                author picks the ones that get paid.
+              </p>
+            </div>
+            {!composerOpen && (
+              <button
+                type="button"
+                onClick={() => setComposerOpen(true)}
+                className="shrink-0 rounded-lg bg-soft-primary px-4 py-2.5 font-soft-display text-[13px] font-semibold text-white shadow-card transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg"
+              >
+                Ask something
+              </button>
+            )}
+          </div>
+          {/* Kolejnosc krokow niesie informacje (to jest sekwencja, nie ozdoba),
+              a srodkowy krok dostaje jedyny akcent - pieczec to sedno produktu. */}
+          <ol className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-2" aria-label="How an Ask works">
+            <li className="flex items-center gap-1.5 rounded-full border border-soft-line bg-soft-surface px-2.5 py-1 text-[11.5px] font-medium text-soft-ink-muted">
+              <PenLine className="h-3.5 w-3.5 text-soft-ink-faint" aria-hidden="true" />
+              Post with a budget
+            </li>
+            <li aria-hidden="true" className="text-[11px] text-soft-ink-faint/70">›</li>
+            <li className="flex items-center gap-1.5 rounded-full border border-soft-primary/25 bg-soft-primary/[0.06] px-2.5 py-1 text-[11.5px] font-medium text-soft-primary-deep">
+              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+              Answers arrive sealed
+            </li>
+            <li aria-hidden="true" className="text-[11px] text-soft-ink-faint/70">›</li>
+            <li className="flex items-center gap-1.5 rounded-full border border-soft-line bg-soft-surface px-2.5 py-1 text-[11.5px] font-medium text-soft-ink-muted">
+              <HandCoins className="h-3.5 w-3.5 text-soft-ink-faint" aria-hidden="true" />
+              Pay the ones you pick
+            </li>
+            <li>
+              <Link
+                href="/re-definition#ask"
+                className="px-1.5 py-1 text-[11.5px] font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              >
+                How an Ask works
+              </Link>
+            </li>
+          </ol>
         </header>
 
         {/* ================= DO ODBIORU =================
@@ -543,9 +572,13 @@ export default function AsksPage() {
             ale NIE milczy, gdy odczytu nie udalo sie wykonac. */}
         <AskClaimPanel className="mb-7" />
 
-        {/* ================= ZAKLADANIE ================= */}
-        <section className="mb-7">
-          {composerOpen ? (
+        {/* ================= ZAKLADANIE =================
+            Kompozytor pojawia sie w tym miejscu dopiero po "Ask something"
+            w naglowku. Stala karta-zaproszenie zeszla ze strony: powtarzala
+            naglowek trzecim akapitem i odsuwala liste, a jej jedyna zywa czesc
+            (przycisk) miesci sie w jednym rzedzie z tytulem. */}
+        {composerOpen && (
+          <section className="mb-7">
             <AskComposer
               onSubmit={handleCreate}
               onCancel={() => setComposerOpen(false)}
@@ -565,30 +598,8 @@ export default function AsksPage() {
               // zakladania: kompozytor pokazuje wtedy sam komunikat.
               loadVaults={loadListedVaults}
             />
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-soft-line bg-soft-surface p-4 shadow-card sm:p-5">
-              <div className="min-w-0 flex-1">
-                <h2 className="font-soft-display text-[15px] font-bold text-soft-ink">
-                  Need something judged?
-                </h2>
-                <p className="mt-0.5 break-words text-[12.5px] leading-[1.5] text-soft-ink-muted">
-                  {!walletAddress
-                    ? 'Connect your wallet to post an Ask.'
-                    : escrowAvailable
-                      ? 'Set a budget, seats and a deadline, then choose whether to lock the budget in escrow now.'
-                      : 'Set a budget, seats and a deadline. You pay only the answers you accept.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setComposerOpen(true)}
-                className="shrink-0 rounded-lg bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
-              >
-                Ask something
-              </button>
-            </div>
-          )}
-        </section>
+          </section>
+        )}
 
         {/* ================= WLASNIE ZALOZONE ================= */}
         {created.length > 0 && (
@@ -627,10 +638,20 @@ export default function AsksPage() {
             <h2 className="mb-1.5 font-soft-display text-[16px] font-bold text-soft-ink">
               Nothing open right now
             </h2>
-            <p className="text-[13.5px] leading-[1.6] text-soft-ink-muted">
+            <p className="mb-4 text-[13.5px] leading-[1.6] text-soft-ink-muted">
               No one has an open Ask at this moment. When someone does, their question, budget,
               seats and countdown show up here.
             </p>
+            {/* Pusty ekran jest zaproszeniem do dzialania, nie tylko raportem. */}
+            {!composerOpen && (
+              <button
+                type="button"
+                onClick={() => setComposerOpen(true)}
+                className="rounded-lg bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+              >
+                Ask the first one
+              </button>
+            )}
           </div>
         )}
 
