@@ -138,7 +138,7 @@ export default function StartpadFooter() {
           Uniswap v4 pool whose liquidity is locked forever. No admin keys, no upgrades: every rule
           below is fixed in immutable contracts, and all payouts are claim-based, in ETH.
           {isB20
-            ? ' Startpad is among the first launchpads built on the B20 standard. Currently running on Base Sepolia (testnet).'
+            ? ` Startpad is among the first launchpads built on the B20 standard. Running live on ${net.label}.`
             : ` Running live on ${net.label}.`}
         </p>
       </div>
@@ -224,7 +224,7 @@ export default function StartpadFooter() {
             <li>Trading fee (0–1%, default 1%) and the creator&apos;s share of it (0–70%, default 70%).</li>
             <li>Fee receivers: up to 8 addresses, shares summing to 100%.</li>
             <li>Auto-buyback slice of the creator&apos;s pool-fee share (0–100%, default 0%).</li>
-            <li>Sniper cap: per-wallet buy limit for the first 5 minutes (default 16M tokens); the creator can lower it, raise it, or disable protection entirely.</li>
+            <li>Sniper cap: per-wallet buy limit for the first 5 minutes, chosen in Creator setup (for example 4M or 8M tokens). A Quick launch sets no cap, and the creator can disable protection entirely.</li>
             <li>Pre-buy: any ETH amount, on the same curve and fee as everyone else.</li>
           </ul>
           <p className="mt-2 text-[11.5px] text-black/45">

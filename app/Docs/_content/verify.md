@@ -49,5 +49,5 @@ The fee rounds down, so the author's share is always the exact remainder. The tw
 ## Check it onchain
 
 - For the Ask escrow on Base (USDC), open the escrow address on `basescan.org`, call `escrowFor(author, askId)` to see the locked budget, seats and deadline, and `claimable(account)` to see a balance waiting to be collected. `FEE_RECIPIENT()` and the fee are immutable. It's also deployed on Base Sepolia (chainId 84532) for testing.
-- The Startpad launchpad, vault, hook and B20 token addresses live in `docs/LAUNCHPAD-STAN.md`. Startpad runs on Base mainnet (the default), Base Sepolia (a testnet), and Robinhood Chain (mainnet). Read a B20 token to confirm its fixed supply and that it exposes no owner/admin functions.
+- The Startpad launchpad addresses are in the table above, and the full per-network set (vault, hook, token factory) sits in the footer of [/startpad](/startpad) with explorer links. Startpad runs on Base mainnet (the default), Base Sepolia (a testnet), and Robinhood Chain (mainnet). Read a B20 token to confirm its fixed supply and that it exposes no owner/admin functions.
 - There's one honest limit. The Morpho curator record is verifiable only in the sense that you can read the same public Morpho data we did. It isn't a MySphere transaction, so treat its timestamp as a dated snapshot, not a hash.

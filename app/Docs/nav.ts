@@ -48,13 +48,13 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'startpad',
     title: 'Startpad launchpad',
-    blurb: 'The bonding curve, graduation, fees — and the math behind them.',
+    blurb: 'The bonding curve, graduation, fees, and the math behind them.',
     group: 'Modules',
   },
   {
     slug: 'b20',
     title: 'B20 tokens',
-    blurb: 'Base’s admin-less token standard and vanity addresses.',
+    blurb: 'The B20 standard, the token market on /b20, and creating your own.',
     group: 'Modules',
   },
   {

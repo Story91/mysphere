@@ -612,7 +612,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'A page that says what you can do today',
     status: 'live',
-    note: '/how is eight steps, each with its price on the front: what it costs, what you sign, where the receipt ends up. Nothing on it is in the future tense — a thing you cannot do today is not allowed on that page in any form, not even as a promise. That is the division of labour between the two pages: /how is the instruction, this one is the state, and everything unbuilt lives here.',
+    note: '/how is a numbered list of steps, each with its price on the front: what it costs, what you sign, where the receipt ends up. Nothing on it is in the future tense — a thing you cannot do today is not allowed on that page in any form, not even as a promise. That is the division of labour between the two pages: /how is the instruction, this one is the state, and everything unbuilt lives here.',
   },
   {
     name: 'Rules and indexes, deployed rather than described',
@@ -1208,9 +1208,9 @@ export default function ReDefinitionPage() {
 
             === PRZYCISK CELOWO FIOLETOWY, NIE BURSZTYNOWY ===
             Ta sama zasada co przy /curators: bursztynowy przycisk prowadzi do
-            kwot, ktore naprawde przeszly miedzy ludzmi. Startpad stoi na Base
-            Sepolia, gdzie ETH nie jest pieniadzem - przycisk nie ma prawa
-            obiecywac kolorem czegos, czego strona nie obiecuje slowem.
+            kwot, ktore juz przeszly miedzy ludzmi. Startpad to akcja, nie
+            zapis historii - przycisk nie ma prawa obiecywac kolorem czegos,
+            czego strona nie obiecuje slowem.
 
             === SKAD SA TE ZDANIA ===
             Kazdy fakt ponizej pochodzi z docs/LAUNCHPAD-DOSSIER.md,
@@ -1221,10 +1221,10 @@ export default function ReDefinitionPage() {
             zdanie w czasie terazniejszym - z tego samego powodu, dla ktorego
             hero ma trzy kolumny czasow.
 
-            Adresow kontraktow tu nie ma i NIE WOLNO ich dopisac do tabeli
-            "Every contract this app touches": tamta lista celowo nie podaje
-            sieci testowych (patrz jej komentarz), a Startpad w calosci stoi
-            na Sepolii. */}
+            Adresow kontraktow tu nie ma. Mainnetowe adresy Startpada podaje
+            /Docs/startpad; tabela "Every contract this app touches" przyjmuje
+            tylko wpisy zweryfikowane skryptem (patrz jej komentarz) i wpis
+            Startpada moze do niej wejsc dopiero ta sama sciezka. */}
         <section className="py-16">
           <Marker amount="3.00 ETH" label="where the curve closes" />
           <H2>A launch whose terms nobody can change overnight</H2>
@@ -1279,11 +1279,11 @@ export default function ReDefinitionPage() {
             The spine is the one this whole page keeps arguing for: <Hi>no owner, no pause, no
             setters, no upgrade path</Hi> — changing any number means deploying a new contract.
             Payouts are pull-based balances you claim, never pushed. The LP position is locked in a
-            vault forever; only the fees it earns can ever be taken out. All of it stands on Base
-            Sepolia, and the full path — launch, curve close, graduation, pool swaps, fee settle,
-            buyback and burn, claims — has been run end to end there and checked on the chain. Real
-            money waits for an external audit, for the same reason the escrow gives: with no admin
-            key, a bug is irreversible.
+            vault forever; only the fees it earns can ever be taken out. It runs on Base mainnet
+            with real ETH, and the full path (launch, curve close, graduation, pool swaps, fee
+            settle, buyback and burn, claims) was run end to end on Base Sepolia and checked on
+            the chain before mainnet opened. Base Sepolia stays available for testing, for the
+            same reason the escrow gives: with no admin key, a bug is irreversible.
           </P>
           <p className="mb-4">
             <Link
@@ -1312,7 +1312,7 @@ export default function ReDefinitionPage() {
             <Link href="/how" className="underline decoration-soft-line-strong underline-offset-2">
               /how
             </Link>{' '}
-            is the same product from the other side: eight things you can do today, each with what
+            is the same product from the other side: the things you can do today, each with what
             it costs and what you sign. Nothing in the future tense is allowed on that page, which
             is why everything in the future tense is on this one.
           </P>

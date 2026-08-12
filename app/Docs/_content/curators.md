@@ -25,7 +25,7 @@ The page is honest about its own state. Four situations that would otherwise loo
 
 ## How to use it
 
-1. Open **[/asks?tab=curators](/asks?tab=curators)**. The record lives as a tab on the Asks page.
+1. Open [/asks?tab=curators](/asks?tab=curators). The record lives as a tab on the Asks page.
 2. Read the header line: how many listed vaults are watched, since when, and when they were last checked.
 3. Scan the cards. Each shows the vault, the kind of change (Fee / Curator / Listing), the change itself with a `→` arrow, who curated it, the dollars in the vault when it was seen, and the date range it was seen between.
 4. If you need someone to actually read a specific vault for you, that's what an [Ask](/asks) is for: put a budget on the question and pay whoever answers.
