@@ -129,7 +129,13 @@ token.
 - **Honest UI.** The interface detects the deployed contract version on-chain
   (`MAX_BUYBACK_BPS` probe) and hides options the chain would reject. Logos and
   descriptions live off-chain (ERC-20 has no on-chain logo) — served through our
-  token list, editable only by the creator verified on-chain.
+  token list, editable only by the creator verified on-chain. The upload is
+  delivered with retries: the server re-reads `launchOf` a few times before
+  refusing (public RPCs return stale state right after the launch block), the
+  client retries the POST and keeps undelivered entries in a local queue that
+  every board visit flushes. Until the server confirms the logo, the creator's
+  own board says so ("Logo not public yet") instead of pretending everyone
+  sees it.
 
 ## 6. Contracts
 

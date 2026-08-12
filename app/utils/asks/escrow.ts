@@ -882,35 +882,35 @@ const ERROR_SENTENCES: Record<string, string> = {
   InvalidAmount: 'The amount per answer has to be more than zero. Nothing was locked.',
   InvalidSeats: 'An Ask has to have between 1 and 20 seats. Nothing was locked.',
   DeadlineInPast:
-    'By the time the transaction reached the chain the deadline had already passed. Nothing was locked — pick a longer deadline and post again.',
+    'By the time the transaction reached the chain the deadline had already passed. Nothing was locked. Pick a longer deadline and post again.',
   DeadlineTooFar:
-    'The escrow contract will not hold money for more than 30 days. Nothing was locked — pick a shorter deadline.',
+    'The escrow contract will not hold money for more than 30 days. Nothing was locked. Pick a shorter deadline.',
   AlreadyFunded:
     'This Ask is already funded in escrow. The contract accepts one deposit per Ask and refuses a second, so you were not charged twice.',
   NotOpen:
     'There is no open escrow for this Ask: it was either never funded, or it has already been resolved or settled. Nothing changed.',
   NoWinners:
-    'Pick at least one answer. The contract refuses to close an Ask with nobody paid — that would be a free way out of a budget you announced.',
+    'Pick at least one answer. The contract refuses to close an Ask with nobody paid, because that would be a free way out of a budget you announced.',
   LengthMismatch:
-    'The list of winners and the list of answers did not line up, so the contract refused it. Nothing changed — reload and try again.',
+    'The list of winners and the list of answers did not line up, so the contract refused it. Nothing changed. Reload and try again.',
   TooManyWinners: 'You picked more answers than this Ask has seats. Nothing changed.',
   InvalidWinner:
     'One of the picked answers has no payable wallet, or it is your own address. The contract refuses both, so nothing changed.',
   DuplicateWinner:
-    'The same wallet is picked twice. One seat per wallet — drop the duplicate and try again. Nothing changed.',
+    'The same wallet is picked twice. One seat per wallet. Drop the duplicate and try again, nothing changed.',
   MissingAnswerRef:
     'One of the picked answers had no id to record on-chain, so the payout would have had no proof attached. Nothing changed.',
   ResolveWindowClosed:
     'The 48-hour window for resolving after the deadline has closed. Nobody can be paid from this escrow any more; the budget can only go back to you, minus the fee.',
   TooEarly:
-    'An unresolved Ask can only be settled 48 hours after its deadline — that window exists so the author has time to read the answers. Nothing changed.',
+    'An unresolved Ask can only be settled 48 hours after its deadline. That window exists so the author has time to read the answers. Nothing changed.',
   EarlyResolveMustFillSeats:
-    'Before the deadline you can only resolve by filling every seat. Otherwise you could read the answers coming in and take the unused budget back early — pick exactly as many answers as there are seats, or wait for the deadline.',
+    'Before the deadline you can only resolve by filling every seat. Otherwise you could read the answers coming in and take the unused budget back early. Pick exactly as many answers as there are seats, or wait for the deadline.',
   NothingToClaim:
     'This wallet has nothing to collect from the escrow contract right now. Nothing was sent.',
   TransferFailed:
-    'The USDC transfer failed inside the contract. Nothing moved — this usually means the token rejected the transfer for this address.',
-  Reentrancy: 'The contract blocked a re-entrant call. Nothing changed — try again.',
+    'The USDC transfer failed inside the contract. Nothing moved. The token most likely rejected the transfer for this address.',
+  Reentrancy: 'The contract blocked a re-entrant call. Nothing changed. Try again.',
 };
 
 /** Odmowa podpisu w portfelu. Nie jest awaria i nie ma sie tak czytac. */
@@ -937,7 +937,7 @@ function isRejection(error: unknown): boolean {
  */
 export function describeEscrowError(error: unknown): string {
   if (error instanceof EscrowNotDeployedError) {
-    return 'Escrow is not available on the network your wallet is on. Switch to Base and try again — nothing was charged.';
+    return 'Escrow is not available on the network your wallet is on. Switch to Base and try again. Nothing was charged.';
   }
 
   if (error instanceof BaseError) {
