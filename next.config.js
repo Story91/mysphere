@@ -67,6 +67,17 @@ const nextConfig = {
     serverComponentsExternalPackages: ['mongodb', 'firebase-admin'],
     // Kompiluje bundle klienta i serwera rownolegle, w osobnych workerach.
     webpackBuildWorker: true,
+    // Dolacza tla kart OG (public/backs/*) do bundla funkcji opengraph-image,
+    // zeby loadOgBg czytal je z DYSKU (fs), a nie pobieral po sieci - serwerowy
+    // fetch wlasnej domeny na Vercelu bywa zawodny (fall back na fetch zostaje).
+    outputFileTracingIncludes: {
+      '/asks/opengraph-image': ['./public/backs/**'],
+      '/money/opengraph-image': ['./public/backs/**'],
+      '/how/opengraph-image': ['./public/backs/**'],
+      '/startpad/opengraph-image': ['./public/backs/**'],
+      '/re-definition/opengraph-image': ['./public/backs/**'],
+      '/Docs/opengraph-image': ['./public/backs/**'],
+    },
     // Pakiety z barrel files (index re-eksportujacy setki modulow). Bez tego
     // webpack musi przejsc caly barrel, zeby wyciagnac jeden import.
     // Lista wylacznie z tego, co faktycznie jest w repo.

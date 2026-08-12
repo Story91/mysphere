@@ -73,6 +73,18 @@ export async function GET(
       next: { revalidate: 60 },
     });
 
+    // Blockscout zwraca 400/404, gdy NIE ZNA tokena (np. swiezy B20 na Base
+    // mainnet, jeszcze niezindeksowany). To NORMALNY przypadek, nie awaria -
+    // klient ma fallback z eventow. Zmiekczamy to na 200 z pusta odpowiedzia,
+    // zeby nie zasmiecac konsoli przegladarki powtarzajacym sie `400`/`404`.
+    // Krotki cache, zeby po zindeksowaniu tokena dane w koncu doszly.
+    if (upstream.status === 400 || upstream.status === 404) {
+      return NextResponse.json(
+        {},
+        { status: 200, headers: { 'cache-control': 'public, max-age=60, stale-while-revalidate=300' } }
+      );
+    }
+
     const body = await upstream.text();
     // Bledu (402 wyczerpane kredyty, 429 limit) NIE cache'ujemy dlugo - chcemy
     // sprobowac ponownie, gdy kredyty wroca. Klient i tak ma wtedy fallback.
