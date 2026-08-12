@@ -587,52 +587,22 @@ export const deletePost = async (postId: string, authorAddress: string) => {
   }
 };
 
-// System powiadomień
-export const addNotification = async (userId: string, notification: {
-  type: 'LIKE' | 'COMMENT' | 'MENTION' | 'FOLLOW';
-  fromUser: string;
-  postId?: string;
-  commentId?: string;
-  timestamp: number;
-}): Promise<void> => {
-  const notificationsRef = collection(db, `users/${userId}/notifications`);
-  await addDoc(notificationsRef, {
-    ...notification,
-    read: false,
-    timestamp: serverTimestamp()
-  });
-};
-
-// Pobierz nieprzeczytane powiadomienia
-export const fetchUnreadNotifications = async (userId: string) => {
-  const notificationsRef = collection(db, `users/${userId}/notifications`);
-  const q = query(
-    notificationsRef,
-    where('read', '==', false),
-    firestoreOrderBy('timestamp', 'desc'),
-    firestoreLimit(20)
-  );
-  
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      // Swiezo zapisane powiadomienie ma timestamp === null (serverTimestamp
-      // jeszcze nie rozwiazany) - wczesniejsze `.toMillis()` wywracalo cala liste.
-      timestamp: toMillis(data.timestamp) || Date.now()
-    };
-  });
-};
-
-// Oznacz powiadomienie jako przeczytane
-export const markNotificationAsRead = async (userId: string, notificationId: string): Promise<void> => {
-  const notificationRef = doc(db, `users/${userId}/notifications/${notificationId}`);
-  await updateDoc(notificationRef, {
-    read: true
-  });
-};
+/*
+ * === POWIADOMIENIA MIESZKAJA W app/utils/friends/notifications.ts ===
+ *
+ * Stal tu DRUGI, rownolegly system powiadomien (addNotification,
+ * fetchUnreadNotifications, markNotificationAsRead) piszacy do tej samej
+ * subkolekcji users/{id}/notifications, ale INNYM ksztaltem dokumentu:
+ * pole `read` zamiast `isRead` i `fromUser` zamiast `fromUserId`. Zaden
+ * z tych trzech eksportow nie mial juz ani jednego wolajacego (zweryfikowane
+ * grepem po calym repo), a jedyny slad po nim to zakomentowany import
+ * w utils/friends/index.ts.
+ *
+ * Zostawienie go bylo realnym ryzykiem: pierwsze uzycie zapisaloby
+ * powiadomienie, ktorego zywy system nie policzy jako nieprzeczytane
+ * (pyta o `isRead`), czyli kropka na dzwonku milczalaby o istniejacym
+ * wpisie. Jeden system, jeden ksztalt dokumentu, jedno miejsce w kodzie.
+ */
 
 // Utwórz nowy post z zaawansowanymi opcjami
 /**
@@ -3520,13 +3490,21 @@ export const getUserTipStats = async (userAddress: string): Promise<TipStats | n
     const variants = addressReadVariants(userAddress);
     // Sufit 500 na strone: bez niego zapytania rosly bez konca z historia
     // napiwkow uzytkownika (Firestore rozlicza kazdy zwrocony dokument).
-    // Celowo bez orderBy - `in` + orderBy wymaga indeksu zlozonego, ktorego
-    // nie ma, wiec powyzej 500 wpisow suma liczy sie z 500 dokumentow w
-    // domyslnej kolejnosci (po ID), nie z "najnowszych". Dzis w kolekcji jest
-    // ~190 wpisow, wiec wynik jest kompletny; zanim sufit zacznie realnie
-    // ucinac, faza 2 audytu kosztow zastapi to licznikami agregowanymi.
-    const receivedQuery = query(tipsRef, where('recipientAddress', 'in', variants), firestoreLimit(500));
-    const sentQuery = query(tipsRef, where('senderAddress', 'in', variants), firestoreLimit(500));
+    // `orderBy` od 2026-08-13 (wdrozone indeksy tips: recipientAddress/
+    // senderAddress + timestamp, dzialaja takze z `in`): dzieki temu sufit
+    // ucina NAJSTARSZE wpisy, a nie arbitralny podzbior w kolejnosci po ID.
+    const receivedQuery = query(
+      tipsRef,
+      where('recipientAddress', 'in', variants),
+      firestoreOrderBy('timestamp', 'desc'),
+      firestoreLimit(500)
+    );
+    const sentQuery = query(
+      tipsRef,
+      where('senderAddress', 'in', variants),
+      firestoreOrderBy('timestamp', 'desc'),
+      firestoreLimit(500)
+    );
 
     const [receivedSnapshot, sentSnapshot] = await Promise.all([
       getDocs(receivedQuery),
