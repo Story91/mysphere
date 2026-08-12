@@ -5009,11 +5009,11 @@ function BaseChatContent() {
         aria-label="Sections"
         className="fixed bottom-0 left-0 right-0 lg:hidden bg-soft-surface/95 backdrop-blur-xl border-t border-soft-line z-40"
       >
-        <div className="flex items-center justify-around p-4">
+        <div className="flex items-center justify-around px-2 pb-3 pt-2">
           <button
             onClick={() => setActiveMobilePanel('left')}
             aria-current={activeMobilePanel === 'left' ? 'page' : undefined}
-            className="flex flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <div className={`p-1 rounded-full ${activeMobilePanel === 'left' ? 'bg-soft-sunken' : ''}`}>
               <UserIcon
@@ -5026,7 +5026,7 @@ function BaseChatContent() {
           <button
             onClick={() => setActiveMobilePanel('main')}
             aria-current={activeMobilePanel === 'main' ? 'page' : undefined}
-            className="flex flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <div className={`p-1 rounded-full ${activeMobilePanel === 'main' ? 'bg-soft-sunken' : ''}`}>
               <HomeIcon
@@ -5039,7 +5039,7 @@ function BaseChatContent() {
           <button
             onClick={() => setActiveMobilePanel('right')}
             aria-current={activeMobilePanel === 'right' ? 'page' : undefined}
-            className="flex flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <div className={`p-1 rounded-full ${activeMobilePanel === 'right' ? 'bg-soft-sunken' : ''}`}>
               <ChartBarIcon
@@ -5073,7 +5073,7 @@ function BaseChatContent() {
           <Link
             href="/asks"
             aria-label="Asks"
-            className="flex flex-col items-center rounded-card p-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <div className="p-1 rounded-full">
               {/* Znak zapytania w kolku - Ask to pytanie z kwota. Wektor,
