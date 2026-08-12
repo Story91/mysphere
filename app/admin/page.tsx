@@ -111,12 +111,16 @@ export default function AdminPanel() {
             }
           } catch (error) {
             console.error('Error parsing cached data:', error);
-            console.log('📊 Cache invalid - performing smart refresh...');
-            handleFetchRealTimeStats(false);
+            // NIE skanujemy automatycznie. Pusty/zepsuty cache oznacza, ze
+            // pierwsze policzenie to PELNY skan users+posts (~450k odczytow) -
+            // odpalany dotad samym wejsciem na zakladke. Teraz czeka na
+            // swiadome klikniecie (Smart / Full / Legacy).
+            console.log('📊 Cache invalid - waiting for a manual refresh.');
           }
         } else {
-          console.log('📊 No cache found - performing smart refresh...');
-          handleFetchRealTimeStats(false); // false = smart incremental refresh
+          // Brak cache: tez bez auto-skanu. Panel pokazuje pusty stan
+          // i przyciski, a admin decyduje, kiedy zaplacic za skan.
+          console.log('📊 No cache found - waiting for a manual refresh.');
         }
       } else {
         console.log('📊 BaseChat data already loaded - skipping refresh');
@@ -1035,8 +1039,8 @@ export default function AdminPanel() {
               <div className="flex items-center gap-3 bg-green-900/20 border border-green-500/30 rounded-lg px-4 py-2">
                 <span className="text-green-400">🤖</span>
                 <div className="text-sm">
-                  <div className="text-green-300 font-medium">Auto-loading enabled</div>
-                  <div className="text-green-200/70">Real Firebase data loads automatically</div>
+                  <div className="text-green-300 font-medium">On-demand stats</div>
+                  <div className="text-green-200/70">BaseChat counts run only when you press a refresh button (full scan)</div>
                 </div>
               </div>
 
@@ -1199,6 +1203,13 @@ export default function AdminPanel() {
                 {/* Global Stats Row */}
                 <div>
                   <h4 className="text-lg font-bold text-white mb-4">📊 Global BaseChat Statistics</h4>
+                  {!globalStats ? (
+                    // Bez skanu nie pokazujemy zer jako pomiaru - liczenie users
+                    // i posts to pelny skan, wiec rusza dopiero po kliknieciu.
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-gray-300">
+                      Not loaded yet. Counting users and posts is a full scan, so it runs only when you press Smart Refresh, Full or Legacy above.
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className={`relative bg-purple-500/20 rounded-lg p-6 text-center border border-purple-500/30 transition-all duration-300 ${
                       updateTrigger.users ? 'scale-105 shadow-lg shadow-purple-500/20' : ''
@@ -1256,6 +1267,7 @@ export default function AdminPanel() {
                       )}
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* MySphere Stats Row */}
