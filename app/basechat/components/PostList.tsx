@@ -1339,8 +1339,6 @@ function PostList({
   const MAX_DISPLAY_LIMIT = 150; // Maksymalnie 150 postów (zmniejszono dla oszczędności)
   const displayedPosts = sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT));
 
-  // ❌ USUNIĘTO DRUGI INFINITE SCROLL obserwator - oszczędność Firebase reads/writes
-
   const loadMorePosts = async () => {
     if (!hasMorePosts || isLoadingMore) return;
 
@@ -1402,6 +1400,34 @@ function PostList({
       setIsLoadingMore(false);
     }
   };
+
+  /* ===== INFINITE SCROLL =====
+     Przywrocony na zyczenie wlasciciela. Przycisk "Load more posts" zostaje
+     jako zapasowe wejscie, ale lista dociaga sie sama, gdy sentinel przed
+     przyciskiem podjezdza pod ekran. Obserwator odpala loadMorePosts z tymi
+     samymi bezpiecznikami (hasMorePosts, isLoadingMore, limit partii 15),
+     wiec koszt odczytow NA PARTIE sie nie zmienia - znika tylko klikanie.
+     `rootMargin` 300px: dociaganie rusza chwile przed koncem listy, zeby
+     przewijanie nie stawalo na pustym ekranie. */
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = loadMoreSentinelRef.current;
+    if (!el || disableInfiniteScroll || !hasMorePosts || isLoadingMore) return;
+    if (displayLimit >= MAX_DISPLAY_LIMIT) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMorePosts();
+        }
+      },
+      { rootMargin: '300px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // displayLimit w zaleznosciach: po kazdej partii obserwator zaklada sie
+    // od nowa, wiec na bardzo wysokim ekranie dociagnie kolejna partie od razu.
+  }, [disableInfiniteScroll, hasMorePosts, isLoadingMore, displayLimit]);
 
   // ❌ USUNIĘTO INFINITE SCROLL - oszczędność Firebase reads/writes
   // Teraz tylko przycisk "Load More" będzie kontrolować ładowanie kolejnych postów
@@ -2779,6 +2805,11 @@ function PostList({
         </React.Fragment>
       ))}
       
+      {/* Sentinel dla infinite scroll - patrz obserwator przy loadMorePosts. */}
+      {!disableInfiniteScroll && hasMorePosts && displayLimit < MAX_DISPLAY_LIMIT && (
+        <div ref={loadMoreSentinelRef} aria-hidden="true" className="h-px" />
+      )}
+
       {/* Load More Button - Hidden for pinned posts */}
       {!disableInfiniteScroll && displayLimit < MAX_DISPLAY_LIMIT && (
         <div className="flex justify-center p-4">

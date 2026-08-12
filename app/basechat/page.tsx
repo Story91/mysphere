@@ -80,6 +80,7 @@ import { NameWithSuffix } from '../utils/nameSuffix';
 import { getGlobalStats, likesTotal, likesNote, likesDetail } from '../utils/stats/globalStats';
 import Link from 'next/link';
 import SoftSectionList from './soft/SoftSectionList';
+import SoftTabs from './soft/SoftTabs';
 import SoftTrendsPanel from './soft/SoftTrendsPanel';
 import SoftProfileHeader from './soft/SoftProfileHeader';
 const MusicSelector = dynamic(() => import('./components/MusicSelector'), { ssr: false });
@@ -4838,6 +4839,30 @@ function BaseChatContent() {
                     </>
                   )}
 
+                  {/* ===== ZAKLADKI FEEDU NA DESKTOPIE - PRZYKLEJONE =====
+                      Te same trzy zakladki (All Posts / Follows / Basenames),
+                      ktore telefon ma w SoftFeedMobile, na tym samym stanie
+                      `activeFeed` - przelaczenie na jednej szerokosci
+                      obowiazuje na kazdej. Dotad desktop w ogole nie mial
+                      dojscia do tego filtra. Pasek jest przyklejony do gory
+                      kolumny jak w duzych feedach, zeby przelaczyc widok dalo
+                      sie bez przewijania z powrotem na gore.
+                      W "My Feed" go nie ma: tam lista to wlasne posty. */}
+                  {!showMyFeed && (
+                    <div className="sticky top-0 z-20 -mt-2 mb-3 hidden bg-soft-bg/95 pb-1 pt-2 backdrop-blur lg:block">
+                      <SoftTabs
+                        tabs={[
+                          { id: 'forYou', label: 'All Posts' },
+                          { id: 'following', label: 'Follows' },
+                          { id: 'baseName', label: 'Basenames' },
+                        ]}
+                        activeTab={activeFeed}
+                        onSelect={(id) => setActiveFeed(id as 'forYou' | 'following' | 'baseName')}
+                        className="!px-0 !py-0"
+                      />
+                    </div>
+                  )}
+
                   {/* Pinned Posts Section - ukryj w trybie My Feed */}
                   {!showMyFeed && (
                     <PinnedPosts
@@ -5038,7 +5063,12 @@ function BaseChatContent() {
         aria-label="Sections"
         className="fixed bottom-0 left-0 right-0 lg:hidden bg-soft-surface/95 backdrop-blur-xl border-t border-soft-line z-40"
       >
-        <div className="flex items-center justify-around px-2 pb-3 pt-2">
+        {/* items-end + wypukly StartPad w srodku - ten sam wzor co w globalnym
+            MobileBottomNav (app/components/MobileBottomNav.tsx): podniesiony
+            fioletowy krazek z rakieta wystaje ponad pasek. Tam piec etykiet
+            miesci sie przy 320px w tych samych rozmiarach, wiec i tutaj sie
+            zmieszcza. */}
+        <div className="flex items-end justify-around px-2 pb-3 pt-2">
           <button
             onClick={() => setActiveMobilePanel('left')}
             aria-current={activeMobilePanel === 'left' ? 'page' : undefined}
@@ -5065,6 +5095,31 @@ function BaseChatContent() {
             </div>
             <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'main' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Feed</span>
           </button>
+
+          {/* ===== STARTPAD W SRODKU - JAK W GLOBALNYM PASKU =====
+              Ten sam podniesiony przycisk co w MobileBottomNav: feed byl
+              jedyna strona bez drogi do launchpada w zasiegu kciuka.
+              To <Link>, nie przycisk panelu - /startpad to osobna trasa,
+              wiec ma dzialac srodkowym przyciskiem myszy i w nowej karcie. */}
+          <Link
+            href="/startpad"
+            aria-label="StartPad - new"
+            className="relative -mt-6 flex flex-col items-center"
+          >
+            <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-soft-primary text-white shadow-[0_10px_28px_rgba(124,107,218,0.55)] ring-4 ring-soft-surface transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-95">
+              <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+              </svg>
+              <span className="absolute -right-1.5 -top-1.5 rounded-full bg-[#ff4d7d] px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-white shadow-[0_2px_6px_rgba(255,77,125,0.5)]">
+                New
+              </span>
+            </span>
+            <span className="mt-1 font-soft text-[11px] font-extrabold text-soft-primary-deep">StartPad</span>
+          </Link>
+
           <button
             onClick={() => setActiveMobilePanel('right')}
             aria-current={activeMobilePanel === 'right' ? 'page' : undefined}
@@ -5097,8 +5152,9 @@ function BaseChatContent() {
               To <Link>, nie przycisk panelu: Asks to osobna trasa, wiec ma
               dzialac srodkowym przyciskiem myszy i w nowej karcie.
 
-              Piatej pozycji nie dokladamy - przy 320px piec etykiet nie miesci
-              sie bez zawijania. */}
+              Piata pozycja (StartPad) stoi w srodku jako wypukly krazek -
+              ten sam wzor i rozmiary co w globalnym MobileBottomNav, ktory
+              miesci piec etykiet przy 320px. */}
           <Link
             href="/asks"
             aria-label="Asks"
