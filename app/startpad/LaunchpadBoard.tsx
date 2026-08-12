@@ -44,6 +44,7 @@ import {
   type LaunchpadToken,
 } from './config';
 import { fetchLogos, recallLogos, rememberLogos } from './logos';
+import { browserStorage, flushPendingProfiles, postProfileWithRetry, sendTokenProfile } from './profileSync';
 import { loadSnapshot, saveSnapshot, loadFeedSnapshot, saveFeedSnapshot } from './snapshot';
 import { fetchHolderCounts } from './blockscout';
 import LaunchTokenModal from './LaunchTokenModal';
@@ -736,6 +737,18 @@ function MyTokensPanel({
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="truncate text-[14px] font-extrabold text-[#16141b]">{token.symbol}</span>
                       <StatePill state={token.state} />
+                      {/* Logo jako data-URL = zyje tylko w localStorage tego
+                          urzadzenia, Blob go jeszcze nie przejal. Bez tej
+                          plakietki tworca nie mial JAK zauwazyc, ze wszyscy
+                          inni widza pusty glif. */}
+                      {token.logoUrl?.startsWith('data:') && (
+                        <span
+                          className="rounded-full bg-[#fff8ed] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#a34b08]"
+                          title="The logo has not reached the server yet. Sign in with your wallet and it will publish itself on your next visit."
+                        >
+                          Logo not public yet
+                        </span>
+                      )}
                     </span>
                     <span className="mt-0.5 block truncate text-[11.5px] text-black/50">{token.name}</span>
                   </span>
@@ -1430,6 +1443,28 @@ export default function LaunchpadBoard() {
     // skan; skan i subskrypcja nadpisza go sekundy pozniej.
     const cachedFeed = loadFeedSnapshot<ActivityItem>(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
     if (cachedFeed && cachedFeed.length) setActivityFeed(cachedFeed);
+  }, []);
+
+  // Dogranie zaleglych profili (logo/opis), ktorych start nie zdolal wyslac -
+  // brak sesji SIWE albo wyscig z RPC zostawialy logo tylko w localStorage
+  // tworcy. Kolejka trzyma takie wpisy, a kazde wejscie na tablice probuje je
+  // dopchnac na serwer. Po sukcesie mapa logo z Bloba wchodzi z pominieciem
+  // cache, zeby data-URL zszedl z ekranu od razu, nie po TTL.
+  useEffect(() => {
+    const chainId = ACTIVE_LAUNCHPAD_NETWORK.chain.id;
+    void flushPendingProfiles(browserStorage(), chainId, Date.now(), (entry) =>
+      postProfileWithRetry(() => sendTokenProfile(entry), { expectLogo: entry.logoUrl !== null, attempts: 2 })
+    ).then(({ saved }) => {
+      if (saved === 0) return;
+      void fetchLogos(chainId, { bust: true }).then((logos) => {
+        setTokens((current) =>
+          current.map((row) => {
+            const url = row.address ? logos[row.address.toLowerCase()] : undefined;
+            return url && url !== row.logoUrl ? { ...row, logoUrl: url } : row;
+          })
+        );
+      });
+    });
   }, []);
 
   useEffect(() => {

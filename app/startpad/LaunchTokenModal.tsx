@@ -51,6 +51,7 @@ import {
   type LaunchpadToken,
 } from './config';
 import { formatUsd, useEthUsd } from './useEthUsd';
+import { browserStorage, clearPendingProfile, postProfileWithRetry, savePendingProfile, sendTokenProfile } from './profileSync';
 import { resolveMediaUrl } from './metadata';
 import { resizeImageFile } from './logoUpload';
 import { expectedAttempts, HEX_SUBSTITUTES, isMineable } from '../utils/b20/addressing';
@@ -1203,28 +1204,30 @@ export default function LaunchTokenModal({
       onLaunched(newToken);
       // Logo i opis ida do Bloba/Firestore OSOBNYM zadaniem - start juz sie
       // udal i zaden blad zapisu nie ma prawa go cofnac ani przykryc ekranu
-      // sukcesu. Brak sesji SIWE (401/403) to normalny przypadek, nie awaria.
+      // sukcesu. Wpis idzie NAJPIERW do kolejki w localStorage: pojedynczy
+      // strzal przegrywal z brakiem sesji SIWE albo wyscigiem z RPC i logo
+      // zostawalo na zawsze tylko na urzadzeniu tworcy. Teraz wysylka ponawia
+      // sie sama, a gdy mimo to nie dojdzie, tablica dogra wpis przy kolejnych
+      // wejsciach. Sukces czysci wpis od reki.
       if (profileLogoUrl !== null || launchDescription.trim() !== '') {
-        void fetch('/api/launchpad/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            address: tokenAddress,
-            chainId: LAUNCHPAD_CHAIN.id,
-            logoUrl: profileLogoUrl,
-            description: launchDescription.trim(),
-          }),
-        })
-          .then((response) => {
-            if (response.status === 401 || response.status === 403) {
-              setProfileNotice('Sign in on the token page to attach the logo.');
-            } else if (!response.ok) {
-              setProfileNotice('The logo was not attached. You can add it on the token page.');
+        const payload = {
+          address: tokenAddress,
+          chainId: LAUNCHPAD_CHAIN.id,
+          logoUrl: profileLogoUrl,
+          description: launchDescription.trim(),
+        };
+        savePendingProfile(browserStorage(), { ...payload, savedAt: Date.now() });
+        void postProfileWithRetry(() => sendTokenProfile(payload), { expectLogo: payload.logoUrl !== null }).then(
+          (outcome) => {
+            if (outcome === 'saved') {
+              clearPendingProfile(browserStorage(), payload.chainId, payload.address);
+            } else if (outcome === 'needs_session') {
+              setProfileNotice('The logo shows only on this device for now. Sign in with your wallet and it will publish itself on your next visit.');
+            } else {
+              setProfileNotice('The logo shows only on this device for now. It will retry on your next visit. You can also add it on the token page.');
             }
-          })
-          .catch(() => {
-            setProfileNotice('The logo was not attached. You can add it on the token page.');
-          });
+          }
+        );
       }
       setLaunched({
         address: tokenAddress,

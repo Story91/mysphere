@@ -3,6 +3,7 @@ import { put } from '@vercel/blob';
 import { createPublicClient, http, type Address } from 'viem';
 import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_NETWORKS, launchpadAbi } from '../../../startpad/config';
 import { sessionAddress } from '../../asks/identity';
+import { resolveCreatorWithRetry } from '../launchOwnership';
 import { getProfiles, isProfileStoreAvailable, saveProfile, tokenDocId } from '../profileStore';
 
 /**
@@ -144,26 +145,34 @@ export async function POST(request: NextRequest) {
 
   const net = resolveNetwork(body.chainId);
 
-  let creator: string;
-  try {
-    const launch = (await readClient(net).readContract({
+  // Odczyt z RETRY: POST przychodzi sekundy po wykopaniu bloku startu, a
+  // publiczny RPC oddaje wtedy nieswieze odczyty (state 0 dla tokena, ktory
+  // JUZ istnieje). Pojedynczy odczyt zamienial ten wyscig w 404 i logo
+  // przepadalo - swieze tokeny (B2026, CLAW, ELEGANT) zostawaly bez logo
+  // w Blobie, widoczne tylko w localStorage tworcy.
+  const client = readClient(net);
+  const resolution = await resolveCreatorWithRetry(async () => {
+    const launch = (await client.readContract({
       address: net.launchpad as Address,
       abi: launchpadAbi,
       functionName: 'launchOf',
       args: [address as Address],
     })) as readonly [Address, number, bigint, bigint, number, `0x${string}`];
-    // `state == 0` znaczy "ten launchpad nie zna tego adresu" - nie "pusta
-    // krzywa". Profil dla nieznanego tokena nie ma prawa powstac.
-    if (Number(launch[1]) === 0) {
+    return { creator: launch[0], state: Number(launch[1]) };
+  });
+  if (!resolution.ok) {
+    // `state == 0` po wyczerpaniu prob znaczy "ten launchpad nie zna tego
+    // adresu" - nie "pusta krzywa". Profil dla nieznanego tokena nie ma
+    // prawa powstac.
+    if (resolution.reason === 'unknown_token') {
       return NextResponse.json({ error: 'This launchpad does not know that token.' }, { status: 404, headers: NO_STORE });
     }
-    creator = launch[0];
-  } catch {
     return NextResponse.json(
       { error: 'Could not read the token from chain right now.', code: 'chain_unavailable' },
       { status: 502, headers: NO_STORE }
     );
   }
+  const creator = resolution.creator;
 
   if (tokenDocId(creator) !== tokenDocId(author)) {
     return NextResponse.json(
