@@ -5,7 +5,7 @@ import content from '../_content/verify.md';
 
 export const metadata: Metadata = {
   title: 'Verify it onchain',
-  description: 'A cross-cutting how-to for verifying every MySphere money claim yourself — which block explorer, which hash, which contract, and what is an off-chain reading instead.',
+  description: 'How to verify every MySphere money claim yourself: which block explorer, which hash, which contract, and what is an off-chain reading instead.',
 };
 
 export default function VerifyDocPage() {

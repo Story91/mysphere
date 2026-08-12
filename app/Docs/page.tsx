@@ -11,7 +11,7 @@ import { DOC_PAGES, docHref } from './nav';
 export const metadata: Metadata = {
   title: 'Docs',
   description:
-    'How MySphere works: the feed, Asks and escrow, your money, the curator record, the Startpad launchpad and B20 tokens — in plain terms, with the math and how to verify each part onchain.',
+    'How MySphere works: the feed, Asks and escrow, your money, the curator record, the Startpad launchpad and B20 tokens, in plain terms, with the math and how to verify each part onchain.',
 };
 
 export default function DocsOverviewPage() {
@@ -30,7 +30,7 @@ export default function DocsOverviewPage() {
         <p className="max-w-[60ch] text-[15.5px] leading-[1.7] text-soft-ink-muted">
           MySphere is a social feed on Base where the timeline is money. Post and get tipped, ask a
           question with a budget and pay for the answers you pick, launch a token on a bonding
-          curve — and open the transaction behind every number. These pages explain each part in
+          curve, and open the transaction behind every number. These pages explain each part in
           plain terms, show the flow, give the math where it matters, and point you at the onchain
           proof.
         </p>

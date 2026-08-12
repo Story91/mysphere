@@ -1,7 +1,7 @@
 'use client';
 
-import SoftStoryRail from './SoftStoryRail';
 import SoftTabs from './SoftTabs';
+import SoftNetworkPicker from './SoftNetworkPicker';
 import SoftComposerPill from './SoftComposerPill';
 
 /**
@@ -27,13 +27,16 @@ import SoftComposerPill from './SoftComposerPill';
  * === FILTR SIECI ===
  * Startuje na "wszystkie". Gdyby domyslnie wybrany byl Base, feed po wejsciu
  * ukrywalby posty z siedmiu pozostalych lancuchow bez informacji dlaczego.
- * Dotkniecie aktywnej sieci ODZNACZA ja - bez tego nie ma drogi powrotnej
- * bez przeladowania strony.
+ * Wybranie aktywnej sieci jeszcze raz ODZNACZA ja - bez tego nie ma drogi
+ * powrotnej bez przeladowania strony.
  *
- * Filtrowanie po sieci jest na razie WYLACZONE (pasek tylko sygnalizuje
- * dostepne lancuchy), bo lista postow nalezy do PostList i to on musialby
- * przyjac ten filtr. Wlaczenie go to jeden prop - ale dopiero wtedy, gdy
- * PostList go obsluzy, a nie "prawie".
+ * === JEDNA LINIA ZAMIAST DWOCH ===
+ * Pasek "stories" (kafle sieci 54x54) i rzad zakladek zajmowaly razem dwa
+ * pelne rzedy ekranu, zanim pojawil sie pierwszy post - zgloszenie
+ * wlasciciela bylo wprost o tym. Ten sam filtr sieci siedzi teraz w
+ * kompaktowym przycisku (SoftNetworkPicker) obok zakladek, w jednym rzedzie.
+ * Zakladki zachowuja wlasny przewijany overflow, wiec nic nie znika na
+ * waskich ekranach.
  */
 
 const TABS = [
@@ -83,12 +86,21 @@ export default function SoftFeedMobile({
 
   return (
     <div className="-mx-4 mb-3 bg-soft-bg font-soft">
-      <SoftStoryRail
-        activeNetwork={activeNetwork ?? ''}
-        onSelect={(id) => onNetworkChange?.(activeNetwork === id ? null : id)}
-      />
-
-      <SoftTabs tabs={TABS} activeTab={activeFeed} onSelect={onFeedChange} />
+      {/* Jeden rzad: zakladki feedu + kompaktowy filtr sieci. SoftTabs nosi
+          wlasny padding poziomy (px-4) - tu daje go kontener, wiec padding
+          zakladek jest zerowany, zeby brzegi sie nie sumowaly. */}
+      <div className="flex items-center gap-2 px-4 pb-1.5 pt-2.5">
+        <SoftTabs
+          tabs={TABS}
+          activeTab={activeFeed}
+          onSelect={onFeedChange}
+          className="min-w-0 flex-1 !px-0 !py-0"
+        />
+        <SoftNetworkPicker
+          activeNetwork={activeNetwork ?? null}
+          onChange={(id) => onNetworkChange?.(id)}
+        />
+      </div>
 
       {currentAddress && !composerOpen && (
         <div className="px-4 pb-1">

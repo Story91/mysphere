@@ -2995,6 +2995,60 @@ function BaseChatContent() {
     }
   };
 
+  /* ===== ZAWARTOSC PANELU TRENDS - JEDNO ZRODLO =====
+     Ten sam blok stoi w dwoch miejscach: w kolumnie bocznej (do progu 2xl
+     i na mobilnej zakladce "Trends") oraz w osobnej prawej kolumnie na
+     najszerszych ekranach - uklad jak w duzych feedach spolecznosciowych:
+     nawigacja i profil po lewej, tresc na srodku, trendy po prawej.
+     Definicja jest jedna, zeby zadna kopia nie rozjechala sie z druga. */
+  const trendsColumnContent = (
+    <>
+      <SoftTrendsPanel
+        stats={[
+          /* Bez String() - `null` ma dojsc do kafla JAKO null.
+             String(null) daje napis "null", ktory compact()
+             przepuszcza bez zmian, wiec kafel z niezmierzona liczba
+             pokazywal slowo "null" zamiast kreski. Znak "nie wiem"
+             wstawia SoftTrendsPanel. */
+          { label: 'Users', value: totalUsers, tone: 'purple' },
+          { label: 'Likes', value: totalLikes, tone: 'amber', note: likesNoteText, detail: likesDetailText },
+          { label: 'Posts', value: totalPosts, tone: 'green' },
+          { label: 'Comments', value: totalComments, tone: 'pink' },
+        ]}
+        /* Cala strona, nie pierwsza piatka. Backend oddaje 10 na
+           stronie i do 5 stron (1-50) - `slice(0, 5)` obcinal to
+           w polowie i kasowal sens stronicowania, bo strona druga
+           pokazywalaby pozycje 11-15 zamiast 11-20. */
+        activeUsers={(activeUsers || []).map((user: any) => ({
+          address: user.address,
+          name: user.name || `${String(user.address).slice(0, 6)}…${String(user.address).slice(-4)}`,
+          points: user.totalPoints ?? user.points ?? 0,
+          avatar: user.avatar ?? null,
+        }))}
+        onOpenUser={(userAddress) => handleViewBuilderProfile(userAddress)}
+        page={currentPage}
+        totalPages={totalUsersPages}
+        onPageChange={setCurrentPage}
+        isLoadingPage={isLoadingUsers}
+      />
+
+      {/* Yaps Stats Widget - ukryty, gdy /yapscan jest wylaczony
+          (config/routeStatus.js). Bez tego kafelek prowadzilby
+          w przekierowanie z powrotem na /basechat. */}
+      <div className={`mt-4 ${isRouteDisabled('/yapscan') ? 'hidden' : ''}`}>
+        <a
+          href="/yapscan"
+          className="flex items-center justify-between rounded-card bg-soft-surface p-4 shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+        >
+          <span className="font-soft-display text-[15px] font-bold text-soft-ink">YapScan</span>
+          <svg className="h-4 w-4 text-soft-primary" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </a>
+      </div>
+    </>
+  );
+
   return (
     <>
       {/* Contract Event Listener - listens for PinCreated events and refreshes feed */}
@@ -3582,69 +3636,21 @@ function BaseChatContent() {
                   NA DESKTOPIE: siedzi pod profilem w tej samej kolumnie,
                   oddzielony linia - dlatego przestal byc potrzebny osobny
                   panel po prawej. */}
+              {/* Tresc panelu jest zdefiniowana raz, w `trendsColumnContent`
+                  nad returnem. Historia bloku (usuniete "Global Statistics"
+                  i "Trending Hashtags") - patrz komentarz przy tej definicji
+                  oraz git log; kafelek YapScan chowa sie sam, gdy /yapscan
+                  jest wylaczony w config/routeStatus.js.
+
+                  `2xl:hidden`: na najszerszych ekranach ten sam blok stoi
+                  w osobnej prawej kolumnie, wiec kopia w kolumnie bocznej
+                  schodzi - inaczej Trends widnialoby dwa razy naraz. */}
               <div
                 className={`${
                   activeMobilePanel === 'right' ? 'block' : 'hidden lg:block'
-                } lg:mt-8 lg:border-t lg:border-soft-line lg:pt-6`}
+                } 2xl:hidden lg:mt-8 lg:border-t lg:border-soft-line lg:pt-6`}
               >
-                <SoftTrendsPanel
-                  stats={[
-                    /* Bez String() - `null` ma dojsc do kafla JAKO null.
-                       String(null) daje napis "null", ktory compact()
-                       przepuszcza bez zmian, wiec kafel z niezmierzona liczba
-                       pokazywal slowo "null" zamiast kreski. Znak "nie wiem"
-                       wstawia SoftTrendsPanel. */
-                    { label: 'Users', value: totalUsers, tone: 'purple' },
-                    { label: 'Likes', value: totalLikes, tone: 'amber', note: likesNoteText, detail: likesDetailText },
-                    { label: 'Posts', value: totalPosts, tone: 'green' },
-                    { label: 'Comments', value: totalComments, tone: 'pink' },
-                  ]}
-                  /* Cala strona, nie pierwsza piatka. Backend oddaje 10 na
-                     stronie i do 5 stron (1-50) - `slice(0, 5)` obcinal to
-                     w polowie i kasowal sens stronicowania, bo strona druga
-                     pokazywalaby pozycje 11-15 zamiast 11-20. */
-                  activeUsers={(activeUsers || []).map((user: any) => ({
-                    address: user.address,
-                    name: user.name || `${String(user.address).slice(0, 6)}…${String(user.address).slice(-4)}`,
-                    points: user.totalPoints ?? user.points ?? 0,
-                    avatar: user.avatar ?? null,
-                  }))}
-                  onOpenUser={(userAddress) => handleViewBuilderProfile(userAddress)}
-                  page={currentPage}
-                  totalPages={totalUsersPages}
-                  onPageChange={setCurrentPage}
-                  isLoadingPage={isLoadingUsers}
-                />
-
-                {/* ===== USUNIETE Z PRAWEGO PANELU (poprzedni krok, opis zostaje) =====
-                    1. "Global Statistics" - te SAME cztery liczby (Users, Likes,
-                       Posts, Comments) renderowal juz SoftTrendsPanel wyzej.
-                       Stały wiec dwa razy pod soba, w dwoch roznych stylach.
-                       To nie byla nadmiarowa informacja, tylko ta sama
-                       informacja dwa razy.
-
-                    2. "Trending Hashtags" - decyzja produktowa wlasciciela.
-
-                    Liczniki (totalUsers, totalLikes...) zostaja - zasilaja
-                    SoftTrendsPanel. Za to `trendingTags` i `expandedTagsList`
-                    poszly razem z widokiem: po usunieciu tamtego bloku NIC ich
-                    juz nie czytalo, a `getTrendingTags(posts)` przemiatal cala
-                    liste postow przy KAZDEJ jej zmianie, zeby policzyc hashtagi
-                    dla nikogo. */}
-                {/* Yaps Stats Widget - ukryty, gdy /yapscan jest wylaczony
-                    (config/routeStatus.js). Bez tego kafelek prowadzilby
-                    w przekierowanie z powrotem na /basechat. */}
-                <div className={`mt-4 ${isRouteDisabled('/yapscan') ? 'hidden' : ''}`}>
-                  <a
-                    href="/yapscan"
-                    className="flex items-center justify-between rounded-card bg-soft-surface p-4 shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-                  >
-                    <span className="font-soft-display text-[15px] font-bold text-soft-ink">YapScan</span>
-                    <svg className="h-4 w-4 text-soft-primary" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                      <path d="M5 12h14M13 6l6 6-6 6" />
-                    </svg>
-                  </a>
-                </div>
+                {trendsColumnContent}
               </div>
             </div>
 
@@ -4926,9 +4932,18 @@ function BaseChatContent() {
               )}
             </div>
 
-              {/* Panel prawy zostal scalony z kolumna boczna - jego zawartosc
-                  (SoftTrendsPanel + kafelek YapScan) stoi teraz pod profilem,
-                  patrz komentarz "TRENDS - PRZENIESIONE Z PRAWEGO PANELU". */}
+              {/* ===== PRAWA KOLUMNA TRENDS - NAJSZERSZE EKRANY =====
+                  Od progu 2xl uklad przechodzi na trzy kolumny, jak w duzych
+                  feedach spolecznosciowych: nawigacja i profil po lewej,
+                  posty na srodku, Trends po prawej. Ponizej 2xl ten sam blok
+                  stoi w kolumnie bocznej (tam ma `2xl:hidden`), wiec zawsze
+                  widac dokladnie jedna kopie. Dla goscia kolumny nie ma,
+                  tak samo jak lewej. */}
+              {isConnected && (
+                <div className="hidden 2xl:block 2xl:w-[360px] 2xl:flex-none overflow-y-auto border-l border-soft-line bg-soft-bg px-5 pt-6 pb-24">
+                  {trendsColumnContent}
+                </div>
+              )}
             </div>
           </div>
           </div>
