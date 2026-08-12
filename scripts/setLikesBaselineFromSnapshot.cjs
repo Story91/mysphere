@@ -7,7 +7,9 @@
  * KOSZT: jeden odczyt (kontrola dokumentu przed zapisem) i jeden zapis.
  * Zero skanowania postow. To jest cala jego racja bytu.
  *
- * TEN SKRYPT NIE ZOSTAL URUCHOMIONY.
+ * URUCHOMIONY 2026-08-13 (--apply): likesBaseline=18817 wpisany do
+ * globalStats/current przy likesSince=58, suma na kaflu 18875 z podpisem
+ * "at least". Ponowne uruchomienie jest idempotentne (merge tej samej liczby).
  *
  * ===========================================================================
  * SKAD TA LICZBA
