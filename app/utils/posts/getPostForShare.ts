@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { doc, getDoc, collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { getPublicDb as getDb } from '../publicFirestore';
 import { toMillis } from '../firestoreTime';
@@ -25,7 +26,10 @@ export type SharedPost = {
   network?: string;
 };
 
-export async function getPostForShare(postId: string): Promise<SharedPost | null> {
+// cache() z Reacta deduplikuje odczyt W OBREBIE JEDNEGO zadania: trase /post/[id]
+// wola generateMetadata, sam komponent strony i karta OG, a bez cache() kazde
+// z nich placiloby za wlasny odczyt tego samego dokumentu.
+export const getPostForShare = cache(async (postId: string): Promise<SharedPost | null> => {
   if (!postId) return null;
 
   try {
@@ -59,7 +63,7 @@ export async function getPostForShare(postId: string): Promise<SharedPost | null
     // Blad daje 500 - a 500 znaczy "sprobuj pozniej", czyli prawde.
     throw error;
   }
-}
+});
 
 /**
  * Identyfikatory ostatnich postow do sitemapy.
@@ -110,7 +114,9 @@ export async function getRecentPostRefs(
  * znaczenia. Blad odczytu zwraca pusty obiekt: karta ma sie wygenerowac zawsze,
  * bo brak podgladu boli bardziej niz brak jednej liczby.
  */
-export async function getPostTipTotals(postId: string): Promise<Record<string, number>> {
+// cache() z tego samego powodu co przy getPostForShare - strona i karta OG
+// pytaja o te same sumy w ramach jednego zadania.
+export const getPostTipTotals = cache(async (postId: string): Promise<Record<string, number>> => {
   if (!postId) return {};
 
   try {
@@ -131,7 +137,7 @@ export async function getPostTipTotals(postId: string): Promise<Record<string, n
     console.error('[getPostTipTotals] Nie udalo sie policzyc tipow:', error);
     return {};
   }
-}
+});
 
 /** Skrocony adres do wyswietlenia, gdy post nie ma nazwy autora. */
 export function shortAddress(address: string): string {

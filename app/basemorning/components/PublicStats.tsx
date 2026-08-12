@@ -79,10 +79,21 @@ const PublicStats: React.FC = () => {
     };
 
     fetchStats();
-    
-    // Auto-refresh every 60 seconds
-    const interval = setInterval(fetchStats, 60000);
-    return () => clearInterval(interval);
+
+    // Auto-refresh co 60 s, ale tylko gdy karta jest widoczna - odswiezanie
+    // statystyk na ukrytej karcie to czysty koszt bez odbiorcy. Powrot na
+    // karte robi odswiezenie od razu, wiec nikt nie patrzy na stare liczby.
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchStats();
+    }, 60000);
+    const onVisible = () => {
+      if (!document.hidden) fetchStats();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const refreshStats = async () => {

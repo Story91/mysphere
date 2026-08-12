@@ -28,7 +28,11 @@ export async function GET(request: Request) {
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    // Wynik Kaito dla danego username zmienia sie wolno - 5 minut w CDN
+    // oszczedza invokacje, gdy kilka osob sprawdza ten sam profil.
+    return NextResponse.json(data, {
+      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' }
+    });
   } catch (error) {
     console.error('Error fetching from Kaito API:', error);
     return NextResponse.json(

@@ -13,6 +13,9 @@ import { getPostForShare, getPostTipTotals, shortAddress } from '../../utils/pos
  */
 
 export const runtime = 'nodejs';
+// To samo okno co strona obok: crawlery kazdego komunikatora pobieraja karte
+// osobno, wiec bez revalidate jeden viralowy link generowal serie odczytow.
+export const revalidate = 300;
 export const alt = 'Post on MySphere';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';

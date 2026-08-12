@@ -35,7 +35,6 @@ import { doc, updateDoc, serverTimestamp, getDoc, setDoc, increment } from 'fire
 import { Post, Stats } from '../types';
 import { UserRank } from '../utils/ranking';
 import Script from 'next/script';
-import { put } from '@vercel/blob';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
@@ -2298,9 +2297,12 @@ function BaseChatContent() {
     const file = event.target.files[0];
     const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
     
-    // Sprawdź rozmiar pliku - admin bez limitów, użytkownicy max 3MB
-    if (!isAdmin && file.size > 3 * 1024 * 1024) {
-      setModalMessage('Maximum file size is 3MB');
+    // Upload idzie przez /api/upload (twardy sufit trasy: 5MB), wiec admin
+    // tez ma limit - "bez limitu" bylo mozliwe tylko przy uploadzie wprost
+    // z przegladarki tokenem zapisu w bundlu, ktory wlasnie wycielismy.
+    const maxUploadBytes = (isAdmin ? 5 : 3) * 1024 * 1024;
+    if (file.size > maxUploadBytes) {
+      setModalMessage(`Maximum file size is ${isAdmin ? 5 : 3}MB`);
       setModalType('error');
       setShowModal(true);
       return;
@@ -2334,7 +2336,7 @@ function BaseChatContent() {
     }
 
     setSelectedFile(file);
-    const maxSizeText = isAdmin ? 'No file size limit for admin' : 'Maximum file size: 3MB';
+    const maxSizeText = isAdmin ? 'Maximum file size: 5MB' : 'Maximum file size: 3MB';
     const timeRestrictionText = isAdmin ? 'Admin can change anytime.' : 'Next change will be possible in one month.';
     setModalMessage(`Are you sure you want to change your profile picture?\n${timeRestrictionText}\n${maxSizeText}`);
     setModalType('confirm');
@@ -2347,12 +2349,16 @@ function BaseChatContent() {
     
     try {
       setIsUploading(true);
-      
-      // Upload do Vercel Blob
-      const { url } = await put(selectedFile.name, selectedFile, {
-        access: 'public',
-        token: process.env.NEXT_PUBLIC_BLOB_READ_WRITE_TOKEN
-      });
+
+      // Upload przez /api/upload, jak kazdy inny plik w aplikacji. Wczesniej
+      // szedl tu put() prosto z przegladarki tokenem NEXT_PUBLIC_* - czyli
+      // token ZAPISU Bloba lezal w publicznym bundlu JS i kazdy mogl nim
+      // pisac po naszym magazynie. Serwerowa trasa trzyma token u siebie.
+      const form = new FormData();
+      form.append('file', selectedFile);
+      const uploadResponse = await fetch('/api/upload', { method: 'POST', body: form });
+      if (!uploadResponse.ok) throw new Error('Upload failed');
+      const { url } = (await uploadResponse.json()) as { url: string };
 
       // Aktualizuj profil użytkownika
       const userRef = doc(db, 'users', address);
@@ -2592,10 +2598,12 @@ function BaseChatContent() {
   // pobranie zrobione juz przy mouncie. Dane sa odswiezane interwalem ponizej
   // oraz recznie przyciskiem Refresh.
   
-  // Regularne odświeżanie co 10 minut (zwiększono z 2 minut)
+  // Regularne odświeżanie co 30 minut. Bylo 10, dokladnie tyle co TTL cache'u,
+  // wiec kazde tykniecie trafialo w wygasly cache i szlo do Firestore po 60
+  // dokumentow. Lista "najaktywniejszych" nie zmienia sie w tempie minut.
   useEffect(() => {
     if (isMounted) {
-      const refreshInterval = setInterval(() => getActiveUsers(false), 10 * 60 * 1000); // Co 10 minut, używa cache'u
+      const refreshInterval = setInterval(() => getActiveUsers(false), 30 * 60 * 1000);
       
       // Cleanup dla interwału
       return () => {
@@ -4013,7 +4021,7 @@ function BaseChatContent() {
                                         }
 
                                         setSelectedFile(file);
-                                        const maxSizeText = isAdmin ? 'No file size limit for admin' : 'Maximum file size: 3MB';
+                                        const maxSizeText = isAdmin ? 'Maximum file size: 5MB' : 'Maximum file size: 3MB';
                                         const timeRestrictionText = isAdmin ? 'Admin can change anytime.' : 'Next change will be possible in one month.';
                                         setModalMessage(`Are you sure you want to change your profile picture?\n${timeRestrictionText}\n${maxSizeText}`);
                                         setModalType('confirm');

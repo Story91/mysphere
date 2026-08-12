@@ -1351,11 +1351,32 @@ function PostList({
 
     try {
       setIsLoadingMore(true);
-      
+
+      // Kursor paginacji powstaje DOPIERO tutaj, przy pierwszym realnym
+      // dociaganiu. Wczesniej osobny efekt (setInitialLastVisible) robil to na
+      // KAZDYM moncie listy - czyli szedl do Firestore po te same posty,
+      // ktore wlasnie przyszly z cache'u, tylko po to, zeby miec skad zaczac
+      // paginacje, ktorej wiekszosc wejsc nigdy nie uzywa. Teraz placi za to
+      // wylacznie ten, kto faktycznie dociaga, i tylko raz.
+      let cursor = lastVisible;
+      if (!cursor) {
+        const seeded = await fetchPosts({
+          userId: address,
+          limit: internalPosts.length || 15,
+          ...(showMyFeed ? { authorFilter: address } : {})
+        });
+        cursor = seeded.lastVisible;
+        if (!cursor) {
+          setHasMorePosts(false);
+          return;
+        }
+        setLastVisible(cursor);
+      }
+
       // Pobierz następną partię postów
       const { posts: morePosts, lastVisible: newLastVisible } = await fetchPosts({
         userId: address,
-        startAfter: lastVisible,
+        startAfter: cursor,
         limit: 15, // ⚡ OPTYMALIZACJA: Pobieraj 15 postów za razem (-40% Firebase reads)
         ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
       });
@@ -1432,29 +1453,11 @@ function PostList({
   // ❌ USUNIĘTO INFINITE SCROLL - oszczędność Firebase reads/writes
   // Teraz tylko przycisk "Load More" będzie kontrolować ładowanie kolejnych postów
 
-  useEffect(() => {
-    const setInitialLastVisible = async () => {
-      if (internalPosts.length > 0 && !lastVisible && address) {
-        try {
-          const { posts: fetchedPosts, lastVisible: newLastVisible } = await fetchPosts({
-            userId: address,
-            limit: internalPosts.length, // Pobierz tyle postów, ile już mamy, żeby uzyskać poprawny lastVisible
-            ...(showMyFeed ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
-          });
-          
-          setLastVisible(newLastVisible);
-    } catch (error) {
-          console.error('Error setting initial lastVisible:', error);
-          // 🗑️ Wyczyść cache w przypadku błędu
-          if (clearPostsCache) {
-            clearPostsCache();
-          }
-        }
-      }
-    };
-    
-    setInitialLastVisible();
-  }, [internalPosts, address, lastVisible, showMyFeed]);
+  // Stal tu efekt setInitialLastVisible: na kazdym moncie (i przy kazdym
+  // optymistycznym updacie, bo deps wisialy na tozsamosci tablicy) szedl do
+  // Firestore po te same posty wylacznie po kursor paginacji - razy dwie
+  // instancje PostList na ekranie. Kursor zasiewa sie teraz leniwie w
+  // loadMorePosts, wiec caly efekt zniknal.
 
   useEffect(() => {
     const fetchAllTokenData = async () => {

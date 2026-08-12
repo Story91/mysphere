@@ -81,8 +81,14 @@ export const TRUST_MIN_FEEDBACK = 3;
 /** Limit Firestore na liczbe wartosci w operatorze `in`. */
 const IN_CHUNK_SIZE = 30;
 
-/** Ile opinii najwyzej czytamy na raz dla jednego agenta. */
-const FEEDBACK_FETCH_CAP = 300;
+/**
+ * Ile opinii najwyzej czytamy na raz dla jednego agenta.
+ *
+ * 100 wystarcza: sortowanie i agregacja reputacji dzieja sie w pamieci na tej
+ * probce, a agenci z setkami opinii to wyjatek - czytanie trzykrotnie wiecej
+ * dokumentow nie zmienialo wyniku, tylko rachunek za odczyty.
+ */
+const FEEDBACK_FETCH_CAP = 100;
 
 /** Skala suwaka w formularzu opinii. */
 const RAW_SCORE_MIN = -100;

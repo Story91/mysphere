@@ -438,30 +438,64 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
 // 🔔 NOTIFICATIONS HOOK
 // ===============================================
 
+export interface UseNotificationsOptions {
+  /**
+   * Dzwonek w globalnej nawigacji montuje sie na KAZDEJ trasie, a na start
+   * potrzebuje wylacznie licznika nieprzeczytanych (1 tani odczyt licznika
+   * z dokumentu usera). Pelna lista to 20 pelnych dokumentow subkolekcji -
+   * pobierana bezwarunkowo na mount kosztowala ~21 odczytow za sama kropke,
+   * na kazde wejscie na kazda strone. Z lazyList mount czyta tylko licznik,
+   * a lista dociera dopiero po jawnym loadNotificationsList().
+   */
+  lazyList?: boolean;
+}
+
 export interface UseNotificationsResult {
   notifications: Notification[];
   /** `null` = liczby NIE ODCZYTANO. Zero znaczy "nic nowego". */
   unreadCount: number | null;
   loading: boolean;
+  /** Doczytywanie listy na zadanie (tryb lazyList) - osobno od `loading`,
+   *  zeby kropka z licznikiem nie migala spinnerem, gdy dogrywa sie lista. */
+  listLoading: boolean;
   error: string | null;
   markAsRead: (notificationId: string) => Promise<boolean>;
   markAllAsRead: () => Promise<boolean>;
   deleteNotification: (notificationId: string) => Promise<boolean>;
+  /**
+   * Doczytuje liste, gdy user naprawde chce ja zobaczyc (np. otwarcie
+   * dropdownu). Wynik siedzi w stanie hooka jako cache sesyjny - ponowne
+   * wywolanie nie czyta bazy drugi raz. Wymuszone odswiezenie to
+   * refreshNotifications().
+   */
+  loadNotificationsList: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
 }
 
 /**
  * Hook do zarządzania powiadomieniami
  */
-export const useNotifications = (userAddress: string | null): UseNotificationsResult => {
+export const useNotifications = (
+  userAddress: string | null,
+  options?: UseNotificationsOptions
+): UseNotificationsResult => {
+  // Prymityw zamiast obiektu opcji w zaleznosciach efektu - konsumenci
+  // podaja opcje inline, wiec obiekt jest nowy co render i restartowalby
+  // efekt (czyli i odczyty) przy kazdym przerysowaniu.
+  const lazyList = options?.lazyList ?? false;
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
   // `null` = nie odczytano. Zero to twierdzenie "nic nowego" i nie wolno go
   // wpisac po padnietym zapytaniu.
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const socialAPIRef = useRef<SocialAPI | null>(null);
+  // Czy lista TEGO uzytkownika juz jest w stanie. Ref, nie stan - to czysty
+  // strażnik przed powtornym odczytem 20 dokumentow, nic nie renderuje.
+  const listLoadedRef = useRef(false);
 
   useEffect(() => {
     if (!userAddress) {
@@ -470,11 +504,14 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
       setUnreadCount(0);
       setLoading(false);
       socialAPIRef.current = null;
+      listLoadedRef.current = false;
       return;
     }
 
     const api = createSocialAPI(userAddress);
     socialAPIRef.current = api;
+    // Nowy adres = cache listy poprzedniego uzytkownika przestaje byc prawda.
+    listLoadedRef.current = false;
 
     // Po zmianie adresu (albo odmontowaniu) stara odpowiedz nie moze nadpisac stanu.
     let cancelled = false;
@@ -484,14 +521,24 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
         setLoading(true);
         setError(null);
 
-        const [notificationsData, unreadCountData] = await Promise.all([
-          api.getNotifications(20),
-          api.getUnreadNotificationsCount()
-        ]);
-        if (cancelled) return;
+        if (lazyList) {
+          // Lista poprzedniego uzytkownika nie moze wisiec w stanie do czasu,
+          // az ktos zawola loadNotificationsList().
+          setNotifications([]);
+          const unreadCountData = await api.getUnreadNotificationsCount();
+          if (cancelled) return;
+          setUnreadCount(unreadCountData);
+        } else {
+          const [notificationsData, unreadCountData] = await Promise.all([
+            api.getNotifications(20),
+            api.getUnreadNotificationsCount()
+          ]);
+          if (cancelled) return;
 
-        setNotifications(notificationsData);
-        setUnreadCount(unreadCountData);
+          setNotifications(notificationsData);
+          setUnreadCount(unreadCountData);
+          listLoadedRef.current = true;
+        }
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
@@ -504,7 +551,7 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
     loadNotifications();
 
     return () => { cancelled = true; };
-  }, [userAddress]);
+  }, [userAddress, lazyList]);
 
   const markAsRead = useCallback(async (notificationId: string): Promise<boolean> => {
     if (!socialAPIRef.current) return false;
@@ -560,6 +607,30 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
     }
   }, [notifications]);
 
+  const loadNotificationsList = useCallback(async (): Promise<void> => {
+    const api = socialAPIRef.current;
+    if (!api) return;
+    // Cache sesyjny: drugie otwarcie dropdownu nie placi drugi raz za 20
+    // dokumentow. Kto chce swiezej listy, wola refreshNotifications().
+    if (listLoadedRef.current) return;
+
+    try {
+      setListLoading(true);
+      const notificationsData = await api.getNotifications(20);
+      // Jesli w trakcie pobierania zmienil sie adres, ta odpowiedz nalezy do
+      // starego uzytkownika i nie wolno jej wpisac w stan nowego.
+      if (socialAPIRef.current !== api) return;
+
+      setNotifications(notificationsData);
+      listLoadedRef.current = true;
+    } catch (error) {
+      console.error('Error loading notifications list:', error);
+      setError("Notifications couldn't be loaded.");
+    } finally {
+      setListLoading(false);
+    }
+  }, []);
+
   const refreshNotifications = useCallback(async (): Promise<void> => {
     if (!socialAPIRef.current) return;
 
@@ -571,6 +642,9 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
 
       setNotifications(notificationsData);
       setUnreadCount(unreadCountData);
+      // Swiezo pobrana lista jest w stanie, wiec lazy-loader nie musi
+      // czytac jej jeszcze raz.
+      listLoadedRef.current = true;
     } catch (error) {
       console.error('Error refreshing notifications:', error);
     }
@@ -580,10 +654,12 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
     notifications,
     unreadCount,
     loading,
+    listLoading,
     error,
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    loadNotificationsList,
     refreshNotifications
   };
 };

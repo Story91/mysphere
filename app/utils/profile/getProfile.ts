@@ -107,13 +107,19 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
       )
     ).catch(onFail('posts')),
 
+    // limit(500) na obu zapytaniach o tipy: sumy i liczniki powstaja z co
+    // najwyzej 500 wpisow, nie z calej historii - bez limitu profil bardzo
+    // aktywnego adresu czytalby tysiace dokumentow przy kazdym wejsciu.
+    // Celowo bez orderBy: `in` + orderBy wymaga indeksu zlozonego, ktorego
+    // brak wywracalby zapytanie. Docelowo (faza 2 audytu kosztow) zastapia
+    // to liczniki agregowane przy zapisie.
     getDocs(
-      query(collection(db, 'tips'), where('recipientAddress', 'in', variants))
+      query(collection(db, 'tips'), where('recipientAddress', 'in', variants), limit(500))
     ).catch(onFail('tips.received')),
 
-    getDocs(query(collection(db, 'tips'), where('senderAddress', 'in', variants))).catch(
-      onFail('tips.sent')
-    ),
+    getDocs(
+      query(collection(db, 'tips'), where('senderAddress', 'in', variants), limit(500))
+    ).catch(onFail('tips.sent')),
   ]);
 
   const userData = (userDoc?.data() ?? {}) as Record<string, any>;

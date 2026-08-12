@@ -13,12 +13,15 @@ import {
 import { EXAM_ATTEMPT_COOLDOWN_MS, EXAM_MAX_ATTEMPTS_PER_DAY } from "@/app/utils/myclaw/progress";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 /**
  * Katalog jest DARMOWY z zalozenia - to discovery. Agent musi poznac cennik
  * i wymagania zanim zaplaci za cokolwiek, wiec tej trasy nie owijamy w x402.
- * force-dynamic, bo tresc odpowiedzi zalezy od X402_PAY_TO_ADDRESS.
+ *
+ * Bez force-dynamic i z doba w CDN: tresc zalezy wylacznie od stalych w kodzie
+ * i od X402_PAY_TO_ADDRESS, a zmiana zmiennej srodowiskowej na Vercelu i tak
+ * wymaga nowego wdrozenia - swiezy deploy uniewaznia cache, wiec odpowiedz
+ * nigdy nie klamie dluzej niz s-maxage.
  */
 
 const DISCIPLINES = [
@@ -209,5 +212,7 @@ export async function GET() {
         status: paidStatus,
       },
     },
+  }, {
+    headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800' }
   });
 }

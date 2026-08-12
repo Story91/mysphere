@@ -33,6 +33,48 @@ const isValidUrl = (urlString: string) => {
   }
 };
 
+// Cache na poziomie MODULU: feed montuje i odmontowuje karty przy scrollu,
+// wiec ten sam URL potrafil trafic do /api/link-preview kilka razy w jednej
+// sesji. Wynik trzymamy per URL, a zapytania w locie deduplikujemy przez
+// wspoldzielona obietnice - drugi mount czeka na pierwszy fetch zamiast
+// odpalac wlasny.
+const previewCache = new Map<string, LinkPreview>();
+const inflightPreviews = new Map<string, Promise<LinkPreview | null>>();
+
+function loadPreview(link: string): Promise<LinkPreview | null> {
+  const cached = previewCache.get(link);
+  if (cached) return Promise.resolve(cached);
+
+  const inflight = inflightPreviews.get(link);
+  if (inflight) return inflight;
+
+  const request = (async () => {
+    try {
+      const response = await fetch(`/api/link-preview?url=${encodeURIComponent(link)}`, {
+        // Timeout, zeby wiszacy host nie blokowal miejsca w partii
+        signal: AbortSignal.timeout(6000)
+      });
+      const data = await response.json();
+      if (data && data.title) {
+        // Trasa oznacza fallbacki bledow flaga `degraded` (timeout, blad HTTP,
+        // nie-HTML) - pokazujemy je, ale NIE utrwalamy w cache'u modulu, zeby
+        // chwilowa czkawka celu nie zamrazala zepsutego podgladu na cala sesje.
+        if (!data.degraded) previewCache.set(link, data);
+        return data as LinkPreview;
+      }
+      return null;
+    } catch {
+      // Bledu nie cache'ujemy - kolejny mount ma prawo sprobowac jeszcze raz
+      return null;
+    } finally {
+      inflightPreviews.delete(link);
+    }
+  })();
+
+  inflightPreviews.set(link, request);
+  return request;
+}
+
 export default function LinkPreview({ content, media }: LinkPreviewProps) {
   const [links, setLinks] = useState<string[]>([]);
   const [previews, setPreviews] = useState<{[key: string]: LinkPreview}>({});
@@ -59,17 +101,15 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
 
     // Pobierz metadane dla każdego linku
     const fetchPreviews = async () => {
-      const newPreviews: {[key: string]: LinkPreview} = {};
-      
       // Ograniczamy liczbę równoczesnych zapytań do API
       const MAX_CONCURRENT_REQUESTS = 3;
       const chunks = [];
-      
+
       // Dzielimy linki na mniejsze grupy, aby uniknąć zbyt wielu równoczesnych żądań
       for (let i = 0; i < links.length; i += MAX_CONCURRENT_REQUESTS) {
         chunks.push(links.slice(i, i + MAX_CONCURRENT_REQUESTS));
       }
-      
+
       // Przetwarzaj każdą grupę linków sekwencyjnie
       for (const chunk of chunks) {
         if (cancelled) return;
@@ -77,6 +117,13 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
         // Ale linki w grupie przetwarzaj równolegle
         await Promise.all(chunk.map(async (link) => {
           try {
+            // Trafiony cache pomija placeholder - dane sa juz kompletne
+            const cached = previewCache.get(link);
+            if (cached) {
+              if (!cancelled) setPreviews(prev => ({...prev, [link]: cached}));
+              return;
+            }
+
             const hostname = new URL(link).hostname;
 
             // Ustaw podstawowe domyślne wartości
@@ -88,21 +135,14 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
             };
 
             // Na początku ustaw domyślne wartości, aby użytkownik widział coś od razu
-            newPreviews[link] = defaultPreview;
             if (cancelled) return;
             setPreviews(prev => ({...prev, [link]: defaultPreview}));
 
-            // Pobierz metadane z API
-            const response = await fetch(`/api/link-preview?url=${encodeURIComponent(link)}`, {
-              // Dodaj timeout do fetch
-              signal: AbortSignal.timeout(6000)
-            });
-
-            const data = await response.json();
+            // Pobierz metadane z API (przez cache i dedup na poziomie modulu)
+            const data = await loadPreview(link);
 
             // Aktualizuj podgląd tylko jeśli dostaliśmy sensowne dane
-            if (data && data.title && !cancelled) {
-              newPreviews[link] = data;
+            if (data && !cancelled) {
               setPreviews(prev => ({...prev, [link]: data}));
             }
           } catch {

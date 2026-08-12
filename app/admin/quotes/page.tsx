@@ -10,7 +10,7 @@ import {
   ADMIN_ADDRESS,
   db
 } from '@/app/utils/firebase';
-import { collection, query, orderBy, getDocs, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 // Kategorie cytatów
@@ -53,9 +53,12 @@ export default function AdminQuotes() {
       try {
         setIsLoading(true);
         const quotesRef = collection(db, 'authorizedQuotes');
+        // limit(100): panel moderacji pracuje na najnowszych zgloszeniach,
+        // a bez limitu kazde otwarcie strony czytalo cala kolekcje.
         const q = query(
           quotesRef,
-          orderBy('timestamp', 'desc')
+          orderBy('timestamp', 'desc'),
+          limit(100)
         );
         
         const snapshot = await getDocs(q);

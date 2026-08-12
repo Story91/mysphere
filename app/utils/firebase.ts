@@ -3872,19 +3872,25 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
   const now = Timestamp.now();
   
   try {
+    // Oba zapytania byly BEZ limitu i rosly liniowo z kazdym postem
+    // kiedykolwiek przypietym - na kazde wejscie na feed. Sekcja przypietych
+    // pokazuje kilka pozycji, wiec sufit 12+24 to wielokrotny zapas, a koszt
+    // przestaje rosnac z historia.
     // 1. Fetch Admin-pinned posts
     const adminPinnedQuery = query(
       collection(db, 'posts'),
       where('isPinned', '==', true),
-      firestoreOrderBy('pinnedAt', 'desc')
+      firestoreOrderBy('pinnedAt', 'desc'),
+      firestoreLimit(12)
     );
-    
+
     // 2. Fetch Active Paid-pinned posts
     const paidPinsQuery = query(
       collection(db, 'paidPins'),
       where('isActive', '==', true),
       where('expiresAt', '>', now),
-      firestoreOrderBy('expiresAt', 'desc')
+      firestoreOrderBy('expiresAt', 'desc'),
+      firestoreLimit(24)
     );
 
     const [adminPinnedSnapshot, paidPinsSnapshot] = await Promise.all([
@@ -4202,8 +4208,15 @@ export const getUserTipStats = async (userAddress: string): Promise<TipStats | n
      * scripts/migrateAddressCasing.mjs.
      */
     const variants = addressReadVariants(userAddress);
-    const receivedQuery = query(tipsRef, where('recipientAddress', 'in', variants));
-    const sentQuery = query(tipsRef, where('senderAddress', 'in', variants));
+    // Sufit 500 na strone: bez niego zapytania rosly bez konca z historia
+    // napiwkow uzytkownika (Firestore rozlicza kazdy zwrocony dokument).
+    // Celowo bez orderBy - `in` + orderBy wymaga indeksu zlozonego, ktorego
+    // nie ma, wiec powyzej 500 wpisow suma liczy sie z 500 dokumentow w
+    // domyslnej kolejnosci (po ID), nie z "najnowszych". Dzis w kolekcji jest
+    // ~190 wpisow, wiec wynik jest kompletny; zanim sufit zacznie realnie
+    // ucinac, faza 2 audytu kosztow zastapi to licznikami agregowanymi.
+    const receivedQuery = query(tipsRef, where('recipientAddress', 'in', variants), firestoreLimit(500));
+    const sentQuery = query(tipsRef, where('senderAddress', 'in', variants), firestoreLimit(500));
 
     const [receivedSnapshot, sentSnapshot] = await Promise.all([
       getDocs(receivedQuery),

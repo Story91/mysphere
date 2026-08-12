@@ -1,5 +1,17 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { parse } from 'node-html-parser';
+
+// node-html-parser i pelny fetch po HTML - trzymamy sie Node, zeby nie ryzykowac
+// limitow pamieci i zgodnosci edge przy parsowaniu obcych stron.
+export const runtime = 'nodejs';
+
+// Podglad URL-a praktycznie sie nie zmienia, wiec CDN moze go serwowac dobe
+// (i tydzien na zasadzie stale-while-revalidate) zamiast budzic funkcje przy
+// kazdym wyswietleniu tego samego linku w feedzie.
+const CACHE_OK = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800';
+// Bledy tez cache'ujemy, ale krotko - zeby zepsuty URL nie mlocil funkcji
+// przy kazdym remoncie karty, a jednoczesnie mogl sie naprawic po 5 minutach.
+const CACHE_ERR = 'public, max-age=300';
 
 /**
  * Podglad linku wklejonego w poscie.
@@ -56,8 +68,9 @@ export async function GET(request: Request) {
       title: 'Error',
       description: 'URL is required',
       image: '',
-      siteName: 'Error'
-    }, { status: 200 });
+      siteName: 'Error',
+      degraded: true
+    }, { status: 200, headers: { 'Cache-Control': CACHE_ERR } });
   }
 
   let hostname = '';
@@ -78,8 +91,9 @@ export async function GET(request: Request) {
       title: 'Invalid URL',
       description: 'Could not parse URL',
       image: '',
-      siteName: 'Error'
-    }, { status: 200 });
+      siteName: 'Error',
+      degraded: true
+    }, { status: 200, headers: { 'Cache-Control': CACHE_ERR } });
   }
 
   try {
@@ -89,7 +103,7 @@ export async function GET(request: Request) {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5'
       },
-      // Dodaj timeout, aby uniknąć długiego oczekiwania
+      // Dodaj timeout, aby uniknÄ…Ä‡ dĹ‚ugiego oczekiwania
       signal: AbortSignal.timeout(5000) 
     });
 
@@ -98,8 +112,9 @@ export async function GET(request: Request) {
         title: hostname,
         description: 'Link preview not available',
         image: '',
-        siteName: hostname
-      }, { status: 200 });
+        siteName: hostname,
+        degraded: true
+      }, { status: 200, headers: { 'Cache-Control': CACHE_ERR } });
     }
 
     // Podglad ma sens tylko dla HTML. Parsowanie pliku wideo albo archiwum to
@@ -110,8 +125,9 @@ export async function GET(request: Request) {
         title: hostname,
         description: 'Link preview not available',
         image: '',
-        siteName: hostname
-      }, { status: 200 });
+        siteName: hostname,
+        degraded: true
+      }, { status: 200, headers: { 'Cache-Control': CACHE_ERR } });
     }
 
     const html = (await response.text()).slice(0, MAX_HTML_BYTES);
@@ -131,14 +147,15 @@ export async function GET(request: Request) {
                 hostname,
     };
 
-    return NextResponse.json(metadata, { status: 200 });
+    return NextResponse.json(metadata, { status: 200, headers: { 'Cache-Control': CACHE_OK } });
   } catch (error) {
-    // Zawsze zwracaj status 200 z domyślnymi wartościami
+    // Zawsze zwracaj status 200 z domyĹ›lnymi wartoĹ›ciami
     return NextResponse.json({
       title: hostname,
       description: 'Link preview not available',
       image: '',
-      siteName: hostname
-    }, { status: 200 });
+      siteName: hostname,
+      degraded: true
+    }, { status: 200, headers: { 'Cache-Control': CACHE_ERR } });
   }
 } 

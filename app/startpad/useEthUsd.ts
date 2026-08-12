@@ -33,10 +33,19 @@ export function useEthUsd(): { usd: number | null; refreshedAt: number | null } 
       }
     };
     void load();
-    const timer = window.setInterval(() => void load(), POLL_MS);
+    // Na ukrytej karcie kurs nikomu nie jest potrzebny - tick odpuszcza fetch,
+    // a powrot na karte od razu odswieza, zeby dopiski USD nie byly przeterminowane.
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void load();
+    }, POLL_MS);
+    const onVisible = () => {
+      if (!document.hidden) void load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
 
