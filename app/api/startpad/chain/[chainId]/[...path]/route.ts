@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * Otwarty proxy = ktokolwiek wysyla dowolne zapytanie na dowolny lancuch NASZYM
  * kluczem. Wiec twardo ograniczamy:
  *   - tylko GET (Blockscout v2 read),
- *   - tylko NASZE lancuchy (84532 Base Sepolia, 4663 Robinhood),
+ *   - tylko NASZE lancuchy (8453 Base mainnet, 84532 Base Sepolia, 4663 Robinhood),
  *   - tylko sciezki odczytu, ktorych naprawde uzywamy (tokens/, addresses/, stats).
  * Wszystko inne dostaje 400/403 ZANIM dotknie klucza.
  */
@@ -25,7 +25,11 @@ import { NextRequest, NextResponse } from 'next/server';
 const BLOCKSCOUT_BASE = 'https://api.blockscout.com';
 
 // Lancuchy, ktore Startpad obsluguje. Spoza tej listy nie ruszamy klucza.
-const ALLOWED_CHAINS = new Set(['84532', '4663']);
+// 8453 (Base mainnet) dodane z wdrozeniem launchpada 2026-08-11 - bez niego
+// board Base mainnet dostawal 400 na `tokens/<addr>/counters`. UWAGA: Blockscout
+// moze jeszcze nie miec swiezego tokena B20 (upstream odda 402/404), ale to juz
+// obsluguje fallback klienta - lepsze niz twardy 400 z naszej strony.
+const ALLOWED_CHAINS = new Set(['8453', '84532', '4663']);
 
 // Prefiksy sciezek, ktore realnie czytamy. Reszta odbija sie 403 - nie chcemy,
 // zeby ktos przez nasz proxy indeksowal cala siec na nasz rachunek.

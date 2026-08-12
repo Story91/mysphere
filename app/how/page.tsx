@@ -35,12 +35,11 @@ import Link from 'next/link';
  *                     produkcyjnym zadna krzywa nie doszla jeszcze do
  *                     3.00 ETH, wiec nikt nie graduowal naprawde.
  *
- * === STARTPAD JEST NA TESTNECIE I KAZDY JEGO KROK TO MOWI ===
- * Naglowek strony obiecuje, ze wszystko tu kosztuje prawdziwe pieniadze.
- * Kroki 08-10 (Startpad) sa wyjatkiem: chodza na Base Sepolia, gdzie ETH
- * jest z kranika. Udawanie, ze faucetowy ETH to pieniadz, byloby dokladnie
- * tym klamstwem, przed ktorym ta strona sie broni - wiec pigulka kosztu
- * mowi "Test ETH", a pierwszy akapit kroku 08 mowi to wprost.
+ * === STARTPAD JEST NA BASE MAINNET (od 2026-08-11) ===
+ * Naglowek strony obiecuje, ze wszystko tu kosztuje prawdziwe pieniadze -
+ * i Startpad (kroki 08-10) juz sie w to wpisuje: domyslnie chodzi na Base
+ * mainnet z PRAWDZIWYM ETH. Base Sepolia zostaje jako opcja testowa. Pigulka
+ * kroku 08 mowi "Gas on Base", a akapit kroku 08 mowi wprost, ze to realny ETH.
  *
  * Instrukcja, ktora przemilcza pustke po drugiej stronie przycisku, klamie
  * przez sugestie kolejki, ktorej nie ma. Czlowiek, ktory bedzie pierwszy, ma
@@ -150,15 +149,15 @@ const STEPS: StepMeta[] = [
    * === TRZY KROKI STARTPADA ===
    * Kolejnosc niesie zaleznosc, tak jak w calej tablicy: bez startu (08)
    * nie ma czym handlowac (09), bez handlu nie ma oplat do odebrania (10).
-   * Wszystkie trzy chodza na Base Sepolia - uzasadnienie pigulki "Test ETH"
-   * stoi w komentarzu naglowkowym pliku.
+   * Wszystkie trzy chodza domyslnie na Base mainnet (realny ETH); Base Sepolia
+   * jest opcja testowa. Uzasadnienie stoi w komentarzu naglowkowym pliku.
    */
   {
     n: '08',
     id: 'launch',
     title: 'Launch a token on Startpad',
-    cost: 'Test ETH',
-    note: 'Runs on Base Sepolia, where ETH comes from a faucet, not real money',
+    cost: 'Gas on Base',
+    note: 'Runs on Base mainnet with real ETH; a Base Sepolia testnet is there for practice',
   },
   {
     n: '09',
@@ -555,8 +554,8 @@ export default function HowPage() {
               <Hi>Startpad</Hi> launches a token on a bonding curve: one
               transaction mints the whole billion-token supply straight onto
               the curve, and nobody (you included) gets any of it for free.
-              It runs on <Hi>Base Sepolia</Hi>, the test network, so the ETH
-              you sign with here comes from a faucet and is not real money.
+              It runs on <Hi>Base mainnet</Hi>, so the ETH you sign with here
+              is real. A Base Sepolia testnet is there if you want to practice first.
             </P>
             <P>
               A <Hi>logo is required</Hi> before the launch button works.
