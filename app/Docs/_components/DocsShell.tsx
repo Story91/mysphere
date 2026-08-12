@@ -4,10 +4,11 @@ import DocsTopNav from './DocsTopNav';
 
 /**
  * Rama dokumentacji: lewy sidebar (desktop) + kolumna tresci. Uzywana WPROST
- * przez kazda strone przewodnika (/Docs i /Docs/<modul>), a NIE jako
- * segmentowy layout.tsx - bo layout objalby takze /Docs/mysphere-whitepaper,
- * ktory jest samodzielna strona z wlasnymi krojami i wlasnym ukladem. Rama
- * jako komponent zostawia tamta strone nietknieta.
+ * przez kazda strone przewodnika (/Docs i /Docs/<modul>), nie jako segmentowy
+ * layout.tsx. Historycznie chodzilo o to, zeby nie objac osieroconej trasy
+ * /Docs/mysphere-whitepaper - ta trasa jest juz usunieta (whitepaper zyje
+ * wylacznie jako statyczny /mysphere-whitepaper-english.html), a rama jako
+ * komponent zostaje, bo strony i tak nakladaja ja per plik.
  */
 export default function DocsShell({ children }: { children: React.ReactNode }) {
   return (
