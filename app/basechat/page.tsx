@@ -40,7 +40,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
 import { useBanStatus } from '../hooks/useBanStatus';
-const ReferralLeaderboard = dynamic(() => import('../utils/referrals/components/ReferralLeaderboard'), { ssr: false });
+// ReferralLeaderboard wylaczony w kolumnie bocznej (decyzja wlasciciela) -
+// import wroci razem z kafelkiem.
 import BuilderProfile from './components/BuilderProfile';
 const FollowingView = dynamic(() => import('./friendsystem/FollowingView'), { ssr: false });
 const FriendsView = dynamic(() => import('./friendsystem/FriendsView'), { ssr: false });
@@ -51,7 +52,8 @@ const NotificationsView = dynamic(() => import('./friendsystem/NotificationsView
 import { RefreshCw } from 'lucide-react';
 import TransactionButton from '../components/TransactionButton';
 import { toast } from 'react-hot-toast';
-const YapsMetrics = dynamic(() => import('../yapscan/components/YapsMetrics'), { ssr: false });
+// YapsMetrics (YapScan) wylaczony w kolumnie bocznej (decyzja wlasciciela) -
+// import wroci razem z kafelkiem.
 
 
 import PostList, { ExtendedPost } from './components/PostList';
@@ -2971,6 +2973,10 @@ function BaseChatContent() {
   const handleBackToFeed = () => {
     setActiveMainPanel('feed');
     setSelectedBuilderProfile(null);
+    // Panel edycji mieszka teraz nad wlasnym Builder Profile - wyjscie
+    // z profilu ma go zamykac, inaczej otworzylby sie sam przy nastepnym
+    // wejsciu.
+    setIsEditingProfile(false);
     // Resetowanie tooltipów
     setHoveredUser(null);
   };
@@ -3095,13 +3101,11 @@ function BaseChatContent() {
                    overscrollBehavior: 'contain'
                  }}
                >
-                 {/* Invisible scroll trigger areas for mobile */}
-                 <div className="lg:hidden pointer-events-none absolute inset-0 z-0">
-                   <div className="absolute left-0 top-0 w-8 h-full pointer-events-auto" 
-                        style={{ touchAction: 'pan-y' }}></div>
-                   <div className="absolute right-0 top-0 w-8 h-full pointer-events-auto"
-                        style={{ touchAction: 'pan-y' }}></div>
-                 </div>
+                 {/* Niewidzialne paski "pan-y" przy krawedziach byly obejsciem
+                     karty z tiltem, ktora lapala dotyk i wstrzymywala
+                     przewijanie zakladki Profile. Karta nie renderuje sie juz
+                     na telefonie (patrz ProfileCard nizej), wiec obejscie
+                     zniklo razem z problemem. */}
 
               {/* ===== PROFIL I NAWIGACJA =====
                   Na telefonie to zawartosc zakladki "Profile". Na desktopie -
@@ -3231,13 +3235,46 @@ function BaseChatContent() {
                 <div className="mb-8">
                   {isConnected ? (
                     <div className="space-y-4">
+                      {/* ===== NAGLOWEK PROFILU NA TELEFONIE - Soft Social =====
+                          Stoi PIERWSZY na zakladce "Profile", nad nawigacja:
+                          najpierw kto, potem dokad. Wczesniej byl POD lista
+                          i jego pelnowymiarowy gradient z zaokraglonym dolem
+                          (projektowany na sam szczyt ekranu) wisial w polowie
+                          zakladki.
+
+                          Olowek nie otwiera juz formularza w miejscu -
+                          prowadzi do wlasnego Builder Profile z otwartym
+                          panelem edycji, bo tam mieszka teraz caly formularz
+                          (awatar, nazwa, linki). Jedno miejsce edycji zamiast
+                          dwoch. */}
+                      {address && (
+                        <SoftProfileHeader
+                          name={userProfile.name || 'MySphere User'}
+                          address={address}
+                          avatarUrl={userProfile.avatar}
+                          posts={userProfile.postCount || 0}
+                          likes={userProfile.likesReceived || 0}
+                          // Punkty licza sie z aktywnosci i zyja w userStats
+                          // pod adresem uzytkownika, nie w profilu.
+                          points={(address && userStats[address]?.totalPoints) || 0}
+                          onCopyAddress={() => {
+                            navigator.clipboard.writeText(address);
+                            toast.success('Address copied');
+                          }}
+                          onEdit={() => {
+                            setIsEditingProfile(true);
+                            handleViewBuilderProfile(address);
+                          }}
+                        />
+                      )}
+
                       {/* ===== PRZELACZNIK WIDOKOW - TYLKO NA TELEFONIE =====
-                          "My Profile / Follows / Friends / Discover" siedzialy
-                          dotad na gorze glownego feedu, jako rzad kolorowych
-                          kafli. Zabieraly pierwszy ekran telefonu i konkurowaly
-                          z trescia, po ktora ludzie tu przychodza - a cztery
-                          z pieciu pozycji to wcale nie jest feed, tylko osobne
-                          widoki.
+                          "All Posts / My Profile / Follows / Friends / Discover"
+                          siedzialy dotad na gorze glownego feedu, jako rzad
+                          kolorowych kafli. Zabieraly pierwszy ekran telefonu
+                          i konkurowaly z trescia, po ktora ludzie tu przychodza
+                          - a wiekszosc pozycji to wcale nie jest feed, tylko
+                          osobne widoki.
 
                           Tak samo rozwiazuje to Twitter: os czasu jest sama,
                           a wszystko "moje" siedzi za profilem.
@@ -3259,6 +3296,26 @@ function BaseChatContent() {
                               setActiveMainPanel('feed');
                               clearViewParams();
                               setActiveMobilePanel('main');
+                            },
+                          },
+                          {
+                            // Telefon nie mial ZADNEJ drogi do wlasnego Builder
+                            // Profile - pozycja "My Profile" istniala tylko w
+                            // liscie desktopowej. Ten sam handler co tam;
+                            // handleViewBuilderProfile sam przelacza na panel
+                            // glowny ponizej progu lg.
+                            id: 'profile',
+                            label: 'My Profile',
+                            description: 'Your builder profile',
+                            icon: <UserCircle className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'builders',
+                            onSelect: () => {
+                              if (address) {
+                                handleViewBuilderProfile(address);
+                                clearViewParams();
+                              } else {
+                                toast.error('Connect your wallet to view builder profiles');
+                              }
                             },
                           },
                           {
@@ -3301,393 +3358,23 @@ function BaseChatContent() {
                         ]}
                       />
 
-                      {/* ===== NAGLOWEK PROFILU NA TELEFONIE - Soft Social =====
-                          Ten sam motyw, co ekran startowy: fioletowy gradient
-                          i znak marki na okregu. Tozsamosc produktu wraca w tym
-                          samym miejscu, wiec profil czyta sie jak jego czesc,
-                          a nie jak osobny ekran.
+                      {/* Panel edycji profilu przeniesiony nad wlasny
+                          Builder Profile w kolumnie glownej - patrz
+                          "EDYCJA PROFILU MIESZKA W BUILDER PROFILE". */}
+                      {/* ===== PROFILECARD - TYLKO DESKTOP =====
+                          Na telefonie te sama tozsamosc pokazuje juz
+                          SoftProfileHeader na gorze zakladki, wiec karta byla
+                          drugim awatarem i drugim przyciskiem Edit na jednym
+                          ekranie. Do tego jej efekt tilt lapal dotyk i potrafil
+                          zawiesic przewijanie calej zakladki. Karta z animacja
+                          zostaje tam, gdzie jest mysz - od progu lg w gore.
 
-                          ProfileCard ponizej zostaje NIETKNIETY i widoczny od
-                          progu `lg` w gore - cala jego logika (tilt, edycja,
-                          linki spolecznosciowe) dziala dalej bez zmian. */}
+                          "Edit" nie otwiera juz formularza w kolumnie bocznej -
+                          prowadzi do wlasnego Builder Profile z otwartym
+                          panelem edycji, bo tam mieszka teraz caly formularz. */}
                       {address && (
-                        <SoftProfileHeader
-                          name={userProfile.name || 'MySphere User'}
-                          address={address}
-                          avatarUrl={userProfile.avatar}
-                          posts={userProfile.postCount || 0}
-                          likes={userProfile.likesReceived || 0}
-                          // Punkty licza sie z aktywnosci i zyja w userStats
-                          // pod adresem uzytkownika, nie w profilu.
-                          points={(address && userStats[address]?.totalPoints) || 0}
-                          onCopyAddress={() => {
-                            navigator.clipboard.writeText(address);
-                            toast.success('Address copied');
-                          }}
-                          onEdit={() => setIsEditingProfile(!isEditingProfile)}
-                        />
-                      )}
-
-                      {/* ===== PANEL EDYCJI STOI TAM, GDZIE PRZYCISK, KTORY GO OTWIERA =====
-                          Byl 340 linii nizej - POD obiema kartami profilu. Na
-                          telefonie znaczylo to: dotykasz "Edit" na gorze, nic
-                          widocznego sie nie dzieje, a formularz otwiera sie poza
-                          ekranem. Zgloszenie brzmialo "pokazuje sie dopiero pod
-                          karta" i bylo trafne co do joty.
-
-                          Reakcja na dotkniecie ma byc widoczna w tym samym kadrze,
-                          w ktorym nastapilo dotkniecie. Teraz panel wychodzi
-                          bezposrednio spod naglowka z tym przyciskiem, na obu
-                          szerokosciach. */}
-                      {isEditingProfile && address && (
-                        <div className="mb-3 relative">
-                          <div className="bg-gradient-to-br from-blue-50/80 via-white/50 to-purple-50/80 dark:from-blue-900/20 dark:via-gray-800/40 dark:to-purple-900/20 backdrop-blur-xl rounded-xl border border-blue-200/50 dark:border-blue-700/30 p-4 shadow-xl">
-                            {/* Header */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </div>
-                                <div>
-                                  <h3 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                                    Edit Profile
-                                  </h3>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">Customize your MySphere identity</p>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => setIsEditingProfile(false)}
-                                className="w-6 h-6 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
-                              >
-                                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
-
-                            {/* Profile Picture Section */}
-                            {/* Profile Section - Grid Layout */}
-                            <div className="mb-4 grid grid-cols-2 gap-3">
-                              {/* Profile Picture */}
-                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                  <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  <span>Profile Picture</span>
-                                </label>
-                                <div className="flex flex-col items-center space-y-2">
-                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-blue-200 dark:border-blue-700">
-                                    {userProfile.avatar ? (
-                                      <img
-                                        src={userProfile.avatar}
-                                        alt="Current profile"
-                                        className="w-full h-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 to-purple-900 flex items-center justify-center">
-                                        <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col items-center">
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={async (e) => {
-                                        if (!e.target.files || !e.target.files[0] || !address) return;
-                                        
-                                        const file = e.target.files[0];
-                                        const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
-                                        
-                                        if (!isAdmin && file.size > 3 * 1024 * 1024) {
-                                          alert('Maximum file size is 3MB');
-                                          return;
-                                        }
-
-                                        // Sprawdź ograniczenia czasowe tylko dla zwykłych użytkowników
-                                        if (!isAdmin) {
-                                        const userRef = doc(db, 'users', address);
-                                        const userDoc = await getDoc(userRef);
-                                        const userData = userDoc.data();
-
-                                        if (userData?.lastImageUpdate) {
-                                          const lastUpdate = userData.lastImageUpdate.toDate();
-                                          const oneMonthAgo = new Date();
-                                          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                                          
-                                          if (lastUpdate > oneMonthAgo) {
-                                            const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
-                                            const now = new Date();
-                                            const diff = timeToWait.getTime() - now.getTime();
-                                            
-                                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                                            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                            
-                                            alert(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
-                                            return;
-                                            }
-                                          }
-                                        }
-
-                                        setSelectedFile(file);
-                                        const maxSizeText = isAdmin ? 'No file size limit for admin' : 'Maximum file size: 3MB';
-                                        const timeRestrictionText = isAdmin ? 'Admin can change anytime.' : 'Next change will be possible in one month.';
-                                        setModalMessage(`Are you sure you want to change your profile picture?\n${timeRestrictionText}\n${maxSizeText}`);
-                                        setModalType('confirm');
-                                        setShowModal(true);
-                                      }}
-                                      className="hidden"
-                                      id="profile-picture-input"
-                                    />
-                                    <label
-                                      htmlFor="profile-picture-input"
-                                      className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all cursor-pointer text-xs font-medium shadow-md"
-                                    >
-                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                      </svg>
-                                      Upload
-                                    </label>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                      Max 3MB
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Upgrade Your Card */}
-                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                  <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                  </svg>
-                                  <span>Card Upgrade</span>
-                                </label>
-                                <div className="flex flex-col items-center space-y-2">
-                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-orange-200 dark:border-orange-700 bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-900 dark:to-yellow-900 flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                    </svg>
-                                  </div>
-                                  <div className="flex flex-col items-center">
-                                    <div className="relative group">
-                                      <button
-                                        className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-lg hover:from-orange-600 hover:to-yellow-600 transition-all cursor-pointer text-xs font-medium shadow-md opacity-75 cursor-not-allowed"
-                                        disabled
-                                      >
-                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                        </svg>
-                                        Upgrade Your Card
-                                      </button>
-                                      {/* Tooltip */}
-                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                        soon
-                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                                      </div>
-                                    </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">
-                                      Premium features
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Username Section - only if no baseName */}
-                            {!baseName && (
-                              <div className="mb-4">
-                                <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                    <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                    <span>Username</span>
-                                  </label>
-                                  <div className="space-y-3">
-                                    <div className="space-y-2">
-                                      <input
-                                        type="text"
-                                        value={customName}
-                                        onChange={(e) => setCustomName(e.target.value)}
-                                        placeholder="Enter username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      />
-                                      <div className="flex items-center space-x-2">
-                                        <span className="text-gray-500 text-sm">Choose domain:</span>
-                                        <select
-                                          value={selectedSuffix}
-                                          onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper' | 'celo' | 'world')}
-                                          className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        >
-                                          <option value="sphere">.sphere (+1500 pts!)</option>
-                                          <option value="camper">.camper (+1000 pts!)</option>
-                                          <option value="celo">.celo (+1250 pts!)</option>
-                                          <option value="world">.world (+1250 pts!)</option>
-                                        </select>
-                                      </div>
-                                    </div>
-                                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-2 border border-blue-200/30 dark:border-purple-700/30">
-                                      <div className="text-center text-xs text-gray-600 dark:text-gray-400">
-                                        Preview: <span className="font-medium text-gray-900 dark:text-white">{customName || 'username'}</span>.
-                                        <span className={
-                                          selectedSuffix === 'sphere' ? 'text-blue-500 font-medium' :
-                                          selectedSuffix === 'camper' ? 'text-orange-500 font-medium' :
-                                          selectedSuffix === 'celo' ? 'text-yellow-500 font-medium' :
-                                          'text-green-500 font-medium'
-                                        }>
-                                          {selectedSuffix}
-                                        </span>
-                                        {selectedSuffix === 'sphere' && <span className="text-blue-600 ml-1">+1500 pts!</span>}
-                                        {selectedSuffix === 'camper' && <span className="text-orange-600 ml-1">🏕️ +1000 pts!</span>}
-                                        {selectedSuffix === 'celo' && <span className="text-yellow-600 ml-1">+1250 pts!</span>}
-                                        {selectedSuffix === 'world' && <span className="text-green-600 ml-1">+1250 pts!</span>}
-                                      </div>
-                                    </div>
-                                    <button
-                                      onClick={handleSaveCustomName}
-                                      className="w-full px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs"
-                                    >
-                                      Save Username
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Social Links Section */}
-                            <div className="mb-4">
-                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                  <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                  </svg>
-                                  <span>Social Links</span>
-                                </label>
-                                <div className="space-y-2">
-                                  {/* Twitter */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                      <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                                      </svg>
-                                    </div>
-                                    <div className="flex-1">
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">X (Twitter)</label>
-                                      <input
-                                        type="text"
-                                        value={userProfile.socialLinks?.twitter || ''}
-                                        onChange={(e) => setUserProfile(prev => ({
-                                          ...prev,
-                                          socialLinks: {
-                                            ...prev.socialLinks,
-                                            twitter: e.target.value
-                                          }
-                                        }))}
-                                        placeholder="username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Farcaster */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
-                                      <img src="/icon.png" alt="Farcaster" className="w-4 h-4" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Farcaster/Warpcast</label>
-                                      <input
-                                        type="text"
-                                        value={userProfile.socialLinks?.farcaster || ''}
-                                        onChange={(e) => setUserProfile(prev => ({
-                                          ...prev,
-                                          socialLinks: {
-                                            ...prev.socialLinks,
-                                            farcaster: e.target.value
-                                          }
-                                        }))}
-                                        placeholder="username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Discord */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-8 h-8 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                                      <svg className="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/>
-                                      </svg>
-                                    </div>
-                                    <div className="flex-1">
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Discord</label>
-                                      <input
-                                        type="text"
-                                        value={userProfile.socialLinks?.discord || ''}
-                                        onChange={(e) => setUserProfile(prev => ({
-                                          ...prev,
-                                          socialLinks: {
-                                            ...prev.socialLinks,
-                                            discord: e.target.value
-                                          }
-                                        }))}
-                                        placeholder="username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <button
-                                    onClick={async () => {
-                                      if (!address) return;
-                                      
-                                      try {
-                                        const userRef = doc(db, 'users', address);
-                                        await updateDoc(userRef, {
-                                          socialLinks: userProfile.socialLinks || {},
-                                          lastUpdated: serverTimestamp()
-                                        });
-                                        
-                                        alert('Social links saved!');
-                                      } catch (error) {
-                                        console.error('Error saving social links:', error);
-                                        alert('Error saving social links. Please try again.');
-                                      }
-                                    }}
-                                    className="w-full px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all font-medium text-xs"
-                                  >
-                                    Save Social Links
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => setIsEditingProfile(false)}
-                                className="flex-1 px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs flex items-center justify-center space-x-1"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                <span>Done</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* ProfileCard at the top */}
-                      {address && (
-                        <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
-                                                      <div className="relative z-10 flex justify-center items-start w-full">
+                        <div className="hidden lg:block mb-4">
+                          <div className="relative z-10 flex justify-center items-start w-full">
                               <ProfileCard
                                 name={userProfile.name || 'MySphere User'}
                                 handle={userProfile.name?.replace('.sphere', '').replace('.camper', '').replace('.celo', '').replace('.world', '') || address.slice(0, 6) + '...' + address.slice(-4)}
@@ -3700,7 +3387,8 @@ function BaseChatContent() {
                                 showUserInfo={true}
                                 enableTilt={true}
                                 onContactClick={() => {
-                                  setIsEditingProfile(!isEditingProfile);
+                                  setIsEditingProfile(true);
+                                  handleViewBuilderProfile(address);
                                 }}
                                 className="w-full max-w-sm"
                               />
@@ -3710,32 +3398,8 @@ function BaseChatContent() {
 
 
 
-                      {/* Modern Edit Profile Panel */}
-
-
-
-
-
-                      {/* YapYap Integration - moved outside About Me */}
-                      {address && (
-                        <div className="mb-4">
-                          <div className="rounded-card bg-soft-surface p-4 shadow-card">
-                            <YapsMetrics address={address} />
-                            <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-center">
-                              <div className="flex items-center">
-                                <div className="text-xs text-gray-400 mr-1">Powered by</div>
-                                <div className="text-xs font-medium text-blue-600 flex items-center">
-                                  <svg className="w-4 h-4 mx-1" viewBox="0 0 24 24" fill="currentColor">
-                                    <circle cx="12" cy="12" r="10" fill="currentColor" />
-                                    <path d="M12 8v4M12 16h.01" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                                  </svg>
-                                  Kaito.ai
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      {/* Kafelek YapsMetrics (YapScan) wylaczony decyzja
+                          wlasciciela produktu - wroci razem z trasa /yapscan. */}
 
                       {/* Bio. Naglowek byl tekstem z gradientem (bg-clip-text)
                           i ikona-dekoracja obok - jedno i drugie to sygnal
@@ -3825,10 +3489,9 @@ function BaseChatContent() {
                         </a>
                       </div>
 
-                      {/* Referral Leaderboard */}
-                      <div className="mb-4">
-                        <ReferralLeaderboard />
-                      </div>
+                      {/* Ranking polecen (ReferralLeaderboard) wylaczony
+                          decyzja wlasciciela produktu - kod komponentu zostaje
+                          w app/utils/referrals, tu tylko nie renderujemy. */}
                   </div>
                 ) : (
                   <div className="space-y-4 pointer-events-none">
@@ -3852,29 +3515,9 @@ function BaseChatContent() {
                       </div>
                     </div>
 
-                    {/* Referral Leaderboard */}
-                    <div className="mb-4">
-                      <ReferralLeaderboard />
-                    </div>
-
-                    {/* YapYap Integration */}
-                    <div className="mb-4">
-                      <div className="rounded-card bg-soft-surface p-4 shadow-card">
-                        <YapsMetrics address={''} />
-                        <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-center">
-                          <div className="flex items-center">
-                            <div className="text-xs text-gray-400 mr-1">Powered by</div>
-                            <div className="text-xs font-medium text-blue-600 flex items-center">
-                              <svg className="w-4 h-4 mx-1" viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="12" cy="12" r="10" fill="currentColor" />
-                                <path d="M12 8v4M12 16h.01" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                              </svg>
-                              Kaito.ai
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    {/* ReferralLeaderboard i YapsMetrics wylaczone decyzja
+                        wlasciciela produktu - tak samo jak w galezi
+                        zalogowanej wyzej. */}
 
                     {/* Bio - widok bez podlaczonego portfela.
                         BYLO TU ZMYSLONE BIO ("Building the future of DeFi on
@@ -4243,6 +3886,376 @@ function BaseChatContent() {
 
               {/* Main content switcher based on activeMainPanel (Przełącznik głównej zawartości) */}
               {activeMainPanel === 'builders' ? (
+                <>
+                  {/* Pasek edycji tylko nad WLASNYM profilem. Cudzy profil
+                      nie ma czego edytowac, wiec przycisk sie nie renderuje. */}
+                  {address && selectedBuilderProfile && selectedBuilderProfile.address.toLowerCase() === address.toLowerCase() && (
+                    <div className="mb-4">
+                      <div className="mb-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingProfile(!isEditingProfile)}
+                          className="flex items-center gap-1.5 rounded-pill bg-soft-surface px-4 py-2 font-soft text-[13px] font-semibold text-soft-primary-deep shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span>{isEditingProfile ? 'Close editing' : 'Edit profile'}</span>
+                        </button>
+                      </div>
+                      {/* ===== EDYCJA PROFILU MIESZKA W BUILDER PROFILE =====
+                          Awatar, nazwa i linki spolecznosciowe zmienialy sie
+                          dotad w kolumnie bocznej, w dwoch miejscach naraz:
+                          naglowek mobilny i ProfileCard otwieraly ten sam
+                          formularz, kazdy w innym punkcie ekranu. Teraz panel
+                          stoi w jednym miejscu, nad wlasnym Builder Profile,
+                          a oba tamte przyciski prowadza tutaj. */}
+                      {isEditingProfile && address && (
+                        <div className="mb-3 relative">
+                          <div className="bg-gradient-to-br from-blue-50/80 via-white/50 to-purple-50/80 dark:from-blue-900/20 dark:via-gray-800/40 dark:to-purple-900/20 backdrop-blur-xl rounded-xl border border-blue-200/50 dark:border-blue-700/30 p-4 shadow-xl">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <h3 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                    Edit Profile
+                                  </h3>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Customize your MySphere identity</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => setIsEditingProfile(false)}
+                                className="w-6 h-6 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
+                              >
+                                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+
+                            {/* Profile Picture Section */}
+                            {/* Profile Section - Grid Layout */}
+                            <div className="mb-4 grid grid-cols-2 gap-3">
+                              {/* Profile Picture */}
+                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                                  <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  <span>Profile Picture</span>
+                                </label>
+                                <div className="flex flex-col items-center space-y-2">
+                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-blue-200 dark:border-blue-700">
+                                    {userProfile.avatar ? (
+                                      <img
+                                        src={userProfile.avatar}
+                                        alt="Current profile"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 to-purple-900 flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-center">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={async (e) => {
+                                        if (!e.target.files || !e.target.files[0] || !address) return;
+                                        
+                                        const file = e.target.files[0];
+                                        const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
+                                        
+                                        if (!isAdmin && file.size > 3 * 1024 * 1024) {
+                                          alert('Maximum file size is 3MB');
+                                          return;
+                                        }
+
+                                        // Sprawdź ograniczenia czasowe tylko dla zwykłych użytkowników
+                                        if (!isAdmin) {
+                                        const userRef = doc(db, 'users', address);
+                                        const userDoc = await getDoc(userRef);
+                                        const userData = userDoc.data();
+
+                                        if (userData?.lastImageUpdate) {
+                                          const lastUpdate = userData.lastImageUpdate.toDate();
+                                          const oneMonthAgo = new Date();
+                                          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                                          
+                                          if (lastUpdate > oneMonthAgo) {
+                                            const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
+                                            const now = new Date();
+                                            const diff = timeToWait.getTime() - now.getTime();
+                                            
+                                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                            
+                                            alert(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
+                                            return;
+                                            }
+                                          }
+                                        }
+
+                                        setSelectedFile(file);
+                                        const maxSizeText = isAdmin ? 'No file size limit for admin' : 'Maximum file size: 3MB';
+                                        const timeRestrictionText = isAdmin ? 'Admin can change anytime.' : 'Next change will be possible in one month.';
+                                        setModalMessage(`Are you sure you want to change your profile picture?\n${timeRestrictionText}\n${maxSizeText}`);
+                                        setModalType('confirm');
+                                        setShowModal(true);
+                                      }}
+                                      className="hidden"
+                                      id="profile-picture-input"
+                                    />
+                                    <label
+                                      htmlFor="profile-picture-input"
+                                      className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all cursor-pointer text-xs font-medium shadow-md"
+                                    >
+                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                      </svg>
+                                      Upload
+                                    </label>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      Max 3MB
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Upgrade Your Card */}
+                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                                  <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                  </svg>
+                                  <span>Card Upgrade</span>
+                                </label>
+                                <div className="flex flex-col items-center space-y-2">
+                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-orange-200 dark:border-orange-700 bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-900 dark:to-yellow-900 flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                    </svg>
+                                  </div>
+                                  <div className="flex flex-col items-center">
+                                    <div className="relative group">
+                                      <button
+                                        className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-lg hover:from-orange-600 hover:to-yellow-600 transition-all cursor-pointer text-xs font-medium shadow-md opacity-75 cursor-not-allowed"
+                                        disabled
+                                      >
+                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                        </svg>
+                                        Upgrade Your Card
+                                      </button>
+                                      {/* Tooltip */}
+                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                        soon
+                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">
+                                      Premium features
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Username Section - only if no baseName */}
+                            {!baseName && (
+                              <div className="mb-4">
+                                <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
+                                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                                    <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span>Username</span>
+                                  </label>
+                                  <div className="space-y-3">
+                                    <div className="space-y-2">
+                                      <input
+                                        type="text"
+                                        value={customName}
+                                        onChange={(e) => setCustomName(e.target.value)}
+                                        placeholder="Enter username"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      />
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-gray-500 text-sm">Choose domain:</span>
+                                        <select
+                                          value={selectedSuffix}
+                                          onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper' | 'celo' | 'world')}
+                                          className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        >
+                                          <option value="sphere">.sphere (+1500 pts!)</option>
+                                          <option value="camper">.camper (+1000 pts!)</option>
+                                          <option value="celo">.celo (+1250 pts!)</option>
+                                          <option value="world">.world (+1250 pts!)</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-2 border border-blue-200/30 dark:border-purple-700/30">
+                                      <div className="text-center text-xs text-gray-600 dark:text-gray-400">
+                                        Preview: <span className="font-medium text-gray-900 dark:text-white">{customName || 'username'}</span>.
+                                        <span className={
+                                          selectedSuffix === 'sphere' ? 'text-blue-500 font-medium' :
+                                          selectedSuffix === 'camper' ? 'text-orange-500 font-medium' :
+                                          selectedSuffix === 'celo' ? 'text-yellow-500 font-medium' :
+                                          'text-green-500 font-medium'
+                                        }>
+                                          {selectedSuffix}
+                                        </span>
+                                        {selectedSuffix === 'sphere' && <span className="text-blue-600 ml-1">+1500 pts!</span>}
+                                        {selectedSuffix === 'camper' && <span className="text-orange-600 ml-1">🏕️ +1000 pts!</span>}
+                                        {selectedSuffix === 'celo' && <span className="text-yellow-600 ml-1">+1250 pts!</span>}
+                                        {selectedSuffix === 'world' && <span className="text-green-600 ml-1">+1250 pts!</span>}
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={handleSaveCustomName}
+                                      className="w-full px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs"
+                                    >
+                                      Save Username
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Social Links Section */}
+                            <div className="mb-4">
+                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                                  <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  </svg>
+                                  <span>Social Links</span>
+                                </label>
+                                <div className="space-y-2">
+                                  {/* Twitter */}
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                      <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">X (Twitter)</label>
+                                      <input
+                                        type="text"
+                                        value={userProfile.socialLinks?.twitter || ''}
+                                        onChange={(e) => setUserProfile(prev => ({
+                                          ...prev,
+                                          socialLinks: {
+                                            ...prev.socialLinks,
+                                            twitter: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="username"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Farcaster */}
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                      <img src="/icon.png" alt="Farcaster" className="w-4 h-4" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Farcaster/Warpcast</label>
+                                      <input
+                                        type="text"
+                                        value={userProfile.socialLinks?.farcaster || ''}
+                                        onChange={(e) => setUserProfile(prev => ({
+                                          ...prev,
+                                          socialLinks: {
+                                            ...prev.socialLinks,
+                                            farcaster: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="username"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Discord */}
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-lg flex items-center justify-center">
+                                      <svg className="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/>
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Discord</label>
+                                      <input
+                                        type="text"
+                                        value={userProfile.socialLinks?.discord || ''}
+                                        onChange={(e) => setUserProfile(prev => ({
+                                          ...prev,
+                                          socialLinks: {
+                                            ...prev.socialLinks,
+                                            discord: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="username"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    onClick={async () => {
+                                      if (!address) return;
+                                      
+                                      try {
+                                        const userRef = doc(db, 'users', address);
+                                        await updateDoc(userRef, {
+                                          socialLinks: userProfile.socialLinks || {},
+                                          lastUpdated: serverTimestamp()
+                                        });
+                                        
+                                        alert('Social links saved!');
+                                      } catch (error) {
+                                        console.error('Error saving social links:', error);
+                                        alert('Error saving social links. Please try again.');
+                                      }
+                                    }}
+                                    className="w-full px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all font-medium text-xs"
+                                  >
+                                    Save Social Links
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => setIsEditingProfile(false)}
+                                className="flex-1 px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs flex items-center justify-center space-x-1"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span>Done</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
                   {/* Builder Profile Content */}
                   {selectedBuilderProfile ? (
@@ -4269,6 +4282,7 @@ function BaseChatContent() {
                     </div>
                   )}
                 </div>
+                </>
               ) : activeMainPanel === 'following' ? (
                 /* 👥 FOLLOWING VIEW (Widok obserwowanych) */
                 <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
