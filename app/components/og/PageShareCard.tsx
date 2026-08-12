@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 /**
  * Generyczna karta udostepniania (OG) dla POJEDYNCZEJ strony.
  *
@@ -73,31 +76,60 @@ export function PageShareCard({ eyebrow = 'MYSPHERE.FUN', head, footer, accent =
 }
 
 /**
- * Laduje tlo karty z public/backs/. Probuje <slug>.png, potem <slug>.jpg.
- * Zwraca data-URL albo null (wtedy karta jest ciemna, fallback). Fetch z
- * KANONICZNEJ domeny - obraz jest statycznym assetem tego samego serwisu; gdy
- * pliku nie ma, proba konczy sie null i karta dziala jak dotad.
+ * Laduje tlo karty z public/backs/<slug>.png (lub .jpg) i zwraca data-URL,
+ * albo null (wtedy karta jest ciemna - fallback).
  *
- * Limit 15 MB, bo tla sa duzymi PNG-ami (~6-7 MB). Wynikowa karta to i tak
- * przerenderowany PNG 1200x630, wiec jej rozmiar zalezy od kadru, nie od zrodla.
+ * DWIE DROGI, bo serwerowy fetch WLASNEJ domeny na Vercelu bywa zawodny:
+ *   1. Z DYSKU: plik jest dolaczony do bundla funkcji przez
+ *      outputFileTracingIncludes (next.config.js), wiec czytamy go z
+ *      `${cwd}/public/backs/`. Najpewniejsza droga, bez sieci.
+ *   2. FETCH backstop: najpierw z VERCEL_URL (adres samego deploya - omija
+ *      custom-domain/WAF), potem z kanonicznej domeny.
+ * Gdy zadna droga nie da obrazka, zwracamy null i karta dziala jak dotad.
  */
-const OG_ORIGIN = 'https://mysphere.fun';
+function toDataUrl(buf: Buffer, name: string): string | null {
+  if (buf.length === 0 || buf.length > 20_000_000) return null;
+  const ct = name.endsWith('.jpg') || name.endsWith('.jpeg') ? 'image/jpeg' : 'image/png';
+  return `data:${ct};base64,${buf.toString('base64')}`;
+}
 
 export async function loadOgBg(slug: string): Promise<string | null> {
-  const candidates = [`${slug}.png`, `${slug}.jpg`];
-  for (const name of candidates) {
+  const names = [`${slug}.png`, `${slug}.jpg`];
+
+  // 1) Z dysku (plik w bundlu funkcji).
+  for (const name of names) {
     try {
-      const res = await fetch(`${OG_ORIGIN}/backs/${name}`, { cache: 'no-store' });
-      if (!res.ok) continue;
-      const ct = (res.headers.get('content-type') ?? '').split(';')[0];
-      if (!ct.startsWith('image/')) continue;
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length === 0 || buf.length > 15_000_000) continue;
-      return `data:${ct};base64,${buf.toString('base64')}`;
+      const buf = await readFile(join(process.cwd(), 'public', 'backs', name));
+      const url = toDataUrl(buf, name);
+      if (url) return url;
     } catch {
-      // Brak pliku / blad sieci - probujemy nastepny kandydat.
+      // Brak w bundlu - probujemy siec ponizej.
     }
   }
+
+  // 2) Fetch: VERCEL_URL (deploy) najpierw, potem kanoniczna domena.
+  const origins = [
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    'https://mysphere.fun',
+  ].filter((o): o is string => Boolean(o));
+  for (const origin of origins) {
+    for (const name of names) {
+      try {
+        const res = await fetch(`${origin}/backs/${name}`, {
+          headers: { 'user-agent': 'Mozilla/5.0 (compatible; MySphereOG/1.0)' },
+          cache: 'no-store',
+        });
+        if (!res.ok) continue;
+        const ct = (res.headers.get('content-type') ?? '').split(';')[0];
+        if (!ct.startsWith('image/')) continue;
+        const url = toDataUrl(Buffer.from(await res.arrayBuffer()), name);
+        if (url) return url;
+      } catch {
+        // Nastepny kandydat / origin.
+      }
+    }
+  }
+
   return null;
 }
 
