@@ -697,12 +697,12 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Startpad: launch a token',
     status: 'live',
-    note: 'A bonding curve that closes at exactly 3.00 ETH and graduates into a Uniswap v4 pool, fees split up to 70% to the creator and never less than 30% to the protocol — the floor is in the contract, not the form. It runs on Base Sepolia, where the ETH is not real money, and the full path — launch, curve close, graduation, pool swaps, buyback and burn, claims — has been run end to end there and checked on the chain.',
+    note: 'A bonding curve that closes at exactly 3.00 ETH and graduates into a Uniswap v4 pool, fees split up to 70% to the creator and never less than 30% to the protocol; the floor is in the contract, not the form. It is live on Base mainnet with real ETH (the default network) and also on Base Sepolia for testing. The full path (launch, curve close, graduation, pool swaps, buyback and burn, claims) has been run end to end on Base-mainnet forks and a Sepolia mini-stack; on the live mainnet, launch and trading run, but no token has reached graduation yet.',
   },
   {
     name: 'Startpad on real money',
-    status: 'planned',
-    note: 'The contracts have no owner, no pause and no upgrade path, so a bug on mainnet would be irreversible and nobody could hand the ETH back. An external audit stands between the testnet and mainnet, and this row stays unlit until it has happened.',
+    status: 'live',
+    note: 'Live on Base mainnet since 11 August 2026. The contracts have no owner, no pause and no upgrade path, so a bug is irreversible and nobody could hand the ETH back. The external audit was deferred by the owner in favor of a harder internal adversarial review and real Base-mainnet fork tests; that raised risk is named here on purpose, not hidden. No token has reached graduation on the live deployment yet.',
   },
 ];
 
@@ -1229,8 +1229,7 @@ export default function ReDefinitionPage() {
           <Marker amount="3.00 ETH" label="where the curve closes" />
           <H2>A launch whose terms nobody can change overnight</H2>
           <State tone="live">
-            Runs on /startpad — Base Sepolia, where the ETH is not real money; mainnet after an
-            audit
+            Runs on /startpad, live on Base mainnet with real ETH (default); Base Sepolia is there for testing
           </State>
           <P>
             <Hi>Startpad</Hi> launches an ERC-20 on a bonding curve. When the curve has collected{' '}
