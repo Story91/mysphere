@@ -107,13 +107,29 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
       )
     ).catch(onFail('posts')),
 
+    // limit(500) na obu zapytaniach o tipy: sumy i liczniki powstaja z co
+    // najwyzej 500 wpisow, nie z calej historii - bez limitu profil bardzo
+    // aktywnego adresu czytalby tysiace dokumentow przy kazdym wejsciu.
+    // `orderBy` od 2026-08-13 (wdrozone indeksy tips + timestamp, dzialaja
+    // takze z `in`): sufit ucina najstarsze wpisy zamiast arbitralnego
+    // podzbioru w kolejnosci po ID dokumentu.
     getDocs(
-      query(collection(db, 'tips'), where('recipientAddress', 'in', variants))
+      query(
+        collection(db, 'tips'),
+        where('recipientAddress', 'in', variants),
+        orderBy('timestamp', 'desc'),
+        limit(500)
+      )
     ).catch(onFail('tips.received')),
 
-    getDocs(query(collection(db, 'tips'), where('senderAddress', 'in', variants))).catch(
-      onFail('tips.sent')
-    ),
+    getDocs(
+      query(
+        collection(db, 'tips'),
+        where('senderAddress', 'in', variants),
+        orderBy('timestamp', 'desc'),
+        limit(500)
+      )
+    ).catch(onFail('tips.sent')),
   ]);
 
   const userData = (userDoc?.data() ?? {}) as Record<string, any>;
@@ -134,7 +150,12 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
         content: typeof data.content === 'string' ? data.content : '',
         timestamp: toMillis(data.timestamp),
         likes,
-        commentCount: Array.isArray(data.comments) ? data.comments.length : 0,
+        // Licznik z zapisu przed dlugoscia tablicy - nowe komentarze zyja
+        // tylko w kolekcji `comments`, nie w dokumencie posta.
+        commentCount:
+          typeof data.commentsCount === 'number'
+            ? Math.max(0, data.commentsCount)
+            : Array.isArray(data.comments) ? data.comments.length : 0,
         network: data.network ?? undefined,
       });
     }

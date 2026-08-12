@@ -16,7 +16,11 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   onNotificationsClick
 }) => {
   const { address } = useAccount();
-  const { unreadCount, loading } = useNotifications(address || null);
+  // lazyList: dzwonek wisi w globalnej nawigacji na kazdej trasie, a pokazuje
+  // wylacznie kropke z liczba. Bez tej opcji kazde wejscie na kazda strone
+  // czytalo 20 pelnych dokumentow powiadomien, ktorych nikt tu nie ogladal -
+  // pelna lista mieszka na /basechat?view=notifications i laduje sie tam.
+  const { unreadCount, loading } = useNotifications(address || null, { lazyList: true });
   const [isAnimating, setIsAnimating] = useState(false);
 
   /**

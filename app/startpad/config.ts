@@ -39,6 +39,17 @@ export type LaunchpadNetwork = {
    */
   scanWindow: bigint;
   maxScanWindows: number;
+  /**
+   * Ile sekund trwa jeden blok tej sieci.
+   *
+   * NIE jest to ciekawostka: strona szczegolow tokena estymuje z tego BLOK
+   * STARTU (`anchorBlock - wiek/secondsPerBlock`) i czas kazdej transakcji na
+   * wykresie, zeby nie robic `getBlock` per log. Do 2026-08-13 stala 2 s byla
+   * zaszyta na sztywno pod Base - na Robinhoodzie (blok co 0,1 s) mylila sie
+   * DWUDZIESTOKROTNIE, wiec skan zaczynal grubo powyzej realnego startu tokena
+   * i historia wychodzila pusta.
+   */
+  secondsPerBlock: number;
   /** Sciezka logo sieci w /public; brak = bez logo. */
   logo?: string;
   /** Tailwind pastylki z nazwa sieci - w barwach marki danego lancucha. */
@@ -78,6 +89,7 @@ const baseMainnetEntry: LaunchpadNetwork = {
   // swiezy launchpad i tak ma plytka historie od deployBlock.
   scanWindow: 1_900n,
   maxScanWindows: 90,
+  secondsPerBlock: 2,
   // Barwy marki Base: #0052FF na bieli.
   logo: '/logotypy/Base_square_blue.png',
   pillClass: 'border-[#0052FF]/30 bg-white text-[#0052FF]',
@@ -107,6 +119,7 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     explorerUrl: 'https://sepolia.basescan.org',
     scanWindow: 1_900n, // publiczny RPC Base Sepolii tnie getLogs na 2000 blokach
     maxScanWindows: 64,
+    secondsPerBlock: 2,
     pillClass: 'border-[#0052FF]/25 bg-[#eef3ff] text-[#0052FF]',
     accentTextClass: 'text-soft-primary-deep',
   },
@@ -129,11 +142,24 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       '0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ROBINHOOD_DEPLOY_BLOCK ?? '33102326'),
     explorerUrl: 'https://robinhoodchain.blockscout.com',
-    // Zmierzone: RPC Robinhooda oddaje 200k blokow w jednym getLogs w ~160ms.
-    // Duze okno = 2-3 zapytania siegaja bloku wdrozenia zamiast 100 okien po 1900
-    // (ktore nawet nie docieraly do startu i pokazywaly mocki).
-    scanWindow: 100_000n,
-    maxScanWindows: 15,
+    /**
+     * Zmierzone 2026-08-13: RPC Robinhooda oddaje 2 MLN blokow w jednym
+     * getLogs w ~160 ms (sprawdzone kolejno 200k, 500k, 1M, 2M - wszystkie OK).
+     *
+     * DLACZEGO OKNO MUSI BYC TAK DUZE WLASNIE TUTAJ: Robinhood robi blok co
+     * ~0,1 s, czyli ~864 tys. blokow na dobe. Poprzednie 15 x 100k = 1,5 mln
+     * blokow dawalo raptem ~1,7 DOBY historii - token Smoke (start i cztery
+     * transakcje) wypadl przez to poza skan i znikal z tablicy na kazdym
+     * swiezym urzadzeniu, mimo ze na lancuchu stoi nietkniety.
+     *
+     * 1 mln x 60 okien = 60 mln blokow, czyli ~70 dni historii. To NIE jest
+     * drozsze, tylko tansze: skan przerywa sie na bloku wdrozenia, wiec dzis
+     * caly lancuch miesci sie w 2 zapytaniach zamiat 15.
+     */
+    scanWindow: 1_000_000n,
+    maxScanWindows: 60,
+    // Zmierzone: ~0,1 s/blok (~864 tys. blokow na dobe).
+    secondsPerBlock: 0.1,
     // Barwy marki Robinhooda: jaskrawa zielen #00C805 na czerni - te same,
     // ktorych uzywa sciezka postowania w basechat (RobinhoodPostingConfig).
     logo: '/robin.webp',

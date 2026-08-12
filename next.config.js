@@ -148,12 +148,9 @@ const nextConfig = {
     return config;
   },
   async rewrites() {
-    return [
-      {
-        source: '/flashblock/:path*',
-        destination: 'https://base-is-10x-faster.vercel.app/:path*',
-      },
-    ];
+    // Byl tu proxy /flashblock/* na zewnetrzna appke. Zero uzyc w kodzie,
+    // a kazde trafienie (takze botow) szlo przez nasz egress - usuniety.
+    return [];
   },
   async redirects() {
     return [

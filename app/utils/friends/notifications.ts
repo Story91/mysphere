@@ -702,9 +702,17 @@ export const getNotificationsSummary = async (userId: string): Promise<Notificat
       return getEmptyNotificationSummary();
     }
 
-    // Drugie zapytanie bylo zbedne - recent to po prostu pierwsza piatka tej samej
-    // listy. Byly to 105 odczytow Firestore zamiast 100.
-    const allNotifications = await getUserNotifications(userId, 100);
+    // `total`, `recent` i `byType` licza sie z pobranej listy (jak dotad, 100 -
+    // zeby "Total" nie skurczyl sie u kogos z wieloma powiadomieniami). Zmienia
+    // sie tylko zrodlo `unread`: bierzemy WIEKSZA z dwoch liczb - licznika
+    // w profilu (lapie nieprzeczytane spoza okna 100) i tego, co realnie
+    // nieprzeczytane w pobranej liscie. `max`, nie sam licznik: gdyby licznik
+    // zdryfowal w dol albo do zera, przycisk "Mark all as read" i tak zostaje
+    // widoczny, dopoki na liscie sa nieprzeczytane wpisy.
+    const [allNotifications, unreadFromCounter] = await Promise.all([
+      getUserNotifications(userId, 100),
+      getUnreadNotificationsCount(userId),
+    ]);
     const recentNotifications = allNotifications.slice(0, 5);
 
     const byType: { [K in NotificationType]: number } = {
@@ -720,18 +728,17 @@ export const getNotificationsSummary = async (userId: string): Promise<Notificat
       ACHIEVEMENT: 0
     };
 
-    let unread = 0;
-
+    let unreadInPage = 0;
     allNotifications.forEach(notification => {
       byType[notification.type]++;
       if (!notification.isRead) {
-        unread++;
+        unreadInPage++;
       }
     });
 
     return {
       total: allNotifications.length,
-      unread,
+      unread: Math.max(unreadFromCounter ?? 0, unreadInPage),
       byType,
       recent: recentNotifications
     };

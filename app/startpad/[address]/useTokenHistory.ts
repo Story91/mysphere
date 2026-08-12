@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getAbiItem, type Address } from 'viem';
 import { usePublicClient } from 'wagmi';
 import {
+  ACTIVE_LAUNCHPAD_NETWORK,
   erc20Abi,
   LAUNCHPAD_ADDRESS,
   LAUNCHPAD_CHAIN,
@@ -22,10 +23,14 @@ import {
 /**
  * Historia jednego tokena odtworzona z logow: transakcje krzywej (Bought/Sold
  * launchpada) i salda holderow (Transfer ERC-20). Oba skany ida TYMI SAMYMI
- * oknami po 1900 blokow - publiczny RPC Base Sepolia odrzuca szersze zakresy.
+ * oknami, ktorych rozmiar bierze sie Z KONFIGURACJI SIECI.
+ *
+ * Do 2026-08-13 stalo tu twarde 1900 x 64 okien (limit publicznego RPC Base).
+ * Na Robinhoodzie, gdzie blok trwa 0,1 s, dawalo to okolo TRZECH MINUT
+ * historii - wykres i lista transakcji tokena byly tam puste, mimo ze logi
+ * stoja na lancuchu. Te same wartosci co tablica rynku (patrz config.ts).
  */
-
-const LOG_WINDOW = 1_900n;
+const LOG_WINDOW = ACTIVE_LAUNCHPAD_NETWORK.scanWindow;
 
 /**
  * Sufit okien. Skan i tak zwykle konczy sie wczesniej: schodzimy wstecz tylko
@@ -33,13 +38,16 @@ const LOG_WINDOW = 1_900n;
  * urywa petle w chwili, gdy je zobaczymy - starszych logow tego tokena z
  * definicji nie ma.
  */
-const MAX_LOG_WINDOWS = 64;
+const MAX_LOG_WINDOWS = ACTIVE_LAUNCHPAD_NETWORK.maxScanWindows;
 
 /**
- * Margines pod estymowany blok startu. Estymacja 2 s/blok potrafi sie myslec
- * o pojedyncze bloki; 900 blokow (~30 min) to tani bufor, ktory zamyka temat.
+ * Margines pod estymowany blok startu, w SEKUNDACH przeliczonych na bloki.
+ *
+ * Bylo 900 blokow na sztywno - na Base to ~30 minut zapasu, ale na
+ * Robinhoodzie (0,1 s/blok) raptem 90 sekund, czyli za malo, zeby pokryc blad
+ * estymacji. Liczymy wiec z czasu: pol godziny zapasu w kazdej sieci.
  */
-const LAUNCH_BLOCK_MARGIN = 900n;
+const LAUNCH_BLOCK_MARGIN = BigInt(Math.ceil(1800 / SECONDS_PER_BLOCK));
 
 const LAUNCHED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Launched' });
 const BOUGHT_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Bought' });

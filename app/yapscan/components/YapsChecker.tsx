@@ -31,7 +31,9 @@ export default function YapsChecker() {
     setMetrics(null);
 
     try {
-      const response = await fetch(`/api/yaps/metrics?username=${encodeURIComponent(username.trim())}`);
+      // /api/yaps zwraca surowa odpowiedz Kaito - ten sam ksztalt, ktory
+      // zwracal usuniety duplikat /api/yaps/metrics.
+      const response = await fetch(`/api/yaps?username=${encodeURIComponent(username.trim())}`);
       if (!response.ok) {
         throw new Error('Failed to fetch Yaps metrics');
       }

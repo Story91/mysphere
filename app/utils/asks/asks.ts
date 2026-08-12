@@ -281,8 +281,16 @@ function toAnswerMeta(id: string, data: Record<string, any>): AskAnswer {
 }
 
 export async function getAnswerMeta(askId: string): Promise<AskAnswer[]> {
+  // fsLimit(200) to bezpiecznik, nie regula biznesowa: Ask ma najwyzej 20
+  // miejsc, wiec 200 odpowiedzi to wielokrotny zapas - limit chroni tylko
+  // przed odczytem bez dna, gdyby kolekcja z jakiegos powodu spuchla.
   const snapshot = await getDocs(
-    query(collection(db, ASK_ANSWERS), where('askId', '==', askId), orderBy('createdAt', 'asc'))
+    query(
+      collection(db, ASK_ANSWERS),
+      where('askId', '==', askId),
+      orderBy('createdAt', 'asc'),
+      fsLimit(200)
+    )
   );
   return snapshot.docs.map((d) => toAnswerMeta(d.id, d.data()));
 }

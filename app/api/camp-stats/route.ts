@@ -19,8 +19,10 @@ import {
 import { guardCampWrite } from '../../utils/camp/proxyGuard';
 
 // guardCampWrite czyta sesje przez node:crypto, a trasa siega po cookies.
+// Bez force-dynamic: obecnosc POST i tak trzyma trase w trybie dynamicznym,
+// a GET zwraca dane zapisane na stale, wiec CDN moze je cache'owac (naglowek
+// w GET nizej) zamiast budzic funkcje przy kazdym wejsciu na strone statystyk.
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -96,11 +98,15 @@ export async function GET(request: NextRequest) {
     
     console.log('✅ MySphere stats loaded with ZERO Firebase reads - saved $15,000/month!');
 
+    // Dane sa stale zapisane w kodzie, wiec doba w CDN (i tydzien na zasadzie
+    // stale-while-revalidate) nic nie psuje, a zdejmuje niemal wszystkie invokacje.
     return NextResponse.json({
       success: true,
       data: staticStats,
       timestamp: new Date().toISOString(),
       optimized: true
+    }, {
+      headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800' }
     });
 
   } catch (error) {

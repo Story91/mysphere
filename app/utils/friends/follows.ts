@@ -129,6 +129,9 @@ export const followUser = async (
     // Commit all changes
     await batch.commit();
 
+    // Zbior obserwowanych w cache'u modulu wlasnie sie zdezaktualizowal.
+    invalidateFollowingIdSet(followerId);
+
     // 5. Send notification (asynchronously)
     setTimeout(async () => {
       try {
@@ -221,6 +224,9 @@ export const unfollowUser = async (
     });
 
     await batch.commit();
+
+    // Zbior obserwowanych w cache'u modulu wlasnie sie zdezaktualizowal.
+    invalidateFollowingIdSet(followerId);
 
     console.log(`❌ Unfollow: ${followerId} -x-> ${followingId}`);
     return { success: true };
@@ -393,15 +399,34 @@ const fetchUsersByIds = async (ids: string[]): Promise<Map<string, any>> => {
  *
  * Czyta wylacznie ID dokumentow z subkolekcji - bez laczenia z profilami.
  * getFollowing() dla tego samego celu kosztowalby dodatkowe N odczytow userow.
+ *
+ * Cache na poziomie MODULU, nie hooka: feed montuje dwie instancje PostList
+ * (glowna + przypiete), a kazda miala wlasny cache w useRef - czyli to samo
+ * zapytanie o max 1000 dokumentow szlo dwa razy przy kazdym wejsciu. Wpis
+ * trzyma PROMISE, wiec rownoczesne wywolania dostaja jedno zapytanie w locie.
+ * follow/unfollow uniewaznia wpis - zmiana obserwacji jest widoczna od razu.
  */
+const FOLLOWING_SET_TTL_MS = 2 * 60 * 1000;
+const followingSetCache = new Map<string, { at: number; promise: Promise<Set<string>> }>();
+
+export const invalidateFollowingIdSet = (userId: string): void => {
+  followingSetCache.delete(userId);
+};
+
 export const fetchFollowingIdSet = async (userId: string): Promise<Set<string>> => {
-  const snap = await getDocs(
+  const hit = followingSetCache.get(userId);
+  if (hit && Date.now() - hit.at < FOLLOWING_SET_TTL_MS) return hit.promise;
+
+  const promise = getDocs(
     query(
       collection(db, `${COLLECTIONS.USERS}/${userId}/${COLLECTIONS.USER_FOLLOWING}`),
       limit(SOCIAL_CONFIG.MAX_FOLLOWERS_FETCH)
     )
-  );
-  return new Set(snap.docs.map(d => d.id));
+  ).then((snap) => new Set(snap.docs.map((d) => d.id)));
+  // Padniete zapytanie nie moze zostac w cache'u jako wieczna porazka.
+  promise.catch(() => followingSetCache.delete(userId));
+  followingSetCache.set(userId, { at: Date.now(), promise });
+  return promise;
 };
 
 /**

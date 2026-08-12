@@ -3,6 +3,7 @@ import {
   getDocs,
   query,
   where,
+  orderBy as fsOrderBy,
   limit as fsLimit,
   type Query,
 } from 'firebase/firestore';
@@ -55,14 +56,20 @@ import { addressReadVariants } from '../monetization/types';
  *   askAnswers  author in [...] + accepted == true wplywy: przyjete odpowiedzi
  *   asks        author in [warianty]               wydatki + otwarte escrow
  *
- * ZADNE nie ma `orderBy`. To nie jest zaniedbanie: dla `tips` i `unlocks`
- * potrzebne indeksy zlozone sa DOPISANE do firestore.indexes.json, ale NIE SA
- * JESZCZE WDROZONE (wdrozenie to komenda wlasciciela). Dopoki Firebase nie
- * pokaze ich jako Enabled, `where(...) + orderBy('timestamp')` konczy sie
- * bledem FAILED_PRECONDITION, czyli pusta sekcja u kogos, kto ma pieniadze.
- * Sortujemy w pamieci, a limit ustawia `truncated` - obciecie ma byc widoczne,
- * a nie udawac kompletu.
- * (Cztery indeksy, ktore by to zdjely, sa wypisane na koncu pliku.)
+ * KAZDE ma `orderBy` od 2026-08-13, gdy wlasciciel wdrozyl indeksy zlozone
+ * (`firebase deploy --only firestore:indexes`) i sonda potwierdzila, ze sa
+ * Enabled - takze dla operatora `in`, ktorego uzywaja warianty adresu.
+ *
+ * Wczesniej `orderBy` tu nie bylo i sortowalismy w pamieci, bo bez indeksu
+ * zapytanie konczy sie FAILED_PRECONDITION, czyli pusta sekcja u kogos, kto ma
+ * pieniadze. Cena tamtego stanu: przy koncie z ponad ROW_CAP pozycjami limit
+ * ucinal ARBITRALNY podzbior (kolejnosc po ID dokumentu) i pokazywal go jako
+ * historie. Teraz cap ucina najstarsze, a `truncated` dalej mowi, ze sumy sa
+ * dolna granica.
+ *
+ * JESLI KIEDYS ZOBACZYSZ TU FAILED_PRECONDITION: znaczy, ze indeks zniknal
+ * (np. `firebase deploy` z niepelnym firestore.indexes.json go skasowal).
+ * Wdroz go ponownie, nie usuwaj `orderBy`.
  *
  * === AWARIA != PUSTKA ===
  * Kazda sekcja niesie WLASNA flage `failed`. Nieudany odczyt napiwkow nie moze
@@ -245,11 +252,30 @@ async function readRows(source: Query, label: string): Promise<RawRead> {
   }
 }
 
-/** Zapytanie po jednym polu adresowym, bez orderBy - patrz naglowek pliku. */
-function byAddressField(collectionName: string, field: string, variants: string[]): Query {
+/**
+ * Zapytanie po jednym polu adresowym, posortowane od najnowszych.
+ *
+ * `orderBy` jest tu od 2026-08-13, gdy wdrozono indeksy zlozone (tips:
+ * recipientAddress/senderAddress + timestamp, unlocks: creatorAddress/
+ * walletAddress + unlockedAt) - zweryfikowane sonda, takze dla operatora `in`.
+ *
+ * Nie chodzi o koszt (limit jest ten sam), tylko o PRAWDE: bez sortowania
+ * Firestore oddawal pierwsze ROW_CAP dokumentow w kolejnosci po ID, czyli przy
+ * koncie z ponad setka pozycji ksiega pokazywala arbitralny podzbior i nazywala
+ * go historia. Teraz cap ucina najstarsze, a `truncated` dalej mowi, ze sumy sa
+ * dolna granica.
+ */
+function byAddressField(
+  collectionName: string,
+  field: string,
+  variants: string[],
+  /** Pole daty tej kolekcji: `tips` trzyma `timestamp`, `unlocks` - `unlockedAt`. */
+  dateField: string
+): Query {
   return query(
     collection(getPublicDb(), collectionName),
     where(field, 'in', variants),
+    fsOrderBy(dateField, 'desc'),
     fsLimit(ROW_CAP)
   );
 }
@@ -357,10 +383,10 @@ export async function getMoneyLedger(address: string): Promise<MoneyLedger> {
   const db = getPublicDb();
 
   const [tipsIn, tipsOut, unlocksIn, unlocksOut, answers, asks] = await Promise.all([
-    readRows(byAddressField(TIPS_COLLECTION, 'recipientAddress', variants), 'otrzymanych napiwkow'),
-    readRows(byAddressField(TIPS_COLLECTION, 'senderAddress', variants), 'wyslanych napiwkow'),
-    readRows(byAddressField(UNLOCKS_COLLECTION, 'creatorAddress', variants), 'sprzedanych odblokowan'),
-    readRows(byAddressField(UNLOCKS_COLLECTION, 'walletAddress', variants), 'kupionych odblokowan'),
+    readRows(byAddressField(TIPS_COLLECTION, 'recipientAddress', variants, 'timestamp'), 'otrzymanych napiwkow'),
+    readRows(byAddressField(TIPS_COLLECTION, 'senderAddress', variants, 'timestamp'), 'wyslanych napiwkow'),
+    readRows(byAddressField(UNLOCKS_COLLECTION, 'creatorAddress', variants, 'unlockedAt'), 'sprzedanych odblokowan'),
+    readRows(byAddressField(UNLOCKS_COLLECTION, 'walletAddress', variants, 'unlockedAt'), 'kupionych odblokowan'),
     readRows(
       query(
         collection(db, ASK_ANSWERS_COLLECTION),
@@ -372,7 +398,7 @@ export async function getMoneyLedger(address: string): Promise<MoneyLedger> {
       ),
       'przyjetych odpowiedzi'
     ),
-    readRows(byAddressField(ASKS_COLLECTION, 'author', variants), 'wlasnych Askow'),
+    readRows(byAddressField(ASKS_COLLECTION, 'author', variants, 'createdAt'), 'wlasnych Askow'),
   ]);
 
   /* --- WPLYWY ------------------------------------------------------- */
@@ -568,17 +594,20 @@ export function isLedgerEmpty(ledger: MoneyLedger): boolean {
 }
 
 /*
- * === INDEKSY, KTORE ZDJELYBY SORTOWANIE W PAMIECI ===
- * Zeby ksiega mogla stronicowac zamiast ciac na ROW_CAP, potrzebne sa cztery
- * indeksy zlozone. Sa juz WPISANE w firestore.indexes.json (cztery ostatnie
- * pozycje w `indexes`), ale NIE SA WDROZONE - wdrozenie to komenda wlasciciela:
- *   tips     (recipientAddress ASC, timestamp DESC)
- *   tips     (senderAddress    ASC, timestamp DESC)
+ * === INDEKSY, NA KTORYCH STOI SORTOWANIE TEJ KSIEGI ===
+ * Wdrozone 2026-08-13 i potwierdzone sonda jako Enabled:
+ *   tips     (recipientAddress ASC, timestamp  DESC)
+ *   tips     (senderAddress    ASC, timestamp  DESC)
  *   unlocks  (creatorAddress   ASC, unlockedAt DESC)
  *   unlocks  (walletAddress    ASC, unlockedAt DESC)
+ *   asks     (author           ASC, createdAt  DESC)   <- byl juz wczesniej
  *
- * KOLEJNOSC MA ZNACZENIE. Dopoki `firebase deploy --only firestore:indexes` nie
- * przejdzie i indeksy nie beda Enabled, dopisanie `orderBy` do ktoregokolwiek
- * zapytania wyzej wywala je bledem FAILED_PRECONDITION - czyli pusta sekcja u
- * czlowieka, ktory ma pieniadze. Wpis w pliku to deklaracja, nie indeks.
+ * Wszystkie sa w firestore.indexes.json. UWAGA przy `firebase deploy --only
+ * firestore:indexes`: ten plik jest STANEM DOCELOWYM, wiec skasowanie z niego
+ * ktoregokolwiek wpisu usuwa indeks z projektu, a zapytania wyzej wywala
+ * wtedy FAILED_PRECONDITION - czyli pusta sekcja u czlowieka, ktory ma
+ * pieniadze. Naprawa to ponowne wdrozenie indeksu, nie usuniecie `orderBy`.
+ *
+ * NASTEPNY KROK (nie zrobiony): majac te indeksy, ksiega moze STRONICOWAC
+ * (startAfter) zamiast ciac na ROW_CAP - wtedy `truncated` znika calkiem.
  */

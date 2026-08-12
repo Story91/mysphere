@@ -1,4 +1,5 @@
 import { formatEther, formatUnits, parseEther, type Address } from 'viem';
+import { ACTIVE_LAUNCHPAD_NETWORK } from '../config';
 import { formatUsd } from '../useEthUsd';
 
 /**
@@ -25,8 +26,15 @@ export const START_PRICE_WEI = (R_VIRT_WEI * WEI) / SUPPLY_WEI;
 /** Graduacja przy DOKLADNIE 3.00 ETH rezerwy (CURVE_TARGET_ETH w config). */
 export const TARGET_WEI = 3n * WEI;
 
-/** Base robi blok co ~2 s; wystarcza do estymacji czasu bez getBlock na kazdy blok. */
-export const SECONDS_PER_BLOCK = 2;
+/**
+ * Tempo blokow AKTYWNEJ sieci - do estymacji czasu bez `getBlock` na kazdy log.
+ *
+ * Bylo tu twarde 2 (Base). Robinhood robi blok co 0,1 s, wiec ta stala mylila
+ * sie tam dwudziestokrotnie: skan historii tokena startowal grubo powyzej jego
+ * realnego bloku startu, a czasy na wykresie byly rozciagniete. Wartosc idzie
+ * teraz z konfiguracji sieci (patrz `secondsPerBlock` w ../config).
+ */
+export const SECONDS_PER_BLOCK = ACTIVE_LAUNCHPAD_NETWORK.secondsPerBlock;
 
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 export const DEAD_ADDRESS = '0x000000000000000000000000000000000000dead';

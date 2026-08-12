@@ -19,6 +19,12 @@ import SharePostActions from './SharePostActions';
 
 export const runtime = 'nodejs';
 
+// Strona jest odswiezana co 5 minut zamiast renderowac sie na kazde wejscie.
+// Linki rozchodza sie falami (jedno wklejenie = wiele wejsc w krotkim oknie),
+// wiec ISR tnie odczyty Firestore do jednego na okno, a lajki i tipy na
+// wklejonym linku i tak nie musza byc co do sekundy.
+export const revalidate = 300;
+
 type Props = { params: { id: string } };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
