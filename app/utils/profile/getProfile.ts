@@ -140,7 +140,12 @@ export async function getProfile(rawAddress: string): Promise<Profile | null> {
         content: typeof data.content === 'string' ? data.content : '',
         timestamp: toMillis(data.timestamp),
         likes,
-        commentCount: Array.isArray(data.comments) ? data.comments.length : 0,
+        // Licznik z zapisu przed dlugoscia tablicy - nowe komentarze zyja
+        // tylko w kolekcji `comments`, nie w dokumencie posta.
+        commentCount:
+          typeof data.commentsCount === 'number'
+            ? Math.max(0, data.commentsCount)
+            : Array.isArray(data.comments) ? data.comments.length : 0,
         network: data.network ?? undefined,
       });
     }

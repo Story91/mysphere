@@ -11,6 +11,13 @@ export interface Post {
   likes: number;
   likedBy: string[];
   comments: Comment[];
+  /**
+   * Licznik komentarzy utrzymywany przy zapisie. Nowe komentarze NIE rosna
+   * juz w tablicy `comments` dokumentu posta (leza w kolekcji `comments`),
+   * wiec liczby nie wolno brac z `comments.length` - dla starych postow bez
+   * tego pola mapPostDoc liczy fallback z tablicy.
+   */
+  commentsCount?: number;
   tags?: string[];
   mentions?: string[];
   visibility?: PostVisibility;

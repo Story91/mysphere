@@ -32,6 +32,43 @@ export default function ContentModeration() {
         id: doc.id,
       }));
 
+      // Nowe komentarze zyja WYLACZNIE w kolekcji `comments` (dokument posta
+      // niesie sam licznik) - panel czytajacy tylko tablice legacy bylby
+      // slepy na wszystko, co powstalo po wprowadzeniu licznikow. Jedno
+      // zapytanie o najswiezsze wpisy i scalenie po id per post.
+      try {
+        const commentsSnap = await getDocs(
+          query(collection(db, 'comments'), orderBy('timestamp', 'desc'), limit(200))
+        );
+        const byPost = new Map<string, Comment[]>();
+        commentsSnap.docs.forEach(commentDoc => {
+          const data = commentDoc.data() as Comment & { postId?: string; timestamp?: any };
+          if (!data.postId) return;
+          const list = byPost.get(data.postId) ?? [];
+          list.push({
+            ...data,
+            id: commentDoc.id,
+            timestamp:
+              typeof data.timestamp === 'number'
+                ? data.timestamp
+                : data.timestamp?.toMillis?.() ?? Date.now(),
+          } as Comment);
+          byPost.set(data.postId, list);
+        });
+        for (const post of postsData) {
+          const fresh = byPost.get(post.id);
+          if (!fresh) continue;
+          const known = new Set((post.comments || []).map(c => c.id));
+          post.comments = [
+            ...(post.comments || []),
+            ...fresh.filter(c => !known.has(c.id)),
+          ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        }
+      } catch (mergeError) {
+        // Panel dalej pokazuje komentarze legacy - lepsze to niz pusty ekran.
+        console.error('Error merging collection comments:', mergeError);
+      }
+
       setPosts(postsData);
       setLoading(false);
     } catch (error) {

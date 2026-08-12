@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { Post, Comment } from '../../types';
 import { doc, updateDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
-import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, ADMIN_ADDRESS, pinPost, unpinPost, isUserAdmin, PinDuration ,
+import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, fetchCommentsForPost, ADMIN_ADDRESS, pinPost, unpinPost, isUserAdmin, PinDuration ,
   getBulkPostTipStats,
   PostTipStats} from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
@@ -100,6 +100,37 @@ const formatNumberWithSuffix = (value: number | string): string => {
   }
   
   return num.toLocaleString(undefined, { maximumFractionDigits: 6 });
+};
+
+/**
+ * Komentarze dociagniete z kolekcji `comments`, per post - na poziomie MODULU.
+ *
+ * Nowe komentarze nie leza w tablicy dokumentu posta (dokument niesie sam
+ * licznik), wiec sekcja komentarzy dociaga je przy pierwszym rozwinieciu.
+ * Cache MUSI byc w module, nie w stanie komponentu: rodzic regularnie
+ * NADPISUJE liste postow (zmiana zakladki, cieply cache, awaryjny refetch)
+ * i kazdy taki reset przywraca tablice legacy. Efekt scalajacy w PostList
+ * dociaga wtedy brakujace wpisy z tego cache'u bez ponownego odczytu
+ * Firestore - a wpisy aktualizuja takze optymistyczne handlery, zeby
+ * scalenie po resecie nie cofalo swiezych zmian.
+ */
+const collectionCommentsCache = new Map<string, Comment[]>();
+const collectionCommentsInflight = new Map<string, Promise<void>>();
+
+const rememberCollectionComment = (postId: string, comment: Comment) => {
+  const list = collectionCommentsCache.get(postId);
+  if (list && !list.some(c => c.id === comment.id)) list.push(comment);
+};
+
+/** Usuwa z cache'u komentarz i jego odpowiedzi - lustro deleteComment. */
+const forgetCollectionComment = (postId: string, mainCommentId: string) => {
+  const list = collectionCommentsCache.get(postId);
+  if (list) {
+    collectionCommentsCache.set(
+      postId,
+      list.filter(c => c.id !== mainCommentId && c.replyTo !== mainCommentId)
+    );
+  }
 };
 
 export interface ExtendedPost extends Post {
@@ -869,6 +900,9 @@ function PostList({
       const commentId = await addComment(postId, draft);
 
       const newComment: Comment = { ...draft, id: commentId };
+      // Do cache'u modulu od razu: scalenie po resecie stanu z rodzica nie
+      // moze cofnac komentarza, ktory juz jest w bazie.
+      rememberCollectionComment(postId, newComment);
 
       setNewComments(prev => ({
         ...prev,
@@ -882,7 +916,8 @@ function PostList({
         if (post.id === postId) {
           return {
             ...post,
-            comments: [...(post.comments || []), newComment]
+            comments: [...(post.comments || []), newComment],
+            commentsCount: (post.commentsCount ?? post.comments?.length ?? 0) + 1
           };
         }
         return post;
@@ -1061,11 +1096,24 @@ function PostList({
 
     try {
       if (confirm('Are you sure you want to delete this comment?')) {
+        // Lustro w cache'u modulu: scalenie po resecie nie moze wskrzesic
+        // usunietego komentarza ani jego odpowiedzi.
+        forgetCollectionComment(postId, commentId);
+
         // ✅ OPTIMISTIC UPDATE: Usuń komentarz z UI natychmiast
         const updatedPosts = internalPosts.map(post => {
           if (post.id === postId) {
-            const updatedComments = post.comments?.filter(comment => comment.id !== commentId);
-            return { ...post, comments: updatedComments };
+            // Znika komentarz i jego widoczne odpowiedzi - licznik schodzi
+            // o tyle samo, o ile skraca sie lista (serwer liczy tak samo).
+            const updatedComments = (post.comments || []).filter(
+              comment => comment.id !== commentId && comment.replyTo !== commentId
+            );
+            const removed = (post.comments?.length || 0) - updatedComments.length;
+            return {
+              ...post,
+              comments: updatedComments,
+              commentsCount: Math.max(0, (post.commentsCount ?? post.comments?.length ?? 0) - removed)
+            };
           }
           return post;
         });
@@ -1288,13 +1336,17 @@ function PostList({
             txHash, // Uproszczona wersja bez null
             network: network // Dodajemy network odpowiedzi
           };
-          
+
+          // Do cache'u modulu - jak przy zwyklym komentarzu.
+          rememberCollectionComment(postId, newReplyComment);
+
           return {
             ...post,
             comments: [
               ...(post.comments || []),
               newReplyComment
-            ]
+            ],
+            commentsCount: (post.commentsCount ?? post.comments?.length ?? 0) + 1
           };
         }
         return post;
@@ -1458,6 +1510,72 @@ function PostList({
   // Firestore po te same posty wylacznie po kursor paginacji - razy dwie
   // instancje PostList na ekranie. Kursor zasiewa sie teraz leniwie w
   // loadMorePosts, wiec caly efekt zniknal.
+
+  /**
+   * Dociagniecie komentarzy z kolekcji przy rozwinietej sekcji + scalanie
+   * po kazdym resecie stanu.
+   *
+   * Placi ten, kto czyta rozmowe (jeden indeksowany odczyt na post na
+   * sesje), nie kazdy, kto przewija feed. Scalanie po id, bo czesc
+   * komentarzy zyje w obu miejscach (dual-write sprzed licznikow).
+   * Efekt jest SAMONAPRAWIALNY: gdy rodzic podmieni posty (zakladka,
+   * cieply cache, awaryjny refetch) i tablica wroci do wersji legacy,
+   * kolejny przebieg scala brakujace wpisy z cache'u modulu - bez
+   * zadnego nowego odczytu. setState leci TYLKO gdy czegos brakuje,
+   * inaczej efekt zapetlilby sie na wlasnej zaleznosci.
+   */
+  useEffect(() => {
+    const mergeFromCache = (postId: string) => {
+      const cached = collectionCommentsCache.get(postId);
+      if (!cached || cached.length === 0) return;
+      const post = internalPosts.find(p => p.id === postId);
+      if (!post) return;
+      const known = new Set((post.comments || []).map(c => c.id));
+      if (!cached.some(c => !known.has(c.id))) return;
+      setInternalPosts(current =>
+        current.map(p => {
+          if (p.id !== postId) return p;
+          const have = new Set((p.comments || []).map(c => c.id));
+          const missing = cached.filter(c => !have.has(c.id));
+          if (missing.length === 0) return p;
+          const merged = [...(p.comments || []), ...missing];
+          merged.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+          return {
+            ...p,
+            comments: merged,
+            // Kopia posta z baseNameFeed rodzi sie z licznikiem 0 i nikt go
+            // tam nie aktualizuje - po scaleniu plakietka nie moze pokazywac
+            // mniej, niz stoi na liscie.
+            commentsCount: Math.max(p.commentsCount ?? 0, merged.length),
+          };
+        })
+      );
+    };
+
+    for (const postId of Object.keys(expandedComments)) {
+      if (!expandedComments[postId]) continue;
+      if (!internalPosts.some(p => p.id === postId)) continue;
+      if (collectionCommentsCache.has(postId)) {
+        mergeFromCache(postId);
+        continue;
+      }
+      if (collectionCommentsInflight.has(postId)) continue;
+      const request = fetchCommentsForPost(postId)
+        .then(fetched => {
+          collectionCommentsCache.set(postId, fetched);
+          mergeFromCache(postId);
+        })
+        .catch(error => {
+          // Nieudany odczyt nie zamyka drogi - brak wpisu w cache'u sprawia,
+          // ze nastepny przebieg sprobuje jeszcze raz.
+          console.error('Error hydrating comments:', error);
+        })
+        .finally(() => {
+          collectionCommentsInflight.delete(postId);
+        });
+      collectionCommentsInflight.set(postId, request);
+    }
+  }, [expandedComments, internalPosts]);
 
   useEffect(() => {
     const fetchAllTokenData = async () => {
@@ -1963,7 +2081,9 @@ function PostList({
   const renderPost = (post: ExtendedPost) => {
     const isLiked = post.likedBy?.includes(address ?? '');
     const isAuthor = post.author === address;
-    const commentCount = post.comments?.length || 0;
+    // Licznik z dokumentu, nie dlugosc tablicy: nowe komentarze zyja w
+    // kolekcji `comments` i w tablicy posta ich nie ma.
+    const commentCount = post.commentsCount ?? (post.comments?.length || 0);
     const postDate = formatTimestamp(post.timestamp);
     const canEdit = isAuthor || address?.toLowerCase() === ADMIN_ADDRESS;
     const canDelete = isAuthor || address?.toLowerCase() === ADMIN_ADDRESS;

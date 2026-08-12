@@ -82,7 +82,8 @@ export default function SoftFeedPage() {
           image: post.image ?? null,
           network: post.network,
           likes: typeof post.likes === 'number' ? post.likes : 0,
-          commentCount: Array.isArray(post.comments) ? post.comments.length : 0,
+          // mapPostDoc liczy commentsCount z licznika albo tablicy legacy.
+          commentCount: post.commentsCount ?? (Array.isArray(post.comments) ? post.comments.length : 0),
         }));
 
         setPosts(mapped);

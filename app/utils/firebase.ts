@@ -147,7 +147,19 @@ const mapPostDoc = (postDoc: QueryDocumentSnapshot): ExtendedPost => {
     timestamp: toMillis(postData.timestamp) || Date.now(),
     likes: postData.likes || 0,
     likedBy: postData.likedBy || [],
-    comments: postData.comments || [], // komentarze sa juz w dokumencie posta
+    // Tablica w dokumencie to LEGACY: nowe komentarze zyja tylko w kolekcji
+    // `comments` i dociagaja sie przy rozwinieciu sekcji (PostList). Tablicy
+    // nie ruszamy, bo stare komentarze moga istniec wylacznie w niej.
+    comments: postData.comments || [],
+    // Liczba do plakietki: licznik z zapisu, a dla postow sprzed licznikow
+    // dlugosc tablicy, ktora i tak przyjechala z dokumentem. Clamp do zera,
+    // bo atomowy decrement przy podwojnym usunieciu moze zejsc ponizej.
+    commentsCount: Math.max(
+      0,
+      typeof postData.commentsCount === 'number'
+        ? postData.commentsCount
+        : (postData.comments || []).length
+    ),
     tags: postData.tags || [],
     mentions: postData.mentions || [],
     image: postData.image || null,
@@ -687,6 +699,7 @@ export const createPost = async (post: {
       likes: 0,
       likedBy: [],
       comments: [],
+      commentsCount: 0,
       isPinned: false,
       image: post.image || null,
       video: post.video || null,
@@ -1039,23 +1052,25 @@ export const addComment = async (postId: string, comment: {
     onchain: comment.txHash ? true : false // Oznacz, czy komentarz jest na blockchainie
   });
 
-  // Dodaj komentarz do tablicy comments w dokumencie posta
+  // Post dostaje TYLKO podbicie licznika. Wczesniej caly komentarz byl
+  // doklejany do tablicy w dokumencie posta - dokument tyl z kazdym
+  // komentarzem i kazdy odczyt feedu ciagnal pelna historie rozmow.
+  // Tresc zyje w kolekcji `comments` (zapis wyzej); feed czyta licznik,
+  // a sekcja komentarzy dociaga tresci przy rozwinieciu.
   const postRef = doc(db, 'posts', postId);
   const postDoc = await getDoc(postRef);
-  
+
   if (postDoc.exists()) {
     const postData = postDoc.data();
+    // Post z licznikiem dostaje ATOMOWY increment - dwa rownolegle komentarze
+    // nie zgubia podbicia. Post sprzed licznikow (pole nie istnieje) dostaje
+    // wartosc DOKLADNA z dlugosci tablicy legacy: migracja przy dotknieciu,
+    // stare posty bez ruchu nie kosztuja ani jednego zapisu.
     await updateDoc(postRef, {
-      comments: [...(postData.comments || []), {
-        id: commentDoc.id,
-        ...comment,
-        authorName, // Dodaj nazwę autora do komentarza w poście
-        timestamp: Date.now(),
-        likes: 0,
-        likedBy: [],
-        mentions: [],
-        network: comment.network || null // Dodaj network komentarza
-      }]
+      commentsCount:
+        typeof postData.commentsCount === 'number'
+          ? increment(1)
+          : (postData.comments || []).length + 1
     });
 
     // Aktualizuj statystyki użytkownika
@@ -1069,6 +1084,38 @@ export const addComment = async (postId: string, comment: {
   // Zwracamy ID nawet gdy post zniknal miedzy zapisem komentarza a odczytem -
   // dokument w kolekcji `comments` juz powstal i ma ten identyfikator.
   return commentDoc.id;
+};
+
+/**
+ * Komentarze posta z kolekcji `comments` - dociagane DOPIERO przy rozwinieciu
+ * sekcji komentarzy (PostList), nigdy dla calego feedu.
+ *
+ * Nowe komentarze zyja wylacznie tutaj (dokument posta niesie sam licznik),
+ * stare bywaja tylko w tablicy posta - wolajacy SCALA oba zrodla po id.
+ * Indeks (postId, timestamp desc) jest wdrozony, wiec zapytanie jest tanie;
+ * wynik odwracamy do rosnacej chronologii, w ktorej rysuje sie watek.
+ */
+export const fetchCommentsForPost = async (postId: string): Promise<Comment[]> => {
+  const snap = await getDocs(
+    query(
+      collection(db, 'comments'),
+      where('postId', '==', postId),
+      firestoreOrderBy('timestamp', 'desc'),
+      firestoreLimit(200)
+    )
+  );
+  return snap.docs
+    .map((d) => {
+      const data = d.data();
+      return {
+        ...data,
+        id: d.id,
+        timestamp: toMillis(data.timestamp) || Date.now(),
+        likes: data.likes || 0,
+        likedBy: data.likedBy || [],
+      } as Comment;
+    })
+    .reverse();
 };
 
 // Funkcja do pobierania profilu użytkownika
@@ -1279,31 +1326,40 @@ export const getProfileName = async (address: string): Promise<string | null> =>
 // Funkcja do edycji komentarza
 export const editComment = async (postId: string, commentId: string, newContent: string) => {
   try {
+    // Najpierw dokument w kolekcji `comments` - tam zyja wszystkie nowe
+    // komentarze i wiekszosc starych. Tablica w poscie zostaje SPOJNA tylko
+    // dla wpisow, ktore w niej sa (legacy); nowych nigdy do niej nie piszemy.
+    const commentRef = doc(db, 'comments', commentId);
+    const commentDoc = await getDoc(commentRef);
+
+    if (commentDoc.exists()) {
+      await updateDoc(commentRef, { content: newContent, lastEdited: serverTimestamp() });
+    }
+
     const postRef = doc(db, 'posts', postId);
     const postDoc = await getDoc(postRef);
-    
     if (!postDoc.exists()) {
+      if (commentDoc.exists()) return true;
       throw new Error('Post not found');
     }
-    
+
     const postData = postDoc.data();
     const comments = postData.comments || [];
     const commentIndex = comments.findIndex((c: any) => c.id === commentId);
-    
-    if (commentIndex === -1) {
+
+    // Wpis w tablicy aktualizujemy tylko wtedy, gdy tam JEST - stary
+    // komentarz sprzed kolekcji. Brak w obu miejscach to dopiero blad.
+    if (commentIndex !== -1) {
+      comments[commentIndex] = {
+        ...comments[commentIndex],
+        content: newContent,
+        lastEdited: Date.now()
+      };
+      await updateDoc(postRef, { comments });
+    } else if (!commentDoc.exists()) {
       throw new Error('Comment not found');
     }
-    
-    // Aktualizuj komentarz
-    comments[commentIndex] = {
-      ...comments[commentIndex],
-      content: newContent,
-      lastEdited: serverTimestamp()
-    };
-    
-    // Zapisz zaktualizowane komentarze
-    await updateDoc(postRef, { comments });
-    
+
     return true;
   } catch (error) {
     console.error('Error editing comment:', error);
@@ -1329,60 +1385,75 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
     
     const postData = postDoc.data();
     const comments = postData.comments || [];
-    
-    
-    // Znajdź komentarz który ma zostać usunięty
-    const commentToDelete = comments.find((c: any) => c.id === commentId);
-    
+
+    // Komentarz moze zyc w tablicy posta (legacy), w kolekcji `comments`
+    // (wszystkie nowe) albo w obu. Do sprawdzenia uprawnien wystarczy
+    // KTORAKOLWIEK kopia.
+    const legacyComment = comments.find((c: any) => c.id === commentId);
+    const commentRef = doc(db, 'comments', commentId);
+    const commentDoc = legacyComment ? null : await getDoc(commentRef);
+    const commentToDelete = legacyComment ?? (commentDoc?.exists() ? commentDoc.data() : null);
+
     if (!commentToDelete) {
       throw new Error('Comment not found');
     }
-    
+
     // Sprawdź uprawnienia - tylko autor komentarza lub admin mogą usuwać
     // (adresy bez wzgledu na wielkosc liter - patrz komentarz w deletePost)
     const isAdmin = userId.toLowerCase() === ADMIN_ADDRESS;
     const isAuthor = typeof commentToDelete.author === 'string'
       && commentToDelete.author.toLowerCase() === userId.toLowerCase();
-    
+
     if (!isAdmin && !isAuthor) {
       throw new Error('Unauthorized to delete this comment');
     }
-    
-    // 3. Znajdź odpowiedzi do usuwanego komentarza
-    const repliesToDelete = comments.filter((c: any) => c.replyTo === commentId);
-    
-    // 4. Usuń główny komentarz z kolekcji comments
+
+    // 3. Odpowiedzi zbieramy z OBU miejsc: tablica (legacy) + kolekcja (nowe).
+    // Rownosc+rownosc nie wymaga indeksu zlozonego.
+    const legacyReplies = comments.filter((c: any) => c.replyTo === commentId);
+    let collectionReplyIds: string[] = [];
     try {
-      const commentRef = doc(db, 'comments', commentId);
-      batch.delete(commentRef);
+      const replySnap = await getDocs(
+        query(collection(db, 'comments'), where('postId', '==', postId), where('replyTo', '==', commentId))
+      );
+      collectionReplyIds = replySnap.docs.map((d) => d.id);
     } catch (error) {
-      console.error(`Błąd podczas usuwania komentarza z głównej kolekcji:`, error);
+      console.error('Błąd odczytu odpowiedzi z kolekcji comments:', error);
     }
-    
-    // 5. Usuń odpowiedzi z kolekcji comments
-    for (const reply of repliesToDelete) {
-      try {
-        const replyRef = doc(db, 'comments', reply.id);
-        batch.delete(replyRef);
-      } catch (error) {
-        console.error(`Błąd podczas usuwania odpowiedzi ${reply.id}:`, error);
-      }
+    const replyIds = Array.from(
+      new Set([...legacyReplies.map((r: any) => r.id), ...collectionReplyIds])
+    ).filter(Boolean);
+
+    // 4-5. Usuń główny komentarz i odpowiedzi z kolekcji comments
+    batch.delete(commentRef);
+    for (const replyId of replyIds) {
+      batch.delete(doc(db, 'comments', replyId));
     }
-    
-    // 6. Przygotuj zaktualizowaną tablicę komentarzy w poście (bez głównego komentarza i jego odpowiedzi)
-    const replyIds = repliesToDelete.map((r: any) => r.id);
-    const updatedComments = comments.filter((c: any) => 
-      c.id !== commentId && !replyIds.includes(c.id)
+
+    // 6-7. Tablice w poscie przepisujemy tylko, gdy cokolwiek z niej znika -
+    // dla nowych komentarzy (spoza tablicy) post dostaje sam licznik.
+    const updatedComments = comments.filter(
+      (c: any) => c.id !== commentId && !replyIds.includes(c.id)
     );
-    
-    
-    // 7. Zaktualizuj tablicę komentarzy w dokumencie posta
-    batch.update(postRef, { comments: updatedComments });
-    
+    const removedCount = 1 + replyIds.length;
+    // Atomowy decrement, gdy pole istnieje - Math.max robic nie ma czym,
+    // wiec przed ujemna wartoscia (podwojne usuniecie w wyscigu) chroni
+    // clamp przy odczycie w mapPostDoc.
+    const postUpdate: { [key: string]: any } = {
+      commentsCount:
+        typeof postData.commentsCount === 'number'
+          ? increment(-removedCount)
+          : Math.max(0, comments.length - removedCount),
+    };
+    if (updatedComments.length !== comments.length) {
+      postUpdate.comments = updatedComments;
+    }
+    batch.update(postRef, postUpdate);
+
     // 8. Wykonaj wszystkie operacje atomowo
     await batch.commit();
-    
-    
+
+
     return true;
   } catch (error) {
     console.error('Error deleting comment:', error);
@@ -1433,36 +1504,47 @@ export const toggleCommentLike = async (postId: string, commentId: string, userI
     const postData = postDoc.data();
     const comments = [...(postData.comments || [])];
 
+    // Komentarz moze byc w tablicy posta (legacy), w kolekcji (nowe) albo
+    // w obu - lajk ma dzialac w kazdym z tych przypadkow. Bledem jest
+    // dopiero brak OBU kopii.
     const commentIndex = comments.findIndex((c: any) => c.id === commentId);
-    if (commentIndex === -1) {
+    if (commentIndex === -1 && !commentDoc.exists()) {
       throw new Error('Comment not found');
     }
 
-    const comment = comments[commentIndex];
-    const likedBy = comment.likedBy || [];
-    const isLiked = likedBy.includes(userId);
-
-    comments[commentIndex] = {
-      ...comment,
-      likes: Math.max(0, (comment.likes || 0) + (isLiked ? -1 : 1)),
-      likedBy: isLiked
-        ? likedBy.filter((id: string) => id !== userId)
-        : [...likedBy, userId]
-    };
-
     const batch = writeBatch(db);
 
-    batch.update(postRef, {
-      comments,
-      lastUpdated: serverTimestamp()
-    });
+    // Stan "przed" bierzemy z tego zrodla, ktore komentarz MA - do zwrotki
+    // dla UI (true = dodano lajka).
+    let wasLiked = false;
 
-    // Kolekcja `comments` jest opcjonalnym duplikatem - starsze komentarze
-    // zyja wylacznie w tablicy na poscie. Brak dokumentu nie jest bledem.
+    if (commentIndex !== -1) {
+      const comment = comments[commentIndex];
+      const likedBy = comment.likedBy || [];
+      const isLiked = likedBy.includes(userId);
+      wasLiked = isLiked;
+
+      comments[commentIndex] = {
+        ...comment,
+        likes: Math.max(0, (comment.likes || 0) + (isLiked ? -1 : 1)),
+        likedBy: isLiked
+          ? likedBy.filter((id: string) => id !== userId)
+          : [...likedBy, userId]
+      };
+
+      batch.update(postRef, {
+        comments,
+        lastUpdated: serverTimestamp()
+      });
+    }
+
+    // Kolekcja `comments`: nowe komentarze zyja WYLACZNIE tutaj, starsze
+    // bywaja tylko w tablicy na poscie. Brak dokumentu nie jest bledem.
     if (commentDoc.exists()) {
       const commentData = commentDoc.data();
       const commentLikedBy = commentData.likedBy || [];
       const isCommentLiked = commentLikedBy.includes(userId);
+      if (commentIndex === -1) wasLiked = isCommentLiked;
 
       batch.update(commentRef, {
         likes: Math.max(0, (commentData.likes || 0) + (isCommentLiked ? -1 : 1)),
@@ -1475,7 +1557,7 @@ export const toggleCommentLike = async (postId: string, commentId: string, userI
 
     await batch.commit();
 
-    return !isLiked; // true = dodano lajka, false = usunieto
+    return !wasLiked; // true = dodano lajka, false = usunieto
   } catch (error) {
     console.error('Error toggling comment like:', error);
     throw error;
@@ -1490,7 +1572,8 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
 }) => {
   try {
     const postRef = doc(db, 'posts', postId);
-    const postDoc = await getDoc(postRef);
+    const parentRef = doc(db, 'comments', commentId);
+    const [postDoc, parentDoc] = await Promise.all([getDoc(postRef), getDoc(parentRef)]);
 
     if (!postDoc.exists()) {
       throw new Error('Post not found');
@@ -1498,48 +1581,58 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
 
     const post = postDoc.data();
     const comments = post.comments || [];
-    
-    // Sprawdź czy komentarz istnieje
-    const parentComment = comments.find((c: any) => c.id === commentId);
-    if (!parentComment) {
+
+    // Rodzic moze byc w tablicy posta (legacy) albo w kolekcji (nowe).
+    const parentInArray = comments.some((c: any) => c.id === commentId);
+    if (!parentInArray && !parentDoc.exists()) {
       throw new Error('Parent comment not found');
     }
 
-    // Utwórz nową odpowiedź z wszystkimi wymaganymi polami
+    // Odpowiedz laduje w kolekcji `comments`, jak kazdy nowy komentarz -
+    // wczesniej szla WYLACZNIE do tablicy posta z lokalnie zmyslonym id,
+    // wiec tuczyl dokument i zyla poza jedynym zrodlem prawdy.
+    const replyDoc = await addDoc(collection(db, 'comments'), {
+      postId,
+      author: replyData.author,
+      content: replyData.content,
+      timestamp: serverTimestamp(),
+      likes: 0,
+      likedBy: [],
+      mentions: [],
+      replyTo: commentId,
+      txHash: replyData.txHash || null,
+      network: replyData.network || null,
+      onchain: replyData.txHash ? true : false
+    });
+
+    // Post dostaje tylko podbicie licznika - atomowe, gdy pole istnieje
+    // (patrz addComment).
+    await updateDoc(postRef, {
+      commentsCount:
+        typeof post.commentsCount === 'number' ? increment(1) : comments.length + 1,
+      lastUpdated: serverTimestamp()
+    });
+
     const newReply = {
-      id: generateId(),
-      postId: postId, // Dodane pole postId
+      id: replyDoc.id,
+      postId,
       author: replyData.author,
       content: replyData.content,
       timestamp: Date.now(),
       likes: 0,
       likedBy: [],
-      mentions: [], // Dodane pole mentions
-      replyTo: commentId, // Dodaj referencję do komentarza nadrzędnego
-      txHash: replyData.txHash || null, // Dodajemy obsługę txHash dla onchain
-      network: replyData.network, // Dodajemy network odpowiedzi
-      onchain: replyData.txHash ? true : false // Oznaczamy czy jest onchain
+      mentions: [],
+      replyTo: commentId,
+      txHash: replyData.txHash || null,
+      network: replyData.network,
+      onchain: replyData.txHash ? true : false
     };
-
-    // Dodaj odpowiedź do tablicy komentarzy
-    comments.push(newReply);
-
-    // Zaktualizuj dokument
-    await updateDoc(postRef, {
-      comments: comments,
-      lastUpdated: serverTimestamp() // Aktualizujemy czas ostatniej zmiany
-    });
 
     return newReply;
   } catch (error) {
     console.error('Error adding reply:', error);
     throw error;
   }
-};
-
-// Funkcja do generowania unikalnych ID
-const generateId = (): string => {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
 // Usuń blokadę zmiany avatara dla admina
@@ -2909,11 +3002,13 @@ export const getGlobalStatsRealTime = async () => {
         totalLikes += postData.likes;
       }
       
-      // Dodaj komentarze
-      if (postData.comments && Array.isArray(postData.comments)) {
+      // Dodaj komentarze - licznik przed tablica: pusta tablica jest truthy,
+      // a nowe komentarze zyja tylko w kolekcji, wiec stara kolejnosc
+      // pomijala caly ruch po wprowadzeniu licznikow.
+      if (typeof postData.commentsCount === 'number') {
+        totalComments += Math.max(0, postData.commentsCount);
+      } else if (postData.comments && Array.isArray(postData.comments)) {
         totalComments += postData.comments.length;
-      } else if (postData.commentsCount) {
-        totalComments += postData.commentsCount;
       }
     }
 
@@ -2978,10 +3073,11 @@ export const getGlobalStatsIncremental = async (forceFullRefresh: boolean = fals
           totalLikes += postData.likes;
         }
         
-        if (postData.comments && Array.isArray(postData.comments)) {
+        // Licznik przed tablica - jak w getGlobalStatsRealTime.
+        if (typeof postData.commentsCount === 'number') {
+          totalComments += Math.max(0, postData.commentsCount);
+        } else if (postData.comments && Array.isArray(postData.comments)) {
           totalComments += postData.comments.length;
-        } else if (postData.commentsCount) {
-          totalComments += postData.commentsCount;
         }
       }
       
@@ -3144,11 +3240,13 @@ export const getGlobalStats = async () => {
         totalLikes += postData.likes;
       }
       
-      // Dodaj komentarze
-      if (postData.comments && Array.isArray(postData.comments)) {
+      // Dodaj komentarze - licznik przed tablica: pusta tablica jest truthy,
+      // a nowe komentarze zyja tylko w kolekcji, wiec stara kolejnosc
+      // pomijala caly ruch po wprowadzeniu licznikow.
+      if (typeof postData.commentsCount === 'number') {
+        totalComments += Math.max(0, postData.commentsCount);
+      } else if (postData.comments && Array.isArray(postData.comments)) {
         totalComments += postData.comments.length;
-      } else if (postData.commentsCount) {
-        totalComments += postData.commentsCount;
       }
     }
 

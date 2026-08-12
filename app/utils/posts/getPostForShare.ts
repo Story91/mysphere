@@ -46,7 +46,12 @@ export const getPostForShare = cache(async (postId: string): Promise<SharedPost 
       timestamp: toMillis(data.timestamp),
       image: data.image ?? null,
       likes: typeof data.likes === 'number' ? data.likes : 0,
-      commentCount: Array.isArray(data.comments) ? data.comments.length : 0,
+      // Licznik z zapisu ma pierwszenstwo: nowe komentarze nie rosna juz
+      // w tablicy dokumentu, wiec sama dlugosc tablicy klamie w dol.
+      commentCount:
+        typeof data.commentsCount === 'number'
+          ? Math.max(0, data.commentsCount)
+          : Array.isArray(data.comments) ? data.comments.length : 0,
       network: data.network ?? undefined,
     };
   } catch (error) {
