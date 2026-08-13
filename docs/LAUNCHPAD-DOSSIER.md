@@ -145,7 +145,14 @@ token.
   per document), and every later visit pulls only the blocks the cache does not
   cover yet. That collection is server-write-only (`firestore.rules`), and when
   it is unreachable the browser falls back to the old scan — a cache failure
-  means *slower*, never *empty*. Nothing priced comes from it: spot price,
+  means *slower*, never *empty*. Two numbers behind that scan were wrong for
+  months and are now measured rather than assumed: both Base RPCs accept a
+  **10 000-block** `eth_getLogs` range (the code assumed 2 000, which is what
+  turned a two-day-old token into 41 sequential round trips), and the server
+  prefers a configured endpoint (`BASE_RPC_URL`, currently CDP Node) with the
+  public RPC kept behind it, so a dead key costs speed instead of deleting the
+  feature. A full cold scan of that token is now one request of ~4 s; every
+  later visit is ~0,4 s. Nothing priced comes from it: spot price,
   reserves, curve state and your own balance are still read straight from the
   chain on every load.
 

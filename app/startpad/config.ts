@@ -31,11 +31,20 @@ export type LaunchpadNetwork = {
   deployBlock: bigint;
   explorerUrl: string;
   /**
-   * Ile blokow bierze jeden `getLogs` przy odtwarzaniu rynku, i ile takich okien
-   * najwyzej. Publiczny RPC Base Sepolii tnie zapytanie na 2000 blokach, wiec tam
-   * male okno; Robinhood (Arbitrum Orbit, sub-sekundowe bloki) przyjmuje 200k
-   * blokow w jednym strzale - a bez duzego okna 64x1900 NIE SIEGA bloku
-   * wdrozenia (siec robi ~100k blokow dziennie) i tablica pokazuje same mocki.
+   * Ile blokow bierze jeden `getLogs` przy odtwarzaniu rynku, i ile takich
+   * okien najwyzej.
+   *
+   * TE LICZBY MAJA BYC ZMIERZONE, NIE ZGADNIETE. Przez pomylke stalo tu 1900
+   * z komentarzem "publiczny RPC tnie na 2000" - realny limit obu sieci Base
+   * to 10 000 blokow (sprawdzone 2026-08-13 na `mainnet.base.org`,
+   * `sepolia.base.org` i na CDP), wiec skan robil pieciokrotnie wiecej kolejek
+   * niz musial i strona tokena sie zacinala. Robinhood (Arbitrum Orbit,
+   * sub-sekundowe bloki) przyjmuje 200k w jednym strzale - a bez duzego okna
+   * skan NIE SIEGA bloku wdrozenia, bo siec robi ~100k blokow dziennie.
+   *
+   * Sprawdzenie limitu to jedno zapytanie:
+   *   curl -s <RPC> -H 'content-type: application/json' -d '{"jsonrpc":"2.0",
+   *   "id":1,"method":"eth_getLogs","params":[{"fromBlock":"0x1","toBlock":"0x2710"}]}'
    */
   scanWindow: bigint;
   maxScanWindows: number;
@@ -84,10 +93,16 @@ const baseMainnetEntry: LaunchpadNetwork = {
     '0xEC7db55Bc081289820097703B3A66003092844D1',
   deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK ?? '49843030'),
   explorerUrl: 'https://basescan.org',
-  // Publiczny RPC Base mainnet tnie getLogs tak samo jak Sepolia (2000 blokow).
-  // Wieksze maxScanWindows niz na Sepolii, bo mainnet robi ~43k blokow dziennie -
-  // swiezy launchpad i tak ma plytka historie od deployBlock.
-  scanWindow: 1_900n,
+  // ZMIERZONE 2026-08-13 na `mainnet.base.org` ORAZ na CDP: limit `eth_getLogs`
+  // to 10 000 blokow, nie 2 000 - tak stalo w tym komentarzu przez pomylke z
+  // Sepolia, i to ta pomylka byla glowna przyczyna zacinania sie strony tokena.
+  // Historia tokena z 11 sierpnia (78 tys. blokow) schodzila przy oknie 1900 w
+  // 41 kolejkach; przy 10 000 to 8 okien i ~3,8 s. Zostawiamy 9 500 z zapasem
+  // pod krancowy blok, zeby nie ocierac sie o sufit.
+  scanWindow: 9_500n,
+  // 90 x 9500 to ~855 tys. blokow, czyli ponad trzy tygodnie lancucha Base -
+  // grubo wiecej, niz ma najstarszy launch, a sufit i tak zwykle nie dziala:
+  // petla urywa sie na zdarzeniu Launched.
   maxScanWindows: 90,
   secondsPerBlock: 2,
   // Barwy marki Base: #0052FF na bieli.
@@ -117,7 +132,11 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'),
     explorerUrl: 'https://sepolia.basescan.org',
-    scanWindow: 1_900n, // publiczny RPC Base Sepolii tnie getLogs na 2000 blokach
+    // ZMIERZONE 2026-08-13 na `sepolia.base.org`: 10 000 przechodzi, 25 000
+    // odbija sie o "limited to a 10,000 range". Stalo tu 1900 z komentarzem o
+    // limicie 2000 - nieprawda, i ta nieprawda kosztowala piec razy dluzszy
+    // skan. 9 500 z zapasem pod krancowy blok.
+    scanWindow: 9_500n,
     maxScanWindows: 64,
     secondsPerBlock: 2,
     pillClass: 'border-[#0052FF]/25 bg-[#eef3ff] text-[#0052FF]',

@@ -9,6 +9,7 @@ import {
 } from '../../../startpad/[address]/historyScan';
 import type { TradeEntry } from '../../../startpad/[address]/detailShared';
 import { planScan } from '../historyLayout';
+import { rpcCandidates } from '../historyRpc';
 import {
   claimScanLock,
   FRESH_FOR_MS,
@@ -91,23 +92,29 @@ export async function GET(request: NextRequest) {
   const startedRaw = params.get('startedAt');
   const startedAt = startedRaw && /^\d+$/.test(startedRaw) ? Number(startedRaw) : null;
 
-  // Wlasny RPC, gdy jest w srodowisku - ta sama zasada, co w /api/auth/verify.
+  // Wlasny RPC (CDP), a za nim publiczny jako zapas - patrz `historyRpc`.
   // Publiczny `mainnet.base.org` odmawia przy szybkiej serii `getLogs` ("over
-  // rate limit"), a wlasnie seria `getLogs` jest cala trescia tej trasy. Skan
-  // przezyje odmowe (uciecie zamiast bledu), ale z wlasnym RPC nie ma jej po co
-  // wywolywac.
-  const rpcUrl = chainId === 8453 ? process.env.BASE_RPC_URL || process.env.CDP_RPC_URL : undefined;
-  const client = createPublicClient({ chain: net.chain, transport: http(rpcUrl) });
-
-  let anchorBlock: bigint;
-  let anchorTs: number;
-  try {
-    const anchor = await client.getBlock({ blockTag: 'latest' });
-    anchorBlock = anchor.number;
-    anchorTs = Number(anchor.timestamp);
-  } catch {
-    return bad('Chain head is unreachable.', 502);
+  // rate limit"), a wlasnie seria `getLogs` jest cala trescia tej trasy. Ale
+  // zepsuta zmienna srodowiskowa (widziany na zywo Alchemy z `401 Must be
+  // authenticated!`) nie moze kasowac calej funkcji - dlatego pierwsze zapytanie
+  // sluzy tez za PROBE: klient, ktory nie odda glowy lancucha, nie dostaje
+  // skanu, tylko ustepuje nastepnemu z kolejki.
+  let client: ReturnType<typeof createPublicClient> | null = null;
+  let anchorBlock = 0n;
+  let anchorTs = 0;
+  for (const rpcUrl of rpcCandidates(chainId, process.env)) {
+    const candidate = createPublicClient({ chain: net.chain, transport: http(rpcUrl) });
+    try {
+      const anchor = await candidate.getBlock({ blockTag: 'latest' });
+      anchorBlock = anchor.number;
+      anchorTs = Number(anchor.timestamp);
+      client = candidate;
+      break;
+    } catch {
+      continue;
+    }
   }
+  if (!client) return bad('Chain head is unreachable.', 502);
 
   // Czas loga liczymy z ROZNICY numerow blokow wzgledem jednej kotwicy -
   // pobieranie timestampu kazdego bloku zamienialoby skan w setki zadan.

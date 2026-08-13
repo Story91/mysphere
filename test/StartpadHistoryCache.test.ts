@@ -261,6 +261,33 @@ describe('uklad dokumentow cache', () => {
   });
 });
 
+describe('rpcCandidates', () => {
+  const { rpcCandidates } = require('../app/api/launchpad/historyRpc');
+
+  const CDP = 'https://api.developer.coinbase.com/rpc/v1/base/klucz';
+
+  it('wlasny RPC idzie pierwszy, publiczny zostaje jako zapasowy', () => {
+    expect(rpcCandidates(8453, { BASE_RPC_URL: CDP })).to.deep.equal([CDP, undefined]);
+  });
+
+  it('bez wlasnego RPC zostaje sam publiczny', () => {
+    expect(rpcCandidates(8453, {})).to.deep.equal([undefined]);
+  });
+
+  it('Sepolia ma wlasna zmienna - klucz Base mainnet tam nie zadziala', () => {
+    const sep = 'https://sepolia.example/klucz';
+    expect(rpcCandidates(84532, { BASE_RPC_URL: CDP, BASE_SEPOLIA_RPC_URL: sep })).to.deep.equal([sep, undefined]);
+  });
+
+  it('siec bez wlasnej zmiennej nie dostaje cudzego endpointu', () => {
+    expect(rpcCandidates(4663, { BASE_RPC_URL: CDP })).to.deep.equal([undefined]);
+  });
+
+  it('pusta zmienna jest traktowana jak brak, a nie jak adres', () => {
+    expect(rpcCandidates(8453, { BASE_RPC_URL: '   ' })).to.deep.equal([undefined]);
+  });
+});
+
 describe('capRows', () => {
   const { capRows } = require('../app/startpad/snapshot');
 
