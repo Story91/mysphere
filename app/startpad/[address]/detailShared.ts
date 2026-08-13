@@ -218,6 +218,36 @@ export function buildLine(points: PricePoint[]): { time: number; value: number }
 /* -------------------------------------------------------------------------- */
 
 /**
+ * REZERWA NA GAZ przy klikaniu 25/50/100% i Max.
+ *
+ * Stalo tu 0,005 ETH, czyli okolo dziewieciu dolarow, i to zamienialo te
+ * przyciski w atrapy: przy saldzie 0,0004 ETH rezerwa byla DWUNASTOKROTNIE
+ * WIEKSZA NIZ CALE SALDO, wiec `saldo - rezerwa` schodzilo do zera i kazdy
+ * procent wpisywal zero.
+ *
+ * Liczba byla oderwana od sieci, w ktorej stoimy. Zmierzony koszt gazu
+ * transakcji launchpada na Base to 0,0000004 ETH - stara rezerwa byla od niego
+ * dwanascie tysiecy razy wieksza. Ta zostawia okolo stu transakcji zapasu i
+ * dalej jest ulamkiem centa.
+ */
+export const GAS_RESERVE_WEI = 50_000_000_000_000n;
+
+/**
+ * Ile z salda wolno zaproponowac do wydania. Nigdy ponizej zera - saldo
+ * mniejsze od rezerwy znaczy "nie ma z czego", a nie "minus".
+ */
+export function spendableEth(balance: bigint | null | undefined, reserve: bigint): bigint {
+  if (typeof balance !== 'bigint') return 0n;
+  return balance > reserve ? balance - reserve : 0n;
+}
+
+/** Ulamek kwoty, zaokraglony W DOL - nie wolno zaproponowac wiecej, niz jest. */
+export function fractionOf(value: bigint, numerator: bigint, denominator: bigint): bigint {
+  if (value <= 0n || denominator <= 0n) return 0n;
+  return (value * numerator) / denominator;
+}
+
+/**
  * BUFOR POSLIZGU - do wyboru przez uzytkownika, w setnych procenta.
  *
  * Stalo tu na sztywno 50 (0,5%) i to bylo za malo o rzad wielkosci. 13 sierpnia

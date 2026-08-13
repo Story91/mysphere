@@ -49,6 +49,10 @@ import { tokenAccent } from './metadata';
 import { browserStorage, flushPendingProfiles, postProfileWithRetry, sendTokenProfile } from './profileSync';
 import { loadSnapshot, saveSnapshot, loadFeedSnapshot, saveFeedSnapshot } from './snapshot';
 import { scanIsTrustworthy, shouldKeepUnscanned } from './boardScan';
+// Jedna, ZMIERZONA rezerwa na gaz i jedna arytmetyka procentow dla obu paneli
+// handlu - mini modala na tablicy i panelu na stronie tokena. Dwie kopie tej
+// samej liczby wlasnie kosztowaly nas przyciski, ktore wpisywaly zero.
+import { fractionOf, GAS_RESERVE_WEI, spendableEth } from './[address]/detailShared';
 import { fetchHolderCounts } from './blockscout';
 import LaunchTokenModal from './LaunchTokenModal';
 import ShareToken from './ShareToken';
@@ -993,15 +997,20 @@ function TradePanel({
   // na gaz przy Max - inaczej Max = calosc i transakcja nie ma z czego zaplacic.
   const { address: walletAddress } = useAccount();
   const { data: ethBalance } = useBalance({ address: walletAddress, chainId: LAUNCHPAD_CHAIN.id });
-  const GAS_HEADROOM_WEI = 5_000_000_000_000_000n; // ~0.005 {NATIVE_SYMBOL}
+  /**
+   * Ile ETH zostaje po rezerwie na gaz. Stalo tu 0,005 ETH i przy saldzie
+   * 0,0004 ETH rezerwa byla wieksza niz cale saldo - kazdy procent wpisywal
+   * wtedy ZERO i przyciski wygladaly na zepsute. Uzasadnienie nowej wartosci
+   * przy `GAS_RESERVE_WEI`.
+   */
+  const spendable = spendableEth(ethBalance?.value, GAS_RESERVE_WEI);
   const setBuyFraction = (numerator: bigint, denominator: bigint) => {
-    if (!ethBalance) return;
-    const spendable = ethBalance.value > GAS_HEADROOM_WEI ? ethBalance.value - GAS_HEADROOM_WEI : 0n;
-    setBuyAmount(formatEther((spendable * numerator) / denominator));
+    if (spendable <= 0n) return;
+    setBuyAmount(formatEther(fractionOf(spendable, numerator, denominator)));
   };
   const setSellFraction = (numerator: bigint, denominator: bigint) => {
-    if (!details) return;
-    setSellAmount(formatUnits((details.balance * numerator) / denominator, decimals));
+    if (!details || details.balance <= 0n) return;
+    setSellAmount(formatUnits(fractionOf(details.balance, numerator, denominator), decimals));
   };
   // ETH pozostaje wartoscia glowna wyceny; dopisek USD znika przy braku kursu.
   const sellQuoteNote = sellQuote === null ? null : usdNote(Number(formatEther(sellQuote)), ethUsd);
@@ -1034,8 +1043,8 @@ function TradePanel({
         <span className="text-[11px] text-sp-shade/45">{ethBalance ? `Balance ${Number(formatEther(ethBalance.value)).toLocaleString('en-US', { maximumFractionDigits: 4 })} ${NATIVE_SYMBOL}` : '0.5% slippage buffer'}</span></div>
       <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">ETH</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!ethBalance} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
-        <button type="button" disabled={!ethBalance} onClick={() => setBuyFraction(1n, 1n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">Max</button>
+        {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={spendable <= 0n} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
+        <button type="button" disabled={spendable <= 0n} onClick={() => setBuyFraction(1n, 1n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">Max</button>
       </div>
     </> : <>
       <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-sp-ink">Token amount</span><span className="text-[11px] text-sp-shade/45">Balance {Number(balance).toFixed(4)}</span></div>

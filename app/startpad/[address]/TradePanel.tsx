@@ -31,6 +31,9 @@ import {
   DEFAULT_SLIPPAGE_BPS,
   fmtEth,
   fmtTokens,
+  fractionOf,
+  GAS_RESERVE_WEI,
+  spendableEth,
   SLIPPAGE_OPTIONS,
   TARGET_WEI,
   toWei,
@@ -52,8 +55,9 @@ type Side = 'buy' | 'sell';
 type Busy = 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest' | 'claim' | null;
 type ClaimSource = 'launch' | 'hookEth' | 'hookToken' | 'vaultEth' | 'vaultToken';
 
-/** Ile ETH zostawiamy na gaz, gdy ktos klika Max. */
-const GAS_HEADROOM_WEI = 5_000_000_000_000_000n;
+// Rezerwa na gaz stala tu jako 0,005 ETH i byla wieksza niz cale saldo malego
+// portfela - patrz `GAS_RESERVE_WEI` w detailShared, gdzie jest teraz jedna,
+// zmierzona wartosc dla obu paneli handlu.
 
 export default function TradePanel({
   core,
@@ -434,15 +438,14 @@ export default function TradePanel({
     }
   };
 
-  // Wspolne wydawalne ETH: saldo minus zapas na gaz. Bez zapasu "Max" = calosc
-  // i transakcji brakuje na oplate gazu.
-  const spendableEth = () =>
-    ethBalance === null ? null : ethBalance > GAS_HEADROOM_WEI ? ethBalance - GAS_HEADROOM_WEI : 0n;
+  // Wydawalne ETH: saldo minus rezerwa na gaz. Ta sama poprawka, co w mini
+  // panelu na tablicy - rezerwa 0,005 ETH byla wieksza niz cale saldo malego
+  // portfela i kazdy procent wpisywal ZERO. Uzasadnienie przy `GAS_RESERVE_WEI`.
+  const spendable = spendableEth(ethBalance, GAS_RESERVE_WEI);
 
   const setBuyPct = (pct: bigint) => {
-    const max = spendableEth();
-    if (max === null) return;
-    setBuyAmount(formatEther((max * pct) / 100n));
+    if (spendable <= 0n) return;
+    setBuyAmount(formatEther(fractionOf(spendable, pct, 100n)));
   };
   const setMaxBuy = () => setBuyPct(100n);
 
@@ -535,11 +538,11 @@ export default function TradePanel({
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {([25n, 50n, 100n] as const).map((pct) => (
-                  <button key={String(pct)} type="button" onClick={() => setBuyPct(pct)} disabled={ethBalance === null} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">
+                  <button key={String(pct)} type="button" onClick={() => setBuyPct(pct)} disabled={spendable <= 0n} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">
                     {String(pct)}%
                   </button>
                 ))}
-                <button type="button" onClick={setMaxBuy} disabled={ethBalance === null} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">
+                <button type="button" onClick={setMaxBuy} disabled={spendable <= 0n} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">
                   Max
                 </button>
               </div>
