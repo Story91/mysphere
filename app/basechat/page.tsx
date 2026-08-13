@@ -4935,6 +4935,10 @@ function BaseChatContent() {
         quickOnly
         initialName={suggestCoinFromPost(newPost).name}
         initialSymbol={suggestCoinFromPost(newPost).symbol}
+        // Zdjecie dolaczone do posta staje sie logo tokena. Kto je wgral i
+        // zaraz startuje token, ma na mysli to zdjecie - proszenie o nie drugi
+        // raz byloby pytaniem o cos, co juz powiedzial.
+        initialLogo={postPreviewImage}
         onClose={() => setQuickLaunchOpen(false)}
         onLaunched={(token) => void publishLaunchPost(token)}
       />

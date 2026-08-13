@@ -23,7 +23,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { formatEther, formatUnits, getAbiItem, maxUint256, parseEther, parseUnits, zeroAddress, type Address } from 'viem';
+import { formatEther, formatUnits, getAbiItem, getAddress, maxUint256, parseEther, parseUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useBalance, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
   NATIVE_SYMBOL,
@@ -1271,9 +1271,17 @@ export default function LaunchpadBoard() {
             tokens?: Array<{ address?: string; name?: string; symbol?: string; creator?: string; startedAt?: number }>;
           };
           if (body?.ok && Array.isArray(body.tokens)) {
+            // Mapa jest kluczowana adresem Z LOGOW, czyli w checksumie
+            // (`0xB200...`), a baza trzyma male litery. Porownanie wprost dawalo
+            // DWA klucze na jeden token i tablica pokazywala go dwa razy: raz z
+            // wolumenem ze skanu, raz z zerami z bazy. Porownujemy wiec po
+            // malych literach, a wstawiamy w checksumie - tak jak reszta mapy.
+            const known = new Set([...launched.keys()].map((key) => key.toLowerCase()));
             for (const entry of body.tokens) {
-              const address = (entry.address ?? '') as Address;
-              if (!/^0x[0-9a-fA-F]{40}$/.test(address) || launched.has(address)) continue;
+              const raw = entry.address ?? '';
+              if (!/^0x[0-9a-fA-F]{40}$/.test(raw) || known.has(raw.toLowerCase())) continue;
+              const address = getAddress(raw) as Address;
+              known.add(raw.toLowerCase());
               launched.set(address, {
                 name: entry.name ?? '',
                 symbol: entry.symbol ?? '',
