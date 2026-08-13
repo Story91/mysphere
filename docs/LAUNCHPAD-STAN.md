@@ -95,6 +95,164 @@ Wdrozenia POPRZEDNIE sa MARTWE i nie wolno ich uzywac:
 - `0x811d...58ba` (popoludnie 2026-08-10, v2) - model 70/30 juz TAK, ale
   sniper cap zabity na 16M; zastapione przez v3 tego samego dnia.
 
+## Arc testnet (chainId 5042002) - W TOKU, 2026-08-13
+
+Circle Arc. Mainnet zapowiedziany na 16 wrzesnia 2026, dzis dziala publiczny
+testnet. Caly stos stoi, wszystkie 15 kontroli wiazan przeszlo przy deployu.
+
+| kontrakt | adres |
+| --- | --- |
+| `CurveLaunchpad` | `0xdAe0dd6EE87a8d7eE7575dD9904A72fA9CA6600d` |
+| `LiquidityVault` | `0x8F224A0782b55aF138A05b0EEA03f8D6D69A51D6` |
+| `B20LaunchHook` | `0x2615415f5eE2E0dF65bF0788E7c43ACdCB036044` (salt `0x…01ae`, 431 prob) |
+| `PlainTokenFactory` | `0xC10eDaF3473CcDB6e91090F204b01Ccb555686C9` |
+| PoolManager v4 (POSTAWIONY PRZEZ NAS) | `0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6` |
+| blok wdrozenia stosu | `56844144` |
+| blok wdrozenia PoolManagera | `56843204` |
+| `FEE_RECIPIENT` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+| deployer | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+
+Parametry jak wszedzie: FEE_BPS=100, CREATOR_FEE_BPS=70, PROTOCOL_SHARE_BPS=3000.
+Fabryka to `PlainTokenFactory`, bo precompile B20 zyje tylko na Base - ta sama
+sciezka co na Robinhoodzie. Pelny zapis: `scripts/output/launchpad-arcTestnet.json`.
+
+### Dlaczego PoolManagera stawialismy sami
+
+Uniswapa na Arc NIE MA. Sprawdzone trzema drogami: `eth_getCode` na trzech
+kanonicznych adresach PoolManagera oddaje pustke, oficjalna lista wdrozen v4
+Arc nie wymienia, a spis kontraktow w docs.arc.io zna tylko USDC, EURC, USYC,
+Permit2, Multicall3 i fabryke CREATE2. Jest tam za to fork Uniswapa V2 od
+projektu spolecznosciowego (fabryka `0x7483...814f`, 39 par).
+
+Arc ma jednak wszystko, czego v4 potrzebuje: TSTORE/TLOAD (EIP-1153), MCOPY i
+PUSH0 - sprawdzone opcode po opcodzie przez `eth_call`. Wiec zamiast pisac
+wariant vaulta pod V2 (co skasowaloby oplaty tworcy po graduacji, bo V2 nie ma
+hookow), postawilismy PoolManagera ze zrodel Uniswapa. Nasz stos idzie na Arc
+bez zmian architektonicznych.
+
+Skrypt: `scripts/launchpad/deployPoolManager.ts`. SYMULUJE wdrozenie przez
+`eth_call` z pustym `to`, zanim cokolwiek wysle, wiec roznica miedzy "kompiluje
+sie u nas" a "wdrozy sie tam" wychodzi za darmo. Kod runtime 24 050 B przy
+limicie 24 576 - zapas 526 B, i tylko dlatego, ze ustawienia kompilatora sa
+przepisane co do liczby z `foundry.toml` Uniswapa.
+
+### Zmiany w repo pod Arc - CZEGO NIE DOTKNELISMY
+
+Zaden nasz kontrakt nie zostal zmieniony. Wdrozenia na Base, Sepolii i
+Robinhoodzie chodza na wlasnym bajtkodzie na lancuchu i zadna zmiana w repo ich
+nie dotyczy.
+
+Doszlo tylko tyle:
+- `hardhat.config.ts`: DRUGI kompilator 0.8.26 obok 0.8.20. Wpis 0.8.20 zostaje
+  pierwszy i nietkniety, wiec nasze kontrakty (`pragma solidity 0.8.20`) daja
+  ten sam bajtkod co dotad - hardhat dobiera kompilator po pragmie pliku.
+  0.8.26 obsluguje WYLACZNIE Uniswapa, ktory wymaga transient storage.
+- `hardhat.config.ts`: siec `arcTestnet` obok pozostalych.
+- `contracts/vendor/UniswapV4PoolManager.sol`: JEDEN import, zero naszej logiki.
+  Istnieje tylko po to, zeby hardhat zobaczyl PoolManagera - kompiluje to, co
+  lezy w `contracts/`, a nie to, co w `node_modules`. Import zamiast wklejonego
+  bajtkodu, bo bajtkodu nie da sie zweryfikowac w eksploratorze.
+- `package.json`: `@uniswap/v4-core` 1.0.2 i `solmate` jako devDependencies
+  (solmate jest wymagany przez `ProtocolFees.sol` Uniswapa).
+
+### PELNY PRZEBIEG PRZESZEDL - 2026-08-13, token ARCF
+
+Cala sciezka od startu tokena do odebranych oplat, na zywo, jednym przebiegiem
+`sepoliaFlow.ts --network arcTestnet`. Token `0xd93D7f1ddf96087bC788a8C69b9A744902d942Bf`.
+
+| krok | blok | gaz | tx |
+| --- | --- | --- | --- |
+| launch | 56845505 | 888 683 | `0xd94d05dc…f89a3` |
+| buy (domkniecie krzywej) | 56846101 | 141 833 | `0x39f6eaa0…cf74e` |
+| **graduate** | 56846104 | 434 320 | `0x34453fba…85319` |
+| **swap w puli po graduacji** | 56846111 | 316 423 | `0x3040b7a9…5cb085` |
+| settle oplat hooka | 56846114 | 60 940 | `0x03278c4e…8303ac` |
+| claim krzywej (0,12 USDC) | 56846118 | 36 472 | `0xde7c67cc…7ccd74` |
+| claim tokenow z hooka (531,55) | 56846120 | 40 304 | `0x114dd8f2…a03226` |
+
+Zweryfikowane osobno odczytem z lancucha, a nie tylko wyjsciem skryptu:
+stan tokena `Graduated`; pool key `currency0 = 0x0` (waluta natywna),
+`currency1` = token, oplata 3000, hooks = nasz hook; pozycja LP z plynnoscia
+21 251 635 231 200 453 637 758 na pelnym zakresie tickow; swap po graduacji ze
+statusem OK i siedmioma logami.
+
+To zamyka jedyna niewiadoma, ktora zostawala: rozliczenie natywnej wartosci
+(`settle`) przy dodawaniu plynnosci dziala, mimo ze walutą natywna jest tu
+dolar. Handel PO graduacji tez dziala i hook nalicza z niego oplate - 531,55
+tokena, odebrane osobna transakcja.
+
+Kupno domykajace krzywa: wplacone 4 USDC, oplata 0,03, ZWROT NADWYZKI 0,97,
+czyli realnie 3,00 poszlo na krzywa. Zwrot potwierdza, ze reguly Arc dotyczace
+przelewow natywnych nie przeszkadzaja naszym wyplatom.
+
+### Czy jestesmy pierwsi z v4 na Arc - NIE, I NIE WOLNO TAK PISAC
+
+Sprawdzone 2026-08-13, zanim ktokolwiek zdazyl to ogłosic. Na Arc testnecie
+stoja co najmniej TRZY inne PoolManagery v4, postawione przez inne osoby:
+
+| adres | rozmiar kodu | wlasciciel |
+| --- | --- | --- |
+| `0x1D2536ec9aa94Bab4d34E1a7FcD2D94E9Dc60cAb` | 24 050 B | `0xa9e9E29e…f8Ee` |
+| `0x5e4b627b99BC77a29c874ba1ccAe65af5d8D1B19` | 24 009 B | `0xCC8a979B…5c34` |
+| `0xC20bd74484de18f9085e88DB9a3207a17da35bC4` | 24 009 B | `0xFf2c6CFD…3b77` |
+
+Kazdy z nich odpowiada na `initialize` puli natywnej tickiem 0, czyli zachowuje
+sie jak prawdziwy PoolManager v4 - to nie sa kontrakty o przypadkowo tej samej
+nazwie. Znalezienie ich zajelo cztery minuty (wyszukiwarka Blockscouta plus
+`eth_call`), wiec kazdy, kto chcialby podwazyc naglowek "pierwszy v4 na Arc",
+zrobi to rownie szybko.
+
+Co MOZNA powiedziec i co da sie obronic co do slowa:
+- Uniswap NIE wdrozyl v4 na Arc; sieci nie ma na ich oficjalnej liscie wdrozen,
+  a spis kontraktow Arc nie wymienia Uniswapa w zadnej wersji;
+- postawilismy wlasny PoolManager ze zrodel i uruchomilismy na nim launchpad
+  z krzywa i WLASNYM HOOKIEM, przechodzac cala sciezke onchain;
+- zrobilismy to na lancuchu, gdzie waluta natywna jest dolarem, bez zmiany
+  jednej linii w kontraktach launchpada.
+
+Czego NIE WOLNO pisac bez dowodu, ktorego nie mamy: "pierwszy hook v4 na Arc",
+"pierwszy launchpad", "pierwsi z v4". Trzy cudze PoolManagery nie dowodza, ze
+ktos ma tam hooka - ale dowodza, ze nikt nie sprawdzil, czy nie ma, a przy
+takim naglowku to sprawdzenie robi za nas ktos inny i publicznie.
+
+### Czego NIE trzeba zmieniac w kontraktach na testnet
+
+Prog graduacji to `G = 4 x R_VIRT`, a `R_VIRT` = 0.75 jednostki NATYWNEJ. Na
+Arc jednostka natywna to USDC, wiec prog wychodzi 3 USDC sam z siebie. Na
+testnecie to jest dokladnie to, czego trzeba: pelny cykl do graduacji kosztuje
+okolo 3,05 USDC (3 do krzywej, z czego 0,045 wraca wolajacemu `graduate()`).
+
+Dopiero mainnet Arc bedzie wymagal parametrow w rozsadnych dolarach (np. 2500
+wirtualnej rezerwy i 10 000 progu), czyli `R_VIRT`, `SQRT_PRICE`, `MIN_LP_ETH`
+i `MAX_BUY` z konstruktora zamiast ze stalych. Decyzja na wrzesien, nie warunek
+startu.
+
+### Fakty o sieci (ZMIERZONE 2026-08-13, nie przepisane z docsow)
+
+- blok co 0,51 s, czyli ~169 tys. blokow na dobe; 30 mln gazu na blok;
+- gaz 21 gwei, ale placony w USDC: zwykla transakcja 0,003 USDC, wdrozenie
+  calego naszego stosu ~0,32 USDC, PoolManager 0,111 USDC;
+- `maxFeePerGas` musi wynosic co najmniej 20 gwei (docs.arc.io), inaczej
+  transakcja wisi albo leci w kosz;
+- `eth_getLogs`: publiczne RPC daja okno 10 000 blokow, ale **Blockdaemon
+  (`rpc.blockdaemon.testnet.arc.io`) daje 50 000** - zmierzone na wszystkich
+  pieciu endpointach z docsow. Przy 169 tys. blokow na dobe to jedyny endpoint,
+  na ktorym skan historii tokena ma sens;
+- natywne USDC ma 18 miejsc, ERC-20 pod `0x3600...0000` ma 6, i to JEST TA SAMA
+  KASA - zmierzone na parze USDC/EURC: saldo natywne 236704171000000000000 przy
+  `balanceOf` 236704171. Kontrakt trzymajacy natywne moze je wyplacic jako
+  ERC-20 bez wrapowania, dzielac przez 1e12;
+- reguly, ktorych nie ma na Base: przelew natywnej wartosci na adres zerowy
+  rewertuje, przelew do lub od adresu z listy blokad Circle rewertuje (i tak
+  spalajac gaz), a wyslanie wartosci pod adres precompile'a rewertuje. Nasze
+  wyplaty sa pull-based (`claim()`), wiec zablokowany odbiorca blokuje wylacznie
+  wlasna wyplate - decyzja podjeta pod Base okazuje sie tu warunkiem dzialania;
+- znaczniki czasu blokow sa NIEMALEJACE, nie rosnace (bloki podsekundowe dziela
+  jedna sekunde). `toPricePoints` juz to zaklada;
+- opt-in privacy Arc jest na mapie drogowej i NIE dziala. Gdy wejdzie, kontrakty
+  w sektorze prywatnym przestana emitowac logi, czyli znikna indekserom. Nasz
+  launchpad ma byc publiczny.
+
 ## Model oplat - USTALONY NA STALE W KODZIE (decyzje z 2026-08-10)
 
 - oplata handlowa na krzywej: **1%** (`MAX_FEE_BPS = 100`), od kazdego kupna

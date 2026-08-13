@@ -26,6 +26,7 @@
 const ENV_BY_CHAIN: Record<number, string> = {
   8453: 'BASE_RPC_URL',
   84532: 'BASE_SEPOLIA_RPC_URL',
+  5042002: 'ARC_TESTNET_RPC_URL',
 };
 
 /**

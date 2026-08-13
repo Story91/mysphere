@@ -1,14 +1,23 @@
-import { artifacts, ethers } from "hardhat";
+import hre, { artifacts, ethers } from "hardhat";
 import fs from "fs";
 import path from "path";
 import { Contract, ContractTransactionReceipt, getAddress } from "ethers";
 import { KNOWN_POOL_MANAGERS } from "./plan";
 
-const CHAIN_ID = 84532;
-const POOL_MANAGER = KNOWN_POOL_MANAGERS[CHAIN_ID];
+/**
+ * NAZWA PLIKU MOWI "SEPOLIA", ALE SKRYPT JEST JUZ NIEZALEZNY OD SIECI.
+ *
+ * Siec bierze sie z `--network`, a PoolManager z mapy sprawdzonych po chainId,
+ * dokladnie jak w `deploy.ts`. Zmiana powstala przy wdrozeniu na Arc (chainId
+ * 5042002), gdzie potrzebny byl ten sam przebieg co do kroku - a przepisanie
+ * 340 linii tylko po to, zeby podmienic jedna stala, zrobiloby drugie zrodlo
+ * prawdy o tym, jak wyglada pelna sciezka.
+ *
+ * Nazwa pliku zostaje: wolaja go `npm run launchpad:flow:sepolia` i runbook w
+ * docs/LAUNCHPAD-STAN.md. Zachowanie na Sepolii jest niezmienione.
+ */
 const MIN_SQRT_PRICE_PLUS_ONE = 4_295_128_740n;
 const SWAP_ETH = ethers.parseEther("0.001");
-const DEFAULT_BUY_ETH = ethers.parseEther("5");
 const LAUNCH_WINDOW = 300;
 
 function requireAddress(name: string) {
@@ -97,10 +106,30 @@ async function main() {
   }
 
   const chainId = Number((await ethers.provider.getNetwork()).chainId);
-  if (chainId !== CHAIN_ID) throw new Error(`Oczekiwalem chainId ${CHAIN_ID}, dostalem ${chainId}.`);
+  const POOL_MANAGER = KNOWN_POOL_MANAGERS[chainId];
+  if (!POOL_MANAGER) {
+    throw new Error(
+      `Nie znam PoolManagera dla chainId ${chainId}. Mapa sprawdzonych ma ` +
+        `[${Object.keys(KNOWN_POOL_MANAGERS).join(", ")}].`
+    );
+  }
+
+  // Jednostka natywna: Arc liczy w USDC, reszta naszych sieci w ETH.
+  const nativeSymbol = chainId === 5042002 ? "USDC" : "ETH";
 
   const launchpadAddress = requireAddress("LAUNCHPAD");
+  /**
+   * Ile wplacamy w kupnie domykajacym krzywa. Domyslne 5 jest pod ETH: prog
+   * graduacji to 3, a nadwyzka pokrywa 1% oplaty i zaokraglenia.
+   *
+   * Na Arc jednostka natywna to USDC, wiec ten sam prog wychodzi 3 USDC i
+   * pelny przebieg kosztuje okolo trzech dolarow zamiast pieciu ETH. Kwote
+   * podaje sie przez FLOW_BUY_ETH - nazwa zostaje historyczna, znaczy "ile
+   * jednostek natywnych".
+   */
   const buyEth = ethers.parseEther(process.env.FLOW_BUY_ETH ?? "5");
+  const tokenName = process.env.FLOW_NAME ?? "Sepolia Flow";
+  const tokenSymbol = process.env.FLOW_SYMBOL ?? "SFLOW";
   const [signer] = await ethers.getSigners();
   const creator = getAddress(signer.address);
   const balanceBefore = await ethers.provider.getBalance(creator);
@@ -128,7 +157,7 @@ async function main() {
   const deadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
   console.log("launchpad", launchpadAddress);
   console.log("creator  ", creator);
-  console.log("buy ETH  ", ethers.formatEther(buyEth));
+  console.log(`buy ${nativeSymbol}`.padEnd(9), ethers.formatEther(buyEth));
 
   // ===========================================================================
   // WZNAWIANIE: FLOW_TOKEN pomija start i kupno
@@ -155,7 +184,7 @@ async function main() {
     if (state === 1n) throw new Error("Token jest jeszcze na krzywej - dokoncz kupno albo uruchom flow bez FLOW_TOKEN.");
     if (state === 3n) console.log("token juz po graduacji - przechodze do puli, oplat i wyplat");
   } else {
-    const launchTx = await pad.launch("Sepolia Flow", "SFLOW", 0, deadline);
+    const launchTx = await pad.launch(tokenName, tokenSymbol, 0, deadline);
     launchReceipt = (await launchTx.wait())!;
     const launched = parseEvent(pad, launchReceipt, "Launched");
     token = getAddress(launched.args[0]);
@@ -284,25 +313,34 @@ async function main() {
     hookTokenClaimReceipt = (await (await hook.claimToken(token)).wait())!;
   }
 
-  console.log(
-    "claim   ",
-    launchClaimReceipt
-      ? `${receiptSummary(launchClaimReceipt)} | odebrano ${ethers.formatEther(launchClaimableBefore)} ETH`
-      : "(zero do odebrania - juz wyplacone)"
-  );
-  console.log(
-    "hook ETH",
-    hookEthClaimReceipt ? receiptSummary(hookEthClaimReceipt) : "(zero do odebrania - wymiana szla ETH->token)"
-  );
-  console.log(
-    "hook TOK",
-    hookTokenClaimReceipt
-      ? `${receiptSummary(hookTokenClaimReceipt)} | odebrano ${ethers.formatEther(hookTokenClaimableBefore)} tokena`
-      : "(zero do odebrania)"
-  );
+  // `receiptSummary` oddaje OBIEKT, wiec w szablonie stringa wychodzil z niego
+  // "[object Object]" - w miejscu, ktore ma byc dowodem, ze wyplata przeszla.
+  // Obiekt idzie wiec osobnym argumentem console.log, a nie w srodku napisu.
+  //
+  // Jednostka jest brana z sieci, nie wpisana. Na Arc te same liczby sa w USDC
+  // i "odebrano 0.12 ETH" byloby po prostu nieprawda.
+  const unit = nativeSymbol;
+  if (launchClaimReceipt) {
+    console.log("claim   ", receiptSummary(launchClaimReceipt), `| odebrano ${ethers.formatEther(launchClaimableBefore)} ${unit}`);
+  } else {
+    console.log("claim   ", "(zero do odebrania - juz wyplacone)");
+  }
+  if (hookEthClaimReceipt) {
+    console.log("hook NAT", receiptSummary(hookEthClaimReceipt));
+  } else {
+    console.log("hook NAT", `(zero do odebrania - wymiana szla ${unit}->token)`);
+  }
+  if (hookTokenClaimReceipt) {
+    console.log("hook TOK", receiptSummary(hookTokenClaimReceipt), `| odebrano ${ethers.formatEther(hookTokenClaimableBefore)} tokena`);
+  } else {
+    console.log("hook TOK", "(zero do odebrania)");
+  }
 
   const out = {
-    network: "base-sepolia",
+    // Bylo tu wpisane "base-sepolia" na sztywno, wiec zapis z przebiegu na Arc
+    // twierdzil, ze jest z Sepolii - obok wlasciwego chainId. Nazwa idzie teraz
+    // z `--network`.
+    network: hre.network.name,
     chainId,
     launchpad: launchpadAddress,
     vault: vaultAddress,
@@ -331,7 +369,7 @@ async function main() {
   };
   const outDir = path.join(process.cwd(), "scripts", "output");
   fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(path.join(outDir, "launchpad-base-sepolia-flow.json"), `${JSON.stringify(out, null, 2)}\n`);
+  fs.writeFileSync(path.join(outDir, `launchpad-${hre.network.name}-flow.json`), `${JSON.stringify(out, null, 2)}\n`);
   console.log(JSON.stringify(out, null, 2));
 }
 

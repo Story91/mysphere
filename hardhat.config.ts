@@ -30,15 +30,45 @@ function deployerAccounts() {
 }
 
 const config = {
+  /**
+   * DWA KOMPILATORY, I TO NIE JEST DOWOLNOSC.
+   *
+   * 0.8.20 zostaje pierwszy i z NIETKNIETYMI ustawieniami - wszystkie nasze
+   * kontrakty maja `pragma solidity 0.8.20`, wiec kompiluja sie dokladnie tak
+   * jak dotad i wychodzi z nich ten sam bajtkod. Dopisanie drugiego wpisu nic
+   * im nie zmienia: hardhat dobiera kompilator po pragmie pliku.
+   *
+   * 0.8.26 jest tu WYLACZNIE dla Uniswapa v4 (contracts/vendor/), ktory wymaga
+   * transient storage i na 0.8.20 sie nie skompiluje. Ustawienia przepisane co
+   * do liczby z foundry.toml samego Uniswapa: 44 444 444 przebiegi
+   * optymalizatora, viaIR, evmVersion cancun. To nie jest przesada - PoolManager
+   * ociera sie o limit 24 kB z EIP-170 i przy mniejszych `runs` po prostu sie
+   * NIE MIESCI, a dowiedzielibysmy sie o tym dopiero przy wdrozeniu.
+   */
   solidity: {
-    version: "0.8.20",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
+    compilers: [
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200
+          },
+          viaIR: true
+        }
       },
-      viaIR: true
-    }
+      {
+        version: "0.8.26",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 44_444_444
+          },
+          viaIR: true,
+          evmVersion: "cancun"
+        }
+      }
+    ]
   },
   paths: {
     // Jedno drzewo kontraktow. Wczesniej wskazywalo na ./camp-contract, wiec
@@ -80,6 +110,21 @@ const config = {
       url: process.env.ROBINHOOD_TESTNET_RPC_URL || "https://rpc.testnet.chain.robinhood.com",
       accounts: deployerAccounts(),
       chainId: 46630,
+    },
+    /**
+     * Arc testnet (Circle). GAZ PLACI SIE W USDC, nie w ETH - jednostka
+     * natywna ma 18 miejsc jak wei, a ten sam pieniadz widziany przez
+     * interfejs ERC-20 pod 0x3600...0000 ma 6. Zmierzone 2026-08-13: blok co
+     * 0,51 s, gaz 21 gwei, czyli zwykla transakcja kosztuje 0,003 USDC.
+     *
+     * `maxFeePerGas` musi wynosic co najmniej 20 gwei - ponizej tego progu
+     * transakcja albo wisi, albo zostaje odrzucona (docs.arc.io, gas-and-fees).
+     * Dlatego nie zostawiamy tu automatu z domyslnym zerem.
+     */
+    arcTestnet: {
+      url: process.env.ARC_TESTNET_RPC_URL || "https://rpc.testnet.arc.network/",
+      accounts: deployerAccounts(),
+      chainId: 5042002,
     },
     linea: {
       url: process.env.LINEA_RPC_URL || "https://linea-rpc.publicnode.com",

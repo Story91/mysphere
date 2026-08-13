@@ -13,6 +13,7 @@ import {
 import { formatEther, formatUnits, maxUint256, parseUnits, type Address } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
+  NATIVE_SYMBOL,
   erc20Abi,
   hookAbi,
   LAUNCH_HOOK_ADDRESS,
@@ -238,7 +239,7 @@ export default function TradePanel({
     }
     const value = toWei(buyAmount);
     if (value === null || value === 0n) {
-      setNotice({ kind: 'error', text: 'Enter an ETH amount greater than zero, written as a decimal number.' });
+      setNotice({ kind: 'error', text: `Enter an ${NATIVE_SYMBOL} amount greater than zero, written as a decimal number.` });
       return;
     }
     if (!(await ensureChain())) return;
@@ -462,10 +463,10 @@ export default function TradePanel({
   // kursu tokena, ktorego swiezo wystartowany rynek po prostu nie ma.
   // Dopisek dopiero od niezerowej kwoty: "0 · $0.00" to szum, nie informacja.
   const claimRows: Array<{ label: string; value: string; amount: bigint; source: ClaimSource; usd?: string | null }> = [
-    { label: 'Startpad fees (ETH)', value: fmtEth(core.launchClaimable), amount: core.launchClaimable, source: 'launch', usd: core.launchClaimable > 0n ? usdSuffix(core.launchClaimable, ethUsd) : null },
-    { label: 'Hook ETH', value: fmtEth(core.hookEthClaimable), amount: core.hookEthClaimable, source: 'hookEth', usd: core.hookEthClaimable > 0n ? usdSuffix(core.hookEthClaimable, ethUsd) : null },
+    { label: `Startpad fees (${NATIVE_SYMBOL})`, value: fmtEth(core.launchClaimable), amount: core.launchClaimable, source: 'launch', usd: core.launchClaimable > 0n ? usdSuffix(core.launchClaimable, ethUsd) : null },
+    { label: `Hook ${NATIVE_SYMBOL}`, value: fmtEth(core.hookEthClaimable), amount: core.hookEthClaimable, source: 'hookEth', usd: core.hookEthClaimable > 0n ? usdSuffix(core.hookEthClaimable, ethUsd) : null },
     { label: `Hook ${core.symbol}`, value: fmtTokens(core.hookTokenClaimable, decimals), amount: core.hookTokenClaimable, source: 'hookToken' },
-    { label: 'Vault ETH', value: fmtEth(core.vaultEthClaimable), amount: core.vaultEthClaimable, source: 'vaultEth', usd: core.vaultEthClaimable > 0n ? usdSuffix(core.vaultEthClaimable, ethUsd) : null },
+    { label: `Vault ${NATIVE_SYMBOL}`, value: fmtEth(core.vaultEthClaimable), amount: core.vaultEthClaimable, source: 'vaultEth', usd: core.vaultEthClaimable > 0n ? usdSuffix(core.vaultEthClaimable, ethUsd) : null },
     { label: `Vault ${core.symbol}`, value: fmtTokens(core.vaultTokenClaimable, decimals), amount: core.vaultTokenClaimable, source: 'vaultToken' },
   ];
   const hasClaims = claimRows.some((row) => row.amount > 0n);
@@ -489,9 +490,9 @@ export default function TradePanel({
         </div>
         <p className="mt-1.5 text-[11px] text-sp-shade/45">
           {core.state === 'Curve'
-            ? `${fmtEth(core.ethReserve)} of ${Number(formatEther(TARGET_WEI)).toFixed(2)} ETH · ${fmtEth(remaining)} ETH to graduation`
+            ? `${fmtEth(core.ethReserve)} of ${Number(formatEther(TARGET_WEI)).toFixed(2)} ${NATIVE_SYMBOL} · ${fmtEth(remaining)} ${NATIVE_SYMBOL} to graduation`
             : core.state === 'Locked'
-              ? 'The curve is closed at 3.00 ETH. Anyone can open the Uniswap v4 pool below.'
+              ? `The curve is closed at 3.00 ${NATIVE_SYMBOL}. Anyone can open the Uniswap v4 pool below.`
               : 'Liquidity lives in the Uniswap v4 pool with the launch hook attached.'}
         </p>
       </div>
@@ -519,12 +520,12 @@ export default function TradePanel({
           {side === 'buy' && onCurve ? (
             <>
               <div className="mt-4 flex items-end justify-between">
-                <span className="text-[12px] font-extrabold text-sp-ink">ETH amount</span>
-                {ethBalance !== null && <span className="text-[11px] text-sp-shade/45">Balance {fmtEth(ethBalance, 4)} ETH</span>}
+                <span className="text-[12px] font-extrabold text-sp-ink">{NATIVE_SYMBOL} amount</span>
+                {ethBalance !== null && <span className="text-[11px] text-sp-shade/45">Balance {fmtEth(ethBalance, 4)} {NATIVE_SYMBOL}</span>}
               </div>
               <div className="relative mt-2">
                 <input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} aria-label="ETH amount to spend" />
-                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">ETH</span>
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">{NATIVE_SYMBOL}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {([25n, 50n, 100n] as const).map((pct) => (
@@ -546,12 +547,12 @@ export default function TradePanel({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">Fee</span>
-                  <span className="font-bold text-sp-shade/60">{buyQuote ? `${fmtEth(buyQuote.fee)} ETH` : '--'}</span>
+                  <span className="font-bold text-sp-shade/60">{buyQuote ? `${fmtEth(buyQuote.fee)} ${NATIVE_SYMBOL}` : '--'}</span>
                 </div>
                 {buyQuote && buyQuote.refund > 0n && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sp-shade/50">Refund (curve fills at 3 ETH)</span>
-                    <span className="font-bold text-sp-up">{fmtEth(buyQuote.refund)} ETH</span>
+                    <span className="text-sp-shade/50">Refund (curve fills at 3 {NATIVE_SYMBOL})</span>
+                    <span className="font-bold text-sp-up">{fmtEth(buyQuote.refund)} {NATIVE_SYMBOL}</span>
                   </div>
                 )}
               </div>
@@ -589,13 +590,13 @@ export default function TradePanel({
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">You receive</span>
                   <span className="font-extrabold text-sp-ink">
-                    {sellQuote ? `~${fmtEth(sellQuote.ethOut)} ETH` : '--'}
+                    {sellQuote ? `~${fmtEth(sellQuote.ethOut)} ${NATIVE_SYMBOL}` : '--'}
                     {sellUsd && <span className="ml-1 text-[10px] font-bold text-sp-shade/40">· {sellUsd}</span>}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">Fee</span>
-                  <span className="font-bold text-sp-shade/60">{sellQuote ? `${fmtEth(sellQuote.fee)} ETH` : '--'}</span>
+                  <span className="font-bold text-sp-shade/60">{sellQuote ? `${fmtEth(sellQuote.fee)} ${NATIVE_SYMBOL}` : '--'}</span>
                 </div>
               </div>
               <button
@@ -641,7 +642,7 @@ export default function TradePanel({
                 Anyone can open the pool. Caller reward:{' '}
                 {core.gradCallerReward === null
                   ? '--'
-                  : `${fmtEth(core.gradCallerReward)} ETH${core.gradCallerReward > 0n && usdSuffix(core.gradCallerReward, ethUsd) ? ` · ${usdSuffix(core.gradCallerReward, ethUsd)}` : ''}`}
+                  : `${fmtEth(core.gradCallerReward)} ${NATIVE_SYMBOL}${core.gradCallerReward > 0n && usdSuffix(core.gradCallerReward, ethUsd) ? ` · ${usdSuffix(core.gradCallerReward, ethUsd)}` : ''}`}
                 .
               </p>
             </div>
@@ -670,7 +671,7 @@ export default function TradePanel({
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button type="button" disabled={core.pendingEth === 0n || busy === 'settle' || !isConnected} onClick={settle} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">
-              {busy === 'settle' ? 'Settling...' : `Settle ${fmtEth(core.pendingEth)} ETH`}
+              {busy === 'settle' ? 'Settling...' : `Settle ${fmtEth(core.pendingEth)} ${NATIVE_SYMBOL}`}
             </button>
             <button type="button" disabled={busy === 'harvest' || !isConnected} onClick={harvest} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">
               {busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}
@@ -686,8 +687,8 @@ export default function TradePanel({
             <CheckCircle2 className={`h-4 w-4 ${hasClaims ? 'text-sp-up-vivid' : 'text-sp-shade/20'}`} aria-hidden="true" />
           </div>
           {/* Krzywa placi w ETH, ale hook i vault po graduacji nabijaja
-              takze strone tokenowa - stary opis "in ETH, not tokens" klamal. */}
-          <p className="mt-1 text-[10.5px] leading-[1.4] text-sp-shade/40">Curve fees accrue in ETH; after graduation pool fees accrue in both ETH and {core.symbol}. Claims are pull-based: nothing moves until you claim.</p>
+              takze strone tokenowa - stary opis `in ${NATIVE_SYMBOL}, not tokens` klamal. */}
+          <p className="mt-1 text-[10.5px] leading-[1.4] text-sp-shade/40">Curve fees accrue in {NATIVE_SYMBOL}; after graduation pool fees accrue in both {NATIVE_SYMBOL} and {core.symbol}. Claims are pull-based: nothing moves until you claim.</p>
           <div className="mt-2 space-y-1.5">
             {claimRows.map((row) => (
               <div key={row.label} className="flex items-center justify-between gap-2 text-[11px]">
