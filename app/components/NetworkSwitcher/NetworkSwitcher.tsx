@@ -93,14 +93,11 @@ const robinhoodEntry = {
 /**
  * Arc (Circle) - testnet, mainnet rusza 16 wrzesnia 2026.
  *
- * JEDYNY WPIS BEZ PLIKU LOGO, i to jest decyzja, nie zaniedbanie. Oficjalnego
- * znaku Arc nie ma pod zadnym ze standardowych adresow (favicon, apple-touch),
- * a znak firmowy narysowany z pamieci wyglada jak zepsuty interfejs. Do czasu,
- * az wrzucimy prawdziwy plik do /public, wpis rysuje monogram na barwie sieci -
- * dokladnie tak, jak token bez logo dostaje glif z inicjalami.
- *
- * Zeby podmienic na prawdziwy: wrzuc plik do /public i dopisz tu `iconUrl`.
- * Nic wiecej nie trzeba.
+ * Znak jest prawdziwym plikiem od wlasciciela. Przez chwile stal tu monogram,
+ * bo oficjalnego logo nie bylo pod zadnym ze standardowych adresow (favicon,
+ * apple-touch - wszystkie 404), a znak firmowy odrysowany z pamieci wyglada
+ * jak zepsuty interfejs. Mechanizm monogramu ZOSTAJE dla kolejnej sieci bez
+ * logo - patrz `networkIcon` i `NetworkMonogram` nizej.
  *
  * Barwa to blekit z motywu startpada dla tej sieci (app/startpad/config.ts).
  */
@@ -108,6 +105,7 @@ const arcEntry = {
   id: arcTestnet.id,
   name: 'Arc Testnet',
   shortName: 'ARC',
+  iconUrl: '/arc.jpg', // Oficjalny znak Arc, dostarczony przez wlasciciela
   color: '#4D9AF0',
   bgWhite: false,
 } as const;
