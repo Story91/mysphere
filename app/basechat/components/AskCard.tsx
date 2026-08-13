@@ -82,8 +82,15 @@ export function formatAskMoney(amount: number, token = 'USDC'): string {
 
 const pad2 = (value: number) => String(value).padStart(2, '0');
 
-/** Ponizej doby zegar HH:MM:SS jak w manifescie, wyzej "3d 04h" - sekundy nic tam nie znacza. */
-function formatCountdown(left: number): string {
+/**
+ * Ponizej doby zegar HH:MM:SS jak w manifescie, wyzej "3d 04h" - sekundy nic
+ * tam nie znacza.
+ *
+ * Eksportowane, bo ten sam zegar rysuje zwarty wiersz w prawym railu
+ * (AskRailRow.tsx). Skopiowany format bylby drugim miejscem, w ktorym ten sam
+ * Ask moze pokazac dwie rozne godziny.
+ */
+export function formatCountdown(left: number): string {
   if (left <= 0) return '00:00:00';
   if (left >= DAY) return `${Math.floor(left / DAY)}d ${pad2(Math.floor((left % DAY) / HOUR))}h`;
   return `${pad2(Math.floor(left / HOUR))}:${pad2(Math.floor((left % HOUR) / MINUTE))}:${pad2(
@@ -113,7 +120,7 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
  * Zwraca `null` do momentu zamontowania - serwer i przegladarka nie moglyby sie
  * zgodzic co do "teraz", a zegar w HTML-u z serwera i tak byloby nieaktualny.
  */
-function useNow(deadline: number, running: boolean): number | null {
+export function useNow(deadline: number, running: boolean): number | null {
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
