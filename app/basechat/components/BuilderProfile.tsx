@@ -390,6 +390,16 @@ interface BuilderProfileProps {
     };
   };
   onBackToFeed: () => void;
+  /**
+   * Otwiera panel edycji profilu, ktory stoi NAD tym komponentem
+   * (basechat/page.tsx, `isEditingProfile`). Awatar, nazwa i linki zmieniaja
+   * sie tam i tylko tam - drugi upload w tym pliku bylby drugim miejscem,
+   * w ktorym trzeba naprawiac ten sam blad przy zapisie zdjecia.
+   *
+   * Bez tej funkcji zdjecie na profilu jest tylko obrazkiem: wchodzisz na
+   * wlasny profil, patrzysz na swoj awatar i nie masz go jak zmienic.
+   */
+  onEditProfile?: () => void;
   toEthereumAddress?: (address: string) => `0x${string}`; // Opcjonalne teraz
   // ✅ USUNIĘTO: RANK_DESCRIPTIONS - nie potrzebne już
   onSocialLinksUpdate?: (links: { twitter: string; farcaster: string; discord: string }) => void;
@@ -401,6 +411,7 @@ export default function BuilderProfile({
   currentUserAddress, 
   profile, 
   onBackToFeed,
+  onEditProfile,
   toEthereumAddress: externalToEthereumAddress,
   onSocialLinksUpdate
 }: BuilderProfileProps) {
@@ -1164,31 +1175,63 @@ export default function BuilderProfile({
           odstep i wlosowa linia pod spodem. Zadnej nowej ramki. */}
       <div>
         <div className="mb-6">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 w-full">
-          <div className="flex flex-col items-center lg:items-start">
-            <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden flex-shrink-0 relative group">
-              {/* Premium ramka z białym gradientem */}
-              <div className="absolute inset-0 rounded-full bg-soft-sunken p-1 shadow-card">
-                <div className="w-full h-full rounded-full overflow-hidden bg-soft-surface">
+          <div className="flex w-full flex-col gap-6">
+          {/* ===== NAGLOWEK JAK W KAZDEJ APLIKACJI Z PROFILAMI =====
+              Bylo tu na desktopie DWIE KOLUMNY obok siebie: waski slupek
+              ze zdjeciem, nazwa, adresem, socjalami i kaflem Sphere Identity,
+              a obok drugi slupek z zarobkami, licznikami i poleceniami. Slupek
+              ze zdjeciem dostawal przez to okolo 200px i wszystko w nim stalo
+              jedno pod drugim, w kolumnie waskiej jak na telefonie - na ekranie
+              szerokim na 1900px.
+
+              Teraz to jest zwykly naglowek profilu: zdjecie i tozsamosc w
+              jednym rzedzie, a wszystko inne pod spodem, na pelnej szerokosci
+              kolumny. */}
+          <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+            {/* ===== ZDJECIE, A NA WLASNYM PROFILU TAKZE JEGO ZMIANA =====
+                Awatar byl tu samym obrazkiem: wchodzilo sie na wlasny profil,
+                patrzylo na swoje zdjecie i nie mialo go jak zmienic - jedyne
+                wejscie stalo w pasku nad komponentem, pod napisem "Edit
+                profile", ktory nie mowil, ze da sie tam podmienic zdjecie.
+
+                Przycisk aparatu NIE robi drugiego uploadu. Otwiera ten sam
+                panel edycji co pasek wyzej, wiec zapis zdjecia ma dalej jedno
+                miejsce w kodzie. Widoczny jest wylacznie dla wlasciciela
+                profilu i tylko wtedy, gdy rodzic poda `onEditProfile`. */}
+            <div className="relative h-28 w-28 flex-shrink-0 lg:h-32 lg:w-32">
+              <div className="h-full w-full overflow-hidden rounded-full bg-soft-surface p-1 shadow-card">
+                <div className="h-full w-full overflow-hidden rounded-full bg-soft-sunken">
                   {profile.avatar ? (
-                    <img 
-                      src={profile.avatar} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    <img
+                      src={profile.avatar}
+                      alt=""
+                      className="h-full w-full object-cover"
                     />
                   ) : (
                     <Avatar address={convertAddress(profile.address)} className="w-full h-full" />
                   )}
                 </div>
               </div>
-              
-              {/* Premium efekty świetlne */}
-              <div className="absolute inset-0 rounded-full bg-transparent"></div>
-              <div className="absolute -inset-2 rounded-full bg-soft-primary/10 filter blur-lg opacity-60 group-hover:opacity-80 transition-opacity [transition-duration:var(--dur-dropdown)] ease-out-strong"></div>
+
+              {onEditProfile && currentUserAddress === userAddress && (
+                <button
+                  type="button"
+                  onClick={onEditProfile}
+                  aria-label="Change profile picture"
+                  title="Change profile picture"
+                  className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-soft-bg bg-soft-primary text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 9a2 2 0 012-2h1.5l1-2h7l1 2H18a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <circle cx="12" cy="13" r="3.2" />
+                  </svg>
+                </button>
+              )}
             </div>
             
-            {/* Nazwa użytkownika pod avatarem */}
-            <div className={`mt-3 text-lg lg:text-xl font-soft-display font-bold text-center lg:text-left ${
+            {/* Nazwa, odznaka i adres stoja OBOK zdjecia, nie pod nim. */}
+            <div className="min-w-0 flex-1 text-center sm:text-left">
+            <div className={`text-[22px] lg:text-[26px] font-soft-display font-bold ${
               isVitalik
                 ? "text-soft-accent-deep"
                 : "text-soft-ink"
@@ -1241,7 +1284,7 @@ export default function BuilderProfile({
             )}
             
             {/* Skrócony adres portfela pod avatarem */}
-            <div className="mt-3 lg:mt-4 w-full lg:w-auto flex flex-col items-center lg:items-start space-y-3">
+            <div className="mt-3 flex w-full flex-col items-center gap-2.5 sm:w-auto sm:items-start">
               <button
                 onClick={copyAddressToClipboard}
                 aria-label="Copy wallet address"
@@ -1279,6 +1322,8 @@ export default function BuilderProfile({
                   </svg>
                 </button>
               </div>
+            </div>
+            </div>
 
               {/* Linki społecznościowe */}
               <ProfileSocials
@@ -1324,7 +1369,6 @@ export default function BuilderProfile({
                 </a>
               )}
             </div>
-          </div>
 
           <div className="flex-1 w-full lg:max-w-none">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-4 lg:mb-6">

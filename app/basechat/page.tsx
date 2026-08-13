@@ -4064,7 +4064,11 @@ function BaseChatContent() {
                       )}
                     </div>
                   )}
-                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
+                {/* Bez bialej karty dookola. Profil ma wlasne sekcje z wlasnymi
+                    kartami, wiec ta ramka byla pudelkiem na pudelka: dawala
+                    drugie biale tlo pod trescia, ktora sama juz jest biala,
+                    i `overflow-hidden` przycinajace to, co z niej wystawalo. */}
+                <div className="mb-4">
                   {/* Builder Profile Content */}
                   {selectedBuilderProfile ? (
                     <BuilderProfile 
@@ -4072,6 +4076,9 @@ function BaseChatContent() {
                       currentUserAddress={address}
                       profile={selectedBuilderProfile}
                       onBackToFeed={handleBackToFeed}
+                      // Aparat przy awatarze otwiera TEN SAM panel edycji, ktory
+                      // stoi nad profilem - jedno miejsce zapisu zdjecia.
+                      onEditProfile={() => setIsEditingProfile(true)}
                       onSocialLinksUpdate={(newLinks) => {
                         setSelectedBuilderProfile(prev => ({
                           ...prev!,
