@@ -286,7 +286,31 @@ export const markAllNotificationsAsRead = async (userId: string): Promise<number
     );
 
     const snapshot = await getDocs(unreadQuery);
-    if (snapshot.empty) return 0;
+
+    /**
+     * ===== LICZNIK ZERUJEMY ZAWSZE, TAKZE GDY NIE MA CO OZNACZAC =====
+     *
+     * Bylo tu `if (snapshot.empty) return 0;` PRZED `resetUnreadCount`, wiec
+     * pusty wynik zapytania konczyl funkcje, nie dotykajac licznika.
+     *
+     * Dzwonek w nawigacji NIE LICZY dokumentow - czyta pole
+     * `unreadNotifications` z dokumentu uzytkownika (getUnreadNotificationsCount
+     * nizej). Te dwie rzeczy potrafia sie rozjechac: licznik rosnie przy kazdym
+     * nowym powiadomieniu, a dokument moze potem zniknac, zapis moze paść po
+     * inkrementacji, albo nieprzeczytanych bywa wiecej niz `limit(100)` w jednej
+     * turze. Gdy licznik mowi 3, a zadnego dokumentu z `isRead: false` juz nie
+     * ma, stary kod wychodzil od razu i pole zostawalo na 3 NA ZAWSZE. Kropka
+     * przy dzwonku przezywala "mark all as read" i przezywala odswiezenie
+     * strony, bo po odswiezeniu czytane jest wlasnie to pole.
+     *
+     * "Oznacz wszystko jako przeczytane" znaczy "od teraz nic nie jest
+     * nieprzeczytane", wiec licznik ma po tej akcji byc zerem niezaleznie od
+     * tego, ile dokumentow trzeba bylo poprawic.
+     */
+    if (snapshot.empty) {
+      await resetUnreadCount(userId);
+      return 0;
+    }
 
     const batch = writeBatch(db);
     const timestamp = serverTimestamp();

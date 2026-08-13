@@ -576,10 +576,18 @@ export const useNotifications = (
 
     try {
       const count = await socialAPIRef.current.markAllNotificationsAsRead();
-      if (count > 0) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-        setUnreadCount(0);
-      }
+      /**
+       * Stan czyscimy ZAWSZE, nie tylko przy `count > 0`.
+       *
+       * Zero znaczy "nie bylo czego oznaczac", a nie "nie udalo sie" - i po tej
+       * akcji nic nie jest nieprzeczytane tak samo, jak przy dziesieciu
+       * poprawionych dokumentach. Warunek zostawial zapalona kropke dokladnie
+       * w tym przypadku, ktory ja utrzymywal przy zyciu: licznik rozjechany
+       * z dokumentami (pelne uzasadnienie przy markAllNotificationsAsRead
+       * w utils/friends/notifications.ts).
+       */
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
       return count > 0;
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
