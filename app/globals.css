@@ -51,11 +51,11 @@
 
   /* Cienie. Wszystkie fioletowe, nie czarne - czarny cien na lawendzie
      wyglada jak brud. */
-  --soft-shadow-card: 0 4px 16px rgba(102, 86, 190, 0.08);
-  --soft-shadow-chip: 0 2px 8px rgba(102, 86, 190, 0.14);
-  --soft-shadow-float: 0 10px 30px rgba(74, 60, 150, 0.18);
+  --soft-shadow-card: 0 6px 24px rgba(102, 86, 190, 0.10);
+  --soft-shadow-chip: 0 2px 10px rgba(102, 86, 190, 0.16);
+  --soft-shadow-float: 0 14px 38px rgba(74, 60, 150, 0.20);
 
-  --soft-radius-card: 24px;
+  --soft-radius-card: 26px;
   --soft-radius-pill: 999px;
 }
 

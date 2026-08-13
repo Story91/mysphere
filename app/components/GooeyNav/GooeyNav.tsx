@@ -102,7 +102,7 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
             >
               {/* Background for non-active items */}
               {!item.isActive && (
-                <div aria-hidden="true" className="absolute inset-0 rounded-2xl bg-gray-100 dark:bg-gray-700" />
+                <div aria-hidden="true" className="absolute inset-0 rounded-2xl bg-soft-sunken" />
               )}
               
               {/* Icon */}
@@ -164,7 +164,7 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 rounded-2xl bg-gray-200 dark:bg-gray-600"
+                  className="absolute inset-0 rounded-2xl bg-soft-line"
                   style={{ 
                     zIndex: 0
                   }}
