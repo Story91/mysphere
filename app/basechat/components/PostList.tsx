@@ -2355,10 +2355,17 @@ function PostList({
         {/* --- NEW ZORA TOKEN INFO & ACTIONS SECTION --- */}
         {post.zoraCoinAddress && (
           <div className="mt-4 mb-2">
-            <SpotlightCard
-              spotlightColor="rgba(124, 107, 218, 0.18)"
-              className="rounded-card border border-soft-line bg-soft-sunken shadow-card hover:shadow-float transition-shadow duration-200 ease-out-strong"
-            >
+            {/* ===== KARTA MONETY BEZ EFEKTU REFLEKTORA =====
+                Byla tu <SpotlightCard/>: fioletowa poswiata podazajaca za
+                kursorem. Na telefonie nie ma kursora, wiec efekt nie robil tam
+                nic poza dodaniem kolejnej warstwy kompozytowej - tej samej
+                rodziny co filtry rozmycia, ktore dawaly pasy na GPU Androida.
+                Na desktopie swiecil pod karta o pieniadzach, gdzie uwage ma
+                trzymac kwota, a nie oprawa.
+
+                Zwykla karta produktu. Zawartosc, liczby i przyciski bez
+                jednej zmiany. */}
+            <div className="rounded-card border border-soft-line bg-soft-sunken shadow-card">
               <Card className="border-0 bg-transparent shadow-none">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
@@ -2367,7 +2374,7 @@ function PostList({
                       <img 
                         src={zoraData.imageUrl} 
                         alt={zoraData?.name || 'Token'} 
-                        className="w-10 h-10 rounded-full ring-2 ring-soft-line"
+                        className="h-10 w-10 rounded-full"
                       />
                     </div>
                   ) : (
@@ -2375,7 +2382,7 @@ function PostList({
                       <img 
                         src="/android-chrome-512x512.png" 
                         alt="Sphere Logo" 
-                        className="w-10 h-10 rounded-full ring-2 ring-soft-line"
+                        className="h-10 w-10 rounded-full"
                       />
                     </div>
                   )}
@@ -2607,7 +2614,7 @@ function PostList({
                 )}
               </CardContent>
             </Card>
-            </SpotlightCard>
+            </div>
           </div>
         )}
         {/* --- END NEW ZORA TOKEN INFO & ACTIONS --- */}
