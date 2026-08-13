@@ -1,5 +1,5 @@
 import { chartDataUri } from './chartSvg';
-import { safeSymbol } from '../../startpad/shareText';
+import { mcapLabel, safeSymbol } from '../../startpad/shareText';
 import type { TokenCardData } from '../../startpad/share/tokenCard';
 
 /**
@@ -195,7 +195,15 @@ export function TokenShareCard({ data, height }: { data: TokenCardData; height: 
             tone={CARD.ink}
           />
           <Stat label="BUYERS" value={String(data.holders)} />
-          <Stat label="PRICE" value={priceLabel(data.priceEth)} />
+          {/* Kapitalizacja, nie cena. Cena tokena na krzywej to 7.5e-10 ETH -
+              w dolarach wyglada jak zero, a w gwei nikt nie wie, czy 0.88 to
+              duzo. Bez kursu ETH schodzimy na cene, zeby kafelek nie zostal
+              pusty. */}
+          {data.mcapUsd === null ? (
+            <Stat label="PRICE" value={priceLabel(data.priceEth)} />
+          ) : (
+            <Stat label="MARKET CAP" value={mcapLabel(data.mcapUsd)} />
+          )}
           <Stat label="AGE" value={data.ageLabel.replace(' old', '')} />
         </div>
       </div>

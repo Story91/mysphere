@@ -4,6 +4,7 @@ import { robinhoodChain } from '../basechat/Robinhood/config/RobinhoodNetworkCon
 // Import TYLKO typu - `networkTheme` czyta z tego pliku LAUNCHPAD_NETWORKS, wiec
 // import wartosci zrobilby cykl. Typ znika przy kompilacji i cyklu nie ma.
 import type { NetworkTheme } from './networkTheme';
+import { pickChainId } from './chainFromUrl';
 
 /**
  * KONFIGURACJA WIELOSIECIOWA - kazda siec to osobne, pelne wdrozenie.
@@ -284,11 +285,28 @@ export const DEFAULT_LAUNCHPAD_CHAIN_ID = base.id;
 const STORAGE_KEY = 'startpad.chainId';
 
 function resolveActiveNetwork(): LaunchpadNetwork {
-  if (typeof window !== 'undefined') {
-    const stored = Number(window.localStorage.getItem(STORAGE_KEY));
-    if (LAUNCHPAD_NETWORKS[stored]) return LAUNCHPAD_NETWORKS[stored];
+  if (typeof window === 'undefined') return LAUNCHPAD_NETWORKS[DEFAULT_LAUNCHPAD_CHAIN_ID];
+
+  // ADRES WYGRYWA Z PAMIECIA - uzasadnienie i testy przy `pickChainId`.
+  const chainId = pickChainId({
+    search: window.location.search,
+    stored: window.localStorage.getItem(STORAGE_KEY),
+    networks: LAUNCHPAD_NETWORKS,
+    fallback: DEFAULT_LAUNCHPAD_CHAIN_ID,
+  });
+
+  // Siec z linku ZOSTAJE po wejsciu. Bez tego zapisu pierwsze klikniecie w
+  // menu wracaloby do sieci sprzed linku - i wygladaloby jak samoczynne
+  // przelaczenie w trakcie ogladania.
+  try {
+    if (String(chainId) !== window.localStorage.getItem(STORAGE_KEY)) {
+      window.localStorage.setItem(STORAGE_KEY, String(chainId));
+    }
+  } catch {
+    // Tryb prywatny - wybor dziala na ta jedna strone i tyle.
   }
-  return LAUNCHPAD_NETWORKS[DEFAULT_LAUNCHPAD_CHAIN_ID];
+
+  return LAUNCHPAD_NETWORKS[chainId];
 }
 
 export const ACTIVE_LAUNCHPAD_NETWORK = resolveActiveNetwork();
@@ -301,8 +319,26 @@ export const ACTIVE_LAUNCHPAD_NETWORK = resolveActiveNetwork();
  */
 export function setLaunchpadChain(chainId: number) {
   if (!LAUNCHPAD_NETWORKS[chainId]) return;
-  window.localStorage.setItem(STORAGE_KEY, String(chainId));
-  window.location.reload();
+  try {
+    window.localStorage.setItem(STORAGE_KEY, String(chainId));
+  } catch {
+    // Tryb prywatny - wybor przeniesie sam adres, ponizej.
+  }
+
+  // WYBOR SIECI LADUJE W ADRESIE, nie tylko w pamieci. Dzieki temu kazda siec
+  // ma wlasny link: po przelaczeniu na Robinhooda pasek adresu pokazuje
+  // `/startpad?c=4663` i skopiowanie go po prostu dziala. Wczesniej wszystkie
+  // trzy sieci mialy ten sam adres, wiec wyslany link otwieral sie odbiorcy na
+  // JEGO sieci, a nie na tej, ktora nadawca ogladal.
+  //
+  // Siec domyslna zostaje BEZ parametru - najczestszy link ma byc krotki.
+  const url = new URL(window.location.href);
+  if (chainId === DEFAULT_LAUNCHPAD_CHAIN_ID) url.searchParams.delete('c');
+  else url.searchParams.set('c', String(chainId));
+
+  // `assign`, a nie `reload`: przeladowanie musi isc pod NOWY adres, inaczej
+  // parametr zniknalby razem ze starym.
+  window.location.assign(url.toString());
 }
 
 export const LAUNCHPAD_CHAIN = ACTIVE_LAUNCHPAD_NETWORK.chain;

@@ -72,7 +72,10 @@ export function BrandMark({ target, size = 20 }: { target: ShareTarget; size?: n
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src="/logotypy/logo-symbol.svg"
+        // TEN SAM plik, co znak w lewym gornym rogu nawigacji. Stal tu
+        // `/logotypy/logo-symbol.svg`, ktory jest znakiem World Chain - obcy
+        // logotyp pod nazwa "MySphere feed" to gorzej niz brak ikony.
+        src="/android-chrome-192x192.png"
         alt=""
         width={size}
         height={size}

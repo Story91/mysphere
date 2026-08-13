@@ -88,9 +88,66 @@ export function buildShareUrl(input: { address: string; chainId: number }): stri
   return `${SITE_URL}/startpad/${address}/${suffix}`;
 }
 
+/**
+ * Adres CALEJ tablicy danej sieci.
+ *
+ * Startpad ma trzy rynki i do 13 sierpnia 2026 wszystkie trzy mialy ten sam
+ * adres, bo wybor sieci zyl wylacznie w localStorage - wyslany link otwieral
+ * sie odbiorcy na JEGO rynku. Odkad przelacznik dopisuje `?c=`, kazdy rynek ma
+ * wlasny adres i da sie go wyslac osobno.
+ */
+export function buildBoardUrl(chainId: number): string {
+  const suffix = chainId === DEFAULT_LAUNCHPAD_CHAIN_ID ? '' : `?c=${chainId}`;
+  return `${SITE_URL}/startpad/${suffix}`;
+}
+
+/**
+ * Zdanie o rynku, nie o tokenie.
+ *
+ * Nazwa sieci jest tu TRESCIA - to jedyna rzecz, ktora odroznia te linki od
+ * siebie. Przy pustym rynku liczba tokenow ZNIKA: "0 coins launched" brzmi jak
+ * porazka miejsca, a nie jak zaproszenie, i nie jest tym, co chce wyslac ktos,
+ * kto wlasnie startuje pierwszy token.
+ */
+export function buildBoardText(input: { label: string; tokens: number }): string {
+  // Nazwa idzie z konfiguracji, ale laduje w poscie pisanym z konta
+  // uzytkownika - lamanie linii i nadmiarowe spacje wypadaja.
+  const label = input.label.replace(/\s+/g, ' ').trim().slice(0, 40) || 'MySphere Startpad';
+  const parts = [`Coins launching on ${label}.`];
+
+  if (Number.isFinite(input.tokens) && input.tokens > 0) {
+    parts.push(`${input.tokens} live right now.`);
+  }
+
+  parts.push('Trade them on MySphere Startpad.');
+  return parts.join(' ');
+}
+
 export function safeSymbol(symbol: string): string {
   const cleaned = symbol.replace(/[^A-Za-z0-9_-]/g, '');
   return cleaned.slice(0, MAX_SYMBOL) || 'TOKEN';
+}
+
+/**
+ * Kapitalizacja w dolarach na karcie udostepniania.
+ *
+ * Karta pokazywala tu dotad CENE, i to w gwei - bo cena tokena na krzywej to
+ * liczby rzedu 7.5e-10 ETH, ktore w dolarach wygladaja jak zero. Bylo to
+ * uczciwe technicznie i bezuzyteczne dla kogos, kto ten link dostal: nikt nie
+ * wie, czy 0.88 gwei to duzo. Kapitalizacja mowi to samo w jednostce, ktora
+ * czyta sie bez tlumaczenia.
+ *
+ * Brak kursu ETH oddaje kreske, NIGDY "$0" - zero wyglada jak wycena, i to jak
+ * wycena zerowa. Ta sama zasada, co przy `formatMultiple`.
+ */
+export function mcapLabel(usd: number | null | undefined): string {
+  if (usd === null || usd === undefined || !Number.isFinite(usd) || usd <= 0) return '--';
+
+  const trim = (text: string) => text.replace(/\.0+$/, '');
+
+  if (usd >= 1_000_000) return `$${trim((usd / 1_000_000).toFixed(1))}M`;
+  if (usd >= 1_000) return `$${trim((usd / 1_000).toFixed(1))}k`;
+  return `$${usd.toFixed(0)}`;
 }
 
 /** Kwoty ETH bez ogona zer: 3 zostaje "3", 0.462 zostaje "0.46". */

@@ -57,6 +57,7 @@ import { toast } from 'react-hot-toast';
 
 import PostList, { ExtendedPost } from './components/PostList';
 import PinnedPosts from './components/PinnedPosts';
+import LinkPreview from './components/LinkPreview';
 import FeedAskRail, { ASKS_RAIL_CACHE_KEY } from './components/FeedAskRail';
 // Zakladanie Aska Z FEEDU. Kompozytor i karta sa te same, ktore stoja na
 // /asks - drugi formularz dotykajacy pieniedzy bylby drugim miejscem, w
@@ -4216,13 +4217,29 @@ function BaseChatContent() {
                               <Avatar address={address} className="w-10 h-10 rounded-full" />
                             )}
                             <div className="flex-1">
+                              {/* Pole ROSNIE Z TRESCIA, a nie przewija sie w
+                                  trzech linijkach. Post z linkiem (np.
+                                  udostepniony token ze startpada) nie miescil
+                                  sie w calosci: adres byl przeciety w polowie i
+                                  trzeba bylo scrollowac wewnatrz pola, zeby
+                                  zobaczyc, co sie wysyla. Sufit jest po to, zeby
+                                  dluga tresc nie zepchnela przyciskow poza
+                                  ekran. */}
                               <textarea
                                 value={newPost}
                                 onChange={(e) => setNewPost(e.target.value)}
                                 placeholder="What's happening onchain?"
-                                className="w-full resize-none rounded-card bg-soft-sunken px-4 py-3 font-soft text-[14px] text-soft-ink placeholder-soft-ink-soft focus:outline-none focus:ring-2 focus:ring-soft-primary"
-                                rows={3}
+                                className="max-h-[320px] min-h-[112px] w-full resize-y overflow-auto rounded-card bg-soft-sunken px-4 py-3 font-soft text-[14px] leading-[1.5] text-soft-ink placeholder-soft-ink-soft focus:outline-none focus:ring-2 focus:ring-soft-primary"
+                                rows={4}
                               />
+
+                              {/* Podglad linku - to samo, co zobacza inni pod
+                                  postem. Bez niego wysylalo sie w ciemno: sam
+                                  adres w polu nie mowi, czy karta w ogole
+                                  powstanie i co bedzie na niej widac.
+                                  Komponent sam wyciaga link z tresci i sam
+                                  milczy, gdy go nie ma. */}
+                              {newPost.trim() !== '' && <LinkPreview content={newPost} />}
 
                               {/* Ta sama informacja, ktora byla wczesniej
                                   UPCHNIETA W PLACEHOLDER ("Add any photo, first

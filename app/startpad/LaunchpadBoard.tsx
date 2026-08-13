@@ -2269,6 +2269,23 @@ export default function LaunchpadBoard() {
               <div className="inline-flex items-stretch overflow-hidden rounded-full border border-sp-shade/10 bg-sp-surface shadow-[0_6px_16px_rgba(124,107,218,0.18)]">
                 <NetworkSwitch />
                 <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-sp-shade/10" />
+                {/* Udostepnianie CALEGO rynku tej sieci. Ma sens dopiero odkad
+                    przelacznik dopisuje `?c=` do adresu - wczesniej wszystkie
+                    trzy rynki mialy ten sam link i odbiorca ladowal na swoim. */}
+                <ShareToken
+                  address={ACTIVE_LAUNCHPAD_NETWORK.launchpad}
+                  chainId={ACTIVE_LAUNCHPAD_NETWORK.chain.id}
+                  symbol=""
+                  raised={0}
+                  target={0}
+                  state="Curve"
+                  board={{
+                    label: ACTIVE_LAUNCHPAD_NETWORK.label,
+                    tokens: tokens.filter((token) => token.live).length,
+                  }}
+                  className="px-2.5"
+                />
+                <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-sp-shade/10" />
                 <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand transition-[background-color,transform] hover:bg-soft-primary-deep active:scale-[0.98]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
               </div>
             </span>
