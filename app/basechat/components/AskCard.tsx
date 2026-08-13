@@ -194,21 +194,21 @@ export default function AskCard({
    */
   const bar = {
     open: {
-      wrap: 'border-soft-line/70 bg-soft-info/[0.06]',
-      text: 'text-soft-info',
-      dot: 'bg-soft-info motion-safe:animate-pulse',
+      wrap: 'border-white/10 bg-white/[0.05]',
+      text: 'text-[#7AB0FF]',
+      dot: 'bg-[#7AB0FF] motion-safe:animate-pulse',
       label: 'Open ask',
     },
     expired: {
-      wrap: 'border-soft-line/70 bg-soft-sunken',
-      text: 'text-soft-ink-muted',
-      dot: 'bg-soft-line-strong',
+      wrap: 'border-white/10 bg-white/[0.03]',
+      text: 'text-white/45',
+      dot: 'bg-white/25',
       label: 'Closed, not resolved',
     },
     resolved: {
-      wrap: 'border-soft-line/70 bg-soft-primary/[0.07]',
-      text: 'text-soft-primary-deep',
-      dot: 'bg-soft-primary',
+      wrap: 'border-white/10 bg-white/[0.05]',
+      text: 'text-[#B9AAFF]',
+      dot: 'bg-[#B9AAFF]',
       label: 'Resolved',
     },
   }[view];
@@ -247,11 +247,18 @@ export default function AskCard({
   const actionDisabled = view === 'expired' && !isAuthor;
 
   const actionClass =
-    'inline-flex shrink-0 items-center justify-center rounded-lg px-3.5 py-1.5 font-soft-display text-[12px] font-semibold transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface';
+    'inline-flex shrink-0 items-center justify-center rounded-pill px-4 py-1.5 font-soft-display text-[12px] font-bold transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[#141a33]';
 
   return (
+    /* ===== ASK JEST JEDNYM OBIEKTEM, WSZEDZIE TAKIM SAMYM =====
+       Karta byla biala jak kazda inna karta w produkcie, wiec w feedzie
+       gubila sie miedzy postami, a na /asks wygladala jak kolejna lista.
+       Ask nie jest postem: ma budzet, termin i miejsca, ktore sie koncza -
+       i jako jedyny element tej aplikacji ma wlasny, ciemny kolor.
+       Ten sam na feedzie, w prawym railu i na /asks; kto raz zobaczy taka
+       karte, rozpozna ja wszedzie. */
     <article
-      className={`relative overflow-hidden rounded-card border border-soft-line bg-soft-surface font-soft shadow-card ${className}`}
+      className={`relative overflow-hidden rounded-card bg-[#141a33] font-soft shadow-card ${className}`}
     >
       <div className={`flex items-center justify-between gap-3 border-b px-4 py-2.5 sm:px-5 ${bar.wrap}`}>
         <span
@@ -275,15 +282,17 @@ export default function AskCard({
             className="h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-[#0052FF] to-[#00E28A]"
             aria-hidden="true"
           />
-          <span className="min-w-0 flex-1 truncate font-soft-display text-[13px] font-semibold text-soft-ink">
+          <span className="min-w-0 flex-1 truncate font-soft-display text-[13px] font-semibold text-white/85">
             {author}
           </span>
           <ResolveRateBadge rate={resolveRate} />
         </div>
 
-        <p className="mb-5 break-words text-[15px] leading-[1.6] text-soft-ink">{ask.question}</p>
+        <p className="mb-5 break-words font-soft-display text-[16px] font-bold leading-[1.45] text-white">
+          {ask.question}
+        </p>
 
-        <div className="grid grid-cols-3 gap-px overflow-hidden rounded-pill border border-soft-line/70 bg-soft-line/40">
+        <div className="grid grid-cols-3 gap-px overflow-hidden rounded-card bg-white/10">
           <Cell label="Budget" value={formatAskMoney(ask.budget, ask.token)} money />
           <Cell label="Seats" value={`${ask.acceptedCount} of ${ask.seats}`} />
           <Cell label="Per answer" value={formatAskMoney(ask.perAnswer, ask.token)} money />
@@ -296,7 +305,7 @@ export default function AskCard({
           odpowiadajacego (patrz naglowek contracts/AskEscrow.sol). Przy
           'on-resolve' nie wolno uzyc slowa escrow w ogole - tam nic nie lezy.
         */}
-        <p className="mt-3 break-words text-[11.5px] leading-[1.5] text-soft-ink-faint">
+        <p className="mt-3 break-words text-[11.5px] leading-[1.5] text-white/40">
           {ask.funding === 'escrowed' ? (
             <>
               {view === 'resolved'
@@ -309,7 +318,7 @@ export default function AskCard({
                     href={`https://basescan.org/tx/${ask.escrowTxHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                    className="font-semibold text-soft-accent underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent"
                   >
                     Check the deposit
                   </a>
@@ -321,8 +330,8 @@ export default function AskCard({
           )}
         </p>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-soft-line/70 pt-4">
-          <span className="min-w-0 break-words text-[12px] text-soft-ink-faint">{answers}</span>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+          <span className="min-w-0 break-words text-[12px] text-white/45">{answers}</span>
 
           {actionDisabled ? (
             // Wylaczony przycisk, a nie brak przycisku: to informacja o stanie,
@@ -330,19 +339,19 @@ export default function AskCard({
             <button
               type="button"
               disabled
-              className={`${actionClass} cursor-not-allowed bg-soft-sunken text-soft-ink-faint`}
+              className={`${actionClass} cursor-not-allowed bg-white/10 text-white/35`}
             >
               {actionLabel}
             </button>
           ) : href ? (
-            <Link href={href} className={`${actionClass} bg-soft-primary text-white`}>
+            <Link href={href} className={`${actionClass} bg-soft-accent text-[#1a1f3a]`}>
               {actionLabel}
             </Link>
           ) : onAnswer ? (
             <button
               type="button"
               onClick={() => onAnswer(ask)}
-              className={`${actionClass} bg-soft-primary text-white`}
+              className={`${actionClass} bg-soft-accent text-[#1a1f3a]`}
             >
               {actionLabel}
             </button>
@@ -358,13 +367,13 @@ function Cell({ label, value, money = false }: { label: string; value: string; m
   return (
     // min-w-0 + lamanie: przy duzym budzecie komorka ma sie zwezic, a nie
     // rozepchnac karty na telefonie o szerokosci 320px.
-    <div className="min-w-0 bg-soft-surface px-2.5 py-3 sm:px-3">
-      <div className="mb-1 text-[10px] uppercase leading-[1.2] tracking-[0.1em] text-soft-ink-faint">
+    <div className="min-w-0 bg-[#141a33] px-2.5 py-3 sm:px-3">
+      <div className="mb-1 text-[10px] uppercase leading-[1.2] tracking-[0.1em] text-white/40">
         {label}
       </div>
       <div
-        className={`break-words font-soft-display text-[15px] font-semibold tabular-nums ${
-          money ? 'text-soft-accent-deep' : 'text-soft-ink'
+        className={`break-words font-soft-display text-[15px] font-bold tabular-nums ${
+          money ? 'text-soft-accent' : 'text-white'
         }`}
       >
         {value}
@@ -385,7 +394,7 @@ function ResolveRateBadge({ rate }: { rate?: ResolveRate | null }) {
 
   if (rate.rate === null || rate.settled === 0) {
     return (
-      <span className="shrink-0 rounded-full border border-soft-line bg-soft-sunken px-2 py-0.5 text-[10px] font-medium text-soft-ink-faint">
+      <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/45">
         no resolve record yet
       </span>
     );
@@ -408,10 +417,8 @@ function ResolveRateBadge({ rate }: { rate?: ResolveRate | null }) {
   const zaniedbane = rate.settled - rate.resolved;
   return (
     <span
-      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium tabular-nums ${
-        zaniedbane > 0
-          ? 'border-soft-line-strong bg-soft-sunken text-soft-ink-muted'
-          : 'border-soft-line bg-soft-sunken text-soft-ink-muted'
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums ${
+        zaniedbane > 0 ? 'bg-white/[0.14] text-white/70' : 'bg-white/10 text-white/55'
       }`}
       title={
         zaniedbane > 0

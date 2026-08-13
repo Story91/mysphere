@@ -679,19 +679,19 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
         <QuietLine tone={column ? 'dark' : 'light'}>Checking resolved asks…</QuietLine>
       ) : resolvedShown.length > 0 ? (
         /*
-          ===== HISTORIA SIEDZI W ZAGLEBIENIU =====
-          Panel `soft-sunken` z obwodka to cala roznica wobec otwartych: karta
-          na powierzchni WEWNATRZ zaglebienia czyta sie jak wpis w archiwum,
-          a nie jak kafelek do klikniecia. Zadnego nowego koloru, zadnego
-          akcentu - uzasadnienie przy DECYZJI 5.
+          ===== HISTORIA BEZ WLASNEGO ZAGLEBIENIA =====
+          Byl tu panel `soft-sunken` z obwodka: karta na powierzchni WEWNATRZ
+          zaglebienia czytala sie jak wpis w archiwum, a nie jak kafelek do
+          klikniecia (DECYZJA 5). Karty Aska sa od tej zmiany ciemne wszedzie
+          (patrz naglowek AskCard.tsx), wiec jasny panel pod nimi przestal byc
+          tlem, a stal sie ramka wokol ciemnych prostokatow.
+
+          Rozroznienie niesie teraz samo zdanie nad lista oraz pasek stanu
+          "Resolved" na kazdej karcie - czyli to, co i tak mowilo prawde.
+          W kolumnie zostaje delikatne zaglebienie, bo tam tlem jest granat
+          karty raila, a nie tlo strony.
         */
-        <div
-          className={
-            column
-              ? 'rounded-xl bg-white/[0.05] p-2'
-              : 'rounded-card border border-soft-line bg-soft-sunken p-2.5 sm:p-3'
-          }
-        >
+        <div className={column ? 'rounded-xl bg-white/[0.05] p-2' : ''}>
           <p
             className={`mb-2 px-0.5 text-[11.5px] leading-[1.45] ${
               column ? 'text-white/55' : 'text-soft-ink-muted'
