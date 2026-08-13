@@ -1795,20 +1795,35 @@ export default function BuilderProfile({
                   </div>
 
                   {/* Twitter Stats */}
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
-                      <div className="text-soft-ink text-2xl font-soft-display font-bold tabular-nums">{twitterUser.followerCount.toLocaleString()}</div>
-                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Followers</div>
-                    </div>
-                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
-                      <div className="text-soft-ink text-2xl font-soft-display font-bold tabular-nums">{twitterUser.followingCount.toLocaleString()}</div>
-                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Following</div>
-                    </div>
-                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
-                      <div className="text-soft-ink text-2xl font-soft-display font-bold tabular-nums">{twitterUser.likeCount.toLocaleString()}</div>
-                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Likes</div>
-                    </div>
-                  </div>
+                  {/* ===== REJESTR, NIE KAFLE Z WIELKA CYFRA =====
+                      Te same trzy (i nizej cztery) biale kwadraty z liczba na
+                      srodku, co w panelu Trends i na czterech ekranach z lewej
+                      nawigacji - i z tego samego powodu schodza: na telefonie
+                      kafel ma tu okolo 100px, wiec liczba i podpis lamia sie
+                      na dwie linijki, a na desktopie to po prostu piaty raz
+                      ten sam uklad. Wiersze z liczba po prawej czytaja sie tak
+                      samo waskim ekranem i szerokim. */}
+                  <dl className="mb-4 rounded-card bg-soft-surface px-4 py-1 shadow-card">
+                    {([
+                      ['Followers', twitterUser.followerCount],
+                      ['Following', twitterUser.followingCount],
+                      ['Likes', twitterUser.likeCount],
+                    ] as const).map(([label, value], index) => (
+                      <div
+                        key={label}
+                        className={`flex items-baseline justify-between gap-3 py-3 ${
+                          index > 0 ? 'border-t border-soft-line/60' : ''
+                        }`}
+                      >
+                        <dt className="font-soft text-[12px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">
+                          {label}
+                        </dt>
+                        <dd className="font-soft-display text-[21px] font-bold tabular-nums text-soft-ink">
+                          {value.toLocaleString()}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
 
                   {/* Expandable Recent Tweets */}
                   {twitterTweets.length > 0 && (
@@ -2001,24 +2016,29 @@ export default function BuilderProfile({
                   </div>
 
                   {/* Spotify Analytics Stats */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
-                      <div className="text-soft-ink text-xl font-soft-display font-bold tabular-nums">{spotifyUserData.analytics?.totalSavedTracks || 0}</div>
-                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Saved Tracks</div>
-                    </div>
-                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
-                      <div className="text-soft-ink text-xl font-soft-display font-bold tabular-nums">{spotifyUserData.analytics?.totalSavedAlbums || 0}</div>
-                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Albums</div>
-                    </div>
-                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
-                      <div className="text-soft-ink text-xl font-soft-display font-bold tabular-nums">{spotifyUserData.analytics?.totalSavedPlaylists || 0}</div>
-                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Playlists</div>
-                    </div>
-                    <div className="text-center bg-soft-surface rounded-card p-3 shadow-card">
-                      <div className="text-soft-ink text-xl font-soft-display font-bold tabular-nums">{spotifyUserData.analytics?.listeningDiversity || 0}%</div>
-                      <div className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Diversity</div>
-                    </div>
-                  </div>
+                  {/* Ten sam rejestr co przy liczbach z X - uzasadnienie wyzej. */}
+                  <dl className="mb-4 rounded-card bg-soft-surface px-4 py-1 shadow-card">
+                    {([
+                      ['Saved tracks', String(spotifyUserData.analytics?.totalSavedTracks || 0)],
+                      ['Albums', String(spotifyUserData.analytics?.totalSavedAlbums || 0)],
+                      ['Playlists', String(spotifyUserData.analytics?.totalSavedPlaylists || 0)],
+                      ['Diversity', `${spotifyUserData.analytics?.listeningDiversity || 0}%`],
+                    ] as const).map(([label, value], index) => (
+                      <div
+                        key={label}
+                        className={`flex items-baseline justify-between gap-3 py-3 ${
+                          index > 0 ? 'border-t border-soft-line/60' : ''
+                        }`}
+                      >
+                        <dt className="font-soft text-[12px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">
+                          {label}
+                        </dt>
+                        <dd className="font-soft-display text-[21px] font-bold tabular-nums text-soft-ink">
+                          {value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
 
                   {/* Music Matching Profile */}
                   {(spotifyUserData.profile?.topGenres?.length > 0 || spotifyUserData.profile?.topArtists?.length > 0) && (
