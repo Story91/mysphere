@@ -552,7 +552,12 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
           return (
             <div
               key={ask.id}
-              className={single ? 'w-full' : 'w-[290px] shrink-0 snap-start sm:w-[330px]'}
+              // `flex flex-col` razem z `flex-1` na karcie: wiersz i tak rownia
+              // opakowania do najwyzszego (domyslny `align-items: stretch`), a
+              // to sprawia, ze SAMA KARTA wypelnia swoje opakowanie. Bez tego
+              // krotszy kafelek konczyl sie w powietrzu i rzad wygladal na
+              // rozjechany.
+              className={single ? 'w-full' : 'flex w-[290px] shrink-0 snap-start flex-col sm:w-[330px]'}
             >
               <AskCard
                 ask={ask}
@@ -577,7 +582,9 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
                 {...(answerable
                   ? { onAnswer: () => setAnswering(ask.id) }
                   : { href: '/asks' })}
-                className="w-full"
+                // W rzedzie kart pytanie jest PRZYCINANE. Na /asks zostaje cale.
+                clampQuestion={!single}
+                className={single ? 'w-full' : 'w-full flex-1'}
               />
               {answering === ask.id && (
                 <FeedAnswerForm

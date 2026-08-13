@@ -159,6 +159,15 @@ export type AskCardProps = {
   href?: string;
   /** Czy patrzacy jest autorem tego Aska. Zmienia napis i zakres przycisku. */
   isAuthor?: boolean;
+  /**
+   * Przycina tresc pytania do czterech linii (pelna zostaje pod `title`).
+   *
+   * Domyslnie WYLACZONE, bo na /asks pytanie ma prawo byc cale. Wlacza to
+   * karuzela na feedzie: tam karty stoja OBOK SIEBIE i pytanie na dziesiec
+   * linii rozciagalo jeden kafelek na pol ekranu, a sasiedni zostawal niski.
+   * Rzad kart o roznej wysokosci czyta sie jak usterka, a nie jak lista.
+   */
+  clampQuestion?: boolean;
   className?: string;
 };
 
@@ -169,6 +178,7 @@ export default function AskCard({
   onAnswer,
   href,
   isAuthor = false,
+  clampQuestion = false,
   className = '',
 }: AskCardProps) {
   const now = useNow(ask.deadline, ask.status === 'open');
@@ -288,7 +298,12 @@ export default function AskCard({
           <ResolveRateBadge rate={resolveRate} />
         </div>
 
-        <p className="mb-5 break-words font-soft-display text-[16px] font-bold leading-[1.45] text-white">
+        <p
+          // Pelna tresc zostaje pod kursorem, wiec przyciecie niczego nie chowa
+          // bezpowrotnie - ten sam uklad, co w AskRailRow.
+          title={clampQuestion ? ask.question : undefined}
+          className={`mb-5 break-words font-soft-display text-[16px] font-bold leading-[1.45] text-white ${clampQuestion ? 'line-clamp-4' : ''}`}
+        >
           {ask.question}
         </p>
 

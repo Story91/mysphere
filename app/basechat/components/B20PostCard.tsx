@@ -49,14 +49,22 @@ type Token = {
   } | null;
 };
 
-/** Wyciaga PIERWSZY adres tokena B20 z tresci posta. `null`, gdy go nie ma. */
-export function findB20Address(content: string): string | null {
-  if (!content) return null;
-  // Format B20 jest na tyle charakterystyczny (0xb2 + dziewiec zer), ze nie
-  // trzeba wymagac calego adresu strony - sam adres tokena w tresci wystarczy.
-  const match = content.match(/0xb2000000000000000000[0-9a-fA-F]{20}/);
-  return match ? match[0].toLowerCase() : null;
-}
+export { findTokenAddress as findB20Address } from './tokenAddress';
+
+/** Karta tokena, ktory zna STARTPAD - cena z krzywej, logo z profilu tworcy. */
+type StartpadCard = {
+  ok: true;
+  chainId: number;
+  address: string;
+  name: string | null;
+  symbol: string | null;
+  state: 'None' | 'Curve' | 'Locked' | 'Graduated';
+  logoUrl: string | null;
+  priceEth: number | null;
+  priceUsd: number | null;
+  mcapUsd: number | null;
+  href: string;
+};
 
 function money(value: number | null): string | null {
   if (value === null || !Number.isFinite(value)) return null;
@@ -69,11 +77,30 @@ function money(value: number | null): string | null {
 
 export default function B20PostCard({ address }: { address: string }) {
   const [token, setToken] = useState<Token | null>(null);
+  const [startpad, setStartpad] = useState<StartpadCard | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // NAJPIERW startpad. Token na krzywej nie ma puli na Uniswapie, wiec
+      // GeckoTerminal (zrodlo /api/b20/token) nie zna ani jego ceny, ani
+      // obrazka - i to on kazal karcie pisac "no market yet" pod postem o
+      // dzialajacym tokenie. Launchpad wie o nim wszystko.
+      try {
+        const res = await fetch(`/api/launchpad/card?address=${address}`);
+        if (res.ok) {
+          const body = await res.json();
+          if (body?.ok) {
+            if (!cancelled) setStartpad(body as StartpadCard);
+            return;
+          }
+        }
+      } catch {
+        // Cisza: brak odpowiedzi startpada nie moze zabrac karty tokenom,
+        // ktore i tak zyja na puli - schodzimy nizej.
+      }
+
       try {
         const res = await fetch(`/api/b20/token/${address}`);
         if (!res.ok) throw new Error(String(res.status));
@@ -88,6 +115,8 @@ export default function B20PostCard({ address }: { address: string }) {
       cancelled = true;
     };
   }, [address]);
+
+  if (startpad) return <StartpadTokenCard card={startpad} />;
 
   // Ani szkieletu, ani ramki bledu: karta jest DODATKIEM do posta, a post czyta
   // sie bez niej. Miganie pustego prostokata przy kazdym przewinieciu byloby
@@ -148,6 +177,73 @@ export default function B20PostCard({ address }: { address: string }) {
             Buy
           </a>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Karta tokena ZE STARTPADA.
+ *
+ * Rozni sie od tej wyzej trzema rzeczami, i kazda z nich byla objawem
+ * zgloszonym z feedu: logo pochodzi z profilu tworcy zamiast szarego glifu z
+ * inicjalami, cena z krzywej zamiast napisu "no market yet", a przycisk i caly
+ * odnosnik prowadza NA STARTPAD, nie na strone b20 i nie na Uniswapa.
+ */
+function StartpadTokenCard({ card }: { card: StartpadCard }) {
+  const price = money(card.priceUsd);
+  const mcap = money(card.mcapUsd);
+  const stateLabel = card.state === 'Graduated' ? 'Graduated' : card.state === 'Locked' ? 'Curve filled' : 'On the curve';
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-card border border-soft-line bg-soft-surface">
+      <div className="flex items-center gap-3 p-3">
+        <Link href={card.href} className="flex min-w-0 flex-1 items-center gap-3">
+          {card.logoUrl ? (
+            // Logo pochodzi od obcego tworcy - metadata.ts przepuszcza wylacznie
+            // https, ipfs i rastrowe data:image, a przy padzie zostaja inicjaly.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={card.logoUrl}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              className="h-10 w-10 shrink-0 rounded-full bg-soft-sunken object-cover"
+            />
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-soft-sunken font-soft-display text-[12px] font-bold text-soft-ink-muted">
+              {tokenInitials(card.symbol ?? '', card.name ?? '')}
+            </span>
+          )}
+
+          <span className="min-w-0 flex-1">
+            <span className="flex items-baseline gap-1.5">
+              <span className="truncate font-soft-display text-[14px] font-bold text-soft-ink">
+                {card.symbol || 'Startpad token'}
+              </span>
+              <span className="truncate text-[12px] text-soft-ink-muted">{card.name}</span>
+            </span>
+            <span className="mt-0.5 block text-[12px] text-soft-ink-faint">
+              {price ? (
+                <>
+                  <span className="font-semibold tabular-nums text-soft-accent-deep">{price}</span>
+                  {mcap ? <> · {mcap} mcap</> : null}
+                </>
+              ) : (
+                // Po graduacji odczyt ceny z krzywej rewertuje. Piszemy wtedy o
+                // STANIE, a nie o cenie - brak liczby nie jest liczba zero.
+                stateLabel
+              )}
+            </span>
+          </span>
+        </Link>
+
+        <Link
+          href={card.href}
+          className="shrink-0 rounded-pill bg-soft-primary px-3.5 py-1.5 font-soft-display text-[12px] font-bold text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.96]"
+        >
+          Trade
+        </Link>
       </div>
     </div>
   );

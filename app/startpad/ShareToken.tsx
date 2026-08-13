@@ -63,7 +63,12 @@ const MENU_GAP = 8;
 const VIEWPORT_MARGIN = 8;
 
 /** Kolejnosc jest kolejnoscia realnej dystrybucji tego produktu, nie alfabetem. */
-const TARGETS: ShareTarget[] = ['x', 'farcaster', 'telegram', 'whatsapp', 'facebook', 'reddit'];
+/**
+ * Wlasny feed stoi PIERWSZY i to jest decyzja, nie kolejnosc alfabetyczna.
+ * Kazdy inny kanal wynosi ruch na zewnatrz; ten jeden zostawia post u nas i
+ * odsyla ludzi z powrotem na strone tokena.
+ */
+const TARGETS: ShareTarget[] = ['mysphere', 'x', 'farcaster', 'telegram', 'whatsapp', 'facebook', 'reddit'];
 
 /**
  * Czern X-a zamieniamy na atrament interfejsu. Jest ku temu powod w kazdym z
@@ -185,7 +190,15 @@ export default function ShareToken({
         }
       }
 
-      window.open(shareIntentUrl(destination, { text, url }), '_blank', 'noopener,noreferrer');
+      const intent = shareIntentUrl(destination, { text, url });
+      // Wlasny feed to nasza trasa - otwieramy ja W TEJ SAMEJ karcie. Nowa
+      // karta na wlasna aplikacje wyglada jak przypadek, a na telefonie
+      // zostawia po sobie osierocone okno.
+      if (destination === 'mysphere') {
+        window.location.assign(intent);
+        return;
+      }
+      window.open(intent, '_blank', 'noopener,noreferrer');
     },
     [text, url]
   );

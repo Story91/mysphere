@@ -33,7 +33,15 @@ const SITE_URL = 'https://mysphere.fun';
 /** Symbole na krzywej sa krotkie; dwanascie znakow to zapas, nie limit. */
 const MAX_SYMBOL = 12;
 
-export type ShareTarget = 'x' | 'farcaster' | 'telegram' | 'whatsapp' | 'facebook' | 'reddit';
+/**
+ * `mysphere` to WLASNY feed i stoi w tym menu pierwszy.
+ *
+ * Reszta kanalow wynosi ruch na zewnatrz; ten jeden zostawia go u nas i
+ * odsyla ludzi z powrotem na strone tokena. Nie ma powodu, zeby jedyne
+ * miejsce, w ktorym token da sie opisac wlasnymi slowami przy wlasnej
+ * publicznosci, bylo jedynym, ktorego w menu brakuje.
+ */
+export type ShareTarget = 'mysphere' | 'x' | 'farcaster' | 'telegram' | 'whatsapp' | 'facebook' | 'reddit';
 
 export type ShareState = 'Curve' | 'Locked' | 'Graduated';
 
@@ -136,10 +144,36 @@ export function buildShareText(input: {
  * Sklejamy przez URLSearchParams, a nie recznie: mnoznik i nazwa tokena moga
  * niesc `&` albo `#`, ktore w recznym stringu rozbilyby adres na kawalki.
  */
+/**
+ * Ile znakow wolno wstawic do kompozytora feedu. To jest pole na jedno zdanie
+ * i link, nie kanal na esej - a tresc przychodzi tu z adresu strony, wiec musi
+ * miec sufit niezalezny od tego, kto ten adres sklada.
+ */
+const MAX_COMPOSE = 600;
+
+/**
+ * Adres kompozytora feedu z gotowa trescia posta.
+ *
+ * WLASNA sciezka, nie `?share=SYMBOL|Nazwa|0xadres`, ktore juz w basechacie
+ * jest. Tamto samo sklada zdanie i doklada link `mysphere.fun/b20/<adres>` -
+ * czyli opisuje token z krzywej startpada strona, ktora nie zna ani jego ceny,
+ * ani logo. Tutaj tresc powstaje RAZ, w `buildShareText`, i jest ta sama we
+ * wszystkich kanalach; basechat ma ja tylko wkleic.
+ */
+export function composeParam(text: string, url: string): string {
+  // Znaki sterujace nie sa trescia posta, a potrafia rozjechac pole tekstowe.
+  // Nowa linia ZOSTAJE - ona te tresc rozdziela.
+  // eslint-disable-next-line no-control-regex
+  const clean = `${text}\n\n${url}`.replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, '');
+  return `/basechat?${new URLSearchParams({ compose: clean.slice(0, MAX_COMPOSE) }).toString()}`;
+}
+
 export function shareIntentUrl(target: ShareTarget, input: { text: string; url: string }): string {
   const params = (entries: Record<string, string>) => new URLSearchParams(entries).toString();
 
   switch (target) {
+    case 'mysphere':
+      return composeParam(input.text, input.url);
     case 'x':
       return `https://x.com/intent/tweet?${params({ text: input.text, url: input.url })}`;
     case 'farcaster':
