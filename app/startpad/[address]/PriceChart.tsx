@@ -65,14 +65,18 @@ export default function PriceChart({
   const [mode, setMode] = useState<Mode>('price');
   const [style, setStyle] = useState<Style | null>(null);
 
-  const lastTradeTs = trades.length ? trades[trades.length - 1].ts : startedAt;
-  const span = Math.max(0, lastTradeTs - startedAt);
-  // Interwal dobrany do wieku rynku: mlody token na swiecach 1h to jeden slupek.
-  const autoInterval: IntervalSec = span < 5400 ? 60 : span < 43_200 ? 300 : 3600;
-  const effInterval = intervalSec ?? autoInterval;
-  // Kilka transakcji nie sklada sie w swiece - linia schodkowa mowi wtedy wiecej.
-  const autoStyle: Style = trades.length >= 8 ? 'candles' : 'line';
-  const effStyle = style ?? autoStyle;
+  /**
+   * Wykres startuje ZAWSZE na swiecach 1m - taki jest domysl kazdej gieldy i
+   * tego oczekuje ktos, kto wchodzi na strone tokena.
+   *
+   * Stal tu wczesniej automat: interwal dobierany do wieku rynku (1h dla
+   * starszych) i linia schodkowa zamiast swiec ponizej osmiu transakcji.
+   * Bronil czytelnosci mlodego rynku, ale kosztem tego, ze ten sam token
+   * wygladal inaczej w zaleznosci od tego, kiedy sie na niego weszlo. Wybor
+   * uzytkownika (przelaczniki obok) nadal wygrywa i zostaje do konca sesji.
+   */
+  const effInterval: IntervalSec = intervalSec ?? 60;
+  const effStyle: Style = style ?? 'candles';
 
   // Po graduacji krzywa jest historia - nie dociagamy plaskiej linii do
   // "teraz", bo sugerowalaby, ze cena wciaz stoi na krzywej. Czas "teraz"

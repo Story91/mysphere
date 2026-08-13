@@ -5,6 +5,8 @@ import type { Address } from 'viem';
 import {
   ArrowDownRight,
   ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   ImagePlus,
   RefreshCw,
@@ -26,6 +28,7 @@ import {
   fmtEth,
   fmtPrice,
   fmtTokens,
+  pageSlice,
   POOL_MANAGER_ADDRESS,
   priceToNumber,
   short,
@@ -79,6 +82,7 @@ export default function DetailTabs({
   onRetryHistory,
   profile,
   isCreator,
+  profileRequest,
   onProfileSaved,
 }: {
   core: CoreState;
@@ -93,10 +97,23 @@ export default function DetailTabs({
   onRetryHistory: () => void;
   profile: TokenProfileView | null;
   isCreator: boolean;
+  /** Licznik zadan z naglowka: tworca kliknal pusta ikonke linku. */
+  profileRequest: number;
   onProfileSaved: (profile: TokenProfileView) => void;
 }) {
   const [tab, setTab] = useState<Tab>('trades');
-  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [page, setPage] = useState(0);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+  // Zadanie z naglowka: otworz Info i pokaz formularz. Pierwsze wywolanie
+  // (licznik 0) pomijamy - inaczej kazde wejscie tworcy na strone przerzucaloby
+  // go z Trades na Info.
+  useEffect(() => {
+    if (!profileRequest || !isCreator) return;
+    setTab('info');
+    const timer = setTimeout(() => editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+    return () => clearTimeout(timer);
+  }, [profileRequest, isCreator]);
 
   // Ranking posiadaczy z Blockscouta - pelny, nie obciety oknem skanu. Pusty
   // (brak klucza / token nieznany) -> zostaje odtworzenie z lancucha ponizej.
@@ -138,6 +155,10 @@ export default function DetailTabs({
   }, [indexHolders, balances, core.creator]);
 
   const newestFirst = useMemo(() => [...trades].reverse(), [trades]);
+  // Strona liczona przy renderze, nie trzymana w stanie: lista zmienia dlugosc
+  // pod reka (zdarzenia na zywo, dociagana historia), wiec numer strony musi
+  // sam sie miescic w tym, ile stron jest TERAZ.
+  const tradePage = pageSlice(newestFirst, page, PAGE_SIZE);
 
   const loadingRow = historyLoading && trades.length === 0 && (
     <div className="flex items-center justify-center gap-2 px-5 py-10 text-[12px] text-black/45">
@@ -207,7 +228,7 @@ export default function DetailTabs({
                   <span />
                 </div>
                 <div className="divide-y divide-black/5">
-                  {newestFirst.slice(0, visible).map((trade) => (
+                  {tradePage.rows.map((trade) => (
                     <div key={trade.id} className="grid grid-cols-[90px_70px_1fr_110px_110px_110px_44px] items-center gap-2 px-4 py-2.5 text-[12px] sm:px-5">
                       <span className="text-[11px] text-black/45">{timeAgo(trade.ts)}</span>
                       <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${trade.kind === 'buy' ? 'bg-[#edfff4] text-[#0b9a51]' : 'bg-[#fff8ed] text-[#a34b08]'}`}>
@@ -233,11 +254,36 @@ export default function DetailTabs({
               </div>
             </div>
           )}
-          {newestFirst.length > visible && (
-            <div className="border-t border-black/10 px-4 py-3 text-center sm:px-5">
-              <button type="button" onClick={() => setVisible((current) => current + PAGE_SIZE)} className="rounded-full border border-black/10 px-4 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">
-                Show {Math.min(PAGE_SIZE, newestFirst.length - visible)} more of {newestFirst.length - visible}
-              </button>
+          {/* Strony, nie rosnaca kolumna: 141 transakcji "Show more" rozciagalo
+              strone na kilka ekranow i psulo przewijanie wszystkiego ponizej. */}
+          {tradePage.pages > 1 && (
+            <div className="flex items-center justify-between gap-3 border-t border-black/10 px-4 py-2.5 sm:px-5">
+              <span className="text-[11px] font-bold text-black/40">
+                {tradePage.page * PAGE_SIZE + 1}-{tradePage.page * PAGE_SIZE + tradePage.rows.length} of {newestFirst.length}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPage(tradePage.page - 1)}
+                  disabled={tradePage.page === 0}
+                  className="rounded-full border border-black/10 p-1.5 text-black/50 transition-colors hover:border-soft-primary hover:text-soft-primary-deep disabled:opacity-30 disabled:hover:border-black/10 disabled:hover:text-black/50"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <span className="min-w-[62px] text-center text-[11.5px] font-extrabold text-[#16141b]">
+                  {tradePage.page + 1} / {tradePage.pages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage(tradePage.page + 1)}
+                  disabled={tradePage.page >= tradePage.pages - 1}
+                  className="rounded-full border border-black/10 p-1.5 text-black/50 transition-colors hover:border-soft-primary hover:text-soft-primary-deep disabled:opacity-30 disabled:hover:border-black/10 disabled:hover:text-black/50"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             </div>
           )}
         </>
@@ -382,7 +428,11 @@ export default function DetailTabs({
             )}
           </div>
 
-          {isCreator && <ProfileEditor token={core.token} profile={profile} onSaved={onProfileSaved} />}
+          {isCreator && (
+            <div ref={editorRef}>
+              <ProfileEditor token={core.token} profile={profile} onSaved={onProfileSaved} />
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -424,6 +474,10 @@ function ProfileEditor({
   const [logoDraft, setLogoDraft] = useState('');
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [websiteDraft, setWebsiteDraft] = useState('');
+  // X i Telegram API przyjmowalo od poczatku - formularz ich po prostu nie
+  // zbieral, wiec te dwie ikonki w naglowku nie mialy prawa sie nigdy zapalic.
+  const [twitterDraft, setTwitterDraft] = useState('');
+  const [telegramDraft, setTelegramDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [resizing, setResizing] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -434,6 +488,8 @@ function ProfileEditor({
     setLogoDraft(profile?.logoUrl ?? '');
     setDescriptionDraft(profile?.description ?? '');
     setWebsiteDraft(profile?.website ?? '');
+    setTwitterDraft(profile?.twitter ?? '');
+    setTelegramDraft(profile?.telegram ?? '');
   }, [profile]);
 
   // Plik NIE wychodzi z przegladarki w oryginale: resizeImageFile skaluje go
@@ -476,7 +532,15 @@ function ProfileEditor({
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: token, chainId: LAUNCHPAD_CHAIN.id, logoUrl: logoDraft, description: descriptionDraft, website: websiteDraft }),
+        body: JSON.stringify({
+          address: token,
+          chainId: LAUNCHPAD_CHAIN.id,
+          logoUrl: logoDraft,
+          description: descriptionDraft,
+          website: websiteDraft,
+          twitter: twitterDraft,
+          telegram: telegramDraft,
+        }),
       });
       const payload = (await response.json()) as { profile?: TokenProfileView; error?: string };
       if (!response.ok) {
@@ -547,10 +611,23 @@ function ProfileEditor({
             ipfs:// is safer: its address is the file&apos;s hash, so nobody can swap the image later. Uploaded files are resized in your browser and shown only on this site.
           </span>
         </div>
-        <label className="block">
-          <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Website</span>
-          <input value={websiteDraft} onChange={(event) => setWebsiteDraft(event.target.value)} className={FIELD} placeholder="https://..." />
-        </label>
+        <div className="space-y-3">
+          <label className="block">
+            <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Website</span>
+            <input value={websiteDraft} onChange={(event) => setWebsiteDraft(event.target.value)} className={FIELD} placeholder="https://..." />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">X</span>
+              {/* Sam uchwyt wystarczy - serwer sklada z niego adres x.com. */}
+              <input value={twitterDraft} onChange={(event) => setTwitterDraft(event.target.value)} className={FIELD} placeholder="@handle" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Telegram</span>
+              <input value={telegramDraft} onChange={(event) => setTelegramDraft(event.target.value)} className={FIELD} placeholder="@channel" />
+            </label>
+          </div>
+        </div>
       </div>
       <label className="mt-3 block">
         <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Description</span>

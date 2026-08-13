@@ -255,9 +255,37 @@ export type ScanOptions = {
   estTs: (block: bigint) => number;
   /** Przerwa przed jedyna ponowna proba okna. Testy podaja 0. */
   retryDelayMs?: number;
+  /**
+   * Ile okien naraz. Domyslnie 1, czyli okno po oknie.
+   *
+   * TO JEST GLOWNY REGULATOR CZASU ZIMNEGO SKANU, i to nie z teorii: zmierzone
+   * na tokenie z 11 sierpnia (78 tys. blokow, dziewiec okien) - 3,8 s, przy
+   * czym OBA `getLogs` w oknie i tak leca rownolegle, wiec usuwanie ktoregos
+   * z nich nie daje nic (sprawdzone: -15 ms). Czekanie robia KOLEJNE RUNDY.
+   *
+   * Wyzej niz 1 idzie serwer, ktory ma wlasny endpoint z zapasem tempa.
+   * Przegladarka zostaje na 1 - tam skan jest awaryjny i leci przez publiczny
+   * RPC, ktory przy serii odpowiada "over rate limit".
+   */
+  concurrency?: number;
 };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type Window = { fromBlock: bigint; toBlock: bigint };
+
+/** Okna od glowy w dol, do dna wlacznie. Lista powstaje ZANIM cokolwiek poleci. */
+function planWindows(opts: ScanOptions): Window[] {
+  const windows: Window[] = [];
+  let toBlock = opts.head;
+  for (let index = 0; index < opts.maxWindows && toBlock >= opts.floor; index += 1) {
+    const fromBlock = toBlock >= opts.floor + opts.window ? toBlock - opts.window + 1n : opts.floor;
+    windows.push({ fromBlock, toBlock });
+    if (fromBlock === opts.floor) break;
+    toBlock = fromBlock - 1n;
+  }
+  return windows;
+}
 
 /**
  * Skan wstecz, oknami, od `head` do `floor`.
@@ -274,7 +302,6 @@ export async function scanBackward(client: ScanClient, opts: ScanOptions): Promi
   let graduatedTs: number | null = null;
   let launchBlock: bigint | null = null;
   let complete = false;
-  let toBlock = opts.head;
   /**
    * Najnizszy blok, ktory NAPRAWDE przeszedl przez `getLogs`. Startuje POWYZEJ
    * glowy, czyli "nic jeszcze nie pokryte" - inaczej skan, ktoremu padlo juz
@@ -283,25 +310,28 @@ export async function scanBackward(client: ScanClient, opts: ScanOptions): Promi
    */
   let scannedFrom = opts.head + 1n;
 
-  for (let window = 0; window < opts.maxWindows && toBlock >= opts.floor; window += 1) {
-    const fromBlock =
-      toBlock >= opts.floor + opts.window ? toBlock - opts.window + 1n : opts.floor;
+  const windows = planWindows(opts);
+  const batchSize = Math.max(1, Math.floor(opts.concurrency ?? 1));
 
-    const fetchWindow = () =>
+  /** Jedno okno, z jedna ponowna proba. `null` = okno nie przeszlo. */
+  const fetchWindow = async (window: Window): Promise<[ScanLog[], ScanLog[]] | null> => {
+    const once = () =>
       Promise.all([
         client.getLogs({
           address: opts.launchpad,
           events: LAUNCHPAD_EVENTS,
-          fromBlock,
-          toBlock,
+          fromBlock: window.fromBlock,
+          toBlock: window.toBlock,
         }),
-        client.getLogs({ address: opts.token, event: TRANSFER_EVENT, fromBlock, toBlock }),
+        client.getLogs({
+          address: opts.token,
+          event: TRANSFER_EVENT,
+          fromBlock: window.fromBlock,
+          toBlock: window.toBlock,
+        }),
       ]);
-
-    let launchpadLogs: ScanLog[];
-    let transferLogs: ScanLog[];
     try {
-      [launchpadLogs, transferLogs] = await fetchWindow();
+      return await once();
     } catch {
       // Publiczne RPC Base odmawia przy szybkiej serii `getLogs` ("over rate
       // limit"). To zwykle chwilowe, wiec jedna proba wiecej po krotkiej
@@ -309,39 +339,51 @@ export async function scanBackward(client: ScanClient, opts: ScanOptions): Promi
       // najmniejszego postepu.
       try {
         await wait(opts.retryDelayMs ?? 400);
-        [launchpadLogs, transferLogs] = await fetchWindow();
+        return await once();
       } catch {
-        // Druga odmowa konczy skan, ale NIE kasuje tego, co juz zebrane:
-        // oddajemy historie ucieta od dolu, a reszte dociagnie nastepne
-        // wejscie. `scannedFrom` zostaje na ostatnim oknie, ktore NAPRAWDE
-        // przeszlo - inaczej cache zapisalby pokrycie, ktorego nie ma.
-        break;
+        return null;
       }
     }
-    scannedFrom = fromBlock;
+  };
 
-    applyTransferLogs(balances, transferLogs);
+  outer: for (let start = 0; start < windows.length; start += batchSize) {
+    const batch = windows.slice(start, start + batchSize);
+    const fetched = await Promise.all(batch.map(fetchWindow));
 
-    for (const log of launchpadLogs) {
-      const token = log.args?.token as string | undefined;
-      if (!token || token.toLowerCase() !== wanted) continue;
-      if (log.eventName === 'Launched') {
-        launchBlock = log.blockNumber ?? null;
+    // Wyniki bierzemy TYLKO z nieprzerwanego poczatku partii. Okno, ktore
+    // padlo, urywa pokrycie - to, co zeskanowalo sie pod nim, lezy za dziura i
+    // zapisanie tego jako ciagly zakres byloby klamstwem cache'u.
+    for (let index = 0; index < batch.length; index += 1) {
+      const result = fetched[index];
+      if (!result) break outer;
+      const window = batch[index];
+      const [launchpadLogs, transferLogs] = result;
+      scannedFrom = window.fromBlock;
+
+      applyTransferLogs(balances, transferLogs);
+
+      for (const log of launchpadLogs) {
+        const token = log.args?.token as string | undefined;
+        if (!token || token.toLowerCase() !== wanted) continue;
+        if (log.eventName === 'Launched') {
+          launchBlock = log.blockNumber ?? null;
+          complete = true;
+        } else if (log.eventName === 'Graduated') {
+          graduatedTs = opts.estTs(log.blockNumber ?? 0n);
+        } else {
+          const trade = decodeTradeLog(log, opts.estTs);
+          if (trade) trades.push(trade);
+        }
+      }
+
+      // Zdarzenie Launched konczy sprawe: ponizej bloku startu tokena logow z
+      // definicji nie ma. Dno przedzialu tak samo - nizej nie mielismy isc.
+      if (complete) break outer;
+      if (window.fromBlock === opts.floor) {
         complete = true;
-      } else if (log.eventName === 'Graduated') {
-        graduatedTs = opts.estTs(log.blockNumber ?? 0n);
-      } else {
-        const trade = decodeTradeLog(log, opts.estTs);
-        if (trade) trades.push(trade);
+        break outer;
       }
     }
-
-    if (complete) break;
-    if (fromBlock === opts.floor) {
-      complete = true;
-      break;
-    }
-    toBlock = fromBlock - 1n;
   }
 
   return {

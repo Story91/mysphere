@@ -138,6 +138,23 @@ export function parseMetadataUri(uri: string | null | undefined): TokenMetadata 
  * RAZ, przy starcie, i nie ma settera. Interfejs pokazuje, ktore zrodlo
  * zadzialalo, zeby ta zamiana nie byla niewidoczna.
  */
+/**
+ * Kolor tokena BEZ logo. Wiekszosc startow nie ma obrazka i glif z inicjalami
+ * jest ich jedyna tozsamoscia wizualna - musi wiec byc ten sam w tablicy, na
+ * stronie tokena i na karcie udostepniania. Stad wspolna paleta tutaj, obok
+ * reszty decyzji o obrazku tokena, a nie w komponencie jednego widoku.
+ *
+ * Kolor liczy sie z ADRESU, wiec jest staly przez cale zycie tokena i nie
+ * wymaga zapisu nigdzie.
+ */
+const ACCENTS = ['#8b78e6', '#5fa78c', '#d78a55', '#5b8bd9', '#d9628a', '#4fa3a8'];
+
+export function tokenAccent(token: string): string {
+  let hash = 0;
+  for (let index = 0; index < token.length; index += 1) hash = (hash * 31 + token.charCodeAt(index)) >>> 0;
+  return ACCENTS[hash % ACCENTS.length];
+}
+
 export function pickTokenImage(input: {
   profileLogoUrl?: string | null;
   metadataUri?: string | null;
