@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '../../components/identity';
 import { NameWithSuffix } from '../../utils/nameSuffix';
 
@@ -98,21 +99,20 @@ export type SoftActiveUser = {
 };
 
 /**
- * Skrocony zapis duzej liczby: 184064 -> "184K".
+ * Pelna liczba z separatorem tysiecy: 184064 -> "184,064".
  *
- * Kafle maja 4 znaki szerokosci uzytecznej i staly obok siebie w kwadracie.
- * "184064" wchodzilo w nie na styk i psulo rowna siatke, a przy 2,6 mln
- * rozpychalo kafel. Pelna wartosc zostaje w `title`, wiec nic nie ginie -
- * schodzi tylko z pierwszego planu, gdzie i tak nikt nie czyta szesciu cyfr.
+ * BYLO TU SKRACANIE do "184.1K". Mialo sens, dopoki liczby staly obok siebie
+ * w kwadratowych kaflach o czterech znakach szerokosci. W ukladzie wierszowym
+ * liczba ma cala prawa strone panelu i nie ma czego oszczedzac - a skrot
+ * odbieral to, co w tym produkcie jest calym punktem: dokladna wartosc.
+ * "184.1K" jest zaokragleniem podanym jako pomiar.
  *
- * Ponizej 10 000 pokazujemy dokladnie: tam kazda cyfra jeszcze cos znaczy.
+ * Znak "nie wiem" i wszystko, co nie jest liczba, przechodzi bez zmian.
  */
-function compact(value: string): string {
+function exact(value: string): string {
   const n = Number(value.replace(/\s/g, ''));
   if (!Number.isFinite(n)) return value;
-  if (n < 10_000) return n.toLocaleString('en-US');
-  if (n < 1_000_000) return `${Math.round(n / 100) / 10}K`.replace('.0K', 'K');
-  return `${Math.round(n / 100_000) / 10}M`.replace('.0M', 'M');
+  return n.toLocaleString('en-US');
 }
 
 /**
@@ -136,6 +136,131 @@ function toTileValue(input: string | number | null | undefined): string {
 }
 
 const MEDAL = ['#F5A73B', '#B9B1D8', '#C98B5A'];
+
+/**
+ * KOLOR LICZBY, JEDEN NA KATEGORIE.
+ *
+ * Kolor siedzi w samej cyfrze, nie w tle - kolorowe tla wracaly do siatki
+ * kafli, ktora wlasnie z tego panelu zeszla. Odcienie sa ciemne, bo stoja na
+ * bialej karcie i musza trzymac kontrast tekstu, a nie tylko "byc kolorowe".
+ */
+const NUMBER_TONE: Record<SoftTrendTone, string> = {
+  purple: 'text-soft-primary-deep',
+  amber: 'text-[#B45309]',
+  green: 'text-[#15803D]',
+  pink: 'text-[#BE185D]',
+  blue: 'text-[#1D4ED8]',
+  teal: 'text-[#0F766E]',
+  money: 'text-soft-accent-deep',
+};
+
+/**
+ * ===== NALICZANIE ZAMIAST NAPISU "LIVE" =====
+ *
+ * Liczby w tym panelu NIE sa transmisja na zywo: `getGlobalStats` czyta je raz
+ * przy wejsciu, a ranking odswieza sie co 30 minut (patrz `refreshInterval`
+ * w basechat/page.tsx). Odznaka "LIVE" przy wartosci, ktora stoi w miejscu,
+ * bylaby napisem nieprawdziwym - a caly ten produkt stoi na tym, ze liczby
+ * mowia prawde.
+ *
+ * Dlatego ruch mowi tylko tyle, ile jest prawda: wartosc zostala WLASNIE
+ * odczytana i wchodzi na ekran. Trwa 900 ms, rusza od zera przy pierwszym
+ * pojawieniu i od poprzedniej wartosci przy kazdej nastepnej zmianie, wiec
+ * odswiezenie widac jako ruch od starej liczby do nowej.
+ *
+ * `prefers-reduced-motion` wylacza go calkowicie - wtedy liczba pojawia sie
+ * od razu w wartosci koncowej.
+ */
+function useCountUp(target: number | null): number | null {
+  const [shown, setShown] = useState<number | null>(target);
+  const fromRef = useRef(0);
+
+  useEffect(() => {
+    if (target === null) {
+      setShown(null);
+      return;
+    }
+
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const from = fromRef.current;
+    fromRef.current = target;
+
+    if (reduced || from === target) {
+      setShown(target);
+      return;
+    }
+
+    const DURATION = 900;
+    let frame = 0;
+    const start = performance.now();
+
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / DURATION);
+      // ease-out: szybko rusza, wyhamowuje na koncu - ta sama krzywa co reszta
+      // ruchu w produkcie (--ease-out-strong).
+      const eased = 1 - Math.pow(1 - t, 3);
+      setShown(Math.round(from + (target - from) * eased));
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
+
+  return shown;
+}
+
+/** Jeden wiersz rejestru. Osobny komponent, bo `useCountUp` to hook. */
+function StatRow({
+  label,
+  value,
+  tone,
+  detail,
+  atLeast,
+  divided,
+}: {
+  label: string;
+  value: string;
+  tone: SoftTrendTone;
+  detail?: string;
+  atLeast?: boolean;
+  divided: boolean;
+}) {
+  const numeric = Number(value.replace(/\s|,/g, ''));
+  const animated = useCountUp(Number.isFinite(numeric) ? numeric : null);
+  const shown = animated === null ? value : animated.toLocaleString('en-US');
+
+  return (
+    <div
+      className={`flex items-baseline justify-between gap-3 py-3 ${
+        divided ? 'border-t border-soft-line/60' : ''
+      }`}
+    >
+      <dt className="min-w-0 font-soft text-[12px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">
+        {label}
+      </dt>
+      <dd
+        title={
+          value === UNKNOWN
+            ? 'Not available right now'
+            : detail
+              ? `${value} — ${detail}`
+              : value
+        }
+        className={`flex-none font-soft-display text-[21px] font-bold leading-none tabular-nums ${NUMBER_TONE[tone]}`}
+      >
+        {shown}
+        {/* Znak dolnej granicy. Licznik lajkow nie obejmuje wszystkiego, wiec
+            po przejsciu na pelne liczby sama wartosc wygladalaby na dokladna.
+            "+" mowi to samo co zdanie "at least", ale nie zabiera wiersza -
+            pelne wyjasnienie zostaje w dymku. */}
+        {atLeast && value !== UNKNOWN && <span className="text-soft-ink-faint">+</span>}
+      </dd>
+    </div>
+  );
+}
 
 export default function SoftTrendsPanel({
   stats,
@@ -211,39 +336,15 @@ export default function SoftTrendsPanel({
       <div className="rounded-card bg-soft-surface px-4 py-1 shadow-card">
         <dl className="flex flex-col">
           {tiles.map((stat, index) => (
-            <div
+            <StatRow
               key={stat.label}
-              className={`flex items-baseline justify-between gap-3 py-3 ${
-                index > 0 ? 'border-t border-soft-line/60' : ''
-              }`}
-            >
-              <dt className="min-w-0 font-soft text-[12px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">
-                {stat.label}
-                {/* Zastrzezenie stoi PRZY liczbie, nie w dymku - liczba
-                    niepelna podana bez niego jest po prostu liczba
-                    nieprawdziwa, a dymka nikt nie otwiera. */}
-                {stat.note && (
-                  <span className="ml-1.5 font-soft text-[10.5px] font-medium normal-case tracking-normal text-soft-ink-faint">
-                    {stat.note}
-                  </span>
-                )}
-              </dt>
-              {/* Skrot na wierzchu, pelna liczba w `title` - patrz compact(). */}
-              <dd
-                title={
-                  stat.value === UNKNOWN
-                    ? 'Not available right now'
-                    : stat.detail
-                      ? `${stat.value} — ${stat.detail}`
-                      : stat.value
-                }
-                className={`flex-none font-soft-display text-[21px] font-bold leading-none tabular-nums ${
-                  stat.tone === 'money' ? 'text-soft-accent-deep' : 'text-soft-ink'
-                }`}
-              >
-                {compact(stat.value)}
-              </dd>
-            </div>
+              label={stat.label}
+              value={exact(stat.value)}
+              tone={stat.tone}
+              detail={stat.detail}
+              atLeast={Boolean(stat.note)}
+              divided={index > 0}
+            />
           ))}
         </dl>
       </div>

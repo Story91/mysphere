@@ -3568,8 +3568,17 @@ function BaseChatContent() {
                   jest w USDC, a kontrakt escrow stoi na Base (patrz
                   ASK_ESCROW_CHAIN_ID). Siedem logotypow nad formularzem, ktory
                   i tak poprosi o Base, obiecywaloby wybor, ktorego nie ma -
-                  a na 360px zabieraloby caly rzad na nic. */}
-              {isConnected && composerMode === 'post' && (
+                  a na 360px zabieraloby caly rzad na nic.
+
+                  POZA FEEDEM TEZ ZNIKA. Rzad stal nad KAZDYM widokiem
+                  srodkowej kolumny: wchodzisz we wlasny profil, w Discover
+                  albo w powiadomienia i dostajesz nad nimi karte z siedmioma
+                  logotypami sieci, ktora steruje kompozytorem stojacym gdzie
+                  indziej. Na desktopie zabierala pierwsze 110 pikselow profilu,
+                  czyli dokladnie miejsce zdjecia i nazwy. `activeMainPanel`
+                  to ta sama galaz, ktora nizej renderuje kompozytor - oprawa
+                  i tresc wlaczaja sie razem. */}
+              {isConnected && activeMainPanel === 'feed' && composerMode === 'post' && (
               <div
                 className={`mb-4 rounded-card bg-soft-surface p-3 shadow-card lg:block ${
                   mobileComposerOpen ? '' : 'hidden'

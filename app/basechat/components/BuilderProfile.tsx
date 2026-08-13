@@ -1136,42 +1136,35 @@ export default function BuilderProfile({
 
   return (
     <div className="font-soft">
-      {/* Builder Panel Header with Back Button - nowoczesny gradient */}
-      <div className="bg-soft-primary-deep p-5 relative overflow-hidden">
-        {/* Dodajemy efekt połysku */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-white opacity-20"></div>
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-soft-primary rounded-full filter blur-3xl opacity-30"></div>
-        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-soft-primary rounded-full filter blur-3xl opacity-20"></div>
+      {/* ===== POWROT: SAMA STRZALKA =====
+          Stal tu fioletowy pas przez cala szerokosc kolumny, z trzema
+          rozmytymi kolami w tle, przyciskiem "Back to Feed" i napisem
+          "Builder Profile" na srodku. Napis nazywal ekran, na ktory czlowiek
+          wlasnie sam wszedl i ktory ma przed oczami - a pas zabieral pierwsze
+          80 pikselow, czyli miejsce, gdzie powinno stac zdjecie i nazwa.
 
-        <div className="flex items-center justify-between relative z-10">
-          <button
-            onClick={onBackToFeed}
-            className="flex items-center text-white bg-white/15 rounded-pill px-4 py-2 font-semibold transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-white/25 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white border border-white/20"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Feed
-          </button>
-          <div className="text-xl font-soft-display font-bold text-white">Builder Profile</div>
-          <div className="w-24"></div> {/* Placeholder dla wyrównania */}
-        </div>
-      </div>
-      
-      {/* User Info Section */}
-      <div className="p-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 mb-6 p-8 lg:p-12 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
-          {/* Premium białe i niebieskie efekty świetlne */}
-          <div className="absolute -top-8 -right-8 w-40 h-40 bg-soft-primary/10 rounded-full filter blur-3xl"></div>
-          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-soft-accent-soft/50 rounded-full filter blur-2xl"></div>
-          <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-soft-line"></div>
+          Zostala sama strzalka. Wyjscie musi byc, tytul nie. */}
+      <button
+        onClick={onBackToFeed}
+        aria-label="Back to feed"
+        className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-pill bg-soft-surface text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+      >
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
 
-          {/* Efekt premium szkła z białymi refleksami */}
-          <div className="absolute inset-0 bg-transparent"></div>
-          <div className="absolute inset-0 bg-transparent"></div>
-          
-          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 w-full">
+      {/* ===== TOZSAMOSC BEZ RAMKI =====
+          Ta sekcja byla karta z obwodka i cieniem, w srodku kolumny, ktora
+          sama juz jest kolumna - pudelko w pudelku. Do tego cztery rozmyte
+          kola i dwie linie "premium" w tle oraz dwa puste <div> po efektach
+          szkla, ktore nic nie rysowaly.
+
+          Teraz tresc rozklada sie wprost na tle strony, a role granicy pelni
+          odstep i wlosowa linia pod spodem. Zadnej nowej ramki. */}
+      <div>
+        <div className="mb-6">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 w-full">
           <div className="flex flex-col items-center lg:items-start">
             <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden flex-shrink-0 relative group">
               {/* Premium ramka z białym gradientem */}
