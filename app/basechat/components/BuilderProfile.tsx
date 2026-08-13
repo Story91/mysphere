@@ -1155,15 +1155,32 @@ export default function BuilderProfile({
           80 pikselow, czyli miejsce, gdzie powinno stac zdjecie i nazwa.
 
           Zostala sama strzalka. Wyjscie musi byc, tytul nie. */}
-      <button
-        onClick={onBackToFeed}
-        aria-label="Back to feed"
-        className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-pill bg-soft-surface text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-      >
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <button
+          onClick={onBackToFeed}
+          aria-label="Back to feed"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-pill bg-soft-surface text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        {/* Wejscie w edycje stoi w JEDNYM rzedzie z powrotem, a nie samotnie
+            nad cala kolumna. Ten sam handler co aparat przy zdjeciu. */}
+        {onEditProfile && currentUserAddress === userAddress && (
+          <button
+            type="button"
+            onClick={onEditProfile}
+            className="inline-flex items-center gap-1.5 rounded-pill bg-soft-surface px-4 py-2 font-soft text-[13px] font-semibold text-soft-primary-deep shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit profile
+          </button>
+        )}
+      </div>
 
       {/* ===== TOZSAMOSC BEZ RAMKI =====
           Ta sekcja byla karta z obwodka i cieniem, w srodku kolumny, ktora

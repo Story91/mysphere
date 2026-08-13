@@ -3699,18 +3699,11 @@ function BaseChatContent() {
                       nie ma czego edytowac, wiec przycisk sie nie renderuje. */}
                   {address && selectedBuilderProfile && selectedBuilderProfile.address.toLowerCase() === address.toLowerCase() && (
                     <div className="mb-4">
-                      <div className="mb-3 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingProfile(!isEditingProfile)}
-                          className="flex items-center gap-1.5 rounded-pill bg-soft-surface px-4 py-2 font-soft text-[13px] font-semibold text-soft-primary-deep shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          <span>{isEditingProfile ? 'Close editing' : 'Edit profile'}</span>
-                        </button>
-                      </div>
+                      {/* Przycisk "Edit profile" stal TUTAJ, samotnie nad cala
+                          kolumna, i byl trzecim wejsciem w to samo miejsce
+                          obok aparatu przy zdjeciu i olowka przy bio.
+                          Przeniesiony do rzedu z powrotem, wewnatrz profilu
+                          (BuilderProfile) - ten sam `isEditingProfile`. */}
                       {/* ===== EDYCJA PROFILU MIESZKA W BUILDER PROFILE =====
                           Awatar, nazwa i linki spolecznosciowe zmienialy sie
                           dotad w kolumnie bocznej, w dwoch miejscach naraz:
@@ -3939,126 +3932,26 @@ function BaseChatContent() {
                               </div>
                             )}
 
-                            {/* Social Links Section */}
-                            <div className="mb-4">
-                              <div className="rounded-card border border-soft-line bg-soft-sunken p-3">
-                                <label className="mb-2 flex items-center gap-1.5 font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">
-                                  <svg className="w-3 h-3 text-soft-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                  </svg>
-                                  <span>Social Links</span>
-                                </label>
-                                <div className="space-y-2">
-                                  {/* Twitter */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-soft-sunken">
-                                      <svg className="w-4 h-4 text-soft-primary" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                                      </svg>
-                                    </div>
-                                    <div className="flex-1">
-                                      <label className="mb-1 block font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">X (Twitter)</label>
-                                      <input
-                                        type="text"
-                                        value={userProfile.socialLinks?.twitter || ''}
-                                        onChange={(e) => setUserProfile(prev => ({
-                                          ...prev,
-                                          socialLinks: {
-                                            ...prev.socialLinks,
-                                            twitter: e.target.value
-                                          }
-                                        }))}
-                                        placeholder="username"
-                                        className="w-full rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-                                      />
-                                    </div>
-                                  </div>
+                            {/* ===== LINKI SPOLECZNOSCIOWE MAJA JEDNO MIEJSCE =====
+                                Stala tu druga edycja X, Farcastera i Discorda,
+                                z wlasnym przyciskiem "Save Social Links"
+                                piszacym do tego samego dokumentu. Ta sama
+                                robota siedzi w <ProfileSocials/> na samym
+                                profilu, nizej - i to ona zostaje, bo jest tam,
+                                gdzie te linki widac.
 
-                                  {/* Farcaster */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-soft-sunken">
-                                      <img src="/icon.png" alt="Farcaster" className="w-4 h-4" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <label className="mb-1 block font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">Farcaster/Warpcast</label>
-                                      <input
-                                        type="text"
-                                        value={userProfile.socialLinks?.farcaster || ''}
-                                        onChange={(e) => setUserProfile(prev => ({
-                                          ...prev,
-                                          socialLinks: {
-                                            ...prev.socialLinks,
-                                            farcaster: e.target.value
-                                          }
-                                        }))}
-                                        placeholder="username"
-                                        className="w-full rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Discord */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-soft-sunken">
-                                      <svg className="w-4 h-4 text-soft-primary" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/>
-                                      </svg>
-                                    </div>
-                                    <div className="flex-1">
-                                      <label className="mb-1 block font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">Discord</label>
-                                      <input
-                                        type="text"
-                                        value={userProfile.socialLinks?.discord || ''}
-                                        onChange={(e) => setUserProfile(prev => ({
-                                          ...prev,
-                                          socialLinks: {
-                                            ...prev.socialLinks,
-                                            discord: e.target.value
-                                          }
-                                        }))}
-                                        placeholder="username"
-                                        className="w-full rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <button
-                                    onClick={async () => {
-                                      if (!address) return;
-                                      
-                                      try {
-                                        const userRef = doc(db, 'users', address);
-                                        await updateDoc(userRef, {
-                                          socialLinks: userProfile.socialLinks || {},
-                                          lastUpdated: serverTimestamp()
-                                        });
-                                        
-                                        alert('Social links saved!');
-                                      } catch (error) {
-                                        console.error('Error saving social links:', error);
-                                        alert('Error saving social links. Please try again.');
-                                      }
-                                    }}
-                                    className="w-full px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all font-medium text-xs"
-                                  >
-                                    Save Social Links
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
+                                Dwa formularze do jednego pola to dwa miejsca,
+                                w ktorych trzeba naprawiac ten sam blad, i dwa
+                                stany, ktore potrafia sie rozjechac w jednej
+                                sesji. Tutaj zostaje wylacznie to, czego profil
+                                nie ma u siebie: zdjecie i system nazw. */}
                             {/* Action Buttons */}
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => setIsEditingProfile(false)}
-                                className="flex-1 px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs flex items-center justify-center space-x-1"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                <span>Done</span>
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => setIsEditingProfile(false)}
+                              className="w-full rounded-pill bg-soft-primary px-3 py-2.5 font-soft-display text-[13px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+                            >
+                              Done editing
+                            </button>
                           </div>
                         </div>
                       )}
