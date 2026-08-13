@@ -2255,7 +2255,13 @@ export default function LaunchpadBoard() {
             schodzi pod spod, gorny wiersz trzyma napis i przyciski. */}
         <div className="relative overflow-hidden py-5 sm:py-7">
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-soft-primary/[0.06] blur-3xl" />
-          <div className="relative flex items-center gap-4">
+          {/* `flex-wrap` jest tu ZABEZPIECZENIEM, nie ozdoba: sekcja ma
+              `overflow-hidden`, wiec cokolwiek nie zmiesci sie w wierszu,
+              zostaje UCIETE bez sladu. Na telefonie tytul plus pigulka z
+              najdluzsza etykieta sieci ("Base B20 Sepolia") przekraczaja
+              szerokosc ekranu - wtedy pigulka schodzi do drugiego wiersza
+              zamiast wystawac poza kadr. */}
+          <div className="relative flex flex-wrap items-center gap-x-4 gap-y-3">
             <h1 className="shrink-0 text-[20px] font-extrabold tracking-tight text-sp-ink">
               Start<span className="text-soft-primary">Pad</span>
             </h1>
@@ -2290,7 +2296,20 @@ export default function LaunchpadBoard() {
                   className="inline-flex items-center px-2"
                 />
                 <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-sp-shade/10" />
-                <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand transition-[background-color,transform] hover:bg-soft-primary-deep active:scale-[0.98]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
+                                {/* Na telefonie zostaje sam plus. Napis "Launch" to okolo 50 px,
+                    ktore na waskim ekranie decyduja o tym, czy cala pigulka
+                    miesci sie w wierszu - a plus obok przelacznika sieci czyta
+                    sie jednoznacznie. `aria-label` niesie pelna nazwe, wiec
+                    czytnik ekranu nie traci nic. */}
+                <button
+                  type="button"
+                  onClick={() => setLaunchOpen(true)}
+                  aria-label="Launch a coin"
+                  className="inline-flex items-center gap-2 bg-soft-primary px-3.5 text-[13px] font-extrabold text-sp-on-brand transition-[background-color,transform] hover:bg-soft-primary-deep active:scale-[0.98] sm:px-4"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">Launch</span>
+                </button>
               </div>
             </span>
           </div>
