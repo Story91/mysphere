@@ -32,7 +32,8 @@
     "launchpad:env": "ts-node scripts/launchpad/printEnv.ts",
     "launchpad:keeper:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/keeper.ts --network base-sepolia",
     "db:setup": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts",
-    "db:indexes": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts"
+    "db:indexes": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts",
+    "launchpad:flow:arc": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json FLOW_CONFIRM=tak LAUNCHPAD=0xdAe0dd6EE87a8d7eE7575dD9904A72fA9CA6600d FLOW_BUY_ETH=4 hardhat run scripts/launchpad/sepoliaFlow.ts --network arcTestnet --no-compile"
   },
   "dependencies": {
     "@base-org/account": "^1.1.1",

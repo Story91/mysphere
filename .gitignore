@@ -215,3 +215,6 @@ wallet_data.txt
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# Ustawienia Claude Code per maszyna - nie do repo.
+.claude/settings.local.json
