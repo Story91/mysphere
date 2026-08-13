@@ -44,10 +44,13 @@ import {
   type LaunchpadToken,
 } from './config';
 import { fetchLogos, recallLogos, rememberLogos } from './logos';
+import { tokenAccent } from './metadata';
 import { browserStorage, flushPendingProfiles, postProfileWithRetry, sendTokenProfile } from './profileSync';
 import { loadSnapshot, saveSnapshot, loadFeedSnapshot, saveFeedSnapshot } from './snapshot';
+import { scanIsTrustworthy, shouldKeepUnscanned } from './boardScan';
 import { fetchHolderCounts } from './blockscout';
 import LaunchTokenModal from './LaunchTokenModal';
+import ShareToken from './ShareToken';
 import StartpadFooter from './StartpadFooter';
 import { formatUsd, useEthUsd } from './useEthUsd';
 
@@ -342,11 +345,28 @@ function LaunchCard({
   return (
     <div className="relative flex flex-col rounded-[18px] border border-black/10 bg-white p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
       {animationsOn && <TradeFlash flash={token.flash} rounded="rounded-[18px]" />}
+      {/* Udostepnianie siedzi NAD blyskiem transakcji (z-20 wobec z-10), inaczej
+          nakladka animacji przechwytywalaby klikniecie tuz po czyimś kupnie -
+          czyli dokladnie w chwili, w ktorej ktos chce sie tym pochwalic.
+          `pr-9` w naglowku robi mu miejsce, zeby dlugi symbol z plakietka stanu
+          nie wjezdzal pod przycisk. */}
+      {!sample && token.address && (
+        <ShareToken
+          className="absolute right-3 top-3 z-20"
+          address={token.address}
+          chainId={LAUNCHPAD_CHAIN.id}
+          symbol={token.symbol}
+          raised={token.raised}
+          target={token.target}
+          state={token.state}
+          priceEth={token.lastPrice}
+        />
+      )}
       {/* Wiersz podgladowy jest proba ukladu, nie rynkiem - nic na nim nie klika. */}
       {sample || !token.address ? (
-        <div className="flex min-w-0 items-start gap-3">{header}</div>
+        <div className="flex min-w-0 items-start gap-3 pr-9">{header}</div>
       ) : (
-        <button type="button" onClick={onOpen} className="flex min-w-0 items-start gap-3 text-left">{header}</button>
+        <button type="button" onClick={onOpen} className="flex min-w-0 items-start gap-3 pr-9 text-left">{header}</button>
       )}
 
       <div className="mt-4">
@@ -829,7 +849,21 @@ function LaunchTableRow({
       {sample ? (
         <span />
       ) : (
-        <span className="flex items-center gap-1.5"><button type="button" onClick={onTrade} className="rounded-full border border-black/15 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] shadow-sm transition-colors hover:border-[#7c6bda] hover:text-[#5f4ec2]">Trade</button>{token.address && <button type="button" onClick={onOpen} className="rounded-full p-2 text-black/40 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]" aria-label={`Open ${token.symbol} details`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></button>}</span>
+        <span className="flex items-center gap-1.5">
+          <button type="button" onClick={onTrade} className="rounded-full border border-black/15 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] shadow-sm transition-colors hover:border-[#7c6bda] hover:text-[#5f4ec2]">Trade</button>
+          {token.address && (
+            <ShareToken
+              address={token.address}
+              chainId={LAUNCHPAD_CHAIN.id}
+              symbol={token.symbol}
+              raised={token.raised}
+              target={token.target}
+              state={token.state}
+              priceEth={token.lastPrice}
+            />
+          )}
+          {token.address && <button type="button" onClick={onOpen} className="rounded-full p-2 text-black/40 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]" aria-label={`Open ${token.symbol} details`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></button>}
+        </span>
       )}
     </div>
   );
@@ -967,13 +1001,13 @@ const HOOK_FEE_SETTLED_EVENT = getAbiItem({ abi: hookAbi, name: 'HookFeeSettled'
 // takze splity miedzy odbiorcow fee. kind 1 = strona tworcy oplaty handlowej.
 const FEE_ACCRUED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'FeeAccrued' });
 
-const ACCENTS = ['#8b78e6', '#5fa78c', '#d78a55', '#5b8bd9', '#d9628a', '#4fa3a8'];
-
-function accentFor(token: string) {
-  let hash = 0;
-  for (let index = 0; index < token.length; index += 1) hash = (hash * 31 + token.charCodeAt(index)) >>> 0;
-  return ACCENTS[hash % ACCENTS.length];
-}
+/**
+ * Paleta i sposob liczenia przeniesione do `metadata.ts` - ten sam kolor musi
+ * dostac karta udostepniania renderowana na serwerze, a ona nie moze wciagac
+ * calej tablicy z wagmi. Wynik jest identyczny, wiec zaden token nie zmienia
+ * barwy.
+ */
+const accentFor = tokenAccent;
 
 function formatAge(startedAt: number) {
   const seconds = Math.max(0, Math.floor(Date.now() / 1000) - startedAt);
@@ -1115,6 +1149,13 @@ export default function LaunchpadBoard() {
       }
       // Dwa adresy w jednym strzale: launchpad emituje handel na krzywej, hook
       // rozliczenia oplat puli. Blad jednego okna nie wywala calego skanu.
+      //
+      // ALE MUSI GO ODNOTOWAC. Do 13 sierpnia 2026 padniete okno oddawalo tu
+      // pusta liste i przez to bylo NIEODROZNIALNE od okna bez zdarzen. Skan
+      // konczyl sie jako kompletny, a regula scalania nizej wyrzucala z tablicy
+      // tokeny, ktorych `Launched` byl akurat w tej dziurze - znikaly ludziom z
+      // ekranu przy zywszym ruchu. Brak danych nie jest danymi.
+      let failedWindows = 0;
       const scanOne = async (r: { fromBlock: bigint; toBlock: bigint }) => {
         const once = () =>
           readClient.getLogs({
@@ -1127,11 +1168,11 @@ export default function LaunchpadBoard() {
           return await once();
         } catch {
           // Jedna proba ponowna: burst zapytan potrafi zebrac 429 z publicznego
-          // RPC, ale po chwili przechodzi. Dopiero drugi blad daje puste okno -
-          // liczby moga byc chwilowo zanizone, ale nastepny loadBoard je pogodzi.
+          // RPC, ale po chwili przechodzi.
           try {
             return await once();
           } catch {
+            failedWindows += 1;
             return [];
           }
         }
@@ -1206,8 +1247,11 @@ export default function LaunchpadBoard() {
       // wdrozenia - ale przy scalaniu ponizej zachowujemy wiersze spoza skanu,
       // wiec cicho niezeskanowany token juz nie znika z tablicy.
       const lowestScanned = ranges.length ? ranges[ranges.length - 1].fromBlock : latest;
+      // Wiarygodny = zszedl do bloku wdrozenia I ZADNE okno nie padlo. Dopiero
+      // taki skan ma prawo rozstrzygac, ze tokena nie ma.
+      const trustworthy = scanIsTrustworthy({ failedWindows, lowestScanned, deployBlock: LAUNCHPAD_DEPLOY_BLOCK });
       if (stale()) return;
-      setScanTruncated(lowestScanned > LAUNCHPAD_DEPLOY_BLOCK);
+      setScanTruncated(!trustworthy);
 
       if (launched.size === 0) {
         setActivityFeed([]);
@@ -1369,7 +1413,6 @@ export default function LaunchpadBoard() {
       // pamieci (localStorage). Raz zobaczone logo juz nie zniknie.
       const remembered = recallLogos(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
       const nowSec = Math.floor(Date.now() / 1000);
-      const scanTruncatedNow = lowestScanned > LAUNCHPAD_DEPLOY_BLOCK;
       setTokens((current) => {
         const logoByAddr = new Map<string, string | undefined>();
         for (const token of current) if (token.address) logoByAddr.set(token.address.toLowerCase(), token.logoUrl);
@@ -1380,17 +1423,11 @@ export default function LaunchpadBoard() {
           const logo = token.logoUrl ?? (key ? logoByAddr.get(key) ?? remembered[key] : undefined);
           return logo && !token.logoUrl ? { ...token, logoUrl: logo } : token;
         });
-        // Zachowaj wiersz w stanie, ktorego NIE ma w skanie, ALE tylko z powodem:
-        // swiezo wystartowany (RPC jeszcze nie indeksuje) LUB skan uciol historie
-        // na sufcie okien. Inaczej trzymalibysmy w nieskonczonosc tokeny z
-        // MARTWEGO wdrozenia (stary launchpad), ktorych zaden skan juz nie zwroci
-        // - to bylby nowy "ghost", gorszy niz znikajace logo.
-        const RECENT_SEC = 15 * 60;
-        const kept = current.filter((t) => {
-          if (!t.live || !t.address || scanned.has(t.address.toLowerCase())) return false;
-          const fresh = typeof t.startedAt === 'number' && nowSec - t.startedAt < RECENT_SEC;
-          return fresh || scanTruncatedNow;
-        });
+        // Wiersz spoza skanu zostaje, dopoki skanowi nie mozna zaufac - patrz
+        // `boardScan`. Wyrzucamy dopiero przy skanie kompletnym, bo wtedy
+        // nieobecnosc tokena znaczy cos realnego: pochodzi z MARTWEGO wdrozenia
+        // i zaden skan go juz nie odda.
+        const kept = current.filter((t) => shouldKeepUnscanned(t, { now: nowSec, scanned, trustworthy }));
         return [...merged, ...kept];
       });
       boardHasContentRef.current = true;

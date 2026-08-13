@@ -18,10 +18,13 @@ Startpad runs on Base mainnet with real ETH, and that is the default network. It
 - King of the hill highlights the live token with the highest reserve.
 - Board stats, Top launches, Top volume, and Top earnings sum the board from the contracts' own events; Top earnings ranks creators by accrued fees counted to the wei.
 - My tokens appears when your wallet is connected: your launches, everything claimable across the launchpad, hook, and vault, and one Claim all button.
+- Every card and table row has a Share button for X, Farcaster, Telegram, WhatsApp, Facebook, Reddit, your phone's own share sheet, or a copied link.
 
 ## Each token's page
 
 Every token has its own page with a candlestick or line chart built from the contract's events (1m, 5m, and 1h intervals; the chart ends at graduation, because after that trading lives in the pool), a trade panel with live quotes and a 0.5% slippage buffer, stats (price, market cap, reserve, volume, trades, holders, age), and tabs for trades, holders (with badges for the curve, vault, hook, pool, and burned balances), and info. The creator, verified by a wallet signature, can edit the token's logo, description, and links from the info tab.
+
+Share is in the page header too. A shared token link previews as a card generated at request time: the multiple the price has made since the curve's first block, the price line rebuilt from the contract's own trade events, ETH raised against the 3.00 ETH target, and the number of wallets that have bought. In Base App and other Farcaster clients the same link opens as an embed with a Trade button, so the token page loads inside the app instead of a browser tab.
 
 ## How to use it
 

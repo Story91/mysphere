@@ -13,9 +13,10 @@ import {
   SearchX,
   Send,
 } from 'lucide-react';
-import { ContractFunctionExecutionError, type Address } from 'viem';
+import { ContractFunctionExecutionError, formatEther, type Address } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 import {
+  CURVE_TARGET_ETH,
   erc20Abi,
   hookAbi,
   LAUNCH_HOOK_ADDRESS,
@@ -31,6 +32,7 @@ import { parseMetadataUri, pickTokenImage } from '../metadata';
 import { fetchLogos } from '../logos';
 import { fetchTokenCounters, type TokenCounters } from '../blockscout';
 import { useEthUsd } from '../useEthUsd';
+import ShareToken from '../ShareToken';
 import DetailTabs from './DetailTabs';
 import PriceChart from './PriceChart';
 import TradePanel from './TradePanel';
@@ -457,6 +459,23 @@ function TokenHeader({
           <SocialLink href={telegram} label="Telegram" isCreator={isCreator} onAdd={onAddSocials}>
             <Send className="h-4 w-4" aria-hidden="true" />
           </SocialLink>
+          {/* Udostepnianie stoi PRZED adresem i eksploratorem: tamte dwa sluza
+              temu, kto juz tu jest, a to jest jedyny przycisk w naglowku, ktory
+              sprowadza kogos nowego. Cena idzie z odczytu spot, a po graduacji
+              (gdy ten odczyt rewertuje) z ostatnich rezerw krzywej - ten sam
+              wzor, ktorym liczy sie mnoznik na karcie. */}
+          <ShareToken
+            variant="button"
+            address={core.token}
+            chainId={LAUNCHPAD_CHAIN.id}
+            symbol={core.symbol}
+            raised={Number(formatEther(core.ethReserve))}
+            target={CURVE_TARGET_ETH}
+            state={core.state}
+            priceEth={priceToNumber(
+              core.spotPriceWei > 0n ? core.spotPriceWei : priceWeiAfter(core.ethReserve, core.tokenReserve)
+            )}
+          />
           <button type="button" onClick={onCopy} className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">
             {copied ? <Check className="h-3.5 w-3.5 text-[#0b9a51]" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
             {copied ? 'Copied' : short(core.token)}
