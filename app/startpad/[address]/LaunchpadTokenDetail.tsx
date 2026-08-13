@@ -296,10 +296,10 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
   if (notFound) return <TokenNotFound address={address} />;
 
   return (
-    <main className="min-h-screen bg-[#fcfcfd] px-4 pb-24 pt-5 font-soft sm:px-6 sm:pt-8">
+    <main className="min-h-screen bg-sp-sunken px-4 pb-24 pt-5 font-soft sm:px-6 sm:pt-8">
       <div className="mx-auto w-full max-w-[1280px]">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/startpad" className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">
+          <Link href="/startpad" className="inline-flex items-center gap-2 rounded-full border border-sp-shade/10 bg-sp-surface px-3.5 py-2 text-[12px] font-extrabold text-sp-ink hover:border-soft-primary">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Startpad market
           </Link>
           <button
@@ -308,21 +308,21 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               void loadCore();
               void reloadHistory();
             }}
-            className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary"
+            className="inline-flex items-center gap-2 rounded-full border border-sp-shade/10 bg-sp-surface px-3.5 py-2 text-[12px] font-extrabold text-sp-ink hover:border-soft-primary"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${coreLoading || history.loading ? 'animate-spin' : ''}`} aria-hidden="true" /> Refresh
           </button>
         </div>
 
         {coreLoading && !core && (
-          <div className="mt-5 flex items-center gap-2 rounded-[20px] border border-black/10 bg-white p-5 text-[12px] text-black/55">
+          <div className="mt-5 flex items-center gap-2 rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12px] text-sp-shade/55">
             <RefreshCw className="h-4 w-4 animate-spin text-soft-primary" aria-hidden="true" /> Reading token state from {LAUNCHPAD_CHAIN.name}...
           </div>
         )}
         {coreError && (
-          <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-[#f3c58a] bg-[#fff8ed] px-4 py-3 text-[12px] text-[#a34b08]">
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-sp-down-line bg-sp-down-soft px-4 py-3 text-[12px] text-sp-down-deep">
             <span className="min-w-0 truncate">Live reads are failing: {coreError}</span>
-            <button type="button" onClick={() => void loadCore()} className="shrink-0 rounded-full border border-[#f3c58a] px-3 py-1.5 text-[11px] font-extrabold hover:bg-white">
+            <button type="button" onClick={() => void loadCore()} className="shrink-0 rounded-full border border-sp-down-line px-3 py-1.5 text-[11px] font-extrabold hover:bg-sp-surface">
               Retry
             </button>
           </div>
@@ -418,16 +418,16 @@ function TokenHeader({
 
   const stateClass =
     core.state === 'Graduated'
-      ? 'bg-[#edfff4] text-[#0b9a51]'
+      ? 'bg-sp-up-soft text-sp-up'
       : core.state === 'Locked'
-        ? 'bg-[#fff8ed] text-[#a34b08]'
-        : 'bg-[#edeaff] text-[#5f4ec2]';
+        ? 'bg-sp-down-soft text-sp-down-deep'
+        : 'bg-sp-brand-soft text-sp-brand-deep';
 
   return (
-    <header className="mt-4 rounded-[20px] border border-black/10 bg-white p-4 sm:p-5">
+    <header className="mt-4 rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-soft-primary font-soft-display text-[22px] font-extrabold text-white">
+          <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-soft-primary font-soft-display text-[22px] font-extrabold text-sp-on-brand">
             {image.url ? (
               // Logo pochodzi od obcego tworcy - metadata.ts przepuszcza
               // wylacznie https, ipfs i rastrowe data:image z uploadu,
@@ -440,13 +440,13 @@ function TokenHeader({
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-soft-display text-[26px] font-extrabold leading-tight text-[#16141b] sm:text-[30px]">{core.symbol}</h1>
+              <h1 className="font-soft-display text-[26px] font-extrabold leading-tight text-sp-ink sm:text-[30px]">{core.symbol}</h1>
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${stateClass}`}>{core.state}</span>
             </div>
-            <p className="mt-0.5 truncate text-[13px] text-black/50">
+            <p className="mt-0.5 truncate text-[13px] text-sp-shade/50">
               {core.name} · launched {timeAgo(core.startedAt)}
             </p>
-            {description && <p className="mt-1.5 max-w-[560px] text-[12px] leading-[1.5] text-black/55">{description.slice(0, 280)}</p>}
+            {description && <p className="mt-1.5 max-w-[560px] text-[12px] leading-[1.5] text-sp-shade/55">{description.slice(0, 280)}</p>}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -476,11 +476,11 @@ function TokenHeader({
               core.spotPriceWei > 0n ? core.spotPriceWei : priceWeiAfter(core.ethReserve, core.tokenReserve)
             )}
           />
-          <button type="button" onClick={onCopy} className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">
-            {copied ? <Check className="h-3.5 w-3.5 text-[#0b9a51]" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+          <button type="button" onClick={onCopy} className="inline-flex items-center gap-1.5 rounded-full border border-sp-shade/10 bg-sp-surface px-3.5 py-2 text-[12px] font-extrabold text-sp-ink hover:border-soft-primary">
+            {copied ? <Check className="h-3.5 w-3.5 text-sp-up" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
             {copied ? 'Copied' : short(core.token)}
           </button>
-          <a href={`${EXPLORER}/address/${core.token}`} target="_blank" rel="noreferrer" className="rounded-full border border-black/10 bg-white p-2.5 text-black/50 hover:text-soft-primary-deep" aria-label="Open token on BaseScan">
+          <a href={`${EXPLORER}/address/${core.token}`} target="_blank" rel="noreferrer" className="rounded-full border border-sp-shade/10 bg-sp-surface p-2.5 text-sp-shade/50 hover:text-soft-primary-deep" aria-label="Open token on BaseScan">
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
           </a>
         </div>
@@ -521,7 +521,7 @@ function SocialLink({
         href={href}
         target="_blank"
         rel="noreferrer"
-        className="rounded-full border border-black/10 bg-white p-2.5 text-black/50 hover:text-soft-primary-deep"
+        className="rounded-full border border-sp-shade/10 bg-sp-surface p-2.5 text-sp-shade/50 hover:text-soft-primary-deep"
         aria-label={`Project ${label}`}
       >
         {children}
@@ -534,7 +534,7 @@ function SocialLink({
       <button
         type="button"
         onClick={onAdd}
-        className="rounded-full border border-dashed border-black/15 bg-white p-2.5 text-black/25 transition-colors hover:border-soft-primary hover:text-soft-primary-deep"
+        className="rounded-full border border-dashed border-sp-shade/15 bg-sp-surface p-2.5 text-sp-shade/25 transition-colors hover:border-soft-primary hover:text-soft-primary-deep"
         aria-label={`Add ${label}`}
         title={`Add ${label}`}
       >
@@ -545,7 +545,7 @@ function SocialLink({
 
   return (
     <span
-      className="rounded-full border border-dashed border-black/10 bg-white p-2.5 text-black/20"
+      className="rounded-full border border-dashed border-sp-shade/10 bg-sp-surface p-2.5 text-sp-shade/20"
       title={`No ${label} set`}
       aria-label={`No ${label} set`}
     >
@@ -629,30 +629,30 @@ function StatsCard({
   ];
 
   return (
-    <section className="rounded-[20px] border border-black/10 bg-white p-4 sm:p-5">
-      <h2 className="text-[13px] font-extrabold text-[#16141b]">Stats</h2>
+    <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+      <h2 className="text-[13px] font-extrabold text-sp-ink">Stats</h2>
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
         {rows.map((row) => (
           <div key={row.label} className="min-w-0">
-            <dt className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/40">{row.label}</dt>
-            <dd className="mt-0.5 truncate text-[14px] font-extrabold text-[#16141b]">
+            <dt className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">{row.label}</dt>
+            <dd className="mt-0.5 truncate text-[14px] font-extrabold text-sp-ink">
               {row.value}
-              {row.usd && <span className="ml-1 text-[11px] font-bold text-black/40">· {row.usd}</span>}
+              {row.usd && <span className="ml-1 text-[11px] font-bold text-sp-shade/40">· {row.usd}</span>}
             </dd>
           </div>
         ))}
       </dl>
-      <div className="mt-4 space-y-2 border-t border-black/10 pt-3 text-[11.5px]">
+      <div className="mt-4 space-y-2 border-t border-sp-shade/10 pt-3 text-[11.5px]">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-black/45">Creator</span>
+          <span className="text-sp-shade/45">Creator</span>
           <a href={`${EXPLORER}/address/${core.creator}`} target="_blank" rel="noreferrer" className="font-extrabold text-soft-primary-deep hover:text-soft-primary">
             {short(core.creator)}
           </a>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-black/45">Token</span>
-          <button type="button" onClick={onCopy} className="inline-flex items-center gap-1.5 font-extrabold text-[#16141b] hover:text-soft-primary-deep">
-            {copied ? <Check className="h-3 w-3 text-[#0b9a51]" aria-hidden="true" /> : <Copy className="h-3 w-3" aria-hidden="true" />}
+          <span className="text-sp-shade/45">Token</span>
+          <button type="button" onClick={onCopy} className="inline-flex items-center gap-1.5 font-extrabold text-sp-ink hover:text-soft-primary-deep">
+            {copied ? <Check className="h-3 w-3 text-sp-up" aria-hidden="true" /> : <Copy className="h-3 w-3" aria-hidden="true" />}
             {short(core.token)}
           </button>
         </div>
@@ -663,18 +663,18 @@ function StatsCard({
 
 function TokenNotFound({ address }: { address: string }) {
   return (
-    <main className="min-h-screen bg-[#fcfcfd] px-4 pb-24 pt-10 font-soft sm:px-6">
-      <div className="mx-auto w-full max-w-[560px] rounded-[20px] border border-black/10 bg-white p-8 text-center">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f4f1ff]">
+    <main className="min-h-screen bg-sp-sunken px-4 pb-24 pt-10 font-soft sm:px-6">
+      <div className="mx-auto w-full max-w-[560px] rounded-[20px] border border-sp-shade/10 bg-sp-surface p-8 text-center">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-sp-brand-soft">
           <SearchX className="h-6 w-6 text-soft-primary" aria-hidden="true" />
         </span>
-        <h1 className="mt-4 font-soft-display text-[24px] font-extrabold text-[#16141b]">Token not found</h1>
-        <p className="mt-2 text-[13px] leading-[1.6] text-black/55">
+        <h1 className="mt-4 font-soft-display text-[24px] font-extrabold text-sp-ink">Token not found</h1>
+        <p className="mt-2 text-[13px] leading-[1.6] text-sp-shade/55">
           {isAddressParam(address)
             ? `This address is not a token launched on the MySphere launchpad on ${LAUNCHPAD_CHAIN.name}.`
             : 'This link does not contain a valid token address.'}
         </p>
-        <Link href="/startpad" className="mt-5 inline-flex items-center gap-2 rounded-full bg-soft-primary px-5 py-2.5 text-[13px] font-extrabold text-white">
+        <Link href="/startpad" className="mt-5 inline-flex items-center gap-2 rounded-full bg-soft-primary px-5 py-2.5 text-[13px] font-extrabold text-sp-on-brand">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to the Startpad market
         </Link>
       </div>

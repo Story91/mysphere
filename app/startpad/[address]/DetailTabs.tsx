@@ -42,7 +42,7 @@ import {
 } from './detailShared';
 
 const FIELD =
-  'w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 text-[14px] text-[#16141b] outline-none placeholder:text-black/35 focus:border-soft-primary';
+  'w-full rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-3 text-[14px] text-sp-ink outline-none placeholder:text-sp-shade/35 focus:border-soft-primary';
 
 const EXPLORER = LAUNCHPAD_EXPLORER_URL;
 
@@ -62,12 +62,12 @@ function badgeFor(address: string, creator: string): HolderRow['badge'] {
 }
 
 const BADGE_CLASS: Record<NonNullable<HolderRow['badge']>, string> = {
-  dev: 'bg-[#edeaff] text-[#5f4ec2]',
-  'bonding curve': 'bg-[#e8f4ff] text-[#1f6fb2]',
-  burned: 'bg-[#ffefef] text-[#a32020]',
-  vault: 'bg-[#edfff4] text-[#0b7a41]',
-  hook: 'bg-[#fff3e8] text-[#a35408]',
-  pool: 'bg-[#edfff4] text-[#0b7a41]',
+  dev: 'bg-sp-brand-soft text-sp-brand-deep',
+  'bonding curve': 'bg-sp-info-soft text-sp-info',
+  burned: 'bg-sp-danger-soft text-sp-danger',
+  vault: 'bg-sp-up-soft text-sp-up',
+  hook: 'bg-sp-down-soft text-sp-down-deep',
+  pool: 'bg-sp-up-soft text-sp-up',
 };
 
 export default function DetailTabs({
@@ -161,14 +161,14 @@ export default function DetailTabs({
   const tradePage = pageSlice(newestFirst, page, PAGE_SIZE);
 
   const loadingRow = historyLoading && trades.length === 0 && (
-    <div className="flex items-center justify-center gap-2 px-5 py-10 text-[12px] text-black/45">
+    <div className="flex items-center justify-center gap-2 px-5 py-10 text-[12px] text-sp-shade/45">
       <RefreshCw className="h-4 w-4 animate-spin text-soft-primary" aria-hidden="true" /> Reading onchain history...
     </div>
   );
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-black/10 bg-white">
-      <div className="flex items-center justify-between gap-3 border-b border-black/10 px-4 py-3 sm:px-5" role="tablist" aria-label="Token history tabs">
+    <section className="overflow-hidden rounded-[20px] border border-sp-shade/10 bg-sp-surface">
+      <div className="flex items-center justify-between gap-3 border-b border-sp-shade/10 px-4 py-3 sm:px-5" role="tablist" aria-label="Token history tabs">
         <div className="flex items-center gap-1">
           {(
             [
@@ -183,7 +183,7 @@ export default function DetailTabs({
               role="tab"
               aria-selected={tab === value}
               onClick={() => setTab(value)}
-              className={`rounded-full px-3.5 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'bg-soft-primary text-white' : 'text-black/50 hover:text-soft-primary-deep'}`}
+              className={`rounded-full px-3.5 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'bg-soft-primary text-sp-on-brand' : 'text-sp-shade/50 hover:text-soft-primary-deep'}`}
             >
               {label}
             </button>
@@ -193,15 +193,15 @@ export default function DetailTabs({
       </div>
 
       {historyError && (
-        <div className="flex items-center justify-between gap-3 border-b border-black/10 bg-[#fff8ed] px-4 py-2.5 text-[11.5px] text-[#a34b08] sm:px-5">
+        <div className="flex items-center justify-between gap-3 border-b border-sp-shade/10 bg-sp-down-soft px-4 py-2.5 text-[11.5px] text-sp-down-deep sm:px-5">
           <span className="min-w-0 truncate">History scan failed: {historyError}</span>
-          <button type="button" onClick={onRetryHistory} className="shrink-0 rounded-full border border-[#f3c58a] px-3 py-1 text-[11px] font-extrabold hover:bg-white">
+          <button type="button" onClick={onRetryHistory} className="shrink-0 rounded-full border border-sp-down-line px-3 py-1 text-[11px] font-extrabold hover:bg-sp-surface">
             Retry
           </button>
         </div>
       )}
       {truncated && !historyError && (
-        <div className="border-b border-black/10 bg-[#fbfbfd] px-4 py-2 text-[10.5px] text-black/40 sm:px-5">
+        <div className="border-b border-sp-shade/10 bg-sp-bg px-4 py-2 text-[10.5px] text-sp-shade/40 sm:px-5">
           The public RPC limits how far back one page can scan, so the oldest part of this history is not shown.
         </div>
       )}
@@ -210,12 +210,12 @@ export default function DetailTabs({
         <>
           {loadingRow}
           {!historyLoading && newestFirst.length === 0 && !historyError && (
-            <div className="px-5 py-10 text-center text-[12px] text-black/45">No trades yet. The first buy will show up here within seconds.</div>
+            <div className="px-5 py-10 text-center text-[12px] text-sp-shade/45">No trades yet. The first buy will show up here within seconds.</div>
           )}
           {newestFirst.length > 0 && (
             <div className="overflow-x-auto">
               <div className="min-w-[680px]">
-                <div className="grid grid-cols-[90px_70px_1fr_110px_110px_110px_44px] gap-2 border-b border-black/10 bg-[#fafafd] px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/40 sm:px-5">
+                <div className="grid grid-cols-[90px_70px_1fr_110px_110px_110px_44px] gap-2 border-b border-sp-shade/10 bg-sp-sunken px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40 sm:px-5">
                   <span>Time</span>
                   <span>Side</span>
                   <span>Account</span>
@@ -227,22 +227,22 @@ export default function DetailTabs({
                   <span className="text-right">Price</span>
                   <span />
                 </div>
-                <div className="divide-y divide-black/5">
+                <div className="divide-y divide-sp-shade/5">
                   {tradePage.rows.map((trade) => (
                     <div key={trade.id} className="grid grid-cols-[90px_70px_1fr_110px_110px_110px_44px] items-center gap-2 px-4 py-2.5 text-[12px] sm:px-5">
-                      <span className="text-[11px] text-black/45">{timeAgo(trade.ts)}</span>
-                      <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${trade.kind === 'buy' ? 'bg-[#edfff4] text-[#0b9a51]' : 'bg-[#fff8ed] text-[#a34b08]'}`}>
+                      <span className="text-[11px] text-sp-shade/45">{timeAgo(trade.ts)}</span>
+                      <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${trade.kind === 'buy' ? 'bg-sp-up-soft text-sp-up' : 'bg-sp-down-soft text-sp-down-deep'}`}>
                         {trade.kind === 'buy' ? <ArrowUpRight className="h-3 w-3" aria-hidden="true" /> : <ArrowDownRight className="h-3 w-3" aria-hidden="true" />}
                         {trade.kind}
                       </span>
-                      <a href={`${EXPLORER}/address/${trade.account}`} target="_blank" rel="noreferrer" className="truncate font-bold text-[#16141b] hover:text-soft-primary-deep">
+                      <a href={`${EXPLORER}/address/${trade.account}`} target="_blank" rel="noreferrer" className="truncate font-bold text-sp-ink hover:text-soft-primary-deep">
                         {short(trade.account)}
                       </a>
-                      <span className="text-right font-extrabold text-[#16141b]">{fmtEth(trade.eth, 4)}</span>
-                      <span className="text-right text-black/60">{fmtTokens(trade.tokens, core.decimals)}</span>
-                      <span className="text-right text-[11px] text-black/50">{fmtPrice(priceToNumber(trade.priceWei))}</span>
+                      <span className="text-right font-extrabold text-sp-ink">{fmtEth(trade.eth, 4)}</span>
+                      <span className="text-right text-sp-shade/60">{fmtTokens(trade.tokens, core.decimals)}</span>
+                      <span className="text-right text-[11px] text-sp-shade/50">{fmtPrice(priceToNumber(trade.priceWei))}</span>
                       {trade.txHash ? (
-                        <a href={`${EXPLORER}/tx/${trade.txHash}`} target="_blank" rel="noreferrer" className="justify-self-end rounded-full p-1.5 text-black/35 hover:bg-[#f4f1ff] hover:text-soft-primary-deep" aria-label="Open transaction on BaseScan">
+                        <a href={`${EXPLORER}/tx/${trade.txHash}`} target="_blank" rel="noreferrer" className="justify-self-end rounded-full p-1.5 text-sp-shade/35 hover:bg-sp-brand-soft hover:text-soft-primary-deep" aria-label="Open transaction on BaseScan">
                           <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                         </a>
                       ) : (
@@ -257,8 +257,8 @@ export default function DetailTabs({
           {/* Strony, nie rosnaca kolumna: 141 transakcji "Show more" rozciagalo
               strone na kilka ekranow i psulo przewijanie wszystkiego ponizej. */}
           {tradePage.pages > 1 && (
-            <div className="flex items-center justify-between gap-3 border-t border-black/10 px-4 py-2.5 sm:px-5">
-              <span className="text-[11px] font-bold text-black/40">
+            <div className="flex items-center justify-between gap-3 border-t border-sp-shade/10 px-4 py-2.5 sm:px-5">
+              <span className="text-[11px] font-bold text-sp-shade/40">
                 {tradePage.page * PAGE_SIZE + 1}-{tradePage.page * PAGE_SIZE + tradePage.rows.length} of {newestFirst.length}
               </span>
               <div className="flex items-center gap-1.5">
@@ -266,19 +266,19 @@ export default function DetailTabs({
                   type="button"
                   onClick={() => setPage(tradePage.page - 1)}
                   disabled={tradePage.page === 0}
-                  className="rounded-full border border-black/10 p-1.5 text-black/50 transition-colors hover:border-soft-primary hover:text-soft-primary-deep disabled:opacity-30 disabled:hover:border-black/10 disabled:hover:text-black/50"
+                  className="rounded-full border border-sp-shade/10 p-1.5 text-sp-shade/50 transition-colors hover:border-soft-primary hover:text-soft-primary-deep disabled:opacity-30 disabled:hover:border-sp-shade/10 disabled:hover:text-sp-shade/50"
                   aria-label="Previous page"
                 >
                   <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                 </button>
-                <span className="min-w-[62px] text-center text-[11.5px] font-extrabold text-[#16141b]">
+                <span className="min-w-[62px] text-center text-[11.5px] font-extrabold text-sp-ink">
                   {tradePage.page + 1} / {tradePage.pages}
                 </span>
                 <button
                   type="button"
                   onClick={() => setPage(tradePage.page + 1)}
                   disabled={tradePage.page >= tradePage.pages - 1}
-                  className="rounded-full border border-black/10 p-1.5 text-black/50 transition-colors hover:border-soft-primary hover:text-soft-primary-deep disabled:opacity-30 disabled:hover:border-black/10 disabled:hover:text-black/50"
+                  className="rounded-full border border-sp-shade/10 p-1.5 text-sp-shade/50 transition-colors hover:border-soft-primary hover:text-soft-primary-deep disabled:opacity-30 disabled:hover:border-sp-shade/10 disabled:hover:text-sp-shade/50"
                   aria-label="Next page"
                 >
                   <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -293,16 +293,16 @@ export default function DetailTabs({
         <>
           {loadingRow}
           {!historyLoading && holders.length === 0 && !historyError && (
-            <div className="px-5 py-10 text-center text-[12px] text-black/45">No holder balances reconstructed yet.</div>
+            <div className="px-5 py-10 text-center text-[12px] text-sp-shade/45">No holder balances reconstructed yet.</div>
           )}
           {holders.length > 0 && (
-            <div className="divide-y divide-black/5">
+            <div className="divide-y divide-sp-shade/5">
               {holders.map((holder, index) => (
                 <div key={holder.address} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
-                  <span className="w-5 shrink-0 text-[11px] font-bold text-black/35">{index + 1}</span>
+                  <span className="w-5 shrink-0 text-[11px] font-bold text-sp-shade/35">{index + 1}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <a href={`${EXPLORER}/address/${holder.address}`} target="_blank" rel="noreferrer" className="text-[12.5px] font-extrabold text-[#16141b] hover:text-soft-primary-deep">
+                      <a href={`${EXPLORER}/address/${holder.address}`} target="_blank" rel="noreferrer" className="text-[12.5px] font-extrabold text-sp-ink hover:text-soft-primary-deep">
                         {short(holder.address)}
                       </a>
                       {holder.badge && (
@@ -310,13 +310,13 @@ export default function DetailTabs({
                       )}
                     </div>
                     {/* Pasek udzialu: procent calej podazy 1e9, nie procent "free float". */}
-                    <div className="mt-1.5 h-1 w-full max-w-[240px] overflow-hidden rounded-full bg-black/6">
+                    <div className="mt-1.5 h-1 w-full max-w-[240px] overflow-hidden rounded-full bg-sp-shade/6">
                       <div className="h-full rounded-full bg-soft-primary/70" style={{ width: `${Math.min(100, holder.pctBps / 100)}%` }} />
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
-                    <span className="block text-[12.5px] font-extrabold text-[#16141b]">{(holder.pctBps / 100).toFixed(2)}%</span>
-                    <span className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] text-black/45">
+                    <span className="block text-[12.5px] font-extrabold text-sp-ink">{(holder.pctBps / 100).toFixed(2)}%</span>
+                    <span className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] text-sp-shade/45">
                       <SymbolGlyph url={logoUrl} symbol={core.symbol} />
                       {fmtTokens(holder.balance, core.decimals)} {core.symbol}
                     </span>
@@ -325,7 +325,7 @@ export default function DetailTabs({
               ))}
             </div>
           )}
-          <div className="border-t border-black/10 px-4 py-2.5 text-[10.5px] text-black/40 sm:px-5">
+          <div className="border-t border-sp-shade/10 px-4 py-2.5 text-[10.5px] text-sp-shade/40 sm:px-5">
             <Users className="mr-1 inline h-3 w-3" aria-hidden="true" />
             Top 20 by balance, rebuilt from ERC-20 Transfer events. Percentages are of the full 1B supply.
           </div>
@@ -336,41 +336,41 @@ export default function DetailTabs({
         <div className="space-y-5 p-4 sm:p-5">
           {core.config.known ? (
             <div>
-              <h3 className="text-[13px] font-extrabold text-[#16141b]">Creator setup</h3>
+              <h3 className="text-[13px] font-extrabold text-sp-ink">Creator setup</h3>
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl bg-[#f8f7fc] p-3">
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/40">Trading fee</p>
-                  <p className="mt-1 text-[16px] font-extrabold text-[#16141b]">{(core.config.feeBps / 100).toFixed(2)}%</p>
-                  <p className="mt-0.5 text-[10.5px] text-black/45">
+                <div className="rounded-xl bg-sp-sunken p-3">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Trading fee</p>
+                  <p className="mt-1 text-[16px] font-extrabold text-sp-ink">{(core.config.feeBps / 100).toFixed(2)}%</p>
+                  <p className="mt-0.5 text-[10.5px] text-sp-shade/45">
                     {(core.config.creatorFeeBps / 100).toFixed(2)}% to {core.config.receiverCount} receiver{core.config.receiverCount === 1 ? '' : 's'}
                   </p>
                 </div>
-                <div className="rounded-xl bg-[#f8f7fc] p-3">
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/40">Auto-buyback</p>
-                  <p className="mt-1 text-[16px] font-extrabold text-[#16141b]">{(core.config.buybackBps / 100).toFixed(0)}%</p>
+                <div className="rounded-xl bg-sp-sunken p-3">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Auto-buyback</p>
+                  <p className="mt-1 text-[16px] font-extrabold text-sp-ink">{(core.config.buybackBps / 100).toFixed(0)}%</p>
                   {/* Buyback jest ciety z DZIALKI TWORCY, nie z calej oplaty
                       hooka - protokol dostaje swoja czesc w calosci. */}
-                  <p className="mt-0.5 text-[10.5px] text-black/45">of the creator&apos;s fee share</p>
+                  <p className="mt-0.5 text-[10.5px] text-sp-shade/45">of the creator&apos;s fee share</p>
                 </div>
-                <div className="rounded-xl bg-[#f8f7fc] p-3">
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/40">Buyback waiting</p>
-                  <p className="mt-1 text-[16px] font-extrabold text-[#16141b]">
+                <div className="rounded-xl bg-sp-sunken p-3">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Buyback waiting</p>
+                  <p className="mt-1 text-[16px] font-extrabold text-sp-ink">
                     {fmtEth(core.config.pendingBuybackEth)} ETH
                     {core.config.pendingBuybackEth > 0n && usdSuffix(core.config.pendingBuybackEth, ethUsd) && (
-                      <span className="ml-1 text-[11px] font-bold text-black/40">· {usdSuffix(core.config.pendingBuybackEth, ethUsd)}</span>
+                      <span className="ml-1 text-[11px] font-bold text-sp-shade/40">· {usdSuffix(core.config.pendingBuybackEth, ethUsd)}</span>
                     )}
                   </p>
-                  <p className="mt-0.5 text-[10.5px] text-black/45">set aside from the creator&apos;s ETH share at settle; anyone can execute</p>
+                  <p className="mt-0.5 text-[10.5px] text-sp-shade/45">set aside from the creator&apos;s ETH share at settle; anyone can execute</p>
                 </div>
-                <div className="rounded-xl bg-[#f8f7fc] p-3">
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/40">Burned so far</p>
-                  <p className="mt-1 text-[16px] font-extrabold text-[#16141b]">{fmtTokens(core.config.buybackBurned, core.decimals)}</p>
-                  <p className="mt-0.5 text-[10.5px] text-black/45">{core.symbol} sent to the burn address</p>
+                <div className="rounded-xl bg-sp-sunken p-3">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Burned so far</p>
+                  <p className="mt-1 text-[16px] font-extrabold text-sp-ink">{fmtTokens(core.config.buybackBurned, core.decimals)}</p>
+                  <p className="mt-0.5 text-[10.5px] text-sp-shade/45">{core.symbol} sent to the burn address</p>
                 </div>
               </div>
             </div>
           ) : (
-            <p className="rounded-xl bg-[#fbfbfd] p-3 text-[11.5px] leading-[1.5] text-black/50">
+            <p className="rounded-xl bg-sp-bg p-3 text-[11.5px] leading-[1.5] text-sp-shade/50">
               This token was launched on a contract version that predates per-token fee configuration, so there is no creator setup to show.
             </p>
           )}
@@ -380,21 +380,21 @@ export default function DetailTabs({
             if (!meta.image && !meta.description && !meta.link) return null;
             return (
               <div>
-                <h3 className="text-[13px] font-extrabold text-[#16141b]">Onchain metadata</h3>
-                <div className="mt-3 flex items-start gap-3 rounded-xl bg-[#f8f7fc] p-3">
+                <h3 className="text-[13px] font-extrabold text-sp-ink">Onchain metadata</h3>
+                <div className="mt-3 flex items-start gap-3 rounded-xl bg-sp-sunken p-3">
                   {/* `next/image` wymagaloby listy `remotePatterns`, a logo pochodzi
                       z dowolnego hosta albo bramy IPFS - adres przeszedl juz przez
                       parseMetadataUri, ktore odsiewa wszystko poza https i ipfs. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {meta.image && <img src={meta.image} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" referrerPolicy="no-referrer" />}
                   <div className="min-w-0">
-                    {meta.description && <p className="text-[12px] leading-[1.5] text-black/60">{meta.description}</p>}
+                    {meta.description && <p className="text-[12px] leading-[1.5] text-sp-shade/60">{meta.description}</p>}
                     {meta.link && (
                       <a href={meta.link} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1.5 text-[11.5px] font-extrabold text-soft-primary-deep hover:text-soft-primary">
                         <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Metadata URI
                       </a>
                     )}
-                    <p className="mt-1 text-[10px] text-black/35">Set once at launch, immutable. The editable profile below can override the logo and description in our interface.</p>
+                    <p className="mt-1 text-[10px] text-sp-shade/35">Set once at launch, immutable. The editable profile below can override the logo and description in our interface.</p>
                   </div>
                 </div>
               </div>
@@ -402,7 +402,7 @@ export default function DetailTabs({
           })()}
 
           <div>
-            <h3 className="text-[13px] font-extrabold text-[#16141b]">Contracts</h3>
+            <h3 className="text-[13px] font-extrabold text-sp-ink">Contracts</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {(
                 [
@@ -412,9 +412,9 @@ export default function DetailTabs({
                   ['Liquidity vault', LIQUIDITY_VAULT_ADDRESS],
                 ] as const
               ).map(([label, address]) => (
-                <a key={label} href={`${EXPLORER}/address/${address}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl border border-black/10 px-3 py-2.5 text-[11.5px] hover:border-soft-primary">
-                  <span className="font-extrabold text-[#16141b]">{label}</span>
-                  <span className="flex items-center gap-1.5 text-black/50">
+                <a key={label} href={`${EXPLORER}/address/${address}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl border border-sp-shade/10 px-3 py-2.5 text-[11.5px] hover:border-soft-primary">
+                  <span className="font-extrabold text-sp-ink">{label}</span>
+                  <span className="flex items-center gap-1.5 text-sp-shade/50">
                     {short(address)}
                     <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </span>
@@ -422,7 +422,7 @@ export default function DetailTabs({
               ))}
             </div>
             {core.state === 'Graduated' && (
-              <p className="mt-2 text-[10.5px] text-black/40">
+              <p className="mt-2 text-[10.5px] text-sp-shade/40">
                 Pool {core.poolId === `0x${'0'.repeat(64)}` ? 'not seeded yet' : short(core.poolId)} · position liquidity {core.liquidity.toString()} · full-range, owned by the vault.
               </p>
             )}
@@ -446,7 +446,7 @@ export default function DetailTabs({
  */
 function SymbolGlyph({ url, symbol }: { url: string | null; symbol: string }) {
   return (
-    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-soft-primary text-[8px] font-extrabold leading-none text-white">
+    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-soft-primary text-[8px] font-extrabold leading-none text-sp-on-brand">
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" loading="lazy" />
@@ -562,21 +562,21 @@ function ProfileEditor({
   };
 
   return (
-    <div className="border-t border-black/10 pt-5">
-      <h3 className="text-[13px] font-extrabold text-[#16141b]">Token profile (creator only)</h3>
-      <p className="mt-1 text-[11.5px] leading-[1.5] text-black/50">
+    <div className="border-t border-sp-shade/10 pt-5">
+      <h3 className="text-[13px] font-extrabold text-sp-ink">Token profile (creator only)</h3>
+      <p className="mt-1 text-[11.5px] leading-[1.5] text-sp-shade/50">
         Only you can edit this. The server checks the creator on chain before saving. The logo also feeds{' '}
         <a href="/api/launchpad/tokenlist" className="font-bold text-soft-primary-deep hover:text-soft-primary">our token list</a>, which wallets and aggregators can import.
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Logo</span>
+          <span className="mb-1.5 block text-[12px] font-extrabold text-sp-ink">Logo</span>
           <div className="flex items-center gap-2">
             {logoDraft.startsWith('data:') ? (
               // Data URL w polu tekstowym to sciana base64 - zamiast niej
               // czytelna plakietka z mozliwoscia cofniecia do pola URL.
               <div className={`${FIELD} flex items-center justify-between gap-2`}>
-                <span className="truncate text-black/55">Uploaded image (stored with the profile)</span>
+                <span className="truncate text-sp-shade/55">Uploaded image (stored with the profile)</span>
                 <button type="button" onClick={() => setLogoDraft('')} className="shrink-0 text-[11px] font-extrabold text-soft-primary-deep hover:text-soft-primary">
                   Clear
                 </button>
@@ -601,43 +601,43 @@ function ProfileEditor({
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={resizing}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-3 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary disabled:opacity-60"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-sp-shade/10 bg-sp-surface px-3 py-3 text-[12px] font-extrabold text-sp-ink hover:border-soft-primary disabled:opacity-60"
             >
               {resizing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />}
               Upload
             </button>
           </div>
-          <span className="mt-1 block text-[10.5px] text-black/45">
+          <span className="mt-1 block text-[10.5px] text-sp-shade/45">
             ipfs:// is safer: its address is the file&apos;s hash, so nobody can swap the image later. Uploaded files are resized in your browser and shown only on this site.
           </span>
         </div>
         <div className="space-y-3">
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Website</span>
+            <span className="mb-1.5 block text-[12px] font-extrabold text-sp-ink">Website</span>
             <input value={websiteDraft} onChange={(event) => setWebsiteDraft(event.target.value)} className={FIELD} placeholder="https://..." />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">X</span>
+              <span className="mb-1.5 block text-[12px] font-extrabold text-sp-ink">X</span>
               {/* Sam uchwyt wystarczy - serwer sklada z niego adres x.com. */}
               <input value={twitterDraft} onChange={(event) => setTwitterDraft(event.target.value)} className={FIELD} placeholder="@handle" />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Telegram</span>
+              <span className="mb-1.5 block text-[12px] font-extrabold text-sp-ink">Telegram</span>
               <input value={telegramDraft} onChange={(event) => setTelegramDraft(event.target.value)} className={FIELD} placeholder="@channel" />
             </label>
           </div>
         </div>
       </div>
       <label className="mt-3 block">
-        <span className="mb-1.5 block text-[12px] font-extrabold text-[#16141b]">Description</span>
+        <span className="mb-1.5 block text-[12px] font-extrabold text-sp-ink">Description</span>
         <textarea rows={2} value={descriptionDraft} onChange={(event) => setDescriptionDraft(event.target.value)} className={FIELD} maxLength={280} />
       </label>
       {notice && (
-        <p className={`mt-3 rounded-xl px-3 py-2 text-[11.5px] font-bold ${notice.kind === 'success' ? 'bg-[#edfff4] text-[#0b7a41]' : 'bg-[#ffefef] text-[#a32020]'}`}>{notice.text}</p>
+        <p className={`mt-3 rounded-xl px-3 py-2 text-[11.5px] font-bold ${notice.kind === 'success' ? 'bg-sp-up-soft text-sp-up' : 'bg-sp-danger-soft text-sp-danger'}`}>{notice.text}</p>
       )}
       <div className="mt-3 flex items-center gap-3">
-        <button type="button" onClick={() => void save()} disabled={busy} className="rounded-full bg-soft-primary px-4 py-2.5 text-[12.5px] font-extrabold text-white disabled:opacity-60">
+        <button type="button" onClick={() => void save()} disabled={busy} className="rounded-full bg-soft-primary px-4 py-2.5 text-[12.5px] font-extrabold text-sp-on-brand disabled:opacity-60">
           {busy ? 'Saving...' : 'Save profile'}
         </button>
         {/* eslint-disable-next-line @next/next/no-img-element */}

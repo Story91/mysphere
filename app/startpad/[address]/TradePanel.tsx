@@ -42,7 +42,7 @@ import {
  */
 
 const FIELD =
-  'w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 text-[14px] text-[#16141b] outline-none transition-colors placeholder:text-black/35 focus:border-[#7c6bda]';
+  'w-full rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-3 text-[14px] text-sp-ink outline-none transition-colors placeholder:text-sp-shade/35 focus:border-sp-brand';
 
 type Side = 'buy' | 'sell';
 type Busy = 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest' | 'claim' | null;
@@ -471,23 +471,23 @@ export default function TradePanel({
   const hasClaims = claimRows.some((row) => row.amount > 0n);
 
   return (
-    <section className="rounded-[20px] border border-black/10 bg-white p-4 sm:p-5">
+    <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
       {/* Pasek postepu krzywej - zawsze na wierzchu panelu, bo odpowiada na
           pierwsze pytanie kazdego kupujacego: jak daleko do graduacji. */}
       <div>
         <div className="flex items-baseline justify-between">
-          <span className="text-[12px] font-extrabold text-[#16141b]">Bonding curve</span>
-          <span className={`text-[11px] font-extrabold ${core.state === 'Graduated' ? 'text-[#0b9a51]' : core.state === 'Locked' ? 'text-[#a34b08]' : 'text-[#12a451]'}`}>
+          <span className="text-[12px] font-extrabold text-sp-ink">Bonding curve</span>
+          <span className={`text-[11px] font-extrabold ${core.state === 'Graduated' ? 'text-sp-up' : core.state === 'Locked' ? 'text-sp-down-deep' : 'text-sp-up'}`}>
             {core.state === 'Graduated' ? 'Graduated' : core.state === 'Locked' ? 'Curve full' : `${progressPct.toFixed(1)}%`}
           </span>
         </div>
-        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-black/8">
+        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-sp-shade/8">
           <div
-            className={`h-full rounded-full transition-[width] duration-500 ${core.state === 'Graduated' ? 'bg-[#12a451]' : core.state === 'Locked' ? 'bg-[#d78a55]' : 'bg-soft-primary'}`}
+            className={`h-full rounded-full transition-[width] duration-500 ${core.state === 'Graduated' ? 'bg-sp-up' : core.state === 'Locked' ? 'bg-[#d78a55]' : 'bg-soft-primary'}`}
             style={{ width: `${Math.min(100, progressPct)}%` }}
           />
         </div>
-        <p className="mt-1.5 text-[11px] text-black/45">
+        <p className="mt-1.5 text-[11px] text-sp-shade/45">
           {core.state === 'Curve'
             ? `${fmtEth(core.ethReserve)} of ${Number(formatEther(TARGET_WEI)).toFixed(2)} ETH · ${fmtEth(remaining)} ETH to graduation`
             : core.state === 'Locked'
@@ -498,20 +498,20 @@ export default function TradePanel({
 
       {canSell && (
         <>
-          <div className="mt-4 flex items-center gap-1 rounded-xl bg-[#f4f1ff] p-1">
+          <div className="mt-4 flex items-center gap-1 rounded-xl bg-sp-brand-soft p-1">
             {(onCurve ? (['buy', 'sell'] as const) : (['sell'] as const)).map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setSide(item)}
-                className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${side === item ? 'bg-white text-soft-primary-deep shadow-sm' : 'text-black/45'}`}
+                className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${side === item ? 'bg-sp-surface text-soft-primary-deep shadow-sm' : 'text-sp-shade/45'}`}
               >
                 {item === 'buy' ? 'Buy' : 'Sell'}
               </button>
             ))}
           </div>
           {!onCurve && (
-            <p className="mt-2 text-[11px] leading-[1.4] text-black/50">
+            <p className="mt-2 text-[11px] leading-[1.4] text-sp-shade/50">
               Buying is closed, the curve is full. Selling stays open until the pool is opened.
             </p>
           )}
@@ -519,39 +519,39 @@ export default function TradePanel({
           {side === 'buy' && onCurve ? (
             <>
               <div className="mt-4 flex items-end justify-between">
-                <span className="text-[12px] font-extrabold text-[#16141b]">ETH amount</span>
-                {ethBalance !== null && <span className="text-[11px] text-black/45">Balance {fmtEth(ethBalance, 4)} ETH</span>}
+                <span className="text-[12px] font-extrabold text-sp-ink">ETH amount</span>
+                {ethBalance !== null && <span className="text-[11px] text-sp-shade/45">Balance {fmtEth(ethBalance, 4)} ETH</span>}
               </div>
               <div className="relative mt-2">
                 <input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} aria-label="ETH amount to spend" />
-                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-black/40">ETH</span>
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">ETH</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {([25n, 50n, 100n] as const).map((pct) => (
-                  <button key={String(pct)} type="button" onClick={() => setBuyPct(pct)} disabled={ethBalance === null} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">
+                  <button key={String(pct)} type="button" onClick={() => setBuyPct(pct)} disabled={ethBalance === null} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">
                     {String(pct)}%
                   </button>
                 ))}
-                <button type="button" onClick={setMaxBuy} disabled={ethBalance === null} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">
+                <button type="button" onClick={setMaxBuy} disabled={ethBalance === null} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">
                   Max
                 </button>
               </div>
-              <div className="mt-3 space-y-1 rounded-xl bg-[#f8f7fc] p-3 text-[11px]">
+              <div className="mt-3 space-y-1 rounded-xl bg-sp-sunken p-3 text-[11px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-black/50">You receive</span>
-                  <span className="font-extrabold text-[#16141b]">
+                  <span className="text-sp-shade/50">You receive</span>
+                  <span className="font-extrabold text-sp-ink">
                     {buyQuote ? `~${fmtTokens(buyQuote.tokensOut, decimals)} ${core.symbol}` : '--'}
-                    {buyUsd && <span className="ml-1 text-[10px] font-bold text-black/40">· {buyUsd}</span>}
+                    {buyUsd && <span className="ml-1 text-[10px] font-bold text-sp-shade/40">· {buyUsd}</span>}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-black/50">Fee</span>
-                  <span className="font-bold text-black/60">{buyQuote ? `${fmtEth(buyQuote.fee)} ETH` : '--'}</span>
+                  <span className="text-sp-shade/50">Fee</span>
+                  <span className="font-bold text-sp-shade/60">{buyQuote ? `${fmtEth(buyQuote.fee)} ETH` : '--'}</span>
                 </div>
                 {buyQuote && buyQuote.refund > 0n && (
                   <div className="flex items-center justify-between">
-                    <span className="text-black/50">Refund (curve fills at 3 ETH)</span>
-                    <span className="font-bold text-[#0b9a51]">{fmtEth(buyQuote.refund)} ETH</span>
+                    <span className="text-sp-shade/50">Refund (curve fills at 3 ETH)</span>
+                    <span className="font-bold text-sp-up">{fmtEth(buyQuote.refund)} ETH</span>
                   </div>
                 )}
               </div>
@@ -559,7 +559,7 @@ export default function TradePanel({
                 type="button"
                 disabled={busy === 'buy' || !isConnected}
                 onClick={buy}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-soft-primary px-4 py-3 text-[13px] font-extrabold text-white disabled:opacity-60"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-soft-primary px-4 py-3 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60"
               >
                 {busy === 'buy' ? 'Buying...' : isConnected ? `Buy ${core.symbol}` : 'Connect a wallet to trade'}
                 <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
@@ -568,41 +568,41 @@ export default function TradePanel({
           ) : (
             <>
               <div className="mt-4 flex items-end justify-between">
-                <span className="text-[12px] font-extrabold text-[#16141b]">Token amount</span>
-                <span className="text-[11px] text-black/45">Balance {fmtTokens(core.balance, decimals)}</span>
+                <span className="text-[12px] font-extrabold text-sp-ink">Token amount</span>
+                <span className="text-[11px] text-sp-shade/45">Balance {fmtTokens(core.balance, decimals)}</span>
               </div>
               <div className="relative mt-2">
                 <input inputMode="decimal" value={sellAmount} onChange={(event) => setSellAmount(event.target.value)} className={`${FIELD} pr-16`} aria-label="Token amount to sell" placeholder="0" />
-                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 max-w-[64px] truncate text-[11px] font-extrabold text-black/40">{core.symbol}</span>
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 max-w-[64px] truncate text-[11px] font-extrabold text-sp-shade/40">{core.symbol}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {([25n, 50n, 100n] as const).map((pct) => (
-                  <button key={String(pct)} type="button" onClick={() => setSellPct(pct)} disabled={core.balance === 0n} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">
+                  <button key={String(pct)} type="button" onClick={() => setSellPct(pct)} disabled={core.balance === 0n} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">
                     {String(pct)}%
                   </button>
                 ))}
-                <button type="button" onClick={() => setSellPct(100n)} disabled={core.balance === 0n} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">
+                <button type="button" onClick={() => setSellPct(100n)} disabled={core.balance === 0n} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">
                   Max
                 </button>
               </div>
-              <div className="mt-3 space-y-1 rounded-xl bg-[#f8f7fc] p-3 text-[11px]">
+              <div className="mt-3 space-y-1 rounded-xl bg-sp-sunken p-3 text-[11px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-black/50">You receive</span>
-                  <span className="font-extrabold text-[#16141b]">
+                  <span className="text-sp-shade/50">You receive</span>
+                  <span className="font-extrabold text-sp-ink">
                     {sellQuote ? `~${fmtEth(sellQuote.ethOut)} ETH` : '--'}
-                    {sellUsd && <span className="ml-1 text-[10px] font-bold text-black/40">· {sellUsd}</span>}
+                    {sellUsd && <span className="ml-1 text-[10px] font-bold text-sp-shade/40">· {sellUsd}</span>}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-black/50">Fee</span>
-                  <span className="font-bold text-black/60">{sellQuote ? `${fmtEth(sellQuote.fee)} ETH` : '--'}</span>
+                  <span className="text-sp-shade/50">Fee</span>
+                  <span className="font-bold text-sp-shade/60">{sellQuote ? `${fmtEth(sellQuote.fee)} ETH` : '--'}</span>
                 </div>
               </div>
               <button
                 type="button"
                 disabled={busy === 'sell' || busy === 'approve' || !isConnected}
                 onClick={sell}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#16141b] px-4 py-3 text-[13px] font-extrabold text-white disabled:opacity-60"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sp-ink px-4 py-3 text-[13px] font-extrabold text-white disabled:opacity-60"
               >
                 {busy === 'approve' ? 'Approving...' : busy === 'sell' ? 'Selling...' : isConnected ? `Sell ${core.symbol}` : 'Connect a wallet to trade'}
                 <ArrowDownToLine className="h-4 w-4" aria-hidden="true" />
@@ -613,15 +613,15 @@ export default function TradePanel({
           {/* Wspolne dla kupna i sprzedazy: to jest jedna decyzja o tym, na ile
               gorsza cene godzisz sie w zamian za to, ze transakcja przejdzie. */}
           <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="text-[10.5px] text-black/40">Max price change you accept</span>
-            <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="group" aria-label="Slippage tolerance">
+            <span className="text-[10.5px] text-sp-shade/40">Max price change you accept</span>
+            <span className="inline-flex overflow-hidden rounded-full border border-sp-shade/10" role="group" aria-label="Slippage tolerance">
               {SLIPPAGE_OPTIONS.map((bps) => (
                 <button
                   key={bps}
                   type="button"
                   aria-pressed={slippageBps === bps}
                   onClick={() => setSlippageBps(bps)}
-                  className={`px-2.5 py-1 text-[10.5px] font-extrabold transition-colors ${slippageBps === bps ? 'bg-soft-primary text-white' : 'bg-white text-black/50 hover:text-soft-primary-deep'}`}
+                  className={`px-2.5 py-1 text-[10.5px] font-extrabold transition-colors ${slippageBps === bps ? 'bg-soft-primary text-sp-on-brand' : 'bg-sp-surface text-sp-shade/50 hover:text-soft-primary-deep'}`}
                 >
                   {bps / 100}%
                 </button>
@@ -632,12 +632,12 @@ export default function TradePanel({
       )}
 
       {core.state === 'Locked' && (
-        <div className="mt-4 rounded-xl border border-[#f3c58a] bg-[#fff8ed] p-3">
+        <div className="mt-4 rounded-xl border border-sp-down-line bg-sp-down-soft p-3">
           <div className="flex items-start gap-2">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#c76b12]" aria-hidden="true" />
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sp-down" aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-extrabold text-[#8c4a0b]">Ready for graduation</p>
-              <p className="mt-1 text-[11px] leading-[1.4] text-black/55">
+              <p className="text-[12px] font-extrabold text-sp-down-deep">Ready for graduation</p>
+              <p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">
                 Anyone can open the pool. Caller reward:{' '}
                 {core.gradCallerReward === null
                   ? '--'
@@ -650,7 +650,7 @@ export default function TradePanel({
             type="button"
             disabled={busy === 'graduate' || !isConnected}
             onClick={graduate}
-            className="mt-3 w-full rounded-xl bg-[#c76b12] px-3 py-2.5 text-[12px] font-extrabold text-white disabled:opacity-50"
+            className="mt-3 w-full rounded-xl bg-sp-down px-3 py-2.5 text-[12px] font-extrabold text-sp-on-brand disabled:opacity-50"
           >
             {busy === 'graduate' ? 'Opening the pool...' : 'Graduate to Uniswap v4'}
           </button>
@@ -658,21 +658,21 @@ export default function TradePanel({
       )}
 
       {core.state === 'Graduated' && (
-        <div className="mt-4 rounded-xl bg-[#f4f1ff] p-3">
+        <div className="mt-4 rounded-xl bg-sp-brand-soft p-3">
           <div className="flex items-start gap-2">
             <Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-extrabold text-[#16141b]">Live Uniswap v4 pool</p>
-              <p className="mt-1 text-[11px] leading-[1.4] text-black/55">
+              <p className="text-[12px] font-extrabold text-sp-ink">Live Uniswap v4 pool</p>
+              <p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">
                 {core.poolId !== `0x${'0'.repeat(64)}` ? `Pool ${core.poolId.slice(0, 10)}... with the launch hook attached.` : 'Pool position is loading.'}
               </p>
             </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" disabled={core.pendingEth === 0n || busy === 'settle' || !isConnected} onClick={settle} className="rounded-lg border border-black/10 bg-white px-2 py-2 text-[11px] font-extrabold text-[#16141b] disabled:opacity-40">
+            <button type="button" disabled={core.pendingEth === 0n || busy === 'settle' || !isConnected} onClick={settle} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">
               {busy === 'settle' ? 'Settling...' : `Settle ${fmtEth(core.pendingEth)} ETH`}
             </button>
-            <button type="button" disabled={busy === 'harvest' || !isConnected} onClick={harvest} className="rounded-lg border border-black/10 bg-white px-2 py-2 text-[11px] font-extrabold text-[#16141b] disabled:opacity-40">
+            <button type="button" disabled={busy === 'harvest' || !isConnected} onClick={harvest} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">
               {busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}
             </button>
           </div>
@@ -680,24 +680,24 @@ export default function TradePanel({
       )}
 
       {isConnected && (
-        <div className="mt-4 border-t border-black/10 pt-4">
+        <div className="mt-4 border-t border-sp-shade/10 pt-4">
           <div className="flex items-center justify-between">
-            <span className="text-[12px] font-extrabold text-[#16141b]">Your claims</span>
-            <CheckCircle2 className={`h-4 w-4 ${hasClaims ? 'text-[#18bd64]' : 'text-black/20'}`} aria-hidden="true" />
+            <span className="text-[12px] font-extrabold text-sp-ink">Your claims</span>
+            <CheckCircle2 className={`h-4 w-4 ${hasClaims ? 'text-sp-up-vivid' : 'text-sp-shade/20'}`} aria-hidden="true" />
           </div>
           {/* Krzywa placi w ETH, ale hook i vault po graduacji nabijaja
               takze strone tokenowa - stary opis "in ETH, not tokens" klamal. */}
-          <p className="mt-1 text-[10.5px] leading-[1.4] text-black/40">Curve fees accrue in ETH; after graduation pool fees accrue in both ETH and {core.symbol}. Claims are pull-based: nothing moves until you claim.</p>
+          <p className="mt-1 text-[10.5px] leading-[1.4] text-sp-shade/40">Curve fees accrue in ETH; after graduation pool fees accrue in both ETH and {core.symbol}. Claims are pull-based: nothing moves until you claim.</p>
           <div className="mt-2 space-y-1.5">
             {claimRows.map((row) => (
               <div key={row.label} className="flex items-center justify-between gap-2 text-[11px]">
-                <span className="text-black/50">{row.label}</span>
-                <span className="flex items-center gap-2 font-extrabold text-[#16141b]">
+                <span className="text-sp-shade/50">{row.label}</span>
+                <span className="flex items-center gap-2 font-extrabold text-sp-ink">
                   <span>
                     {row.value}
-                    {row.usd && <span className="ml-1 text-[10px] font-bold text-black/40">· {row.usd}</span>}
+                    {row.usd && <span className="ml-1 text-[10px] font-bold text-sp-shade/40">· {row.usd}</span>}
                   </span>
-                  <button type="button" disabled={row.amount === 0n || busy === 'claim'} onClick={() => void claim(row.source)} className="rounded-full border border-black/10 px-2 py-1 text-[10px] text-soft-primary-deep disabled:opacity-30">
+                  <button type="button" disabled={row.amount === 0n || busy === 'claim'} onClick={() => void claim(row.source)} className="rounded-full border border-sp-shade/10 px-2 py-1 text-[10px] text-soft-primary-deep disabled:opacity-30">
                     Claim
                   </button>
                 </span>
@@ -708,7 +708,7 @@ export default function TradePanel({
       )}
 
       {notice && (
-        <div className={`mt-4 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11.5px] ${notice.kind === 'success' ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]' : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'}`}>
+        <div className={`mt-4 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11.5px] ${notice.kind === 'success' ? 'border-sp-up-line bg-sp-up-soft text-sp-up' : 'border-sp-down-line bg-sp-down-soft text-sp-down-deep'}`}>
           <span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}</span>
           <span className="min-w-0 break-words">{notice.text}</span>
         </div>

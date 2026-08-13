@@ -5,6 +5,8 @@ import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import AppShell from './components/AppShell';
+import { DEFAULT_LAUNCHPAD_CHAIN_ID } from './startpad/config';
+import { networkThemeCss, themeBootScript } from './startpad/networkTheme';
 
 // next/font hostuje fonty same-origin i wstrzykuje preload - zamiast
 // render-blokujacego @import z fonts.googleapis.com wewnatrz globals.css.
@@ -224,6 +226,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${bodyFont.variable} ${headingFont.variable} ${softDisplayFont.variable} ${softBodyFont.variable}`}
     >
       <body className="min-h-screen bg-white">
+        {/* ===== MOTYW SIECI STARTPADA =====
+            Dwa elementy, oba MUSZA stac przed trescia.
+
+            Styl niesie palety wszystkich sieci, ktore je maja (dzis jedna,
+            Robinhood). Jest nieaktywny, dopoki na <html> nie pojawi sie
+            `data-net-theme` - poza startpadem nie robi zatem nic.
+
+            Skrypt ustawia ten atrybut PRZED pierwszym malowaniem. Musi byc
+            wpisany wprost i synchronicznie: wybor sieci zyje w localStorage,
+            wiec serwer renderuje zawsze siec domyslna i kazde inne rozwiazanie
+            (efekt, provider, next/script) pokazaloby najpierw biala strone,
+            a dopiero potem czarna. Uzasadnienie calosci: startpad/networkTheme.ts. */}
+        <style dangerouslySetInnerHTML={{ __html: networkThemeCss() }} />
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript(DEFAULT_LAUNCHPAD_CHAIN_ID) }} />
+
         <AppShell>{children}</AppShell>
 
         <Analytics />

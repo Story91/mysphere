@@ -66,14 +66,20 @@ const VIEWPORT_MARGIN = 8;
 const TARGETS: ShareTarget[] = ['x', 'farcaster', 'telegram', 'whatsapp', 'facebook', 'reddit'];
 
 /**
- * Czern X-a zamieniamy na atrament interfejsu. Czysta czern jest jedynym
- * kolorem z tej szostki, ktory na bialej karcie czyta sie jak dziura po
- * ikonie, a nie jak znak firmowy.
+ * Czern X-a zamieniamy na atrament interfejsu. Jest ku temu powod w kazdym z
+ * dwoch motywow: na bieli czysta czern czyta sie jak dziura po ikonie, a na
+ * czarnym tle Robinhooda czarny znak nie istnieje w ogole. Atrament jest w obu
+ * przypadkach tym, czym czern mial byc.
  */
-const brandColor = (target: ShareTarget) => (target === 'x' ? '#16141b' : SHARE_BRANDS[target].color);
+const brandColor = (target: ShareTarget) => (target === 'x' ? 'rgb(var(--sp-ink))' : SHARE_BRANDS[target].color);
 
-/** Tlo kafelka to ten sam kolor z 8% krycia - stad dwie cyfry doklejone do hexa. */
-const brandTint = (target: ShareTarget) => `${brandColor(target)}14`;
+/**
+ * Tlo kafelka to ten sam kolor z 8% krycia. Barwy marek sa hexami, wiec
+ * wystarcza dwie cyfry doklejone na koncu; atrament jest zmienna i musi dostac
+ * krycie skladnia `rgb(... / alfa)` - doklejenie "14" daloby tam smiec.
+ */
+const brandTint = (target: ShareTarget) =>
+  target === 'x' ? 'rgb(var(--sp-ink) / 0.08)' : `${SHARE_BRANDS[target].color}14`;
 
 const START_PRICE_ETH = priceToNumber(START_PRICE_WEI);
 
@@ -219,7 +225,7 @@ export default function ShareToken({
     variant === 'button' ? (
       <button
         {...triggerProps}
-        className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] transition-colors hover:border-soft-primary hover:text-[#5f4ec2]"
+        className="inline-flex items-center gap-1.5 rounded-full border border-sp-shade/10 bg-sp-surface px-3.5 py-2 text-[12px] font-extrabold text-sp-ink transition-colors hover:border-soft-primary hover:text-sp-brand-deep"
       >
         <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
         Share
@@ -229,7 +235,7 @@ export default function ShareToken({
         {...triggerProps}
         aria-label={`Share ${symbol}`}
         className={`rounded-full p-1.5 transition-colors ${
-          open ? 'bg-[#f4f1ff] text-[#5f4ec2]' : 'text-black/30 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]'
+          open ? 'bg-sp-brand-soft text-sp-brand-deep' : 'text-sp-shade/30 hover:bg-sp-brand-soft hover:text-sp-brand-deep'
         }`}
       >
         <Share2 className="h-4 w-4" aria-hidden="true" />
@@ -237,7 +243,7 @@ export default function ShareToken({
     );
 
   const row =
-    'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[12px] font-bold text-black/60 transition-colors hover:bg-[#f7f5ff] hover:text-[#16141b]';
+    'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[12px] font-bold text-sp-shade/60 transition-colors hover:bg-sp-brand-soft hover:text-sp-ink';
 
   const menu =
     spot === null ? null : (
@@ -246,16 +252,16 @@ export default function ShareToken({
         role="menu"
         aria-label={`Share ${symbol}`}
         style={{ position: 'fixed', top: spot.top, left: spot.left, width: MENU_WIDTH }}
-        className="z-[60] rounded-[20px] border border-black/8 bg-white p-2 shadow-[0_20px_50px_rgba(20,16,40,0.18)]"
+        className="z-[60] rounded-[20px] border border-sp-shade/8 bg-sp-surface p-2 shadow-[0_20px_50px_rgba(20,16,40,0.18)]"
       >
         {/* Naglowek mowi, CO sie udostepnia. Bez niego menu otwarte nad
             sasiednim kafelkiem nie ma zwiazku z tokenem, ktorego dotyczy. */}
         <div className="flex items-center justify-between gap-2 px-1.5 pb-1.5 pt-0.5">
-          <span className="truncate text-[12.5px] font-extrabold text-[#16141b]">${symbol}</span>
+          <span className="truncate text-[12.5px] font-extrabold text-sp-ink">${symbol}</span>
           {multiple && (
             <span
               className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
-                up ? 'bg-[#edfff4] text-[#0b9a51]' : 'bg-[#fff8ed] text-[#a34b08]'
+                up ? 'bg-sp-up-soft text-sp-up' : 'bg-sp-down-soft text-sp-down-deep'
               }`}
             >
               {multiple}
@@ -276,7 +282,7 @@ export default function ShareToken({
                 event.stopPropagation();
                 void openIntent(destination);
               }}
-              className="group flex flex-col items-center gap-1.5 rounded-2xl px-1 py-2 transition-colors hover:bg-[#f7f5ff]"
+              className="group flex flex-col items-center gap-1.5 rounded-2xl px-1 py-2 transition-colors hover:bg-sp-brand-soft"
             >
               <span
                 className="flex h-10 w-10 items-center justify-center rounded-[14px] transition-transform duration-150 group-hover:scale-105 group-active:scale-95"
@@ -284,14 +290,14 @@ export default function ShareToken({
               >
                 <BrandMark target={destination} size={18} />
               </span>
-              <span className="text-[10px] font-bold leading-none text-black/50">
+              <span className="text-[10px] font-bold leading-none text-sp-shade/50">
                 {SHARE_BRANDS[destination].label}
               </span>
             </button>
           ))}
         </div>
 
-        <div className="my-1.5 h-px bg-black/8" />
+        <div className="my-1.5 h-px bg-sp-shade/8" />
 
         <button
           type="button"
@@ -304,7 +310,7 @@ export default function ShareToken({
           className={row}
         >
           {copied ? (
-            <Check className="h-3.5 w-3.5 text-[#0b9a51]" aria-hidden="true" />
+            <Check className="h-3.5 w-3.5 text-sp-up" aria-hidden="true" />
           ) : (
             <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
           )}

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import LaunchpadBoard from './LaunchpadBoard';
+import NetworkThemeSync from './NetworkThemeSync';
 
 export const metadata: Metadata = {
   title: 'Startpad',
@@ -7,5 +8,11 @@ export const metadata: Metadata = {
 };
 
 export default function LaunchpadPage() {
-  return <LaunchpadBoard />;
+  return (
+    <>
+      {/* Zdejmuje motyw sieci przy wyjsciu ze startpada - patrz NetworkThemeSync. */}
+      <NetworkThemeSync />
+      <LaunchpadBoard />
+    </>
+  );
 }

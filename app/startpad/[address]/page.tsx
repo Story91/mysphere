@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import LaunchpadTokenDetail from './LaunchpadTokenDetail';
+import NetworkThemeSync from '../NetworkThemeSync';
 import { loadTokenCard } from '../share/tokenCard';
 import { buildShareUrl, safeSymbol } from '../shareText';
 
@@ -78,5 +79,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default function LaunchpadTokenPage({ params }: Props) {
-  return <LaunchpadTokenDetail address={params.address} />;
+  return (
+    <>
+      <NetworkThemeSync />
+      <LaunchpadTokenDetail address={params.address} />
+    </>
+  );
 }
