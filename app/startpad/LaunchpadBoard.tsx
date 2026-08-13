@@ -1250,6 +1250,39 @@ export default function LaunchpadBoard() {
           }
         }
 
+      // ===== TOZSAMOSCI Z BAZY, NIE Z TEGO SKANU =====
+      // Lista startow przychodzi z /api/launchpad/board, gdzie jest ZAPISANA.
+      // Skan z przegladarki dowozi tylko to, co zobaczyl w swoich oknach, a
+      // najstarszy token lezy w najglebszym z nich - to on znikal z tablicy,
+      // gdy okno padlo na limicie publicznego RPC. Baza tego nie gubi, bo raz
+      // zapisany token z niej nie wypada.
+      //
+      // Doklejamy WYLACZNIE brakujace: gdy skan zobaczyl `Launched`, jego dane
+      // sa swiezsze i zostaja.
+      try {
+        const response = await fetch(`/api/launchpad/board?chainId=${ACTIVE_LAUNCHPAD_NETWORK.chain.id}`);
+        if (response.ok) {
+          const body = (await response.json()) as {
+            ok?: boolean;
+            tokens?: Array<{ address?: string; name?: string; symbol?: string; creator?: string; startedAt?: number }>;
+          };
+          if (body?.ok && Array.isArray(body.tokens)) {
+            for (const entry of body.tokens) {
+              const address = (entry.address ?? '') as Address;
+              if (!/^0x[0-9a-fA-F]{40}$/.test(address) || launched.has(address)) continue;
+              launched.set(address, {
+                name: entry.name ?? '',
+                symbol: entry.symbol ?? '',
+                creator: (entry.creator ?? '0x0000000000000000000000000000000000000000') as Address,
+                startedAt: Number(entry.startedAt ?? 0),
+              });
+            }
+          }
+        }
+      } catch {
+        // Indeks niedostepny - zostaje sam skan, czyli stan sprzed tej zmiany.
+      }
+
       // Skan mogl uciac historie na SUFICIE OKIEN zamiast dojsc do bloku
       // wdrozenia - ale przy scalaniu ponizej zachowujemy wiersze spoza skanu,
       // wiec cicho niezeskanowany token juz nie znika z tablicy.
