@@ -1,6 +1,29 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  /**
+   * ===== TRYB CIEMNY STEROWANY KLASA, KTOREJ NIKT NIE DOKLADA =====
+   *
+   * Bez tego wpisu Tailwind stoi na domyslnym `media`, czyli KAZDA klasa
+   * `dark:` w repo odpala sie od ustawienia systemu patrzacego. A ta aplikacja
+   * ma jedno, jasne tlo wpisane na sztywno (`bg-soft-bg`, patrz naglowek
+   * tokenow w app/globals.css) i nie ma zadnego przelacznika motywu:
+   * ThemeContext trzyma stan, ale NIGDY nie dokłada klasy `dark` do
+   * dokumentu - sprawdzone w calym repo.
+   *
+   * Skutek byl realny i widoczny: czlowiek z ciemnym systemem dostawal na
+   * jasnych kartach nadpisania w rodzaju `dark:text-white` (bialy tekst na
+   * bialej karcie) i `dark:bg-gray-800` (ciemny kafel w jasnym panelu). Sam
+   * basechat ma okolo 170 takich klas, wiekszosc w panelu edycji profilu
+   * i w kompozytorach lancuchowych.
+   *
+   * `class` wylacza je wszystkie naraz, bez ruszania ani jednego wywolania.
+   * Nadpisania zostaja w kodzie i odzyja w chwili, gdy ktos naprawde doda
+   * przelacznik motywu i zacznie dokladac klase `dark` - wtedy trzeba je
+   * przejrzec, bo dzis nikt ich nie widzial i nikt nie sprawdzil, czy sa
+   * spojne.
+   */
+  darkMode: 'class',
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",

@@ -3706,27 +3706,27 @@ function BaseChatContent() {
                           a oba tamte przyciski prowadza tutaj. */}
                       {isEditingProfile && address && (
                         <div className="mb-3 relative">
-                          <div className="bg-gradient-to-br from-blue-50/80 via-white/50 to-purple-50/80 dark:from-blue-900/20 dark:via-gray-800/40 dark:to-purple-900/20 backdrop-blur-xl rounded-xl border border-blue-200/50 dark:border-blue-700/30 p-4 shadow-xl">
+                          <div className="rounded-card bg-soft-surface p-4 shadow-card">
                             {/* Header */}
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-soft-primary">
                                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                   </svg>
                                 </div>
                                 <div>
-                                  <h3 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                  <h3 className="font-soft-display text-[17px] font-bold text-soft-ink">
                                     Edit Profile
                                   </h3>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">Customize your MySphere identity</p>
+                                  <p className="font-soft text-[11.5px] text-soft-ink-soft">Customize your MySphere identity</p>
                                 </div>
                               </div>
                               <button
                                 onClick={() => setIsEditingProfile(false)}
-                                className="w-6 h-6 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
+                                className="flex h-7 w-7 items-center justify-center rounded-pill bg-soft-sunken transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                               >
-                                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-3.5 w-3.5 text-soft-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                               </button>
@@ -3736,15 +3736,15 @@ function BaseChatContent() {
                             {/* Profile Section - Grid Layout */}
                             <div className="mb-4 grid grid-cols-2 gap-3">
                               {/* Profile Picture */}
-                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                  <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <div className="rounded-card border border-soft-line bg-soft-sunken p-3">
+                                <label className="mb-2 flex items-center gap-1.5 font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">
+                                  <svg className="w-3 h-3 text-soft-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                   </svg>
                                   <span>Profile Picture</span>
                                 </label>
                                 <div className="flex flex-col items-center space-y-2">
-                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-blue-200 dark:border-blue-700">
+                                  <div className="h-12 w-12 overflow-hidden rounded-xl border-2 border-soft-line">
                                     {userProfile.avatar ? (
                                       <img
                                         src={userProfile.avatar}
@@ -3752,7 +3752,7 @@ function BaseChatContent() {
                                         className="w-full h-full object-cover"
                                       />
                                     ) : (
-                                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 to-purple-900 flex items-center justify-center">
+                                      <div className="flex h-full w-full items-center justify-center bg-soft-sunken">
                                         <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                         </svg>
@@ -3811,14 +3811,14 @@ function BaseChatContent() {
                                     />
                                     <label
                                       htmlFor="profile-picture-input"
-                                      className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all cursor-pointer text-xs font-medium shadow-md"
+                                      className="inline-flex cursor-pointer items-center rounded-pill bg-soft-primary px-3.5 py-1.5 font-soft-display text-[12px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
                                     >
                                       <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                       </svg>
                                       Upload
                                     </label>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    <p className="font-soft text-[11.5px] text-soft-ink-soft mt-1">
                                       Max 3MB
                                     </p>
                                   </div>
@@ -3826,15 +3826,15 @@ function BaseChatContent() {
                               </div>
 
                               {/* Upgrade Your Card */}
-                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                              <div className="rounded-card border border-soft-line bg-soft-sunken p-3">
+                                <label className="mb-2 flex items-center gap-1.5 font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">
                                   <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                                   </svg>
                                   <span>Card Upgrade</span>
                                 </label>
                                 <div className="flex flex-col items-center space-y-2">
-                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-orange-200 dark:border-orange-700 bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-900 dark:to-yellow-900 flex items-center justify-center">
+                                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border-2 border-soft-accent-soft bg-soft-accent-soft">
                                     <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                                     </svg>
@@ -3842,7 +3842,7 @@ function BaseChatContent() {
                                   <div className="flex flex-col items-center">
                                     <div className="relative group">
                                       <button
-                                        className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-lg hover:from-orange-600 hover:to-yellow-600 transition-all cursor-pointer text-xs font-medium shadow-md opacity-75 cursor-not-allowed"
+                                        className="inline-flex cursor-not-allowed items-center rounded-pill bg-soft-accent px-3.5 py-1.5 font-soft-display text-[12px] font-bold text-[#1a1f3a] opacity-75"
                                         disabled
                                       >
                                         <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3856,7 +3856,7 @@ function BaseChatContent() {
                                         <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
                                       </div>
                                     </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">
+                                    <p className="font-soft text-[11.5px] text-soft-ink-soft mt-1 text-center">
                                       Premium features
                                     </p>
                                   </div>
@@ -3867,9 +3867,9 @@ function BaseChatContent() {
                             {/* Username Section - only if no baseName */}
                             {!baseName && (
                               <div className="mb-4">
-                                <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                    <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="rounded-card border border-soft-line bg-soft-sunken p-3">
+                                  <label className="mb-2 flex items-center gap-1.5 font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">
+                                    <svg className="w-3 h-3 text-soft-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>
                                     <span>Username</span>
@@ -3881,14 +3881,14 @@ function BaseChatContent() {
                                         value={customName}
                                         onChange={(e) => setCustomName(e.target.value)}
                                         placeholder="Enter username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                                       />
                                       <div className="flex items-center space-x-2">
-                                        <span className="text-gray-500 text-sm">Choose domain:</span>
+                                        <span className="font-soft text-[13px] text-soft-ink-soft">Choose domain:</span>
                                         <select
                                           value={selectedSuffix}
                                           onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper' | 'celo' | 'world')}
-                                          className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                          className="flex-1 rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                                         >
                                           <option value="sphere">.sphere (+1500 pts!)</option>
                                           <option value="camper">.camper (+1000 pts!)</option>
@@ -3897,14 +3897,14 @@ function BaseChatContent() {
                                         </select>
                                       </div>
                                     </div>
-                                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-2 border border-blue-200/30 dark:border-purple-700/30">
-                                      <div className="text-center text-xs text-gray-600 dark:text-gray-400">
-                                        Preview: <span className="font-medium text-gray-900 dark:text-white">{customName || 'username'}</span>.
+                                    <div className="rounded-xl border border-soft-line bg-soft-surface p-2">
+                                      <div className="text-center font-soft text-[11.5px] text-soft-ink-soft">
+                                        Preview: <span className="font-bold text-soft-ink">{customName || 'username'}</span>.
                                         <span className={
-                                          selectedSuffix === 'sphere' ? 'text-blue-500 font-medium' :
+                                          selectedSuffix === 'sphere' ? 'text-soft-primary font-medium' :
                                           selectedSuffix === 'camper' ? 'text-orange-500 font-medium' :
                                           selectedSuffix === 'celo' ? 'text-yellow-500 font-medium' :
-                                          'text-green-500 font-medium'
+                                          'text-soft-primary font-medium'
                                         }>
                                           {selectedSuffix}
                                         </span>
@@ -3916,7 +3916,7 @@ function BaseChatContent() {
                                     </div>
                                     <button
                                       onClick={handleSaveCustomName}
-                                      className="w-full px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs"
+                                      className="w-full rounded-pill bg-soft-primary px-3 py-2 font-soft-display text-[12px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
                                     >
                                       Save Username
                                     </button>
@@ -3927,9 +3927,9 @@ function BaseChatContent() {
 
                             {/* Social Links Section */}
                             <div className="mb-4">
-                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                  <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <div className="rounded-card border border-soft-line bg-soft-sunken p-3">
+                                <label className="mb-2 flex items-center gap-1.5 font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">
+                                  <svg className="w-3 h-3 text-soft-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                                   </svg>
                                   <span>Social Links</span>
@@ -3937,13 +3937,13 @@ function BaseChatContent() {
                                 <div className="space-y-2">
                                   {/* Twitter */}
                                   <div className="flex items-center space-x-2">
-                                    <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                      <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-soft-sunken">
+                                      <svg className="w-4 h-4 text-soft-primary" viewBox="0 0 24 24" fill="currentColor">
                                         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                                       </svg>
                                     </div>
                                     <div className="flex-1">
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">X (Twitter)</label>
+                                      <label className="mb-1 block font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">X (Twitter)</label>
                                       <input
                                         type="text"
                                         value={userProfile.socialLinks?.twitter || ''}
@@ -3955,18 +3955,18 @@ function BaseChatContent() {
                                           }
                                         }))}
                                         placeholder="username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                                       />
                                     </div>
                                   </div>
 
                                   {/* Farcaster */}
                                   <div className="flex items-center space-x-2">
-                                    <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-soft-sunken">
                                       <img src="/icon.png" alt="Farcaster" className="w-4 h-4" />
                                     </div>
                                     <div className="flex-1">
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Farcaster/Warpcast</label>
+                                      <label className="mb-1 block font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">Farcaster/Warpcast</label>
                                       <input
                                         type="text"
                                         value={userProfile.socialLinks?.farcaster || ''}
@@ -3978,20 +3978,20 @@ function BaseChatContent() {
                                           }
                                         }))}
                                         placeholder="username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        className="w-full rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                                       />
                                     </div>
                                   </div>
 
                                   {/* Discord */}
                                   <div className="flex items-center space-x-2">
-                                    <div className="w-8 h-8 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                                      <svg className="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-soft-sunken">
+                                      <svg className="w-4 h-4 text-soft-primary" viewBox="0 0 24 24" fill="currentColor">
                                         <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/>
                                       </svg>
                                     </div>
                                     <div className="flex-1">
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Discord</label>
+                                      <label className="mb-1 block font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">Discord</label>
                                       <input
                                         type="text"
                                         value={userProfile.socialLinks?.discord || ''}
@@ -4003,7 +4003,7 @@ function BaseChatContent() {
                                           }
                                         }))}
                                         placeholder="username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                        className="w-full rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                                       />
                                     </div>
                                   </div>
