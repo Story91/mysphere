@@ -1651,15 +1651,18 @@ export default function BuilderProfile({
                 </div>
               ) : (talentScore && (talentScore.score !== undefined || talentScore.percentile !== undefined)) ? (
                 <div className="text-center">
-                  {/* Builder Score z neonową poświatą */}
-                  <div className="relative inline-block mb-2">
-                    <div className="text-6xl font-soft-display font-bold tabular-nums text-soft-primary-deep relative z-10">
-                      {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
-                    </div>
-                    {/* Dodatkowa neonowa poświata */}
-                    <div className="absolute inset-0 text-6xl font-soft-display font-bold tabular-nums text-soft-primary blur-md opacity-20">
-                      {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
-                    </div>
+                  {/* ===== BEZ "NEONOWEJ POSWIATY" =====
+                      Pod ta liczba lezala JEJ DRUGA KOPIA, ustawiona
+                      absolutnie, w `blur-md` i `opacity-20`. Filtr rozmycia na
+                      tekscie musi byc rasteryzowany na nowo przy kazdej klatce
+                      przewijania - na telefonie widac to jako miganie
+                      dokladnie tej jednej sekcji i tylko w ruchu. Zglosil to
+                      wlasciciel produktu.
+
+                      Poswiata nie niosla zadnej informacji: ta sama liczba,
+                      rozmyta, pod ta sama liczba. Liczba zostaje. */}
+                  <div className="mb-2 font-soft-display text-6xl font-bold tabular-nums text-soft-primary-deep">
+                    {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
                   </div>
 
                   <div className="text-xs uppercase tracking-wider font-semibold text-soft-ink-faint mb-4">Builder Score</div>
