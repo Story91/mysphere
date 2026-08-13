@@ -3158,7 +3158,7 @@ function BaseChatContent() {
                    dolozyl. Na telefonie zostaje - stamtad prowadza do niej
                    zakladki na dole. */
                 isConnected ? 'lg:block' : 'lg:hidden'
-              } lg:relative lg:w-[352px] xl:w-[380px] lg:flex-none lg:pt-6 lg:pb-24 lg:border-r lg:border-soft-line bg-soft-bg overflow-y-auto p-4 lg:px-5 mobile-scroll-container`}
+              } lg:relative lg:w-[352px] xl:w-[280px] 2xl:w-[320px] lg:flex-none lg:pt-6 lg:pb-24 lg:border-r lg:border-soft-line bg-soft-bg overflow-y-auto p-4 lg:px-5 mobile-scroll-container`}
                                  style={{
                    WebkitOverflowScrolling: 'touch',
                    overscrollBehavior: 'contain'
@@ -3651,13 +3651,15 @@ function BaseChatContent() {
                   oraz git log; kafelek YapScan chowa sie sam, gdy /yapscan
                   jest wylaczony w config/routeStatus.js.
 
-                  `2xl:hidden`: na najszerszych ekranach ten sam blok stoi
-                  w osobnej prawej kolumnie, wiec kopia w kolumnie bocznej
-                  schodzi - inaczej Trends widnialoby dwa razy naraz. */}
+                  `xl:hidden`: od 1280px ten sam blok stoi w osobnej prawej
+                  kolumnie, wiec kopia w kolumnie bocznej schodzi - inaczej
+                  Trends widnialoby dwa razy naraz. Prog byl wczesniej `2xl`
+                  i przez to na typowym laptopie (1280-1535px) trzeciej
+                  kolumny w ogole nie bylo. */}
               <div
                 className={`${
                   activeMobilePanel === 'right' ? 'block' : 'hidden lg:block'
-                } 2xl:hidden lg:mt-8 lg:border-t lg:border-soft-line lg:pt-6`}
+                } xl:hidden lg:mt-8 lg:border-t lg:border-soft-line lg:pt-6`}
               >
                 {trendsColumnContent}
               </div>
@@ -4899,8 +4901,12 @@ function BaseChatContent() {
 
                       W "My Feed" pasa nie ma: tam patrzacy oglada WLASNE posty,
                       a cudze otwarte Aski nie sa czescia tej odpowiedzi. */}
+                  {/* Od 1280px ten sam pas stoi w prawej kolumnie, w ukladzie
+                      kolumnowym - `xl:hidden` pilnuje, zeby Aski nie byly na
+                      ekranie dwa razy naraz. Ponizej 1280px i na telefonie
+                      wszystko zostaje tak, jak bylo. */}
                   {!showMyFeed && (
-                    <FeedAskRail viewer={address ?? null} className="mb-4" />
+                    <FeedAskRail viewer={address ?? null} className="mb-4 xl:hidden" />
                   )}
 
                   {/* ===== ODCZYT PADL != PUSTY FEED =====
@@ -4965,15 +4971,23 @@ function BaseChatContent() {
               )}
             </div>
 
-              {/* ===== PRAWA KOLUMNA TRENDS - NAJSZERSZE EKRANY =====
-                  Od progu 2xl uklad przechodzi na trzy kolumny, jak w duzych
+              {/* ===== PRAWA KOLUMNA: ASKI I TRENDS =====
+                  Od progu xl uklad przechodzi na trzy kolumny, jak w duzych
                   feedach spolecznosciowych: nawigacja i profil po lewej,
-                  posty na srodku, Trends po prawej. Ponizej 2xl ten sam blok
-                  stoi w kolumnie bocznej (tam ma `2xl:hidden`), wiec zawsze
+                  posty na srodku, Trends po prawej. Ponizej xl ten sam blok
+                  stoi w kolumnie bocznej (tam ma `xl:hidden`), wiec zawsze
                   widac dokladnie jedna kopie. Dla goscia kolumny nie ma,
                   tak samo jak lewej. */}
               {isConnected && (
-                <div className="hidden 2xl:block 2xl:w-[360px] 2xl:flex-none overflow-y-auto border-l border-soft-line bg-soft-bg px-5 pt-6 pb-24">
+                <div className="hidden xl:block xl:w-[320px] xl:flex-none 2xl:w-[360px] overflow-y-auto border-l border-soft-line bg-soft-bg px-5 pt-6 pb-24">
+                  {/* Aski stoja NAD statystykami, bo jako jedyne w tej kolumnie
+                      sa czyms do zrobienia, a nie czyms do przeczytania.
+                      W "My Feed" ich nie ma - z tego samego powodu co
+                      w feedzie: patrzacy oglada wtedy wlasne posty, a cudze
+                      otwarte Aski nie sa czescia tej odpowiedzi. */}
+                  {!showMyFeed && (
+                    <FeedAskRail viewer={address ?? null} layout="column" className="mb-4" />
+                  )}
                   {trendsColumnContent}
                 </div>
               )}
