@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom';
 import { Check, Link2, MoreHorizontal, Share2 } from 'lucide-react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import {
+  buildBoardText,
+  buildBoardUrl,
   buildShareText,
   buildShareUrl,
   formatMultiple,
@@ -97,6 +99,15 @@ export type ShareTokenProps = {
   state: ShareState;
   /** Ostatnia znana cena spot w ETH za token; bez niej tekst idzie bez mnoznika. */
   priceEth?: number;
+  /**
+   * Obecnosc tego pola przelacza menu na udostepnianie CALEJ TABLICY danej
+   * sieci zamiast pojedynczego tokena. Pozostale pola sa wtedy pomijane.
+   *
+   * Osobny tryb, a nie osobny komponent: menu, arkusz systemowy, pozycjonowanie
+   * i obsluga miniappki sa identyczne, a druga kopia tego wszystkiego
+   * rozjechalaby sie po pierwszej poprawce w jednej z nich.
+   */
+  board?: { label: string; tokens: number };
   variant?: 'icon' | 'button';
   className?: string;
 };
@@ -109,6 +120,7 @@ export default function ShareToken({
   target,
   state,
   priceEth,
+  board,
   variant = 'icon',
   className = '',
 }: ShareTokenProps) {
@@ -167,10 +179,10 @@ export default function ShareToken({
     };
   }, [open]);
 
-  const url = buildShareUrl({ address, chainId });
   const multiple = priceEth ? formatMultiple(priceEth, START_PRICE_ETH) : null;
   const up = priceEth !== undefined && priceEth >= START_PRICE_ETH;
-  const text = buildShareText({ symbol, multiple, raised, target, state });
+  const url = board ? buildBoardUrl(chainId) : buildShareUrl({ address, chainId });
+  const text = board ? buildBoardText(board) : buildShareText({ symbol, multiple, raised, target, state });
 
   const openIntent = useCallback(
     async (destination: ShareTarget) => {
