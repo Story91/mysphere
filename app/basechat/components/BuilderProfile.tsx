@@ -1366,7 +1366,11 @@ export default function BuilderProfile({
               {!isRouteDisabled('/base') && (
                 <a
                   href="/base"
-                  className="mt-3 block w-full rounded-card bg-gradient-to-r from-gray-900 via-blue-900 to-black p-4 text-center shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  /* Ten sam granat co karta Aska (#141a33). W produkcie jest
+                     dokladnie JEDEN ciemny kolor - trzy odcienie czerni na
+                     dwoch kaflach obok siebie czytaly sie jak niedokonczona
+                     podmiana, a nie jak decyzja. */
+                  className="mt-3 block w-full rounded-card bg-[#141a33] p-4 text-center shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
                   <div className="mb-1.5 flex items-center justify-center gap-2">
                     <span className="font-soft-display text-[15px] font-bold text-white">
