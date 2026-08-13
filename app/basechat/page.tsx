@@ -2703,12 +2703,17 @@ function BaseChatContent() {
       </div>
       <div className="flex-1 min-w-0 px-2">
         <div className="flex items-center">
-          <span className={`text-[11px] font-medium truncate ${
+          {/* Tekst z gradientem (bg-clip-text) poszedl: na Androidzie potrafi
+              dac czarne prostokaty zamiast liter (ten sam powod, dla ktorego
+              zniknal z PinnedPosts.tsx), a przy 11px roznica miedzy trzema
+              gradientami i tak byla nieczytelna. Wyroznienie zostaje, tylko
+              robi je waga i kolor tekstu. */}
+          <span className={`truncate text-[11px] ${
             isVitalik
-              ? 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-transparent bg-clip-text font-bold'
-              : userNames[user.address]?.name?.includes('.base.eth') 
-                ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text' 
-                : 'text-gray-900 dark:text-white'
+              ? 'font-bold text-soft-accent-deep'
+              : userNames[user.address]?.name?.includes('.base.eth')
+                ? 'font-bold text-soft-primary-deep'
+                : 'font-medium text-soft-ink'
           }`}>
             <span>
           {userNames[user.address]?.name?.endsWith('.sphere') ? (
