@@ -2,6 +2,7 @@
 'use client';
 
 import { base, baseSepolia } from 'viem/chains';
+import { arcTestnet } from './startpad/arcChain';
 import { createContext, useContext, useState, useMemo } from 'react';
 import { createConfig, http, fallback, cookieStorage, createStorage } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
@@ -65,7 +66,7 @@ const queryClient = new QueryClient({
  * Wagmi Configuration (bez Base Sepolia)
  * PL: Przygotowane dwie gałęzie konfiguracji, aby uniknąć błędu typów dla 484
  */
-const CHAINS_BASE = [base, baseSepolia, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain] as const;
+const CHAINS_BASE = [base, baseSepolia, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain, arcTestnet] as const;
 const TRANSPORTS_BASE = {
   // Base MAINNET: publiczny mainnet.base.org jest rate-limited (429/-32016) i
   // tnie getLogs na 2000 blokach, a startpad odpala do 90 okien getLogs na load.
@@ -101,6 +102,15 @@ const TRANSPORTS_BASE = {
   // endpoint (Alchemy/QuickNode). ROBINHOOD_RPC_URLS[0] bierze env, a jak go
   // brak - publiczny fallback.
   [robinhoodChain.id]: http(ROBINHOOD_RPC_URLS[0]),
+  /**
+   * Arc testnet. Blockdaemon, a NIE oficjalny rpc.testnet.arc.io, i to jest
+   * pomiar, nie preferencja: z pieciu publicznych endpointow Arc tylko ten
+   * przyjmuje eth_getLogs na oknie 50 000 blokow, reszta tnie na 10 000.
+   * Arc robi blok co 0,51 s, czyli ~169 tys. blokow na dobe - przy oknie 10 tys.
+   * tablica startpada nie zdazylaby odtworzyc nawet jednego dnia rynku.
+   * Uzasadnienie i pelny pomiar: app/startpad/arcChain.ts.
+   */
+  [arcTestnet.id]: http(process.env.NEXT_PUBLIC_ARC_TESTNET_RPC_URL || 'https://rpc.blockdaemon.testnet.arc.io'),
 } as const;
 
 const CHAINS_WITH_CAMP_MAINNET = [
