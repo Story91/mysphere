@@ -93,6 +93,28 @@ export function safeSymbol(symbol: string): string {
   return cleaned.slice(0, MAX_SYMBOL) || 'TOKEN';
 }
 
+/**
+ * Kapitalizacja w dolarach na karcie udostepniania.
+ *
+ * Karta pokazywala tu dotad CENE, i to w gwei - bo cena tokena na krzywej to
+ * liczby rzedu 7.5e-10 ETH, ktore w dolarach wygladaja jak zero. Bylo to
+ * uczciwe technicznie i bezuzyteczne dla kogos, kto ten link dostal: nikt nie
+ * wie, czy 0.88 gwei to duzo. Kapitalizacja mowi to samo w jednostce, ktora
+ * czyta sie bez tlumaczenia.
+ *
+ * Brak kursu ETH oddaje kreske, NIGDY "$0" - zero wyglada jak wycena, i to jak
+ * wycena zerowa. Ta sama zasada, co przy `formatMultiple`.
+ */
+export function mcapLabel(usd: number | null | undefined): string {
+  if (usd === null || usd === undefined || !Number.isFinite(usd) || usd <= 0) return '--';
+
+  const trim = (text: string) => text.replace(/\.0+$/, '');
+
+  if (usd >= 1_000_000) return `$${trim((usd / 1_000_000).toFixed(1))}M`;
+  if (usd >= 1_000) return `$${trim((usd / 1_000).toFixed(1))}k`;
+  return `$${usd.toFixed(0)}`;
+}
+
 /** Kwoty ETH bez ogona zer: 3 zostaje "3", 0.462 zostaje "0.46". */
 function formatEthAmount(value: number): string {
   if (!Number.isFinite(value) || value < 0) return '0';

@@ -9,6 +9,7 @@ import {
   priceToNumber,
   priceWeiAfter,
   START_PRICE_WEI,
+  SUPPLY_TOKENS,
   TARGET_WEI,
   type TradeEntry,
 } from '../[address]/detailShared';
@@ -44,6 +45,33 @@ import { formatMultiple } from '../shareText';
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
+/**
+ * Kurs ETH/USD dla kapitalizacji na karcie.
+ *
+ * Prosto do zrodla, nie przez `/api/launchpad/eth-price`: ten kod biegnie w
+ * generatorze obrazka, ktory nie zna wlasnego adresu bazowego, a wolanie
+ * samego siebie po HTTP przy renderze karty to dodatkowy tor awarii tam, gdzie
+ * i tak nie ma komu jej zobaczyc. To samo zrodlo, co tamta trasa.
+ *
+ * `null` znaczy "nie wiemy" i karta pokazuje wtedy kreske - nigdy "$0".
+ * Krotki timeout, bo crawler nie czeka: lepsza karta bez jednej liczby niz
+ * karta, ktora nie zdazyla powstac.
+ */
+async function ethUsdSpot(): Promise<number | null> {
+  try {
+    const response = await fetch('https://api.coinbase.com/v2/prices/ETH-USD/spot', {
+      signal: AbortSignal.timeout(2500),
+      next: { revalidate: 300 },
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { data?: { amount?: unknown } };
+    const value = Number(body?.data?.amount);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export type TokenCardData = {
   chainId: number;
   networkLabel: string;
@@ -56,6 +84,8 @@ export type TokenCardData = {
   raised: number;
   target: number;
   priceEth: number;
+  /** Kapitalizacja w dolarach. `null` = nie znamy kursu ETH, karta da kreske. */
+  mcapUsd: number | null;
   /** Sformatowany mnozniki od startu, albo null gdy ceny nie znamy. */
   multiple: string | null;
   /** Liczeni tak samo jak w tablicy: rozne adresy, ktore kupily. */
@@ -279,9 +309,10 @@ export async function loadTokenCard(
   const priceWei = spotPrice > 0n ? spotPrice : priceWeiAfter(ethReserve, tokenReserve);
   const priceEth = priceToNumber(priceWei);
 
-  const [history, blobLogo] = await Promise.all([
+  const [history, blobLogo, ethUsd] = await Promise.all([
     historyFrom(net.chain.id, token),
     withLogo ? logoFromBlob(net.chain.id, token) : Promise.resolve(null),
+    ethUsdSpot(),
   ]);
 
   const first = history.prices[0] ?? 0;
@@ -301,6 +332,10 @@ export async function loadTokenCard(
     raised: Number(formatEther(ethReserve)),
     target: Number(formatEther(TARGET_WEI)),
     priceEth,
+    // Kapitalizacja Z CALEJ PODAZY - ta sama regula, co `mcapWei` na stronie
+    // tokena i w karcie pod postem, zeby trzy miejsca nie podawaly trzech
+    // liczb. Bez kursu ETH zostaje `null`, a karta pokazuje kreske.
+    mcapUsd: ethUsd === null ? null : priceEth * ethUsd * Number(SUPPLY_TOKENS),
     multiple: formatMultiple(priceEth, priceToNumber(START_PRICE_WEI)),
     holders: history.holders,
     prices: history.prices,
