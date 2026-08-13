@@ -12,6 +12,7 @@ import { celoChain } from '@/app/basechat/Celo/config/CeloNetworkConfig';
 import { ethereumChain } from '@/app/basechat/ETH/config/EthereumNetworkConfig';
 import { worldChain } from '@/app/basechat/World/config/WorldChainNetworkConfig';
 import { robinhoodChain } from '@/app/basechat/Robinhood/config/RobinhoodNetworkConfig';
+import { arcTestnet } from '@/app/startpad/arcChain';
 
 // Definicja sieci z polskimi komentarzami
 // Definition of networks with Polish comments
@@ -89,9 +90,53 @@ const robinhoodEntry = {
   bgWhite: false,
 } as const;
 
-// Kolejność: Base, Camp Mainnet, Linea, Celo, Ethereum, World Chain, Robinhood Chain
-const networks = [baseEntry, baseSepoliaEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry] as const;
+/**
+ * Arc (Circle) - testnet, mainnet rusza 16 wrzesnia 2026.
+ *
+ * JEDYNY WPIS BEZ PLIKU LOGO, i to jest decyzja, nie zaniedbanie. Oficjalnego
+ * znaku Arc nie ma pod zadnym ze standardowych adresow (favicon, apple-touch),
+ * a znak firmowy narysowany z pamieci wyglada jak zepsuty interfejs. Do czasu,
+ * az wrzucimy prawdziwy plik do /public, wpis rysuje monogram na barwie sieci -
+ * dokladnie tak, jak token bez logo dostaje glif z inicjalami.
+ *
+ * Zeby podmienic na prawdziwy: wrzuc plik do /public i dopisz tu `iconUrl`.
+ * Nic wiecej nie trzeba.
+ *
+ * Barwa to blekit z motywu startpada dla tej sieci (app/startpad/config.ts).
+ */
+const arcEntry = {
+  id: arcTestnet.id,
+  name: 'Arc Testnet',
+  shortName: 'ARC',
+  color: '#4D9AF0',
+  bgWhite: false,
+} as const;
+
+// Kolejność: Base, Camp Mainnet, Linea, Celo, Ethereum, World Chain, Robinhood Chain, Arc
+const networks = [baseEntry, baseSepoliaEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry, arcEntry] as const;
 type Network = (typeof networks)[number];
+
+/** Adres pliku znaku sieci albo null, gdy wpis go nie ma (patrz `arcEntry`). */
+function networkIcon(network: Network): string | null {
+  return 'iconUrl' in network ? network.iconUrl : null;
+}
+
+/**
+ * Zastepstwo znaku firmowego: dwie litery skrotu na barwie sieci. Ta sama
+ * zasada, co przy tokenach bez logo w startpadzie - lepiej uczciwy monogram niz
+ * logotyp odrysowany z pamieci.
+ */
+function NetworkMonogram({ network, size }: { network: Network; size: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex items-center justify-center rounded-full font-soft-display font-extrabold text-white"
+      style={{ width: size, height: size, backgroundColor: network.color, fontSize: Math.round(size * 0.42) }}
+    >
+      {network.shortName.slice(0, 2)}
+    </span>
+  );
+}
 
 /**
  * Tlo pod logo: nie kazdy wpis ma te pola, wiec pytamy przez `in`, nie przez `any`.
@@ -187,15 +232,19 @@ export function NetworkSwitcher() {
           </div>
         ) : (
           <>
-            <div className={`w-5 h-5 rounded-full overflow-hidden ${iconBackground(activeNetwork)} flex items-center justify-center`}>
-              <Image
-                src={activeNetwork.iconUrl}
-                alt=""
-                width={16}
-                height={16}
-                className="object-contain"
-              />
-            </div>
+            {networkIcon(activeNetwork) ? (
+              <div className={`w-5 h-5 rounded-full overflow-hidden ${iconBackground(activeNetwork)} flex items-center justify-center`}>
+                <Image
+                  src={networkIcon(activeNetwork) as string}
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="object-contain"
+                />
+              </div>
+            ) : (
+              <NetworkMonogram network={activeNetwork} size={20} />
+            )}
             <span className="hidden sm:block text-soft-ink text-sm font-soft-display font-bold">
               {activeNetwork.shortName}
             </span>
@@ -240,7 +289,7 @@ export function NetworkSwitcher() {
                 {network.id === base.id ? (
                   <div className="bg-white rounded-lg p-1.5 flex items-center justify-center flex-shrink-0">
                     <Image
-                      src={network.iconUrl}
+                      src={networkIcon(network) as string}
                       alt=""
                       width={50}
                       height={20}
@@ -248,15 +297,19 @@ export function NetworkSwitcher() {
                     />
                   </div>
                 ) : (
+                  networkIcon(network) ? (
                   <div className={`w-6 h-6 rounded-full overflow-hidden ${iconBackground(network)} flex items-center justify-center flex-shrink-0`}>
                     <Image
-                      src={network.iconUrl}
+                      src={networkIcon(network) as string}
                       alt=""
                       width={20}
                       height={20}
                       className="object-contain"
                     />
                   </div>
+                  ) : (
+                    <NetworkMonogram network={network} size={24} />
+                  )
                 )}
                 {network.id !== base.id && (
                   <div className="flex-1 min-w-0">
