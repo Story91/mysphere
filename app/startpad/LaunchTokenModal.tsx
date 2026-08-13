@@ -316,6 +316,7 @@ export default function LaunchTokenModal({
   quickOnly = false,
   initialName = '',
   initialSymbol = '',
+  initialLogo = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -328,6 +329,15 @@ export default function LaunchTokenModal({
   /** Podpowiedzi z tresci posta. Autor moze je nadpisac przed startem. */
   initialName?: string;
   initialSymbol?: string;
+  /**
+   * Obrazek wgrany do posta, jako logo tokena.
+   *
+   * Kto dolaczyl zdjecie do posta i zaraz startuje z niego token, ma na mysli
+   * TO zdjecie - kazanie mu wgrywac je drugi raz w kreatorze bylo by pytaniem
+   * o cos, co juz powiedzial. Wchodzi jako podpowiedz, wiec da sie je
+   * podmienic przed startem.
+   */
+  initialLogo?: string | null;
 }) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -1026,6 +1036,16 @@ export default function LaunchTokenModal({
     if (!open) return;
     if (initialName) setLaunchName((current) => (current.trim() === '' ? initialName : current));
     if (initialSymbol) setLaunchSymbol((current) => (current.trim() === '' ? initialSymbol : current));
+    if (initialLogo) {
+      // Zdjecie z posta przychodzi juz jako data URL po przeskalowaniu w
+      // przegladarce, wiec trafia tam, gdzie ladowalby upload z kreatora -
+      // nie do pola na adres. Adres `https://` z posta obsluguje drugie pole.
+      if (initialLogo.startsWith('data:image/')) {
+        setLogoDataUrl((current) => current ?? initialLogo);
+      } else {
+        setLaunchImage((current) => (current.trim() === '' ? initialLogo : current));
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

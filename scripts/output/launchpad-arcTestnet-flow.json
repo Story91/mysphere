@@ -6,51 +6,51 @@
   "hook": "0x2615415f5eE2E0dF65bF0788E7c43ACdCB036044",
   "poolManager": "0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6",
   "creator": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
-  "token": "0xd93D7f1ddf96087bC788a8C69b9A744902d942Bf",
+  "token": "0x1DF9a981F3630C51e1b3B5ed6e4C6f40BC22f170",
   "buyEth": "4000000000000000000",
   "resumed": false,
   "quoteTokensOut": "800000000000000000000000000",
   "quoteFee": "30000000000000000",
   "quoteRefund": "970000000000000000",
   "launch": {
-    "hash": "0xd94d05dce42418d461ab98ced564310f25900806b6cb8626bf41066ed75f89a3",
-    "block": 56845505,
-    "gas": "888683"
+    "hash": "0x8b8d6f47285eab56377132d15d2780c796ad8a115f1bc35ad6f881edadb58fc8",
+    "block": 56850523,
+    "gas": "871643"
   },
   "buy": {
-    "hash": "0x39f6eaa0d648120b399391b88a4c6120f0549f8f24361e109072f5c9695cf74e",
-    "block": 56846101,
+    "hash": "0x5e7a0015e1e6714ca523b60eb14d6b127deb27c2c9ee03d575c00c16b810684f",
+    "block": 56851119,
     "gas": "141833"
   },
   "graduate": {
-    "hash": "0x34453fba875ac717dc9ba91f6f5ff34a548dfc02cc50640b578204ee57185319",
-    "block": 56846104,
+    "hash": "0xd7e4fb7d4d27380bc0cf244af7ca4b0b55b8a9094b0e4eb7fab4d2e3f385d182",
+    "block": 56851123,
     "gas": "434320"
   },
   "probeDeployGas": "565150",
   "swap": {
-    "hash": "0x3040b7a9ee77abb18b1119dda7aa3aa2ebfacde73e2d146cdbe380b0f35cb085",
-    "block": 56846111,
+    "hash": "0xf97907fe5a65f07ad7b714e2aa5f1a945ade0a209840794acd6bdb3ef7c571db",
+    "block": 56851129,
     "gas": "316423"
   },
   "settle": {
-    "hash": "0x03278c4eadc9620bafa9f7393cdd906b1c1f98e95ea56c2e207519e0938303ac",
-    "block": 56846114,
+    "hash": "0x967b639965a8f0fdfb8b685ad9444455669560e500d81e8342b82bbf1e7c0adb",
+    "block": 56851132,
     "gas": "60940"
   },
   "launchClaimableBefore": "120000000000000000",
   "launchClaim": {
-    "hash": "0xde7c67cccd7a1dee9a8cbd3ddf3829598a52b38c09f024f58aa18333ef7ccd74",
-    "block": 56846118,
+    "hash": "0x47a841edf64a9fdf02361c6c712b3cbb127b76b31c3bddc0bbaf157d110b8203",
+    "block": 56851136,
     "gas": "36472"
   },
   "hookEthClaimableBefore": "0",
   "hookTokenClaimableBefore": "531551217675593619716",
   "hookEthClaim": null,
   "hookTokenClaim": {
-    "hash": "0x114dd8f2aa650814f35df8ee670f12fdd6d0e5daa4ca045cce35574a5ea03226",
-    "block": 56846120,
+    "hash": "0x32b04c5a224d5cbeef509ede755deeb5819ea82a74b575d889a6beebd794fc2a",
+    "block": 56851139,
     "gas": "40304"
   },
-  "completedAt": "2026-08-13T21:39:23.585Z"
+  "completedAt": "2026-08-13T22:21:54.179Z"
 }

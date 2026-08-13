@@ -23,7 +23,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { formatEther, formatUnits, getAbiItem, maxUint256, parseEther, parseUnits, zeroAddress, type Address } from 'viem';
+import { formatEther, formatUnits, getAbiItem, getAddress, maxUint256, parseEther, parseUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useBalance, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
   NATIVE_SYMBOL,
@@ -958,7 +958,11 @@ function TradePanel({
     {!canBuy && canSell && <p className="mt-2 text-[11px] leading-[1.4] text-sp-shade/50">Buying is closed, the curve is full. Selling stays open until the pool opens.</p>}
     {!canSell && <p className="mt-5 rounded-xl bg-sp-brand-soft p-3 text-[11px] leading-[1.4] text-sp-shade/55">Curve trading ended at graduation. Swaps happen in the Uniswap v4 pool now.</p>}
     {canSell && (effectiveSide === 'buy' ? <>
-      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-sp-ink">{NATIVE_SYMBOL} amount</span><span className="text-[11px] text-sp-shade/45">0.5% slippage buffer</span></div>
+      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-sp-ink">{NATIVE_SYMBOL} amount</span>{/* SALDO, a nie sama nota o poslizgu. Panel ma przyciski 25/50/100% i Max,
+          ktore licza z salda - ale samego salda nie pokazywal, wiec nie bylo od
+          czego ich odniesc. Na stronie tokena stoi to od poczatku; tutaj
+          brakowalo. */}
+        <span className="text-[11px] text-sp-shade/45">{ethBalance ? `Balance ${Number(formatEther(ethBalance.value)).toLocaleString('en-US', { maximumFractionDigits: 4 })} ${NATIVE_SYMBOL}` : '0.5% slippage buffer'}</span></div>
       <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">ETH</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!ethBalance} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
@@ -1267,9 +1271,17 @@ export default function LaunchpadBoard() {
             tokens?: Array<{ address?: string; name?: string; symbol?: string; creator?: string; startedAt?: number }>;
           };
           if (body?.ok && Array.isArray(body.tokens)) {
+            // Mapa jest kluczowana adresem Z LOGOW, czyli w checksumie
+            // (`0xB200...`), a baza trzyma male litery. Porownanie wprost dawalo
+            // DWA klucze na jeden token i tablica pokazywala go dwa razy: raz z
+            // wolumenem ze skanu, raz z zerami z bazy. Porownujemy wiec po
+            // malych literach, a wstawiamy w checksumie - tak jak reszta mapy.
+            const known = new Set([...launched.keys()].map((key) => key.toLowerCase()));
             for (const entry of body.tokens) {
-              const address = (entry.address ?? '') as Address;
-              if (!/^0x[0-9a-fA-F]{40}$/.test(address) || launched.has(address)) continue;
+              const raw = entry.address ?? '';
+              if (!/^0x[0-9a-fA-F]{40}$/.test(raw) || known.has(raw.toLowerCase())) continue;
+              const address = getAddress(raw) as Address;
+              known.add(raw.toLowerCase());
               launched.set(address, {
                 name: entry.name ?? '',
                 symbol: entry.symbol ?? '',
