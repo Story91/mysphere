@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CandlestickChart, LineChart as LineChartIcon, RefreshCw } from 'lucide-react';
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
-import { ACTIVE_LAUNCHPAD_NETWORK } from '../config';
+import { ACTIVE_LAUNCHPAD_NETWORK, NATIVE_SYMBOL } from '../config';
 import { formatUsd } from '../useEthUsd';
 import {
   buildCandles,
@@ -222,8 +222,8 @@ export default function PriceChart({
             {mode === 'mcap' ? 'Market cap' : state === 'Graduated' ? 'Last curve price' : 'Price'}
           </p>
           <p className="mt-1 font-soft-display text-[26px] font-extrabold leading-none text-sp-ink">
-            {fmtPrice(currentValue)} <span className="text-[14px] text-sp-shade/40">ETH</span>
-            {/* Sam wykres zostaje w ETH - USD jest tylko dopiskiem przy naglowku. */}
+            {fmtPrice(currentValue)} <span className="text-[14px] text-sp-shade/40">{NATIVE_SYMBOL}</span>
+            {/* Sam wykres zostaje w jednostce natywnej - USD jest tylko dopiskiem. */}
             {ethUsd !== null && <span className="ml-1.5 text-[13px] font-bold text-sp-shade/35">· {formatUsd(currentValue * ethUsd)}</span>}
           </p>
           <p className="mt-1 text-[11px] font-bold text-sp-shade/45">
