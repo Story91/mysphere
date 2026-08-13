@@ -47,7 +47,14 @@ export default function AskRailRow({ ask, onAnswer, href }: AskRailRowProps) {
 
   const body = (
     <>
-      <p className="mb-1.5 font-soft-display text-[13px] font-bold leading-[1.35] text-white">
+      {/* Trzy linie i koniec. Pelna tresc jest o jedno klikniecie dalej,
+          a Ask na siedem linii spychal kwote i zegar tak nisko, ze karta
+          przestawala byc jednym rzutem oka. Tytul HTML daje calosc pod
+          kursorem, wiec nic nie ginie. */}
+      <p
+        title={ask.question}
+        className="mb-1.5 line-clamp-3 font-soft-display text-[13px] font-bold leading-[1.35] text-white"
+      >
         {ask.question}
       </p>
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-soft text-[11.5px] leading-none">

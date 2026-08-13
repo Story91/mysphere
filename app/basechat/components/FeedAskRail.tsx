@@ -606,9 +606,11 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
            tylko FETCH_LIMIT najnowszych otwartych Askow i nie wolno mu
            udawac, ze zna wszystkie. */
         <div className="mb-3">
-          <div className="mb-1.5 flex items-start justify-between gap-2">
-            <h2 className="font-soft-display text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/45">
-              {shownTab === 'open' ? 'Open asks · money on the table' : 'Resolved asks'}
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            {/* Krotko, bo w kolumnie 320px dluzszy naglowek lamal sie na dwie
+                linie i wchodzil pod przelacznik. */}
+            <h2 className="min-w-0 font-soft-display text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/45">
+              {shownTab === 'open' ? 'Money on the table' : 'Resolved asks'}
             </h2>
             <RailFilter value={shownTab} onPick={pick} tone="dark" />
           </div>
