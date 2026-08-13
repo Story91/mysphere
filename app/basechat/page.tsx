@@ -788,6 +788,17 @@ function BaseChatContent() {
    * dwie osobne trasy bez wciagania globalnego magazynu dla jednej rzeczy.
    */
   const shareParam = searchParams.get('share');
+  /**
+   * Gotowa tresc posta z innej trasy - dzis ze startpada (`composeParam` w
+   * app/startpad/shareText.ts).
+   *
+   * Osobny parametr obok `share`, bo tamten sklada zdanie TUTAJ i doklada link
+   * `mysphere.fun/b20/<adres>`. Dla tokena z krzywej startpada to zly adres:
+   * strona b20 czyta cene z GeckoTerminala, ktory tokena bez puli nie zna.
+   * Przy `compose` tresc powstaje po stronie startpada, raz, ta sama we
+   * wszystkich kanalach udostepniania.
+   */
+  const composeParamValue = searchParams.get('compose');
   const [userStats, setUserStats] = useState<{[key: string]: Stats & { totalPoints: number }}>({});
   // `hoveredElement` bylo ustawiane przy kazdym najechaniu na nazwe uzytkownika w
   // feedzie, ale nikt tej wartosci nie czytal - podpowiedz "Click to view profile"
@@ -841,6 +852,22 @@ function BaseChatContent() {
 
     router.replace('/basechat', { scroll: false });
   }, [shareParam, router]);
+
+  // Tresc gotowa z innej trasy. Wstawiamy TYLKO do pustego pola - nadpisanie
+  // czyjegos niedokonczonego posta parametrem z adresu byloby kradzieza tekstu.
+  const composeUsedRef = useRef(false);
+  useEffect(() => {
+    if (!composeParamValue || composeUsedRef.current) return;
+    composeUsedRef.current = true;
+
+    const draft = composeParamValue.slice(0, 600);
+    if (draft.trim()) {
+      setNewPost((current) => (current.trim() === '' ? draft : current));
+      setMobileComposerOpen(true);
+    }
+
+    router.replace('/basechat', { scroll: false });
+  }, [composeParamValue, router]);
 
   // Obsługa komunikatu powitalnego dla użytkowników z linku referalowego
   useEffect(() => {

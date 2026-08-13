@@ -21,6 +21,16 @@ import type { ShareTarget } from './shareText';
  */
 
 export const SHARE_BRANDS: Record<ShareTarget, { label: string; color: string; path: string }> = {
+  /**
+   * WLASNY feed. `path` zostaje pusty, bo znaku MySphere NIE rysujemy z
+   * pamieci - `BrandMark` podstawia tu prawdziwy plik logo z /public. Ta sama
+   * zasada, co przy reszcie: albo znak ze zrodla, albo zaden.
+   */
+  mysphere: {
+    label: 'MySphere feed',
+    color: '#61DFFF',
+    path: '',
+  },
   x: {
     label: 'X',
     // Czern marki. W menu i tak podmieniamy ja na atrament interfejsu -
@@ -57,6 +67,21 @@ export const SHARE_BRANDS: Record<ShareTarget, { label: string; color: string; p
 };
 
 export function BrandMark({ target, size = 20 }: { target: ShareTarget; size?: number }) {
+  // Wlasny znak idzie z pliku, nie ze sciezki przepisanej z pamieci.
+  if (target === 'mysphere') {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/logotypy/logo-symbol.svg"
+        alt=""
+        width={size}
+        height={size}
+        className="rounded-[4px]"
+        aria-hidden="true"
+      />
+    );
+  }
+
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d={SHARE_BRANDS[target].path} />
