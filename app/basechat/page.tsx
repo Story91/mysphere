@@ -3009,10 +3009,16 @@ function BaseChatContent() {
      i na mobilnej zakladce "Trends") oraz w osobnej prawej kolumnie na
      najszerszych ekranach - uklad jak w duzych feedach spolecznosciowych:
      nawigacja i profil po lewej, tresc na srodku, trendy po prawej.
-     Definicja jest jedna, zeby zadna kopia nie rozjechala sie z druga. */
-  const trendsColumnContent = (
+     Definicja jest jedna, zeby zadna kopia nie rozjechala sie z druga.
+
+     PARAMETR `tone` NIE ROBI Z TEGO DWOCH BLOKOW. To ta sama funkcja z tymi
+     samymi propsami, wywolana dwa razy - raz jasno (telefon i kolumna boczna),
+     raz ciemno (prawa kolumna, gdzie panel stoi pod karta Askow i ma sie z nia
+     czytac jako jeden pas). Zmieniaja sie wylacznie kolory. */
+  const renderTrendsColumn = (tone: 'light' | 'dark') => (
     <>
       <SoftTrendsPanel
+        tone={tone}
         stats={[
           /* Bez String() - `null` ma dojsc do kafla JAKO null.
              String(null) daje napis "null", ktory compact()
@@ -3047,10 +3053,28 @@ function BaseChatContent() {
       <div className={`mt-4 ${isRouteDisabled('/yapscan') ? 'hidden' : ''}`}>
         <a
           href="/yapscan"
-          className="flex items-center justify-between rounded-card bg-soft-surface p-4 shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          className={`flex items-center justify-between rounded-card p-4 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 ${
+            tone === 'dark'
+              ? 'bg-[#141a33] shadow-card focus-visible:ring-soft-accent'
+              : 'bg-soft-surface shadow-card focus-visible:ring-soft-primary'
+          }`}
         >
-          <span className="font-soft-display text-[15px] font-bold text-soft-ink">YapScan</span>
-          <svg className="h-4 w-4 text-soft-primary" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+          <span
+            className={`font-soft-display text-[15px] font-bold ${
+              tone === 'dark' ? 'text-white' : 'text-soft-ink'
+            }`}
+          >
+            YapScan
+          </span>
+          <svg
+            className={`h-4 w-4 ${tone === 'dark' ? 'text-soft-accent' : 'text-soft-primary'}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            viewBox="0 0 24 24"
+          >
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>
         </a>
@@ -3645,7 +3669,7 @@ function BaseChatContent() {
                   NA DESKTOPIE: siedzi pod profilem w tej samej kolumnie,
                   oddzielony linia - dlatego przestal byc potrzebny osobny
                   panel po prawej. */}
-              {/* Tresc panelu jest zdefiniowana raz, w `trendsColumnContent`
+              {/* Tresc panelu jest zdefiniowana raz, w `renderTrendsColumn`
                   nad returnem. Historia bloku (usuniete "Global Statistics"
                   i "Trending Hashtags") - patrz komentarz przy tej definicji
                   oraz git log; kafelek YapScan chowa sie sam, gdy /yapscan
@@ -3661,7 +3685,7 @@ function BaseChatContent() {
                   activeMobilePanel === 'right' ? 'block' : 'hidden lg:block'
                 } xl:hidden lg:mt-8 lg:border-t lg:border-soft-line lg:pt-6`}
               >
-                {trendsColumnContent}
+                {renderTrendsColumn('light')}
               </div>
             </div>
 
@@ -4988,7 +5012,7 @@ function BaseChatContent() {
                   {!showMyFeed && (
                     <FeedAskRail viewer={address ?? null} layout="column" className="mb-4" />
                   )}
-                  {trendsColumnContent}
+                  {renderTrendsColumn('dark')}
                 </div>
               )}
             </div>

@@ -124,6 +124,34 @@ const TONE = {
 } as const;
 
 /**
+ * TE SAME SZESC KATEGORII NA GRANACIE.
+ *
+ * Panel stoi od 1280px w prawej kolumnie, obok ciemnej karty Askow, i ma sie
+ * z nia czytac jako jeden pas. Odcieniowe tla z jasnej wersji (#EEE9FB i
+ * reszta) na granacie robia sie brudnymi plamami, a ciemne teksty
+ * (soft-primary-deep, #15803D) schodza ponizej czytelnego kontrastu.
+ *
+ * Dlatego tlo jest jedno dla wszystkich kafli, a kategorie rozroznia SAMA
+ * LICZBA - rozjasnione warianty tych samych szesciu barw. Zasada z naglowka
+ * pliku zostaje w mocy: kolor nadal jest przypisany do kategorii, a kafel
+ * Tips nadal jest jedynym, ktory dostaje pomarancz zgodnie z regula
+ * "pomarancz znaczy pieniadze" - i jako jedyny zachowuje pierscien.
+ */
+const TONE_DARK = {
+  purple: { bg: 'bg-white/[0.06]', text: 'text-[#B9AAFF]', ring: '' },
+  amber: { bg: 'bg-white/[0.06]', text: 'text-[#F7C067]', ring: '' },
+  green: { bg: 'bg-white/[0.06]', text: 'text-[#5DDBA0]', ring: '' },
+  pink: { bg: 'bg-white/[0.06]', text: 'text-[#F78BBC]', ring: '' },
+  blue: { bg: 'bg-white/[0.06]', text: 'text-[#7AB0FF]', ring: '' },
+  teal: { bg: 'bg-white/[0.06]', text: 'text-[#5FD3C4]', ring: '' },
+  money: {
+    bg: 'bg-soft-accent/15',
+    text: 'text-soft-accent',
+    ring: 'ring-1 ring-inset ring-soft-accent/40',
+  },
+} as const;
+
+/**
  * Znak "nie wiem". `null` z gory znaczy NIEUDANY ODCZYT, a nie zero - to dwie
  * rozne rzeczy i tak samo rozroznia je warstwa danych (`failed` w
  * getLeaderboard i getOpenAsks). Zero na kaflu Tips to zdanie o swiecie
@@ -156,6 +184,7 @@ export default function SoftTrendsPanel({
   totalPages,
   onPageChange,
   isLoadingPage = false,
+  tone = 'light',
   children,
 }: {
   stats: SoftTrendStat[];
@@ -186,8 +215,20 @@ export default function SoftTrendsPanel({
   totalPages?: number;
   onPageChange?: (page: number) => void;
   isLoadingPage?: boolean;
+  /**
+   * `light` telefon, zakladka "Trends" i kolumna boczna do 1280px. Domyslny
+   *         i niezmieniony.
+   * `dark`  prawa kolumna od 1280px, gdzie panel stoi pod ciemna karta Askow
+   *         i ma sie z nia czytac jako jeden pas.
+   *
+   * TO JEST WYLACZNIE OPRAWA. Te same kafle, te same liczby, ten sam ranking,
+   * to samo stronicowanie - zmieniaja sie kolory i nic poza nimi.
+   */
+  tone?: 'light' | 'dark';
   children?: React.ReactNode;
 }) {
+  const dark = tone === 'dark';
+  const TILE = dark ? TONE_DARK : TONE;
   // Numeracja ma byc CIAGLA przez wszystkie strony: druga strona zaczyna sie
   // od 11, a nie znowu od 1. Inaczej "top 10" na kazdej stronie znaczy co
   // innego, a medale trafialyby na miejsca 11-13.
@@ -207,13 +248,30 @@ export default function SoftTrendsPanel({
   ];
 
   return (
-    <div className="flex flex-col gap-4 font-soft">
-      <h2 className="font-soft-display text-[24px] font-bold text-soft-ink lg:text-[18px]">Trends</h2>
+    <div
+      className={
+        dark
+          ? 'flex flex-col gap-3 rounded-card bg-[#141a33] p-4 font-soft shadow-card'
+          : 'flex flex-col gap-4 font-soft'
+      }
+    >
+      {dark ? (
+        <h2 className="font-soft-display text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/45">
+          Trends
+        </h2>
+      ) : (
+        <h2 className="font-soft-display text-[24px] font-bold text-soft-ink lg:text-[18px]">Trends</h2>
+      )}
 
       {/* Dwie kolumny na kazdej szerokosci - uzasadnienie w naglowku pliku. */}
       <div className="grid grid-cols-2 gap-2.5">
         {tiles.map((stat) => (
-          <div key={stat.label} className={`rounded-card px-4 py-3.5 ${TONE[stat.tone].bg} ${TONE[stat.tone].ring}`}>
+          <div
+            key={stat.label}
+            className={`${dark ? 'rounded-xl px-3.5 py-3' : 'rounded-card px-4 py-3.5'} ${
+              TILE[stat.tone].bg
+            } ${TILE[stat.tone].ring}`}
+          >
             {/* Skrot na wierzchu, pelna liczba w `title` - patrz compact(). */}
             <div
               title={
@@ -223,11 +281,17 @@ export default function SoftTrendsPanel({
                     ? `${stat.value} — ${stat.detail}`
                     : stat.value
               }
-              className={`font-soft-display text-[26px] font-bold leading-none tabular-nums ${TONE[stat.tone].text}`}
+              className={`font-soft-display ${
+                dark ? 'text-[22px]' : 'text-[26px]'
+              } font-bold leading-none tabular-nums ${TILE[stat.tone].text}`}
             >
               {compact(stat.value)}
             </div>
-            <div className="mt-1.5 font-soft text-[11.5px] font-semibold uppercase tracking-[0.06em] text-soft-ink-soft">
+            <div
+              className={`mt-1.5 font-soft text-[11.5px] font-semibold uppercase tracking-[0.06em] ${
+                dark ? 'text-white/45' : 'text-soft-ink-soft'
+              }`}
+            >
               {stat.label}
             </div>
             {/* Zastrzezenie stoi PRZY liczbie, nie w dymku - liczba niepelna
@@ -235,7 +299,11 @@ export default function SoftTrendsPanel({
                 nikt nie otwiera. Mniejsze i jasniejsze od podpisu, zeby nie
                 konkurowalo z sama liczba. */}
             {stat.note && (
-              <div className="mt-0.5 font-soft text-[10.5px] font-medium normal-case tracking-normal text-soft-ink-faint">
+              <div
+                className={`mt-0.5 font-soft text-[10.5px] font-medium normal-case tracking-normal ${
+                  dark ? 'text-white/35' : 'text-soft-ink-faint'
+                }`}
+              >
                 {stat.note}
               </div>
             )}
@@ -243,14 +311,31 @@ export default function SoftTrendsPanel({
         ))}
       </div>
 
-      <section className="rounded-card bg-soft-surface p-4 shadow-card">
+      {/* Na granacie ranking NIE dostaje wlasnej karty: stoi w tej samej,
+          co kafle, oddzielony cienka linia. Karta w karcie robilaby z waskiej
+          kolumny schodki z ramek. */}
+      <section
+        className={dark ? 'border-t border-white/10 pt-3' : 'rounded-card bg-soft-surface p-4 shadow-card'}
+      >
         <div className="mb-3 flex items-baseline justify-between">
-          <h3 className="font-soft-display text-[15px] font-bold text-soft-ink">Most Active</h3>
+          <h3
+            className={
+              dark
+                ? 'font-soft-display text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/45'
+                : 'font-soft-display text-[15px] font-bold text-soft-ink'
+            }
+          >
+            Most Active
+          </h3>
           {onSeeAll && (
             <button
               type="button"
               onClick={onSeeAll}
-              className="font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className={`font-soft text-[12.5px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 ${
+                dark
+                  ? 'text-soft-accent focus-visible:ring-soft-accent'
+                  : 'text-soft-primary-deep focus-visible:ring-soft-primary'
+              }`}
             >
               See all
             </button>
@@ -258,7 +343,11 @@ export default function SoftTrendsPanel({
         </div>
 
         {activeUsers.length === 0 ? (
-          <p className="py-4 text-center font-soft text-[13px] text-soft-ink-soft">
+          <p
+            className={`py-4 text-center font-soft text-[13px] ${
+              dark ? 'text-white/45' : 'text-soft-ink-soft'
+            }`}
+          >
             Nobody has earned points yet.
           </p>
         ) : (
@@ -268,7 +357,11 @@ export default function SoftTrendsPanel({
                 <button
                   type="button"
                   onClick={() => onOpenUser?.(user.address)}
-                  className="flex w-full items-center gap-3 rounded-pill py-2.5 text-left transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.99] hover:bg-soft-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  className={`flex w-full items-center gap-3 rounded-pill py-2.5 text-left transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 ${
+                    dark
+                      ? 'px-1.5 hover:bg-white/[0.06] focus-visible:ring-soft-accent'
+                      : 'hover:bg-soft-sunken focus-visible:ring-soft-primary'
+                  }`}
                 >
                   <span
                     className="flex h-6 w-6 flex-none items-center justify-center rounded-full font-soft-display text-[11px] font-bold text-white"
@@ -290,7 +383,11 @@ export default function SoftTrendsPanel({
                       `defaultComponent` wchodzi wylacznie wtedy, gdy tam nic
                       nie ma. Czyli dokladnie "ich ENS albo nasze profilowe,
                       zaleznie co maja" - bez zgadywania po naszej stronie. */}
-                  <span className="h-7 w-7 flex-none overflow-hidden rounded-full bg-soft-sunken">
+                  <span
+                    className={`h-7 w-7 flex-none overflow-hidden rounded-full ${
+                      dark ? 'bg-white/10' : 'bg-soft-sunken'
+                    }`}
+                  >
                     <Avatar
                       address={user.address as `0x${string}`}
                       className="h-7 w-7"
@@ -314,9 +411,15 @@ export default function SoftTrendsPanel({
                       wygladaly identycznie. */}
                   <NameWithSuffix
                     name={user.name}
-                    className="min-w-0 flex-1 truncate font-soft text-[13.5px] font-semibold text-soft-ink"
+                    className={`min-w-0 flex-1 truncate font-soft text-[13.5px] font-semibold ${
+                      dark ? 'text-white' : 'text-soft-ink'
+                    }`}
                   />
-                  <span className="flex-none rounded-pill bg-soft-sunken px-2.5 py-1 font-soft-display text-[12px] font-bold tabular-nums text-soft-primary-deep">
+                  <span
+                    className={`flex-none rounded-pill px-2.5 py-1 font-soft-display text-[12px] font-bold tabular-nums ${
+                      dark ? 'bg-white/10 text-white/80' : 'bg-soft-sunken text-soft-primary-deep'
+                    }`}
+                  >
                     {user.points.toLocaleString('en-US')}
                   </span>
                 </button>
@@ -333,17 +436,29 @@ export default function SoftTrendsPanel({
             ze stalej: ta lista raz juz oglaszala 5 stron i 50 osob, majac
             w reku 12 rekordow. */}
         {showPager && (
-          <div className="mt-3 flex items-center justify-between border-t border-soft-line pt-3">
+          <div
+            className={`mt-3 flex items-center justify-between border-t pt-3 ${
+              dark ? 'border-white/10' : 'border-soft-line'
+            }`}
+          >
             <button
               type="button"
               disabled={page! <= 1 || isLoadingPage}
               onClick={() => onPageChange!(page! - 1)}
-              className="rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:text-soft-ink-faint disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className={`rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 ${
+                dark
+                  ? 'text-soft-accent disabled:text-white/25 focus-visible:ring-soft-accent'
+                  : 'text-soft-primary-deep disabled:text-soft-ink-faint focus-visible:ring-soft-primary'
+              }`}
             >
               ← Prev
             </button>
 
-            <span className="font-soft text-[12px] font-semibold tabular-nums text-soft-ink-soft">
+            <span
+              className={`font-soft text-[12px] font-semibold tabular-nums ${
+                dark ? 'text-white/45' : 'text-soft-ink-soft'
+              }`}
+            >
               {isLoadingPage ? 'Loading…' : `${page} / ${totalPages}`}
             </span>
 
@@ -351,7 +466,11 @@ export default function SoftTrendsPanel({
               type="button"
               disabled={page! >= totalPages! || isLoadingPage}
               onClick={() => onPageChange!(page! + 1)}
-              className="rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:text-soft-ink-faint disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              className={`rounded-pill px-3 py-1.5 font-soft text-[12.5px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 ${
+                dark
+                  ? 'text-soft-accent disabled:text-white/25 focus-visible:ring-soft-accent'
+                  : 'text-soft-primary-deep disabled:text-soft-ink-faint focus-visible:ring-soft-primary'
+              }`}
             >
               Next →
             </button>
