@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import ProfileSocials from './ProfileSocials';
+import { isRouteDisabled } from '@/config/routeStatus';
 import { toast } from 'react-hot-toast';
 // ✅ USUNIĘTO: UserRank i RANK_DESCRIPTIONS - nie używane już
 // Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
@@ -1298,6 +1299,37 @@ export default function BuilderProfile({
                   }
                 }}
               />
+
+              {/* ===== SPHERE IDENTITY - PRZENIESIONE Z KOLUMNY BOCZNEJ =====
+                  Kafel stal w lewej kolumnie feedu, ktora zostala sprowadzona
+                  do samej nawigacji. Jest to odnosnik do PELNEJ aktywnosci
+                  onchain wlasciciela profilu, wiec jego miejsce jest na
+                  profilu, pod linkami spolecznosciowymi - a nie w menu.
+
+                  Ten sam warunek `isRouteDisabled('/base')` co przedtem: bez
+                  niego kafel prowadzilby w przekierowanie z powrotem. */}
+              {!isRouteDisabled('/base') && (
+                <a
+                  href="/base"
+                  className="mt-3 block w-full rounded-card bg-gradient-to-r from-gray-900 via-blue-900 to-black p-4 text-center shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                >
+                  <div className="mb-1.5 flex items-center justify-center gap-2">
+                    <span className="font-soft-display text-[15px] font-bold text-white">
+                      Sphere Identity
+                    </span>
+                    <span className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5">
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 146 146" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <circle cx="73" cy="73" r="73" fill="#0052FF" />
+                        <path d="M73.323 123.729C101.617 123.729 124.553 100.832 124.553 72.5875C124.553 44.343 101.617 21.4463 73.323 21.4463C46.4795 21.4463 24.4581 42.0558 22.271 68.2887H89.9859V76.8864H22.271C24.4581 103.119 46.4795 123.729 73.323 123.729Z" fill="white" />
+                      </svg>
+                      <span className="font-soft text-[10.5px] font-medium text-white">Base</span>
+                    </span>
+                  </div>
+                  <p className="font-soft text-[12px] leading-[1.45] text-blue-200">
+                    Transactions, tokens, NFTs and contracts, straight from the chain.
+                  </p>
+                </a>
+              )}
             </div>
           </div>
 

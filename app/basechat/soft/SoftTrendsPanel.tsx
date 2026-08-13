@@ -12,28 +12,31 @@ import { NameWithSuffix } from '../../utils/nameSuffix';
  * Statistics", nie pokazywal juz ZADNYCH statystyk. Te same dane maja byc
  * widoczne na obu szerokosciach; roznica ma byc w oprawie, nie w tresci.
  *
- * SZESC KAFLI, SZESC KOLOROW. To jedyne miejsce w aplikacji, gdzie kolor jest
- * przypisany do kategorii, a nie do znaczenia - i jest to swiadomy wyjatek.
- * Liczby o tej samej wadze, ustawione w siatke, bez rozroznienia czytaja sie
- * jak tabela; z rozroznieniem kazda ma wlasne miejsce w pamieci i wzrok wraca
- * do wlasciwej bez czytania podpisu.
+ * REJESTR, NIE SIATKA PASTELOWYCH KAFLI.
  *
- * Odcienie sa PRZYGASZONE, zeby siatka nie konkurowala z pomaranczem, ktory
- * w tej aplikacji znaczy pieniadze.
+ * Bylo tu szesc kwadratow 2x2, kazdy we wlasnym przygaszonym kolorze
+ * kategorii. Argument brzmial: liczby o tej samej wadze bez rozroznienia
+ * czytaja sie jak tabela, a z kolorem kazda ma wlasne miejsce w pamieci.
+ * Argument jest nieglupi, ale przegral z tym, jak to wygladalo - siatka
+ * kolorowych kafli z wielka cyfra w kazdym to najczestszy uklad panelu
+ * statystyk, jaki istnieje, i przez to nie mowi o tym produkcie nic.
+ * Decyzja wlasciciela produktu i jest sluszna.
  *
- * JEDEN WYJATEK OD "POMARANCZ TO PIENIADZE": kafel Tips. On WLASNIE liczy
- * pieniadze - rozliczone platnosci - wiec jest jedynym miejscem w tej siatce,
- * gdzie akcent jest uzyty zgodnie z regula, a nie wbrew niej. Zeby nie mylil
- * sie z cieplym "amber" innej kategorii, dostaje MOCNIEJSZE tlo
- * (soft-accent-soft zamiast wygaszonego) i cienki pierscien w kolorze akcentu.
+ * Teraz jest to jedna karta z wierszami: podpis po lewej, liczba po prawej,
+ * wlosowa linia miedzy nimi. Liczby stoja w jednej kolumnie na `tabular-nums`,
+ * wiec cyfry sa pod cyframi i sam slupek pokazuje rzedy wielkosci bez zadnego
+ * koloru. Czyta sie to jak wyciag, a produkt, ktorego motyw brzmi "kazda
+ * liczba jest paragonem", ma prawo tak wygladac.
  *
- * DWIE KOLUMNY, NIE TRZY. Szesc kafli kusi, zeby ustawic je 3x2 - i na
- * telefonie 320px to jest pulapka: kafel ma wtedy 89px, czyli 57px tresci po
- * odjeciu oddechu, a "184K" w rozmiarze 26px potrzebuje 62px. Zeby trojka
- * weszla, trzeba zmniejszyc liczbe i skrocic podpisy do skrotow - czyli
- * dokladnie zamienic panel w sciane cyfr, ktorej nikt nie czyta. Dwie kolumny
- * trzymaja pelne slowa i pelny rozmiar liczby na kazdej szerokosci: i na
- * telefonie, i w kolumnie bocznej 352px, gdzie miejsca jest jeszcze mniej.
+ * KOLOR ZOSTAL JEDEN: pomarancz na wierszu Tips. On WLASNIE liczy pieniadze -
+ * rozliczone platnosci - wiec jako jedyny uzywa akcentu zgodnie z regula
+ * "pomarancz znaczy pieniadze", a nie wbrew niej. Pole `tone` zostaje w typie,
+ * bo wywolania je podaja, ale czyta sie z niego juz tylko `money`.
+ *
+ * JEDNA KOLUMNA, NIE DWIE. Wiersz bierze cala szerokosc, wiec panel dziala tak
+ * samo na telefonie 320px, w kolumnie bocznej 352px i w prawej 320px - nie ma
+ * czego skracac ani zmniejszac, zeby sie zmiescilo. Poprzedni uklad musial
+ * pilnowac, zeby "184K" w rozmiarze 26px zmiescilo sie w kaflu 89px.
  *
  * CZEGO TU NIE MA I DLACZEGO: "Networks". Da sie policzyc (SOFT_NETWORKS ma
  * SIEDEM pozycji), ale ta liczba nigdy sie nie zmienia. Kafel, ktory zawsze
@@ -111,17 +114,6 @@ function compact(value: string): string {
   if (n < 1_000_000) return `${Math.round(n / 100) / 10}K`.replace('.0K', 'K');
   return `${Math.round(n / 100_000) / 10}M`.replace('.0M', 'M');
 }
-
-const TONE = {
-  purple: { bg: 'bg-[#EEE9FB]', text: 'text-soft-primary-deep', ring: '' },
-  amber: { bg: 'bg-[#FDF0DC]', text: 'text-soft-accent-deep', ring: '' },
-  green: { bg: 'bg-[#E4F5EA]', text: 'text-[#15803D]', ring: '' },
-  pink: { bg: 'bg-[#FCE7F0]', text: 'text-[#BE185D]', ring: '' },
-  blue: { bg: 'bg-[#E7EEFA]', text: 'text-[#1D4ED8]', ring: '' },
-  teal: { bg: 'bg-[#DEF1EC]', text: 'text-[#0F766E]', ring: '' },
-  // Pieniadze. Mocniejsze tlo niz `amber` i pierscien - patrz naglowek pliku.
-  money: { bg: 'bg-soft-accent-soft', text: 'text-soft-accent-deep', ring: 'ring-1 ring-inset ring-soft-accent/40' },
-} as const;
 
 /**
  * Znak "nie wiem". `null` z gory znaczy NIEUDANY ODCZYT, a nie zero - to dwie
@@ -210,37 +202,50 @@ export default function SoftTrendsPanel({
     <div className="flex flex-col gap-4 font-soft">
       <h2 className="font-soft-display text-[24px] font-bold text-soft-ink lg:text-[18px]">Trends</h2>
 
-      {/* Dwie kolumny na kazdej szerokosci - uzasadnienie w naglowku pliku. */}
-      <div className="grid grid-cols-2 gap-2.5">
-        {tiles.map((stat) => (
-          <div key={stat.label} className={`rounded-card px-4 py-3.5 ${TONE[stat.tone].bg} ${TONE[stat.tone].ring}`}>
-            {/* Skrot na wierzchu, pelna liczba w `title` - patrz compact(). */}
+      {/* ===== REJESTR, NIE SIATKA KAFLI =====
+          Uzasadnienie tej formy stoi w naglowku pliku. Jedna karta, wiersze
+          oddzielone wlosowa linia, podpis po lewej, liczba po prawej w kolumnie
+          o stalej szerokosci cyfry (`tabular-nums`) - przez to jednostki,
+          dziesiatki i setki stoja pod soba i wysokosc slupka sama pokazuje
+          rzedy wielkosci. */}
+      <div className="rounded-card bg-soft-surface px-4 py-1 shadow-card">
+        <dl className="flex flex-col">
+          {tiles.map((stat, index) => (
             <div
-              title={
-                stat.value === UNKNOWN
-                  ? 'Not available right now'
-                  : stat.detail
-                    ? `${stat.value} — ${stat.detail}`
-                    : stat.value
-              }
-              className={`font-soft-display text-[26px] font-bold leading-none tabular-nums ${TONE[stat.tone].text}`}
+              key={stat.label}
+              className={`flex items-baseline justify-between gap-3 py-3 ${
+                index > 0 ? 'border-t border-soft-line/60' : ''
+              }`}
             >
-              {compact(stat.value)}
+              <dt className="min-w-0 font-soft text-[12px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">
+                {stat.label}
+                {/* Zastrzezenie stoi PRZY liczbie, nie w dymku - liczba
+                    niepelna podana bez niego jest po prostu liczba
+                    nieprawdziwa, a dymka nikt nie otwiera. */}
+                {stat.note && (
+                  <span className="ml-1.5 font-soft text-[10.5px] font-medium normal-case tracking-normal text-soft-ink-faint">
+                    {stat.note}
+                  </span>
+                )}
+              </dt>
+              {/* Skrot na wierzchu, pelna liczba w `title` - patrz compact(). */}
+              <dd
+                title={
+                  stat.value === UNKNOWN
+                    ? 'Not available right now'
+                    : stat.detail
+                      ? `${stat.value} — ${stat.detail}`
+                      : stat.value
+                }
+                className={`flex-none font-soft-display text-[21px] font-bold leading-none tabular-nums ${
+                  stat.tone === 'money' ? 'text-soft-accent-deep' : 'text-soft-ink'
+                }`}
+              >
+                {compact(stat.value)}
+              </dd>
             </div>
-            <div className="mt-1.5 font-soft text-[11.5px] font-semibold uppercase tracking-[0.06em] text-soft-ink-soft">
-              {stat.label}
-            </div>
-            {/* Zastrzezenie stoi PRZY liczbie, nie w dymku - liczba niepelna
-                podana bez niego jest po prostu liczba nieprawdziwa, a dymka
-                nikt nie otwiera. Mniejsze i jasniejsze od podpisu, zeby nie
-                konkurowalo z sama liczba. */}
-            {stat.note && (
-              <div className="mt-0.5 font-soft text-[10.5px] font-medium normal-case tracking-normal text-soft-ink-faint">
-                {stat.note}
-              </div>
-            )}
-          </div>
-        ))}
+          ))}
+        </dl>
       </div>
 
       <section className="rounded-card bg-soft-surface p-4 shadow-card">

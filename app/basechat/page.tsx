@@ -56,7 +56,6 @@ import { toast } from 'react-hot-toast';
 
 
 import PostList, { ExtendedPost } from './components/PostList';
-import ProfileCard from './components/ProfileCard';
 import PinnedPosts from './components/PinnedPosts';
 import FeedAskRail, { ASKS_RAIL_CACHE_KEY } from './components/FeedAskRail';
 // Zakladanie Aska Z FEEDU. Kompozytor i karta sa te same, ktore stoja na
@@ -68,7 +67,9 @@ import AskCard from './components/AskCard';
 import { useCreateAsk } from '../utils/asks/useCreateAsk';
 import { loadListedVaults } from '../utils/asks/listedVaults';
 import type { Ask } from '../utils/asks/types';
-import { HomeIcon, UserIcon, ChartBarIcon } from '@heroicons/react/24/solid';
+// Bars3Icon jako MenuIcon: dolna zakladka otwiera liste przejsc, nie profil,
+// wiec sylwetka czlowieka byla tam obietnica innego ekranu.
+import { HomeIcon, Bars3Icon as MenuIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 // GlassIcons juz tu nie wchodzi - nawigacja desktopu idzie przez
 // SoftSectionList (patrz komentarz przy liscie w kolumnie bocznej).
@@ -81,7 +82,6 @@ import Link from 'next/link';
 import SoftSectionList from './soft/SoftSectionList';
 import SoftTabs from './soft/SoftTabs';
 import SoftTrendsPanel from './soft/SoftTrendsPanel';
-import SoftProfileHeader from './soft/SoftProfileHeader';
 const MusicSelector = dynamic(() => import('./components/MusicSelector'), { ssr: false });
 import SpotifyTrackCard from './components/SpotifyTrackCard';
 // Import Zora SDK functions
@@ -3295,43 +3295,30 @@ function BaseChatContent() {
                   />
                 )}
 
+                {/* ===== LEWA KOLUMNA TO JUZ TYLKO NAWIGACJA =====
+                    Staly tu jeszcze: naglowek profilu na telefonie
+                    (SoftProfileHeader), karta ProfileCard z tiltem na
+                    desktopie, sekcja "About Me" z edycja bio, socjale
+                    i kafel Sphere Identity. Wszystkie cztery mowily o TOBIE,
+                    czyli o tym samym, co Builder Profile - a Builder Profile
+                    jest osobnym, pelnym ekranem, do ktorego prowadzi pozycja
+                    "My Profile" tej samej listy nizej.
+
+                    Przez to "My Profile" znaczylo dwie rozne rzeczy zaleznie od
+                    szerokosci: na desktopie przelaczalo kolumne glowna na
+                    Builder Profile, a na telefonie dolna zakladka o tej samej
+                    nazwie otwierala TEN panel. Jedna nazwa, dwa ekrany, i pelny
+                    profil praktycznie nieosiagalny z telefonu.
+
+                    NIC NIE ZGINELO: bio wraz z ta sama regula "raz na dobe"
+                    oraz socjale sa juz w BuilderProfile.tsx (patrz saveBio
+                    i <ProfileSocials/> tam), a kafel Sphere Identity zostal
+                    tam przeniesiony w tej samej zmianie. Kafel YapScan i tak
+                    sie nie rysowal, bo /yapscan jest wylaczony
+                    w config/routeStatus.js. */}
                 <div className="mb-8">
-                  {isConnected ? (
-                    <div className="space-y-4">
-                      {/* ===== NAGLOWEK PROFILU NA TELEFONIE - Soft Social =====
-                          Stoi PIERWSZY na zakladce "Profile", nad nawigacja:
-                          najpierw kto, potem dokad. Wczesniej byl POD lista
-                          i jego pelnowymiarowy gradient z zaokraglonym dolem
-                          (projektowany na sam szczyt ekranu) wisial w polowie
-                          zakladki.
-
-                          Olowek nie otwiera juz formularza w miejscu -
-                          prowadzi do wlasnego Builder Profile z otwartym
-                          panelem edycji, bo tam mieszka teraz caly formularz
-                          (awatar, nazwa, linki). Jedno miejsce edycji zamiast
-                          dwoch. */}
-                      {address && (
-                        <SoftProfileHeader
-                          name={userProfile.name || 'MySphere User'}
-                          address={address}
-                          avatarUrl={userProfile.avatar}
-                          posts={userProfile.postCount || 0}
-                          likes={userProfile.likesReceived || 0}
-                          // Punkty licza sie z aktywnosci i zyja w userStats
-                          // pod adresem uzytkownika, nie w profilu.
-                          points={(address && userStats[address]?.totalPoints) || 0}
-                          onCopyAddress={() => {
-                            navigator.clipboard.writeText(address);
-                            toast.success('Address copied');
-                          }}
-                          onEdit={() => {
-                            setIsEditingProfile(true);
-                            handleViewBuilderProfile(address);
-                          }}
-                        />
-                      )}
-
-                      {/* ===== PRZELACZNIK WIDOKOW - TYLKO NA TELEFONIE =====
+                  {isConnected && (
+                      /* ===== PRZELACZNIK WIDOKOW - TYLKO NA TELEFONIE =====
                           "All Posts / My Profile / Follows / Friends / Discover"
                           siedzialy dotad na gorze glownego feedu, jako rzad
                           kolorowych kafli. Zabieraly pierwszy ekran telefonu
@@ -3343,8 +3330,8 @@ function BaseChatContent() {
                           a wszystko "moje" siedzi za profilem.
 
                           Na desktopie nic sie nie zmienia - tam jest miejsce
-                          w bok i rzad kafli nikomu nie przeszkadza. */}
-                      <SoftSectionList
+                          w bok i rzad kafli nikomu nie przeszkadza. */
+                    <SoftSectionList
                         className="mb-4 lg:hidden"
                         sections={[
                           {
@@ -3420,217 +3407,7 @@ function BaseChatContent() {
                           },
                         ]}
                       />
-
-                      {/* Panel edycji profilu przeniesiony nad wlasny
-                          Builder Profile w kolumnie glownej - patrz
-                          "EDYCJA PROFILU MIESZKA W BUILDER PROFILE". */}
-                      {/* ===== PROFILECARD - TYLKO DESKTOP =====
-                          Na telefonie te sama tozsamosc pokazuje juz
-                          SoftProfileHeader na gorze zakladki, wiec karta byla
-                          drugim awatarem i drugim przyciskiem Edit na jednym
-                          ekranie. Do tego jej efekt tilt lapal dotyk i potrafil
-                          zawiesic przewijanie calej zakladki. Karta z animacja
-                          zostaje tam, gdzie jest mysz - od progu lg w gore.
-
-                          "Edit" nie otwiera juz formularza w kolumnie bocznej -
-                          prowadzi do wlasnego Builder Profile z otwartym
-                          panelem edycji, bo tam mieszka teraz caly formularz. */}
-                      {address && (
-                        <div className="hidden lg:block mb-4">
-                          <div className="relative z-10 flex justify-center items-start w-full">
-                              <ProfileCard
-                                name={userProfile.name || 'MySphere User'}
-                                handle={userProfile.name?.replace('.sphere', '').replace('.camper', '').replace('.celo', '').replace('.world', '') || address.slice(0, 6) + '...' + address.slice(-4)}
-                                status={address.slice(0, 6) + '...' + address.slice(-4)}
-                                fullAddress={address}
-                                contactText="Edit"
-                                avatarUrl={userProfile.avatar || `/favicon_io (1)/android-chrome-192x1921.png`}
-                                miniAvatarUrl={userProfile.avatar}
-                                socialLinks={userProfile.socialLinks}
-                                showUserInfo={true}
-                                enableTilt={true}
-                                onContactClick={() => {
-                                  setIsEditingProfile(true);
-                                  handleViewBuilderProfile(address);
-                                }}
-                                className="w-full max-w-sm"
-                              />
-                            </div>
-                        </div>
-                      )}
-
-
-
-                      {/* Kafelek YapsMetrics (YapScan) wylaczony decyzja
-                          wlasciciela produktu - wroci razem z trasa /yapscan. */}
-
-                      {/* Bio. Naglowek byl tekstem z gradientem (bg-clip-text)
-                          i ikona-dekoracja obok - jedno i drugie to sygnal
-                          "wygenerowane", a nie hierarchia. Teraz zwykly
-                          naglowek w kroju naglowkowym. */}
-                      <div className="mt-4 rounded-card bg-soft-surface p-4 shadow-card">
-                        <div className="flex justify-between items-center mb-3">
-                          <h3 className="font-soft-display text-[15px] font-bold text-soft-ink">About Me</h3>
-                          <button
-                            onClick={async () => {
-                              if (!address) return;
-                              
-                              // Sprawdź ostatnią edycję bio
-                              const userRef = doc(db, 'users', address);
-                              const userDoc = await getDoc(userRef);
-                              const lastBioUpdate = userDoc.data()?.lastBioUpdate?.toDate() || new Date(0);
-                              const now = new Date();
-                              
-                              // Sprawdź czy minęło 24h od ostatniej edycji
-                              if (now.getTime() - lastBioUpdate.getTime() < 24 * 60 * 60 * 1000) {
-                                const nextUpdate = new Date(lastBioUpdate.getTime() + 24 * 60 * 60 * 1000);
-                                const hoursLeft = Math.ceil((nextUpdate.getTime() - now.getTime()) / (1000 * 60 * 60));
-                                alert(`You can edit your bio once per day. ${hoursLeft} hours remaining.`);
-                                return;
-                              }
-
-                              const newBio = prompt('Enter your bio (max 90 characters):', userProfile.bio);
-                              if (newBio && newBio.length <= 90) {
-                                await updateDoc(userRef, { 
-                                  bio: newBio,
-                                  lastBioUpdate: serverTimestamp()
-                                });
-                                setUserProfile(prev => ({ ...prev, bio: newBio }));
-                              }
-                            }}
-                            className="flex items-center space-x-1 rounded-pill px-2 py-1 font-soft text-[13px] font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            <span>Edit</span>
-                          </button>
-                        </div>
-                        <div className="rounded-[14px] bg-soft-sunken p-4">
-                          <div className="font-soft text-[13.5px] leading-relaxed text-soft-ink-muted">
-                            {userProfile.bio ||
-                              <span className="text-soft-ink-soft">Nothing here yet - use Edit to add your bio.</span>
-                            }
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Base Tracking Identity Link.
-                          UWAGA: /base jest teraz wylaczone (config/routeStatus.js).
-                          Poprzednio kafelek wskazywal na /profile - trase, ktora
-                          NIGDY nie istniala w tym repo (brak app/profile), wiec
-                          byl to martwy link zwracajacy 404. */}
-                      <div className={`mt-4 ${isRouteDisabled('/base') ? 'hidden' : ''}`}>
-                        <a
-                          href="/base"
-                          className="block w-full p-6 bg-gradient-to-r from-gray-900 via-blue-900 to-black rounded-xl text-center hover:from-black hover:via-blue-800 hover:to-gray-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                        >
-                          <div className="flex items-center justify-center mb-3">
-                            <svg className="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                            </svg>
-                            <div className="flex items-center">
-                              <span className="text-white text-xl font-bold mr-2">Sphere Identity</span>
-                              <div className="flex items-center gap-1 px-2 py-1 bg-white/10 rounded-full">
-                                <svg className="w-4 h-4" viewBox="0 0 146 146" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <circle cx="73" cy="73" r="73" fill="#0052FF"/>
-                                  <path d="M73.323 123.729C101.617 123.729 124.553 100.832 124.553 72.5875C124.553 44.343 101.617 21.4463 73.323 21.4463C46.4795 21.4463 24.4581 42.0558 22.271 68.2887H89.9859V76.8864H22.271C24.4581 103.119 46.4795 123.729 73.323 123.729Z" fill="white"/>
-                                </svg>
-                                <span className="text-white text-xs font-medium">Base</span>
-                              </div>
-                            </div>
-                          </div>
-                          <p className="text-blue-200 text-sm mb-2">
-                            View your complete on-chain identity & activity
-                          </p>
-                          <div className="flex items-center justify-center text-blue-300 text-xs">
-                            <span>Transactions • Tokens • NFTs • Contracts</span>
-                            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                          </div>
-                        </a>
-                      </div>
-
-                      {/* Ranking polecen (ReferralLeaderboard) wylaczony
-                          decyzja wlasciciela produktu - kod komponentu zostaje
-                          w app/utils/referrals, tu tylko nie renderujemy. */}
-                  </div>
-                ) : (
-                  <div className="space-y-4 pointer-events-none">
-                    {/* ProfileCard at the top */}
-                    <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
-                      <div className="relative z-10 flex justify-center items-start w-full">
-                        <ProfileCard
-                          name={'MySphere User'}
-                          handle={'mysphere-user'}
-                          status={'0x0000...0000'}
-                          fullAddress={'0x0000000000000000000000000000000000000000'}
-                          contactText="Edit"
-                          avatarUrl={`/ghostavatar.png`}
-                          miniAvatarUrl={`/ghostavatar.png`}
-                          socialLinks={{}}
-                          showUserInfo={true}
-                          enableTilt={true}
-                          onContactClick={() => {}}
-                          className="w-full max-w-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* ReferralLeaderboard i YapsMetrics wylaczone decyzja
-                        wlasciciela produktu - tak samo jak w galezi
-                        zalogowanej wyzej. */}
-
-                    {/* Bio - widok bez podlaczonego portfela.
-                        BYLO TU ZMYSLONE BIO ("Building the future of DeFi on
-                        Base... Always learning, always building!") wpisane na
-                        sztywno w kod. Widzial je kazdy niezalogowany gosc, przy
-                        awatarze-duchu i adresie 0x0000...0000 - czyli produkt,
-                        ktorego cala teza brzmi "te dane sa sprawdzalne",
-                        otwieral sie wymyslonym cudzym zyciorysem.
-                        Teraz honest empty state: nie ma danych, bo nie ma
-                        jeszcze uzytkownika, i tak to pisze. */}
-                    <div className="mt-4 rounded-card bg-soft-surface p-4 shadow-card">
-                      <h3 className="mb-3 font-soft-display text-[15px] font-bold text-soft-ink">About Me</h3>
-                      <div className="rounded-[14px] bg-soft-sunken p-4">
-                        <p className="font-soft text-[13.5px] leading-relaxed text-soft-ink-soft">
-                          Sign in to write your bio.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Base Tracking Identity Link */}
-                    <div className="mt-4">
-                      <div className="block w-full p-6 bg-gradient-to-r from-gray-900 via-blue-900 to-black rounded-xl text-center hover:from-black hover:via-blue-800 hover:to-gray-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
-                        <div className="flex items-center justify-center mb-3">
-                          <svg className="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                          </svg>
-                          <div className="flex items-center">
-                            <span className="text-white text-xl font-bold mr-2">Sphere Identity</span>
-                            <div className="flex items-center gap-1 px-2 py-1 bg-white/10 rounded-full">
-                              <svg className="w-4 h-4" viewBox="0 0 146 146" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="73" cy="73" r="73" fill="#0052FF"/>
-                                <path d="M73.323 123.729C101.617 123.729 124.553 100.832 124.553 72.5875C124.553 44.343 101.617 21.4463 73.323 21.4463C46.4795 21.4463 24.4581 42.0558 22.271 68.2887H89.9859V76.8864H22.271C24.4581 103.119 46.4795 123.729 73.323 123.729Z" fill="white"/>
-                              </svg>
-                              <span className="text-white text-xs font-medium">Base</span>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-blue-200 text-sm mb-2">
-                          View your complete on-chain identity & activity
-                        </p>
-                        <div className="flex items-center justify-center text-blue-300 text-xs">
-                          <span>Transactions • Tokens • NFTs • Contracts</span>
-                          <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-          )}
+                  )}
                 </div>
               </div>
 
@@ -5091,18 +4868,24 @@ function BaseChatContent() {
             miesci sie przy 320px w tych samych rozmiarach, wiec i tutaj sie
             zmieszcza. */}
         <div className="flex items-end justify-around px-2 pb-3 pt-2">
+          {/* ===== "MENU", A NIE "PROFILE" =====
+              Ten przycisk otwiera lewy panel, w ktorym stoi teraz WYLACZNIE
+              nawigacja. Podpisany "Profile" obiecywal profil, a dawal liste
+              przejsc - i konkurowal nazwa z pozycja "My Profile" w srodku tej
+              listy, ktora prowadzi do prawdziwego, pelnego profilu. Jedna
+              nazwa nie moze znaczyc dwoch roznych ekranow. */}
           <button
             onClick={() => setActiveMobilePanel('left')}
             aria-current={activeMobilePanel === 'left' ? 'page' : undefined}
             className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <div className={`p-1 rounded-full ${activeMobilePanel === 'left' ? 'bg-soft-sunken' : ''}`}>
-              <UserIcon
+              <MenuIcon
                 className="w-6 h-6"
                 color={activeMobilePanel === 'left' ? '#7C6BDA' : '#8D86AB'}
               />
             </div>
-            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'left' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Profile</span>
+            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'left' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Menu</span>
           </button>
           <button
             onClick={() => setActiveMobilePanel('main')}
