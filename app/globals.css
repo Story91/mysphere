@@ -37,6 +37,10 @@
      kontrastu 4.5:1. */
   --soft-primary: 124 107 218; /* #7c6bda */
   --soft-primary-deep: 95 78 194; /* #5f4ec2 */
+  /* Tekst NA wypelnieniu fioletem (aktywna pigulka nawigacji). Biel, jak
+     dotad - ale osobnym tokenem, zeby motyw sieci mogl ja zamienic na ciemna
+     tam, gdzie wypelnienie robi sie jasnozielone. */
+  --soft-on-primary: 255 255 255;
   --soft-line: 214 205 242; /* #d6cdf2 */
   --soft-line-strong: 185 177 216; /* #b9b1d8 */
 
@@ -57,6 +61,57 @@
 
   --soft-radius-card: 26px;
   --soft-radius-pill: 999px;
+
+  /* =========================================================================
+     PALETA STARTPADA (--sp-*)
+     =========================================================================
+     Launchpad byl jedynym ekranem pomalowanym KOLORAMI WPISANYMI WPROST -
+     `bg-white`, `#16141b`, `border-black/10`, okolo 350 razy w siedmiu plikach.
+     Dopoki tak bylo, motyw sieci (czarno-zielony Robinhood, patrz
+     app/startpad/networkTheme.ts) byl niewykonalny: nie bylo czego podmienic.
+
+     Wartosci ponizej to DOKLADNIE te kolory, ktore stoja w tych plikach dzis,
+     wiec jasny startpad nie zmienia sie o odcien. Podmienia je wylacznie blok
+     motywu, gdy na <html> pojawi sie `data-net-theme`.
+
+     `--sp-shade` wymaga slowa osobno: to jest baza WSZYSTKICH krawedzi i
+     przygaszonych tekstow pisanych z przezroczystoscia (`border-sp-shade/10`,
+     `text-sp-shade/45`). W jasnym motywie jest czernia, w ciemnym biela - i ta
+     jedna zmienna odwraca cala rodzine, nie ruszajac ani jednej wartosci
+     krycia.
+     ====================================================================== */
+  --sp-bg: 251 251 253; /* #fbfbfd - tlo sekcji pod kartami */
+  --sp-surface: 255 255 255; /* karty, pola, panele */
+  --sp-sunken: 250 250 253; /* #fafafd - naglowek tabeli, pasy zaglebione */
+  --sp-shade: 0 0 0; /* baza krawedzi i przygaszonego tekstu */
+  --sp-ink: 22 20 27; /* #16141b - tekst mocny */
+  --sp-ink-soft: 138 135 148; /* #8a8794 - tekst nieaktywny */
+  --sp-hover: 255 248 252; /* #fff8fc - podswietlenie wiersza */
+
+  --sp-brand: 124 107 218; /* #7c6bda */
+  /* Tekst LEZACY NA wypelnieniu marki (przycisk Trade, Launch). W jasnym
+     motywie biel, jak dotad. W ciemnym musi byc CIEMNY: biel na #00C805 daje
+     kontrast 2.3:1, czyli napis, ktorego nie widac - i dokladnie dlatego
+     Robinhood pisze po swojej zieleni czernia. */
+  --sp-on-brand: 255 255 255;
+  --sp-brand-deep: 95 78 194; /* #5f4ec2 - tekst marki na jasnym */
+  --sp-brand-soft: 244 241 255; /* #f4f1ff - tlo pigulki marki */
+  --sp-brand-strong: 143 69 223; /* #8f45df - akcent wyrozniony */
+
+  --sp-up: 11 154 81; /* #0b9a51 */
+  --sp-up-vivid: 24 189 100; /* #18bd64 - linia wzrostu */
+  --sp-up-soft: 237 255 244; /* #edfff4 */
+  --sp-up-line: 157 231 187; /* #9de7bb */
+
+  --sp-down: 199 107 18; /* #c76b12 */
+  --sp-down-deep: 163 75 8; /* #a34b08 */
+  --sp-down-soft: 255 248 237; /* #fff8ed */
+  --sp-down-line: 243 197 138; /* #f3c58a */
+
+  --sp-danger: 163 32 32; /* #a32020 */
+  --sp-danger-soft: 255 239 239; /* #ffefef */
+  --sp-info: 31 111 178; /* #1f6fb2 */
+  --sp-info-soft: 232 244 255; /* #e8f4ff */
 }
 
 /* ===========================================================================

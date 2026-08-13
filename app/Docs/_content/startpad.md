@@ -28,7 +28,7 @@ Share is in the page header too. A shared token link previews as a card generate
 
 ## How to use it
 
-1. Open [/startpad](/startpad). It opens on Base mainnet by default, and the header switcher also offers Base Sepolia and Robinhood Chain.
+1. Open [/startpad](/startpad). It opens on Base mainnet by default, and the header switcher also offers Base Sepolia and Robinhood Chain. Switching to Robinhood Chain also repaints the launchpad in that network's colours, black and green, so you can tell at a glance which market you are looking at.
 2. Connect a wallet funded for that network: real ETH on Base mainnet, test ETH on Base Sepolia.
 3. Launch with a name, symbol, and logo (a launch does not go out without one). Quick launch uses defaults and takes an optional pre-buy. Creator setup additionally sets the trade fee (up to 1%), your share of it (up to 70%), up to 8 fee receivers, an auto-buyback slice, a per-wallet buy cap for the first 5 minutes, and on B20 networks an optional vanity token address you mine in your own browser. Quick launch sets no buy cap; if you want sniper protection, set it in Creator setup. Everything chosen at launch is immutable afterwards.
 4. Trade by buying or selling against the curve. The quote you see (`quoteBuy` / `quoteSell`) is what the trade returns.

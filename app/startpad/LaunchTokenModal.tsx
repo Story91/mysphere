@@ -58,12 +58,12 @@ import { expectedAttempts, HEX_SUBSTITUTES, isMineable } from '../utils/b20/addr
 import { mineLaunchpadVanity, predictLaunchpadVanity, type LaunchpadVanityContext } from '../utils/b20/launchpadVanity';
 
 const FIELD =
-  'w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 text-[14px] text-[#16141b] outline-none transition-colors placeholder:text-black/35 focus:border-[#7c6bda]';
-const LABEL = 'mb-1.5 block text-[12px] font-extrabold text-[#16141b]';
-const HINT = 'mt-1 block text-[11px] leading-[1.4] text-black/45';
-const FIELD_ERROR = 'mt-1 block text-[11px] font-bold leading-[1.4] text-[#b02a5c]';
+  'w-full rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-3 text-[14px] text-sp-ink outline-none transition-colors placeholder:text-sp-shade/35 focus:border-sp-brand';
+const LABEL = 'mb-1.5 block text-[12px] font-extrabold text-sp-ink';
+const HINT = 'mt-1 block text-[11px] leading-[1.4] text-sp-shade/45';
+const FIELD_ERROR = 'mt-1 block text-[11px] font-bold leading-[1.4] text-sp-danger';
 const CHIP =
-  'rounded-full border border-black/10 bg-white px-2.5 py-1 text-[10.5px] font-bold text-black/60 transition-colors hover:border-soft-primary';
+  'rounded-full border border-sp-shade/10 bg-sp-surface px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 transition-colors hover:border-soft-primary';
 
 /**
  * Sufity sa TYMI SAMYMI liczbami, co w `CurveLaunchpad`. Interfejs czyta je z
@@ -205,7 +205,7 @@ type LaunchedResult = {
 
 function CurvePill() {
   return (
-    <span className="rounded-full bg-[#edeaff] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#5f4ec2]">
+    <span className="rounded-full bg-sp-brand-soft px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-sp-brand-deep">
       Curve
     </span>
   );
@@ -231,8 +231,8 @@ function BoardPreviewCard({
 }) {
   const progress = Math.min(100, Math.round((raised / CURVE_TARGET_ETH) * 100));
   return (
-    <div className="rounded-[18px] border border-black/10 bg-white p-4">
-      <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-black/40">Board preview</p>
+    <div className="rounded-[18px] border border-sp-shade/10 bg-sp-surface p-4">
+      <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-sp-shade/40">Board preview</p>
       <div className="mt-3 flex items-start gap-3">
         <div
           className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[16px] font-soft-display text-[14px] font-extrabold text-white shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
@@ -246,31 +246,31 @@ function BoardPreviewCard({
           ) : (
             <>
               <span className="relative z-10">{(symbol || '??').slice(0, 2)}</span>
-              <span aria-hidden="true" className="absolute -right-2 -top-3 h-8 w-8 rounded-full bg-white/25" />
-              <span aria-hidden="true" className="absolute -bottom-3 -left-2 h-8 w-8 rounded-full bg-black/10" />
+              <span aria-hidden="true" className="absolute -right-2 -top-3 h-8 w-8 rounded-full bg-sp-surface/25" />
+              <span aria-hidden="true" className="absolute -bottom-3 -left-2 h-8 w-8 rounded-full bg-sp-shade/10" />
             </>
           )}
         </div>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-[15px] font-extrabold text-[#16141b]">{symbol || 'TICKER'}</span>
+            <span className="truncate text-[15px] font-extrabold text-sp-ink">{symbol || 'TICKER'}</span>
             <CurvePill />
           </span>
-          <span className="mt-1 block truncate text-[12px] text-black/50">{name || 'Your token name'}</span>
+          <span className="mt-1 block truncate text-[12px] text-sp-shade/50">{name || 'Your token name'}</span>
         </span>
       </div>
       <div className="mt-4">
         <div className="flex items-baseline justify-between">
-          <span className="text-[15px] font-extrabold text-[#16141b]">{raised.toFixed(raised >= 1 ? 2 : 3)} ETH</span>
-          <span className="text-[11px] font-extrabold text-[#12a451]">{progress}%</span>
+          <span className="text-[15px] font-extrabold text-sp-ink">{raised.toFixed(raised >= 1 ? 2 : 3)} ETH</span>
+          <span className="text-[11px] font-extrabold text-sp-up">{progress}%</span>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/8">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sp-shade/8">
           <div
             className="h-full rounded-full transition-[width] duration-500"
             style={{ width: `${progress}%`, backgroundColor: PREVIEW_ACCENT }}
           />
         </div>
-        <div className="mt-2 flex items-center justify-between text-[11px] text-black/45">
+        <div className="mt-2 flex items-center justify-between text-[11px] text-sp-shade/45">
           <span>{hasPreBuy ? 'You are holder #1' : 'No holders yet'}</span>
           <span>just now</span>
         </div>
@@ -291,9 +291,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-black/10 bg-white p-4">
+    <section className="rounded-2xl border border-sp-shade/10 bg-sp-surface p-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-[13px] font-extrabold text-[#16141b]">
+        <h3 className="flex items-center gap-2 text-[13px] font-extrabold text-sp-ink">
           {icon}
           {title}
         </h3>
@@ -1273,7 +1273,7 @@ export default function LaunchTokenModal({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-stretch justify-center bg-[#16141b]/35 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 z-[70] flex items-stretch justify-center bg-sp-ink/35 backdrop-blur-sm sm:items-center sm:p-4"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) handleClose();
@@ -1283,23 +1283,23 @@ export default function LaunchTokenModal({
         role="dialog"
         aria-modal="true"
         aria-label="Launch a token"
-        className="flex h-full max-h-full w-full flex-col overflow-hidden bg-white font-soft shadow-[0_24px_80px_rgba(0,0,0,0.2)] sm:h-auto sm:max-h-[90vh] sm:max-w-[880px] sm:rounded-[22px] sm:border sm:border-black/10"
+        className="flex h-full max-h-full w-full flex-col overflow-hidden bg-sp-surface font-soft shadow-[0_24px_80px_rgba(0,0,0,0.2)] sm:h-auto sm:max-h-[90vh] sm:max-w-[880px] sm:rounded-[22px] sm:border sm:border-sp-shade/10"
       >
         {/* ------------------------------ NAGLOWEK ------------------------------ */}
-        <header className="shrink-0 border-b border-black/10 px-5 pb-4 pt-5">
+        <header className="shrink-0 border-b border-sp-shade/10 px-5 pb-4 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">
                 {phase === 'success' ? 'Launch confirmed' : 'New launch'}
               </p>
-              <h2 className="mt-1 text-[21px] font-extrabold text-[#16141b]">
+              <h2 className="mt-1 text-[21px] font-extrabold text-sp-ink">
                 {phase === 'success' ? 'Your token is live.' : 'Put an idea on curve.'}
               </h2>
             </div>
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-full p-2 text-black/40 hover:bg-black/5 hover:text-[#16141b]"
+              className="rounded-full p-2 text-sp-shade/40 hover:bg-sp-shade/5 hover:text-sp-ink"
               aria-label="Close dialog"
             >
               <X className="h-5 w-5" aria-hidden="true" />
@@ -1307,14 +1307,14 @@ export default function LaunchTokenModal({
           </div>
 
           {phase === 'form' && (
-            <div className="mt-4 flex items-center gap-1 rounded-xl bg-[#f4f1ff] p-1" role="tablist" aria-label="Launch mode">
+            <div className="mt-4 flex items-center gap-1 rounded-xl bg-sp-brand-soft p-1" role="tablist" aria-label="Launch mode">
               <button
                 type="button"
                 role="tab"
                 aria-selected={mode === 'quick'}
                 onClick={() => setMode('quick')}
                 className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold ${
-                  mode === 'quick' ? 'bg-white text-soft-primary-deep shadow-sm' : 'text-black/45'
+                  mode === 'quick' ? 'bg-sp-surface text-soft-primary-deep shadow-sm' : 'text-sp-shade/45'
                 }`}
               >
                 <Zap className="mr-1.5 inline h-3.5 w-3.5" aria-hidden="true" />
@@ -1326,13 +1326,13 @@ export default function LaunchTokenModal({
                 aria-selected={mode === 'creator'}
                 onClick={() => setMode('creator')}
                 className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold ${
-                  mode === 'creator' ? 'bg-white text-soft-primary-deep shadow-sm' : 'text-black/45'
+                  mode === 'creator' ? 'bg-sp-surface text-soft-primary-deep shadow-sm' : 'text-sp-shade/45'
                 }`}
               >
                 <Layers3 className="mr-1.5 inline h-3.5 w-3.5" aria-hidden="true" />
                 Creator setup
                 {advancedSupported === false && (
-                  <span className="ml-1.5 rounded-full bg-[#d78a55]/15 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.05em] text-[#a35c1a]">
+                  <span className="ml-1.5 rounded-full bg-[#d78a55]/15 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.05em] text-sp-down-deep">
                     legacy
                   </span>
                 )}
@@ -1350,11 +1350,11 @@ export default function LaunchTokenModal({
               (przelacznik obok Launch), zeby nie mylic "sieci portfela" z
               "sieci launchpada". */}
           {phase === 'form' && isConnected && !onSepolia && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#f3c58a] bg-[#fff8ed] px-3.5 py-3">
-              <Globe className="mt-0.5 h-4 w-4 shrink-0 text-[#c76b12]" aria-hidden="true" />
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-sp-down-line bg-sp-down-soft px-3.5 py-3">
+              <Globe className="mt-0.5 h-4 w-4 shrink-0 text-sp-down" aria-hidden="true" />
               <div className="min-w-0 flex-1">
-                <p className="text-[12.5px] font-extrabold text-[#8c4a0b]">Your wallet is on another network</p>
-                <p className="mt-0.5 text-[11.5px] leading-[1.45] text-[#a34b08]">
+                <p className="text-[12.5px] font-extrabold text-sp-down-deep">Your wallet is on another network</p>
+                <p className="mt-0.5 text-[11.5px] leading-[1.45] text-sp-down-deep">
                   Startpad is set to <span className="font-bold">{LAUNCHPAD_CHAIN.name}</span>. Clicking
                   Launch will ask your wallet to switch there, approve it when it pops up. To point
                   Startpad at a different network instead, use the network switch next to the Launch
@@ -1365,16 +1365,16 @@ export default function LaunchTokenModal({
           )}
           {phase === 'success' && launched ? (
             <div className="mx-auto flex max-w-[420px] flex-col items-center py-6 text-center">
-              <CheckCircle2 className="h-14 w-14 text-[#18bd64]" aria-hidden="true" />
-              <h3 className="mt-4 text-[22px] font-extrabold text-[#16141b]">{launched.symbol} is live on the curve</h3>
-              <p className="mt-1 text-[13px] text-black/50">
+              <CheckCircle2 className="h-14 w-14 text-sp-up-vivid" aria-hidden="true" />
+              <h3 className="mt-4 text-[22px] font-extrabold text-sp-ink">{launched.symbol} is live on the curve</h3>
+              <p className="mt-1 text-[13px] text-sp-shade/50">
                 {launched.name}
                 {launched.preBuyWei > 0n
                   ? ` · your ${formatEther(launched.preBuyWei)} ETH${usdSuffix(Number(formatEther(launched.preBuyWei)))} pre-buy filled in the same transaction`
                   : ''}
               </p>
-              <div className="mt-5 flex w-full items-center justify-between gap-2 rounded-xl border border-black/10 bg-[#fbfbfd] px-3.5 py-3">
-                <span className="truncate font-mono text-[12px] text-[#16141b]">{shortAddress(launched.address)}</span>
+              <div className="mt-5 flex w-full items-center justify-between gap-2 rounded-xl border border-sp-shade/10 bg-sp-bg px-3.5 py-3">
+                <span className="truncate font-mono text-[12px] text-sp-ink">{shortAddress(launched.address)}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -1382,22 +1382,22 @@ export default function LaunchTokenModal({
                     setCopied(true);
                     window.setTimeout(() => setCopied(false), 1600);
                   }}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-black/10 px-3 py-1.5 text-[11px] font-extrabold text-[#16141b] hover:border-soft-primary"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sp-shade/10 px-3 py-1.5 text-[11px] font-extrabold text-sp-ink hover:border-soft-primary"
                 >
-                  {copied ? <Check className="h-3.5 w-3.5 text-[#12a451]" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+                  {copied ? <Check className="h-3.5 w-3.5 text-sp-up" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
                   {copied ? 'Copied' : 'Copy CA'}
                 </button>
               </div>
-              <p className="mt-2 text-[11px] text-black/40">Tx {launched.hash.slice(0, 10)}...</p>
+              <p className="mt-2 text-[11px] text-sp-shade/40">Tx {launched.hash.slice(0, 10)}...</p>
               {profileNotice && (
-                <p className="mt-3 w-full rounded-xl border border-[#f3c58a] bg-[#fff8ed] px-3.5 py-2.5 text-left text-[12px] leading-[1.45] text-[#a34b08]">
+                <p className="mt-3 w-full rounded-xl border border-sp-down-line bg-sp-down-soft px-3.5 py-2.5 text-left text-[12px] leading-[1.45] text-sp-down-deep">
                   {profileNotice}
                 </p>
               )}
               <div className="mt-6 flex w-full flex-col gap-2 sm:flex-row">
                 <Link
                   href={`/startpad/${launched.address}`}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-soft-primary px-4 py-3 text-[13px] font-extrabold text-white"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-soft-primary px-4 py-3 text-[13px] font-extrabold text-sp-on-brand"
                 >
                   View token page
                   <ExternalLink className="h-4 w-4" aria-hidden="true" />
@@ -1409,7 +1409,7 @@ export default function LaunchTokenModal({
                     setPhase('form');
                     setLaunched(null);
                   }}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-black/15 bg-white px-4 py-3 text-[13px] font-extrabold text-[#16141b] hover:border-soft-primary"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-sp-shade/15 bg-sp-surface px-4 py-3 text-[13px] font-extrabold text-sp-ink hover:border-soft-primary"
                 >
                   Launch another
                 </button>
@@ -1479,7 +1479,7 @@ export default function LaunchTokenModal({
                           void handleLogoFile(event.dataTransfer.files?.[0]);
                         }}
                         className={`flex w-full items-center gap-3 rounded-xl border border-dashed px-3.5 py-3 text-left transition-colors ${
-                          logoDragOver ? 'border-soft-primary bg-soft-primary/[0.06]' : 'border-black/15 bg-white hover:border-soft-primary'
+                          logoDragOver ? 'border-soft-primary bg-soft-primary/[0.06]' : 'border-sp-shade/15 bg-sp-surface hover:border-soft-primary'
                         }`}
                       >
                         {logoDataUrl ? (
@@ -1488,15 +1488,15 @@ export default function LaunchTokenModal({
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={logoDataUrl} alt="Token logo preview" className="h-11 w-11 shrink-0 rounded-[14px] object-cover" />
                         ) : (
-                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#f4f1ff] text-soft-primary">
+                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-sp-brand-soft text-soft-primary">
                             <ImagePlus className="h-5 w-5" aria-hidden="true" />
                           </span>
                         )}
                         <span className="min-w-0">
-                          <span className="block text-[12.5px] font-extrabold text-[#16141b]">
+                          <span className="block text-[12.5px] font-extrabold text-sp-ink">
                             {logoBusy ? 'Processing image...' : logoDataUrl ? 'Logo ready, click to replace' : 'Drop an image or click to browse'}
                           </span>
-                          <span className="mt-0.5 block text-[11px] text-black/45">PNG, JPEG or WebP, resized to 256 px.</span>
+                          <span className="mt-0.5 block text-[11px] text-sp-shade/45">PNG, JPEG or WebP, resized to 256 px.</span>
                         </span>
                       </button>
                       <input
@@ -1512,7 +1512,7 @@ export default function LaunchTokenModal({
                         }}
                       />
                       {logoDataUrl && (
-                        <button type="button" onClick={() => setLogoDataUrl(null)} className="mt-1.5 text-[11px] font-extrabold text-[#8d2748]">
+                        <button type="button" onClick={() => setLogoDataUrl(null)} className="mt-1.5 text-[11px] font-extrabold text-sp-danger">
                           Remove uploaded logo
                         </button>
                       )}
@@ -1536,7 +1536,7 @@ export default function LaunchTokenModal({
                       ) : urlStatus === 'checking' ? (
                         <span className={HINT}>Loading the image to make sure it renders...</span>
                       ) : urlStatus === 'valid' ? (
-                        <span className="mt-1 block text-[11px] font-bold text-[#0b9a51]">
+                        <span className="mt-1 block text-[11px] font-bold text-sp-up">
                           Image loads. It is stored onchain forever; ipfs:// links cannot be swapped out later.
                         </span>
                       ) : (
@@ -1558,22 +1558,22 @@ export default function LaunchTokenModal({
 
                     {/* Socjale sa zwijane: wiekszosc startow ich nie ma i nie
                         powinny wydluzac podstawowej sciezki. */}
-                    <div className="rounded-2xl border border-black/10 bg-[#fbfbfd]">
+                    <div className="rounded-2xl border border-sp-shade/10 bg-sp-bg">
                       <button
                         type="button"
                         onClick={() => setLinksOpen((current) => !current)}
                         aria-expanded={linksOpen}
-                        className="flex w-full items-center justify-between px-3.5 py-3 text-[12.5px] font-extrabold text-[#16141b]"
+                        className="flex w-full items-center justify-between px-3.5 py-3 text-[12.5px] font-extrabold text-sp-ink"
                       >
                         <span className="inline-flex items-center gap-2">
                           <Globe className="h-4 w-4 text-soft-primary" aria-hidden="true" />
                           Website &amp; socials
-                          <span className="text-[10.5px] font-bold text-black/35">optional</span>
+                          <span className="text-[10.5px] font-bold text-sp-shade/35">optional</span>
                         </span>
-                        <span className="text-[11px] font-bold text-black/45">{linksOpen ? 'Hide' : 'Add'}</span>
+                        <span className="text-[11px] font-bold text-sp-shade/45">{linksOpen ? 'Hide' : 'Add'}</span>
                       </button>
                       {linksOpen && (
-                        <div className="space-y-3 border-t border-black/10 px-3.5 py-3.5">
+                        <div className="space-y-3 border-t border-sp-shade/10 px-3.5 py-3.5">
                           {(
                             [
                               ['website', 'Website', 'https://yourproject.xyz'],
@@ -1600,7 +1600,7 @@ export default function LaunchTokenModal({
                     {/* Pre-buy jako osobny KROK, nie pole schowane w siatce -
                         to jedyna decyzja o pieniadzach na szybkiej sciezce. */}
                     <div className="rounded-2xl border border-soft-primary/25 bg-soft-primary/[0.05] p-4">
-                      <p className="flex items-center gap-2 text-[13px] font-extrabold text-[#16141b]">
+                      <p className="flex items-center gap-2 text-[13px] font-extrabold text-sp-ink">
                         <Zap className="h-4 w-4 text-soft-primary" aria-hidden="true" />
                         Pre-buy: how much do you buy as the first buyer?
                       </p>
@@ -1614,7 +1614,7 @@ export default function LaunchTokenModal({
                             placeholder="0"
                             aria-label="Pre-buy amount in ETH"
                           />
-                          <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-black/40">
+                          <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">
                             ETH
                           </span>
                         </div>
@@ -1629,7 +1629,7 @@ export default function LaunchTokenModal({
                       {preBuyError ? (
                         <span className={FIELD_ERROR}>{preBuyError}</span>
                       ) : (
-                        <p className="mt-2 text-[12px] font-bold text-[#16141b]">
+                        <p className="mt-2 text-[12px] font-bold text-sp-ink">
                           {preBuyPreview
                             ? `≈ ${preBuyPreview.tokens.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${launchSymbol || 'tokens'} · ${preBuyPreview.share.toFixed(2)}% of supply · for ${Number(preBuyEth)} ETH${usdSuffix(Number(preBuyEth))}`
                             : 'No pre-buy. The curve opens to everyone at the same price.'}
@@ -1644,10 +1644,10 @@ export default function LaunchTokenModal({
                 ) : (
                   <div className="space-y-4">
                     {advancedSupported === null && (
-                      <p className="text-[11.5px] text-black/50">Checking what the deployed launchpad supports...</p>
+                      <p className="text-[11.5px] text-sp-shade/50">Checking what the deployed launchpad supports...</p>
                     )}
                     {advancedSupported === false && (
-                      <div className="flex items-start gap-2 rounded-xl bg-[#d78a55]/12 p-3 text-[11.5px] leading-[1.45] text-[#7a4a1d]">
+                      <div className="flex items-start gap-2 rounded-xl bg-sp-down/12 p-3 text-[11.5px] leading-[1.45] text-sp-down-deep">
                         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                         <span>
                           The launchpad at this address predates advanced config, so these fields cannot be sent yet. Your
@@ -1667,14 +1667,14 @@ export default function LaunchTokenModal({
                         }
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="flex overflow-hidden rounded-full border border-black/10" role="group" aria-label="Fee presets">
+                          <div className="flex overflow-hidden rounded-full border border-sp-shade/10" role="group" aria-label="Fee presets">
                             {feePresets.map((bps) => (
                               <button
                                 key={bps}
                                 type="button"
                                 onClick={() => setFeeBps(bps)}
                                 className={`px-3 py-1.5 text-[11px] font-extrabold transition-colors ${
-                                  feeBpsNow === bps ? 'bg-soft-primary text-white' : 'bg-white text-[#16141b] hover:text-soft-primary-deep'
+                                  feeBpsNow === bps ? 'bg-soft-primary text-sp-on-brand' : 'bg-sp-surface text-sp-ink hover:text-soft-primary-deep'
                                 }`}
                               >
                                 {(bps / 100).toFixed(2)}%
@@ -1685,7 +1685,7 @@ export default function LaunchTokenModal({
                             <button
                               type="button"
                               onClick={() => setFeeBps(feeBpsNow - 5)}
-                              className="rounded-full border border-black/10 p-1.5 text-black/50 hover:border-soft-primary"
+                              className="rounded-full border border-sp-shade/10 p-1.5 text-sp-shade/50 hover:border-soft-primary"
                               aria-label="Decrease fee by 0.05%"
                             >
                               <Minus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1693,7 +1693,7 @@ export default function LaunchTokenModal({
                             <button
                               type="button"
                               onClick={() => setFeeBps(feeBpsNow + 5)}
-                              className="rounded-full border border-black/10 p-1.5 text-black/50 hover:border-soft-primary"
+                              className="rounded-full border border-sp-shade/10 p-1.5 text-sp-shade/50 hover:border-soft-primary"
                               aria-label="Increase fee by 0.05%"
                             >
                               <Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1708,7 +1708,7 @@ export default function LaunchTokenModal({
                         <div className="mt-4">
                           <div className="flex items-center justify-between">
                             <span className={LABEL}>Your share of that fee</span>
-                            <span className="text-[12px] font-extrabold text-[#16141b]">{creatorPctNow.toFixed(0)}%</span>
+                            <span className="text-[12px] font-extrabold text-sp-ink">{creatorPctNow.toFixed(0)}%</span>
                           </div>
                           <input
                             type="range"
@@ -1717,26 +1717,26 @@ export default function LaunchTokenModal({
                             step={5}
                             value={creatorSharePct}
                             onChange={(event) => setCreatorSharePct(event.target.value)}
-                            className="w-full accent-[#7c6bda]"
+                            className="w-full accent-sp-brand"
                             aria-label="Creator share of the trading fee"
                           />
                           {/* Pasek podzialu: fiolet = tworca, szary = protokol.
                               Kreska pokazuje podloge, ktorej suwak nie przekroczy. */}
-                          <div className="relative mt-1 h-3 w-full overflow-hidden rounded-full bg-black/15">
+                          <div className="relative mt-1 h-3 w-full overflow-hidden rounded-full bg-sp-shade/15">
                             <div
                               className="absolute inset-y-0 left-0 rounded-l-full bg-soft-primary transition-[width]"
                               style={{ width: `${creatorPctNow}%` }}
                               aria-hidden="true"
                             />
                             <div
-                              className="absolute inset-y-0 w-0 border-l-2 border-dashed border-black/35"
+                              className="absolute inset-y-0 w-0 border-l-2 border-dashed border-sp-shade/35"
                               style={{ left: `${limits.maxCreatorShareBps / 100}%` }}
                               aria-hidden="true"
                             />
                           </div>
                           <div className="mt-1.5 flex items-center justify-between text-[11px] font-bold">
                             <span className="text-soft-primary-deep">You {creatorPctNow.toFixed(0)}%</span>
-                            <span className="text-black/50">Protocol {(100 - creatorPctNow).toFixed(0)}%</span>
+                            <span className="text-sp-shade/50">Protocol {(100 - creatorPctNow).toFixed(0)}%</span>
                           </div>
                           <span className={HINT}>
                             {protocolFloorPct.toFixed(0)}% floor belongs to the protocol, enforced by the contract, not this
@@ -1746,12 +1746,12 @@ export default function LaunchTokenModal({
                       </SectionCard>
 
                       <SectionCard
-                        icon={<CircleDollarSign className="h-4 w-4 text-[#12a451]" aria-hidden="true" />}
+                        icon={<CircleDollarSign className="h-4 w-4 text-sp-up" aria-hidden="true" />}
                         title="Fee receivers"
                         aside={
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10.5px] font-extrabold ${
-                              receiverTotalOk ? 'bg-[#edfff4] text-[#0b9a51]' : 'bg-[#d9628a]/12 text-[#8d2748]'
+                              receiverTotalOk ? 'bg-sp-up-soft text-sp-up' : 'bg-sp-danger/12 text-sp-danger'
                             }`}
                           >
                             {receiverTotalOk && <Check className="h-3 w-3" aria-hidden="true" />}
@@ -1777,11 +1777,11 @@ export default function LaunchTokenModal({
                             placeholder="10"
                             aria-label="New receiver share in percent"
                           />
-                          <span className="text-[12px] font-bold text-black/40">%</span>
+                          <span className="text-[12px] font-bold text-sp-shade/40">%</span>
                           <button
                             type="button"
                             onClick={addReceiver}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-black/15 bg-white px-3 py-2 text-[11px] font-extrabold text-soft-primary-deep hover:border-soft-primary"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sp-shade/15 bg-sp-surface px-3 py-2 text-[11px] font-extrabold text-soft-primary-deep hover:border-soft-primary"
                           >
                             <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Add
                           </button>
@@ -1790,14 +1790,14 @@ export default function LaunchTokenModal({
 
                         <ul className="mt-3 space-y-1.5">
                           {youShareBps > 0 && (
-                            <li className="flex items-center justify-between rounded-xl bg-[#fbfbfd] px-3 py-2 text-[12px]">
-                              <span className="min-w-0 truncate font-bold text-[#16141b]">
+                            <li className="flex items-center justify-between rounded-xl bg-sp-bg px-3 py-2 text-[12px]">
+                              <span className="min-w-0 truncate font-bold text-sp-ink">
                                 You{' '}
-                                <span className="font-mono text-[11px] font-normal text-black/45">
+                                <span className="font-mono text-[11px] font-normal text-sp-shade/45">
                                   {address ? shortAddress(address) : 'connected wallet'}
                                 </span>
                               </span>
-                              <span className="ml-2 shrink-0 font-extrabold text-[#16141b]">
+                              <span className="ml-2 shrink-0 font-extrabold text-sp-ink">
                                 {(youShareBps / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%
                               </span>
                             </li>
@@ -1805,17 +1805,17 @@ export default function LaunchTokenModal({
                           {addedReceivers.map((row, index) => (
                             <li
                               key={`${row.account}-${index}`}
-                              className="flex items-center justify-between gap-2 rounded-xl bg-[#fbfbfd] px-3 py-2 text-[12px]"
+                              className="flex items-center justify-between gap-2 rounded-xl bg-sp-bg px-3 py-2 text-[12px]"
                             >
-                              <span className="min-w-0 truncate font-mono text-[11.5px] text-[#16141b]">{shortAddress(row.account)}</span>
+                              <span className="min-w-0 truncate font-mono text-[11.5px] text-sp-ink">{shortAddress(row.account)}</span>
                               <span className="flex shrink-0 items-center gap-1.5">
-                                <span className="font-extrabold text-[#16141b]">
+                                <span className="font-extrabold text-sp-ink">
                                   {row.share.toLocaleString('en-US', { maximumFractionDigits: 2 })}%
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => setAddedReceivers((rows) => rows.filter((_, position) => position !== index))}
-                                  className="rounded-full p-1 text-black/35 hover:bg-black/5 hover:text-[#16141b]"
+                                  className="rounded-full p-1 text-sp-shade/35 hover:bg-sp-shade/5 hover:text-sp-ink"
                                   aria-label={`Remove receiver ${shortAddress(row.account)}`}
                                 >
                                   <X className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1833,7 +1833,7 @@ export default function LaunchTokenModal({
                       <SectionCard
                         icon={<Flame className="h-4 w-4 text-[#d78a55]" aria-hidden="true" />}
                         title="Pool fee split (after graduation)"
-                        aside={<span className="font-soft-display text-[18px] font-extrabold text-[#a35c1a]">{fmtPct(buybackShare)}%</span>}
+                        aside={<span className="font-soft-display text-[18px] font-extrabold text-sp-down-deep">{fmtPct(buybackShare)}%</span>}
                       >
                         <span className={LABEL}>Auto-buyback (% of your slice)</span>
                         <input
@@ -1848,15 +1848,15 @@ export default function LaunchTokenModal({
                         />
                         {/* Jeden pasek = 100% oplaty puli. Segment protokolu
                             stoi; suwak buybacku NA ZYWO zweza segment "you". */}
-                        <div className="mt-3 flex h-3 w-full overflow-hidden rounded-full bg-black/10">
-                          <div className="h-full bg-black/35" style={{ width: `${protocolPoolPct}%` }} aria-hidden="true" />
+                        <div className="mt-3 flex h-3 w-full overflow-hidden rounded-full bg-sp-shade/10">
+                          <div className="h-full bg-sp-shade/35" style={{ width: `${protocolPoolPct}%` }} aria-hidden="true" />
                           <div className="h-full bg-soft-primary transition-[width]" style={{ width: `${youPoolPct}%` }} aria-hidden="true" />
                           <div className="h-full bg-[#d78a55] transition-[width]" style={{ width: `${buybackPoolPct}%` }} aria-hidden="true" />
                         </div>
                         <div className="mt-1.5 flex items-center justify-between text-[11px] font-bold">
-                          <span className="text-black/50">Protocol {fmtPct(protocolPoolPct)}% (fixed)</span>
+                          <span className="text-sp-shade/50">Protocol {fmtPct(protocolPoolPct)}% (fixed)</span>
                           <span className="text-soft-primary-deep">You {fmtPct(youPoolPct)}%</span>
-                          <span className="text-[#a35c1a]">Buyback {fmtPct(buybackPoolPct)}%</span>
+                          <span className="text-sp-down-deep">Buyback {fmtPct(buybackPoolPct)}%</span>
                         </div>
                         <span className={HINT}>
                           You keep {fmtPct(youPoolPct)}% of every pool fee, {fmtPct(buybackPoolPct)}% buys &amp; burns your
@@ -1874,11 +1874,11 @@ export default function LaunchTokenModal({
                             role="switch"
                             aria-checked={sniperOn}
                             onClick={() => setSniperOn((current) => !current)}
-                            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${sniperOn ? 'bg-soft-primary' : 'bg-black/20'}`}
+                            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${sniperOn ? 'bg-soft-primary' : 'bg-sp-shade/20'}`}
                             aria-label="Toggle sniper protection"
                           >
                             <span
-                              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left] ${sniperOn ? 'left-[22px]' : 'left-0.5'}`}
+                              className={`absolute top-0.5 h-5 w-5 rounded-full bg-sp-surface shadow transition-[left] ${sniperOn ? 'left-[22px]' : 'left-0.5'}`}
                               aria-hidden="true"
                             />
                           </button>
@@ -1914,7 +1914,7 @@ export default function LaunchTokenModal({
                               const capTokens = Number(sniperCapTokens) || 0;
                               const over = preBuyPreview.tokens > capTokens;
                               return (
-                                <div className={`mt-2 rounded-xl border px-3 py-2.5 text-[11.5px] leading-[1.45] ${over ? 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]' : 'border-black/10 bg-[#f8f7fc] text-black/60'}`}>
+                                <div className={`mt-2 rounded-xl border px-3 py-2.5 text-[11.5px] leading-[1.45] ${over ? 'border-sp-down-line bg-sp-down-soft text-sp-down-deep' : 'border-sp-shade/10 bg-sp-sunken text-sp-shade/60'}`}>
                                   <div className="flex items-center justify-between gap-2 font-bold">
                                     <span>Your pre-buy ≈ {Math.round(preBuyPreview.tokens).toLocaleString('en-US')} tokens</span>
                                     <span className="shrink-0">cap {capTokens.toLocaleString('en-US')}</span>
@@ -1929,7 +1929,7 @@ export default function LaunchTokenModal({
                             })()}
                           </>
                         ) : (
-                          <p className="flex items-start gap-2 rounded-xl bg-[#d9628a]/10 p-3 text-[11.5px] font-bold leading-[1.45] text-[#8d2748]">
+                          <p className="flex items-start gap-2 rounded-xl bg-sp-danger/10 p-3 text-[11.5px] font-bold leading-[1.45] text-sp-danger">
                             <Flame className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                             Anyone, including you, can buy the whole curve at launch.
                           </p>
@@ -1946,11 +1946,11 @@ export default function LaunchTokenModal({
                               role="switch"
                               aria-checked={vanityOn}
                               onClick={() => setVanityOn((current) => !current)}
-                              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${vanityOn ? 'bg-soft-primary' : 'bg-black/20'}`}
+                              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${vanityOn ? 'bg-soft-primary' : 'bg-sp-shade/20'}`}
                               aria-label="Toggle vanity address"
                             >
                               <span
-                                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left] ${vanityOn ? 'left-[22px]' : 'left-0.5'}`}
+                                className={`absolute top-0.5 h-5 w-5 rounded-full bg-sp-surface shadow transition-[left] ${vanityOn ? 'left-[22px]' : 'left-0.5'}`}
                                 aria-hidden="true"
                               />
                             </button>
@@ -1963,7 +1963,7 @@ export default function LaunchTokenModal({
                               baked into this launch. Off by default; a random address is perfectly fine.
                             </span>
                           ) : !vanityCtx ? (
-                            <p className="flex items-start gap-2 rounded-xl bg-[#d9628a]/10 p-3 text-[11.5px] font-bold leading-[1.45] text-[#8d2748]">
+                            <p className="flex items-start gap-2 rounded-xl bg-sp-danger/10 p-3 text-[11.5px] font-bold leading-[1.45] text-sp-danger">
                               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                               Connect a wallet first — the address is tied to your creator address, so it can only be mined
                               once we know it.
@@ -1973,8 +1973,8 @@ export default function LaunchTokenModal({
                               {/* OSTRZEZENIE, NIE BLOKADA (decyzja produktowa): przewidywalny
                                   adres = snajper w mempoolu. Rekomendujemy ciasny cap jednym
                                   kliknieciem, ale nie wymuszamy go. */}
-                              <div className="flex items-start gap-2 rounded-xl border border-[#f3c58a] bg-[#fff8ed] px-3 py-2.5 text-[11.5px] leading-[1.45] text-[#a34b08]">
-                                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#c76b12]" aria-hidden="true" />
+                              <div className="flex items-start gap-2 rounded-xl border border-sp-down-line bg-sp-down-soft px-3 py-2.5 text-[11.5px] leading-[1.45] text-sp-down-deep">
+                                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sp-down" aria-hidden="true" />
                                 <div className="min-w-0">
                                   <p className="font-bold">A vanity address is predictable.</p>
                                   <p className="mt-0.5">
@@ -1985,7 +1985,7 @@ export default function LaunchTokenModal({
                                   <button
                                     type="button"
                                     onClick={applyRecommendedCap}
-                                    className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[#e0a253] bg-white px-2.5 py-1 text-[11px] font-extrabold text-[#a34b08] hover:border-[#c76b12]"
+                                    className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-sp-down-line bg-sp-surface px-2.5 py-1 text-[11px] font-extrabold text-sp-down-deep hover:border-sp-down"
                                   >
                                     Apply recommended 4M cap
                                   </button>
@@ -2028,7 +2028,7 @@ export default function LaunchTokenModal({
                                   type="button"
                                   onClick={vanityMining ? stopVanityMining : startVanityMining}
                                   disabled={!vanityValid && !vanityMining}
-                                  className="inline-flex items-center gap-1.5 rounded-full bg-soft-primary px-3.5 py-2 text-[12px] font-extrabold text-white disabled:opacity-40"
+                                  className="inline-flex items-center gap-1.5 rounded-full bg-soft-primary px-3.5 py-2 text-[12px] font-extrabold text-sp-on-brand disabled:opacity-40"
                                 >
                                   {vanityMining ? (
                                     <>
@@ -2041,18 +2041,18 @@ export default function LaunchTokenModal({
                                   )}
                                 </button>
                                 {(vanityMining || vanityAttempts > 0) && (
-                                  <span className="text-[11.5px] font-bold text-black/50">
+                                  <span className="text-[11.5px] font-bold text-sp-shade/50">
                                     {vanityAttempts.toLocaleString('en-US')} tried
                                   </span>
                                 )}
                               </div>
 
                               {vanityAddress && vanitySalt && (
-                                <div className="mt-3 rounded-xl border border-[#bfe6cf] bg-[#f2fbf6] px-3 py-2.5">
-                                  <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#0b9a51]">
+                                <div className="mt-3 rounded-xl border border-sp-up-line bg-sp-up-soft px-3 py-2.5">
+                                  <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-sp-up">
                                     <Check className="h-3.5 w-3.5" aria-hidden="true" /> Address mined
                                   </p>
-                                  <p className="mt-1 break-all font-mono text-[12px] text-[#16141b]">
+                                  <p className="mt-1 break-all font-mono text-[12px] text-sp-ink">
                                     {vanityAddress.slice(0, 24)}
                                     <span className="font-extrabold text-soft-primary-deep">
                                       {vanityAddress.slice(24, 24 + vanityNorm.length)}
@@ -2071,7 +2071,7 @@ export default function LaunchTokenModal({
                       )}
 
                       <SectionCard
-                        icon={<Layers3 className="h-4 w-4 text-black/45" aria-hidden="true" />}
+                        icon={<Layers3 className="h-4 w-4 text-sp-shade/45" aria-hidden="true" />}
                         title="Metadata override"
                       >
                         <input
@@ -2085,13 +2085,13 @@ export default function LaunchTokenModal({
                         </span>
                       </SectionCard>
 
-                      <div className="rounded-2xl border border-black/10 bg-white p-4">
+                      <div className="rounded-2xl border border-sp-shade/10 bg-sp-surface p-4">
                         <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.1em] text-soft-primary-deep">
                           <CircleDollarSign className="h-3.5 w-3.5" aria-hidden="true" /> What you earn
                         </p>
                         <table className="mt-2 w-full text-[12px]">
                           <thead>
-                            <tr className="text-left text-[10.5px] uppercase tracking-[0.08em] text-black/40">
+                            <tr className="text-left text-[10.5px] uppercase tracking-[0.08em] text-sp-shade/40">
                               <th className="pb-1 font-bold">Volume</th>
                               <th className="pb-1 text-right font-bold">On curve</th>
                               <th className="pb-1 text-right font-bold">In pool</th>
@@ -2102,30 +2102,30 @@ export default function LaunchTokenModal({
                                 wartoscia glowna, dolar tylko dopiskiem i znika,
                                 gdy kurs jest niedostepny. */}
                             {estimate.map((row) => (
-                              <tr key={row.volume} className="border-t border-black/5 align-top">
-                                <td className="py-1.5 text-black/55">
+                              <tr key={row.volume} className="border-t border-sp-shade/5 align-top">
+                                <td className="py-1.5 text-sp-shade/55">
                                   {row.volume} ETH
                                   {ethUsd !== null && (
-                                    <span className="block text-[10px] font-bold text-black/35">{formatUsd(row.volume * ethUsd)}</span>
+                                    <span className="block text-[10px] font-bold text-sp-shade/35">{formatUsd(row.volume * ethUsd)}</span>
                                   )}
                                 </td>
-                                <td className="py-1.5 text-right font-extrabold text-[#16141b]">
+                                <td className="py-1.5 text-right font-extrabold text-sp-ink">
                                   {row.curve.toFixed(3)} ETH
                                   {ethUsd !== null && (
-                                    <span className="block text-[10px] font-bold text-black/40">{formatUsd(row.curve * ethUsd)}</span>
+                                    <span className="block text-[10px] font-bold text-sp-shade/40">{formatUsd(row.curve * ethUsd)}</span>
                                   )}
                                 </td>
-                                <td className="py-1.5 text-right font-extrabold text-[#16141b]">
+                                <td className="py-1.5 text-right font-extrabold text-sp-ink">
                                   {row.pool.toFixed(3)} ETH
                                   {ethUsd !== null && (
-                                    <span className="block text-[10px] font-bold text-black/40">{formatUsd(row.pool * ethUsd)}</span>
+                                    <span className="block text-[10px] font-bold text-sp-shade/40">{formatUsd(row.pool * ethUsd)}</span>
                                   )}
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
-                        <p className="mt-2 text-[12px] font-extrabold text-[#0b9a51]">Creator earnings are paid in ETH, not tokens.</p>
+                        <p className="mt-2 text-[12px] font-extrabold text-sp-up">Creator earnings are paid in ETH, not tokens.</p>
                         <span className={HINT}>
                           Curve earnings are exact for the fee you picked. Pool earnings assume the hook&apos;s{' '}
                           {(hookSplit.feeBps / 100).toFixed(2)}% swap fee and your{' '}
@@ -2136,7 +2136,7 @@ export default function LaunchTokenModal({
                     </fieldset>
 
                     {advancedSupported === true && advanced.error && (
-                      <p className="rounded-xl bg-[#d9628a]/12 px-3 py-2 text-[11.5px] font-bold text-[#8d2748]">{advanced.error}</p>
+                      <p className="rounded-xl bg-sp-danger/12 px-3 py-2 text-[11.5px] font-bold text-sp-danger">{advanced.error}</p>
                     )}
                   </div>
                 )}
@@ -2152,9 +2152,9 @@ export default function LaunchTokenModal({
                     raised={previewRaised}
                     hasPreBuy={previewRaised > 0}
                   />
-                  <div className="rounded-[18px] border border-black/10 bg-[#fbfbfd] p-4">
-                    <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-black/40">How it works</p>
-                    <ul className="mt-3 space-y-2.5 text-[11.5px] leading-[1.45] text-black/60">
+                  <div className="rounded-[18px] border border-sp-shade/10 bg-sp-bg p-4">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-sp-shade/40">How it works</p>
+                    <ul className="mt-3 space-y-2.5 text-[11.5px] leading-[1.45] text-sp-shade/60">
                       <li className="flex items-start gap-2">
                         <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-soft-primary" aria-hidden="true" />
                         One transaction creates the token and starts its curve. Graduates to a Uniswap v4 pool at{' '}
@@ -2165,7 +2165,7 @@ export default function LaunchTokenModal({
                         Pre-buy is atomic: it fills in the launch transaction itself, before anyone else can trade.
                       </li>
                       <li className="flex items-start gap-2">
-                        <CircleDollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#0b9a51]" aria-hidden="true" />
+                        <CircleDollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sp-up" aria-hidden="true" />
                         Creator earnings are paid in ETH, not tokens. Claim them any time.
                       </li>
                     </ul>
@@ -2178,13 +2178,13 @@ export default function LaunchTokenModal({
 
         {/* -------------------------------- STOPKA ------------------------------- */}
         {phase === 'form' && (
-          <footer className="shrink-0 border-t border-black/10 bg-white px-5 py-4">
+          <footer className="shrink-0 border-t border-sp-shade/10 bg-sp-surface px-5 py-4">
             {notice && (
               <div
                 className={`mb-3 flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-[12px] ${
                   notice.kind === 'success'
-                    ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]'
-                    : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'
+                    ? 'border-sp-up-line bg-sp-up-soft text-sp-up'
+                    : 'border-sp-down-line bg-sp-down-soft text-sp-down-deep'
                 }`}
               >
                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -2192,14 +2192,14 @@ export default function LaunchTokenModal({
               </div>
             )}
             <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-[11px] leading-[1.4] text-black/45" aria-live="polite">
+              <span className="text-[11px] leading-[1.4] text-sp-shade/45" aria-live="polite">
                 {busy ? 'Waiting for the transaction to confirm...' : disabledReason ?? summaryText}
               </span>
               <button
                 type="button"
                 disabled={busy || disabledReason !== null}
                 onClick={launch}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-soft-primary px-5 py-3 text-[13px] font-extrabold text-white shadow-[0_6px_16px_rgba(124,107,218,0.22)] transition-transform active:scale-[0.97] disabled:opacity-60 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-soft-primary px-5 py-3 text-[13px] font-extrabold text-sp-on-brand shadow-[0_6px_16px_rgba(124,107,218,0.22)] transition-transform active:scale-[0.97] disabled:opacity-60 sm:w-auto"
               >
                 {busy ? 'Launching...' : 'Launch on curve'}
                 <ArrowUpRight className="h-4 w-4" aria-hidden="true" />

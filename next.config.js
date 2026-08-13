@@ -64,7 +64,13 @@ const nextConfig = {
     //
     // serverComponentsExternalPackages robi jedno i drugie naraz: zostawia
     // pakiet niezbundlowany I kaze go sledzic, wiec laduje w funkcji.
-    serverComponentsExternalPackages: ['mongodb', 'firebase-admin'],
+    //
+    // `sharp` jest tu z tego samego powodu: to modul NATYWNY, ktory ma zostac
+    // niezbundlowany i trafic do funkcji razem ze swoja binarka. Uzywa go
+    // wylacznie karta udostepniania tokena, zeby przerobic logo na PNG -
+    // `resvg` w @vercel/og nie ma dekodera webp, a wlasnie webp zapisuje nasz
+    // upload logo (app/startpad/logoUpload.ts).
+    serverComponentsExternalPackages: ['mongodb', 'firebase-admin', 'sharp'],
     // Kompiluje bundle klienta i serwera rownolegle, w osobnych workerach.
     webpackBuildWorker: true,
     // Dolacza tla kart OG (public/backs/*) do bundla funkcji opengraph-image,

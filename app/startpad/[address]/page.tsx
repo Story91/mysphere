@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import LaunchpadTokenDetail from './LaunchpadTokenDetail';
+import NetworkThemeSync from '../NetworkThemeSync';
 import { loadTokenCard } from '../share/tokenCard';
 import { buildShareUrl, safeSymbol } from '../shareText';
 
@@ -26,7 +27,10 @@ export const revalidate = 120;
 type Props = { params: { address: string } };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const data = await loadTokenCard(params.address, null).catch(() => null);
+  // Bez logo: metadane niosa tytul, opis i adresy, a obrazek rysuje sie w
+  // osobnym zadaniu (opengraph-image). Pobieranie go tutaj bylo praca, ktorej
+  // wynik i tak ladowal w koszu.
+  const data = await loadTokenCard(params.address, null, { withLogo: false }).catch(() => null);
 
   if (!data) {
     // Adres, ktorego zaden launchpad nie zna. Zadnej karty tokena tu nie ma i
@@ -75,5 +79,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default function LaunchpadTokenPage({ params }: Props) {
-  return <LaunchpadTokenDetail address={params.address} />;
+  return (
+    <>
+      <NetworkThemeSync />
+      <LaunchpadTokenDetail address={params.address} />
+    </>
+  );
 }

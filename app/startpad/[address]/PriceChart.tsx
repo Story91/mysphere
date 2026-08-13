@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CandlestickChart, LineChart as LineChartIcon, RefreshCw } from 'lucide-react';
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
+import { ACTIVE_LAUNCHPAD_NETWORK } from '../config';
 import { formatUsd } from '../useEthUsd';
 import {
   buildCandles,
@@ -32,8 +33,26 @@ const INTERVALS: Array<{ value: IntervalSec; label: string }> = [
   { value: 3600, label: '1h' },
 ];
 
-const UP = '#12a451';
-const DOWN = '#e0527f';
+/**
+ * Kolory wykresu ida JavaScriptem, bo lightweight-charts rysuje na canvasie i
+ * zmiennych CSS nie czyta. Zrodlem jest ta sama paleta sieci, co reszta
+ * startpada (config.ts -> theme.chart), wiec czarno-zielony Robinhood nie ma
+ * wykresu w barwach jasnego motywu. Brak motywu = wartosci jasne, czyli te,
+ * ktore stoja tu od poczatku.
+ */
+const CHART =
+  ACTIVE_LAUNCHPAD_NETWORK.theme?.chart ?? {
+    background: 'transparent',
+    text: '#8a8794',
+    grid: 'rgba(0,0,0,0.05)',
+    up: '#12a451',
+    down: '#e0527f',
+    line: '#7c6bda',
+    lineFill: 'rgba(124,107,218,0.16)',
+  };
+
+const UP = CHART.up;
+const DOWN = CHART.down;
 
 export default function PriceChart({
   trades,
@@ -114,13 +133,13 @@ export default function PriceChart({
         const chart = mod.createChart(containerRef.current, {
           autoSize: true,
           layout: {
-            background: { color: 'transparent' },
-            textColor: '#8a8794',
+            background: { color: CHART.background },
+            textColor: CHART.text,
             fontFamily: 'Nunito, system-ui, sans-serif',
           },
           grid: {
-            vertLines: { color: 'rgba(0,0,0,0.05)' },
-            horzLines: { color: 'rgba(0,0,0,0.05)' },
+            vertLines: { color: CHART.grid },
+            horzLines: { color: CHART.grid },
           },
           rightPriceScale: { borderVisible: false },
           timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
@@ -167,7 +186,7 @@ export default function PriceChart({
       series.setData(candles.map((candle) => ({ ...candle, time: candle.time as Time })));
     } else {
       series = chart.addSeries(mod.LineSeries, {
-        color: '#7c6bda',
+        color: CHART.line,
         lineWidth: 2,
         lineType: mod.LineType.WithSteps,
         priceFormat,
@@ -196,27 +215,27 @@ export default function PriceChart({
   }, [ready, effStyle, mode, candles, linePoints, graduatedTs]);
 
   return (
-    <section className="rounded-[20px] border border-black/10 bg-white p-4 sm:p-5">
+    <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-black/40">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-sp-shade/40">
             {mode === 'mcap' ? 'Market cap' : state === 'Graduated' ? 'Last curve price' : 'Price'}
           </p>
-          <p className="mt-1 font-soft-display text-[26px] font-extrabold leading-none text-[#16141b]">
-            {fmtPrice(currentValue)} <span className="text-[14px] text-black/40">ETH</span>
+          <p className="mt-1 font-soft-display text-[26px] font-extrabold leading-none text-sp-ink">
+            {fmtPrice(currentValue)} <span className="text-[14px] text-sp-shade/40">ETH</span>
             {/* Sam wykres zostaje w ETH - USD jest tylko dopiskiem przy naglowku. */}
-            {ethUsd !== null && <span className="ml-1.5 text-[13px] font-bold text-black/35">· {formatUsd(currentValue * ethUsd)}</span>}
+            {ethUsd !== null && <span className="ml-1.5 text-[13px] font-bold text-sp-shade/35">· {formatUsd(currentValue * ethUsd)}</span>}
           </p>
-          <p className="mt-1 text-[11px] font-bold text-black/45">
+          <p className="mt-1 text-[11px] font-bold text-sp-shade/45">
             {multiple >= 1 ? (
-              <span className="text-[#0b9a51]">{multiple.toFixed(multiple >= 10 ? 1 : 2)}x since launch</span>
+              <span className="text-sp-up">{multiple.toFixed(multiple >= 10 ? 1 : 2)}x since launch</span>
             ) : (
-              <span className="text-[#a34b08]">{multiple.toFixed(2)}x since launch</span>
+              <span className="text-sp-down-deep">{multiple.toFixed(2)}x since launch</span>
             )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="tablist" aria-label="Chart interval">
+          <span className="inline-flex overflow-hidden rounded-full border border-sp-shade/10" role="tablist" aria-label="Chart interval">
             {INTERVALS.map((item) => (
               <button
                 key={item.value}
@@ -224,19 +243,19 @@ export default function PriceChart({
                 role="tab"
                 aria-selected={effInterval === item.value}
                 onClick={() => setIntervalSec(item.value)}
-                className={`px-2.5 py-1.5 text-[11px] font-extrabold transition-colors ${effInterval === item.value ? 'bg-soft-primary text-white' : 'bg-white text-black/50 hover:text-soft-primary-deep'}`}
+                className={`px-2.5 py-1.5 text-[11px] font-extrabold transition-colors ${effInterval === item.value ? 'bg-soft-primary text-sp-on-brand' : 'bg-sp-surface text-sp-shade/50 hover:text-soft-primary-deep'}`}
               >
                 {item.label}
               </button>
             ))}
           </span>
-          <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="tablist" aria-label="Chart style">
+          <span className="inline-flex overflow-hidden rounded-full border border-sp-shade/10" role="tablist" aria-label="Chart style">
             <button
               type="button"
               role="tab"
               aria-selected={effStyle === 'candles'}
               onClick={() => setStyle('candles')}
-              className={`px-2.5 py-1.5 transition-colors ${effStyle === 'candles' ? 'bg-soft-primary text-white' : 'bg-white text-black/50 hover:text-soft-primary-deep'}`}
+              className={`px-2.5 py-1.5 transition-colors ${effStyle === 'candles' ? 'bg-soft-primary text-sp-on-brand' : 'bg-sp-surface text-sp-shade/50 hover:text-soft-primary-deep'}`}
               aria-label="Candlestick chart"
             >
               <CandlestickChart className="h-3.5 w-3.5" aria-hidden="true" />
@@ -246,13 +265,13 @@ export default function PriceChart({
               role="tab"
               aria-selected={effStyle === 'line'}
               onClick={() => setStyle('line')}
-              className={`px-2.5 py-1.5 transition-colors ${effStyle === 'line' ? 'bg-soft-primary text-white' : 'bg-white text-black/50 hover:text-soft-primary-deep'}`}
+              className={`px-2.5 py-1.5 transition-colors ${effStyle === 'line' ? 'bg-soft-primary text-sp-on-brand' : 'bg-sp-surface text-sp-shade/50 hover:text-soft-primary-deep'}`}
               aria-label="Line chart"
             >
               <LineChartIcon className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </span>
-          <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="tablist" aria-label="Price or market cap">
+          <span className="inline-flex overflow-hidden rounded-full border border-sp-shade/10" role="tablist" aria-label="Price or market cap">
             {(['price', 'mcap'] as const).map((item) => (
               <button
                 key={item}
@@ -260,7 +279,7 @@ export default function PriceChart({
                 role="tab"
                 aria-selected={mode === item}
                 onClick={() => setMode(item)}
-                className={`px-2.5 py-1.5 text-[11px] font-extrabold transition-colors ${mode === item ? 'bg-soft-primary text-white' : 'bg-white text-black/50 hover:text-soft-primary-deep'}`}
+                className={`px-2.5 py-1.5 text-[11px] font-extrabold transition-colors ${mode === item ? 'bg-soft-primary text-sp-on-brand' : 'bg-sp-surface text-sp-shade/50 hover:text-soft-primary-deep'}`}
               >
                 {item === 'price' ? 'Price' : 'MCap'}
               </button>
@@ -271,27 +290,27 @@ export default function PriceChart({
 
       <div className="relative mt-4">
         {state === 'Graduated' && (
-          <span className="absolute left-2 top-2 z-10 rounded-full bg-[#edfff4] px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#0b9a51]">
+          <span className="absolute left-2 top-2 z-10 rounded-full bg-sp-up-soft px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-sp-up">
             Graduated: trading moved to Uniswap v4
           </span>
         )}
         {chartError ? (
-          <div className="flex h-[320px] items-center justify-center rounded-xl bg-[#f8f7fc] text-[12px] text-black/45">
+          <div className="flex h-[320px] items-center justify-center rounded-xl bg-sp-sunken text-[12px] text-sp-shade/45">
             The chart library failed to load. Trades below still show the full history.
           </div>
         ) : (
           <div ref={containerRef} className="h-[320px] w-full sm:h-[380px]" />
         )}
         {loading && trades.length === 0 && !chartError && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/70">
-            <span className="inline-flex items-center gap-2 text-[12px] font-bold text-black/50">
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-sp-surface/70">
+            <span className="inline-flex items-center gap-2 text-[12px] font-bold text-sp-shade/50">
               <RefreshCw className="h-4 w-4 animate-spin text-soft-primary" aria-hidden="true" />
               Building the chart from onchain trades...
             </span>
           </div>
         )}
       </div>
-      <p className="mt-2 text-[10.5px] text-black/35">
+      <p className="mt-2 text-[10.5px] text-sp-shade/35">
         Every point is the exact post-trade curve price from Bought/Sold events. Timestamps are estimated from block numbers (~2s per block).
       </p>
     </section>

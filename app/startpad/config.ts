@@ -1,6 +1,9 @@
 import { base, baseSepolia } from 'viem/chains';
 import type { Chain } from 'viem';
 import { robinhoodChain } from '../basechat/Robinhood/config/RobinhoodNetworkConfig';
+// Import TYLKO typu - `networkTheme` czyta z tego pliku LAUNCHPAD_NETWORKS, wiec
+// import wartosci zrobilby cykl. Typ znika przy kompilacji i cyklu nie ma.
+import type { NetworkTheme } from './networkTheme';
 
 /**
  * KONFIGURACJA WIELOSIECIOWA - kazda siec to osobne, pelne wdrozenie.
@@ -65,6 +68,14 @@ export type LaunchpadNetwork = {
   pillClass: string;
   /** Tailwind akcentu tekstowego (naglowki, eyebrow w stopce). */
   accentTextClass: string;
+  /**
+   * PELNA paleta startpada dla tej sieci. Brak pola znaczy "jasny motyw
+   * produktu", i tak zostaje dla Base oraz Sepolii - lawenda jest glosem
+   * MySphere i nie ma powodu jej zmieniac tam, gdzie siec nie ma wlasnego.
+   *
+   * Mechanika i uzasadnienie: app/startpad/networkTheme.ts.
+   */
+  theme?: NetworkTheme;
 };
 
 /**
@@ -184,6 +195,82 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     logo: '/robin.webp',
     pillClass: 'border-[#00C805]/50 bg-black text-[#00C805]',
     accentTextClass: 'text-[#00b104]',
+    /**
+     * CZARNO-ZIELONY STARTPAD. Te same barwy marki, co pastylka wyzej i sciezka
+     * postowania w basechat: #00C805 na czerni.
+     *
+     * Wartosci sa TROJKAMI RGB - Tailwind sklada z nich `rgb(var(--x)/alfa)`.
+     * Uklad odwraca dwie rzeczy wobec jasnego motywu i obie sa celowe:
+     *   - `--sp-shade` z czerni robi biel, bo na nim stoja WSZYSTKIE krawedzie
+     *     i przygaszone teksty (`border-black/10`, `text-black/45`); jedna
+     *     zmienna odwraca ich cala rodzine, nie ruszajac przezroczystosci;
+     *   - `deep` jest tu JASNIEJSZE od podstawowego, a nie ciemniejsze. W
+     *     jasnym motywie `deep` sluzyl do pisania po bieli, wiec musial byc
+     *     ciemny; na czerni ta sama rola wymaga odwrotnego kierunku.
+     *
+     * Pomarancz spadku zostaje pomaranczem, tylko rozjasnionym: zielen jest tu
+     * kolorem MARKI, wiec gdyby oznaczala takze wzrost, spadek nie mialby z
+     * czym kontrastowac.
+     */
+    theme: {
+      key: 'robinhood',
+      colorScheme: 'dark',
+      vars: {
+        '--sp-bg': '8 9 10',
+        '--sp-surface': '18 20 23',
+        '--sp-sunken': '13 15 17',
+        '--sp-shade': '255 255 255',
+        '--sp-ink': '236 255 238',
+        '--sp-ink-soft': '126 139 128',
+        '--sp-hover': '16 26 18',
+        '--sp-brand': '0 200 5',
+        '--sp-on-brand': '8 9 10',
+        '--sp-brand-deep': '0 230 6',
+        '--sp-brand-soft': '11 36 16',
+        '--sp-brand-strong': '124 255 131',
+        '--sp-up': '0 200 5',
+        '--sp-up-vivid': '75 255 90',
+        '--sp-up-soft': '10 32 16',
+        '--sp-up-line': '22 85 42',
+        '--sp-down': '240 160 60',
+        '--sp-down-deep': '255 186 105',
+        '--sp-down-soft': '36 26 12',
+        '--sp-down-line': '92 60 24',
+        '--sp-danger': '255 107 107',
+        '--sp-danger-soft': '45 16 16',
+        '--sp-info': '90 180 255',
+        '--sp-info-soft': '12 26 40',
+        // Wspolna powloka: nawigacja i dolny pasek sa pisane tokenami --soft-*,
+        // wiec bez tych dziewieciu linii czarna tablica siedzialaby pod jasna
+        // belka. Poza startpadem atrybut nie istnieje, wiec nic sie nie zmienia.
+        '--soft-bg': '8 9 10',
+        '--soft-surface': '18 20 23',
+        '--soft-surface-sunken': '13 15 17',
+        '--soft-ink': '236 255 238',
+        '--soft-ink-muted': '150 165 152',
+        '--soft-ink-soft': '126 139 128',
+        '--soft-ink-faint': '100 110 102',
+        '--soft-primary': '0 200 5',
+        '--soft-primary-deep': '0 230 6',
+        '--soft-on-primary': '8 9 10',
+        '--soft-line': '38 46 40',
+        '--soft-line-strong': '58 68 60',
+        '--soft-accent': '245 167 59',
+        '--soft-accent-soft': '40 27 12',
+        '--soft-accent-deep': '255 186 105',
+        '--soft-info': '90 180 255',
+        '--soft-info-soft': '12 26 40',
+      },
+      chart: {
+        background: '#0D0F11',
+        text: '#7E8B80',
+        grid: 'rgba(255,255,255,0.06)',
+        up: '#00C805',
+        down: '#F0A03C',
+        line: '#00C805',
+        lineFill: 'rgba(0,200,5,0.16)',
+      },
+    },
   },
 };
 

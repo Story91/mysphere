@@ -105,7 +105,7 @@ function NavItem({
          cieszy, tylko opoznia. */
       className={`${style.layout} items-center px-4 py-2.5 rounded-pill font-soft-display text-sm font-bold border transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface ${
         isActive
-          ? `bg-soft-primary border-soft-primary text-white ${style.active}`
+          ? `bg-soft-primary border-soft-primary text-soft-on-primary ${style.active}`
           : `bg-soft-surface border-soft-line text-soft-ink-muted ${style.idle}`
       }`}
     >

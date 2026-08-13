@@ -55,7 +55,7 @@ import StartpadFooter from './StartpadFooter';
 import { formatUsd, useEthUsd } from './useEthUsd';
 
 const FIELD =
-  'w-full rounded-xl border border-black/10 bg-white px-3.5 py-3 text-[14px] text-[#16141b] outline-none transition-colors placeholder:text-black/35 focus:border-[#7c6bda]';
+  'w-full rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-3 text-[14px] text-sp-ink outline-none transition-colors placeholder:text-sp-shade/35 focus:border-sp-brand';
 
 /**
  * `parseEther` rzuca na wszystkim, co nie jest zapisem dziesietnym - a
@@ -91,7 +91,7 @@ function NetworkSwitch() {
   useEffect(() => setMounted(true), []);
   const active = ACTIVE_LAUNCHPAD_NETWORK;
   if (!mounted) {
-    return <span className="py-2.5 pl-3.5 pr-2 text-[12px] font-bold text-black/40">{NET}</span>;
+    return <span className="py-2.5 pl-3.5 pr-2 text-[12px] font-bold text-sp-shade/40">{NET}</span>;
   }
   return (
     <span className={`inline-flex items-center gap-1.5 py-2.5 pl-3.5 pr-2 ${active.accentTextClass}`}>
@@ -100,7 +100,7 @@ function NetworkSwitch() {
         value={active.chain.id}
         onChange={(event) => setLaunchpadChain(Number(event.target.value))}
         aria-label="Launchpad network"
-        className="cursor-pointer bg-transparent text-[12px] font-extrabold outline-none [color:inherit] [&>option]:bg-white [&>option]:text-[#16141b]"
+        className="cursor-pointer bg-transparent text-[12px] font-extrabold outline-none [color:inherit] [&>option]:bg-sp-surface [&>option]:text-sp-ink"
       >
         {Object.values(LAUNCHPAD_NETWORKS).map((net) => (
           <option key={net.chain.id} value={net.chain.id}>
@@ -117,7 +117,7 @@ function NetworkTag() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const net = mounted ? ACTIVE_LAUNCHPAD_NETWORK : null;
-  if (!net) return <span className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/35">{NET}</span>;
+  if (!net) return <span className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/35">{NET}</span>;
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${net.pillClass}`}>
       {net.label}
@@ -239,6 +239,10 @@ function TokenGlyph({ token, large = false }: { token: LaunchpadToken; large?: b
       ) : (
         <>
           <span className="relative z-10">{token.symbol.slice(0, 2)}</span>
+          {/* Te dwa kolka leza NA kolorze tokena, ktory jest jego tozsamoscia i
+              nie zmienia sie z motywem sieci. Wiec i one nie moga: biel i czern
+              sa tu swiatlem i cieniem na tej samej powierzchni, a nie tlem
+              interfejsu. Podmiana na zmienne motywu zgasilaby glif na czarnym. */}
           <span aria-hidden="true" className="absolute -right-2 -top-3 h-8 w-8 rounded-full bg-white/25" />
           <span aria-hidden="true" className="absolute -bottom-3 -left-2 h-8 w-8 rounded-full bg-black/10" />
         </>
@@ -249,15 +253,15 @@ function TokenGlyph({ token, large = false }: { token: LaunchpadToken; large?: b
 
 function StatePill({ state }: { state: LaunchpadToken['state'] }) {
   const meta = {
-    Curve: { label: 'Curve', className: 'bg-[#edeaff] text-[#5f4ec2]' },
-    Locked: { label: 'Locked', className: 'bg-[#f4f1ff] text-[#705fd0]' },
-    Graduated: { label: 'Graduated', className: 'bg-[#edfff4] text-[#0b9a51]' },
+    Curve: { label: 'Curve', className: 'bg-sp-brand-soft text-sp-brand-deep' },
+    Locked: { label: 'Locked', className: 'bg-sp-brand-soft text-sp-brand-deep' },
+    Graduated: { label: 'Graduated', className: 'bg-sp-up-soft text-sp-up' },
   }[state];
   return <span className={`rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${meta.className}`}>{meta.label}</span>;
 }
 
 function SamplePill() {
-  return <span className="rounded-full bg-black/8 px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-black/50">Sample</span>;
+  return <span className="rounded-full bg-sp-shade/8 px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/50">Sample</span>;
 }
 
 /**
@@ -280,7 +284,9 @@ function Sparkline({ prices }: { prices: number[] }) {
     .join(' ');
   return (
     <svg viewBox="0 0 60 28" className="h-7 w-16 shrink-0" aria-hidden="true">
-      <polyline points={points} fill="none" stroke={up ? '#18bd64' : '#c76b12'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Kolor klasa, nie atrybutem: `stroke="#18bd64"` nie zna motywu sieci,
+          a regula CSS z Tailwinda bije atrybut prezentacyjny. */}
+      <polyline points={points} fill="none" className={up ? 'stroke-sp-up-vivid' : 'stroke-sp-down'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -298,10 +304,10 @@ function TradeFlash({ flash, rounded }: { flash: BoardToken['flash']; rounded: s
 }
 
 function curveStatusLabel(token: LaunchpadToken) {
-  if (token.state === 'Graduated') return { text: 'Graduated to pool', className: 'text-[#0b9a51]' };
-  if (token.state === 'Locked') return { text: 'Awaiting graduation', className: 'text-[#705fd0]' };
+  if (token.state === 'Graduated') return { text: 'Graduated to pool', className: 'text-sp-up' };
+  if (token.state === 'Locked') return { text: 'Awaiting graduation', className: 'text-sp-brand-deep' };
   const toGo = Math.max(0, token.target - token.raised);
-  return { text: `${toGo.toFixed(2)} ETH to graduation`, className: 'text-[#c76b12]' };
+  return { text: `${toGo.toFixed(2)} ETH to graduation`, className: 'text-sp-down' };
 }
 
 /**
@@ -334,16 +340,16 @@ function LaunchCard({
       <TokenGlyph token={token} />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-[15px] font-extrabold text-[#16141b]">{token.symbol}</span>
+          <span className="truncate text-[15px] font-extrabold text-sp-ink">{token.symbol}</span>
           <StatePill state={token.state} />
           {sample && <SamplePill />}
         </span>
-        <span className="mt-1 block truncate text-[12px] text-black/50">{token.name}</span>
+        <span className="mt-1 block truncate text-[12px] text-sp-shade/50">{token.name}</span>
       </span>
     </>
   );
   return (
-    <div className="relative flex flex-col rounded-[18px] border border-black/10 bg-white p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+    <div className="relative flex flex-col rounded-[18px] border border-sp-shade/10 bg-sp-surface p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
       {animationsOn && <TradeFlash flash={token.flash} rounded="rounded-[18px]" />}
       {/* Udostepnianie siedzi NAD blyskiem transakcji (z-20 wobec z-10), inaczej
           nakladka animacji przechwytywalaby klikniecie tuz po czyimś kupnie -
@@ -364,9 +370,9 @@ function LaunchCard({
       )}
       {/* Wiersz podgladowy jest proba ukladu, nie rynkiem - nic na nim nie klika. */}
       {sample || !token.address ? (
-        <div className="flex min-w-0 items-start gap-3 pr-9">{header}</div>
+        <div className="flex min-w-0 items-start gap-3 pr-10">{header}</div>
       ) : (
-        <button type="button" onClick={onOpen} className="flex min-w-0 items-start gap-3 pr-9 text-left">{header}</button>
+        <button type="button" onClick={onOpen} className="flex min-w-0 items-start gap-3 pr-10 text-left">{header}</button>
       )}
 
       <div className="mt-4">
@@ -374,13 +380,13 @@ function LaunchCard({
             i "2.54 ETH to graduation" nie walcza o jedna linie - status schodzi
             nizej, a cena i USD pokazuja sie w calosci (koniec z "$865..."). */}
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-[17px] font-extrabold text-[#16141b]">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-black/40"> · {raisedNote}</span>}</span>
+          <span className="text-[17px] font-extrabold text-sp-ink">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-sp-shade/40"> · {raisedNote}</span>}</span>
           <span className={`ml-auto shrink-0 text-[11px] font-extrabold ${status.className}`}>{status.text}</span>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/8">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sp-shade/8">
           <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${progress}%`, backgroundColor: token.accent }} />
         </div>
-        <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-black/45">
+        <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-sp-shade/45">
           <span className="min-w-0 truncate">{formatEth(token.volume ?? 0)}{volNote ? ` (${volNote})` : ''} vol · {token.holders} holders · {token.age}</span>
           <Sparkline prices={token.prices ?? []} />
         </div>
@@ -388,9 +394,9 @@ function LaunchCard({
 
       {!sample && (
         <div className="mt-4 flex items-center gap-2">
-          <button type="button" onClick={onTrade} className="flex-1 rounded-full bg-soft-primary px-3 py-2 text-[12px] font-extrabold text-white">Trade</button>
+          <button type="button" onClick={onTrade} className="flex-1 rounded-full bg-soft-primary px-3 py-2 text-[12px] font-extrabold text-sp-on-brand">Trade</button>
           {/* Bez adresu "Details" prowadziloby na /startpad/undefined. */}
-          {token.address && <button type="button" onClick={onOpen} className="rounded-full border border-black/15 bg-white px-3 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">Details</button>}
+          {token.address && <button type="button" onClick={onOpen} className="rounded-full border border-sp-shade/15 bg-sp-surface px-3 py-2 text-[12px] font-extrabold text-sp-ink hover:border-soft-primary">Details</button>}
         </div>
       )}
     </div>
@@ -408,7 +414,7 @@ function KingOfTheHill({ token, ethUsd, onTrade, onDetails }: { token: BoardToke
   const raisedNote = usdNote(token.raised, ethUsd);
   const volNote = usdNote(token.volume ?? 0, ethUsd);
   return (
-    <section className="relative mt-5 overflow-hidden rounded-[20px] border border-soft-primary/30 bg-white p-4 sm:p-5" aria-label="King of the hill">
+    <section className="relative mt-5 overflow-hidden rounded-[20px] border border-soft-primary/30 bg-sp-surface p-4 sm:p-5" aria-label="King of the hill">
       <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-soft-primary/[0.08] blur-2xl" />
       <div className="relative flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -418,24 +424,24 @@ function KingOfTheHill({ token, ethUsd, onTrade, onDetails }: { token: BoardToke
               <Crown className="h-3.5 w-3.5" aria-hidden="true" /> King of the hill
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="text-[17px] font-extrabold text-[#16141b]">{token.symbol}</span>
+              <span className="text-[17px] font-extrabold text-sp-ink">{token.symbol}</span>
               <StatePill state={token.state} />
             </div>
-            <p className="mt-0.5 truncate text-[12px] text-black/50">{token.name} · {token.holders} holders · {formatEth(token.volume ?? 0)}{volNote ? ` (${volNote})` : ''} vol · {token.age}</p>
+            <p className="mt-0.5 truncate text-[12px] text-sp-shade/50">{token.name} · {token.holders} holders · {formatEth(token.volume ?? 0)}{volNote ? ` (${volNote})` : ''} vol · {token.age}</p>
           </div>
         </div>
         <div className="w-full sm:w-[240px]">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 truncate text-[15px] font-extrabold text-[#16141b]">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-black/45"> · {raisedNote}</span>}</span>
-            <span className="text-[11px] font-extrabold text-[#c76b12]">{toGo.toFixed(2)} ETH to go</span>
+            <span className="min-w-0 truncate text-[15px] font-extrabold text-sp-ink">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-sp-shade/45"> · {raisedNote}</span>}</span>
+            <span className="text-[11px] font-extrabold text-sp-down">{toGo.toFixed(2)} ETH to go</span>
           </div>
-          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-black/8">
+          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-sp-shade/8">
             <div className="h-full rounded-full bg-soft-primary transition-[width] duration-500" style={{ width: `${progress}%` }} />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onTrade} className="rounded-full bg-soft-primary px-4 py-2.5 text-[12px] font-extrabold text-white">Trade</button>
-          {token.address && <button type="button" onClick={onDetails} className="rounded-full border border-black/15 bg-white px-4 py-2.5 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">Details</button>}
+          <button type="button" onClick={onTrade} className="rounded-full bg-soft-primary px-4 py-2.5 text-[12px] font-extrabold text-sp-on-brand">Trade</button>
+          {token.address && <button type="button" onClick={onDetails} className="rounded-full border border-sp-shade/15 bg-sp-surface px-4 py-2.5 text-[12px] font-extrabold text-sp-ink hover:border-soft-primary">Details</button>}
         </div>
       </div>
     </section>
@@ -469,10 +475,10 @@ function darkenAccent(hex: string, factor = 0.55): string {
 }
 
 const FEED_TONE_DOT: Record<ActivityItem['tone'], string> = {
-  buy: '#18bd64',
-  sell: '#c76b12',
-  launch: '#7c6bda',
-  graduate: '#0b9a51',
+  buy: 'rgb(var(--sp-up-vivid))',
+  sell: 'rgb(var(--sp-down))',
+  launch: 'rgb(var(--sp-brand))',
+  graduate: 'rgb(var(--sp-up))',
 };
 
 /**
@@ -484,7 +490,7 @@ function FeedGlyph({ item }: { item: ActivityItem }) {
   return (
     <span className="relative h-7 w-7 shrink-0" aria-hidden="true">
       <span
-        className="flex h-full w-full items-center justify-center overflow-hidden rounded-full text-[9px] font-extrabold text-white ring-1 ring-black/10"
+        className="flex h-full w-full items-center justify-center overflow-hidden rounded-full text-[9px] font-extrabold text-white ring-1 ring-sp-shade/10"
         style={{ background: `linear-gradient(135deg, ${item.accent}, ${darkenAccent(item.accent)})` }}
       >
         {item.logoUrl ? (
@@ -512,17 +518,17 @@ function ActivityTicker({ events }: { events: ActivityItem[] }) {
   // overflow-x-auto: gdy sie nie miesci, mozna przewinac recznie.
   const items = events.slice(0, 20);
   return (
-    <div className="-mx-4 overflow-x-auto border-b border-black/10 bg-white sm:-mx-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Live Startpad events">
+    <div className="-mx-4 overflow-x-auto border-b border-sp-shade/10 bg-sp-surface sm:-mx-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Live Startpad events">
       <div className="flex min-h-[38px] w-max items-center gap-1.5 px-2 py-1.5">
         {items.length ? items.map((event) => (
-          <div key={event.id} className="lp-ticker-in flex shrink-0 items-center gap-1.5 rounded-full border border-black/10 bg-white px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+          <div key={event.id} className="lp-ticker-in flex shrink-0 items-center gap-1.5 rounded-full border border-sp-shade/10 bg-sp-surface px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
             <FeedGlyph item={event} />
             <span className="pr-1 text-left leading-tight">
-              <span className="block text-[10px] font-bold text-[#16141b]">{event.symbol}</span>
-              <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-[#a34b08]' : event.tone === 'buy' ? 'text-[#0b9a51]' : event.tone === 'graduate' ? 'text-[#0b7a41]' : 'text-[#5f4ec2]'}`}>{event.label}</span>
+              <span className="block text-[10px] font-bold text-sp-ink">{event.symbol}</span>
+              <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-sp-down-deep' : event.tone === 'buy' ? 'text-sp-up' : event.tone === 'graduate' ? 'text-sp-up' : 'text-sp-brand-deep'}`}>{event.label}</span>
             </span>
           </div>
-        )) : <span className="px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-black/35">Listening for live Startpad events...</span>}
+        )) : <span className="px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/35">Listening for live Startpad events...</span>}
       </div>
     </div>
   );
@@ -534,23 +540,23 @@ function ActivityTicker({ events }: { events: ActivityItem[] }) {
  */
 function BoardStats({ totalRaised, totalVolume, totalTrades, liveCount, ethUsd }: { totalRaised: number; totalVolume: number; totalTrades: number; liveCount: number; ethUsd: number | null }) {
   const rows = [
-    { icon: <CircleDollarSign className="h-4 w-4 text-[#8f45df]" aria-hidden="true" />, label: 'Curve reserve', value: formatEth(totalRaised), sub: usdNote(totalRaised, ethUsd) },
-    { icon: <TrendingUp className="h-4 w-4 text-[#24a3ee]" aria-hidden="true" />, label: 'Indexed volume', value: formatEth(totalVolume), sub: usdNote(totalVolume, ethUsd) },
-    { icon: <BarChart3 className="h-4 w-4 text-[#18bd64]" aria-hidden="true" />, label: 'Trades', value: totalTrades.toLocaleString('en-US'), sub: null },
+    { icon: <CircleDollarSign className="h-4 w-4 text-sp-brand-strong" aria-hidden="true" />, label: 'Curve reserve', value: formatEth(totalRaised), sub: usdNote(totalRaised, ethUsd) },
+    { icon: <TrendingUp className="h-4 w-4 text-sp-info" aria-hidden="true" />, label: 'Indexed volume', value: formatEth(totalVolume), sub: usdNote(totalVolume, ethUsd) },
+    { icon: <BarChart3 className="h-4 w-4 text-sp-up-vivid" aria-hidden="true" />, label: 'Trades', value: totalTrades.toLocaleString('en-US'), sub: null },
     { icon: <Zap className="h-4 w-4 text-soft-primary" aria-hidden="true" />, label: 'Active curves', value: String(liveCount), sub: null },
   ];
   return (
-    <section className="rounded-[20px] border border-black/10 bg-white p-5">
+    <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[16px] font-extrabold text-[#16141b]">Board stats</h2>
+        <h2 className="text-[16px] font-extrabold text-sp-ink">Board stats</h2>
         <NetworkTag />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         {rows.map((row) => (
-          <div key={row.label} className="rounded-xl bg-[#fafafd] p-3">
-            <span className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.06em] text-black/40">{row.icon}{row.label}</span>
-            <span className="mt-1.5 block truncate font-soft-display text-[18px] font-extrabold leading-none text-[#111016]">{row.value}</span>
-            {row.sub && <span className="mt-1 block truncate text-[10.5px] font-bold text-black/40">{row.sub}</span>}
+          <div key={row.label} className="rounded-xl bg-sp-sunken p-3">
+            <span className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">{row.icon}{row.label}</span>
+            <span className="mt-1.5 block truncate font-soft-display text-[18px] font-extrabold leading-none text-sp-ink">{row.value}</span>
+            {row.sub && <span className="mt-1 block truncate text-[10.5px] font-bold text-sp-shade/40">{row.sub}</span>}
           </div>
         ))}
       </div>
@@ -561,18 +567,18 @@ function BoardStats({ totalRaised, totalVolume, totalTrades, liveCount, ethUsd }
 function TopLaunches({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token: BoardToken) => void }) {
   const top = [...tokens].sort((a, b) => b.raised - a.raised).slice(0, 3);
   return (
-    <section className="rounded-[20px] border border-black/10 bg-white p-5">
+    <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[16px] font-extrabold text-[#16141b]">Top launches</h2>
-        <TrendingUp className="h-4 w-4 text-[#7c6bda]" aria-hidden="true" />
+        <h2 className="text-[16px] font-extrabold text-sp-ink">Top launches</h2>
+        <TrendingUp className="h-4 w-4 text-sp-brand" aria-hidden="true" />
       </div>
       <div className="mt-5 grid grid-cols-3 gap-3">
         {top.map((token) => {
           const body = (
             <>
               <span className="mx-auto block w-fit transition-transform group-hover:-translate-y-1"><TokenGlyph token={token} large /></span>
-              <span className="mt-2 block truncate text-[12px] font-extrabold text-[#16141b]">{token.symbol}</span>
-              <span className="mt-1 block truncate text-[11px] text-black/50">{formatEth(token.raised)}</span>
+              <span className="mt-2 block truncate text-[12px] font-extrabold text-sp-ink">{token.symbol}</span>
+              <span className="mt-1 block truncate text-[11px] text-sp-shade/50">{formatEth(token.raised)}</span>
             </>
           );
           // Wiersze przykladowe nie maja adresu - nie ma dokad nawigowac.
@@ -591,21 +597,21 @@ function VolumePanel({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token:
   const top = [...tokens].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0)).slice(0, 3);
   const rowClass = 'grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-3 py-2 text-left';
   return (
-    <section className="rounded-[20px] border border-black/10 bg-white p-5">
+    <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[16px] font-extrabold text-[#16141b]">Top volume</h2>
-        <BarChart3 className="h-4 w-4 text-[#1e9de0]" aria-hidden="true" />
+        <h2 className="text-[16px] font-extrabold text-sp-ink">Top volume</h2>
+        <BarChart3 className="h-4 w-4 text-sp-info" aria-hidden="true" />
       </div>
-      <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-x-3 text-[10px] font-bold uppercase tracking-[0.08em] text-black/40">
+      <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-x-3 text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40">
         <span>Coin</span><span>Volume</span><span>Trades</span>
       </div>
-      <div className="mt-2 divide-y divide-black/10">
+      <div className="mt-2 divide-y divide-sp-shade/10">
         {top.map((token) => {
           const cells = (
             <>
-              <span className="flex min-w-0 items-center gap-2"><TokenGlyph token={token} /><span className="truncate text-[12px] font-extrabold text-[#16141b]">{token.symbol}</span></span>
-              <span className="text-[12px] font-bold text-[#16141b]">{formatEth(token.volume ?? 0)}</span>
-              <span className="text-[12px] font-bold text-black/60">{token.trades ?? 0}</span>
+              <span className="flex min-w-0 items-center gap-2"><TokenGlyph token={token} /><span className="truncate text-[12px] font-extrabold text-sp-ink">{token.symbol}</span></span>
+              <span className="text-[12px] font-bold text-sp-ink">{formatEth(token.volume ?? 0)}</span>
+              <span className="text-[12px] font-bold text-sp-shade/60">{token.trades ?? 0}</span>
             </>
           );
           // Wiersze przykladowe nie maja adresu - nie ma dokad nawigowac.
@@ -630,25 +636,25 @@ function VolumePanel({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token:
 function TopEarnings({ rows, ethUsd }: { rows: CreatorEarnings[]; ethUsd: number | null }) {
   const explorer = LAUNCHPAD_CHAIN.blockExplorers?.default?.url ?? 'https://sepolia.basescan.org';
   return (
-    <section className="rounded-[20px] border border-black/10 bg-white p-5">
+    <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[16px] font-extrabold text-[#16141b]">Top earnings</h2>
+        <h2 className="text-[16px] font-extrabold text-sp-ink">Top earnings</h2>
         <Crown className="h-4 w-4 text-[#d99a1b]" aria-hidden="true" />
       </div>
-      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-black/40">Creator-side fees claimable on-chain now - curve + pool + vault, protocol share excluded</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40">Creator-side fees claimable on-chain now - curve + pool + vault, protocol share excluded</p>
       {rows.length === 0 ? (
-        <p className="mt-4 text-[11.5px] leading-[1.5] text-black/45">
+        <p className="mt-4 text-[11.5px] leading-[1.5] text-sp-shade/45">
           No creator fees indexed yet. Every curve trade and pool swap accrues a creator share that shows up here.
         </p>
       ) : (
-        <div className="mt-3 divide-y divide-black/5">
+        <div className="mt-3 divide-y divide-sp-shade/5">
           {rows.map((row, index) => {
             const eth = Number(formatEther(row.totalWei));
             const note = usdNote(eth, ethUsd);
             const first = index === 0;
             return (
-              <div key={row.creator} className={`flex items-center gap-2.5 py-2 ${first ? '-mx-2 rounded-xl bg-[#fff8ed] px-2' : ''}`}>
-                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${first ? 'bg-[#f3c58a] text-[#8c4a0b]' : 'bg-black/5 text-black/50'}`}>
+              <div key={row.creator} className={`flex items-center gap-2.5 py-2 ${first ? '-mx-2 rounded-xl bg-sp-down-soft px-2' : ''}`}>
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${first ? 'bg-sp-down-line text-sp-down-deep' : 'bg-sp-shade/5 text-sp-shade/50'}`}>
                   {first ? <Crown className="h-3.5 w-3.5" aria-hidden="true" /> : index + 1}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -656,26 +662,26 @@ function TopEarnings({ rows, ethUsd }: { rows: CreatorEarnings[]; ethUsd: number
                     href={`${explorer}/address/${row.creator}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[12px] font-extrabold text-[#16141b] hover:text-soft-primary-deep"
+                    className="inline-flex items-center gap-1 text-[12px] font-extrabold text-sp-ink hover:text-soft-primary-deep"
                   >
                     {shortAddress(row.creator)}
-                    <ExternalLink className="h-3 w-3 text-black/30" aria-hidden="true" />
+                    <ExternalLink className="h-3 w-3 text-sp-shade/30" aria-hidden="true" />
                   </a>
-                  <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-black/45">
+                  <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-sp-shade/45">
                     <span>{row.tokenCount} {row.tokenCount === 1 ? 'token' : 'tokens'}</span>
-                    {row.graduated && <span className="rounded-full bg-[#edfff4] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.05em] text-[#0b9a51]">Graduated</span>}
+                    {row.graduated && <span className="rounded-full bg-sp-up-soft px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.05em] text-sp-up">Graduated</span>}
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="block text-[12px] font-extrabold text-[#16141b]">{eth.toFixed(4)} ETH</span>
-                  {note && <span className="block text-[10.5px] font-bold text-black/40">{note}</span>}
+                  <span className="block text-[12px] font-extrabold text-sp-ink">{eth.toFixed(4)} ETH</span>
+                  {note && <span className="block text-[10.5px] font-bold text-sp-shade/40">{note}</span>}
                 </span>
               </div>
             );
           })}
         </div>
       )}
-      <p className="mt-3 border-t border-black/5 pt-2.5 text-[10.5px] leading-[1.5] text-black/40">
+      <p className="mt-3 border-t border-sp-shade/5 pt-2.5 text-[10.5px] leading-[1.5] text-sp-shade/40">
         Curve fees split per each token&apos;s own config; pool fees settle through the hook. Auto-buybacks come out of the creator&apos;s share only.
       </p>
     </section>
@@ -712,24 +718,24 @@ function MyTokensPanel({
   const claimEth = Number(formatEther(totalClaimable));
   const claimNote = usdNote(claimEth, ethUsd);
   return (
-    <section className="mt-5 rounded-[20px] border border-black/10 bg-white p-5" aria-label="My tokens">
+    <section className="mt-5 rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5" aria-label="My tokens">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 text-[16px] font-extrabold text-[#16141b]">
+          <h2 className="flex items-center gap-2 text-[16px] font-extrabold text-sp-ink">
             <WalletCards className="h-4 w-4 text-soft-primary" aria-hidden="true" /> My tokens
           </h2>
-          <p className="mt-1 text-[11px] text-black/45">Launches created by your connected wallet · earnings accrue on-chain</p>
+          <p className="mt-1 text-[11px] text-sp-shade/45">Launches created by your connected wallet · earnings accrue on-chain</p>
         </div>
         {totalClaimable > 0n && (
-          <span className="flex items-center gap-2.5 rounded-full bg-[#f0fff5] py-1.5 pl-3.5 pr-1.5">
-            <span className="text-[12px] font-extrabold text-[#08753d]">
-              {claimEth.toFixed(4)} ETH claimable{claimNote && <span className="font-bold text-[#08753d]/70"> · {claimNote}</span>}
+          <span className="flex items-center gap-2.5 rounded-full bg-sp-up-soft py-1.5 pl-3.5 pr-1.5">
+            <span className="text-[12px] font-extrabold text-sp-up">
+              {claimEth.toFixed(4)} ETH claimable{claimNote && <span className="font-bold text-sp-up/70"> · {claimNote}</span>}
             </span>
             <button
               type="button"
               disabled={claimBusy}
               onClick={onClaim}
-              className="rounded-full bg-[#0b9a51] px-3.5 py-1.5 text-[11px] font-extrabold text-white disabled:opacity-60"
+              className="rounded-full bg-sp-up px-3.5 py-1.5 text-[11px] font-extrabold text-sp-on-brand disabled:opacity-60"
             >
               {claimBusy ? 'Claiming...' : 'Claim'}
             </button>
@@ -737,14 +743,14 @@ function MyTokensPanel({
         )}
       </div>
       {tokens.length === 0 ? (
-        <div className="mt-4 flex flex-col items-center gap-3 rounded-xl bg-[#fafafd] px-4 py-8 text-center">
-          <p className="text-[13px] font-bold text-black/50">You have not launched anything yet</p>
-          <button type="button" onClick={onLaunch} className="inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[12px] font-extrabold text-white">
+        <div className="mt-4 flex flex-col items-center gap-3 rounded-xl bg-sp-sunken px-4 py-8 text-center">
+          <p className="text-[13px] font-bold text-sp-shade/50">You have not launched anything yet</p>
+          <button type="button" onClick={onLaunch} className="inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[12px] font-extrabold text-sp-on-brand">
             <Plus className="h-4 w-4" aria-hidden="true" /> Launch
           </button>
         </div>
       ) : (
-        <div className="mt-2 divide-y divide-black/5">
+        <div className="mt-2 divide-y divide-sp-shade/5">
           {tokens.map((token) => {
             const progress = curvePercent(token);
             const earnedEth = Number(formatEther(token.creatorAccruedWei ?? 0n));
@@ -755,7 +761,7 @@ function MyTokensPanel({
                   <TokenGlyph token={token} />
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-[14px] font-extrabold text-[#16141b]">{token.symbol}</span>
+                      <span className="truncate text-[14px] font-extrabold text-sp-ink">{token.symbol}</span>
                       <StatePill state={token.state} />
                       {/* Logo jako data-URL = zyje tylko w localStorage tego
                           urzadzenia, Blob go jeszcze nie przejal. Bez tej
@@ -763,37 +769,37 @@ function MyTokensPanel({
                           inni widza pusty glif. */}
                       {token.logoUrl?.startsWith('data:') && (
                         <span
-                          className="rounded-full bg-[#fff8ed] px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-[#a34b08]"
+                          className="rounded-full bg-sp-down-soft px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] text-sp-down-deep"
                           title="The logo has not reached the server yet. Sign in with your wallet and it will publish itself on your next visit."
                         >
                           Logo not public yet
                         </span>
                       )}
                     </span>
-                    <span className="mt-0.5 block truncate text-[11.5px] text-black/50">{token.name}</span>
+                    <span className="mt-0.5 block truncate text-[11.5px] text-sp-shade/50">{token.name}</span>
                   </span>
                 </button>
                 <div className="w-full shrink-0 sm:w-[170px]">
                   <div className="flex items-baseline justify-between gap-2 text-[11px]">
-                    <span className="font-extrabold text-[#16141b]">{formatEth(token.raised)}</span>
-                    <span className="text-black/40">{progress}%</span>
+                    <span className="font-extrabold text-sp-ink">{formatEth(token.raised)}</span>
+                    <span className="text-sp-shade/40">{progress}%</span>
                   </div>
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/8">
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-sp-shade/8">
                     <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${progress}%`, backgroundColor: token.accent }} />
                   </div>
                 </div>
                 <div className="w-[92px] shrink-0">
-                  <span className="block text-[12px] font-bold text-[#16141b]">{formatEth(token.volume ?? 0)}</span>
-                  <span className="block text-[10px] text-black/40">volume</span>
+                  <span className="block text-[12px] font-bold text-sp-ink">{formatEth(token.volume ?? 0)}</span>
+                  <span className="block text-[10px] text-sp-shade/40">volume</span>
                 </div>
                 <div className="w-[118px] shrink-0">
-                  <span className="block text-[12px] font-extrabold text-[#0b9a51]">{earnedEth.toFixed(4)} ETH</span>
-                  <span className="block text-[10px] text-black/40">{earnedNote ? `${earnedNote} accrued` : 'accrued earnings'}</span>
+                  <span className="block text-[12px] font-extrabold text-sp-up">{earnedEth.toFixed(4)} ETH</span>
+                  <span className="block text-[10px] text-sp-shade/40">{earnedNote ? `${earnedNote} accrued` : 'accrued earnings'}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => onOpen(token)}
-                  className="ml-auto shrink-0 rounded-full p-2 text-black/40 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]"
+                  className="ml-auto shrink-0 rounded-full p-2 text-sp-shade/40 hover:bg-sp-brand-soft hover:text-sp-brand-deep"
                   aria-label={`Open ${token.symbol} page`}
                 >
                   <ExternalLink className="h-4 w-4" aria-hidden="true" />
@@ -829,28 +835,28 @@ function LaunchTableRow({
     <>
       <TokenGlyph token={token} />
       <span className="min-w-0">
-        <span className="flex flex-wrap items-center gap-2"><span className="truncate text-[14px] font-extrabold text-[#16141b]">{token.symbol}</span><StatePill state={token.state} />{sample && <SamplePill />}</span>
-        <span className="mt-1 flex items-center gap-2 truncate text-[12px] text-black/50"><span>{token.name}</span><span aria-hidden="true">•</span><span>{token.age}</span></span>
+        <span className="flex flex-wrap items-center gap-2"><span className="truncate text-[14px] font-extrabold text-sp-ink">{token.symbol}</span><StatePill state={token.state} />{sample && <SamplePill />}</span>
+        <span className="mt-1 flex items-center gap-2 truncate text-[12px] text-sp-shade/50"><span>{token.name}</span><span aria-hidden="true">•</span><span>{token.age}</span></span>
       </span>
     </>
   );
   return (
-    <div className="relative grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] items-center gap-4 border-t border-black/10 px-4 py-3.5 text-left transition-colors hover:bg-[#fff8fc] sm:px-5">
+    <div className="relative grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] items-center gap-4 border-t border-sp-shade/10 px-4 py-3.5 text-left transition-colors hover:bg-sp-hover sm:px-5">
       {animationsOn && <TradeFlash flash={token.flash} rounded="rounded-none" />}
       {sample || !token.address ? (
         <div className="flex min-w-0 items-center gap-3">{coinCell}</div>
       ) : (
         <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-3 text-left">{coinCell}</button>
       )}
-      <div><span className="block text-[14px] font-extrabold text-[#16141b]">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-black/40"> · {raisedNote}</span>}</span><span className={`mt-1 block text-[11px] font-bold ${status.className}`}>{status.text}</span></div>
-      <div><span className="block text-[14px] font-bold text-[#16141b]">{formatEth(token.volume ?? 0)}{volNote && <span className="text-[11px] font-bold text-black/40"> · {volNote}</span>}</span><span className="mt-1 block text-[11px] text-black/45">indexed volume</span></div>
-      <div className="flex items-center gap-2"><Sparkline prices={token.prices ?? []} /><span className="text-[11px] font-bold text-black/45">{token.holders} holders</span></div>
-      <div><span className="block text-[14px] font-bold text-[#16141b]">{shortAddress(token.creator)}</span><span className="mt-1 block text-[11px] text-black/45">creator</span></div>
+      <div><span className="block text-[14px] font-extrabold text-sp-ink">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-sp-shade/40"> · {raisedNote}</span>}</span><span className={`mt-1 block text-[11px] font-bold ${status.className}`}>{status.text}</span></div>
+      <div><span className="block text-[14px] font-bold text-sp-ink">{formatEth(token.volume ?? 0)}{volNote && <span className="text-[11px] font-bold text-sp-shade/40"> · {volNote}</span>}</span><span className="mt-1 block text-[11px] text-sp-shade/45">indexed volume</span></div>
+      <div className="flex items-center gap-2"><Sparkline prices={token.prices ?? []} /><span className="text-[11px] font-bold text-sp-shade/45">{token.holders} holders</span></div>
+      <div><span className="block text-[14px] font-bold text-sp-ink">{shortAddress(token.creator)}</span><span className="mt-1 block text-[11px] text-sp-shade/45">creator</span></div>
       {sample ? (
         <span />
       ) : (
         <span className="flex items-center gap-1.5">
-          <button type="button" onClick={onTrade} className="rounded-full border border-black/15 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] shadow-sm transition-colors hover:border-[#7c6bda] hover:text-[#5f4ec2]">Trade</button>
+          <button type="button" onClick={onTrade} className="rounded-full border border-sp-shade/15 bg-sp-surface px-3.5 py-2 text-[12px] font-extrabold text-sp-ink shadow-sm transition-colors hover:border-sp-brand hover:text-sp-brand-deep">Trade</button>
           {token.address && (
             <ShareToken
               address={token.address}
@@ -862,7 +868,7 @@ function LaunchTableRow({
               priceEth={token.lastPrice}
             />
           )}
-          {token.address && <button type="button" onClick={onOpen} className="rounded-full p-2 text-black/40 hover:bg-[#f4f1ff] hover:text-[#5f4ec2]" aria-label={`Open ${token.symbol} details`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></button>}
+          {token.address && <button type="button" onClick={onOpen} className="rounded-full p-2 text-sp-shade/40 hover:bg-sp-brand-soft hover:text-sp-brand-deep" aria-label={`Open ${token.symbol} details`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></button>}
         </span>
       )}
     </div>
@@ -945,33 +951,33 @@ function TradePanel({
   const effectiveSide: TradeSide = side === 'buy' && !canBuy ? 'sell' : side;
 
   return <>
-    {canSell && <div className="mt-5 flex items-center gap-1 rounded-xl bg-[#f4f1ff] p-1">
-      {(canBuy ? (['buy', 'sell'] as const) : (['sell'] as const)).map((item) => <button key={item} type="button" onClick={() => setSide(item)} className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${effectiveSide === item ? 'bg-white text-soft-primary-deep shadow-sm' : 'text-black/45'}`}>{item === 'buy' ? 'Buy with ETH' : 'Sell token'}</button>)}
+    {canSell && <div className="mt-5 flex items-center gap-1 rounded-xl bg-sp-brand-soft p-1">
+      {(canBuy ? (['buy', 'sell'] as const) : (['sell'] as const)).map((item) => <button key={item} type="button" onClick={() => setSide(item)} className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${effectiveSide === item ? 'bg-sp-surface text-soft-primary-deep shadow-sm' : 'text-sp-shade/45'}`}>{item === 'buy' ? 'Buy with ETH' : 'Sell token'}</button>)}
     </div>}
-    {!canBuy && canSell && <p className="mt-2 text-[11px] leading-[1.4] text-black/50">Buying is closed, the curve is full. Selling stays open until the pool opens.</p>}
-    {!canSell && <p className="mt-5 rounded-xl bg-[#f4f1ff] p-3 text-[11px] leading-[1.4] text-black/55">Curve trading ended at graduation. Swaps happen in the Uniswap v4 pool now.</p>}
+    {!canBuy && canSell && <p className="mt-2 text-[11px] leading-[1.4] text-sp-shade/50">Buying is closed, the curve is full. Selling stays open until the pool opens.</p>}
+    {!canSell && <p className="mt-5 rounded-xl bg-sp-brand-soft p-3 text-[11px] leading-[1.4] text-sp-shade/55">Curve trading ended at graduation. Swaps happen in the Uniswap v4 pool now.</p>}
     {canSell && (effectiveSide === 'buy' ? <>
-      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-[#16141b]">ETH amount</span><span className="text-[11px] text-black/45">0.5% slippage buffer</span></div>
-      <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-black/40">ETH</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-white disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
+      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-sp-ink">ETH amount</span><span className="text-[11px] text-sp-shade/45">0.5% slippage buffer</span></div>
+      <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">ETH</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!ethBalance} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
-        <button type="button" disabled={!ethBalance} onClick={() => setBuyFraction(1n, 1n)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">Max</button>
+        {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!ethBalance} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
+        <button type="button" disabled={!ethBalance} onClick={() => setBuyFraction(1n, 1n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">Max</button>
       </div>
     </> : <>
-      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-[#16141b]">Token amount</span><span className="text-[11px] text-black/45">Balance {Number(balance).toFixed(4)}</span></div>
-      <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={sellAmount} onChange={(event) => setSellAmount(event.target.value)} className={`${FIELD} pr-16`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-extrabold text-black/40">{token.symbol}</span></div><button type="button" disabled={busy === 'sell' || busy === 'approve'} onClick={onSell} className="inline-flex items-center gap-2 rounded-xl bg-[#16141b] px-4 text-[13px] font-extrabold text-white disabled:opacity-60">{busy === 'approve' ? 'Approving...' : busy === 'sell' ? 'Selling...' : 'Sell'}<ArrowDownToLine className="h-4 w-4" aria-hidden="true" /></button></div>
+      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-sp-ink">Token amount</span><span className="text-[11px] text-sp-shade/45">Balance {Number(balance).toFixed(4)}</span></div>
+      <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={sellAmount} onChange={(event) => setSellAmount(event.target.value)} className={`${FIELD} pr-16`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-extrabold text-sp-shade/40">{token.symbol}</span></div><button type="button" disabled={busy === 'sell' || busy === 'approve'} onClick={onSell} className="inline-flex items-center gap-2 rounded-xl bg-sp-ink px-4 text-[13px] font-extrabold text-white disabled:opacity-60">{busy === 'approve' ? 'Approving...' : busy === 'sell' ? 'Selling...' : 'Sell'}<ArrowDownToLine className="h-4 w-4" aria-hidden="true" /></button></div>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!details || details.balance === 0n} onClick={() => setSellFraction(BigInt(pct), 100n)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
-        <button type="button" disabled={!details || details.balance === 0n} onClick={() => setSellFraction(1n, 1n)} className="rounded-full border border-black/10 px-2.5 py-1 text-[10.5px] font-bold text-black/60 hover:border-soft-primary disabled:opacity-40">Max</button>
+        {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!details || details.balance === 0n} onClick={() => setSellFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
+        <button type="button" disabled={!details || details.balance === 0n} onClick={() => setSellFraction(1n, 1n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">Max</button>
       </div>
-      <div className="mt-2 flex items-center justify-between text-[11px] text-black/45"><span>Estimated output</span><span className="font-extrabold text-[#16141b]">{sellQuote === null ? '--' : `${formatEther(sellQuote)} ETH`}{sellQuoteNote && <span className="font-bold text-black/45"> · {sellQuoteNote}</span>}</span></div>
+      <div className="mt-2 flex items-center justify-between text-[11px] text-sp-shade/45"><span>Estimated output</span><span className="font-extrabold text-sp-ink">{sellQuote === null ? '--' : `${formatEther(sellQuote)} ETH`}{sellQuoteNote && <span className="font-bold text-sp-shade/45"> · {sellQuoteNote}</span>}</span></div>
     </>)}
 
-    {token.state === 'Locked' && <div className="mt-5 rounded-xl border border-[#f3c58a] bg-[#fff8ed] p-3"><div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#c76b12]" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[#8c4a0b]">Ready for graduation</p><p className="mt-1 text-[11px] leading-[1.4] text-black/55">Anyone can open the pool. Caller reward: {gradReward === null ? '--' : `${formatEther(gradReward)} ETH`}.</p></div><button type="button" disabled={busy === 'graduate'} onClick={onGraduate} className="rounded-full bg-[#c76b12] px-3 py-2 text-[11px] font-extrabold text-white disabled:opacity-50">{busy === 'graduate' ? 'Opening...' : 'Graduate'}</button></div></div>}
+    {token.state === 'Locked' && <div className="mt-5 rounded-xl border border-sp-down-line bg-sp-down-soft p-3"><div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sp-down" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-sp-down-deep">Ready for graduation</p><p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">Anyone can open the pool. Caller reward: {gradReward === null ? '--' : `${formatEther(gradReward)} ETH`}.</p></div><button type="button" disabled={busy === 'graduate'} onClick={onGraduate} className="rounded-full bg-sp-down px-3 py-2 text-[11px] font-extrabold text-sp-on-brand disabled:opacity-50">{busy === 'graduate' ? 'Opening...' : 'Graduate'}</button></div></div>}
 
-    {token.state === 'Graduated' && <div className="mt-5 rounded-xl bg-[#f4f1ff] p-3"><div className="flex items-start gap-2"><Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[#16141b]">Live pool with hook</p><p className="mt-1 text-[11px] leading-[1.4] text-black/55">{details?.poolId && details.poolId !== `0x${'0'.repeat(64)}` ? `Pool ${details.poolId.slice(0, 10)}...` : 'Pool position is loading.'}</p></div></div><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" disabled={!details?.pendingEth || busy === 'settle'} onClick={onSettle} className="rounded-lg border border-black/10 bg-white px-2 py-2 text-[11px] font-extrabold text-[#16141b] disabled:opacity-40">{busy === 'settle' ? 'Settling...' : `Settle ${details ? formatEther(details.pendingEth) : '0'} ETH`}</button><button type="button" disabled={busy === 'harvest'} onClick={onHarvest} className="rounded-lg border border-black/10 bg-white px-2 py-2 text-[11px] font-extrabold text-[#16141b] disabled:opacity-40">{busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}</button></div></div>}
+    {token.state === 'Graduated' && <div className="mt-5 rounded-xl bg-sp-brand-soft p-3"><div className="flex items-start gap-2"><Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-sp-ink">Live pool with hook</p><p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">{details?.poolId && details.poolId !== `0x${'0'.repeat(64)}` ? `Pool ${details.poolId.slice(0, 10)}...` : 'Pool position is loading.'}</p></div></div><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" disabled={!details?.pendingEth || busy === 'settle'} onClick={onSettle} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'settle' ? 'Settling...' : `Settle ${details ? formatEther(details.pendingEth) : '0'} ETH`}</button><button type="button" disabled={busy === 'harvest'} onClick={onHarvest} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}</button></div></div>}
 
-    {isConnected && details && <div className="mt-5 border-t border-black/10 pt-4"><div className="flex items-center justify-between"><span className="text-[12px] font-extrabold text-[#16141b]">Available claims</span><CheckCircle2 className="h-4 w-4 text-[#18bd64]" aria-hidden="true" /></div><div className="mt-2 space-y-1.5">{claimRows.map((row) => <div key={row.label} className="flex items-center justify-between gap-2 text-[11px]"><span className="text-black/50">{row.label}</span><span className="flex items-center gap-2 font-extrabold text-[#16141b]"><span>{row.value}</span><button type="button" disabled={row.amount === 0n} onClick={() => onClaim(row.source)} className="rounded-full border border-black/10 px-2 py-1 text-[10px] text-soft-primary-deep disabled:opacity-30">Claim</button></span></div>)}</div></div>}
+    {isConnected && details && <div className="mt-5 border-t border-sp-shade/10 pt-4"><div className="flex items-center justify-between"><span className="text-[12px] font-extrabold text-sp-ink">Available claims</span><CheckCircle2 className="h-4 w-4 text-sp-up-vivid" aria-hidden="true" /></div><div className="mt-2 space-y-1.5">{claimRows.map((row) => <div key={row.label} className="flex items-center justify-between gap-2 text-[11px]"><span className="text-sp-shade/50">{row.label}</span><span className="flex items-center gap-2 font-extrabold text-sp-ink"><span>{row.value}</span><button type="button" disabled={row.amount === 0n} onClick={() => onClaim(row.source)} className="rounded-full border border-sp-shade/10 px-2 py-1 text-[10px] text-soft-primary-deep disabled:opacity-30">Claim</button></span></div>)}</div></div>}
   </>;
 }
 
@@ -2202,7 +2208,7 @@ export default function LaunchpadBoard() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fcfcfd] px-4 pb-24 pt-0 font-soft sm:px-6">
+    <main className="min-h-screen bg-sp-sunken px-4 pb-24 pt-0 font-soft sm:px-6">
       {/* Blysk kart zyje razem z tym widokiem - globals.css jest poza zakresem
           tego komponentu, a te trzy reguly nie przydadza sie nigdzie indziej.
           `forwards` zostawia nakladke przezroczysta po wygasnieciu, wiec nie
@@ -2250,20 +2256,20 @@ export default function LaunchpadBoard() {
         <div className="relative overflow-hidden py-5 sm:py-7">
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-soft-primary/[0.06] blur-3xl" />
           <div className="relative flex items-center gap-4">
-            <h1 className="shrink-0 text-[20px] font-extrabold tracking-tight text-[#16141b]">
+            <h1 className="shrink-0 text-[20px] font-extrabold tracking-tight text-sp-ink">
               Start<span className="text-soft-primary">Pad</span>
             </h1>
             <label className="relative hidden min-w-0 flex-1 max-w-[560px] sm:block">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" aria-hidden="true" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${FIELD} rounded-full bg-[#f3f3f5] pl-10`} placeholder="Search coins, creators" aria-label="Search coins and creators" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-sp-shade/40" aria-hidden="true" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${FIELD} rounded-full bg-sp-sunken pl-10`} placeholder="Search coins, creators" aria-label="Search coins and creators" />
             </label>
             <span className="ml-auto flex items-center gap-2">
               {/* Split-button: selektor sieci + Launch w JEDNYM pillu - spojna
                   kontrolka zamiast dwoch osobnych, ktore sie gryzly. */}
-              <div className="inline-flex items-stretch overflow-hidden rounded-full border border-black/10 bg-white shadow-[0_6px_16px_rgba(124,107,218,0.18)]">
+              <div className="inline-flex items-stretch overflow-hidden rounded-full border border-sp-shade/10 bg-sp-surface shadow-[0_6px_16px_rgba(124,107,218,0.18)]">
                 <NetworkSwitch />
-                <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-black/10" />
-                <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 bg-soft-primary px-4 text-[13px] font-extrabold text-white transition-[background-color,transform] hover:bg-soft-primary-deep active:scale-[0.98]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
+                <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-sp-shade/10" />
+                <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand transition-[background-color,transform] hover:bg-soft-primary-deep active:scale-[0.98]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
               </div>
             </span>
           </div>
@@ -2272,8 +2278,8 @@ export default function LaunchpadBoard() {
               (jest w gornym wierszu obok logo). */}
         </div>
 
-        {notice && <div role="status" aria-live="polite" className={`lp-toast-in fixed right-4 top-4 z-[80] flex max-w-[min(92vw,360px)] items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] shadow-[0_14px_44px_rgba(0,0,0,0.18)] ${notice.kind === 'success' ? 'border-[#9de7bb] bg-[#f0fff5] text-[#08753d]' : 'border-[#f3c58a] bg-[#fff8ed] text-[#a34b08]'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span className="min-w-0 flex-1">{notice.text}</span><button type="button" onClick={() => setNotice(null)} className="ml-1 shrink-0 opacity-50 hover:opacity-100" aria-label="Dismiss"><X className="h-3.5 w-3.5" aria-hidden="true" /></button></div>}
-        {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[11.5px] text-black/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-[#c76b12]'}`} aria-hidden="true" /><span suppressHydrationWarning>{loadingBoard ? `Reading Launchpad activity from ${NET}...` : `Live data unavailable. ${boardError}`}</span></div>}
+        {notice && <div role="status" aria-live="polite" className={`lp-toast-in fixed right-4 top-4 z-[80] flex max-w-[min(92vw,360px)] items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] shadow-[0_14px_44px_rgba(0,0,0,0.18)] ${notice.kind === 'success' ? 'border-sp-up-line bg-sp-up-soft text-sp-up' : 'border-sp-down-line bg-sp-down-soft text-sp-down-deep'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span className="min-w-0 flex-1">{notice.text}</span><button type="button" onClick={() => setNotice(null)} className="ml-1 shrink-0 opacity-50 hover:opacity-100" aria-label="Dismiss"><X className="h-3.5 w-3.5" aria-hidden="true" /></button></div>}
+        {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-2.5 text-[11.5px] text-sp-shade/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-sp-down'}`} aria-hidden="true" /><span suppressHydrationWarning>{loadingBoard ? `Reading Launchpad activity from ${NET}...` : `Live data unavailable. ${boardError}`}</span></div>}
 
         {/* Rynek na CALA szerokosc - Live tape zjechal na gorny ticker, wiec nie
             ma juz prawej kolumny; grid tokenow wypelnia caly ekran. */}
@@ -2281,11 +2287,11 @@ export default function LaunchpadBoard() {
             {/* Belka rynku: FILTRY zamiast tytulu/podtytulu - oszczedza pionowe
                 miejsce. Tytul "Startpad market" i opisowa gadka wylecialy; ich
                 miejsce zajmuja filtry, ktore i tak sa najwazniejsze. */}
-            <section className="overflow-hidden rounded-[20px] border border-black/10 bg-white" aria-label="Startpad market">
+            <section className="overflow-hidden rounded-[20px] border border-sp-shade/10 bg-sp-surface" aria-label="Startpad market">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
                 <div className="min-w-0">
                   {/* Mobile: jeden przycisk-dropdown. */}
-                  <select value={tab} onChange={(event) => setTab(event.target.value as BoardTab)} aria-label="Sort launches" className="rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] outline-none sm:hidden">
+                  <select value={tab} onChange={(event) => setTab(event.target.value as BoardTab)} aria-label="Sort launches" className="rounded-full border border-sp-shade/10 bg-sp-surface px-3.5 py-2 text-[12px] font-extrabold text-sp-ink outline-none sm:hidden">
                     {([['new', 'New'], ['trending', 'Trending'], ['about', 'About to graduate'], ['graduated', 'Graduated'], ['all', 'All']] as const).map(([value, label]) => (
                       <option key={value} value={value}>{label}</option>
                     ))}
@@ -2293,28 +2299,28 @@ export default function LaunchpadBoard() {
                   {/* Desktop: chipy inline. */}
                   <div className="hidden flex-wrap items-center gap-2 sm:flex" role="tablist" aria-label="Sort launches">
                     {([['new', 'New'], ['trending', 'Trending'], ['about', 'About to graduate'], ['graduated', 'Graduated'], ['all', 'All']] as const).map(([value, label]) => (
-                      <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-white' : 'border-black/10 bg-white text-[#16141b] hover:border-soft-primary'}`}>{label}</button>
+                      <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] font-extrabold transition-colors ${tab === value ? 'border-soft-primary bg-soft-primary text-sp-on-brand' : 'border-sp-shade/10 bg-sp-surface text-sp-ink hover:border-soft-primary'}`}>{label}</button>
                     ))}
                   </div>
                 </div>
                 <span className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="tablist" aria-label="Market layout">
+                  <span className="inline-flex overflow-hidden rounded-full border border-sp-shade/10" role="tablist" aria-label="Market layout">
                     {(['grid', 'table'] as const).map((mode) => (
-                      <button key={mode} type="button" role="tab" aria-selected={view === mode} onClick={() => setView(mode)} className={`px-3 py-1.5 text-[11px] font-extrabold capitalize transition-colors ${view === mode ? 'bg-soft-primary text-white' : 'bg-white text-[#16141b] hover:text-soft-primary-deep'}`}>{mode}</button>
+                      <button key={mode} type="button" role="tab" aria-selected={view === mode} onClick={() => setView(mode)} className={`px-3 py-1.5 text-[11px] font-extrabold capitalize transition-colors ${view === mode ? 'bg-soft-primary text-sp-on-brand' : 'bg-sp-surface text-sp-ink hover:text-soft-primary-deep'}`}>{mode}</button>
                     ))}
                   </span>
                 </span>
               </div>
               {view === 'grid' ? (
-                <div className="border-t border-black/10 p-4 sm:p-5">
+                <div className="border-t border-sp-shade/10 p-4 sm:p-5">
                   {tokens.length === 0 && loadingBoard ? (
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-hidden="true">
                       {Array.from({ length: 6 }, (_, index) => (
-                        <div key={index} className="animate-pulse rounded-[18px] border border-black/10 bg-white p-4">
-                          <div className="flex items-center gap-3"><span className="h-11 w-11 rounded-[16px] bg-black/8" /><span className="h-4 w-24 rounded bg-black/8" /></div>
-                          <div className="mt-5 h-4 w-32 rounded bg-black/8" />
-                          <div className="mt-3 h-1.5 w-full rounded-full bg-black/8" />
-                          <div className="mt-4 h-8 w-full rounded-full bg-black/8" />
+                        <div key={index} className="animate-pulse rounded-[18px] border border-sp-shade/10 bg-sp-surface p-4">
+                          <div className="flex items-center gap-3"><span className="h-11 w-11 rounded-[16px] bg-sp-shade/8" /><span className="h-4 w-24 rounded bg-sp-shade/8" /></div>
+                          <div className="mt-5 h-4 w-32 rounded bg-sp-shade/8" />
+                          <div className="mt-3 h-1.5 w-full rounded-full bg-sp-shade/8" />
+                          <div className="mt-4 h-8 w-full rounded-full bg-sp-shade/8" />
                         </div>
                       ))}
                     </div>
@@ -2323,30 +2329,30 @@ export default function LaunchpadBoard() {
                       {pagedTokens.map((token) => <LaunchCard key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />)}
                     </div>
                   ) : (
-                    <div className="py-14 text-center text-[13px] text-black/50">No launches in this view.</div>
+                    <div className="py-14 text-center text-[13px] text-sp-shade/50">No launches in this view.</div>
                   )}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] gap-4 border-y border-black/10 bg-[#fafafd] px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-black/45 sm:px-5"><span>Coin</span><span>Curve</span><span>Indexed vol</span><span>Momentum</span><span>Creator</span><span /></div>
-                  {tokens.length === 0 && loadingBoard ? <div suppressHydrationWarning className="px-5 py-14 text-center text-[13px] text-black/45">Reading launches from {NET}...</div> : visibleTokens.length > 0 ? pagedTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-black/50">No launches in this view.</div>}
+                  <div className="grid min-w-[760px] grid-cols-[minmax(220px,1.7fr)_0.9fr_0.8fr_1.1fr_0.8fr_auto] gap-4 border-y border-sp-shade/10 bg-sp-sunken px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45 sm:px-5"><span>Coin</span><span>Curve</span><span>Indexed vol</span><span>Momentum</span><span>Creator</span><span /></div>
+                  {tokens.length === 0 && loadingBoard ? <div suppressHydrationWarning className="px-5 py-14 text-center text-[13px] text-sp-shade/45">Reading launches from {NET}...</div> : visibleTokens.length > 0 ? pagedTokens.map((token) => <LaunchTableRow key={token.id} token={token} animationsOn={animationsOn} ethUsd={ethUsd} onTrade={() => selectToken(token.id, true)} onOpen={() => token.address && router.push(`/startpad/${token.address}`)} />) : <div className="px-5 py-14 text-center text-[13px] text-sp-shade/50">No launches in this view.</div>}
                 </div>
               )}
               {/* Przelacznik stron - rynek pokazuje 8 naraz, reszta na kolejnych
                   stronach; okienko nie renderuje wszystkiego na raz. */}
               {visibleTokens.length > BOARD_PAGE && (
-                <div className="flex items-center justify-between gap-3 border-t border-black/10 px-4 py-3 sm:px-5">
-                  <span className="text-[11px] text-black/45">
+                <div className="flex items-center justify-between gap-3 border-t border-sp-shade/10 px-4 py-3 sm:px-5">
+                  <span className="text-[11px] text-sp-shade/45">
                     {safePage * BOARD_PAGE + 1}–{Math.min((safePage + 1) * BOARD_PAGE, visibleTokens.length)} of {visibleTokens.length}
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <button type="button" disabled={safePage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="rounded-full border border-black/10 px-3 py-1.5 text-[11px] font-extrabold text-[#16141b] hover:border-soft-primary disabled:opacity-40">Prev</button>
-                    <span className="px-1 text-[11px] font-bold text-black/45">{safePage + 1}/{pageCount}</span>
-                    <button type="button" disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} className="rounded-full border border-black/10 px-3 py-1.5 text-[11px] font-extrabold text-[#16141b] hover:border-soft-primary disabled:opacity-40">Next</button>
+                    <button type="button" disabled={safePage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="rounded-full border border-sp-shade/10 px-3 py-1.5 text-[11px] font-extrabold text-sp-ink hover:border-soft-primary disabled:opacity-40">Prev</button>
+                    <span className="px-1 text-[11px] font-bold text-sp-shade/45">{safePage + 1}/{pageCount}</span>
+                    <button type="button" disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} className="rounded-full border border-sp-shade/10 px-3 py-1.5 text-[11px] font-extrabold text-sp-ink hover:border-soft-primary disabled:opacity-40">Next</button>
                   </span>
                 </div>
               )}
-              <div className="border-t border-black/10 px-4 py-3 text-[11px] text-black/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Startpad events and current onchain state.'}</div>
+              <div className="border-t border-sp-shade/10 px-4 py-3 text-[11px] text-sp-shade/40 sm:px-5">{showingPreview ? 'Sample rows are placeholders and cannot be traded. They disappear with the first real launch.' : 'Every row is reconstructed from Startpad events and current onchain state.'}</div>
             </section>
         </div>
 
@@ -2400,12 +2406,12 @@ export default function LaunchpadBoard() {
       />
 
       {tradeOpen && selected && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#16141b]/35 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setTradeOpen(false); }}>
-          <section className="max-h-[88vh] w-full max-w-[440px] overflow-y-auto rounded-[22px] border border-black/10 bg-white p-5 shadow-[0_24px_80px_rgba(0,0,0,0.2)]" role="dialog" aria-modal="true" aria-label="Trade token">
-            <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">Curve trade</p><h2 className="mt-1 text-[21px] font-extrabold text-[#16141b]">{selected.symbol} market</h2></div><button type="button" onClick={() => setTradeOpen(false)} className="rounded-full p-2 text-black/40 hover:bg-black/5 hover:text-[#16141b]" aria-label="Close dialog"><X className="h-5 w-5" aria-hidden="true" /></button></div>
-            <div className="mt-5 flex items-center gap-3"><TokenGlyph token={selected} large /><div><div className="flex items-center gap-2"><span className="text-[16px] font-extrabold text-[#16141b]">{selected.symbol}</span><StatePill state={selected.state} /></div><p className="mt-1 text-[12px] text-black/45">{selected.name} · {curvePercent(selected)}% of curve</p></div></div>
-            {selected.live ? <TradePanel token={selected} details={details} side={tradeSide} setSide={setTradeSide} buyAmount={buyAmount} setBuyAmount={setBuyAmount} sellAmount={sellAmount} setSellAmount={setSellAmount} sellQuote={sellQuote} gradReward={gradReward} busy={busy} ethUsd={ethUsd} onBuy={buy} onSell={sell} onGraduate={graduate} onSettle={settle} onHarvest={harvest} onClaim={claim} isConnected={isConnected} /> : <div className="mt-5 flex items-start gap-2 rounded-xl bg-[#f5f5f7] p-3 text-[11.5px] leading-[1.45] text-black/55"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><span>This is a sample row. Launch a token to activate the live trade panel.</span></div>}
-            <div className="mt-5 flex items-center justify-between border-t border-black/10 pt-4 text-[11px] text-black/45"><span>{selected.holders} holders · {selected.trades ?? 0} trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => router.push(`/startpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-sp-ink/35 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setTradeOpen(false); }}>
+          <section className="max-h-[88vh] w-full max-w-[440px] overflow-y-auto rounded-[22px] border border-sp-shade/10 bg-sp-surface p-5 shadow-[0_24px_80px_rgba(0,0,0,0.2)]" role="dialog" aria-modal="true" aria-label="Trade token">
+            <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">Curve trade</p><h2 className="mt-1 text-[21px] font-extrabold text-sp-ink">{selected.symbol} market</h2></div><button type="button" onClick={() => setTradeOpen(false)} className="rounded-full p-2 text-sp-shade/40 hover:bg-sp-shade/5 hover:text-sp-ink" aria-label="Close dialog"><X className="h-5 w-5" aria-hidden="true" /></button></div>
+            <div className="mt-5 flex items-center gap-3"><TokenGlyph token={selected} large /><div><div className="flex items-center gap-2"><span className="text-[16px] font-extrabold text-sp-ink">{selected.symbol}</span><StatePill state={selected.state} /></div><p className="mt-1 text-[12px] text-sp-shade/45">{selected.name} · {curvePercent(selected)}% of curve</p></div></div>
+            {selected.live ? <TradePanel token={selected} details={details} side={tradeSide} setSide={setTradeSide} buyAmount={buyAmount} setBuyAmount={setBuyAmount} sellAmount={sellAmount} setSellAmount={setSellAmount} sellQuote={sellQuote} gradReward={gradReward} busy={busy} ethUsd={ethUsd} onBuy={buy} onSell={sell} onGraduate={graduate} onSettle={settle} onHarvest={harvest} onClaim={claim} isConnected={isConnected} /> : <div className="mt-5 flex items-start gap-2 rounded-xl bg-sp-sunken p-3 text-[11.5px] leading-[1.45] text-sp-shade/55"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><span>This is a sample row. Launch a token to activate the live trade panel.</span></div>}
+            <div className="mt-5 flex items-center justify-between border-t border-sp-shade/10 pt-4 text-[11px] text-sp-shade/45"><span>{selected.holders} holders · {selected.trades ?? 0} trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => router.push(`/startpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
           </section>
         </div>
       )}
