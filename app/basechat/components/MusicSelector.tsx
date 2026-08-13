@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useAccount } from 'wagmi';
+import { spotifyFailureKind } from './spotifyState';
 
 /**
  * ssr:false jest WYMOGIEM, nie optymalizacja: CampProvider i hooki SDK wolaja
@@ -129,11 +130,18 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
           savedAlbums: data.data.profile?.savedAlbums?.length || 0,
           savedPlaylists: data.data.profile?.savedPlaylists?.length || 0
         });
+      } else if (spotifyFailureKind(data) === 'not-connected') {
+        // BRAK PODLACZONEGO KONTA TO NIE AWARIA. Wczesniej ladowalo to w tym
+        // samym `error`, co niedostepny Camp Network, wiec ktos bez Spotify
+        // widzial czerwone "❌" i przycisk Try Again - ponawianie czegos, czego
+        // nie da sie ponowic. Zostawiamy `error` puste; nizej wchodzi wtedy
+        // konektor, ktorym da sie konto podpiac bez wychodzenia z posta.
+        setError(null);
+        setSpotifyData(null);
       } else {
-        // `error` niesie zdanie kazdej odmowy z /api/camp/spotify (zly adres,
-        // za szybko, Camp nie odpowiedzial). `message` zostaje dla starszego
-        // ksztaltu odpowiedzi "sprawdzilem i nic nie ma".
-        setError(data.error || data.message || 'Failed to fetch Spotify data');
+        // Tu zostaja PRAWDZIWE odmowy: Camp nie odpowiedzial, zly adres, limit.
+        // Przy nich ponowienie ma sens, wiec przycisk Try Again zostaje.
+        setError(data.error || 'Failed to fetch Spotify data');
       }
     } catch (err) {
       if (isCancelled()) return;

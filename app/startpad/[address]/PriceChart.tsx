@@ -51,6 +51,11 @@ const CHART =
     lineFill: 'rgba(124,107,218,0.16)',
   };
 
+// Tempo blokow bierzemy z konfiguracji sieci. Stalo tu wpisane "~2s", prawdziwe
+// na Base i nieprawdziwe wszedzie indziej: Arc robi blok co 0,51 s, Robinhood co
+// 0,1 s. Zdanie tlumaczy, skad na wykresie biora sie czasy, wiec nie moze klamac.
+const SECONDS_PER_BLOCK = ACTIVE_LAUNCHPAD_NETWORK.secondsPerBlock;
+
 const UP = CHART.up;
 const DOWN = CHART.down;
 
@@ -311,7 +316,7 @@ export default function PriceChart({
         )}
       </div>
       <p className="mt-2 text-[10.5px] text-sp-shade/35">
-        Every point is the exact post-trade curve price from Bought/Sold events. Timestamps are estimated from block numbers (~2s per block).
+        Every point is the exact post-trade curve price from Bought/Sold events. Timestamps are estimated from block numbers (~{SECONDS_PER_BLOCK}s per block).
       </p>
     </section>
   );

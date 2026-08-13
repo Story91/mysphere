@@ -218,6 +218,82 @@ export function buildLine(points: PricePoint[]): { time: number; value: number }
 /* -------------------------------------------------------------------------- */
 
 /**
+ * Kwota na PASKU ZDARZEN NA ZYWO.
+ *
+ * Pasek pisal kwoty w ETH i to go zabijalo: typowe kupno na krzywej to
+ * 0,00008 ETH, wiec przez tablice jechalo "Buy 0.000 ETH" - liczba, ktora
+ * wyglada jak zero i nie mowi nikomu nic. To samo zdarzenie w dolarach brzmi
+ * "Buy $0.15": tyle samo prawdy, a widac, ze ktos naprawde cos kupil.
+ *
+ * Przelaczamy sie na dolary DOPIERO tam, gdzie ETH przestaje cokolwiek
+ * pokazywac (ponizej 0,0001, czyli ponizej czterech miejsc po przecinku).
+ * Wyzej zostaje ETH, bo to jest waluta tego rynku i przy 0,05 ETH liczba mowi
+ * sama za siebie.
+ *
+ * Bez kursu zostaje ETH - zmyslony dolar bylby gorszy od nieczytelnego eteru.
+ */
+export function tapeAmount(eth: number, ethUsd: number | null): string {
+  if (!Number.isFinite(eth) || eth < 0) return '0';
+
+  const asEth = () => `${eth.toFixed(eth >= 1 ? 2 : 4).replace(/\.?0+$/, '')} ETH`;
+  if (ethUsd === null || !Number.isFinite(ethUsd) || ethUsd <= 0) return asEth();
+  if (eth >= 0.0001) return asEth();
+
+  const usd = eth * ethUsd;
+  if (usd === 0) return '$0.00';
+  // Ulamek centa NIE moze pokazac sie jako "$0.00" - to wyglada jak brak
+  // transakcji, a transakcja byla.
+  if (usd < 0.01) return '<$0.01';
+  return `$${usd.toFixed(2)}`;
+}
+
+/**
+ * CALY zarobek konta w rankingu, nie tylko to, co zostalo do odebrania.
+ *
+ * Ranking pokazywal wylacznie biezace `claimable`, wiec kto odebral swoje
+ * oplaty, spadal z listy do zera - mimo ze zarobil je naprawde. "Top earnings"
+ * ma liczyc to, co ZARABIANE, a nie to, co jeszcze lezy nieodebrane.
+ *
+ * Suma ze zdarzen `FeeAccrued` jest calym zarobkiem, bo skan tablicy siega
+ * bloku wdrozenia launchpada. Saldo z lancucha zostaje jako DOL: gdyby ktores
+ * okno skanu padlo, suma zdarzen bylaby zanizona, a tego, co lezy do odebrania,
+ * ranking zaniżyć nie ma prawa.
+ */
+export function totalEarned(fromEvents: bigint, claimableNow: bigint): bigint {
+  return fromEvents > claimableNow ? fromEvents : claimableNow;
+}
+
+/**
+ * REZERWA NA GAZ przy klikaniu 25/50/100% i Max.
+ *
+ * Stalo tu 0,005 ETH, czyli okolo dziewieciu dolarow, i to zamienialo te
+ * przyciski w atrapy: przy saldzie 0,0004 ETH rezerwa byla DWUNASTOKROTNIE
+ * WIEKSZA NIZ CALE SALDO, wiec `saldo - rezerwa` schodzilo do zera i kazdy
+ * procent wpisywal zero.
+ *
+ * Liczba byla oderwana od sieci, w ktorej stoimy. Zmierzony koszt gazu
+ * transakcji launchpada na Base to 0,0000004 ETH - stara rezerwa byla od niego
+ * dwanascie tysiecy razy wieksza. Ta zostawia okolo stu transakcji zapasu i
+ * dalej jest ulamkiem centa.
+ */
+export const GAS_RESERVE_WEI = 50_000_000_000_000n;
+
+/**
+ * Ile z salda wolno zaproponowac do wydania. Nigdy ponizej zera - saldo
+ * mniejsze od rezerwy znaczy "nie ma z czego", a nie "minus".
+ */
+export function spendableEth(balance: bigint | null | undefined, reserve: bigint): bigint {
+  if (typeof balance !== 'bigint') return 0n;
+  return balance > reserve ? balance - reserve : 0n;
+}
+
+/** Ulamek kwoty, zaokraglony W DOL - nie wolno zaproponowac wiecej, niz jest. */
+export function fractionOf(value: bigint, numerator: bigint, denominator: bigint): bigint {
+  if (value <= 0n || denominator <= 0n) return 0n;
+  return (value * numerator) / denominator;
+}
+
+/**
  * BUFOR POSLIZGU - do wyboru przez uzytkownika, w setnych procenta.
  *
  * Stalo tu na sztywno 50 (0,5%) i to bylo za malo o rzad wielkosci. 13 sierpnia
