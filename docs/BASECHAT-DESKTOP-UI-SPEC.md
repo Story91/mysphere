@@ -166,3 +166,135 @@ Ręcznie, w przeglądarce, na czterech szerokościach: 1024, 1280, 1440, 1920.
 8. Gość bez portfela widzi ekran powitalny na całej szerokości, bez pustych
    kolumn po bokach.
 9. `npm run build` przechodzi.
+
+---
+
+# Aneks: co dołożyliśmy w trakcie (2026-08-13, ta sama sesja)
+
+Wszystko poniżej powstało po zatwierdzeniu specyfikacji wyżej, na żywo, na
+prośbę właściciela produktu przy patrzeniu na localhost. Zasada nadrzędna
+obowiązuje bez zmian: żadna funkcja nie zniknęła.
+
+## 1. Tryb ciemny wyłączony klasą (BŁĄD, nie kosmetyka)
+
+`tailwind.config.ts` nie miał `darkMode`, więc Tailwind stał na domyślnym
+`media`. W repo jest około 170 klas `dark:` w samym basechacie, a `ThemeContext`
+nigdy nie dokłada klasy `dark` do dokumentu, więc sterowało tym wyłącznie
+ustawienie systemu patrzącego. Strona ma jedno jasne tło na stałe.
+
+Skutek: człowiek z ciemnym systemem widział `dark:text-white` na białej karcie,
+czyli biały tekst na białym, i ciemne kafle w jasnym panelu.
+
+Poprawka: `darkMode: 'class'`. Jedna linia zamiast 170 podmian. Klasy zostają
+w kodzie i odżyją, gdy ktoś doda prawdziwy przełącznik motywu — wtedy trzeba je
+przejrzeć, bo dziś nikt ich nie widział i nikt nie sprawdził, czy są spójne.
+
+**Dotyczy całej aplikacji, nie tylko basechatu.**
+
+## 2. Ask jako jeden obiekt
+
+`AskCard` jest ciemna WSZĘDZIE: w pasie nad feedem, w prawym railu i na `/asks`.
+Ask nie jest postem — ma budżet, termin i miejsca, które się kończą — i jako
+jedyny element aplikacji ma własny kolor. Kto raz zobaczy taką kartę, rozpozna
+ją wszędzie.
+
+To odpowiada też na pytanie o telefon: tak, na telefonie Aski są teraz ciemne,
+bo ciemna jest sama karta, a nie jej oprawa w railu.
+
+W prawym railu Aski stoją PIONOWO, do czterech (`SHOW_LIMIT`), bez suwaka na
+boki. Karuzela została tam, gdzie była: w pasie nad feedem poniżej `xl`.
+
+## 3. Trends: rejestr zamiast siatki kafli
+
+Sześć pastelowych kwadratów z wielką cyfrą zamieniło się w jedną kartę
+z wierszami: podpis po lewej, liczba po prawej, włosowa linia między nimi.
+Powód: siatka kolorowych kafli to najczęstszy układ panelu statystyk, jaki
+istnieje, więc nie mówiła o tym produkcie nic.
+
+Liczby są PEŁNE (`184,064`, nie `184.1K`) — skrót był zaokrągleniem podanym
+jako pomiar. Kolor siedzi w cyfrze, jeden na kategorię. Napis „at least" przy
+lajkach zamienił się w `+` przy liczbie, bo to naprawdę dolna granica.
+
+Zamiast odznaki „LIVE" jest naliczanie wartości przy wejściu: `getGlobalStats`
+czyta raz, ranking co 30 minut, więc słowo „live" byłoby nieprawdą.
+`prefers-reduced-motion` wyłącza ruch.
+
+## 4. Lewa kolumna to wyłącznie nawigacja
+
+Zeszły z niej: nagłówek profilu na telefonie, karta `ProfileCard` z tiltem,
+sekcja „About Me" z edycją bio, socjale i kafel Sphere Identity.
+
+Nic nie zginęło: bio wraz z regułą „raz na dobę" oraz socjale są w
+`BuilderProfile`, a Sphere Identity został tam przeniesiony. Kafel YapScan i tak
+się nie rysował, bo `/yapscan` jest wyłączony w `config/routeStatus.js`.
+
+Dolna zakładka na telefonie nazywa się teraz „Menu" i ma ikonę listy. Wcześniej
+nazywała się „Profile" i konkurowała z pozycją „My Profile" w środku tej samej
+listy — jedna nazwa, dwa różne ekrany.
+
+## 5. Builder Profile
+
+- Fioletowy pas przez całą szerokość z napisem „Builder Profile" zniknął.
+  Została sama strzałka powrotu, a obok niej „Edit profile”. Napis nazywał
+  ekran, na który człowiek właśnie sam wszedł.
+- Nagłówek to jeden rząd: zdjęcie, obok nazwa, adres i link do profilu
+  publicznego. Wcześniej desktop dzielił to na dwie kolumny i tożsamość
+  dostawała słupek ~200px na ekranie szerokim na 1900.
+- Zdjęcie ma przycisk aparatu, widoczny tylko dla właściciela profilu. NIE robi
+  drugiego uploadu — otwiera ten sam panel edycji, więc zapis zdjęcia ma dalej
+  jedno miejsce w kodzie.
+- Z panelu edycji wyleciała druga edycja X, Farcastera i Discorda z własnym
+  „Save Social Links”. Ta sama robota siedzi w `ProfileSocials` na profilu.
+  Zostało to, czego profil nie ma u siebie: zdjęcie i system nazw.
+- Liczby z X i ze Spotify (3 i 4 kafle) czytają się teraz jak rejestr, tak samo
+  jak Trends. Na 360px kafel miał tam około 100px.
+- Biała karta owijająca cały profil zeszła: profil ma własne sekcje z własnymi
+  kartami, więc była pudełkiem na pudełka, a `overflow-hidden` przycinał to, co
+  z niej wystawało.
+
+## 6. Cztery widoki z nawigacji
+
+Follows, Friends, Discover i powiadomienia zaczynały się identycznie: biała
+karta, w niej emotka z tytułem i trzy wielkie liczby na środku. Ten sam szablon
+cztery razy. Teraz tytuł stoi wprost na tle, liczby idą w jednym rzędzie za
+włosową linią. Ramek dookoła (`rounded-card bg-soft-surface … overflow-hidden`)
+już nie ma — widoki wypełniają kolumnę.
+
+## 7. Jeden pasek nad kompozytorem
+
+Zakładki feedu (All Posts / Follows / Basenames) stały POD kompozytorem, a nad
+nim był drugi rząd pigułek (Post / Ask). Trzy rzędy pigułek na jednym ekranie
+i żaden nie mówił, który czym steruje.
+
+Teraz jedna linia: po lewej WIDOK, po prawej TRYB PISANIA, rozdzielone pionową
+włosową linią. Przyklejenie do góry kolumny zostaje, ale dopiero od `lg`.
+
+## 8. Wybór sieci tylko nad feedem
+
+Rząd siedmiu logotypów renderował się nad KAŻDYM widokiem środkowej kolumny,
+także nad profilem i Discover, gdzie sterował kompozytorem stojącym gdzie
+indziej. Na desktopie zabierał pierwsze 110 pikseli profilu. Teraz warunek to
+`activeMainPanel === 'feed'`.
+
+## 9. Drobne
+
+- Nazwy użytkowników straciły gradient w tekście (`bg-clip-text`) — ten sam
+  chwyt usunięto kiedyś z `PinnedPosts`, bo na Androidzie daje czarne
+  prostokąty zamiast liter.
+- Panel edycji profilu przeszedł na tokeny `soft`: poszły gradientowe tło,
+  nagłówek malowany `bg-clip-text`, cztery różne kolory obwódki focusa na
+  czterech polach obok siebie i przyciski w czterech gradientach.
+- `PinnedPosts`, `LinkPreview`, `SpotifyTrackCard` i kompozytory łańcuchowe
+  przeszły z twardych szarości na tokeny; martwe nadpisania `dark:` z tych
+  plików usunięte.
+
+## Czego NADAL nie zrobiono
+
+- Lista kontrolna z sekcji 6 nie została przejechana systematycznie na czterech
+  szerokościach.
+- `BuilderProfile.tsx`, `PostList.tsx`, `TipButton.tsx` i `basechat/page.tsx`
+  mają `@ts-nocheck`. Typecheck ich nie sprawdza, a to razem prawie 12 tys.
+  linii.
+- Reszta `BuilderProfile` poniżej nagłówka (zarobki, referral, Camp connector,
+  Spotify) nie została uporządkowana.
+- `CreatorCoinSection` i konfiguracje sieci per łańcuch nadal mają stare klasy.
