@@ -4167,12 +4167,15 @@ function BaseChatContent() {
                           bo dwie grupy pigulek bez niej czytaja sie jak jedna
                           o szesciu pozycjach.
 
-                          PRZYKLEJENIE ZOSTAJE, ale dopiero od `lg`. Powod byl
-                          slusznymi: przelaczenie widoku bez przewijania na sam
-                          gore kolumny. Na telefonie paska nie przyklejamy, bo
-                          tam zakladki maja swoje miejsce w SoftFeedMobile i nic
-                          sie nie zmienia. */}
-                      <div className="mb-3 flex items-center gap-3 lg:sticky lg:top-0 lg:z-20 lg:-mt-2 lg:bg-soft-bg lg:pb-1 lg:pt-2">
+                          PRZYKLEJENIA JUZ NIE MA i to jest swiadome cofniecie.
+                          Stalo tu `lg:sticky lg:top-0 lg:z-20` z uzasadnieniem
+                          "przelaczenie widoku bez przewijania na gore kolumny".
+                          Brzmi rozsadnie i w praktyce dzialalo zle: pasek
+                          jechal przez cala dlugosc feedu, przykrywajac posty i
+                          zostawiajac nad soba scinek tego, co wlasnie pod niego
+                          wjechalo. Przelacznik widoku jest potrzebny RAZ, przy
+                          wejsciu - a nie na kazdym ekranie przewijania. */}
+                      <div className="mb-3 flex items-center gap-3">
                         {!showMyFeed && (
                           <>
                             <div className="hidden min-w-0 flex-1 lg:block">
@@ -4310,9 +4313,12 @@ function BaseChatContent() {
                                   $tickera znikala dokladnie wtedy, kiedy byla
                                   potrzebna. Nic nie ubylo, tresc stoi na stale
                                   pod polem. */}
-                              <p className="mt-2 font-soft text-[12px] text-soft-ink-soft">
-                                First letters of your post become the $ticker of your PostCoin.
-                              </p>
+                              {/* Zdanie o $tickerze PostCoina znikneło razem z
+                                  PostCoinem. Opisywalo regule cudzego produktu
+                                  i stalo pod polem na stale, takze dla kogos,
+                                  kto nigdy nie zamierzal wybijac monety. Co
+                                  robi przycisk startu, mowi teraz sam
+                                  przycisk. */}
 
                               <PremiumComposer
                                 value={premium}
