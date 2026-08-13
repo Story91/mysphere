@@ -4100,7 +4100,10 @@ function BaseChatContent() {
                 </>
               ) : activeMainPanel === 'following' ? (
                 /* 👥 FOLLOWING VIEW (Widok obserwowanych) */
-                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
+                /* Bez ramki dookola: widok sam rysuje swoje karty i naglowek,
+                   a druga biala plyta pod spodem dawala pudelko w pudelku
+                   i `overflow-hidden` przycinajace to, co z niej wystawalo. */
+                <div className="mb-4">
                   <FollowingView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -4108,7 +4111,10 @@ function BaseChatContent() {
                 </div>
               ) : activeMainPanel === 'friends' ? (
                 /* 🤝 FRIENDS VIEW (Widok znajomych) */
-                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
+                /* Bez ramki dookola: widok sam rysuje swoje karty i naglowek,
+                   a druga biala plyta pod spodem dawala pudelko w pudelku
+                   i `overflow-hidden` przycinajace to, co z niej wystawalo. */
+                <div className="mb-4">
                   <FriendsView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -4116,7 +4122,10 @@ function BaseChatContent() {
                 </div>
               ) : activeMainPanel === 'discover' ? (
                 /* 🔍 DISCOVER VIEW (Widok odkrywania) */
-                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
+                /* Bez ramki dookola: widok sam rysuje swoje karty i naglowek,
+                   a druga biala plyta pod spodem dawala pudelko w pudelku
+                   i `overflow-hidden` przycinajace to, co z niej wystawalo. */
+                <div className="mb-4">
                   <DiscoverView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -4124,7 +4133,10 @@ function BaseChatContent() {
                 </div>
               ) : activeMainPanel === 'notifications' ? (
                 /* 🔔 NOTIFICATIONS VIEW (Widok powiadomień) */
-                <div className="rounded-card bg-soft-surface shadow-card mb-4 overflow-hidden">
+                /* Bez ramki dookola: widok sam rysuje swoje karty i naglowek,
+                   a druga biala plyta pod spodem dawala pudelko w pudelku
+                   i `overflow-hidden` przycinajace to, co z niej wystawalo. */
+                <div className="mb-4">
                   <NotificationsView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}

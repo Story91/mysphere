@@ -144,21 +144,30 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header with stats */}
-      <div className="bg-soft-surface border border-soft-line rounded-card p-6 shadow-card font-soft">
-        <h2 className="font-soft-display text-2xl font-bold mb-3 text-soft-ink">🤝 Friends</h2>
-        <div className="flex items-center gap-6">
-          <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{statValue(friendsStats?.totalFriends)}</div>
-            <div className="text-sm text-soft-ink-muted">Total Friends</div>
+      {/* ===== NAGLOWEK EKRANU, NIE KARTA Z EMOTKA =====
+          Cztery widoki z lewej nawigacji zaczynaly sie identycznie: biala
+          karta, w niej emotka z tytulem i trzy wielkie liczby na srodku.
+          Ten sam szablon cztery razy - a karta byla naglowkiem kolumny, ktora
+          i tak stoi sama na tle strony, wiec ramka niczego nie oddzielala
+          od niczego.
+
+          Teraz tytul jest tytulem: stoi wprost na tle, a liczby ida w jednym
+          rzedzie pod nim, oddzielone wlosowa linia. Ten sam jezyk co panel
+          Trends w prawej kolumnie - liczba po prawej, podpis wersalikami. */}
+      <div className="font-soft">
+        <h2 className="font-soft-display text-[26px] font-bold leading-none text-soft-ink">Friends</h2>
+        <div className="mt-4 flex items-center gap-6 border-t border-soft-line pt-4">
+          <div>
+            <div className="font-soft-display text-[22px] font-bold tabular-nums text-soft-ink">{statValue(friendsStats?.totalFriends)}</div>
+            <div className="mt-0.5 font-soft text-[11px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Total Friends</div>
           </div>
-          <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{statValue(friendsStats?.pendingRequests)}</div>
-            <div className="text-sm text-soft-ink-muted">Pending Requests</div>
+          <div>
+            <div className="font-soft-display text-[22px] font-bold tabular-nums text-soft-ink">{statValue(friendsStats?.pendingRequests)}</div>
+            <div className="mt-0.5 font-soft text-[11px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Pending Requests</div>
           </div>
-          <div className="text-center">
-            <div className="font-soft-display text-3xl font-bold text-soft-primary-deep">{statValue(friendsStats?.onlineFriends)}</div>
-            <div className="text-sm text-soft-ink-muted">Online Now</div>
+          <div>
+            <div className="font-soft-display text-[22px] font-bold tabular-nums text-soft-ink">{statValue(friendsStats?.onlineFriends)}</div>
+            <div className="mt-0.5 font-soft text-[11px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Online Now</div>
           </div>
         </div>
       </div>

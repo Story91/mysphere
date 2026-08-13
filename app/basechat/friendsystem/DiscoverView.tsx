@@ -165,11 +165,12 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="bg-soft-surface border border-soft-line rounded-card p-6 shadow-card font-soft">
-        <h2 className="font-soft-display text-2xl font-bold mb-2 text-soft-ink">🔍 Discover</h2>
-        <p className="text-soft-ink-muted">
-          Find interesting people to follow and connect with!
+      {/* Naglowek ekranu, nie karta - powod przy tej samej zmianie
+          w FollowingView.tsx. */}
+      <div className="font-soft">
+        <h2 className="font-soft-display text-[26px] font-bold leading-none text-soft-ink">Discover</h2>
+        <p className="mt-2 font-soft text-[13.5px] text-soft-ink-muted">
+          People worth following, picked from who you already follow.
         </p>
       </div>
 
