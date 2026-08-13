@@ -123,13 +123,13 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
 
   return (
     <>
-      /* ===== MONETA TWORCY W JEZYKU RESZTY PRODUKTU =====
+      {/* ===== MONETA TWORCY W JEZYKU RESZTY PRODUKTU =====
           Byl tu gradient przez trzy fiolety, obwodka w czwartym i cien
           `shadow-lg`, ktorego nie uzywa nic innego w tej aplikacji. Sekcja
           krzyczala mocniej niz saldo i przyciski w srodku, a to one sa tu
           trescia. Zwykla karta produktu; kolor niesie tylko to, co znaczy:
-          zielen kupna, czerwien sprzedazy, bursztyn przy kwocie. */
-        <div className="rounded-card bg-soft-surface p-4 shadow-card">
+          zielen kupna, czerwien sprzedazy, bursztyn przy kwocie. */}
+      <div className="rounded-card bg-soft-surface p-4 shadow-card">
         {/* Coin Info */}
         <div className="flex items-center space-x-3">
           {creatorCoin.imageUrl ? (
