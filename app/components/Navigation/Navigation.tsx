@@ -95,6 +95,20 @@ function NavItem({
 }) {
   const style = NAV_ITEM_VARIANT[variant];
 
+  /**
+   * Startpad OGLADANY Z INNEJ STRONY dostaje delikatna obwodke w kolorze marki.
+   *
+   * To jest jedyne miejsce w belce, ktore prowadzi do rynku - reszta zakladek
+   * to czytanie. Bez wyroznienia ginelo miedzy nimi, mimo ze jest tam
+   * najwiecej powodow, zeby wejsc.
+   *
+   * ZADNEGO MIGANIA: pigulka pulsujaca w kolko przy kazdym ekranie zamienia
+   * sie po minucie w szum, ktory mozg uczy sie omijac - a przy `prefers-
+   * reduced-motion` po prostu nie wolno jej ruszac. Wystarczy, ze wyglada
+   * inaczej niz sasiedzi.
+   */
+  const highlight = !isActive && link.label === 'Startpad';
+
   return (
     <Link
       href={link.href}
@@ -106,7 +120,9 @@ function NavItem({
       className={`${style.layout} items-center px-4 py-2.5 rounded-pill font-soft-display text-sm font-bold border transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface ${
         isActive
           ? `bg-soft-primary border-soft-primary text-soft-on-primary ${style.active}`
-          : `bg-soft-surface border-soft-line text-soft-ink-muted ${style.idle}`
+          : highlight
+            ? `bg-soft-primary/10 border-soft-primary text-soft-primary-deep shadow-[0_0_0_3px_rgba(124,107,218,0.12)] ${style.idle}`
+            : `bg-soft-surface border-soft-line text-soft-ink-muted ${style.idle}`
       }`}
     >
       {/* Ikony sa dekoracja przy tekstowej etykiecie obok - czytnik ekranu ma

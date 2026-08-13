@@ -409,6 +409,75 @@ function LaunchCard({
  * graduacji. Jedna wyrozniona karta zamiast rownorzednej siatki - lider ma byc
  * widoczny od progu, jak na kazdym wspolczesnym launchpadzie.
  */
+/**
+ * PASEK PROMOCYJNY W NAGLOWKU - miejsce, ktore docelowo bedzie sponsorowane.
+ *
+ * ===========================================================================
+ * DLACZEGO STOI TU KING OF THE HILL, A NIE PUSTE MIEJSCE NA REKLAME
+ * ===========================================================================
+ * Puste miejsce reklamowe uczy oko, ze w tym pasie nie ma nic ciekawego -
+ * i kiedy w koncu wejdzie tam platny wpis, nikt go juz nie zobaczy. Slot,
+ * ktory od pierwszego dnia pokazuje NAJMOCNIEJSZY token rynku, buduje sobie
+ * uwage, ktora sponsor pozniej przejmie.
+ *
+ * Wejscie sponsora nie wymaga ruszania tablicy: wystarczy podac tu inne
+ * `label` i `href`. Dlatego to jest osobny komponent, a nie wstawka w naglowku.
+ *
+ * ===========================================================================
+ * DLACZEGO NIE MIGA
+ * ===========================================================================
+ * Pas reklamowy, ktory pulsuje przy kazdym ekranie, po minucie staje sie
+ * szumem omijanym wzrokiem - a przy `prefers-reduced-motion` ruszac sie po
+ * prostu nie moze. Wyroznia go wiec kolor i obwodka marki, a rusza sie jedynie
+ * kropka "na zywo", i tylko gdy uzytkownik na ruch pozwala.
+ */
+function BoardPromo({ token, onOpen }: { token: BoardToken | null; onOpen: () => void }) {
+  if (!token) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`King of the hill: ${token.symbol}. Open the coin.`}
+      className="group hidden min-w-0 shrink items-center gap-2.5 rounded-full border border-soft-primary/30 bg-gradient-to-r from-soft-primary/[0.14] via-soft-primary/[0.06] to-transparent px-3.5 py-2 text-left transition-[border-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:border-soft-primary active:scale-[0.98] lg:inline-flex"
+    >
+      <Crown className="h-3.5 w-3.5 shrink-0 text-soft-primary-deep" aria-hidden="true" />
+      <span className="shrink-0 text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">
+        King of the hill
+      </span>
+      <span aria-hidden="true" className="h-3 w-px shrink-0 bg-soft-primary/25" />
+      {/* Wlasny, maly znaczek zamiast `TokenGlyph`: tamten ma 44 px i rozsadzilby
+          pasek wysoki na 36. */}
+      {token.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={token.logoUrl}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="h-5 w-5 shrink-0 rounded-full object-cover"
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[8px] font-extrabold text-white"
+          style={{ background: token.accent }}
+        >
+          {token.symbol.slice(0, 2)}
+        </span>
+      )}
+      <span className="min-w-0 truncate text-[12.5px] font-extrabold text-sp-ink">{token.symbol}</span>
+      <span className="shrink-0 text-[12px] font-bold tabular-nums text-sp-shade/55">
+        {formatEth(token.raised)} ETH
+      </span>
+      <span
+        aria-hidden="true"
+        className="h-1.5 w-1.5 shrink-0 rounded-full bg-soft-primary motion-safe:animate-pulse"
+      />
+    </button>
+  );
+}
+
 function KingOfTheHill({ token, ethUsd, onTrade, onDetails }: { token: BoardToken; ethUsd: number | null; onTrade: () => void; onDetails: () => void }) {
   const progress = curvePercent(token);
   const toGo = Math.max(0, token.target - token.raised);
@@ -2315,6 +2384,16 @@ export default function LaunchpadBoard() {
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-sp-shade/40" aria-hidden="true" />
               <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${FIELD} rounded-full bg-sp-sunken pl-10`} placeholder="Search coins, creators" aria-label="Search coins and creators" />
             </label>
+            {/* Slot promocyjny miedzy wyszukiwarka a kontrolkami. Tylko od `lg`:
+                na wezszym ekranie naglowek i tak zawija sie do dwoch wierszy,
+                a trzeci element robilby z niego trzy. */}
+            <BoardPromo
+              token={kingToken}
+              onOpen={() => {
+                if (kingToken?.address) router.push(`/startpad/${kingToken.address}`);
+              }}
+            />
+
             <span className="ml-auto flex items-center gap-2">
               {/* Split-button: selektor sieci + Launch w JEDNYM pillu - spojna
                   kontrolka zamiast dwoch osobnych, ktore sie gryzly. */}
