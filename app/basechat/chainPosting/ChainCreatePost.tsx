@@ -206,14 +206,14 @@ export default function ChainCreatePost({
   return (
     <BanRestriction
       fallback={
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 border border-blue-200">
-          <div className="text-red-500 dark:text-red-400 text-center">
+        <div className="bg-soft-surface rounded-lg p-4 mb-4 border border-blue-200">
+          <div className="text-red-500 text-center">
             You cannot create new posts because your account has been banned
           </div>
         </div>
       }
     >
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 relative overflow-hidden">
+      <div className="bg-soft-surface rounded-lg p-4 mb-4 relative overflow-hidden">
         <div className="absolute top-4 right-4 opacity-5 pointer-events-none" aria-hidden="true">
           {composer.background}
         </div>
@@ -227,7 +227,7 @@ export default function ChainCreatePost({
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder={composer.placeholder}
-              className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 ${composer.focusRing} resize-none`}
+              className={`w-full px-4 py-3 bg-soft-sunken border border-soft-line rounded-xl text-black placeholder-gray-500 text-sm focus:outline-none focus:ring-2 ${composer.focusRing} resize-none`}
               rows={3}
               maxLength={500}
               disabled={controlsDisabled}
@@ -264,21 +264,21 @@ export default function ChainCreatePost({
         {uploadProgress > 0 && uploadProgress < 100 && (
           <div className="absolute bottom-2 left-2 right-2">
             <div className="bg-white/90 backdrop-blur-sm rounded-lg p-2">
-              <div className="bg-gray-200 rounded-full h-1">
+              <div className="bg-soft-line rounded-full h-1">
                 <div
                   className={`${composer.progressBar} h-1 rounded-full transition-all duration-300`}
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-600 mt-1">Uploading... {uploadProgress}%</p>
+              <p className="text-xs text-soft-ink-muted mt-1">Uploading... {uploadProgress}%</p>
             </div>
           </div>
         )}
 
         {selectedMusic && (
-          <div className="mb-4 border border-green-300 dark:border-green-600 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
+          <div className="mb-4 border border-green-300 rounded-lg p-3 bg-green-50">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-green-800 dark:text-green-300">🎵 Attached Track</h4>
+              <h4 className="text-sm font-medium text-green-800">🎵 Attached Track</h4>
               <button
                 type="button"
                 onClick={() => setSelectedMusic(null)}
@@ -298,25 +298,25 @@ export default function ChainCreatePost({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 text-xs sm:text-sm bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+              className="flex items-center space-x-1 sm:space-x-2 text-soft-ink-soft hover:text-blue-600:text-blue-400 text-xs sm:text-sm bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100:bg-blue-900/40 transition-colors"
               title="Add photo or video"
               disabled={controlsDisabled}
             >
               <span className="text-lg" aria-hidden="true">📷</span>
-              <span className="hidden sm:inline font-medium text-blue-600 dark:text-blue-400">Photo</span>
+              <span className="hidden sm:inline font-medium text-blue-600">Photo</span>
             </button>
 
             <button
               type="button"
               onClick={() => setShowMusicSelector(true)}
-              className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400 text-xs sm:text-sm bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+              className="flex items-center space-x-1 sm:space-x-2 text-soft-ink-soft hover:text-green-600:text-green-400 text-xs sm:text-sm bg-green-50 px-2 py-1 rounded-lg hover:bg-green-100:bg-green-900/40 transition-colors"
               title="Add track from Spotify"
               disabled={controlsDisabled}
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z" />
               </svg>
-              <span className="hidden sm:inline font-medium text-green-600 dark:text-green-400">
+              <span className="hidden sm:inline font-medium text-green-600">
                 {selectedMusic ? 'Change Track' : 'Spotify'}
               </span>
             </button>

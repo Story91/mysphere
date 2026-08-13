@@ -228,7 +228,7 @@ export default function ChainCommentButton({
         disabled
         title={message}
         aria-label={message}
-        className="px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm flex items-center bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-300 opacity-70 cursor-not-allowed"
+        className="px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm flex items-center bg-gray-300 text-soft-ink-muted opacity-70 cursor-not-allowed"
       >
         <span className="whitespace-nowrap">Coming soon</span>
       </button>

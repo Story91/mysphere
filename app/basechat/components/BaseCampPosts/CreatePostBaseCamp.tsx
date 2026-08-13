@@ -188,14 +188,14 @@ export default function CreatePostBaseCamp({ onPostCreated }: CreatePostBaseCamp
   return (
     <BanRestriction
       fallback={
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 border border-blue-200">
-          <div className="text-red-500 dark:text-red-400 text-center">
+        <div className="bg-soft-surface rounded-lg p-4 mb-4 border border-blue-200">
+          <div className="text-red-500 text-center">
             You cannot create new posts because your account has been banned
           </div>
         </div>
       }
     >
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4">
+      <div className="bg-soft-surface rounded-lg p-4 mb-4">
         <div className="flex items-center space-x-3 mb-4">
           <Avatar address={address} className="w-10 h-10 rounded-full" />
           <div className="flex-1">
@@ -203,7 +203,7 @@ export default function CreatePostBaseCamp({ onPostCreated }: CreatePostBaseCamp
               value={content}
               onChange={(e) => setContent(e.target.value)}
                               placeholder="What's up .campers? Drop your current Spotify vibe and share what's on your mind with the camp!"
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+              className="w-full px-4 py-3 bg-soft-sunken border border-soft-line rounded-xl text-black placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
               rows={3}
               disabled={isSaving}
             />
@@ -248,7 +248,7 @@ export default function CreatePostBaseCamp({ onPostCreated }: CreatePostBaseCamp
               </svg>
             </button>
             {uploadProgress > 0 && uploadProgress < 100 && (
-              <div className="absolute bottom-2 left-2 right-2 bg-gray-200 rounded-full h-2">
+              <div className="absolute bottom-2 left-2 right-2 bg-soft-line rounded-full h-2">
                 <div 
                   className="bg-orange-500 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
@@ -260,9 +260,9 @@ export default function CreatePostBaseCamp({ onPostCreated }: CreatePostBaseCamp
 
         {/* Selected Music Preview */}
         {selectedMusic && (
-          <div className="mb-4 border border-green-300 dark:border-green-600 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
+          <div className="mb-4 border border-green-300 rounded-lg p-3 bg-green-50">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-green-800 dark:text-green-300">
+              <h4 className="text-sm font-medium text-green-800">
                 🎵 Attached Track
               </h4>
               <button
@@ -287,24 +287,24 @@ export default function CreatePostBaseCamp({ onPostCreated }: CreatePostBaseCamp
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 text-xs sm:text-sm bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+              className="flex items-center space-x-1 sm:space-x-2 text-soft-ink-soft hover:text-blue-600:text-blue-400 text-xs sm:text-sm bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100:bg-blue-900/40 transition-colors"
               title="Add photo or video"
               disabled={isSaving}
             >
               <span className="text-lg">📷</span>
-              <span className="hidden sm:inline font-medium text-blue-600 dark:text-blue-400">Photo</span>
+              <span className="hidden sm:inline font-medium text-blue-600">Photo</span>
             </button>
 
             <button 
               onClick={() => setShowMusicSelector(true)}
-              className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400 text-xs sm:text-sm bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+              className="flex items-center space-x-1 sm:space-x-2 text-soft-ink-soft hover:text-green-600:text-green-400 text-xs sm:text-sm bg-green-50 px-2 py-1 rounded-lg hover:bg-green-100:bg-green-900/40 transition-colors"
               title="Add track from Spotify"
               disabled={isSaving}
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
               </svg>
-              <span className="hidden sm:inline font-medium text-green-600 dark:text-green-400">
+              <span className="hidden sm:inline font-medium text-green-600">
                 {selectedMusic ? 'Change Track' : 'Spotify'}
               </span>
             </button>

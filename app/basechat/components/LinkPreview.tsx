@@ -238,7 +238,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-white dark:bg-gray-800 border border-soft-line dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+              className="block bg-soft-surface border border-soft-line rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
             >
               <div className="flex flex-col md:flex-row">
                 {preview.image && !hasFailedImage ? (
@@ -257,7 +257,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
                   </div>
                 ) : null}
                 <div className="flex-1 p-4">
-                  <div className="flex items-center text-xs text-soft-ink-soft dark:text-soft-ink-faint mb-2">
+                  <div className="flex items-center text-xs text-soft-ink-soft mb-2">
                     <div className="flex items-center">
                       <img 
                         src={`https://www.google.com/s2/favicons?domain=${hostname}`}
@@ -271,11 +271,11 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
                       {hostname}
                     </div>
                   </div>
-                  <h3 className="text-lg font-semibold text-soft-ink dark:text-white mb-2 line-clamp-2">
+                  <h3 className="text-lg font-semibold text-soft-ink mb-2 line-clamp-2">
                     {preview.title || formatLink(link)}
                   </h3>
                   {preview.description && (
-                    <p className="text-soft-ink-muted dark:text-gray-300 text-sm line-clamp-3 mb-2">
+                    <p className="text-soft-ink-muted text-sm line-clamp-3 mb-2">
                       {preview.description}
                     </p>
                   )}

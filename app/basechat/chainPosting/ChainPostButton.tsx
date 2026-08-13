@@ -233,7 +233,7 @@ export default function ChainPostButton({
         disabled
         title={message}
         aria-label={message}
-        className="flex items-center justify-center px-3 py-0.5 sm:px-4 sm:py-0.5 rounded-lg font-medium text-xs sm:text-sm h-[32px] bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-300 border border-gray-400 dark:border-gray-500 opacity-70 cursor-not-allowed"
+        className="flex items-center justify-center px-3 py-0.5 sm:px-4 sm:py-0.5 rounded-lg font-medium text-xs sm:text-sm h-[32px] bg-gray-300 text-soft-ink-muted border border-gray-400 opacity-70 cursor-not-allowed"
       >
         <span className="leading-tight whitespace-nowrap">Coming soon</span>
       </button>
