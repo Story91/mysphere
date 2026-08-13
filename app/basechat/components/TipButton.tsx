@@ -429,7 +429,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
       {isOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overscroll-contain">
           <div 
-            className="absolute inset-0 bg-soft-ink/30 backdrop-blur-sm"
+            className="absolute inset-0 bg-soft-ink/30"
             onClick={() => { setIsOpen(false); setTipSaved(false); }}
           ></div>
 
@@ -441,7 +441,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
           >
             {/* Jedna, ciepla poswiata w rogu. Druga (fioletowa) i pusty
                 `bg-transparent` nic nie wnosily poza trzema warstwami do zlozenia. */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-accent-soft/70 rounded-full filter blur-2xl"></div>
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-accent-soft/70 rounded-full"></div>
 
             <div className="relative z-10">
               {/* Header */}

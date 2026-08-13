@@ -94,7 +94,7 @@ export default function SoftFeedMobile({
           (wzor duzych feedow), wiec zmiana zakladki albo sieci nie wymaga
           wracania na gore listy. Tlo i z-index, zeby tresc chowala sie POD
           pasek, a nie przezierala przez niego. */}
-      <div className="sticky top-0 z-20 flex items-center gap-2 bg-soft-bg/95 px-4 pb-1.5 pt-2.5 backdrop-blur">
+      <div className="sticky top-0 z-20 flex items-center gap-2 bg-soft-bg/95 px-4 pb-1.5 pt-2.5">
         <SoftTabs
           tabs={TABS}
           activeTab={activeFeed}

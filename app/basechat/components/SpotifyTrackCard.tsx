@@ -88,7 +88,7 @@ export default function SpotifyTrackCard({
       }}
     >
       {/* Blurred Background Overlay */}
-      <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
+      <div className={`absolute inset-0 rounded-lg ${
         track?.album?.images?.[0]?.url 
           ? 'bg-black/40' 
           : 'bg-gradient-to-br from-green-900/30 to-emerald-800/30'
@@ -130,7 +130,7 @@ export default function SpotifyTrackCard({
                   className={`absolute inset-0 flex items-center justify-center rounded transition-opacity duration-200 disabled:opacity-50 ${
                     isPlaying && currentTrackUrl === track.preview_url 
                       ? 'bg-black/30 opacity-100' 
-                      : 'bg-black/50 backdrop-blur-sm opacity-0 group-hover:opacity-100'
+                      : 'bg-black/50 opacity-0 group-hover:opacity-100'
                   }`}
                   title={isPlaying && currentTrackUrl === track.preview_url ? 'Pause' : 'Play 30s preview'}
                 >

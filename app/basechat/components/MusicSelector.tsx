@@ -172,7 +172,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-soft-ink/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-soft-ink/30 z-50 flex items-center justify-center p-4">
       <div className="bg-soft-surface rounded-card shadow-float max-w-4xl w-full max-h-[80vh] overflow-hidden">
         {/* Header */}
         <div className="p-6 border-b border-soft-line">

@@ -257,7 +257,7 @@ const ClaimPortalBanner = () => {
   // leczyc komentarzem "simplified to prevent flickering".
   const previewModal = showPreviewModal ? (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/45 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/45 p-4"
       onClick={() => setShowPreviewModal(false)}
     >
       <div

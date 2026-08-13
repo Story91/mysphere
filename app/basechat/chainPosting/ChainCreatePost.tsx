@@ -263,7 +263,7 @@ export default function ChainCreatePost({
 
         {uploadProgress > 0 && uploadProgress < 100 && (
           <div className="absolute bottom-2 left-2 right-2">
-            <div className="bg-white/90 backdrop-blur-sm rounded-lg p-2">
+            <div className="bg-white/90 rounded-lg p-2">
               <div className="bg-soft-line rounded-full h-1">
                 <div
                   className={`${composer.progressBar} h-1 rounded-full transition-all duration-300`}

@@ -1613,8 +1613,8 @@ export default function BuilderProfile({
         {(talentScore || talentProfile || loadingTalentData) && (
           <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Neonowa poświata */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full filter blur-xl"></div>
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full"></div>
             <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
 
             {/* Efekt szkła */}
@@ -1711,8 +1711,8 @@ export default function BuilderProfile({
         {(twitterUser || loadingTwitterData || twitterError) && (
           <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Twitter blue poświata */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full filter blur-xl"></div>
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full"></div>
             <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
 
             {/* Efekt szkła */}
@@ -1901,8 +1901,8 @@ export default function BuilderProfile({
         {(spotifyUserData || loadingSpotifyData || spotifyError) && (
           <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Spotify green poświata */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full filter blur-xl"></div>
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full"></div>
             <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
 
             {/* Efekt szkła */}
@@ -2157,7 +2157,7 @@ export default function BuilderProfile({
                                     }}
                                   >
                                     {/* Blurred Background Overlay */}
-                                    <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
+                                    <div className={`absolute inset-0 rounded-lg ${
                                       item?.track?.album?.images?.[0]?.url 
                                         ? 'bg-black/40' 
                                         : 'bg-soft-ink/90'
@@ -2200,7 +2200,7 @@ export default function BuilderProfile({
                                             <button
                                               onClick={() => playTrack(item.track.preview_url!)}
                                               disabled={isLoading && currentTrackUrl === item.track.preview_url}
-                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded transition-opacity duration-200 disabled:opacity-50 ${
+                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 rounded transition-opacity duration-200 disabled:opacity-50 ${
                                                 isPlaying && currentTrackUrl === item.track.preview_url 
                                                   ? 'opacity-100' 
                                                   : 'opacity-0 group-hover:opacity-100'
@@ -2408,7 +2408,7 @@ export default function BuilderProfile({
                                     }}
                                   >
                                     {/* Blurred Background Overlay */}
-                                    <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
+                                    <div className={`absolute inset-0 rounded-lg ${
                                       item?.track?.album?.images?.[0]?.url 
                                         ? 'bg-black/40' 
                                         : 'bg-soft-ink/90'
@@ -2451,7 +2451,7 @@ export default function BuilderProfile({
                                             <button
                                               onClick={() => playTrack(item.track.preview_url!)}
                                               disabled={isLoading && currentTrackUrl === item.track.preview_url}
-                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded transition-opacity duration-200 disabled:opacity-50 ${
+                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 rounded transition-opacity duration-200 disabled:opacity-50 ${
                                                 isPlaying && currentTrackUrl === item.track.preview_url 
                                                   ? 'opacity-100' 
                                                   : 'opacity-0 group-hover:opacity-100'
@@ -2658,8 +2658,8 @@ export default function BuilderProfile({
         {/* Bio Section */}
         <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
           {/* Niebieska poświata */}
-          <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full filter blur-2xl"></div>
-          <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full filter blur-xl"></div>
+          <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full"></div>
+          <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full"></div>
           <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
 
           {/* Efekt szkła */}
@@ -2744,8 +2744,8 @@ export default function BuilderProfile({
         {isVitalik && (
           <div className="mb-6 bg-soft-surface rounded-card shadow-card p-6 border border-soft-line relative overflow-hidden">
             {/* Efekt świecenia */}
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-soft-accent-soft rounded-full filter blur-3xl opacity-40"></div>
-            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-soft-primary/10 rounded-full filter blur-3xl opacity-30"></div>
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-soft-accent-soft rounded-full opacity-40"></div>
+            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-soft-primary/10 rounded-full opacity-30"></div>
 
             <div className="text-soft-ink-muted relative z-10">
               <h3 className="font-soft-display font-bold text-xl mb-3 text-soft-ink">About Vitalik Buterin</h3>

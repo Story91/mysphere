@@ -3115,7 +3115,7 @@ function BaseChatContent() {
                 />
               </div>
               {/* Second marquee disabled
-              <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
+              <div className="w-full bg-white/[.02] py-1">
                 <gecko-coin-price-marquee-widget 
                   locale="en" 
                   outlined="true"
@@ -4084,7 +4084,7 @@ function BaseChatContent() {
                           gore kolumny. Na telefonie paska nie przyklejamy, bo
                           tam zakladki maja swoje miejsce w SoftFeedMobile i nic
                           sie nie zmienia. */}
-                      <div className="mb-3 flex items-center gap-3 lg:sticky lg:top-0 lg:z-20 lg:-mt-2 lg:bg-soft-bg/95 lg:pb-1 lg:pt-2 lg:backdrop-blur">
+                      <div className="mb-3 flex items-center gap-3 lg:sticky lg:top-0 lg:z-20 lg:-mt-2 lg:bg-soft-bg lg:pb-1 lg:pt-2">
                         {!showMyFeed && (
                           <>
                             <div className="hidden min-w-0 flex-1 lg:block">
@@ -4813,7 +4813,7 @@ function BaseChatContent() {
           otwarta. */}
       <nav
         aria-label="Sections"
-        className="fixed bottom-0 left-0 right-0 lg:hidden bg-soft-surface/95 backdrop-blur-xl border-t border-soft-line z-40"
+        className="fixed bottom-0 left-0 right-0 lg:hidden bg-soft-surface/95 border-t border-soft-line z-40"
       >
         {/* items-end + wypukly StartPad w srodku - ten sam wzor co w globalnym
             MobileBottomNav (app/components/MobileBottomNav.tsx): podniesiony
