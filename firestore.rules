@@ -86,6 +86,25 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // INDEKS TOKENOW LAUNCHPADA
+    // ========================================================================
+    // Lista startow na siec: adres, nazwa, symbol, tworca, blok startu. Dane
+    // niezmienne, odtworzone ze zdarzen `Launched` przez /api/launchpad/board.
+    //
+    // ZAPIS TYLKO Z SERWERA i to nie jest formalnosc: z tej listy powstaje
+    // TABLICA. Kto moglby do niej pisac, dopisalby token, ktorego nikt nie
+    // wystartowal, albo podmienil nazwe i symbol istniejacego - czyli
+    // podszylby sie pod cudzy launch w miejscu, w ktorym ludzie wybieraja, co
+    // kupic. Odczyt jawny, bo te dane i tak sa na lancuchu.
+    //
+    // `launchpadTokenIndex` JEST na liscie w `hasOwnRules` - bez tego ta
+    // regula bylaby martwa dekoracja.
+    match /launchpadTokenIndex/{chainKey} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ========================================================================
     // REJESTR AGENTOW
     // ========================================================================
     // docId = adres wlasciciela, lowercase. Dzieki temu dopasowanie autora
@@ -558,7 +577,8 @@ service cloud.firestore {
         'curatorWatch',
         'curatorChanges',
         'launchpadTokens',
-        'launchpadHistory'
+        'launchpadHistory',
+        'launchpadTokenIndex'
       ];
     }
 
