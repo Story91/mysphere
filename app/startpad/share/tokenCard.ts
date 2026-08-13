@@ -132,39 +132,79 @@ async function logoFromBlob(chainId: number, token: string): Promise<string | nu
   }
 }
 
-/** Formaty, ktore rasteryzator kart na pewno rozumie. Reszta konczy sie glifem. */
-const LOGO_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif']);
-const LOGO_MAX_BYTES = 1_500_000;
-const LOGO_TIMEOUT_MS = 2500;
+const LOGO_MAX_BYTES = 3_000_000;
+const LOGO_TIMEOUT_MS = 3000;
+/** Bok logo na karcie to 104 px; 128 daje zapas na ekrany o gestych pikselach. */
+const LOGO_PX = 128;
 
 /**
- * Logo POBRANE PRZEZ NAS, nie podane rendererowi jako adres.
+ * Logo POBRANE I PRZEROBIONE PRZEZ NAS, nie podane rendererowi jako adres.
  *
- * Satori pobiera obrazek sam i robi to bez limitu czasu - a logo tokena bywa
- * na cudzej bramie IPFS, ktora potrafi milczec. Jeden taki token zamienialby
- * cala karte w blad, czyli w brak podgladu linku. Pobranie u siebie daje limit
- * czasu, limit rozmiaru i sprawdzenie typu; kazda z tych trzech rzeczy konczy
- * sie glifem z inicjalami, a nie wywroceniem obrazka.
+ * ===========================================================================
+ * DLACZEGO PRZERABIAMY, A NIE PODAJEMY DALEJ
+ * ===========================================================================
+ * Karta $ELE poszla w swiat z glifem "EL" zamiast logo, mimo ze logo lezalo w
+ * Blobie. Powod: nasz upload zapisuje je jako WEBP (app/startpad/logoUpload.ts
+ * wybiera webp jako najmniejszy), a `resvg` wbudowany w @vercel/og nie ma
+ * dekodera webp - w jego binarce nie wystepuje nawet takie slowo. Satori
+ * rozpozna typ i wstawi obrazek, po czym rasteryzacja odda puste miejsce.
+ *
+ * Dlatego kazde logo przechodzi przez `sharp` i wychodzi PNG-iem 128 px. Przy
+ * okazji zalatwia to trzy inne rzeczy: obcy `metadataURI` moze byc avif albo
+ * svg i tez zadziala, dane sa przycinane do kwadratu (kadr karty ma staly
+ * rozmiar), a wynik wazy kilkanascie kilobajtow zamiast megabajta z telefonu.
+ *
+ * ===========================================================================
+ * DLACZEGO POBIERAMY SAMI
+ * ===========================================================================
+ * Satori pobiera obrazek sam i robi to bez limitu czasu, a logo tokena bywa na
+ * cudzej bramie IPFS, ktora potrafi milczec. Jeden taki token zamienialby cala
+ * karte w blad, czyli w brak podgladu linku. U siebie mamy limit czasu, limit
+ * rozmiaru i `catch` - kazde niepowodzenie konczy sie glifem z inicjalami,
+ * nigdy wywroconym obrazkiem.
  */
 async function logoData(url: string | null): Promise<string | null> {
   if (!url) return null;
-  if (url.startsWith('data:')) return url;
-  if (!url.startsWith('https://')) return null;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), LOGO_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return null;
-    const type = (response.headers.get('content-type') ?? '').split(';')[0].trim();
-    if (!LOGO_TYPES.has(type)) return null;
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length === 0 || bytes.length > LOGO_MAX_BYTES) return null;
-    return `data:${type};base64,${bytes.toString('base64')}`;
+    let source: Buffer | null = null;
+
+    if (url.startsWith('data:')) {
+      const comma = url.indexOf(',');
+      // Interesuje nas wylacznie base64 - `metadata.ts` innych data: nie
+      // przepuszcza, a bez tego znacznika `Buffer.from` cicho zwroci smiec.
+      if (comma < 0 || !url.slice(0, comma).includes('base64')) return null;
+      source = Buffer.from(url.slice(comma + 1), 'base64');
+    } else if (url.startsWith('https://')) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), LOGO_TIMEOUT_MS);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) return null;
+        if (!(response.headers.get('content-type') ?? '').startsWith('image/')) return null;
+        source = Buffer.from(await response.arrayBuffer());
+      } finally {
+        clearTimeout(timer);
+      }
+    } else {
+      return null;
+    }
+
+    if (!source || source.length === 0 || source.length > LOGO_MAX_BYTES) return null;
+
+    // Import w srodku funkcji: `sharp` ciagnie za soba binarke, a wiekszosc
+    // wywolan tego modulu (metadane strony) logo w ogole nie potrzebuje.
+    const sharp = (await import('sharp')).default;
+    const png = await sharp(source, { animated: false })
+      .resize(LOGO_PX, LOGO_PX, { fit: 'cover', position: 'centre' })
+      .png()
+      .toBuffer();
+
+    return `data:image/png;base64,${png.toString('base64')}`;
   } catch {
+    // Nieczytelny plik, padnieta brama, format bez dekodera - karta ma wyjsc
+    // z glifem, a nie nie wyjsc wcale.
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -197,7 +237,17 @@ async function historyFrom(chainId: number, token: string): Promise<{ prices: nu
   };
 }
 
-export async function loadTokenCard(address: string, chainHint: number | null): Promise<TokenCardData | null> {
+/**
+ * `withLogo` domyslnie tak, ale metadane strony tokena wolaja z `false` - one
+ * potrzebuja tytulu i liczb, a nie obrazka. Bez tego kazde wejscie na strone
+ * ciagnelo logo z Bloba i uruchamialo `sharp` po to, zeby wynik wyrzucic.
+ */
+export async function loadTokenCard(
+  address: string,
+  chainHint: number | null,
+  options: { withLogo?: boolean } = {}
+): Promise<TokenCardData | null> {
+  const withLogo = options.withLogo !== false;
   if (!ADDRESS_RE.test(address)) return null;
 
   const token = address as Address;
@@ -231,12 +281,14 @@ export async function loadTokenCard(address: string, chainHint: number | null): 
 
   const [history, blobLogo] = await Promise.all([
     historyFrom(net.chain.id, token),
-    logoFromBlob(net.chain.id, token),
+    withLogo ? logoFromBlob(net.chain.id, token) : Promise.resolve(null),
   ]);
 
   const first = history.prices[0] ?? 0;
   const last = history.prices[history.prices.length - 1] ?? 0;
-  const logo = await logoData(pickTokenImage({ profileLogoUrl: blobLogo, metadataUri }).url);
+  const logo = withLogo
+    ? await logoData(pickTokenImage({ profileLogoUrl: blobLogo, metadataUri }).url)
+    : null;
 
   return {
     chainId: net.chain.id,

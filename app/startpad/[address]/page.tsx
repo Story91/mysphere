@@ -26,7 +26,10 @@ export const revalidate = 120;
 type Props = { params: { address: string } };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const data = await loadTokenCard(params.address, null).catch(() => null);
+  // Bez logo: metadane niosa tytul, opis i adresy, a obrazek rysuje sie w
+  // osobnym zadaniu (opengraph-image). Pobieranie go tutaj bylo praca, ktorej
+  // wynik i tak ladowal w koszu.
+  const data = await loadTokenCard(params.address, null, { withLogo: false }).catch(() => null);
 
   if (!data) {
     // Adres, ktorego zaden launchpad nie zna. Zadnej karty tokena tu nie ma i

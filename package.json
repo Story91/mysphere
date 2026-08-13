@@ -93,6 +93,7 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "sharp": "^0.35.3",
     "tailwind-merge": "^2.6.0",
     "three": "^0.161.0",
     "viem": "^2.35.1",

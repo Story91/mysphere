@@ -364,9 +364,9 @@ function LaunchCard({
       )}
       {/* Wiersz podgladowy jest proba ukladu, nie rynkiem - nic na nim nie klika. */}
       {sample || !token.address ? (
-        <div className="flex min-w-0 items-start gap-3 pr-9">{header}</div>
+        <div className="flex min-w-0 items-start gap-3 pr-10">{header}</div>
       ) : (
-        <button type="button" onClick={onOpen} className="flex min-w-0 items-start gap-3 pr-9 text-left">{header}</button>
+        <button type="button" onClick={onOpen} className="flex min-w-0 items-start gap-3 pr-10 text-left">{header}</button>
       )}
 
       <div className="mt-4">
