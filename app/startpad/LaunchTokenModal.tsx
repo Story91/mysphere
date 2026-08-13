@@ -49,6 +49,7 @@ import {
   hookAbi,
   launchpadAbi,
   type LaunchpadToken,
+  NATIVE_SYMBOL,
 } from './config';
 import { formatUsd, useEthUsd } from './useEthUsd';
 import { browserStorage, clearPendingProfile, postProfileWithRetry, savePendingProfile, sendTokenProfile } from './profileSync';
@@ -261,7 +262,7 @@ function BoardPreviewCard({
       </div>
       <div className="mt-4">
         <div className="flex items-baseline justify-between">
-          <span className="text-[15px] font-extrabold text-sp-ink">{raised.toFixed(raised >= 1 ? 2 : 3)} ETH</span>
+          <span className="text-[15px] font-extrabold text-sp-ink">{raised.toFixed(raised >= 1 ? 2 : 3)} {NATIVE_SYMBOL}</span>
           <span className="text-[11px] font-extrabold text-sp-up">{progress}%</span>
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sp-shade/8">
@@ -312,10 +313,21 @@ export default function LaunchTokenModal({
   open,
   onClose,
   onLaunched,
+  quickOnly = false,
+  initialName = '',
+  initialSymbol = '',
 }: {
   open: boolean;
   onClose: () => void;
   onLaunched: (token: LaunchpadToken) => void;
+  /**
+   * Chowa przelacznik trybow i zostawia sam szybki start. Uzywa tego
+   * kompozytor feedu - patrz komentarz przy przelaczniku nizej.
+   */
+  quickOnly?: boolean;
+  /** Podpowiedzi z tresci posta. Autor moze je nadpisac przed startem. */
+  initialName?: string;
+  initialSymbol?: string;
 }) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -710,7 +722,7 @@ export default function LaunchTokenModal({
     const buybackBps = Math.round(buyPct * 100);
 
     const preBuyWei = preBuyEth.trim() === '' || Number(preBuyEth) === 0 ? 0n : toWei(preBuyEth);
-    if (preBuyWei === null) return fail('Pre-buy must be zero or more ETH, written as a decimal number.');
+    if (preBuyWei === null) return fail(`Pre-buy must be zero or more ${NATIVE_SYMBOL}, written as a decimal number.`);
 
     // Ile tokenow kupi pre-buy po cenie startowej (ethReserve=0). Ta sama
     // formula, co podglad; sluzy do sprawdzenia, czy pre-buy zmiesci sie pod
@@ -745,7 +757,7 @@ export default function LaunchTokenModal({
       // realny wynik <= cap. Margines 2% falszywie blokowal pre-buy tuz pod capem.
       if (preBuyTokens > 0 && preBuyTokens > Number(formatEther(parsedCap))) {
         return fail(
-          `Your ${preBuyEthNum} ETH pre-buy is about ${Math.round(preBuyTokens).toLocaleString('en-US')} tokens, ` +
+          `Your ${preBuyEthNum} ${NATIVE_SYMBOL} pre-buy is about ${Math.round(preBuyTokens).toLocaleString('en-US')} tokens, ` +
             `above the ${Number(formatEther(parsedCap)).toLocaleString('en-US')} per-wallet cap. ` +
             `Raise the cap or lower the pre-buy; the cap applies to you too for the first 5 minutes.`
         );
@@ -1003,6 +1015,20 @@ export default function LaunchTokenModal({
 
   // Escape zamyka jak klik w tlo - ale nie w trakcie wysylania transakcji,
   // zeby przypadkowy klawisz nie schowal stanu "Launching...".
+  /**
+   * Podpowiedzi z zewnatrz wchodza PRZY OTWARCIU i tylko do pustych pol.
+   *
+   * Nadpisywanie ich przy kazdej zmianie propsow kasowaloby to, co autor
+   * wlasnie wpisal - a tresc posta zmienia sie pod reka, bo kompozytor stoi
+   * obok otwartego kreatora.
+   */
+  useEffect(() => {
+    if (!open) return;
+    if (initialName) setLaunchName((current) => (current.trim() === '' ? initialName : current));
+    if (initialSymbol) setLaunchSymbol((current) => (current.trim() === '' ? initialSymbol : current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -1098,7 +1124,7 @@ export default function LaunchTokenModal({
     }
     const preBuyWei = preBuyEth.trim() === '' || Number(preBuyEth) === 0 ? 0n : toWei(preBuyEth);
     if (preBuyWei === null) {
-      setNotice({ kind: 'error', text: 'Pre-buy must be zero or more ETH, written as a decimal number.' });
+      setNotice({ kind: 'error', text: `Pre-buy must be zero or more ${NATIVE_SYMBOL}, written as a decimal number.` });
       return;
     }
     if (!(await ensureSepolia())) return;
@@ -1306,7 +1332,13 @@ export default function LaunchTokenModal({
             </button>
           </div>
 
-          {phase === 'form' && (
+          {/* Z FEEDU pokazujemy WYLACZNIE szybki start.
+              Przelacznik trybow otwieralby pelen kreator (oplaty, udzialy,
+              buyback, vanity, ochrona przed sniperami) w polu obok pisania
+              posta - czyli decyzje na kilkanascie minut w miejscu, ktore ma
+              zajac kilkanascie sekund. Kto chce pro, idzie na startpad, i
+              wlasnie tam prowadzi odnosnik pod formularzem. */}
+          {phase === 'form' && !quickOnly && (
             <div className="mt-4 flex items-center gap-1 rounded-xl bg-sp-brand-soft p-1" role="tablist" aria-label="Launch mode">
               <button
                 type="button"
@@ -1370,7 +1402,7 @@ export default function LaunchTokenModal({
               <p className="mt-1 text-[13px] text-sp-shade/50">
                 {launched.name}
                 {launched.preBuyWei > 0n
-                  ? ` · your ${formatEther(launched.preBuyWei)} ETH${usdSuffix(Number(formatEther(launched.preBuyWei)))} pre-buy filled in the same transaction`
+                  ? ` · your ${formatEther(launched.preBuyWei)} ${NATIVE_SYMBOL}${usdSuffix(Number(formatEther(launched.preBuyWei)))} pre-buy filled in the same transaction`
                   : ''}
               </p>
               <div className="mt-5 flex w-full items-center justify-between gap-2 rounded-xl border border-sp-shade/10 bg-sp-bg px-3.5 py-3">
@@ -1612,17 +1644,17 @@ export default function LaunchTokenModal({
                             onChange={(event) => setPreBuyEth(event.target.value)}
                             className={`${FIELD} pr-14`}
                             placeholder="0"
-                            aria-label="Pre-buy amount in ETH"
+                            aria-label={`Pre-buy amount in ${NATIVE_SYMBOL}`}
                           />
                           <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">
-                            ETH
+                            {NATIVE_SYMBOL}
                           </span>
                         </div>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {['0', '0.01', '0.05', '0.1'].map((amount) => (
                           <button key={amount} type="button" onClick={() => setPreBuyEth(amount)} className={CHIP}>
-                            {amount === '0' ? 'None' : `${amount} ETH`}
+                            {amount === '0' ? 'None' : `${amount} ${NATIVE_SYMBOL}`}
                           </button>
                         ))}
                       </div>
@@ -1631,7 +1663,7 @@ export default function LaunchTokenModal({
                       ) : (
                         <p className="mt-2 text-[12px] font-bold text-sp-ink">
                           {preBuyPreview
-                            ? `≈ ${preBuyPreview.tokens.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${launchSymbol || 'tokens'} · ${preBuyPreview.share.toFixed(2)}% of supply · for ${Number(preBuyEth)} ETH${usdSuffix(Number(preBuyEth))}`
+                            ? `≈ ${preBuyPreview.tokens.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${launchSymbol || 'tokens'} · ${preBuyPreview.share.toFixed(2)}% of supply · for ${Number(preBuyEth)} ${NATIVE_SYMBOL}${usdSuffix(Number(preBuyEth))}`
                             : 'No pre-buy. The curve opens to everyone at the same price.'}
                         </p>
                       )}
@@ -1826,7 +1858,7 @@ export default function LaunchTokenModal({
                         </ul>
                         <span className={HINT}>
                           The first receiver is you; your share is whatever the others leave. Up to {limits.maxRecipients}{' '}
-                          addresses, paid out in ETH.
+                          addresses, paid out in {NATIVE_SYMBOL}.
                         </span>
                       </SectionCard>
 
@@ -2104,19 +2136,19 @@ export default function LaunchTokenModal({
                             {estimate.map((row) => (
                               <tr key={row.volume} className="border-t border-sp-shade/5 align-top">
                                 <td className="py-1.5 text-sp-shade/55">
-                                  {row.volume} ETH
+                                  {row.volume} {NATIVE_SYMBOL}
                                   {ethUsd !== null && (
                                     <span className="block text-[10px] font-bold text-sp-shade/35">{formatUsd(row.volume * ethUsd)}</span>
                                   )}
                                 </td>
                                 <td className="py-1.5 text-right font-extrabold text-sp-ink">
-                                  {row.curve.toFixed(3)} ETH
+                                  {row.curve.toFixed(3)} {NATIVE_SYMBOL}
                                   {ethUsd !== null && (
                                     <span className="block text-[10px] font-bold text-sp-shade/40">{formatUsd(row.curve * ethUsd)}</span>
                                   )}
                                 </td>
                                 <td className="py-1.5 text-right font-extrabold text-sp-ink">
-                                  {row.pool.toFixed(3)} ETH
+                                  {row.pool.toFixed(3)} {NATIVE_SYMBOL}
                                   {ethUsd !== null && (
                                     <span className="block text-[10px] font-bold text-sp-shade/40">{formatUsd(row.pool * ethUsd)}</span>
                                   )}
@@ -2125,7 +2157,7 @@ export default function LaunchTokenModal({
                             ))}
                           </tbody>
                         </table>
-                        <p className="mt-2 text-[12px] font-extrabold text-sp-up">Creator earnings are paid in ETH, not tokens.</p>
+                        <p className="mt-2 text-[12px] font-extrabold text-sp-up">Creator earnings are paid in {NATIVE_SYMBOL}, not tokens.</p>
                         <span className={HINT}>
                           Curve earnings are exact for the fee you picked. Pool earnings assume the hook&apos;s{' '}
                           {(hookSplit.feeBps / 100).toFixed(2)}% swap fee and your{' '}
@@ -2158,7 +2190,7 @@ export default function LaunchTokenModal({
                       <li className="flex items-start gap-2">
                         <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-soft-primary" aria-hidden="true" />
                         One transaction creates the token and starts its curve. Graduates to a Uniswap v4 pool at{' '}
-                        {CURVE_TARGET_ETH} ETH.
+                        {CURVE_TARGET_ETH} {NATIVE_SYMBOL}.
                       </li>
                       <li className="flex items-start gap-2">
                         <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-soft-primary" aria-hidden="true" />
@@ -2166,7 +2198,7 @@ export default function LaunchTokenModal({
                       </li>
                       <li className="flex items-start gap-2">
                         <CircleDollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sp-up" aria-hidden="true" />
-                        Creator earnings are paid in ETH, not tokens. Claim them any time.
+                        Creator earnings are paid in {NATIVE_SYMBOL}, not tokens. Claim them any time.
                       </li>
                     </ul>
                   </div>
@@ -2205,6 +2237,18 @@ export default function LaunchTokenModal({
                 <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
+
+            {/* Wyjscie do pelnego kreatora. Pokazujemy je TYLKO tam, gdzie
+                przelacznik trybow jest schowany - inaczej byloby drugim
+                sposobem na to samo, dwa centymetry od pierwszego. */}
+            {quickOnly && (
+              <a
+                href="/startpad/"
+                className="mt-2.5 block text-[11px] text-sp-shade/45 underline-offset-2 hover:text-soft-primary-deep hover:underline"
+              >
+                Need fees, revenue splits or sniper protection? Open the full creator on Startpad.
+              </a>
+            )}
           </footer>
         )}
       </section>
