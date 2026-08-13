@@ -81,6 +81,12 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
   const [notFound, setNotFound] = useState(tokenAddress === null);
   const [profile, setProfile] = useState<TokenProfileView | null>(null);
   const [copied, setCopied] = useState(false);
+  /**
+   * Licznik zadan "pokaz formularz profilu". Licznik, a nie flaga: tworca moze
+   * kliknac pusta ikonke drugi raz po zamknieciu zakladki, a flaga `true` juz
+   * ustawiona na `true` nie wywolalaby zadnego efektu.
+   */
+  const [profileRequest, setProfileRequest] = useState(0);
 
   const loadCore = useCallback(async () => {
     if (!readClient || !tokenAddress) return;
@@ -196,6 +202,9 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
 
   const history = useTokenHistory(notFound ? null : tokenAddress, core?.startedAt ?? null);
   const { applyLive, reload: reloadHistory } = history;
+
+  /** Tworca tokena - jedyny, kto moze uzupelnic profil i linki. */
+  const isCreator = Boolean(account && core && account.toLowerCase() === core.creator.toLowerCase());
 
   // NA ZYWO: pojedyncze zdarzenia dokladane do stanu, ktory juz jest na
   // ekranie. Rezerwy bierzemy PROSTO ze zdarzenia (ethReserveAfter), nie z
@@ -319,7 +328,14 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
 
         {core && (
           <>
-            <TokenHeader core={core} profile={profile} copied={copied} onCopy={() => void copyAddress()} />
+            <TokenHeader
+              core={core}
+              profile={profile}
+              copied={copied}
+              onCopy={() => void copyAddress()}
+              isCreator={isCreator}
+              onAddSocials={() => setProfileRequest((count) => count + 1)}
+            />
 
             <div className="mt-5 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="min-w-0 lg:col-start-1 lg:row-start-1">
@@ -353,7 +369,8 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
                   truncated={history.truncated}
                   onRetryHistory={() => void reloadHistory()}
                   profile={profile}
-                  isCreator={Boolean(account && account.toLowerCase() === core.creator.toLowerCase())}
+                  isCreator={isCreator}
+                  profileRequest={profileRequest}
                   onProfileSaved={setProfile}
                 />
               </div>
@@ -379,11 +396,16 @@ function TokenHeader({
   profile,
   copied,
   onCopy,
+  isCreator,
+  onAddSocials,
 }: {
   core: CoreState;
   profile: TokenProfileView | null;
   copied: boolean;
   onCopy: () => void;
+  isCreator: boolean;
+  /** Tworca klikajacy pusta ikonke ma trafic do formularza profilu. */
+  onAddSocials: () => void;
 }) {
   const image = pickTokenImage({ profileLogoUrl: profile?.logoUrl, metadataUri: core.config.metadataURI });
   const chainMeta = parseMetadataUri(core.config.metadataURI);
@@ -426,21 +448,15 @@ function TokenHeader({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {website && (
-            <a href={website} target="_blank" rel="noreferrer" className="rounded-full border border-black/10 bg-white p-2.5 text-black/50 hover:text-soft-primary-deep" aria-label="Project website">
-              <Globe className="h-4 w-4" aria-hidden="true" />
-            </a>
-          )}
-          {twitter && (
-            <a href={twitter} target="_blank" rel="noreferrer" className="rounded-full border border-black/10 bg-white p-2.5 text-black/50 hover:text-soft-primary-deep" aria-label="Project on X">
-              <AtSign className="h-4 w-4" aria-hidden="true" />
-            </a>
-          )}
-          {telegram && (
-            <a href={telegram} target="_blank" rel="noreferrer" className="rounded-full border border-black/10 bg-white p-2.5 text-black/50 hover:text-soft-primary-deep" aria-label="Project Telegram">
-              <Send className="h-4 w-4" aria-hidden="true" />
-            </a>
-          )}
+          <SocialLink href={website} label="website" isCreator={isCreator} onAdd={onAddSocials}>
+            <Globe className="h-4 w-4" aria-hidden="true" />
+          </SocialLink>
+          <SocialLink href={twitter} label="X profile" isCreator={isCreator} onAdd={onAddSocials}>
+            <AtSign className="h-4 w-4" aria-hidden="true" />
+          </SocialLink>
+          <SocialLink href={telegram} label="Telegram" isCreator={isCreator} onAdd={onAddSocials}>
+            <Send className="h-4 w-4" aria-hidden="true" />
+          </SocialLink>
           <button type="button" onClick={onCopy} className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#16141b] hover:border-soft-primary">
             {copied ? <Check className="h-3.5 w-3.5 text-[#0b9a51]" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
             {copied ? 'Copied' : short(core.token)}
@@ -451,6 +467,71 @@ function TokenHeader({
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * Ikonka linku spolecznosciowego, ktora STOI TAM ZAWSZE.
+ *
+ * Wczesniej brakujacy link znaczyl brak ikonki - naglowek wygladal wtedy tak
+ * samo jak naglowek tokena, ktory po prostu nie ma strony, i nie dalo sie
+ * odroznic "nie ma" od "nie sprawdzalem". Teraz brak jest widoczny: ikona
+ * zostaje, przygaszona i z przerywana obwodka.
+ *
+ * Dla ogladajacego pusta ikona nie jest klikalna - klikalna pustka to obietnica
+ * bez pokrycia. Dla TWORCY tego tokena jest przyciskiem, ktory otwiera
+ * zakladke Info z formularzem profilu, bo to on i tylko on moze ten brak
+ * uzupelnic.
+ */
+function SocialLink({
+  href,
+  label,
+  isCreator,
+  onAdd,
+  children,
+}: {
+  href: string | null;
+  label: string;
+  isCreator: boolean;
+  onAdd: () => void;
+  children: React.ReactNode;
+}) {
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="rounded-full border border-black/10 bg-white p-2.5 text-black/50 hover:text-soft-primary-deep"
+        aria-label={`Project ${label}`}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  if (isCreator) {
+    return (
+      <button
+        type="button"
+        onClick={onAdd}
+        className="rounded-full border border-dashed border-black/15 bg-white p-2.5 text-black/25 transition-colors hover:border-soft-primary hover:text-soft-primary-deep"
+        aria-label={`Add ${label}`}
+        title={`Add ${label}`}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <span
+      className="rounded-full border border-dashed border-black/10 bg-white p-2.5 text-black/20"
+      title={`No ${label} set`}
+      aria-label={`No ${label} set`}
+    >
+      {children}
+    </span>
   );
 }
 

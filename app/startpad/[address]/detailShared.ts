@@ -217,6 +217,26 @@ export function buildLine(points: PricePoint[]): { time: number; value: number }
 /*  FORMATOWANIE - wylacznie warstwa widoku                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Jedna strona listy. Uzywane przez zakladke Trades, ktora dotad rosla w dol
+ * przyciskiem "Show more" - przy tokenie ze 141 transakcjami rozciagalo to
+ * strone na kilka ekranow i psulo przewijanie wszystkiego ponizej.
+ *
+ * Numer strony poza zakresem NIE jest bledem, tylko wraca do ostatniej
+ * istniejacej: lista transakcji zmienia dlugosc pod reka (zdarzenia na zywo,
+ * dociagana historia), wiec stan "jestem na stronie 7" musi przezyc to, ze
+ * stron zrobilo sie piec.
+ */
+export function pageSlice<T>(
+  items: T[],
+  page: number,
+  size: number
+): { rows: T[]; page: number; pages: number } {
+  const pages = Math.max(1, Math.ceil(items.length / size));
+  const safe = Math.min(Math.max(0, Math.floor(page)), pages - 1);
+  return { rows: items.slice(safe * size, safe * size + size), page: safe, pages };
+}
+
 export function short(value: string): string {
   return value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
 }

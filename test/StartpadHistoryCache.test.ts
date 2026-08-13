@@ -261,6 +261,27 @@ describe('uklad dokumentow cache', () => {
   });
 });
 
+describe('pageSlice', () => {
+  const { pageSlice } = require('../app/startpad/[address]/detailShared');
+  const items = [1, 2, 3, 4, 5, 6, 7];
+
+  it('oddaje zadana strone i laczna liczbe stron', () => {
+    expect(pageSlice(items, 1, 3)).to.deep.equal({ rows: [4, 5, 6], page: 1, pages: 3 });
+  });
+
+  it('ostatnia strona bywa krotsza', () => {
+    expect(pageSlice(items, 2, 3)).to.deep.equal({ rows: [7], page: 2, pages: 3 });
+  });
+
+  it('strona poza zakresem wraca do ostatniej istniejacej - lista mogla sie skrocic', () => {
+    expect(pageSlice(items, 9, 3)).to.deep.equal({ rows: [7], page: 2, pages: 3 });
+  });
+
+  it('pusta lista to jedna pusta strona, nie zero stron', () => {
+    expect(pageSlice([], 0, 3)).to.deep.equal({ rows: [], page: 0, pages: 1 });
+  });
+});
+
 describe('rpcCandidates', () => {
   const { rpcCandidates } = require('../app/api/launchpad/historyRpc');
 
@@ -492,6 +513,34 @@ describe('scanBackward', () => {
     // zeskanowany - inaczej transakcja z tego bloku przepadlaby na zawsze.
     expect(result.scannedFrom).to.equal(1_001n);
     expect(result.complete).to.equal(false);
+  });
+
+  it('z zadana rownoleglascia zbiera to samo, co okno po oknie', async () => {
+    const byBlock = { '950': [boughtLog(950n, 0)], '620': [boughtLog(620n, 0)], '10': [boughtLog(10n, 0)] };
+
+    const kolejno = await scanBackward(fakeClient(byBlock), opts());
+    const rownolegle = await scanBackward(fakeClient(byBlock), opts({ concurrency: 4 }));
+
+    expect(rownolegle.trades.map((t: any) => t.block)).to.deep.equal(kolejno.trades.map((t: any) => t.block));
+    expect(rownolegle.complete).to.equal(kolejno.complete);
+    expect(rownolegle.scannedFrom).to.equal(kolejno.scannedFrom);
+  });
+
+  it('naprawde puszcza okna rownolegle, a nie tylko udaje', async () => {
+    let inFlight = 0, peak = 0;
+    const client = {
+      getLogs: async () => {
+        inFlight += 1; peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight -= 1;
+        return [];
+      },
+    };
+
+    await scanBackward(client, opts({ concurrency: 4 }));
+
+    // Cztery okna po dwa zapytania - szczyt ma siegnac osmiu jednoczesnych.
+    expect(peak).to.be.greaterThan(2);
   });
 
   it('sklada salda z Transferow tego tokena', async () => {

@@ -63,6 +63,21 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const MAX_WINDOWS_PER_REQUEST = 40;
 
 /**
+ * Ile okien serwer puszcza NARAZ.
+ *
+ * Zimny skan to kilka-kilkanascie okien, a jego czas robily dotad KOLEJNE
+ * RUNDY, nie liczba zapytan w rundzie (zmierzone: usuniecie jednego z dwoch
+ * rownoleglych `getLogs` w oknie oszczedza -15 ms, czyli nic). Szesc okien
+ * naraz to najwyzej dwanascie zapytan w locie - miesci sie w budzecie CDP
+ * (7500 BU na 5 s, czyli 75 wywolan `eth_getLogs`) i nie zblizy sie do niego
+ * nawet przy kilku tokenach skanowanych rownoczesnie.
+ *
+ * Przegladarka zostaje na jednym oknie naraz: tam skan jest awaryjny i idzie
+ * przez publiczny RPC, ktory przy serii odpowiada "over rate limit".
+ */
+const SCAN_CONCURRENCY = 6;
+
+/**
  * Zapas pod estymowany blok startu tokena, w SEKUNDACH przeliczonych na bloki -
  * pol godziny w kazdej sieci. Ta sama wartosc, co w `useTokenHistory`: blok
  * startu liczymy z `startedAt`, a ta estymacja ma prawo sie mylic.
@@ -173,6 +188,7 @@ export async function GET(request: NextRequest) {
           window: net.scanWindow,
           maxWindows: Math.min(windows, MAX_WINDOWS_PER_REQUEST),
           estTs,
+          concurrency: SCAN_CONCURRENCY,
         });
 
         trades = mergeTrades(trades, result.trades);
