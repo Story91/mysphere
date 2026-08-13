@@ -2,10 +2,11 @@
 
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import AskCard from './AskCard';
+import AskCard, { formatAskMoney } from './AskCard';
+import AskRailRow from './AskRailRow';
 import FeedAnswerForm from './FeedAnswerForm';
 import { getOpenAsks, getResolvedAsks } from '../../utils/asks/asks';
-import { isExpired, type Ask } from '../../utils/asks/types';
+import { addTokenAmount, isExpired, type Ask, type TokenAmounts } from '../../utils/asks/types';
 
 /**
  * Aski NA FEEDZIE - wezszy pas nad lista postow.
@@ -259,10 +260,21 @@ export type FeedAskRailProps = {
    * "Answer" na jego karcie prowadzilby prosto w odmowe.
    */
   viewer?: string | null;
+  /**
+   * `row`    poziomy pas nad lista postow. Domyslny i niezmieniony.
+   * `column` ciemna karta w prawej kolumnie na ekranach od 1280px.
+   *
+   * TO JEST WYLACZNIE UKLAD. Odczyty, cache, przelacznik Open/Resolved,
+   * odsiew po terminie i miejscach, zwijanie pasa przy pisaniu odpowiedzi
+   * i obsluga awarii sa wspolne dla obu wariantow - inaczej mielibysmy dwa
+   * miejsca do naprawiania jednego bledu.
+   */
+  layout?: 'row' | 'column';
   className?: string;
 };
 
-function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
+function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskRailProps) {
+  const column = layout === 'column';
   const [openList, setOpenList] = useState<ListState>({ phase: 'loading', asks: [] });
   const [resolvedList, setResolvedList] = useState<ListState>(IDLE);
   const [openAttempt, setOpenAttempt] = useState(0);
@@ -310,13 +322,43 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
 
   // Odsiew na BIEZACYM czasie, nie na tym z chwili pobrania.
   const now = Date.now();
-  const openShown =
-    openList.phase === 'ready'
-      ? openList.asks.filter((ask) => isAnswerable(ask, now)).slice(0, SHOW_LIMIT)
-      : [];
+  /**
+   * WSZYSTKIE otwarte, w ktore da sie jeszcze wejsc - nie tylko te pokazane.
+   * Suma w naglowku liczy sie z tej listy, bo mowi o pieniadzach lezacych
+   * na stole, a nie o pieniadzach lezacych na czterech pierwszych kartach.
+   */
+  const openAnswerable =
+    openList.phase === 'ready' ? openList.asks.filter((ask) => isAnswerable(ask, now)) : [];
+  const openShown = openAnswerable.slice(0, SHOW_LIMIT);
 
   /** Odczyt sie udal i nie zostalo nic, w co da sie jeszcze wejsc. */
   const openEmpty = openList.phase === 'ready' && openShown.length === 0;
+
+  /**
+   * ===== ILE PIENIEDZY LEZY NA STOLE =====
+   *
+   * `perAnswer * (seats - acceptedCount)`, czyli miejsca JESZCZE WOLNE. Suma
+   * calych budzetow obejmowalaby takze miejsca juz zajete i oplacone, a
+   * naglowek mowi o pieniadzach, ktore nadal da sie zgarnac.
+   *
+   * PER TOKEN, a nie w jednej liczbie. `Ask.token` domyslnie to USDC
+   * i kompozytor wpisuje USDC na sztywno (useCreateAsk.ts), ale typ dopuszcza
+   * inne. Zsumowanie roznych tokenow w jedno "$17.00" byloby napisem
+   * nieprawdziwym. `addTokenAmount` jest do dokladnie tego i zwraca `false`,
+   * gdy nie bylo czego dodac - takie pozycje liczymy osobno, jako "nie wiadomo
+   * ile", zamiast wrzucac je jako zero.
+   *
+   * ZERO NOWYCH ODCZYTOW: liczone z tablicy, ktora komponent i tak juz ma.
+   */
+  const openMoney: TokenAmounts = {};
+  let unpricedCount = 0;
+  for (const ask of openAnswerable) {
+    const seatsLeft = Math.max(0, ask.seats - ask.acceptedCount);
+    if (!addTokenAmount(openMoney, ask.token, ask.perAnswer * seatsLeft)) unpricedCount += 1;
+  }
+  const moneyLines = Object.entries(openMoney).map(([token, amount]) =>
+    formatAskMoney(amount, token)
+  );
 
   /**
    * Co pas rzeczywiscie pokazuje. Reczny wybor ma pierwszenstwo; bez niego
@@ -447,6 +489,46 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
     const focused = answering ? fullList.find((item) => item.id === answering) : undefined;
     const list = focused ? [focused] : fullList;
     const single = list.length === 1;
+
+    /**
+     * WARIANT KOLUMNOWY. Ta sama lista, ten sam podzial na "odpowiadajacy
+     * zostaje, autor wychodzi" - inny tylko ksztalt wiersza i kierunek.
+     * Formularz odpowiedzi zostaje jasny i siedzi w jasnej ramce: to pole do
+     * pisania, a nie element ozdobny, i ma sie czytac tak samo jak w feedzie.
+     */
+    if (column) {
+      return (
+        <ul className="-mx-1 flex flex-col">
+          {list.map((ask) => {
+            const isAuthor = viewerAddress !== null && ask.author.toLowerCase() === viewerAddress;
+            const answerable =
+              !isAuthor &&
+              ask.status === 'open' &&
+              ask.deadline > Date.now() &&
+              ask.acceptedCount < ask.seats;
+
+            return (
+              <li key={ask.id} className="border-t border-white/10 first:border-t-0">
+                <AskRailRow
+                  ask={ask}
+                  {...(answerable ? { onAnswer: () => setAnswering(ask.id) } : { href: '/asks' })}
+                />
+                {answering === ask.id && (
+                  <div className="mx-1 mb-2 rounded-card bg-soft-surface p-2">
+                    <FeedAnswerForm
+                      ask={ask}
+                      onSent={bumpAnswerCount}
+                      onClose={() => setAnswering(null)}
+                    />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      );
+    }
+
     return (
       <div
         className={
@@ -513,31 +595,61 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
 
   return (
     <section
-      className={`font-soft ${className}`}
+      className={`font-soft ${column ? 'rounded-card bg-[#141a33] p-4 shadow-card' : ''} ${className}`}
       aria-label={shownTab === 'open' ? 'Open asks' : 'Resolved asks'}
     >
-      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-0.5">
-        <h2 className="min-w-0 font-soft-display text-[13px] font-bold text-soft-ink">
-          Asks
-          <span className="ml-1.5 font-soft text-[12px] font-normal text-soft-ink-faint">
-            questions with a budget and a deadline
-          </span>
-        </h2>
-
-        <div className="flex shrink-0 items-center gap-2.5">
-          <RailFilter value={shownTab} onPick={pick} />
-          <Link
-            href="/asks"
-            className="shrink-0 text-[12px] font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-          >
-            See all
-          </Link>
+      {column ? (
+        /* ===== NAGLOWEK KOLUMNOWY: NAJPIERW LICZBA, POTEM LISTA =====
+           Sama lista pytan nie mowi, ile tu lezy. Suma mowi to jednym rzutem
+           oka i jest policzona z tych samych Askow, ktore widac pod nia -
+           zadnego drugiego zrodla. Podpis nazywa zakres wprost, bo pas zna
+           tylko FETCH_LIMIT najnowszych otwartych Askow i nie wolno mu
+           udawac, ze zna wszystkie. */
+        <div className="mb-3">
+          <div className="mb-1.5 flex items-start justify-between gap-2">
+            <h2 className="font-soft-display text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/45">
+              {shownTab === 'open' ? 'Open asks · money on the table' : 'Resolved asks'}
+            </h2>
+            <RailFilter value={shownTab} onPick={pick} tone="dark" />
+          </div>
+          {shownTab === 'open' && moneyLines.length > 0 && (
+            <>
+              <p className="font-soft-display text-[26px] font-bold leading-none text-white">
+                {moneyLines.join(' + ')}
+              </p>
+              <p className="mt-1 font-soft text-[11px] text-white/40">
+                across {openAnswerable.length}{' '}
+                {openAnswerable.length === 1 ? 'open ask' : 'open asks'}
+                {unpricedCount > 0 ? `, ${unpricedCount} without a listed budget` : ''}
+              </p>
+            </>
+          )}
         </div>
-      </div>
+      ) : (
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-0.5">
+          <h2 className="min-w-0 font-soft-display text-[13px] font-bold text-soft-ink">
+            Asks
+            <span className="ml-1.5 font-soft text-[12px] font-normal text-soft-ink-faint">
+              questions with a budget and a deadline
+            </span>
+          </h2>
+
+          <div className="flex shrink-0 items-center gap-2.5">
+            <RailFilter value={shownTab} onPick={pick} />
+            <Link
+              href="/asks"
+              className="shrink-0 text-[12px] font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            >
+              See all
+            </Link>
+          </div>
+        </div>
+      )}
 
       {shownTab === 'open' ? (
         openList.phase === 'failed' ? (
           <FailedLine
+            tone={column ? 'dark' : 'light'}
             onRetry={retryOpen}
             message="Open asks could not be checked. This is a failed read, not an empty list. The posts below are unaffected."
           />
@@ -547,13 +659,14 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
           // Reczny wybor "Open" przy pustej liscie. Historii tu NIE
           // podstawiamy - filtr, ktory pokazuje co innego, niz na nim pisze,
           // jest gorszy niz puste miejsce. Zdanie mowi, gdzie sa tresci.
-          <QuietLine>
+          <QuietLine tone={column ? 'dark' : 'light'}>
             No open asks right now. Nothing to answer at this moment, but resolved ones are still
             on the record.
           </QuietLine>
         )
       ) : resolvedList.phase === 'failed' ? (
         <FailedLine
+          tone={column ? 'dark' : 'light'}
           onRetry={retryResolved}
           message="Resolved asks could not be loaded. This is a failed read, not an empty history. Open asks and the posts below are unaffected."
         />
@@ -561,7 +674,7 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
         // Ponowna proba po awarii NIE MOZE zwinac pasa: naglowek i filtr
         // zostaja, zmienia sie sam srodek. Jedna linia, a nie szkielet karty -
         // szkielet obiecywalby karty, ktorych moze wcale nie byc.
-        <QuietLine>Checking resolved asks…</QuietLine>
+        <QuietLine tone={column ? 'dark' : 'light'}>Checking resolved asks…</QuietLine>
       ) : resolvedShown.length > 0 ? (
         /*
           ===== HISTORIA SIEDZI W ZAGLEBIENIU =====
@@ -570,8 +683,18 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
           a nie jak kafelek do klikniecia. Zadnego nowego koloru, zadnego
           akcentu - uzasadnienie przy DECYZJI 5.
         */
-        <div className="rounded-card border border-soft-line bg-soft-sunken p-2.5 sm:p-3">
-          <p className="mb-2 px-0.5 text-[11.5px] leading-[1.45] text-soft-ink-muted">
+        <div
+          className={
+            column
+              ? 'rounded-xl bg-white/[0.05] p-2'
+              : 'rounded-card border border-soft-line bg-soft-sunken p-2.5 sm:p-3'
+          }
+        >
+          <p
+            className={`mb-2 px-0.5 text-[11.5px] leading-[1.45] ${
+              column ? 'text-white/55' : 'text-soft-ink-muted'
+            }`}
+          >
             Closed and paid. Nothing to answer here: each accepted answer already carries the
             transaction that paid for it.
           </p>
@@ -581,6 +704,7 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
         // Historia jest pusta, a otwartych NIE UDALO SIE sprawdzic. Nie wolno
         // tu napisac "nikt jeszcze nie zalozyl Aska" - tego wlasnie nie wiemy.
         <FailedLine
+          tone={column ? 'dark' : 'light'}
           onRetry={retryOpen}
           message="No resolved asks yet, and open asks could not be checked. This is a failed read, not an empty list. The posts below are unaffected."
         />
@@ -588,7 +712,7 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
         // Historia pusta, ale otwarte SA - ktos siegnal po nia sam. "No asks
         // yet" bylo by tu klamstwem o produkcie, wiec mowimy dokladnie tyle,
         // ile wiemy, i wskazujemy druga pigulke.
-        <QuietLine>
+        <QuietLine tone={column ? 'dark' : 'light'}>
           Nothing has been resolved yet. Asks that get closed and paid land here; the open ones are
           under Open.
         </QuietLine>
@@ -596,16 +720,32 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
         // ===== PUSTY RYNEK TRZEBA NAZWAC =====
         // Obie listy odczytane, obie puste. To jedyny moment, w ktorym pas nie
         // ma zadnego Aska - i najlepszy, zeby powiedziec, po co on jest.
-        <QuietLine>
+        <QuietLine tone={column ? 'dark' : 'light'}>
           No asks yet. An ask is a question with a budget, a deadline and a fixed number of seats.
           Answers stay sealed until the author resolves and pays.{' '}
           <Link
             href="/asks"
-            className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className={`font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 ${
+              column
+                ? 'text-soft-accent focus-visible:ring-soft-accent'
+                : 'text-soft-primary-deep focus-visible:ring-soft-primary'
+            }`}
           >
             See how asks work
           </Link>
         </QuietLine>
+      )}
+
+      {column && (
+        /* Jedno wyjscie z karty. Prowadzi na /asks, bo tam jest cala lista,
+           zakladanie wlasnego Aska i rozstrzyganie. Napis mowi, co sie stanie
+           po klinieciu, a nie jak sie nazywa strona docelowa. */
+        <Link
+          href="/asks"
+          className="mt-3 block rounded-pill bg-soft-accent px-4 py-2.5 text-center font-soft-display text-[12px] font-bold uppercase tracking-[0.1em] text-[#1a1f3a] transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[#141a33]"
+        >
+          {shownTab === 'open' ? 'Answer an ask' : 'See all asks'}
+        </Link>
       )}
     </section>
   );
@@ -620,17 +760,28 @@ function FeedAskRail({ viewer = null, className = '' }: FeedAskRailProps) {
  * lezy w zaglebieniu. Ruch wylacznie na transform, czas przez zmienna -
  * `duration-[--dur-press]` NIE KOMPILUJE SIE i nie wolno go tu wpisac.
  */
-function RailFilter({ value, onPick }: { value: RailTab; onPick: (next: RailTab) => void }) {
+function RailFilter({
+  value,
+  onPick,
+  tone = 'light',
+}: {
+  value: RailTab;
+  onPick: (next: RailTab) => void;
+  tone?: 'light' | 'dark';
+}) {
   const options: { key: RailTab; label: string }[] = [
     { key: 'open', label: 'Open' },
     { key: 'resolved', label: 'Resolved' },
   ];
+  const dark = tone === 'dark';
 
   return (
     <div
       role="group"
       aria-label="Filter asks"
-      className="flex shrink-0 items-center gap-0.5 rounded-pill border border-soft-line bg-soft-sunken p-0.5"
+      className={`flex shrink-0 items-center gap-0.5 rounded-pill p-0.5 ${
+        dark ? 'bg-white/10' : 'border border-soft-line bg-soft-sunken'
+      }`}
     >
       {options.map((option) => {
         const active = option.key === value;
@@ -641,7 +792,13 @@ function RailFilter({ value, onPick }: { value: RailTab; onPick: (next: RailTab)
             aria-pressed={active}
             onClick={() => onPick(option.key)}
             className={`rounded-pill px-2.5 py-[3px] font-soft-display text-[11px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-1 focus-visible:ring-offset-soft-bg ${
-              active ? 'bg-soft-surface text-soft-ink shadow-chip' : 'text-soft-ink-faint'
+              active
+                ? dark
+                  ? 'bg-white/90 text-[#141a33]'
+                  : 'bg-soft-surface text-soft-ink shadow-chip'
+                : dark
+                  ? 'text-white/50'
+                  : 'text-soft-ink-faint'
             }`}
           >
             {option.label}
@@ -657,28 +814,55 @@ function RailFilter({ value, onPick }: { value: RailTab; onPick: (next: RailTab)
  * produktu - pas ma zajmowac miejsce takze wtedy, gdy nie ma czego pokazac,
  * bo znikanie uczylo ludzi, ze tej funkcji nie ma.
  */
-function QuietLine({ children }: { children: ReactNode }) {
+function QuietLine({ children, tone = 'light' }: { children: ReactNode; tone?: 'light' | 'dark' }) {
   return (
-    <p className="rounded-card border border-soft-line bg-soft-surface px-4 py-3 text-[12.5px] leading-[1.5] text-soft-ink-muted shadow-card">
+    <p
+      className={
+        tone === 'dark'
+          ? 'rounded-xl bg-white/[0.06] px-3.5 py-3 text-[12.5px] leading-[1.5] text-white/70'
+          : 'rounded-card border border-soft-line bg-soft-surface px-4 py-3 text-[12.5px] leading-[1.5] text-soft-ink-muted shadow-card'
+      }
+    >
       {children}
     </p>
   );
 }
 
 /** Awaria ma wlasny slad na ekranie i wlasne wyjscie - nigdy nie udaje pustki. */
-function FailedLine({ message, onRetry }: { message: string; onRetry: () => void }) {
+function FailedLine({
+  message,
+  onRetry,
+  tone = 'light',
+}: {
+  message: string;
+  onRetry: () => void;
+  tone?: 'light' | 'dark';
+}) {
+  const dark = tone === 'dark';
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-card border border-soft-line bg-soft-surface px-4 py-3 shadow-card"
+      className={
+        dark
+          ? 'flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl bg-white/[0.06] px-3.5 py-3'
+          : 'flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-card border border-soft-line bg-soft-surface px-4 py-3 shadow-card'
+      }
     >
-      <p className="min-w-0 flex-1 break-words text-[12.5px] leading-[1.5] text-soft-ink-muted">
+      <p
+        className={`min-w-0 flex-1 break-words text-[12.5px] leading-[1.5] ${
+          dark ? 'text-white/70' : 'text-soft-ink-muted'
+        }`}
+      >
         {message}
       </p>
       <button
         type="button"
         onClick={onRetry}
-        className="shrink-0 rounded-lg bg-soft-primary px-3.5 py-1.5 font-soft-display text-[12px] font-semibold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+        className={`shrink-0 rounded-lg px-3.5 py-1.5 font-soft-display text-[12px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 ${
+          dark
+            ? 'bg-soft-accent text-[#1a1f3a] focus-visible:ring-soft-accent'
+            : 'bg-soft-primary text-white focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface'
+        }`}
       >
         Try again
       </button>
