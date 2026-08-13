@@ -258,7 +258,9 @@ export default function ShareToken({
     ) : (
       <button
         {...triggerProps}
-        aria-label={`Share ${symbol}`}
+        // W trybie tablicy `symbol` jest pusty, wiec sama interpolacja dawala
+        // czytnikowi ekranu "Share " i nic wiecej.
+        aria-label={board ? `Share ${board.label}` : `Share ${symbol}`}
         className={`rounded-full p-1.5 transition-colors ${
           open ? 'bg-sp-brand-soft text-sp-brand-deep' : 'text-sp-shade/30 hover:bg-sp-brand-soft hover:text-sp-brand-deep'
         }`}
@@ -275,15 +277,19 @@ export default function ShareToken({
       <div
         ref={menuRef}
         role="menu"
-        aria-label={`Share ${symbol}`}
+        aria-label={board ? `Share ${board.label}` : `Share ${symbol}`}
         style={{ position: 'fixed', top: spot.top, left: spot.left, width: MENU_WIDTH }}
         className="z-[60] rounded-[20px] border border-sp-shade/8 bg-sp-surface p-2 shadow-[0_20px_50px_rgba(20,16,40,0.18)]"
       >
         {/* Naglowek mowi, CO sie udostepnia. Bez niego menu otwarte nad
             sasiednim kafelkiem nie ma zwiazku z tokenem, ktorego dotyczy. */}
         <div className="flex items-center justify-between gap-2 px-1.5 pb-1.5 pt-0.5">
-          <span className="truncate text-[12.5px] font-extrabold text-sp-ink">${symbol}</span>
-          {multiple && (
+          {/* Tablica ma nazwe sieci, token symbol z dolarem. Sama interpolacja
+              dawala w trybie tablicy goly znak dolara. */}
+          <span className="truncate text-[12.5px] font-extrabold text-sp-ink">
+            {board ? board.label : `$${symbol}`}
+          </span>
+          {!board && multiple && (
             <span
               className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
                 up ? 'bg-sp-up-soft text-sp-up' : 'bg-sp-down-soft text-sp-down-deep'

@@ -2283,7 +2283,11 @@ export default function LaunchpadBoard() {
                     label: ACTIVE_LAUNCHPAD_NETWORK.label,
                     tokens: tokens.filter((token) => token.live).length,
                   }}
-                  className="px-2.5"
+                  // Wewnetrzny przycisk ma wlasny, maly padding - bez tego
+                  // opakowania siedzial przy GORNEJ krawedzi paska zamiast na
+                  // jego srodku, bo `items-stretch` rozciaga go na cala
+                  // wysokosc, a on rysuje sie od gory.
+                  className="inline-flex items-center px-2"
                 />
                 <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-sp-shade/10" />
                 <button type="button" onClick={() => setLaunchOpen(true)} className="inline-flex items-center gap-2 bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand transition-[background-color,transform] hover:bg-soft-primary-deep active:scale-[0.98]"><Plus className="h-4 w-4" aria-hidden="true" /> Launch</button>
