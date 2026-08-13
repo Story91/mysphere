@@ -60,6 +60,32 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // CACHE HISTORII TOKENA LAUNCHPADA
+    // ========================================================================
+    // Odtworzona z logow historia jednego tokena: transakcje krzywej i salda
+    // holderow. Zrodlem prawdy jest lancuch, ta kolekcja jest wylacznie
+    // przyspieszeniem - patrz app/api/launchpad/historyStore.ts.
+    //
+    // ODCZYT jest jawny, bo to publiczne logi. ZAPIS nalezy wylacznie do
+    // serwera (/api/launchpad/history), ktory sam je skanuje. Gdyby pisala tu
+    // przegladarka, dalo by sie narysowac dowolny wykres i dowolna liste
+    // transakcji dowolnego tokena - a to jest pierwsza rzecz, ktora widzi
+    // ktos decydujacy o zakupie.
+    //
+    // Wiersze leza w podkolekcji `parts`, stad druga regula. Nazwa kolekcji
+    // JEST na liscie w `hasOwnRules` - bez tego obie te reguly byly by martwa
+    // dekoracja, dokladnie jak opisuje akapit wyzej.
+    match /launchpadHistory/{tokenKey} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /launchpadHistory/{tokenKey}/{rest=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ========================================================================
     // REJESTR AGENTOW
     // ========================================================================
     // docId = adres wlasciciela, lowercase. Dzieki temu dopasowanie autora
@@ -531,7 +557,8 @@ service cloud.firestore {
         'tips',
         'curatorWatch',
         'curatorChanges',
-        'launchpadTokens'
+        'launchpadTokens',
+        'launchpadHistory'
       ];
     }
 

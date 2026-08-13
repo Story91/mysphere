@@ -1,60 +1,70 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { getAbiItem, type Address } from 'viem';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { type Address } from 'viem';
 import { usePublicClient } from 'wagmi';
 import {
   ACTIVE_LAUNCHPAD_NETWORK,
-  erc20Abi,
   LAUNCHPAD_ADDRESS,
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_DEPLOY_BLOCK,
-  launchpadAbi,
 } from '../config';
+import { loadTokenHistory, saveTokenHistory } from '../snapshot';
 import {
   DEAD_ADDRESS,
   POOL_MANAGER_ADDRESS,
   priceWeiAfter,
   SECONDS_PER_BLOCK,
-  ZERO_ADDRESS,
   type TradeEntry,
 } from './detailShared';
+import {
+  applyBalanceDelta,
+  applyTradeToBalances,
+  mergeTrades,
+  parseBalances,
+  parseTrades,
+  scanBackward,
+  serializeBalances,
+  serializeTrades,
+} from './historyScan';
 
 /**
- * Historia jednego tokena odtworzona z logow: transakcje krzywej (Bought/Sold
- * launchpada) i salda holderow (Transfer ERC-20). Oba skany ida TYMI SAMYMI
- * oknami, ktorych rozmiar bierze sie Z KONFIGURACJI SIECI.
+ * Historia jednego tokena: transakcje krzywej (wykres, lista) i salda holderow.
  *
- * Do 2026-08-13 stalo tu twarde 1900 x 64 okien (limit publicznego RPC Base).
- * Na Robinhoodzie, gdzie blok trwa 0,1 s, dawalo to okolo TRZECH MINUT
- * historii - wykres i lista transakcji tokena byly tam puste, mimo ze logi
- * stoja na lancuchu. Te same wartosci co tablica rynku (patrz config.ts).
+ * ===========================================================================
+ * SKAD TE DANE PRZYCHODZA - I DLACZEGO TO SIE ZMIENILO
+ * ===========================================================================
+ * Do 2026-08-13 KAZDE wejscie na strone tokena odtwarzalo cala historie od
+ * zera: schodzenie oknami po ~1900 blokow wstecz, dwa `getLogs` na okno, jedno
+ * okno po drugim, az do bloku startu tokena. Na Base jedno okno to okolo
+ * godziny lancucha, wiec token zyjacy trzy dni znaczyl ~70 kolejek zanim
+ * cokolwiek pokazalo sie na wykresie. Na tokenie z ruchem strona sie przez to
+ * zacinala, i tym mocniej, im dluzej token zyl.
+ *
+ * Teraz sa trzy zrodla, w tej kolejnosci:
+ *   1. MIGAWKA z localStorage - maluje wykres natychmiast, jeszcze przed siecia;
+ *   2. `/api/launchpad/history` - wspolny cache; oddaje gotowa historie, a od
+ *      bloku z migawki dosyla tylko ROZNICE;
+ *   3. SKAN Z PRZEGLADARKI - dokladnie to, co bylo tu wczesniej, uzywane gdy
+ *      trasa cache'u nie odpowiada. Awaria cache'u ma znaczyc "wolniej", nigdy
+ *      "pusto".
+ *
+ * Zdarzenia na zywo (`applyLive`) doklejaja sie do tego, co juz jest na
+ * ekranie, i nie zaleza od zadnego z tych trzech zrodel.
  */
+
+/** Rozmiar okna skanu awaryjnego - limit `getLogs` danej sieci. */
 const LOG_WINDOW = ACTIVE_LAUNCHPAD_NETWORK.scanWindow;
 
-/**
- * Sufit okien. Skan i tak zwykle konczy sie wczesniej: schodzimy wstecz tylko
- * do bloku startu tokena (estymowanego ze startedAt), a zdarzenie Launched
- * urywa petle w chwili, gdy je zobaczymy - starszych logow tego tokena z
- * definicji nie ma.
- */
+/** Sufit okien skanu awaryjnego. */
 const MAX_LOG_WINDOWS = ACTIVE_LAUNCHPAD_NETWORK.maxScanWindows;
 
 /**
- * Margines pod estymowany blok startu, w SEKUNDACH przeliczonych na bloki.
- *
- * Bylo 900 blokow na sztywno - na Base to ~30 minut zapasu, ale na
- * Robinhoodzie (0,1 s/blok) raptem 90 sekund, czyli za malo, zeby pokryc blad
- * estymacji. Liczymy wiec z czasu: pol godziny zapasu w kazdej sieci.
+ * Zapas pod estymowany blok startu, w SEKUNDACH przeliczonych na bloki - pol
+ * godziny w kazdej sieci. Blok startu liczymy z `startedAt`, a ta estymacja ma
+ * prawo sie mylic (na Robinhoodzie blok trwa 0,1 s, na Base 2 s).
  */
 const LAUNCH_BLOCK_MARGIN = BigInt(Math.ceil(1800 / SECONDS_PER_BLOCK));
-
-const LAUNCHED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Launched' });
-const BOUGHT_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Bought' });
-const SOLD_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Sold' });
-const LOCKED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'CurveLocked' });
-const GRADUATED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Graduated' });
-const TRANSFER_EVENT = getAbiItem({ abi: erc20Abi, name: 'Transfer' });
 
 /** Ksztalt loga z watchContractEvent - dekodowany, ale traktowany ostroznie. */
 export type LiveLaunchpadLog = {
@@ -74,7 +84,7 @@ export type TokenHistory = {
   /** Adres (lowercase) -> saldo w wei tokena. Zawiera kontrakty i dEaD. */
   balances: Map<string, bigint>;
   graduatedTs: number | null;
-  /** Skan uderzyl w sufit okien - historia na ekranie jest ucieta od dolu. */
+  /** Historia nie siega jeszcze startu tokena - jest ucieta od dolu. */
   truncated: boolean;
 };
 
@@ -88,132 +98,158 @@ const EMPTY: TokenHistory = {
   truncated: false,
 };
 
-function applyBalanceDelta(balances: Map<string, bigint>, account: string, delta: bigint) {
-  const key = account.toLowerCase();
-  if (key === ZERO_ADDRESS) return;
-  balances.set(key, (balances.get(key) ?? 0n) + delta);
-}
-
-/** Skutek transakcji dla saldo: krzywa oddaje tokeny kupujacemu i odbiera od sprzedajacego. */
-function applyTradeToBalances(balances: Map<string, bigint>, trade: TradeEntry) {
-  const curve = LAUNCHPAD_ADDRESS.toLowerCase();
-  if (trade.kind === 'buy') {
-    applyBalanceDelta(balances, trade.account, trade.tokens);
-    applyBalanceDelta(balances, curve, -trade.tokens);
-  } else {
-    applyBalanceDelta(balances, trade.account, -trade.tokens);
-    applyBalanceDelta(balances, curve, trade.tokens);
-  }
-}
+type CacheResponse = {
+  highBlock?: string;
+  complete?: boolean;
+  graduatedTs?: number | null;
+  trades?: unknown;
+  balances?: unknown;
+};
 
 export function useTokenHistory(tokenAddress: Address | null, startedAt: number | null) {
   const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
   const [state, setState] = useState<TokenHistory>(EMPTY);
 
+  /**
+   * Ostatnio ZNANY stan pokrycia: do ktorego bloku mamy historie i czy mamy ja
+   * w calosci. Trzymany w ref, a nie w stanie, bo sluzy wylacznie do zbudowania
+   * nastepnego zapytania - przerysowanie ekranu od tego nie zalezy.
+   */
+  const coverage = useRef<{ highBlock: string; full: boolean } | null>(null);
+
+  // Migawka maluje wykres, zanim cokolwiek poleci po sieci. Osobny efekt, bo
+  // ma zdazyc przy PIERWSZYM renderze tokena, a nie po odpowiedzi serwera.
+  useEffect(() => {
+    coverage.current = null;
+    if (!tokenAddress) return;
+    const snapshot = loadTokenHistory(LAUNCHPAD_CHAIN.id, tokenAddress);
+    if (!snapshot) {
+      setState(EMPTY);
+      return;
+    }
+    coverage.current = { highBlock: snapshot.highBlock, full: snapshot.full };
+    setState({
+      loading: true,
+      loaded: true,
+      error: null,
+      trades: parseTrades(snapshot.trades),
+      balances: parseBalances(snapshot.balances),
+      graduatedTs: snapshot.graduatedTs,
+      truncated: !snapshot.complete,
+    });
+  }, [tokenAddress]);
+
+  /**
+   * Skan awaryjny - kod sprzed cache'u. Wolany WYLACZNIE wtedy, gdy trasa
+   * `/api/launchpad/history` nie odpowiada.
+   */
+  const scanFromChain = useCallback(async (token: Address, started: number) => {
+    if (!readClient) throw new Error('No RPC client.');
+
+    // Jeden getBlock na caly skan. Czas kazdego loga liczymy z roznicy numerow
+    // blokow - pobieranie timestampu kazdego bloku zamieniloby skan w setki
+    // dodatkowych zadan.
+    const anchor = await readClient.getBlock({ blockTag: 'latest' });
+    const anchorBlock = anchor.number;
+    const anchorTs = Number(anchor.timestamp);
+    const estTs = (block: bigint) =>
+      Math.max(started, anchorTs - Number(anchorBlock - block) * SECONDS_PER_BLOCK);
+
+    const ageBlocks = BigInt(Math.max(0, Math.floor((anchorTs - started) / SECONDS_PER_BLOCK)));
+    const estLaunchBlock = anchorBlock > ageBlocks ? anchorBlock - ageBlocks : 0n;
+    const candidate = estLaunchBlock > LAUNCH_BLOCK_MARGIN ? estLaunchBlock - LAUNCH_BLOCK_MARGIN : 0n;
+    const floor = candidate > LAUNCHPAD_DEPLOY_BLOCK ? candidate : LAUNCHPAD_DEPLOY_BLOCK;
+
+    const result = await scanBackward(readClient, {
+      launchpad: LAUNCHPAD_ADDRESS,
+      token,
+      head: anchorBlock,
+      floor,
+      window: LOG_WINDOW,
+      maxWindows: MAX_LOG_WINDOWS,
+      estTs,
+    });
+
+    return { result, anchorBlock };
+  }, [readClient]);
+
   const load = useCallback(async () => {
-    if (!readClient || !tokenAddress || startedAt === null) return;
+    if (!tokenAddress || startedAt === null) return;
     setState((prev) => ({ ...prev, loading: true, error: null }));
+
+    // Roznice wolno prosic TYLKO wtedy, gdy migawka trzyma komplet historii -
+    // przyciety ogon plus sama roznica dalby wykres z dziura na poczatku.
+    const since = coverage.current?.full ? coverage.current.highBlock : null;
+
     try {
-      // Jeden getBlock na caly skan. Czas kazdego loga liczymy z roznicy
-      // numerow blokow (~2 s/blok) - pobieranie timestampu kazdego bloku
-      // zamieniloby skan w setki dodatkowych requestow.
-      const anchor = await readClient.getBlock({ blockTag: 'latest' });
-      const anchorBlock = anchor.number;
-      const anchorTs = Number(anchor.timestamp);
-      const estTs = (block: bigint) =>
-        Math.max(startedAt, anchorTs - Number(anchorBlock - block) * SECONDS_PER_BLOCK);
+      const query = new URLSearchParams({
+        chainId: String(LAUNCHPAD_CHAIN.id),
+        token: tokenAddress,
+        startedAt: String(startedAt),
+      });
+      if (since) query.set('sinceBlock', since);
 
-      const ageBlocks = BigInt(Math.max(0, Math.floor((anchorTs - startedAt) / SECONDS_PER_BLOCK)));
-      const estLaunchBlock = anchorBlock > ageBlocks ? anchorBlock - ageBlocks : 0n;
-      const floorCandidate = estLaunchBlock > LAUNCH_BLOCK_MARGIN ? estLaunchBlock - LAUNCH_BLOCK_MARGIN : 0n;
-      const floor = floorCandidate > LAUNCHPAD_DEPLOY_BLOCK ? floorCandidate : LAUNCHPAD_DEPLOY_BLOCK;
+      const response = await fetch(`/api/launchpad/history?${query.toString()}`);
+      if (!response.ok) throw new Error(`History cache responded ${response.status}.`);
+      const data = (await response.json()) as CacheResponse;
 
-      const wanted = tokenAddress.toLowerCase();
-      const trades: TradeEntry[] = [];
-      const balances = new Map<string, bigint>();
-      let graduatedTs: number | null = null;
-      let sawLaunched = false;
-      let truncated = false;
+      const incoming = parseTrades(Array.isArray(data.trades) ? data.trades : []);
+      const balances = parseBalances(Array.isArray(data.balances) ? data.balances : []);
+      const highBlock = typeof data.highBlock === 'string' ? data.highBlock : '0';
+      const complete = data.complete === true;
+      const graduatedTs = typeof data.graduatedTs === 'number' ? data.graduatedTs : null;
 
-      let toBlock = anchorBlock;
-      for (let window = 0; window < MAX_LOG_WINDOWS && toBlock >= floor; window += 1) {
-        const fromBlock = toBlock > floor + LOG_WINDOW ? toBlock - LOG_WINDOW : floor;
-        const [launchpadLogs, transferLogs] = await Promise.all([
-          readClient.getLogs({
-            address: LAUNCHPAD_ADDRESS as Address,
-            events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, LOCKED_EVENT, GRADUATED_EVENT],
-            fromBlock,
-            toBlock,
-          }),
-          readClient.getLogs({ address: tokenAddress, event: TRANSFER_EVENT, fromBlock, toBlock }),
-        ]);
-
-        for (const log of transferLogs) {
-          const from = log.args.from as string | undefined;
-          const to = log.args.to as string | undefined;
-          const value = log.args.value as bigint | undefined;
-          if (value === undefined) continue;
-          if (from) applyBalanceDelta(balances, from, -value);
-          if (to) applyBalanceDelta(balances, to, value);
-        }
-
-        for (const log of launchpadLogs) {
-          const token = log.args.token as Address | undefined;
-          if (!token || token.toLowerCase() !== wanted) continue;
-          const id = `${log.transactionHash ?? 'log'}-${String(log.logIndex ?? 0)}`;
-          if (log.eventName === 'Launched') {
-            sawLaunched = true;
-          } else if (log.eventName === 'Bought' || log.eventName === 'Sold') {
-            const isBuy = log.eventName === 'Bought';
-            const args = log.args as Record<string, unknown>;
-            const account = (isBuy ? args.buyer : args.seller) as Address | undefined;
-            const eth = (isBuy ? args.ethNet : args.ethOut) as bigint | undefined;
-            const tokens = (isBuy ? args.tokensOut : args.tokensIn) as bigint | undefined;
-            const reserveAfter = args.ethReserveAfter as bigint | undefined;
-            const tokenReserveAfter = args.tokenReserveAfter as bigint | undefined;
-            if (!account || eth === undefined || tokens === undefined || reserveAfter === undefined || tokenReserveAfter === undefined) continue;
-            trades.push({
-              id,
-              kind: isBuy ? 'buy' : 'sell',
-              account,
-              eth,
-              tokens,
-              priceWei: priceWeiAfter(reserveAfter, tokenReserveAfter),
-              ethReserveAfter: reserveAfter,
-              block: log.blockNumber,
-              logIndex: Number(log.logIndex ?? 0),
-              ts: estTs(log.blockNumber),
-              txHash: log.transactionHash,
-            });
-          } else if (log.eventName === 'Graduated') {
-            graduatedTs = estTs(log.blockNumber);
-          }
-        }
-
-        if (fromBlock === floor || sawLaunched) break;
-        toBlock = fromBlock - 1n;
-        if (window === MAX_LOG_WINDOWS - 1 && toBlock >= floor) truncated = true;
-      }
-
-      trades.sort((a, b) =>
-        a.block === b.block ? a.logIndex - b.logIndex : a.block < b.block ? -1 : 1
-      );
+      // Roznicy wolno prosic dopiero wtedy, gdy cache siega startu tokena.
+      // Dopoki nie siega, brakujace transakcje leza PONIZEJ `highBlock`, wiec
+      // pytanie o sama roznice nigdy by ich nie przynioslo.
+      coverage.current = { highBlock, full: complete };
 
       setState((prev) => {
-        // Zywe logi potrafia przyjsc W TRAKCIE skanu i byc nowsze niz jego
-        // kotwica - nadpisanie stanu golym wynikiem skanu by je zgubilo.
-        // Doklejamy wiec te, ktorych skan nie mogl widziec.
-        const scanned = new Set(trades.map((trade) => trade.id));
-        const keep = prev.trades.filter((trade) => !scanned.has(trade.id) && trade.block > anchorBlock);
-        for (const trade of keep) applyTradeToBalances(balances, trade);
+        // Przy zapytaniu o roznice podstawa jest to, co juz na ekranie; przy
+        // pelnym - wylacznie odpowiedz serwera, zeby stara migawka nie
+        // przetrzymala transakcji, ktorej lancuch juz nie ma.
+        const base = since ? prev.trades : [];
+        const trades = mergeTrades(base, incoming);
+
+        // Zdarzenia na zywo potrafia przyjsc W TRAKCIE zapytania i byc nowsze
+        // niz cache. Doklejamy te, ktorych serwer nie mogl widziec.
+        const head = BigInt(highBlock);
+        const seen = new Set(trades.map((trade) => trade.id));
+        const live = prev.trades.filter((trade) => !seen.has(trade.id) && trade.block > head);
+        for (const trade of live) applyTradeToBalances(balances, trade, LAUNCHPAD_ADDRESS.toLowerCase());
+
+        const merged = live.length ? mergeTrades(trades, live) : trades;
         return {
           loading: false,
           loaded: true,
           error: null,
-          trades: [...trades, ...keep],
+          trades: merged,
           balances,
           graduatedTs: graduatedTs ?? prev.graduatedTs,
-          truncated,
+          truncated: !complete,
+        };
+      });
+      return;
+    } catch {
+      // Cache padl - schodzimy do skanu z przegladarki. Wolniej, ale strona
+      // pokazuje historie zamiast bledu.
+    }
+
+    try {
+      const { result, anchorBlock } = await scanFromChain(tokenAddress, startedAt);
+      coverage.current = { highBlock: anchorBlock.toString(), full: result.complete };
+      setState((prev) => {
+        const seen = new Set(result.trades.map((trade) => trade.id));
+        const live = prev.trades.filter((trade) => !seen.has(trade.id) && trade.block > anchorBlock);
+        for (const trade of live) applyTradeToBalances(result.balances, trade, LAUNCHPAD_ADDRESS.toLowerCase());
+        return {
+          loading: false,
+          loaded: true,
+          error: null,
+          trades: live.length ? mergeTrades(result.trades, live) : result.trades,
+          balances: result.balances,
+          graduatedTs: result.graduatedTs ?? prev.graduatedTs,
+          truncated: !result.complete,
         };
       });
     } catch (cause) {
@@ -223,16 +259,34 @@ export function useTokenHistory(tokenAddress: Address | null, startedAt: number 
         error: cause instanceof Error ? cause.message.split('\n')[0] : String(cause),
       }));
     }
-  }, [readClient, startedAt, tokenAddress]);
+  }, [scanFromChain, startedAt, tokenAddress]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   /**
-   * Doklada pojedyncze zdarzenia z watchContractEvent do stanu, ktory juz
-   * jest na ekranie - bez ponownego skanu. Wolajacy MUSI podac wylacznie
-   * logi tego tokena.
+   * Zapis migawki - PO ustaleniu stanu, nie w jego reduktorze. Dzieki temu
+   * localStorage dostaje tez transakcje z `applyLive`, a podwojne wywolanie
+   * reduktora (React w trybie scislym) niczego nie zapisuje dwa razy.
+   */
+  useEffect(() => {
+    const cover = coverage.current;
+    if (!tokenAddress || !cover || state.loading || !state.loaded || state.error) return;
+    saveTokenHistory(LAUNCHPAD_CHAIN.id, tokenAddress, {
+      highBlock: cover.highBlock,
+      complete: !state.truncated,
+      graduatedTs: state.graduatedTs,
+      trades: serializeTrades(state.trades),
+      balances: serializeBalances(state.balances),
+      full: cover.full,
+    });
+  }, [state, tokenAddress]);
+
+  /**
+   * Doklada pojedyncze zdarzenia z watchContractEvent do stanu, ktory juz jest
+   * na ekranie - bez ponownego skanu. Wolajacy MUSI podac wylacznie logi tego
+   * tokena.
    */
   const applyLive = useCallback((logs: LiveLaunchpadLog[]) => {
     setState((prev) => {
@@ -242,6 +296,7 @@ export function useTokenHistory(tokenAddress: Address | null, startedAt: number 
       const mutable = () => (balances ??= new Map(prev.balances));
       let graduatedTs = prev.graduatedTs;
       const now = Math.floor(Date.now() / 1000);
+      const curve = LAUNCHPAD_ADDRESS.toLowerCase();
 
       for (const log of logs) {
         const name = log.eventName;
@@ -271,7 +326,7 @@ export function useTokenHistory(tokenAddress: Address | null, startedAt: number 
           };
           seen.add(id);
           fresh.push(entry);
-          applyTradeToBalances(mutable(), entry);
+          applyTradeToBalances(mutable(), entry, curve);
         } else if (name === 'Graduated') {
           graduatedTs = graduatedTs ?? now;
           // Graduacja przenosi tokeny krzywej do puli i na adres spalenia.
@@ -280,7 +335,6 @@ export function useTokenHistory(tokenAddress: Address | null, startedAt: number 
           const toPool = args.tokensToPool as bigint | undefined;
           const toDead = args.tokensToDead as bigint | undefined;
           if (toPool !== undefined && toDead !== undefined) {
-            const curve = LAUNCHPAD_ADDRESS.toLowerCase();
             applyBalanceDelta(mutable(), curve, -(toPool + toDead));
             applyBalanceDelta(mutable(), POOL_MANAGER_ADDRESS, toPool);
             applyBalanceDelta(mutable(), DEAD_ADDRESS, toDead);

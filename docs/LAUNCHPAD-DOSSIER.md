@@ -4,7 +4,7 @@
 > launchpada — kontraktów, opłat, adresów lub UI, jeśli zmienia zachowanie opisane
 > tutaj. Stan wdrożenia i adresy: `docs/LAUNCHPAD-STAN.md`.
 >
-> Last updated: 2026-08-11 (v3 + internal-audit addendum, §7) · deployments: `0x4Cc0...1A48` (Base Sepolia,
+> Last updated: 2026-08-13 (v3 + internal-audit addendum §7; token-history cache §5) · deployments: `0x4Cc0...1A48` (Base Sepolia,
 > B20 tokens) and `0x712E...B22f` (Robinhood Chain MAINNET, plain ERC-20 tokens
 > — no B20 precompile there; same rules, all four contracts verified on
 > Blockscout, smoke-tested with real transactions; the frontend has a network
@@ -136,6 +136,18 @@ token.
   every board visit flushes. Until the server confirms the logo, the creator's
   own board says so ("Logo not public yet") instead of pretending everyone
   sees it.
+- **The chart is cached, the money is not.** A token's price chart, trade list
+  and holder table are rebuilt from public logs (`Bought`/`Sold`/`Transfer`).
+  Until 2026-08-13 the browser re-scanned that history from scratch on every
+  visit — dozens of sequential `getLogs` windows back to the launch block,
+  which made a busy token's page stall. Now `/api/launchpad/history` scans
+  once, server-side, into `launchpadHistory` (Firestore, chunked at 1000 trades
+  per document), and every later visit pulls only the blocks the cache does not
+  cover yet. That collection is server-write-only (`firestore.rules`), and when
+  it is unreachable the browser falls back to the old scan — a cache failure
+  means *slower*, never *empty*. Nothing priced comes from it: spot price,
+  reserves, curve state and your own balance are still read straight from the
+  chain on every load.
 
 ## 6. Contracts
 
