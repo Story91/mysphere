@@ -218,6 +218,69 @@ export function buildLine(points: PricePoint[]): { time: number; value: number }
 /* -------------------------------------------------------------------------- */
 
 /**
+ * BUFOR POSLIZGU - do wyboru przez uzytkownika, w setnych procenta.
+ *
+ * Stalo tu na sztywno 50 (0,5%) i to bylo za malo o rzad wielkosci. 13 sierpnia
+ * 2026 na tokenie SAUSAGES padalo 28% sprzedazy i 15% zakupow: rezerwa krzywej
+ * spadala z 0,2136 do 0,0822 ETH w kilkanascie minut, wiec jedna cudza
+ * transakcja miedzy odczytem wyceny a wejsciem do bloku wystarczala, zeby
+ * minimum przestalo byc osiagalne. Jedna z nieudanych sprzedazy miala minimum
+ * 14,8% powyzej tego, co krzywa wtedy placila.
+ *
+ * Dlatego to jest WYBOR, a nie stala: na krzywej z ruchem zadna jedna liczba
+ * nie jest dobra dla wszystkich, a uzytkownik ma prawo wiedziec, na ile
+ * gorsza cene sie godzi.
+ */
+export const SLIPPAGE_OPTIONS = [100, 300, 500] as const;
+export const DEFAULT_SLIPPAGE_BPS = 300;
+
+/**
+ * Minimum, ktore wolno przyjac przy danej wycenie.
+ *
+ * Zaokraglamy W DOL, bo minimum ma byc osiagalne, a nie ambitne. Wyjatek:
+ * niezerowa wycena nie moze zejsc do zera - kontrakt rewertuje wtedy z
+ * `SlippageRequired`, wiec zaokraglony do zera pyl zamienialby male zlecenie
+ * w pewny rewert.
+ */
+export function applySlippage(quoted: bigint, bps: number): bigint {
+  if (quoted <= 0n) return 0n;
+  const kept = BigInt(Math.max(0, Math.min(10_000, Math.round(bps))));
+  const min = (quoted * (10_000n - kept)) / 10_000n;
+  return min > 0n ? min : 1n;
+}
+
+/**
+ * Blad kontraktu -> zdanie dla czlowieka.
+ *
+ * Goly `execution reverted` nie mowi nikomu nic, a akurat te trzy przypadki
+ * maja bardzo konkretne przyczyny i bardzo konkretne wyjscie.
+ */
+export function tradeErrorMessage(cause: unknown): string {
+  const raw = cause instanceof Error ? cause.message : String(cause);
+
+  if (/User rejected|User denied|rejected the request/i.test(raw)) {
+    return 'You cancelled the transaction in your wallet.';
+  }
+  if (/Slippage\(\)/.test(raw)) {
+    return 'The price moved before your transaction landed. Check the quote and try again, or raise the slippage setting.';
+  }
+  if (/TokenTransferFailed\(\)/.test(raw)) {
+    return 'The launchpad could not take your tokens, which means the approval did not go through. Approve again and retry.';
+  }
+  if (/NothingToClaim\(\)/.test(raw)) {
+    return 'Nothing to claim right now.';
+  }
+  if (/DeadlineExpired\(\)/.test(raw)) {
+    return 'The transaction sat unsigned for too long. Send it again.';
+  }
+  if (/insufficient funds/i.test(raw)) {
+    return 'Not enough ETH to cover the amount plus gas.';
+  }
+
+  return raw.split('\n')[0];
+}
+
+/**
  * Jedna strona listy. Uzywane przez zakladke Trades, ktora dotad rosla w dol
  * przyciskiem "Show more" - przy tokenie ze 141 transakcjami rozciagalo to
  * strone na kilka ekranow i psulo przewijanie wszystkiego ponizej.

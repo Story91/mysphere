@@ -22,7 +22,18 @@ import {
   LIQUIDITY_VAULT_ADDRESS,
   liquidityVaultAbi,
 } from '../config';
-import { fmtEth, fmtTokens, TARGET_WEI, toWei, usdSuffix, type CoreState } from './detailShared';
+import {
+  applySlippage,
+  DEFAULT_SLIPPAGE_BPS,
+  fmtEth,
+  fmtTokens,
+  SLIPPAGE_OPTIONS,
+  TARGET_WEI,
+  toWei,
+  tradeErrorMessage,
+  usdSuffix,
+  type CoreState,
+} from './detailShared';
 
 /**
  * Panel handlu NA STRONIE tokena - koniec z odsylaniem do boardu. Wzorce
@@ -64,6 +75,7 @@ export default function TradePanel({
   const [buyQuote, setBuyQuote] = useState<{ tokensOut: bigint; fee: bigint; refund: bigint } | null>(null);
   const [sellQuote, setSellQuote] = useState<{ ethOut: bigint; fee: bigint } | null>(null);
   const [ethBalance, setEthBalance] = useState<bigint | null>(null);
+  const [slippageBps, setSlippageBps] = useState<number>(DEFAULT_SLIPPAGE_BPS);
 
   const onCurve = core.state === 'Curve';
   // Kontrakt w stanie Locked jawnie DOPUSZCZA sprzedaz (CurveLaunchpad._sell:
@@ -158,8 +170,66 @@ export default function TradePanel({
     }
   }, [chainId, switchChainAsync]);
 
-  const fail = (cause: unknown) =>
-    setNotice({ kind: 'error', text: cause instanceof Error ? cause.message.split('\n')[0] : String(cause) });
+  const fail = (cause: unknown) => setNotice({ kind: 'error', text: tradeErrorMessage(cause) });
+
+  /**
+   * Zatwierdzenie tokena dla launchpada. Zwraca `true` dopiero, gdy allowance
+   * NAPRAWDE wystarcza.
+   *
+   * Bylo tu `await waitForTransactionReceipt(...)` bez patrzenia na wynik i to
+   * kosztowalo ludzi pieniadze: 13 sierpnia 2026 zatwierdzenia na tokenie
+   * SAUSAGES wychodzily z limitem gazu 45 552 przy zapotrzebowaniu 46 300,
+   * konczyly sie wyczerpaniem gazu - a kod szedl dalej i wysylal `sell`, ktory
+   * odbijal sie o `TokenTransferFailed()`. Dwie transakcje, dwa rachunki za
+   * gaz, zero sprzedanych tokenow.
+   *
+   * Stad dwie rzeczy naraz: WLASNY limit gazu z zapasem (portfele licza go
+   * ciasno i bez marginesu) oraz sprawdzenie statusu paragonu.
+   */
+  const ensureAllowance = async (amount: bigint): Promise<boolean> => {
+    if (!account || !walletClient || !readClient) return false;
+
+    // Swiezy odczyt, nie `core.allowance` sprzed wejscia na strone.
+    const current = (await readClient.readContract({
+      address: core.token,
+      abi: erc20Abi,
+      functionName: 'allowance',
+      args: [account, LAUNCHPAD_ADDRESS as Address],
+    })) as bigint;
+    if (current >= amount) return true;
+
+    setBusy('approve');
+    let gas: bigint | undefined;
+    try {
+      const estimate = await readClient.estimateContractGas({
+        address: core.token,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [LAUNCHPAD_ADDRESS as Address, maxUint256],
+        account,
+      });
+      gas = (estimate * 125n) / 100n;
+    } catch {
+      // Bez oszacowania oddajemy pole portfelowi - to nadal lepsze niz brak
+      // zatwierdzenia. Sprawdzenie statusu nizej i tak zlapie porazke.
+    }
+
+    const hash = await walletClient.writeContract({
+      address: core.token,
+      abi: erc20Abi,
+      functionName: 'approve',
+      args: [LAUNCHPAD_ADDRESS as Address, maxUint256],
+      chain: LAUNCHPAD_CHAIN,
+      account,
+      ...(gas ? { gas } : {}),
+    });
+    const receipt = await readClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== 'success') {
+      setNotice({ kind: 'error', text: 'The approval transaction failed, so nothing was sold. Try again.' });
+      return false;
+    }
+    return true;
+  };
 
   const buy = async () => {
     if (!account || !walletClient || !readClient) {
@@ -176,8 +246,19 @@ export default function TradePanel({
     setNotice(null);
     try {
       const quote = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [core.token, value] });
-      // 0.5% bufora poslizgu - ten sam mnoznik, co w LaunchpadBoard.
-      const minTokensOut = (quote[0] * 9950n) / 10_000n;
+      const minTokensOut = applySlippage(quote[0], slippageBps);
+      // Symulacja PRZED otwarciem portfela. Transakcja, ktora i tak by padla,
+      // nie ma po co isc na lancuch - uzytkownik dostaje powod zamiast
+      // rachunku za gaz.
+      const { request } = await readClient.simulateContract({
+        address: LAUNCHPAD_ADDRESS as Address,
+        abi: launchpadAbi,
+        functionName: 'buy',
+        args: [core.token, minTokensOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
+        value,
+        account,
+      });
+      void request;
       const hash = await walletClient.writeContract({
         address: LAUNCHPAD_ADDRESS as Address,
         abi: launchpadAbi,
@@ -215,23 +296,19 @@ export default function TradePanel({
       return;
     }
     if (!(await ensureChain())) return;
-    setBusy('approve');
     setNotice(null);
     try {
-      if (core.allowance < amount) {
-        const approveHash = await walletClient.writeContract({
-          address: core.token,
-          abi: erc20Abi,
-          functionName: 'approve',
-          args: [LAUNCHPAD_ADDRESS as Address, maxUint256],
-          chain: LAUNCHPAD_CHAIN,
-          account,
-        });
-        await readClient.waitForTransactionReceipt({ hash: approveHash });
-      }
+      if (!(await ensureAllowance(amount))) return;
       setBusy('sell');
       const quote = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [core.token, amount] });
-      const minEthOut = (quote[0] * 9950n) / 10_000n;
+      const minEthOut = applySlippage(quote[0], slippageBps);
+      await readClient.simulateContract({
+        address: LAUNCHPAD_ADDRESS as Address,
+        abi: launchpadAbi,
+        functionName: 'sell',
+        args: [core.token, amount, minEthOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
+        account,
+      });
       const hash = await walletClient.writeContract({
         address: LAUNCHPAD_ADDRESS as Address,
         abi: launchpadAbi,
@@ -329,6 +406,13 @@ export default function TradePanel({
               : source === 'vaultEth'
                 ? { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimEth' as const, args: [] as const }
                 : { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimToken' as const, args: [core.token] as const };
+      // Symulacja przed podpisem. Kwota w tabelce pochodzi z odczytu przy
+      // wejsciu na strone i potrafi sie zdezaktualizowac - a wtedy przycisk
+      // zostaje aktywny i wysyla transakcje donikad. Tak wlasnie odpadlo 37 z
+      // 37 wywolan `claim` na Base mainnet: kazde z `NothingToClaim()` i
+      // kazde oplacone gazem.
+      // eslint-disable-next-line
+      await readClient.simulateContract({ ...transaction, account } as any);
       // Unia pieciu ksztaltow wywolania nie sklada sie w jeden przeciazony
       // podpis writeContract - ten sam swiadomy skrot, co w LaunchpadBoard.
       // eslint-disable-next-line
@@ -470,7 +554,6 @@ export default function TradePanel({
                     <span className="font-bold text-[#0b9a51]">{fmtEth(buyQuote.refund)} ETH</span>
                   </div>
                 )}
-                <p className="pt-1 text-[10px] text-black/35">0.5% slippage buffer is applied automatically.</p>
               </div>
               <button
                 type="button"
@@ -514,7 +597,6 @@ export default function TradePanel({
                   <span className="text-black/50">Fee</span>
                   <span className="font-bold text-black/60">{sellQuote ? `${fmtEth(sellQuote.fee)} ETH` : '--'}</span>
                 </div>
-                <p className="pt-1 text-[10px] text-black/35">Approval is requested once, then the sell goes through.</p>
               </div>
               <button
                 type="button"
@@ -527,6 +609,25 @@ export default function TradePanel({
               </button>
             </>
           )}
+
+          {/* Wspolne dla kupna i sprzedazy: to jest jedna decyzja o tym, na ile
+              gorsza cene godzisz sie w zamian za to, ze transakcja przejdzie. */}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[10.5px] text-black/40">Max price change you accept</span>
+            <span className="inline-flex overflow-hidden rounded-full border border-black/10" role="group" aria-label="Slippage tolerance">
+              {SLIPPAGE_OPTIONS.map((bps) => (
+                <button
+                  key={bps}
+                  type="button"
+                  aria-pressed={slippageBps === bps}
+                  onClick={() => setSlippageBps(bps)}
+                  className={`px-2.5 py-1 text-[10.5px] font-extrabold transition-colors ${slippageBps === bps ? 'bg-soft-primary text-white' : 'bg-white text-black/50 hover:text-soft-primary-deep'}`}
+                >
+                  {bps / 100}%
+                </button>
+              ))}
+            </span>
+          </div>
         </>
       )}
 
