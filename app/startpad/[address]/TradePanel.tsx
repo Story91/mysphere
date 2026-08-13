@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  ExternalLink,
   Layers3,
   ShieldCheck,
   Sparkles,
@@ -13,6 +14,8 @@ import {
 import { formatEther, formatUnits, maxUint256, parseUnits, type Address } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
+  ACTIVE_LAUNCHPAD_NETWORK,
+  LAUNCHPAD_EXPLORER_URL,
   NATIVE_SYMBOL,
   erc20Abi,
   hookAbi,
@@ -74,6 +77,9 @@ export default function TradePanel({
   const [busy, setBusy] = useState<Busy>(null);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [buyQuote, setBuyQuote] = useState<{ tokensOut: bigint; fee: bigint; refund: bigint } | null>(null);
+  // Potwierdzenie skopiowania identyfikatora puli. Zostaje do konca sesji -
+  // to nie jest stan, ktory trzeba cofac, tylko slad, ze klikniecie zadzialalo.
+  const [poolIdCopied, setPoolIdCopied] = useState(false);
   const [sellQuote, setSellQuote] = useState<{ ethOut: bigint; fee: bigint } | null>(null);
   const [ethBalance, setEthBalance] = useState<bigint | null>(null);
   const [slippageBps, setSlippageBps] = useState<number>(DEFAULT_SLIPPAGE_BPS);
@@ -664,9 +670,43 @@ export default function TradePanel({
             <Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <p className="text-[12px] font-extrabold text-sp-ink">Live Uniswap v4 pool</p>
-              <p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">
-                {core.poolId !== `0x${'0'.repeat(64)}` ? `Pool ${core.poolId.slice(0, 10)}... with the launch hook attached.` : 'Pool position is loading.'}
-              </p>
+              {/* ===== DLACZEGO TU NIE MA ADRESU PULI =====
+                  Bo pula v4 GO NIE MA. W v3 kazda para byla osobnym kontraktem
+                  pod wlasnym adresem; v4 trzyma wszystkie pule w JEDNYM
+                  kontrakcie (PoolManager), a pojedyncza pula jest w nim
+                  identyfikatorem `poolId` - 32 bajtami, ktorych zaden
+                  eksplorator nie ma jak pokazac jako strony.
+                  Stal tu skrocony `poolId` bez niczego obok i wygladalo to na
+                  wymowke. Wiec: pelny identyfikator do skopiowania, a obok
+                  odnosnik do PoolManagera, ktory adres MA - i to jest ten
+                  kontrakt, w ktorym te plynnosc da sie sprawdzic u zrodla. */}
+              {core.poolId !== `0x${'0'.repeat(64)}` ? (
+                <>
+                  <p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">
+                    A v4 pool has no address of its own - it lives inside the PoolManager under this id, with the launch hook attached.
+                  </p>
+                  <p className="mt-1.5 break-all font-mono text-[10px] leading-[1.35] text-sp-shade/45">{core.poolId}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void navigator.clipboard?.writeText(core.poolId).then(() => setPoolIdCopied(true))}
+                      className="rounded-full border border-sp-shade/10 bg-sp-surface px-2.5 py-1 text-[10.5px] font-extrabold text-sp-ink"
+                    >
+                      {poolIdCopied ? 'Pool id copied' : 'Copy pool id'}
+                    </button>
+                    <a
+                      href={`${LAUNCHPAD_EXPLORER_URL}/address/${ACTIVE_LAUNCHPAD_NETWORK.poolManager}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full border border-sp-shade/10 bg-sp-surface px-2.5 py-1 text-[10.5px] font-extrabold text-sp-brand-deep"
+                    >
+                      PoolManager <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">Pool position is loading.</p>
+              )}
             </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">

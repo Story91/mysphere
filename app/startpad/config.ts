@@ -33,6 +33,17 @@ export type LaunchpadNetwork = {
   vault: `0x${string}`;
   hook: `0x${string}`;
   tokenFactory: `0x${string}`;
+  /**
+   * PoolManager Uniswapa v4, do ktorego trafia plynnosc po graduacji.
+   *
+   * Interfejs go POTRZEBUJE, choc kontrakty biora go z wlasnych pol: pula v4
+   * nie ma adresu, tylko identyfikator poolId (bytes32) WEWNATRZ tego jednego
+   * kontraktu.
+   * Zeby dalo sie ja sprawdzic u zrodla, trzeba pokazac adres, ktory eksplorator
+   * w ogole zna - czyli wlasnie ten. Wartosci sa te same, co w mapie
+   * KNOWN_POOL_MANAGERS w scripts/launchpad/plan.ts.
+   */
+  poolManager: `0x${string}`;
   deployBlock: bigint;
   explorerUrl: string;
   /**
@@ -104,6 +115,7 @@ const baseMainnetEntry: LaunchpadNetwork = {
   tokenFactory:
     (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_BASE_ADDRESS as `0x${string}` | undefined) ??
     '0xEC7db55Bc081289820097703B3A66003092844D1',
+  poolManager: '0x498581fF718922c3f8e6A244956aF099B2652b2b',
   deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK ?? '49843030'),
   explorerUrl: 'https://basescan.org',
   // ZMIERZONE 2026-08-13 na `mainnet.base.org` ORAZ na CDP: limit `eth_getLogs`
@@ -143,6 +155,7 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     tokenFactory:
       (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
       '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F',
+    poolManager: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'),
     explorerUrl: 'https://sepolia.basescan.org',
     // ZMIERZONE 2026-08-13 na `sepolia.base.org`: 10 000 przechodzi, 25 000
@@ -172,6 +185,7 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     tokenFactory:
       (process.env.NEXT_PUBLIC_TOKEN_FACTORY_ROBINHOOD_ADDRESS as `0x${string}` | undefined) ??
       '0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A',
+    poolManager: '0x8366a39cc670b4001a1121b8f6a443a643e40951',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ROBINHOOD_DEPLOY_BLOCK ?? '33102326'),
     explorerUrl: 'https://robinhoodchain.blockscout.com',
     /**
@@ -315,6 +329,7 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     tokenFactory:
       (process.env.NEXT_PUBLIC_TOKEN_FACTORY_ARC_ADDRESS as `0x${string}` | undefined) ??
       '0xC10eDaF3473CcDB6e91090F204b01Ccb555686C9',
+    poolManager: '0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_DEPLOY_BLOCK ?? '56844144'),
     explorerUrl: 'https://testnet.arcscan.app',
     // ZMIERZONE 2026-08-13 na wszystkich pieciu endpointach z docs.arc.io:
