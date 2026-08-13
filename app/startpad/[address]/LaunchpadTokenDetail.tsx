@@ -16,6 +16,7 @@ import {
 import { ContractFunctionExecutionError, formatEther, type Address } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 import {
+  NATIVE_SYMBOL,
   CURVE_TARGET_ETH,
   erc20Abi,
   hookAbi,
@@ -609,14 +610,14 @@ function StatsCard({
   const rows: Array<{ label: string; value: string; usd?: string | null }> = [
     {
       label: 'Price',
-      value: `${fmtPrice(priceToNumber(priceWei))} ETH`,
+      value: `${fmtPrice(priceToNumber(priceWei))} ${NATIVE_SYMBOL}`,
       // Cena tokena to ulamek centa - `fmtUsdPrice` pokazuje ja pelnym zapisem
       // ($0.00000367) zamiast bezuzytecznego "<$0.01".
       usd: ethUsd !== null ? fmtUsdPrice(priceToNumber(priceWei) * ethUsd) : null,
     },
-    { label: 'Market cap', value: `${fmtEth(mcapWei(priceWei), 3)} ETH`, usd: usdSuffix(mcapWei(priceWei), ethUsd) },
-    { label: 'ETH reserve', value: `${fmtEth(core.ethReserve, 4)} ETH`, usd: usdSuffix(core.ethReserve, ethUsd) },
-    { label: 'Volume', value: `${fmtEth(volumeWei, 4)} ETH`, usd: usdSuffix(volumeWei, ethUsd) },
+    { label: 'Market cap', value: `${fmtEth(mcapWei(priceWei), 3)} ${NATIVE_SYMBOL}`, usd: usdSuffix(mcapWei(priceWei), ethUsd) },
+    { label: `${NATIVE_SYMBOL} reserve`, value: `${fmtEth(core.ethReserve, 4)} ${NATIVE_SYMBOL}`, usd: usdSuffix(core.ethReserve, ethUsd) },
+    { label: 'Volume', value: `${fmtEth(volumeWei, 4)} ${NATIVE_SYMBOL}`, usd: usdSuffix(volumeWei, ethUsd) },
     { label: 'Trades', value: String(trades.length) },
     // Transfery z indeksu Blockscouta - wszystkie ruchy tokena, nie tylko nasze
     // transakcje krzywej. Gdy indeks milczy, chowamy wiersz zamiast klamac zerem.

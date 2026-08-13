@@ -16,7 +16,10 @@ import { list } from '@vercel/blob';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_CHAINS = new Set(['84532', '4663', '8453']);
+// Lista zamknieta, bo `chainId` idzie prosto do sciezki w Blobie - bez niej
+// dowolny ciag z adresu listowalby dowolny prefiks kubelka.
+// 5042002 = Arc testnet (wdrozenie 2026-08-13).
+const ALLOWED_CHAINS = new Set(['84532', '4663', '8453', '5042002']);
 const TOKEN_RE = /^0x[0-9a-f]{40}$/;
 
 export async function GET(request: NextRequest) {

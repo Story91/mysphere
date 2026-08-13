@@ -26,6 +26,7 @@ import {
 import { formatEther, formatUnits, getAbiItem, maxUint256, parseEther, parseUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useBalance, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
+  NATIVE_SYMBOL,
   ACTIVE_LAUNCHPAD_NETWORK,
   CURVE_TARGET_ETH,
   erc20Abi,
@@ -191,7 +192,7 @@ function curvePercent(token: LaunchpadToken) {
 }
 
 function formatEth(value: number) {
-  return `${value.toFixed(value >= 1 ? 2 : 3)} ETH`;
+  return `${value.toFixed(value >= 1 ? 2 : 3)} ${NATIVE_SYMBOL}`;
 }
 
 /**
@@ -307,7 +308,7 @@ function curveStatusLabel(token: LaunchpadToken) {
   if (token.state === 'Graduated') return { text: 'Graduated to pool', className: 'text-sp-up' };
   if (token.state === 'Locked') return { text: 'Awaiting graduation', className: 'text-sp-brand-deep' };
   const toGo = Math.max(0, token.target - token.raised);
-  return { text: `${toGo.toFixed(2)} ETH to graduation`, className: 'text-sp-down' };
+  return { text: `${toGo.toFixed(2)} ${NATIVE_SYMBOL} to graduation`, className: 'text-sp-down' };
 }
 
 /**
@@ -377,7 +378,7 @@ function LaunchCard({
 
       <div className="mt-4">
         {/* flex-wrap zamiast truncate: przy duzych sumach "0.462 ETH · $865.01"
-            i "2.54 ETH to graduation" nie walcza o jedna linie - status schodzi
+            i `2.54 ${NATIVE_SYMBOL} to graduation` nie walcza o jedna linie - status schodzi
             nizej, a cena i USD pokazuja sie w calosci (koniec z "$865..."). */}
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-[17px] font-extrabold text-sp-ink">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-sp-shade/40"> · {raisedNote}</span>}</span>
@@ -433,7 +434,7 @@ function KingOfTheHill({ token, ethUsd, onTrade, onDetails }: { token: BoardToke
         <div className="w-full sm:w-[240px]">
           <div className="flex items-baseline justify-between gap-3">
             <span className="min-w-0 truncate text-[15px] font-extrabold text-sp-ink">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-sp-shade/45"> · {raisedNote}</span>}</span>
-            <span className="text-[11px] font-extrabold text-sp-down">{toGo.toFixed(2)} ETH to go</span>
+            <span className="text-[11px] font-extrabold text-sp-down">{toGo.toFixed(2)} {NATIVE_SYMBOL} to go</span>
           </div>
           <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-sp-shade/8">
             <div className="h-full rounded-full bg-soft-primary transition-[width] duration-500" style={{ width: `${progress}%` }} />
@@ -673,7 +674,7 @@ function TopEarnings({ rows, ethUsd }: { rows: CreatorEarnings[]; ethUsd: number
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="block text-[12px] font-extrabold text-sp-ink">{eth.toFixed(4)} ETH</span>
+                  <span className="block text-[12px] font-extrabold text-sp-ink">{eth.toFixed(4)} {NATIVE_SYMBOL}</span>
                   {note && <span className="block text-[10.5px] font-bold text-sp-shade/40">{note}</span>}
                 </span>
               </div>
@@ -729,7 +730,7 @@ function MyTokensPanel({
         {totalClaimable > 0n && (
           <span className="flex items-center gap-2.5 rounded-full bg-sp-up-soft py-1.5 pl-3.5 pr-1.5">
             <span className="text-[12px] font-extrabold text-sp-up">
-              {claimEth.toFixed(4)} ETH claimable{claimNote && <span className="font-bold text-sp-up/70"> · {claimNote}</span>}
+              {claimEth.toFixed(4)} {NATIVE_SYMBOL} claimable{claimNote && <span className="font-bold text-sp-up/70"> · {claimNote}</span>}
             </span>
             <button
               type="button"
@@ -793,7 +794,7 @@ function MyTokensPanel({
                   <span className="block text-[10px] text-sp-shade/40">volume</span>
                 </div>
                 <div className="w-[118px] shrink-0">
-                  <span className="block text-[12px] font-extrabold text-sp-up">{earnedEth.toFixed(4)} ETH</span>
+                  <span className="block text-[12px] font-extrabold text-sp-up">{earnedEth.toFixed(4)} {NATIVE_SYMBOL}</span>
                   <span className="block text-[10px] text-sp-shade/40">{earnedNote ? `${earnedNote} accrued` : 'accrued earnings'}</span>
                 </div>
                 <button
@@ -923,7 +924,7 @@ function TradePanel({
   // na gaz przy Max - inaczej Max = calosc i transakcja nie ma z czego zaplacic.
   const { address: walletAddress } = useAccount();
   const { data: ethBalance } = useBalance({ address: walletAddress, chainId: LAUNCHPAD_CHAIN.id });
-  const GAS_HEADROOM_WEI = 5_000_000_000_000_000n; // ~0.005 ETH
+  const GAS_HEADROOM_WEI = 5_000_000_000_000_000n; // ~0.005 {NATIVE_SYMBOL}
   const setBuyFraction = (numerator: bigint, denominator: bigint) => {
     if (!ethBalance) return;
     const spendable = ethBalance.value > GAS_HEADROOM_WEI ? ethBalance.value - GAS_HEADROOM_WEI : 0n;
@@ -937,9 +938,9 @@ function TradePanel({
   const sellQuoteNote = sellQuote === null ? null : usdNote(Number(formatEther(sellQuote)), ethUsd);
   const claimRows = details ? [
     { label: 'Startpad fees (curve)', value: formatEther(details.launchClaimable), amount: details.launchClaimable, source: 'launch' as const },
-    { label: 'Hook ETH', value: formatEther(details.hookEthClaimable), amount: details.hookEthClaimable, source: 'hookEth' as const },
+    { label: `Hook ${NATIVE_SYMBOL}`, value: formatEther(details.hookEthClaimable), amount: details.hookEthClaimable, source: 'hookEth' as const },
     { label: 'Hook token', value: formatUnits(details.hookTokenClaimable, decimals), amount: details.hookTokenClaimable, source: 'hookToken' as const },
-    { label: 'Vault ETH', value: formatEther(details.vaultEthClaimable), amount: details.vaultEthClaimable, source: 'vaultEth' as const },
+    { label: `Vault ${NATIVE_SYMBOL}`, value: formatEther(details.vaultEthClaimable), amount: details.vaultEthClaimable, source: 'vaultEth' as const },
     { label: 'Vault token', value: formatUnits(details.vaultTokenClaimable, decimals), amount: details.vaultTokenClaimable, source: 'vaultToken' as const },
   ] : [];
 
@@ -952,12 +953,12 @@ function TradePanel({
 
   return <>
     {canSell && <div className="mt-5 flex items-center gap-1 rounded-xl bg-sp-brand-soft p-1">
-      {(canBuy ? (['buy', 'sell'] as const) : (['sell'] as const)).map((item) => <button key={item} type="button" onClick={() => setSide(item)} className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${effectiveSide === item ? 'bg-sp-surface text-soft-primary-deep shadow-sm' : 'text-sp-shade/45'}`}>{item === 'buy' ? 'Buy with ETH' : 'Sell token'}</button>)}
+      {(canBuy ? (['buy', 'sell'] as const) : (['sell'] as const)).map((item) => <button key={item} type="button" onClick={() => setSide(item)} className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${effectiveSide === item ? 'bg-sp-surface text-soft-primary-deep shadow-sm' : 'text-sp-shade/45'}`}>{item === 'buy' ? `Buy with ${NATIVE_SYMBOL}` : 'Sell token'}</button>)}
     </div>}
     {!canBuy && canSell && <p className="mt-2 text-[11px] leading-[1.4] text-sp-shade/50">Buying is closed, the curve is full. Selling stays open until the pool opens.</p>}
     {!canSell && <p className="mt-5 rounded-xl bg-sp-brand-soft p-3 text-[11px] leading-[1.4] text-sp-shade/55">Curve trading ended at graduation. Swaps happen in the Uniswap v4 pool now.</p>}
     {canSell && (effectiveSide === 'buy' ? <>
-      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-sp-ink">ETH amount</span><span className="text-[11px] text-sp-shade/45">0.5% slippage buffer</span></div>
+      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-sp-ink">{NATIVE_SYMBOL} amount</span><span className="text-[11px] text-sp-shade/45">0.5% slippage buffer</span></div>
       <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">ETH</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!ethBalance} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
@@ -970,12 +971,12 @@ function TradePanel({
         {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={!details || details.balance === 0n} onClick={() => setSellFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
         <button type="button" disabled={!details || details.balance === 0n} onClick={() => setSellFraction(1n, 1n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">Max</button>
       </div>
-      <div className="mt-2 flex items-center justify-between text-[11px] text-sp-shade/45"><span>Estimated output</span><span className="font-extrabold text-sp-ink">{sellQuote === null ? '--' : `${formatEther(sellQuote)} ETH`}{sellQuoteNote && <span className="font-bold text-sp-shade/45"> · {sellQuoteNote}</span>}</span></div>
+      <div className="mt-2 flex items-center justify-between text-[11px] text-sp-shade/45"><span>Estimated output</span><span className="font-extrabold text-sp-ink">{sellQuote === null ? '--' : `${formatEther(sellQuote)} ${NATIVE_SYMBOL}`}{sellQuoteNote && <span className="font-bold text-sp-shade/45"> · {sellQuoteNote}</span>}</span></div>
     </>)}
 
-    {token.state === 'Locked' && <div className="mt-5 rounded-xl border border-sp-down-line bg-sp-down-soft p-3"><div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sp-down" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-sp-down-deep">Ready for graduation</p><p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">Anyone can open the pool. Caller reward: {gradReward === null ? '--' : `${formatEther(gradReward)} ETH`}.</p></div><button type="button" disabled={busy === 'graduate'} onClick={onGraduate} className="rounded-full bg-sp-down px-3 py-2 text-[11px] font-extrabold text-sp-on-brand disabled:opacity-50">{busy === 'graduate' ? 'Opening...' : 'Graduate'}</button></div></div>}
+    {token.state === 'Locked' && <div className="mt-5 rounded-xl border border-sp-down-line bg-sp-down-soft p-3"><div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sp-down" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-sp-down-deep">Ready for graduation</p><p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">Anyone can open the pool. Caller reward: {gradReward === null ? '--' : `${formatEther(gradReward)} ${NATIVE_SYMBOL}`}.</p></div><button type="button" disabled={busy === 'graduate'} onClick={onGraduate} className="rounded-full bg-sp-down px-3 py-2 text-[11px] font-extrabold text-sp-on-brand disabled:opacity-50">{busy === 'graduate' ? 'Opening...' : 'Graduate'}</button></div></div>}
 
-    {token.state === 'Graduated' && <div className="mt-5 rounded-xl bg-sp-brand-soft p-3"><div className="flex items-start gap-2"><Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-sp-ink">Live pool with hook</p><p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">{details?.poolId && details.poolId !== `0x${'0'.repeat(64)}` ? `Pool ${details.poolId.slice(0, 10)}...` : 'Pool position is loading.'}</p></div></div><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" disabled={!details?.pendingEth || busy === 'settle'} onClick={onSettle} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'settle' ? 'Settling...' : `Settle ${details ? formatEther(details.pendingEth) : '0'} ETH`}</button><button type="button" disabled={busy === 'harvest'} onClick={onHarvest} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}</button></div></div>}
+    {token.state === 'Graduated' && <div className="mt-5 rounded-xl bg-sp-brand-soft p-3"><div className="flex items-start gap-2"><Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-sp-ink">Live pool with hook</p><p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">{details?.poolId && details.poolId !== `0x${'0'.repeat(64)}` ? `Pool ${details.poolId.slice(0, 10)}...` : 'Pool position is loading.'}</p></div></div><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" disabled={!details?.pendingEth || busy === 'settle'} onClick={onSettle} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'settle' ? 'Settling...' : `Settle ${details ? formatEther(details.pendingEth) : '0'} ${NATIVE_SYMBOL}`}</button><button type="button" disabled={busy === 'harvest'} onClick={onHarvest} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}</button></div></div>}
 
     {isConnected && details && <div className="mt-5 border-t border-sp-shade/10 pt-4"><div className="flex items-center justify-between"><span className="text-[12px] font-extrabold text-sp-ink">Available claims</span><CheckCircle2 className="h-4 w-4 text-sp-up-vivid" aria-hidden="true" /></div><div className="mt-2 space-y-1.5">{claimRows.map((row) => <div key={row.label} className="flex items-center justify-between gap-2 text-[11px]"><span className="text-sp-shade/50">{row.label}</span><span className="flex items-center gap-2 font-extrabold text-sp-ink"><span>{row.value}</span><button type="button" disabled={row.amount === 0n} onClick={() => onClaim(row.source)} className="rounded-full border border-sp-shade/10 px-2 py-1 text-[10px] text-soft-primary-deep disabled:opacity-30">Claim</button></span></div>)}</div></div>}
   </>;
@@ -1956,7 +1957,7 @@ export default function LaunchpadBoard() {
     // stanu zajetosci.
     const value = toWei(buyAmount);
     if (value === null || value === 0n) {
-      setNotice({ kind: 'error', text: 'Enter an ETH amount greater than zero, written as a decimal number.' });
+      setNotice({ kind: 'error', text: `Enter an ${NATIVE_SYMBOL} amount greater than zero, written as a decimal number.` });
       return;
     }
     if (!(await ensureSepolia())) return;

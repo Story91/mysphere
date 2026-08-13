@@ -1,6 +1,7 @@
 import { base, baseSepolia } from 'viem/chains';
 import type { Chain } from 'viem';
 import { robinhoodChain } from '../basechat/Robinhood/config/RobinhoodNetworkConfig';
+import { arcTestnet } from './arcChain';
 // Import TYLKO typu - `networkTheme` czyta z tego pliku LAUNCHPAD_NETWORKS, wiec
 // import wartosci zrobilby cykl. Typ znika przy kompilacji i cyklu nie ma.
 import type { NetworkTheme } from './networkTheme';
@@ -273,6 +274,133 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       },
     },
   },
+  /**
+   * ARC TESTNET (Circle). Wdrozenie 2026-08-13, pelne fakty i pomiary sieci w
+   * docs/LAUNCHPAD-STAN.md.
+   *
+   * TRZY RZECZY, KTORYCH NIE MA ZADNA INNA SIEC W TEJ MAPIE:
+   *
+   * 1. JEDNOSTKA NATYWNA TO USDC. Prog graduacji `G = 4 x R_VIRT` wychodzi tu
+   *    3 USDC, a nie 3 ETH - ten sam bajtkod, inna waluta. Na testnecie to
+   *    zaleta: pelny cykl do graduacji kosztuje okolo trzech dolarow. Interfejs
+   *    pisze na razie wszedzie "ETH" i to jest DO POPRAWKI (etykieta jednostki
+   *    per siec), nie cecha.
+   *
+   * 2. POOLMANAGER JEST NASZ. Uniswap na Arc nie istnieje i nie zapowiedzial
+   *    sie - postawilismy v4 ze zrodel, bo Arc ma transient storage. Bez tego
+   *    graduacja nie mialaby dokad wypuscic plynnosci.
+   *
+   * 3. OKNO SKANU 50 000, a nie 9 500. Blok co 0,51 s daje ~169 tys. blokow na
+   *    dobe, wiec przy oknie 10 tys. (tyle daja cztery z pieciu publicznych
+   *    endpointow) historia jednego dnia to siedemnascie kolejek. Domyslny RPC
+   *    tej sieci to Blockdaemon - jedyny z oknem 50 tys.; uzasadnienie i pomiar
+   *    przy `arcTestnet` w arcChain.ts.
+   */
+  [arcTestnet.id]: {
+    chain: arcTestnet,
+    label: 'Arc Testnet',
+    testnet: true,
+    // Precompile B20 zyje tylko na Base - tu, jak na Robinhoodzie, token jest
+    // zwyklym ERC-20 z naszej fabryki.
+    tokenStandard: 'plain',
+    launchpad:
+      (process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_ADDRESS as `0x${string}` | undefined) ??
+      '0xdAe0dd6EE87a8d7eE7575dD9904A72fA9CA6600d',
+    vault:
+      (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_ARC_ADDRESS as `0x${string}` | undefined) ??
+      '0x8F224A0782b55aF138A05b0EEA03f8D6D69A51D6',
+    hook:
+      (process.env.NEXT_PUBLIC_LAUNCH_HOOK_ARC_ADDRESS as `0x${string}` | undefined) ??
+      '0x2615415f5eE2E0dF65bF0788E7c43ACdCB036044',
+    tokenFactory:
+      (process.env.NEXT_PUBLIC_TOKEN_FACTORY_ARC_ADDRESS as `0x${string}` | undefined) ??
+      '0xC10eDaF3473CcDB6e91090F204b01Ccb555686C9',
+    deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_DEPLOY_BLOCK ?? '56844144'),
+    explorerUrl: 'https://testnet.arcscan.app',
+    // ZMIERZONE 2026-08-13 na wszystkich pieciu endpointach z docs.arc.io:
+    // 50 000 przechodzi wylacznie na Blockdaemonie, pozostale odbijaja sie o
+    // "requested range too large" powyzej 10 000. Zapas pod krancowy blok.
+    scanWindow: 49_000n,
+    // 60 x 49 000 to ~2,9 mln blokow, czyli okolo siedemnastu dni tego lancucha.
+    maxScanWindows: 60,
+    // Zmierzone: 0,51 s (100 tys. blokow roznicy timestampow / 100 tys.).
+    secondsPerBlock: 0.51,
+    // Blekit USDC - Arc jest lancuchem tego jednego pieniadza i to jest jego
+    // najuczciwszy znak rozpoznawczy.
+    // Pastylka i akcent zyja WEWNATRZ ciemnego motywu ponizej, wiec sa ciemne.
+    pillClass: 'border-[#4D9AF0]/40 bg-[#0E1E30] text-[#7CB8FF]',
+    accentTextClass: 'text-[#7CB8FF]',
+    /**
+     * GRANATOWY STARTPAD. Arc jest lancuchem jednego pieniadza i to dyktuje
+     * kolor: blekit USDC, a nie barwa wymyslona pod nastroj.
+     *
+     * Dlaczego ciemny, skoro Robinhood juz jest ciemny. Bo strona Arc jest
+     * ciemna i instytucjonalna, a te dwa motywy nie sa do pomylenia: tam czern
+     * z jaskrawa zielenia, tu granat z chlodnym blekitem. Zielen na Arc znaczy
+     * WZROST i nic wiecej - nie jest kolorem marki, wiec nie musi walczyc o te
+     * sama role co na Robinhoodzie.
+     *
+     * `--sp-on-brand` jest ciemny z tego samego powodu, co tam: bialy tekst na
+     * #4D9AF0 ma kontrast 2.6:1, ciemny ma 7:1.
+     */
+    theme: {
+      key: 'arc',
+      colorScheme: 'dark',
+      vars: {
+        '--sp-bg': '7 11 18',
+        '--sp-surface': '16 23 34',
+        '--sp-sunken': '11 17 26',
+        '--sp-shade': '255 255 255',
+        '--sp-ink': '232 240 251',
+        '--sp-ink-soft': '125 140 163',
+        '--sp-hover': '18 28 42',
+        '--sp-brand': '77 154 240',
+        '--sp-on-brand': '7 11 18',
+        '--sp-brand-deep': '124 184 255',
+        '--sp-brand-soft': '14 30 48',
+        '--sp-brand-strong': '169 212 255',
+        '--sp-up': '34 197 94',
+        '--sp-up-vivid': '74 222 128',
+        '--sp-up-soft': '12 36 23',
+        '--sp-up-line': '23 81 47',
+        '--sp-down': '240 160 60',
+        '--sp-down-deep': '255 186 105',
+        '--sp-down-soft': '36 26 12',
+        '--sp-down-line': '92 60 24',
+        '--sp-danger': '255 107 107',
+        '--sp-danger-soft': '45 16 16',
+        '--sp-info': '90 180 255',
+        '--sp-info-soft': '12 26 40',
+        // Wspolna powloka - nawigacja i dolny pasek.
+        '--soft-bg': '7 11 18',
+        '--soft-surface': '16 23 34',
+        '--soft-surface-sunken': '11 17 26',
+        '--soft-ink': '232 240 251',
+        '--soft-ink-muted': '148 163 184',
+        '--soft-ink-soft': '125 140 163',
+        '--soft-ink-faint': '100 116 139',
+        '--soft-primary': '77 154 240',
+        '--soft-primary-deep': '124 184 255',
+        '--soft-on-primary': '7 11 18',
+        '--soft-line': '30 41 59',
+        '--soft-line-strong': '45 58 79',
+        '--soft-accent': '245 167 59',
+        '--soft-accent-soft': '36 26 12',
+        '--soft-accent-deep': '255 186 105',
+        '--soft-info': '90 180 255',
+        '--soft-info-soft': '12 26 40',
+      },
+      chart: {
+        background: '#0B111A',
+        text: '#7D8CA3',
+        grid: 'rgba(255,255,255,0.06)',
+        up: '#22C55E',
+        down: '#F0A03C',
+        line: '#4D9AF0',
+        lineFill: 'rgba(77,154,240,0.16)',
+      },
+    },
+  },
 };
 
 // Po wdrozeniu mainnetu (env ustawione) domyslna sieca staje sie Base mainnet;
@@ -342,6 +470,27 @@ export function setLaunchpadChain(chainId: number) {
 }
 
 export const LAUNCHPAD_CHAIN = ACTIVE_LAUNCHPAD_NETWORK.chain;
+
+/**
+ * Symbol jednostki, w ktorej liczy KRZYWA - czyli waluty natywnej tej sieci.
+ *
+ * Do 2026-08-13 caly startpad mial wpisane "ETH" w stu kilkunastu miejscach i
+ * bylo to prawda na kazdej obslugiwanej sieci. Arc to konczy: tam jednostka
+ * natywna to USDC, wiec "3 ETH do graduacji" bylo by po prostu nieprawda -
+ * i to nieprawda o pieniadzach, na dodatek w miejscu, gdzie ktos podejmuje
+ * decyzje o zakupie.
+ *
+ * Arytmetyka sie NIE zmienia: natywne USDC ma 18 miejsc, dokladnie jak wei,
+ * wiec `formatEther` i `parseEther` licza tak samo. Zmienia sie wylacznie to,
+ * co jest napisane obok liczby.
+ */
+export const NATIVE_SYMBOL = ACTIVE_LAUNCHPAD_NETWORK.chain.nativeCurrency.symbol;
+
+/**
+ * Czy jednostka natywna JEST dolarem. Na takiej sieci kurs do dopiskow USD
+ * wynosi 1 i nie ma czego pytac zadnej wyroczni - patrz `useEthUsd`.
+ */
+export const NATIVE_IS_USD = /^(USDC|USDT|USD)$/i.test(NATIVE_SYMBOL);
 export const LAUNCHPAD_EXPLORER_URL = ACTIVE_LAUNCHPAD_NETWORK.explorerUrl;
 export const LAUNCHPAD_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.launchpad;
 export const LIQUIDITY_VAULT_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.vault;

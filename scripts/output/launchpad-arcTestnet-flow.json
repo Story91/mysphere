@@ -1,0 +1,56 @@
+{
+  "network": "arcTestnet",
+  "chainId": 5042002,
+  "launchpad": "0xdAe0dd6EE87a8d7eE7575dD9904A72fA9CA6600d",
+  "vault": "0x8F224A0782b55aF138A05b0EEA03f8D6D69A51D6",
+  "hook": "0x2615415f5eE2E0dF65bF0788E7c43ACdCB036044",
+  "poolManager": "0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6",
+  "creator": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "token": "0xd93D7f1ddf96087bC788a8C69b9A744902d942Bf",
+  "buyEth": "4000000000000000000",
+  "resumed": false,
+  "quoteTokensOut": "800000000000000000000000000",
+  "quoteFee": "30000000000000000",
+  "quoteRefund": "970000000000000000",
+  "launch": {
+    "hash": "0xd94d05dce42418d461ab98ced564310f25900806b6cb8626bf41066ed75f89a3",
+    "block": 56845505,
+    "gas": "888683"
+  },
+  "buy": {
+    "hash": "0x39f6eaa0d648120b399391b88a4c6120f0549f8f24361e109072f5c9695cf74e",
+    "block": 56846101,
+    "gas": "141833"
+  },
+  "graduate": {
+    "hash": "0x34453fba875ac717dc9ba91f6f5ff34a548dfc02cc50640b578204ee57185319",
+    "block": 56846104,
+    "gas": "434320"
+  },
+  "probeDeployGas": "565150",
+  "swap": {
+    "hash": "0x3040b7a9ee77abb18b1119dda7aa3aa2ebfacde73e2d146cdbe380b0f35cb085",
+    "block": 56846111,
+    "gas": "316423"
+  },
+  "settle": {
+    "hash": "0x03278c4eadc9620bafa9f7393cdd906b1c1f98e95ea56c2e207519e0938303ac",
+    "block": 56846114,
+    "gas": "60940"
+  },
+  "launchClaimableBefore": "120000000000000000",
+  "launchClaim": {
+    "hash": "0xde7c67cccd7a1dee9a8cbd3ddf3829598a52b38c09f024f58aa18333ef7ccd74",
+    "block": 56846118,
+    "gas": "36472"
+  },
+  "hookEthClaimableBefore": "0",
+  "hookTokenClaimableBefore": "531551217675593619716",
+  "hookEthClaim": null,
+  "hookTokenClaim": {
+    "hash": "0x114dd8f2aa650814f35df8ee670f12fdd6d0e5daa4ca045cce35574a5ea03226",
+    "block": 56846120,
+    "gas": "40304"
+  },
+  "completedAt": "2026-08-13T21:39:23.585Z"
+}

@@ -19,6 +19,7 @@ import {
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_EXPLORER_URL,
   LIQUIDITY_VAULT_ADDRESS,
+  NATIVE_SYMBOL,
 } from '../config';
 import { resizeImageFile } from '../logoUpload';
 import useSiweAuth from '../../utils/auth/useSiweAuth';
@@ -219,7 +220,7 @@ export default function DetailTabs({
                   <span>Time</span>
                   <span>Side</span>
                   <span>Account</span>
-                  <span className="text-right">ETH</span>
+                  <span className="text-right">{NATIVE_SYMBOL}</span>
                   <span className="flex items-center justify-end gap-1.5">
                     <SymbolGlyph url={logoUrl} symbol={core.symbol} />
                     {core.symbol}
@@ -355,12 +356,12 @@ export default function DetailTabs({
                 <div className="rounded-xl bg-sp-sunken p-3">
                   <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Buyback waiting</p>
                   <p className="mt-1 text-[16px] font-extrabold text-sp-ink">
-                    {fmtEth(core.config.pendingBuybackEth)} ETH
+                    {fmtEth(core.config.pendingBuybackEth)} {NATIVE_SYMBOL}
                     {core.config.pendingBuybackEth > 0n && usdSuffix(core.config.pendingBuybackEth, ethUsd) && (
                       <span className="ml-1 text-[11px] font-bold text-sp-shade/40">· {usdSuffix(core.config.pendingBuybackEth, ethUsd)}</span>
                     )}
                   </p>
-                  <p className="mt-0.5 text-[10.5px] text-sp-shade/45">set aside from the creator&apos;s ETH share at settle; anyone can execute</p>
+                  <p className="mt-0.5 text-[10.5px] text-sp-shade/45">set aside from the creator&apos;s {NATIVE_SYMBOL} share at settle; anyone can execute</p>
                 </div>
                 <div className="rounded-xl bg-sp-sunken p-3">
                   <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Burned so far</p>

@@ -76,6 +76,19 @@ export const KNOWN_POOL_MANAGERS: Record<number, string> = {
   84532: "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
   // Robinhood Chain. 24 009 bajtow, sprawdzone `eth_getCode` 2026-08-10.
   4663: "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+  /**
+   * Arc testnet (Circle). JEDYNY wpis w tej mapie, ktorego nie postawil
+   * Uniswap - na Arc v4 nie ma i nie zostal zapowiedziany. Postawiony przez
+   * nas ze zrodel `@uniswap/v4-core` 1.0.2 skryptem `deployPoolManager.ts`.
+   *
+   * 24 050 bajtow, a nie 24 009 jak trzy wpisy wyzej, i to jest w porzadku:
+   * tamte pochodza z wdrozen Uniswapa, ktore kompilowal Foundry z wylaczonym
+   * `bytecode_hash`, u nas metadane zostaja. Kod zweryfikowany `eth_getCode`
+   * 2026-08-13, blok wdrozenia 56843204.
+   *
+   * Pomiary sieci i uzasadnienie: docs/LAUNCHPAD-STAN.md, sekcja Arc.
+   */
+  5042002: "0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6",
 };
 
 export type PlanInput = {

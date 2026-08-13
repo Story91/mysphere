@@ -58,6 +58,10 @@ import { toast } from 'react-hot-toast';
 import PostList, { ExtendedPost } from './components/PostList';
 import PinnedPosts from './components/PinnedPosts';
 import LinkPreview from './components/LinkPreview';
+import LaunchTokenModal from '../startpad/LaunchTokenModal';
+import { LAUNCHPAD_CHAIN, type LaunchpadToken } from '../startpad/config';
+import { buildShareUrl } from '../startpad/shareText';
+import { suggestCoinFromPost } from './coinFromPost';
 import FeedAskRail, { ASKS_RAIL_CACHE_KEY } from './components/FeedAskRail';
 // Zakladanie Aska Z FEEDU. Kompozytor i karta sa te same, ktore stoja na
 // /asks - drugi formularz dotykajacy pieniedzy bylby drugim miejscem, w
@@ -656,6 +660,8 @@ function BaseChatContent() {
    * Na DESKTOPIE bez zmian - tam nie ma pigulki i kompozytor stoi otwarty.
    */
   const [mobileComposerOpen, setMobileComposerOpen] = useState(false);
+  /** Czy otwarty jest szybki kreator tokena (dawny przycisk PostCoin). */
+  const [quickLaunchOpen, setQuickLaunchOpen] = useState(false);
 
   /**
    * ===================================================================
@@ -1528,6 +1534,60 @@ function BaseChatContent() {
   };
 
   // Czyszczenie formularza po udanej publikacji.
+  /**
+   * Token wystartowal - publikujemy post, ktory o nim mowi.
+   *
+   * Do tresci autora doklejamy LINK DO TOKENA, a nie surowy adres kontraktu:
+   * link renderuje sie pod postem jako karta z logo, cena z krzywej i
+   * przyciskiem Trade, a goly adres wygladalby jak wklejony przypadkiem.
+   *
+   * Tresc bierzemy z argumentu, nie ze stanu: `setNewPost` jest asynchroniczne,
+   * wiec czytanie `newPost` tuz po jego ustawieniu oddaloby STARA wartosc.
+   */
+  const publishLaunchPost = async (token: LaunchpadToken) => {
+    // Bez adresu tokena nie ma o czym pisac posta - a `address` w
+    // `LaunchpadToken` jest opcjonalny, bo ten typ obsluguje tez wiersze
+    // podgladowe tablicy, ktore adresu nie maja.
+    if (!address || !token.address) return;
+    const link = buildShareUrl({ address: token.address, chainId: LAUNCHPAD_CHAIN.id });
+    const content = `${newPost.trim()}\n\n${link}`.trim();
+
+    try {
+      const postId = await createPost({
+        author: address,
+        content,
+        timestamp: Date.now(),
+        network: 'base' as const,
+      });
+      // Post na gorze listy OD RAZU, ta sama sciezka co przy publikacji
+      // onchain - bez tego autor po udanym starcie widzi pusty kompozytor i
+      // zadnego sladu po tym, co wlasnie zrobil.
+      setPosts((current) => [
+        {
+          id: postId,
+          author: address,
+          content,
+          timestamp: Date.now(),
+          likes: 0,
+          likedBy: [],
+          comments: [],
+          network: 'base' as const,
+          isPinned: false,
+        } as ExtendedPost,
+        ...current,
+      ]);
+      resetComposer();
+      setQuickLaunchOpen(false);
+    } catch (error) {
+      // Token JUZ ISTNIEJE na lancuchu - nieudany zapis posta nie moze
+      // wygladac jak nieudany start. Zostawiamy tresc z linkiem w polu, zeby
+      // dalo sie kliknac Post jeszcze raz.
+      setNewPost(content);
+      setQuickLaunchOpen(false);
+      console.error('Coin launched, but the post was not saved:', error);
+    }
+  };
+
   const resetComposer = () => {
     setNewPost('');
     setPremium(EMPTY_PREMIUM);
@@ -4475,13 +4535,28 @@ function BaseChatContent() {
                             })()}
 
                             <div className="flex space-x-2">
+                            {/* ===== START TOKENA ZAMIAST POSTCOINA =====
+                                Ten przycisk wolal `handleCreatePost`, czyli
+                                Zore. Teraz otwiera SZYBKI START na naszej
+                                krzywej: oplata z krzywej i plynnosc po
+                                graduacji zostaja w naszych kontraktach, a caly
+                                lejek (post -> karta tokena -> strona tokena ->
+                                handel) jest u nas.
+
+                                Istniejace PostCoiny pod starymi postami
+                                renderuja sie dalej i dalej da sie nimi
+                                handlowac - kasowanie ich zabraloby ludziom to,
+                                co juz wybili. Znika sam sposob tworzenia
+                                nowych. */}
                             <button
-                              onClick={handleCreatePost}
-                                    disabled={!newPost.trim() || isCreatingPost || (chainId !== base.id && chainId !== baseSepolia.id)}
-                              className={`px-3 py-0.5 text-sm font-medium rounded-lg transition-colors duration-200 flex items-center justify-center h-[32px] ${ 
-                                      (!newPost.trim() || isCreatingPost || (chainId !== base.id && chainId !== baseSepolia.id))
+                              type="button"
+                              onClick={() => setQuickLaunchOpen(true)}
+                              disabled={!newPost.trim() || isCreatingPost}
+                              title="Launch a coin for this post on Startpad"
+                              className={`px-3 py-0.5 text-sm font-medium rounded-lg transition-colors duration-200 flex items-center justify-center h-[32px] ${
+                                !newPost.trim() || isCreatingPost
                                   ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                                    : 'bg-white text-[#0052FF] border border-[#0052FF]'
+                                  : 'bg-white text-[#0052FF] border border-[#0052FF]'
                               }`}
                             >
                               {isCreatingPost ? (
@@ -4494,12 +4569,12 @@ function BaseChatContent() {
                                 </>                                  
                               ) : (
                                   <>
-                                    <img 
+                                    <img
                                       src="/android-chrome-512x512.png"
                                       alt="Sphere"
                                       className="w-4 h-4 mr-1.5"
                                     />
-                                    <span className="leading-tight">PostCoin</span>
+                                    <span className="leading-tight">Launch coin</span>
                                   </>
                               )}
                             </button>
@@ -4839,6 +4914,24 @@ function BaseChatContent() {
       <div className="pb-8">
         {/* ... rest of the content ... */}
       </div>
+
+      {/* ===== SZYBKI START TOKENA Z FEEDU =====
+          TEN SAM kreator, co na startpadzie, tylko w trybie szybkim: nazwa,
+          symbol, obrazek, opis i pre-buy. Nie budujemy drugiego formularza -
+          drugi formularz startu tokena bylby drugim miejscem, w ktorym trzeba
+          naprawiac walidacje pre-buy, limity na portfel i obsluge sieci.
+
+          Siec jest ta, ktora wybrano na startpadzie (kreator czyta ja przy
+          ladowaniu modulu). Kto chce inna, przelacza ja tam - odnosnik do
+          pelnego kreatora stoi pod formularzem. */}
+      <LaunchTokenModal
+        open={quickLaunchOpen}
+        quickOnly
+        initialName={suggestCoinFromPost(newPost).name}
+        initialSymbol={suggestCoinFromPost(newPost).symbol}
+        onClose={() => setQuickLaunchOpen(false)}
+        onLaunched={(token) => void publishLaunchPost(token)}
+      />
 
 
       {/* ===== PASEK ZAKLADEK NA TELEFONIE =====

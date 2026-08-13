@@ -1,21 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { NATIVE_IS_USD } from './config';
 
 /**
- * Kurs ETH/USD dla dopiskow w UI - KONTRAKT INTERFEJSU dla calego launchpada:
- * ETH jest zawsze wartoscia glowna, USD tylko dopiskiem ("2.1 ETH · $9,400"),
- * a przy braku kursu dopisek po prostu znika. Dlatego null, nie 0 i nie NaN -
- * zero daloby sie pomylic z prawdziwa cena.
+ * Kurs jednostki natywnej do USD dla dopiskow w UI - KONTRAKT INTERFEJSU dla
+ * calego launchpada: jednostka natywna jest zawsze wartoscia glowna, USD tylko
+ * dopiskiem ("2.1 ETH · $9,400"), a przy braku kursu dopisek po prostu znika.
+ * Dlatego null, nie 0 i nie NaN - zero daloby sie pomylic z prawdziwa cena.
+ *
+ * NA SIECI, GDZIE NATYWNY PIENIADZ JEST DOLAREM, KURSU SIE NIE PYTA.
+ * Arc liczy w USDC, wiec kurs wynosi tam 1 z definicji. Pytanie o niego
+ * wyroczni ceny ETH dawaloby dopiski w rodzaju "3 USDC · $13 000" - liczbe
+ * fizycznie nieprawdziwa, wzieta z zupelnie innego aktywa.
  */
 
 const POLL_MS = 60_000;
 
 export function useEthUsd(): { usd: number | null; refreshedAt: number | null } {
-  const [usd, setUsd] = useState<number | null>(null);
+  const [usd, setUsd] = useState<number | null>(NATIVE_IS_USD ? 1 : null);
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null);
 
   useEffect(() => {
+    // Dolar do dolara. Zadnego zapytania, zadnego pollowania.
+    if (NATIVE_IS_USD) return;
     let cancelled = false;
     const load = async () => {
       try {
