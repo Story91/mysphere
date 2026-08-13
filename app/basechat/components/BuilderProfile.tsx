@@ -2229,7 +2229,7 @@ export default function BuilderProfile({
                                         ) : (
                                           <p className="text-white text-sm font-medium truncate">{item?.track?.name || 'Unknown Track'}</p>
                                         )}
-                                        <div className="text-gray-300 text-xs truncate">
+                                        <div className="truncate text-xs text-soft-ink-soft">
                                           {item?.track?.artists?.map((artist, idx) => (
                                             <span key={idx}>
                                               {artist?.external_urls?.spotify ? (
@@ -2480,7 +2480,7 @@ export default function BuilderProfile({
                                         ) : (
                                           <p className="text-white text-sm font-medium truncate">{item?.track?.name || 'Unknown Track'}</p>
                                         )}
-                                        <div className="text-gray-300 text-xs truncate">
+                                        <div className="truncate text-xs text-soft-ink-soft">
                                           {item?.track?.artists?.map((artist, idx) => (
                                             <span key={idx}>
                                               {artist?.external_urls?.spotify ? (
@@ -2758,25 +2758,26 @@ export default function BuilderProfile({
         )}
         
         {/* BaseChatPoints - Zunifikowana sekcja z kafelkami */}
-        <div className="mb-6 bg-soft-sunken rounded-card p-6 relative overflow-hidden shadow-card">
-          <div className="absolute top-0 left-0 w-full h-1 bg-soft-primary"></div>
+        {/* ===== SUMA PUNKTOW JEST TU NAJWAZNIEJSZA =====
+            Naglowek mial obok siebie blyskawice i iskierke, a suma siedziala
+            w kafelku obwiedzionym fioletem, wielkoscia rowna napisowi obok.
+            Dwie emotki i ramka walczyly o uwage z jedyna liczba, po ktora
+            czlowiek tu patrzy.
 
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-soft-display font-bold text-soft-ink flex items-center">
-              Sphere Points
-              <div className="ml-2 text-3xl">⚡</div>
+            Teraz suma jest najwieksza rzecza w tej sekcji i stoi pod tytulem,
+            a rozbicie na skladniki lezy pod nia. Bez emotek: to jest wynik,
+            nie zabawka. */}
+        <div className="mb-6 rounded-card bg-soft-sunken p-6 shadow-card">
+          <div className="mb-6">
+            <h2 className="font-soft text-[11px] font-bold uppercase tracking-[0.14em] text-soft-ink-soft">
+              Sphere points
             </h2>
-
-            {/* Total Score - zawsze widoczny */}
-            <div className="flex items-center bg-soft-primary p-0.5 rounded-card">
-              <div className="bg-soft-surface px-4 py-2 rounded-card flex items-center">
-                <span className="text-soft-ink-faint text-xs uppercase tracking-wider font-semibold mr-2">Total Score:</span>
-                <div className="text-2xl font-soft-display font-bold tabular-nums text-soft-primary-deep">
-                  {profile.baseChatPoints?.totalPoints || Math.round(((profile.postCount || 0) * 5 + (profile.likesReceived || 0)) * 1.25)}
-                </div>
-                <div className="ml-2 text-lg">✨</div>
-              </div>
+            <div className="mt-1 font-soft-display text-[38px] font-bold leading-none tabular-nums text-soft-ink">
+              {profile.baseChatPoints?.totalPoints || Math.round(((profile.postCount || 0) * 5 + (profile.likesReceived || 0)) * 1.25)}
             </div>
+            <p className="mt-1.5 font-soft text-[11.5px] text-soft-ink-soft">
+              Earned from posts, likes and the names on this wallet.
+            </p>
           </div>
 
           {/* Lista punktów */}

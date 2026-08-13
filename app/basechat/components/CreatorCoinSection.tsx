@@ -105,12 +105,12 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-r from-purple-50 via-violet-50 to-indigo-50 dark:from-purple-900/20 dark:via-violet-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-700/50 rounded-xl p-4 animate-pulse">
+      <div className="animate-pulse rounded-card bg-soft-surface p-4 shadow-card">
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-purple-200 dark:bg-purple-700 rounded-full" />
+          <div className="h-12 w-12 rounded-full bg-soft-sunken" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 bg-purple-200 dark:bg-purple-700 rounded w-24" />
-            <div className="h-3 bg-purple-200 dark:bg-purple-700 rounded w-16" />
+            <div className="h-4 w-24 rounded bg-soft-sunken" />
+            <div className="h-3 w-16 rounded bg-soft-sunken" />
           </div>
         </div>
       </div>
@@ -123,59 +123,65 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
 
   return (
     <>
-      <div className="bg-gradient-to-r from-purple-50 via-violet-50 to-indigo-50 dark:from-purple-900/20 dark:via-violet-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-700/50 rounded-xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
+      /* ===== MONETA TWORCY W JEZYKU RESZTY PRODUKTU =====
+          Byl tu gradient przez trzy fiolety, obwodka w czwartym i cien
+          `shadow-lg`, ktorego nie uzywa nic innego w tej aplikacji. Sekcja
+          krzyczala mocniej niz saldo i przyciski w srodku, a to one sa tu
+          trescia. Zwykla karta produktu; kolor niesie tylko to, co znaczy:
+          zielen kupna, czerwien sprzedazy, bursztyn przy kwocie. */
+        <div className="rounded-card bg-soft-surface p-4 shadow-card">
         {/* Coin Info */}
         <div className="flex items-center space-x-3">
           {creatorCoin.imageUrl ? (
             <img 
               src={creatorCoin.imageUrl} 
               alt={creatorCoin.symbol} 
-              className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-300 dark:ring-purple-600"
+              className="h-12 w-12 rounded-full object-cover"
             />
           ) : (
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center ring-2 ring-purple-300 dark:ring-purple-600">
-              <span className="text-white font-bold text-lg">{creatorCoin.symbol.charAt(0)}</span>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-soft-primary">
+              <span className="font-soft-display text-lg font-bold text-white">{creatorCoin.symbol.charAt(0)}</span>
             </div>
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-soft-ink dark:text-white truncate">
+              <span className="truncate font-soft-display font-bold text-soft-ink">
                 {creatorCoin.symbol}
               </span>
               {creatorCoin.priceUSD && (
-                <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                <span className="font-soft-display text-sm font-bold tabular-nums text-soft-accent-deep">
                   ${parseFloat(creatorCoin.priceUSD).toFixed(6)}
                 </span>
               )}
             </div>
-            <p className="text-xs text-soft-ink-soft dark:text-soft-ink-faint truncate">
+            <p className="text-xs text-soft-ink-soft truncate">
               {creatorCoin.name}
             </p>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-purple-200/50 dark:border-purple-700/30">
+        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-soft-line pt-3">
           {creatorCoin.marketCap && (
             <div className="text-center">
-              <p className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">Market Cap</p>
-              <p className="text-sm font-semibold text-soft-ink dark:text-white">
+              <p className="font-soft text-[10.5px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Market cap</p>
+              <p className="font-soft-display text-[15px] font-bold tabular-nums text-soft-ink">
                 ${Number(creatorCoin.marketCap).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </div>
           )}
           {creatorCoin.volume24h && (
             <div className="text-center">
-              <p className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">24h Vol</p>
-              <p className="text-sm font-semibold text-soft-ink dark:text-white">
+              <p className="font-soft text-[10.5px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">24h volume</p>
+              <p className="font-soft-display text-[15px] font-bold tabular-nums text-soft-ink">
                 ${Number(creatorCoin.volume24h).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </div>
           )}
           {creatorCoin.uniqueHolders !== undefined && (
             <div className="text-center">
-              <p className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">Holders</p>
-              <p className="text-sm font-semibold text-soft-ink dark:text-white">
+              <p className="font-soft text-[10.5px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Holders</p>
+              <p className="font-soft-display text-[15px] font-bold tabular-nums text-soft-ink">
                 {creatorCoin.uniqueHolders.toLocaleString()}
               </p>
             </div>
@@ -187,14 +193,14 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
           <div className="flex gap-2 mt-3">
             <button
               onClick={() => handleOpenTrade('buy')}
-              className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg"
+              className="flex-1 rounded-pill bg-[#15803D] px-3 py-2 font-soft-display text-[13px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               Buy
             </button>
             {userBalance !== null && parseFloat(userBalance) > 0 && (
               <button
                 onClick={() => handleOpenTrade('sell')}
-                className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 transition-all shadow-md hover:shadow-lg"
+                className="flex-1 rounded-pill bg-[#BE185D] px-3 py-2 font-soft-display text-[13px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 Sell
               </button>
@@ -205,8 +211,8 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
         {/* User Balance */}
         {currentUserAddress && userBalance !== null && parseFloat(userBalance) > 0 && (
           <div className="mt-2 text-center">
-            <span className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">
-              Your balance: <span className="font-medium text-purple-600 dark:text-purple-400">{parseFloat(userBalance).toFixed(4)} {creatorCoin.symbol}</span>
+            <span className="text-xs text-soft-ink-soft">
+              Your balance: <span className="font-bold text-soft-accent-deep">{parseFloat(userBalance).toFixed(4)} {creatorCoin.symbol}</span>
             </span>
           </div>
         )}
@@ -215,7 +221,7 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
             miejscu znaczy "nie masz tej monety", a tego nie sprawdzilismy. */}
         {currentUserAddress && balanceFailed && (
           <div className="mt-2 text-center">
-            <span className="text-xs text-soft-ink-soft dark:text-soft-ink-faint">
+            <span className="text-xs text-soft-ink-soft">
               Your balance couldn&apos;t be loaded
             </span>
           </div>
