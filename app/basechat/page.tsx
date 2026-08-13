@@ -4143,10 +4143,54 @@ function BaseChatContent() {
                           `role="group"` + `aria-pressed`, a nie zakladki: to nie
                           jest nawigacja i nic tu nie zmienia adresu - podmienia
                           formularz w miejscu. */}
+                      {/* ===== JEDEN PASEK: CO CZYTAM | CO PISZE =====
+                          Zakladki feedu (All Posts / Follows / Basenames) staly
+                          dotad POD kompozytorem, jako osobny rzad pigulek. Nad
+                          nimi byl drugi rzad pigulek (Post / Ask), a miedzy nimi
+                          cala karta kompozytora - trzy rzedy pigulek na jednym
+                          ekranie, w trzech roznych miejscach, i zaden nie mowil,
+                          ktory czym steruje.
+
+                          Teraz stoja w jednej linii, rozdzielone pionowa
+                          wlosowa linia: po lewej WIDOK (co pokazuje lista pod
+                          spodem), po prawej TRYB PISANIA (co robi kompozytor
+                          tuz pod paskiem). Linia jest jedynym rozdzielnikiem,
+                          bo dwie grupy pigulek bez niej czytaja sie jak jedna
+                          o szesciu pozycjach.
+
+                          PRZYKLEJENIE ZOSTAJE, ale dopiero od `lg`. Powod byl
+                          slusznymi: przelaczenie widoku bez przewijania na sam
+                          gore kolumny. Na telefonie paska nie przyklejamy, bo
+                          tam zakladki maja swoje miejsce w SoftFeedMobile i nic
+                          sie nie zmienia. */}
+                      <div className="mb-3 flex items-center gap-3 lg:sticky lg:top-0 lg:z-20 lg:-mt-2 lg:bg-soft-bg/95 lg:pb-1 lg:pt-2 lg:backdrop-blur">
+                        {!showMyFeed && (
+                          <>
+                            <div className="hidden min-w-0 flex-1 lg:block">
+                              <SoftTabs
+                                tabs={[
+                                  { id: 'forYou', label: 'All Posts' },
+                                  { id: 'following', label: 'Follows' },
+                                  { id: 'baseName', label: 'Basenames' },
+                                ]}
+                                activeTab={activeFeed}
+                                onSelect={(id) =>
+                                  setActiveFeed(id as 'forYou' | 'following' | 'baseName')
+                                }
+                                className="!px-0 !py-0"
+                              />
+                            </div>
+                            <span
+                              aria-hidden="true"
+                              className="hidden h-7 w-px flex-none bg-soft-line lg:block"
+                            />
+                          </>
+                        )}
+
                       <div
                         role="group"
                         aria-label="What are you posting"
-                        className={`mb-3 gap-2 lg:flex ${
+                        className={`flex-none gap-2 lg:flex ${
                           mobileComposerOpen ? 'flex' : 'hidden'
                         }`}
                       >
@@ -4171,6 +4215,7 @@ function BaseChatContent() {
                             </button>
                           );
                         })}
+                      </div>
                       </div>
 
                       {composerMode === 'ask' ? (
@@ -4631,29 +4676,11 @@ function BaseChatContent() {
                     </>
                   )}
 
-                  {/* ===== ZAKLADKI FEEDU NA DESKTOPIE - PRZYKLEJONE =====
-                      Te same trzy zakladki (All Posts / Follows / Basenames),
-                      ktore telefon ma w SoftFeedMobile, na tym samym stanie
-                      `activeFeed` - przelaczenie na jednej szerokosci
-                      obowiazuje na kazdej. Dotad desktop w ogole nie mial
-                      dojscia do tego filtra. Pasek jest przyklejony do gory
-                      kolumny jak w duzych feedach, zeby przelaczyc widok dalo
-                      sie bez przewijania z powrotem na gore.
-                      W "My Feed" go nie ma: tam lista to wlasne posty. */}
-                  {!showMyFeed && (
-                    <div className="sticky top-0 z-20 -mt-2 mb-3 hidden bg-soft-bg/95 pb-1 pt-2 backdrop-blur lg:block">
-                      <SoftTabs
-                        tabs={[
-                          { id: 'forYou', label: 'All Posts' },
-                          { id: 'following', label: 'Follows' },
-                          { id: 'baseName', label: 'Basenames' },
-                        ]}
-                        activeTab={activeFeed}
-                        onSelect={(id) => setActiveFeed(id as 'forYou' | 'following' | 'baseName')}
-                        className="!px-0 !py-0"
-                      />
-                    </div>
-                  )}
+                  {/* Zakladki feedu na desktopie stoja teraz w pasku NAD
+                      kompozytorem, razem z wyborem Post/Ask - szukaj
+                      "JEDEN PASEK: CO CZYTAM | CO PISZE". Ten sam stan
+                      `activeFeed`, te same trzy pozycje, ta sama zasada
+                      "w My Feed ich nie ma". */}
 
                   {/* Pinned Posts Section - ukryj w trybie My Feed */}
                   {!showMyFeed && (
