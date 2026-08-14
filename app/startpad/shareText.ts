@@ -170,6 +170,12 @@ export function buildShareText(input: {
   raised: number;
   target: number;
   state: ShareState;
+  /**
+   * Jednostka natywna sieci. Domyslnie ETH, bo tam stoi produkcja - ale
+   * Robinhood i Arc maja wlasna i wpisanie im etheru do posta bylo by
+   * zdaniem o cudzych pieniadzach, ktore jest nieprawda.
+   */
+  native?: string;
 }): string {
   const parts: string[] = [`$${safeSymbol(input.symbol)}`];
 
@@ -180,7 +186,7 @@ export function buildShareText(input: {
   } else if (input.state === 'Locked') {
     parts.push('Curve filled, waiting for graduation.');
   } else {
-    parts.push(`${formatEthAmount(input.raised)} of ${formatEthAmount(input.target)} ETH on the curve.`);
+    parts.push(`${formatEthAmount(input.raised)} of ${formatEthAmount(input.target)} ${input.native ?? 'ETH'} on the curve.`);
   }
 
   parts.push('Trade it on MySphere Startpad.');

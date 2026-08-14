@@ -472,7 +472,9 @@ function BoardPromo({ token, onOpen }: { token: BoardToken | null; onOpen: () =>
       )}
       <span className="min-w-0 truncate text-[12.5px] font-extrabold text-sp-ink">{token.symbol}</span>
       <span className="shrink-0 text-[12px] font-bold tabular-nums text-sp-shade/55">
-        {formatEth(token.raised)} ETH
+        {/* `formatEth` dokleja juz jednostke sieci - drugie "ETH" dawalo
+            "0.069 ETH ETH", a na Arc doklejaloby eter do cudzej waluty. */}
+        {formatEth(token.raised)}
       </span>
       <span
         aria-hidden="true"
@@ -1047,7 +1049,7 @@ function TradePanel({
           czego ich odniesc. Na stronie tokena stoi to od poczatku; tutaj
           brakowalo. */}
         <span className="text-[11px] text-sp-shade/45">{ethBalance ? `Balance ${Number(formatEther(ethBalance.value)).toLocaleString('en-US', { maximumFractionDigits: 4 })} ${NATIVE_SYMBOL}` : '0.5% slippage buffer'}</span></div>
-      <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">ETH</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
+      <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">{NATIVE_SYMBOL}</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={spendable <= 0n} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
         <button type="button" disabled={spendable <= 0n} onClick={() => setBuyFraction(1n, 1n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">Max</button>
@@ -1926,7 +1928,7 @@ export default function LaunchpadBoard() {
     return activityFeed.map((event) => {
       // Kwota doklejana TUTAJ, nie przy skanie - kurs ETH/USD dochodzi
       // asynchronicznie i pasek ma pokazac dolary, gdy tylko sa znane.
-      const label = event.eth === undefined ? event.label : `${event.label} ${tapeAmount(event.eth, ethUsd)}`;
+      const label = event.eth === undefined ? event.label : `${event.label} ${tapeAmount(event.eth, ethUsd, NATIVE_SYMBOL)}`;
       const known = event.address ? byAddress.get(event.address.toLowerCase()) : undefined;
       if (!known) return { ...event, label };
       return {

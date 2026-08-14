@@ -232,14 +232,27 @@ export function buildLine(points: PricePoint[]): { time: number; value: number }
  *
  * Bez kursu zostaje ETH - zmyslony dolar bylby gorszy od nieczytelnego eteru.
  */
-export function tapeAmount(eth: number, ethUsd: number | null): string {
-  if (!Number.isFinite(eth) || eth < 0) return '0';
+/**
+ * Jednostki, dla ktorych wolno przeliczyc kwote na dolary.
+ *
+ * Kurs, ktorym dysponuje tablica, to kurs ETH/USD. Uzycie go do jednostki
+ * INNEJ SIECI (Arc, Robinhood) byloby klamstwem o pieniadzach, a nie wygoda -
+ * pokazywaloby cudza walute wycenie etheru. Sieci rozliczane w dolarach maja
+ * kurs 1 i tam dolar jest po prostu prawda.
+ */
+const PRICEABLE = /^(ETH|WETH|USDC|USDT|USD)$/i;
 
-  const asEth = () => `${eth.toFixed(eth >= 1 ? 2 : 4).replace(/\.?0+$/, '')} ETH`;
-  if (ethUsd === null || !Number.isFinite(ethUsd) || ethUsd <= 0) return asEth();
-  if (eth >= 0.0001) return asEth();
+export function tapeAmount(amount: number, usdRate: number | null, symbol: string): string {
+  if (!Number.isFinite(amount) || amount < 0) return '0';
 
-  const usd = eth * ethUsd;
+  // Symbol dokleja TA funkcja i tylko ona. `formatEth` w tablicy robi to samo,
+  // wiec sklejenie obu dawalo "0.069 ETH ETH".
+  const native = () => `${amount.toFixed(amount >= 1 ? 2 : 4).replace(/\.?0+$/, '')} ${symbol}`;
+
+  if (usdRate === null || !Number.isFinite(usdRate) || usdRate <= 0) return native();
+  if (!PRICEABLE.test(symbol)) return native();
+
+  const usd = amount * usdRate;
   if (usd === 0) return '$0.00';
   // Ulamek centa NIE moze pokazac sie jako "$0.00" - to wyglada jak brak
   // transakcji, a transakcja byla.
