@@ -3,6 +3,10 @@ import LaunchpadTokenDetail from './LaunchpadTokenDetail';
 import NetworkThemeSync from '../NetworkThemeSync';
 import { loadTokenCard } from '../share/tokenCard';
 import { buildShareUrl, safeSymbol } from '../shareText';
+// Jednostka natywna SIECI TOKENA, nie wpisany na sztywno eter: opis karty
+// udostepnienia idzie na X i Farcastera, a token z Arc rozliczany "w ETH"
+// bylby zdaniem o cudzych pieniadzach, ktore jest nieprawda.
+import { LAUNCHPAD_NETWORKS } from '../config';
 
 /**
  * Strona tokena launchpada.
@@ -46,7 +50,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const curve =
     data.state === 'Graduated'
       ? 'Graduated to a live pool.'
-      : `${data.raised.toFixed(2)} of ${data.target} ETH on the curve.`;
+      : `${data.raised.toFixed(2)} of ${data.target} ${
+          LAUNCHPAD_NETWORKS[data.chainId]?.chain.nativeCurrency.symbol ?? 'ETH'
+        } on the curve.`;
   const description = `${data.name} on MySphere Startpad. ${curve} ${data.holders} buyers so far.`;
 
   const url = buildShareUrl({ address: data.address, chainId: data.chainId });

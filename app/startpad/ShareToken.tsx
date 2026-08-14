@@ -15,6 +15,7 @@ import {
   type ShareTarget,
 } from './shareText';
 import { BrandMark, SHARE_BRANDS } from './shareIcons';
+import { NATIVE_SYMBOL } from './config';
 import { priceToNumber, START_PRICE_WEI } from './[address]/detailShared';
 
 /**
@@ -182,7 +183,7 @@ export default function ShareToken({
   const multiple = priceEth ? formatMultiple(priceEth, START_PRICE_ETH) : null;
   const up = priceEth !== undefined && priceEth >= START_PRICE_ETH;
   const url = board ? buildBoardUrl(chainId) : buildShareUrl({ address, chainId });
-  const text = board ? buildBoardText(board) : buildShareText({ symbol, multiple, raised, target, state });
+  const text = board ? buildBoardText(board) : buildShareText({ symbol, multiple, raised, target, state, native: NATIVE_SYMBOL });
 
   const openIntent = useCallback(
     async (destination: ShareTarget) => {

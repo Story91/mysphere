@@ -18,30 +18,41 @@ const { tapeAmount, totalEarned } = require('../app/startpad/[address]/detailSha
  */
 
 describe('tapeAmount', () => {
-  it('male kwoty pisze w dolarach - w ETH byloby zero', () => {
-    // 0,00008 ETH przy kursie $1800 to 14 centow.
-    expect(tapeAmount(0.00008, 1800)).to.equal('$0.14');
+  it('kwoty na ETH pisze w dolarach - w eterze to same zera', () => {
+    // 0,0002 ETH przy kursie $1800 to 36 centow. W pasku "Buy 0.0002 ETH"
+    // wyglada jak nic; "Buy $0.36" mowi, ze ktos naprawde cos kupil.
+    expect(tapeAmount(0.0002, 1800, 'ETH')).to.equal('$0.36');
   });
 
-  it('wieksze kwoty zostaja w ETH - tam liczba mowi sama za siebie', () => {
-    expect(tapeAmount(0.05, 1800)).to.contain('ETH');
+  it('duze kwoty tez w dolarach - pasek ma jedna jednostke, nie dwie', () => {
+    expect(tapeAmount(0.05, 1800, 'ETH')).to.equal('$90.00');
   });
 
-  it('bez kursu zostaje ETH, nigdy zmyslony dolar', () => {
-    expect(tapeAmount(0.00008, null)).to.contain('ETH');
+  it('bez kursu zostaje jednostka sieci, nigdy zmyslony dolar', () => {
+    expect(tapeAmount(0.0002, null, 'ETH')).to.equal('0.0002 ETH');
+  });
+
+  it('OBCA JEDNOSTKA NIE JEST PRZELICZANA KURSEM ETH', () => {
+    // Na Arc jednostka natywna nie jest eterem. Kurs z `useEthUsd` to kurs
+    // ETH/USD - uzyty tutaj bylby klamstwem o pieniadzach, a nie wygoda.
+    expect(tapeAmount(0.0002, 1800, 'ARC')).to.equal('0.0002 ARC');
+  });
+
+  it('siec rozliczana w dolarach pisze dolary wprost', () => {
+    expect(tapeAmount(2.5, 1, 'USDC')).to.equal('$2.50');
   });
 
   it('kwoty ponizej centa nie udaja zera dolarow', () => {
-    // 0,0000001 ETH to ulamek centa; "$0.00" wygladaloby jak brak transakcji.
-    expect(tapeAmount(0.0000001, 1800)).to.equal('<$0.01');
+    // "$0.00" wygladaloby jak brak transakcji, a transakcja byla.
+    expect(tapeAmount(0.0000001, 1800, 'ETH')).to.equal('<$0.01');
   });
 
   it('zero zostaje zerem, bez udziwnien', () => {
-    expect(tapeAmount(0, 1800)).to.equal('$0.00');
+    expect(tapeAmount(0, 1800, 'ETH')).to.equal('$0.00');
   });
 
-  it('duze kwoty skraca, zeby pasek nie pekl', () => {
-    expect(tapeAmount(10, 1800)).to.contain('ETH');
+  it('nie dokleja symbolu dwa razy - liczba przychodzi goła', () => {
+    expect(tapeAmount(0.069, null, 'ETH')).to.equal('0.069 ETH');
   });
 });
 
