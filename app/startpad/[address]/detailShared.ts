@@ -1,5 +1,5 @@
 import { formatEther, formatUnits, parseEther, type Address } from 'viem';
-import { ACTIVE_LAUNCHPAD_NETWORK } from '../config';
+import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_NETWORKS } from '../config';
 import { formatUsd } from '../useEthUsd';
 
 /**
@@ -10,21 +10,66 @@ import { formatUsd } from '../useEthUsd';
 
 export const WEI = 1_000_000_000_000_000_000n;
 
-/** R_VIRT z CurveLaunchpad: wirtualna rezerwa ETH, stala kontraktu. */
-export const R_VIRT_WEI = 750_000_000_000_000_000n;
-
 /** Cala podaz to zawsze 1e9 tokenow po 18 miejsc - stala T0 kontraktu. */
 export const SUPPLY_TOKENS = 1_000_000_000n;
 export const SUPPLY_WEI = SUPPLY_TOKENS * WEI;
 
 /**
- * Cena startowa krzywej w wei za caly token: (R_VIRT * 1e18) / T0.
- * Wychodzi 7.5e8 wei, czyli 7.5e-10 ETH - od tego punktu zaczyna sie wykres.
+ * SKALA KRZYWEJ JEST WLASNOSCIA SIECI, NIE STALA MODULU.
+ *
+ * Stalo tu `R_VIRT_WEI = 0.75e18` i `TARGET_WEI = 3e18` - prawda kazdego
+ * wdrozenia az do 2026-08-14, gdy `R_VIRT` stalo sie argumentem konstruktora.
+ * Na Arc launchpad zbiera 1000 USDC, wiec strona tokena pisala "61.72 of 3.00
+ * USDC - 0 USDC to graduation" przy krzywej przejechanej w szesciu procentach.
+ *
+ * Wersje z `chainId` sa tu dlatego, ze ten modul dziala TAKZE na serwerze, przy
+ * karcie udostepniania: `loadTokenCard` rozpoznaje siec tokena sama i moze to
+ * byc siec inna niz domyslna. Stale ponizej zostaja dla kodu klienckiego, gdzie
+ * aktywna siec wynika juz z adresu strony.
  */
-export const START_PRICE_WEI = (R_VIRT_WEI * WEI) / SUPPLY_WEI;
+function scaleOf(chainId: number): bigint {
+  const net = LAUNCHPAD_NETWORKS[chainId] ?? ACTIVE_LAUNCHPAD_NETWORK;
+  return parseEther(String(net.rVirt));
+}
 
-/** Graduacja przy DOKLADNIE 3.00 ETH rezerwy (CURVE_TARGET_ETH w config). */
-export const TARGET_WEI = 3n * WEI;
+/** Wirtualna rezerwa krzywej danej sieci, w wei. */
+export function rVirtWeiFor(chainId: number): bigint {
+  return scaleOf(chainId);
+}
+
+/** Prog graduacji danej sieci: zawsze czterokrotnosc wirtualnej rezerwy. */
+export function targetWeiFor(chainId: number): bigint {
+  return scaleOf(chainId) * 4n;
+}
+
+/** Cena startowa krzywej danej sieci w wei za caly token: (R_VIRT * 1e18) / T0. */
+export function startPriceWeiFor(chainId: number): bigint {
+  return (scaleOf(chainId) * WEI) / SUPPLY_WEI;
+}
+
+/**
+ * Cena spot po transakcji NA WSKAZANEJ SIECI:
+ * (R_VIRT + ethReserve) * 1e18 / tokenReserve.
+ */
+export function priceWeiAfterOn(
+  chainId: number,
+  ethReserveAfter: bigint,
+  tokenReserveAfter: bigint
+): bigint {
+  if (tokenReserveAfter <= 0n) return 0n;
+  return ((scaleOf(chainId) + ethReserveAfter) * WEI) / tokenReserveAfter;
+}
+
+const ACTIVE_CHAIN_ID = ACTIVE_LAUNCHPAD_NETWORK.chain.id;
+
+/** R_VIRT aktywnej sieci: wirtualna rezerwa, ktorej krzywa nigdy nie wyplaca. */
+export const R_VIRT_WEI = rVirtWeiFor(ACTIVE_CHAIN_ID);
+
+/** Cena startowa krzywej - od tego punktu zaczyna sie wykres. */
+export const START_PRICE_WEI = startPriceWeiFor(ACTIVE_CHAIN_ID);
+
+/** Graduacja przy czterokrotnosci R_VIRT (CURVE_TARGET_ETH w config). */
+export const TARGET_WEI = targetWeiFor(ACTIVE_CHAIN_ID);
 
 /**
  * Tempo blokow AKTYWNEJ sieci - do estymacji czasu bez `getBlock` na kazdy log.
@@ -127,13 +172,14 @@ export type HolderRow = {
 };
 
 /**
- * Cena spot po transakcji: (R_VIRT + ethReserve) * 1e18 / tokenReserve.
- * Ten sam wzor, co spotPriceWeiPerToken w kontrakcie - liczony z pol
- * ethReserveAfter/tokenReserveAfter, ktore niesie kazdy Bought i Sold.
+ * Cena spot po transakcji na AKTYWNEJ sieci: (R_VIRT + ethReserve) * 1e18 /
+ * tokenReserve. Ten sam wzor, co spotPriceWeiPerToken w kontrakcie - liczony
+ * z pol ethReserveAfter/tokenReserveAfter, ktore niesie kazdy Bought i Sold.
+ *
+ * Dla sieci innej niz aktywna jest `priceWeiAfterOn(chainId, ...)`.
  */
 export function priceWeiAfter(ethReserveAfter: bigint, tokenReserveAfter: bigint): bigint {
-  if (tokenReserveAfter <= 0n) return 0n;
-  return ((R_VIRT_WEI + ethReserveAfter) * WEI) / tokenReserveAfter;
+  return priceWeiAfterOn(ACTIVE_CHAIN_ID, ethReserveAfter, tokenReserveAfter);
 }
 
 /** Market cap w wei ETH: cena za token razy cala podaz (1e9 tokenow). */

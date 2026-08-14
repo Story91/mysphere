@@ -7,10 +7,10 @@ import { rpcCandidates } from '../../api/launchpad/historyRpc';
 import { readHistory } from '../../api/launchpad/historyStore';
 import {
   priceToNumber,
-  priceWeiAfter,
-  START_PRICE_WEI,
+  priceWeiAfterOn,
+  startPriceWeiFor,
   SUPPLY_TOKENS,
-  TARGET_WEI,
+  targetWeiFor,
   type TradeEntry,
 } from '../[address]/detailShared';
 import { formatMultiple } from '../shareText';
@@ -260,9 +260,12 @@ async function historyFrom(chainId: number, token: string): Promise<{ prices: nu
   }
 
   return {
-    // Cena startowa krzywej jest stala kontraktu i obowiazuje od bloku startu,
-    // wiec jest pelnoprawnym pierwszym punktem, a nie domysleniem.
-    prices: [priceToNumber(START_PRICE_WEI), ...trades.map((trade) => priceToNumber(trade.priceWei))],
+    // Cena startowa krzywej wynika ze skali TEJ sieci i obowiazuje od bloku
+    // startu, wiec jest pelnoprawnym pierwszym punktem, a nie domysleniem.
+    prices: [
+      priceToNumber(startPriceWeiFor(chainId)),
+      ...trades.map((trade) => priceToNumber(trade.priceWei)),
+    ],
     holders: buyers.size,
   };
 }
@@ -306,7 +309,7 @@ export async function loadTokenCard(
 
   // Po graduacji zostaja ostatnie rezerwy krzywej i licza sie tym samym wzorem,
   // co w kontrakcie - inaczej karta tokena po graduacji nie mialaby ceny wcale.
-  const priceWei = spotPrice > 0n ? spotPrice : priceWeiAfter(ethReserve, tokenReserve);
+  const priceWei = spotPrice > 0n ? spotPrice : priceWeiAfterOn(net.chain.id, ethReserve, tokenReserve);
   const priceEth = priceToNumber(priceWei);
 
   const [history, blobLogo, ethUsd] = await Promise.all([
@@ -330,13 +333,13 @@ export async function loadTokenCard(
     state: (LAUNCH_STATE[Number(stateIndex)] ?? 'Curve') as TokenCardData['state'],
     creator,
     raised: Number(formatEther(ethReserve)),
-    target: Number(formatEther(TARGET_WEI)),
+    target: Number(formatEther(targetWeiFor(net.chain.id))),
     priceEth,
     // Kapitalizacja Z CALEJ PODAZY - ta sama regula, co `mcapWei` na stronie
     // tokena i w karcie pod postem, zeby trzy miejsca nie podawaly trzech
     // liczb. Bez kursu ETH zostaje `null`, a karta pokazuje kreske.
     mcapUsd: ethUsd === null ? null : priceEth * ethUsd * Number(SUPPLY_TOKENS),
-    multiple: formatMultiple(priceEth, priceToNumber(START_PRICE_WEI)),
+    multiple: formatMultiple(priceEth, priceToNumber(startPriceWeiFor(net.chain.id))),
     holders: history.holders,
     prices: history.prices,
     up: last >= first,
