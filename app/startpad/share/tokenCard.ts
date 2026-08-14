@@ -86,6 +86,8 @@ export type TokenCardData = {
   priceEth: number;
   /** Kapitalizacja w dolarach. `null` = nie znamy kursu ETH, karta da kreske. */
   mcapUsd: number | null;
+  /** Jednostka natywna SIECI TOKENA - "ETH" na Base, "USDC" na Arc. */
+  nativeSymbol: string;
   /** Sformatowany mnozniki od startu, albo null gdy ceny nie znamy. */
   multiple: string | null;
   /** Liczeni tak samo jak w tablicy: rozne adresy, ktore kupily. */
@@ -312,11 +314,17 @@ export async function loadTokenCard(
   const priceWei = spotPrice > 0n ? spotPrice : priceWeiAfterOn(net.chain.id, ethReserve, tokenReserve);
   const priceEth = priceToNumber(priceWei);
 
+  const native = net.chain.nativeCurrency.symbol;
+  const isUsd = /^(USDC|USDT|USD)$/i.test(native);
+  const isEth = /^(ETH|WETH)$/i.test(native);
+
   const [history, blobLogo, ethUsd] = await Promise.all([
     historyFrom(net.chain.id, token),
     withLogo ? logoFromBlob(net.chain.id, token) : Promise.resolve(null),
-    ethUsdSpot(),
+    isEth ? ethUsdSpot() : Promise.resolve(null),
   ]);
+
+  const usdRate = isUsd ? 1 : ethUsd;
 
   const first = history.prices[0] ?? 0;
   const last = history.prices[history.prices.length - 1] ?? 0;
@@ -338,7 +346,13 @@ export async function loadTokenCard(
     // Kapitalizacja Z CALEJ PODAZY - ta sama regula, co `mcapWei` na stronie
     // tokena i w karcie pod postem, zeby trzy miejsca nie podawaly trzech
     // liczb. Bez kursu ETH zostaje `null`, a karta pokazuje kreske.
-    mcapUsd: ethUsd === null ? null : priceEth * ethUsd * Number(SUPPLY_TOKENS),
+    nativeSymbol: native,
+    // KURS ETH TYLKO DLA ETH. Na Arc jednostka natywna to USDC, wiec ten sam
+    // kod mnozyl kwote w dolarach przez kurs etheru i karta pokazywala 586,6
+    // tys. dolarow kapitalizacji przy 28 USDC na krzywej. Siec rozliczana w
+    // dolarach ma kurs 1; jednostka, ktorej nie umiemy wycenic, oddaje null i
+    // karta pisze kreske zamiast zmyslonej liczby.
+    mcapUsd: usdRate === null ? null : priceEth * usdRate * Number(SUPPLY_TOKENS),
     multiple: formatMultiple(priceEth, priceToNumber(startPriceWeiFor(net.chain.id))),
     holders: history.holders,
     prices: history.prices,

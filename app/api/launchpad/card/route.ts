@@ -140,7 +140,20 @@ export async function GET(request: NextRequest) {
 
     const priceWei = typeof spotPriceWei === 'bigint' ? spotPriceWei : null;
     const priceEth = priceWei === null ? null : Number(priceWei) / Number(WEI);
-    const usd = priceEth === null ? null : await ethUsd(request);
+    // KURS ETH TYLKO DLA ETH. Na Arc jednostka natywna to USDC, wiec ten sam
+    // kod mnozyl kwote w dolarach przez kurs etheru - karta pod postem
+    // pokazywalaby setki tysiecy dolarow przy kilkudziesieciu na krzywej.
+    // Siec rozliczana w dolarach ma kurs 1; jednostki, ktorej nie umiemy
+    // wycenic, nie wyceniamy wcale.
+    const native = net.chain.nativeCurrency.symbol;
+    const usd =
+      priceEth === null
+        ? null
+        : /^(USDC|USDT|USD)$/i.test(native)
+          ? 1
+          : /^(ETH|WETH)$/i.test(native)
+            ? await ethUsd(request)
+            : null;
 
     return NextResponse.json(
       {

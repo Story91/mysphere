@@ -1,5 +1,6 @@
 import 'server-only';
 import { getAdminDb } from '../../utils/auth/firebaseAdmin';
+import { DB_DEADLINE_MS, withDeadline } from './dbDeadline';
 import type { TradeEntry } from '../../startpad/[address]/detailShared';
 import {
   BALANCE_CHUNK_SIZE,
@@ -117,7 +118,11 @@ export async function readHistory(chainId: number, token: string): Promise<Histo
 
   try {
     const docRef = db.collection(HISTORY_COLLECTION).doc(historyDocId(chainId, token));
-    const snapshot = await docRef.get();
+    // Termin, a nie samo `catch`: przy wyczerpanym limicie Firestore SDK
+    // ponawia `RESOURCE_EXHAUSTED` z narastajacym odstepem i do `catch`
+    // dochodzi po minutach. Patrz `dbDeadline`.
+    const snapshot = await withDeadline(docRef.get(), DB_DEADLINE_MS, null);
+    if (!snapshot) return null;
     if (!snapshot.exists) return null;
     const meta = readMeta(chainId, token, snapshot.data() as MetaDoc);
 
@@ -127,7 +132,8 @@ export async function readHistory(chainId: number, token: string): Promise<Histo
     if (ids.length === 0) return { meta, trades: [], balances: new Map() };
 
     const refs = ids.map((id) => docRef.collection(PARTS_SUBCOLLECTION).doc(id));
-    const docs = await db.getAll(...refs);
+    const docs = await withDeadline(db.getAll(...refs), DB_DEADLINE_MS, null);
+    if (!docs) return { meta, trades: [], balances: new Map() };
     const parts: HistoryPart[] = [];
     for (const doc of docs) {
       if (!doc.exists) continue;
@@ -158,13 +164,13 @@ export async function claimScanLock(chainId: number, token: string): Promise<boo
   const docRef = db.collection(HISTORY_COLLECTION).doc(historyDocId(chainId, token));
   const now = Date.now();
   try {
-    return await db.runTransaction(async (tx: any) => {
+    return await withDeadline(db.runTransaction(async (tx: any) => {
       const snapshot = await tx.get(docRef);
       const until = snapshot.exists ? (snapshot.data() as MetaDoc).scanLockUntil : 0;
       if (typeof until === 'number' && until > now) return false;
       tx.set(docRef, { chainId, token: token.toLowerCase(), scanLockUntil: now + SCAN_LOCK_MS }, { merge: true });
       return true;
-    });
+    }), DB_DEADLINE_MS, false);
   } catch {
     return false;
   }
@@ -251,7 +257,7 @@ export async function writeHistory(input: {
       { merge: true }
     );
 
-    await batch.commit();
+    await withDeadline(batch.commit(), DB_DEADLINE_MS, undefined);
   } catch {
     // Nieudany zapis znaczy tylko tyle, ze nastepny odwiedzajacy zeskanuje to
     // samo jeszcze raz. Zadanie i tak odda swiezo zeskanowana historie.
