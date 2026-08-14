@@ -122,7 +122,12 @@ const config = {
      * Dlatego nie zostawiamy tu automatu z domyslnym zerem.
      */
     arcTestnet: {
-      url: process.env.ARC_TESTNET_RPC_URL || "https://rpc.testnet.arc.network/",
+      // Blockdaemon, a nie rpc.testnet.arc.network. Ten drugi oddaje HTTP 429
+      // przy kilkudziesieciu transakcjach z rzedu - przebieg tlumu wywrocil sie
+      // na nim w PODSUMOWANIU, czyli juz po wyslaniu wszystkich transakcji.
+      // Praca zrobiona, raportu brak - najgorsze mozliwe miejsce na blad.
+      // To ten sam endpoint, ktory jako jedyny daje okno 50 000 na eth_getLogs.
+      url: process.env.ARC_TESTNET_RPC_URL || "https://rpc.blockdaemon.testnet.arc.io",
       accounts: deployerAccounts(),
       chainId: 5042002,
     },
