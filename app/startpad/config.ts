@@ -45,6 +45,23 @@ export type LaunchpadNetwork = {
    */
   poolManager: `0x${string}`;
   deployBlock: bigint;
+  /**
+   * SKALA KRZYWEJ TEGO WDROZENIA, w jednostce natywnej sieci.
+   *
+   * Od 2026-08-14 `R_VIRT` jest argumentem konstruktora `CurveLaunchpad`, a nie
+   * stala - bo na Arc `msg.value` to USDC, wiec ten sam bajtkod zbieral tam
+   * DOLARY zamiast eteru. Interfejs musi wiec wiedziec, na jakiej skali stoi
+   * siec, ktora akurat oglada.
+   *
+   * Stala `0.75` wpisana w kodzie frontu przezyla to wdrozenie o jeden dzien za
+   * dlugo: tablica liczyla prog 3 USDC przy launchpadzie zbierajacym 1000, wiec
+   * KAZDY token pokazywal pelny pasek i "0.00 USDC to graduation". Dane z
+   * lancucha byly poprawne przez caly czas - klamal wylacznie ten jeden mnoznik.
+   *
+   * Ma byc rowne `R_VIRT()` wdrozonego launchpada. Wszystko inne wynika stad:
+   * prog zbiorki to `4 x`, a kapitalizacja po graduacji `25 x`.
+   */
+  rVirt: number;
   explorerUrl: string;
   /**
    * Ile blokow bierze jeden `getLogs` przy odtwarzaniu rynku, i ile takich
@@ -117,6 +134,8 @@ const baseMainnetEntry: LaunchpadNetwork = {
     '0xEC7db55Bc081289820097703B3A66003092844D1',
   poolManager: '0x498581fF718922c3f8e6A244956aF099B2652b2b',
   deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK ?? '49843030'),
+  // Wdrozenie sprzed parametryzacji skali - dawna stala kontraktu.
+  rVirt: 0.75,
   explorerUrl: 'https://basescan.org',
   // ZMIERZONE 2026-08-13 na `mainnet.base.org` ORAZ na CDP: limit `eth_getLogs`
   // to 10 000 blokow, nie 2 000 - tak stalo w tym komentarzu przez pomylke z
@@ -157,6 +176,8 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F',
     poolManager: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'),
+    // Wdrozenie sprzed parametryzacji skali - dawna stala kontraktu.
+    rVirt: 0.75,
     explorerUrl: 'https://sepolia.basescan.org',
     // ZMIERZONE 2026-08-13 na `sepolia.base.org`: 10 000 przechodzi, 25 000
     // odbija sie o "limited to a 10,000 range". Stalo tu 1900 z komentarzem o
@@ -187,6 +208,8 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       '0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A',
     poolManager: '0x8366a39cc670b4001a1121b8f6a443a643e40951',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ROBINHOOD_DEPLOY_BLOCK ?? '33102326'),
+    // Wdrozenie sprzed parametryzacji skali - dawna stala kontraktu.
+    rVirt: 0.75,
     explorerUrl: 'https://robinhoodchain.blockscout.com',
     /**
      * Zmierzone 2026-08-13: RPC Robinhooda oddaje 2 MLN blokow w jednym
@@ -348,6 +371,9 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       '0xC10eDaF3473CcDB6e91090F204b01Ccb555686C9',
     poolManager: '0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6',
     deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_DEPLOY_BLOCK ?? '56866835'),
+    // 250 USDC wirtualnej rezerwy, czyli prog zbiorki 1000 i mcap 6250 po
+    // graduacji. Sprawdzone odczytem `R_VIRT()` z wdrozonego kontraktu.
+    rVirt: 250,
     explorerUrl: 'https://testnet.arcscan.app',
     // ZMIERZONE 2026-08-13 na wszystkich pieciu endpointach z docs.arc.io:
     // 50 000 przechodzi wylacznie na Blockdaemonie, pozostale odbijaja sie o
@@ -1053,8 +1079,24 @@ export const LAUNCH_STATE = ['None', 'Curve', 'Locked', 'Graduated'] as const;
 
 export type LaunchState = (typeof LAUNCH_STATE)[number];
 
-/** Zbiorka do awansu wynika ze stalych krzywej i jest DOKLADNIE 3.00 ETH. */
-export const CURVE_TARGET_ETH = 3;
+/**
+ * Wirtualna rezerwa krzywej AKTYWNEJ sieci. Cena spot to
+ * `(R_VIRT + ethReserve) / tokenReserve`, wiec ta liczba wchodzi do KAZDEGO
+ * przeliczenia ceny i kapitalizacji w interfejsie.
+ */
+export const R_VIRT_NATIVE = ACTIVE_LAUNCHPAD_NETWORK.rVirt;
+
+/**
+ * Zbiorka do awansu. Wynika z geometrii krzywej i jest zawsze czterokrotnoscia
+ * wirtualnej rezerwy - stalo tu `3`, prawdziwe dopoki kazde wdrozenie mialo
+ * `R_VIRT` = 0.75. Na Arc launchpad zbiera 1000 USDC, wiec ta trojka kazala
+ * tablicy pokazywac pelny pasek i "0.00 USDC to graduation" przy tokenie, ktory
+ * przeszedl dopiero kilka procent drogi.
+ *
+ * Nazwa z `_ETH` zostaje, bo tak wola ja kilkanascie miejsc, ale jednostka to
+ * zawsze pieniadz natywny sieci - `NATIVE_SYMBOL`.
+ */
+export const CURVE_TARGET_ETH = ACTIVE_LAUNCHPAD_NETWORK.rVirt * 4;
 
 /**
  * Blok wdrozenia launchpada na AKTYWNEJ sieci. `getLogs` od bloku 0 na

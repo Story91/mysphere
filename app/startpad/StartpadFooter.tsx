@@ -5,6 +5,8 @@ import { ExternalLink } from 'lucide-react';
 import {
   NATIVE_SYMBOL,
   ACTIVE_LAUNCHPAD_NETWORK,
+  CURVE_TARGET_ETH,
+  R_VIRT_NATIVE,
   B20_PRECOMPILE_ADDRESS,
   DEFAULT_LAUNCHPAD_CHAIN_ID,
   LAUNCHPAD_NETWORKS,
@@ -17,7 +19,12 @@ import {
  * Tresc jest skrotem `docs/LAUNCHPAD-DOSSIER.md` - przy kazdej zmianie
  * launchpada aktualizuje sie dossier ORAZ te stopke (ta sama zasada, ktora
  * pilnuje dossiera). Liczby sa przepisane z kontraktow, nie wymyslone:
- * 70/30, prog 3.00 ETH, 25x, buyback z dzialki tworcy.
+ * 70/30, 25x, buyback z dzialki tworcy.
+ *
+ * Skala krzywej NIE jest tu wpisana. Stalo w tej tabeli "0.75 / 3.00 / 18.75",
+ * co bylo prawda kazdego wdrozenia do 2026-08-14 - a od tamtej pory `R_VIRT`
+ * jest argumentem konstruktora i na Arc wynosi 250. Stopka opisujaca cudza
+ * krzywa jest gorsza niz brak stopki, wiec te trzy liczby licza sie z sieci.
  *
  * Zaden fragment nie potrzebuje stanu ani sieci - stopka to czysty HTML
  * (details/summary zamiast wlasnego akordeonu), wiec nie dorzuca ani jednego
@@ -26,6 +33,15 @@ import {
 
 function shortAddr(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+/**
+ * Kwota krzywej. Ta sama funkcja obsluguje 0.75 i 6250, wiec nie moze ani
+ * uciac ulamka, ani wypisac "6250.00" - stad zmienna liczba miejsc po
+ * przecinku i separator tysiecy.
+ */
+function curveAmount(value: number): string {
+  return value.toLocaleString('en-US', { maximumFractionDigits: value < 10 ? 2 : 0 });
 }
 
 /* Krok cyklu zycia - chip z podpisem. Strzalki rysuje rodzic. */
@@ -165,9 +181,9 @@ export default function StartpadFooter() {
                   ['Total supply (minted once, to the curve)', '1,000,000,000'],
                   ['Sold on the curve', 'up to 800,000,000 (80%)'],
                   ['Moved to the pool at graduation', '200,000,000 (20%)'],
-                  ['Starting market cap', `0.75 ${NATIVE_SYMBOL}`],
-                  ['Graduation trigger', `reserve = 3.00 ${NATIVE_SYMBOL} exactly`],
-                  ['Market cap at graduation', `18.75 ${NATIVE_SYMBOL} (25×)`],
+                  ['Starting market cap', `${curveAmount(R_VIRT_NATIVE)} ${NATIVE_SYMBOL}`],
+                  ['Graduation trigger', `reserve = ${curveAmount(CURVE_TARGET_ETH)} ${NATIVE_SYMBOL} exactly`],
+                  ['Market cap at graduation', `${curveAmount(R_VIRT_NATIVE * 25)} ${NATIVE_SYMBOL} (25×)`],
                   ['Creator allocation', 'none (a pre-buy is a normal buy on the same curve)'],
                 ].map(([k, v]) => (
                   <tr key={k} className="border-t border-sp-shade/5 first:border-t-0">
@@ -180,7 +196,7 @@ export default function StartpadFooter() {
           </div>
           <p className="mt-2 text-[11.5px] text-sp-shade/45">
             Solvency invariant: selling every circulating token back returns exactly the {NATIVE_SYMBOL} reserve.
-            The virtual 0.75 {NATIVE_SYMBOL} is never paid out.
+            The virtual {curveAmount(R_VIRT_NATIVE)} {NATIVE_SYMBOL} is never paid out.
           </p>
         </DocSection>
 

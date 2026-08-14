@@ -29,6 +29,7 @@ import {
   NATIVE_SYMBOL,
   ACTIVE_LAUNCHPAD_NETWORK,
   CURVE_TARGET_ETH,
+  R_VIRT_NATIVE,
   erc20Abi,
   hookAbi,
   LAUNCH_HOOK_ADDRESS,
@@ -210,17 +211,19 @@ function usdNote(eth: number, ethUsd: number | null): string | null {
 }
 
 /**
- * Wirtualna rezerwa krzywej w ETH - stala `R_VIRT` kontraktu. Cena spot po
- * transakcji to (R_VIRT + ethReserve) / tokenReserve, i DOKLADNIE te rezerwy
- * niesie kazdy event `Bought`/`Sold`, wiec historia cen nie wymaga ani jednego
- * dodatkowego odczytu.
+ * Wirtualna rezerwa krzywej AKTYWNEJ sieci. Cena spot po transakcji to
+ * (R_VIRT + ethReserve) / tokenReserve, i DOKLADNIE te rezerwy niesie kazdy
+ * event `Bought`/`Sold`, wiec historia cen nie wymaga ani jednego dodatkowego
+ * odczytu.
+ *
+ * Stalo tu `0.75` - prawda kazdego wdrozenia az do 2026-08-14, gdy skala stala
+ * sie argumentem konstruktora. Na Arc (R_VIRT = 250) ta stala zanizala kazda
+ * cene i kazda kapitalizacje o ponad dwiescie jednostek wirtualnej rezerwy.
  */
-const R_VIRT_ETH = 0.75;
-
 function spotPriceFromReserves(ethReserveAfter: bigint, tokenReserveAfter: bigint): number {
   const tokens = Number(formatEther(tokenReserveAfter));
   if (tokens <= 0) return 0;
-  return (R_VIRT_ETH + Number(formatEther(ethReserveAfter))) / tokens;
+  return (R_VIRT_NATIVE + Number(formatEther(ethReserveAfter))) / tokens;
 }
 
 function TokenGlyph({ token, large = false }: { token: LaunchpadToken; large?: boolean }) {
