@@ -115,9 +115,14 @@ async function main() {
     );
   }
 
+  // Jednostka natywna SIECI. Wypisywanie "ETH" na Arc bylo drobiazgiem tylko z
+  // pozoru: caly powod tej zmiany to fakt, ze te same liczby znacza tam dolary,
+  // wiec podpisanie ich zla waluta myli dokladnie tam, gdzie boli najbardziej.
+  const unit = chainId === 5042002 ? "USDC" : "ETH";
+
   console.log("siec              ", `${network.name} (chainId ${chainId})`);
   console.log("wdrazajacy        ", deployer);
-  console.log("saldo             ", ethers.formatEther(await ethers.provider.getBalance(deployer)), "ETH");
+  console.log("saldo             ", ethers.formatEther(await ethers.provider.getBalance(deployer)), unit);
   console.log("PoolManager       ", poolManager, `[${pmSource}, ${(pmCode.length - 2) / 2} B kodu]`);
   console.log("feeRecipient      ", feeRecipient);
   console.log("feeBps            ", feeBps.toString());
@@ -126,7 +131,6 @@ async function main() {
   // Skala wypisana JAKO SKUTKI, nie jako surowa liczba. "R_VIRT 250" nie mowi
   // nikomu nic; "prog 1000, kapitalizacja po graduacji 6250" mowi wszystko i
   // pozwala zlapac pomylke o rzad wielkosci na sekunde przed CONFIRM=tak.
-  const unit = chainId === 5042002 ? "USDC" : "ETH";
   const target = rVirt * 4n;
   console.log("R_VIRT            ", `${ethers.formatEther(rVirt)} ${unit}`);
   console.log("prog zbiorki      ", `${ethers.formatEther(target)} ${unit}`);

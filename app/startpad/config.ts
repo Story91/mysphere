@@ -317,20 +317,37 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     // Precompile B20 zyje tylko na Base - tu, jak na Robinhoodzie, token jest
     // zwyklym ERC-20 z naszej fabryki.
     tokenStandard: 'plain',
+    /*
+     * WDROZENIE Z 2026-08-14, prog 1000 USDC (R_VIRT = 250).
+     *
+     * Pierwsze wdrozenie na Arc (0xdAe0...600d) zbieralo 3 USDC do graduacji -
+     * liczba odziedziczona po Base, gdzie znaczyla 3 ETH. Tutaj znaczyla trzy
+     * dolary, czyli tyle, ze token domykal krzywa przypadkiem.
+     *
+     * Skala jest teraz argumentem konstruktora, wiec te 1000 USDC to ta sama
+     * krzywa co na Base, tylko przeskalowana - prog to zawsze czterokrotnosc
+     * R_VIRT, a kapitalizacja po graduacji szesc i cwierc raza wieksza od
+     * zebranej kwoty (tu 6250 USDC).
+     *
+     * Stare launchpady zyja dalej i ich tokeny nie znikaja z lancucha, ale
+     * tablica czyta JEDEN adres na siec, wiec widac wylacznie tokeny stad.
+     */
     launchpad:
       (process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_ADDRESS as `0x${string}` | undefined) ??
-      '0xdAe0dd6EE87a8d7eE7575dD9904A72fA9CA6600d',
+      '0xe984986f4F1E067f697b548D5fe942813d03Da37',
     vault:
       (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_ARC_ADDRESS as `0x${string}` | undefined) ??
-      '0x8F224A0782b55aF138A05b0EEA03f8D6D69A51D6',
+      '0xaD714ce622D20d9A385DA751903C6B85beEB90e0',
     hook:
       (process.env.NEXT_PUBLIC_LAUNCH_HOOK_ARC_ADDRESS as `0x${string}` | undefined) ??
-      '0x2615415f5eE2E0dF65bF0788E7c43ACdCB036044',
+      '0x7e8E196cc94547c938725923cbB4B518146De044',
+    // Fabryka jest wspoldzielona - nie ma w niej niczego, co zalezy od skali
+    // krzywej, wiec drugie wdrozenie uzywa tej samej i oszczedza gaz.
     tokenFactory:
       (process.env.NEXT_PUBLIC_TOKEN_FACTORY_ARC_ADDRESS as `0x${string}` | undefined) ??
       '0xC10eDaF3473CcDB6e91090F204b01Ccb555686C9',
     poolManager: '0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6',
-    deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_DEPLOY_BLOCK ?? '56844144'),
+    deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_DEPLOY_BLOCK ?? '56866835'),
     explorerUrl: 'https://testnet.arcscan.app',
     // ZMIERZONE 2026-08-13 na wszystkich pieciu endpointach z docs.arc.io:
     // 50 000 przechodzi wylacznie na Blockdaemonie, pozostale odbijaja sie o

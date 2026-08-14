@@ -76,8 +76,26 @@ async function main() {
   const [admin] = await ethers.getSigners();
   const pad = (await ethers.getContractAt("CurveLaunchpad", launchpadAddress)) as Contract;
 
+  /**
+   * WIELKOSC ZLECENIA IDZIE ZE SKALI KRZYWEJ, A NIE Z WPISANEJ LICZBY.
+   *
+   * Stalo tu "od 0,01 do 0,15" - dobrane pod launchpada, ktory zbieral 3 USDC.
+   * Na krzywej z progiem 1000 USDC taka transakcja nie rusza ceny o nic
+   * widocznego: wykres zostaje plaski, pasek postepu nie drgnie i caly przebieg
+   * udaje handel, zamiast go pokazywac.
+   *
+   * Teraz zakres to 0,1% - 1% progu zbiorki, wiec ten sam skrypt daje sensowny
+   * ruch na kazdej skali: 1-10 USDC przy progu 1000, 0,02-0,2 przy progu 20.
+   */
+  const rVirt = (await pad.R_VIRT()) as bigint;
+  const target = rVirt * 4n;
+  const minTrade = target / 1_000n;
+  const maxTrade = target / 100n;
+
   console.log("siec     ", hre.network.name, `(chainId ${chainId})`);
   console.log("launchpad", launchpadAddress);
+  console.log("prog     ", `${ethers.formatEther(target)} ${unit}`);
+  console.log("zlecenia ", `${ethers.formatEther(minTrade)} - ${ethers.formatEther(maxTrade)} ${unit}`);
   console.log("tokeny   ", tokens.length);
   console.log("portfele ", count, `po ${ethers.formatEther(fund)} ${unit}`);
   console.log("rundy    ", rounds);
@@ -150,11 +168,14 @@ async function main() {
           sells += 1;
         } else {
           const spendable = balance - GAS_RESERVE;
-          // Od 0,01 do 0,15 jednostki - dosc, zeby ruszyc cena, za malo, zeby
-          // jeden portfel domknal krzywa.
-          const wanted = ethers.parseEther((0.01 + random() * 0.14).toFixed(4));
+          // Ulamek progu, a nie stala kwota - dosc, zeby ruszyc cena, za malo,
+          // zeby jeden portfel domknal krzywa.
+          const draw = BigInt(Math.floor(random() * 1_000));
+          const wanted = minTrade + ((maxTrade - minTrade) * draw) / 1_000n;
           const value = wanted > spendable ? spendable : wanted;
-          if (value < ethers.parseEther("0.005")) {
+          // Ponizej polowy dolnego widelka transakcja jest juz tylko oplata za
+          // gaz - portfel przepuszcza runde i zostawia srodki na nastepna.
+          if (value < minTrade / 2n) {
             skipped += 1;
             continue;
           }
