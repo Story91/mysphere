@@ -189,7 +189,21 @@ export function useTokenHistory(tokenAddress: Address | null, startedAt: number 
       });
       if (since) query.set('sinceBlock', since);
 
-      const response = await fetch(`/api/launchpad/history?${query.toString()}`);
+      // TERMIN NA ODPOWIEDZ TRASY, nie tylko na jej blad.
+      //
+      // Awaryjny skan z lancucha (nizej) wlaczal sie dotad wylacznie po
+      // BLEDZIE trasy. 14 sierpnia 2026 Firestore wyczerpal dzienny limit
+      // odczytow i trasa przestala oddawac blad - zaczela MILCZEC, bo SDK
+      // Firebase ponawia `RESOURCE_EXHAUSTED` z narastajacym odstepem.
+      // Odpowiedzi przychodzily po 120 i 372 sekundach, a wykres na stronie
+      // tokena budowal sie "w nieskonczonosc", majac obok gotowa droge do
+      // policzenia tego samego z logow.
+      //
+      // Osiem sekund to sufit sensownego cache'u: skan lancucha trwa okolo
+      // dwoch, wiec czekanie dluzej przestaje byc przyspieszeniem.
+      const response = await fetch(`/api/launchpad/history?${query.toString()}`, {
+        signal: AbortSignal.timeout(8000),
+      });
       if (!response.ok) throw new Error(`History cache responded ${response.status}.`);
       const data = (await response.json()) as CacheResponse;
 

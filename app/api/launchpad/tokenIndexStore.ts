@@ -1,5 +1,6 @@
 import 'server-only';
 import { getAdminDb } from '../../utils/auth/firebaseAdmin';
+import { DB_DEADLINE_MS, withDeadline } from './dbDeadline';
 import {
   indexDocId,
   mergeIndex,
@@ -36,8 +37,12 @@ export async function readTokenIndex(chainId: number): Promise<TokenIndex | null
   if (!db) return null;
 
   try {
-    const snapshot = await db.collection(TOKEN_INDEX_COLLECTION).doc(indexDocId(chainId)).get();
-    if (!snapshot.exists) return null;
+    const snapshot = await withDeadline(
+      db.collection(TOKEN_INDEX_COLLECTION).doc(indexDocId(chainId)).get(),
+      DB_DEADLINE_MS,
+      null
+    );
+    if (!snapshot || !snapshot.exists) return null;
     const data = snapshot.data() as { tokens?: unknown; lastBlock?: unknown; updatedAt?: unknown };
     return {
       chainId,
@@ -72,7 +77,7 @@ export async function writeTokenIndex(input: {
   const lastBlock = current && current.lastBlock > input.lastBlock ? current.lastBlock : input.lastBlock;
 
   try {
-    await db.collection(TOKEN_INDEX_COLLECTION).doc(indexDocId(input.chainId)).set(
+    await withDeadline(db.collection(TOKEN_INDEX_COLLECTION).doc(indexDocId(input.chainId)).set(
       {
         chainId: input.chainId,
         tokens,
@@ -80,7 +85,7 @@ export async function writeTokenIndex(input: {
         updatedAt: Date.now(),
       },
       { merge: true }
-    );
+    ), DB_DEADLINE_MS, undefined);
   } catch {
     // Nieudany zapis znaczy tylko tyle, ze nastepne wejscie zeskanuje ten sam
     // zakres jeszcze raz. Lista, ktora wlasnie zlozylismy, i tak wraca do

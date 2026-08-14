@@ -191,7 +191,9 @@ export function TokenShareCard({ data, height }: { data: TokenCardData; height: 
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <Stat
             label={data.state === 'Graduated' ? 'RAISED' : `ON THE CURVE · ${progress}%`}
-            value={`${ethLabel(data.raised)} / ${ethLabel(data.target)} ETH`}
+            // Jednostka SIECI, nie wpisany na sztywno eter: Arc rozlicza sie
+            // w USDC i karta pisala tam "1000 ETH".
+            value={`${ethLabel(data.raised)} / ${ethLabel(data.target)} ${data.nativeSymbol}`}
             tone={CARD.ink}
           />
           <Stat label="BUYERS" value={String(data.holders)} />
