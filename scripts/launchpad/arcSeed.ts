@@ -26,11 +26,47 @@ import { getAddress, type Contract, type ContractTransactionReceipt } from "ethe
  * wszystkie, czekamy raz i dopiero potem kupujemy. Trzy tokeny kosztuja przez
  * to jedno oczekiwanie, a nie trzy - piec minut zamiast pietnastu.
  *
+ * ===========================================================================
+ * LOGO: DLACZEGO `data:application/json`, A NIE ADRES OBRAZKA
+ * ===========================================================================
+ * `metadataURI` niosacy sam adres obrazka interfejs pokaze jako ODNOSNIK, nie
+ * jako logo - `parseMetadataUri` szuka pola `image` w JSON-ie i tylko wtedy ma
+ * prawo cokolwiek wyrenderowac. To nie jest kaprys: pod obcym adresem moze
+ * lezec cokolwiek, wiec zgoda na "to jest obrazek" musi byc wpisana wprost.
+ *
+ * Uzywamy tej samej sciezki, co formularz startu - JSON zapakowany w URI, bez
+ * zadnego backendu w srodku. Same obrazki to assety, ktore juz stoja na
+ * mysphere.fun, wiec zaden test nie wisi na cudzej bramie IPFS.
+ *
+ * `metadataURI` NIE MA SETTERA - ustawia sie raz, przy starcie. Tokenom
+ * zasianym wczesniej logo dopisze sie wylacznie przez profil (podpisem tworcy),
+ * a nie tym skryptem.
+ *
  * Uzycie (kwoty w jednostce natywnej sieci; na Arc to USDC):
  *   SEED_COUNT=3 SEED_BUY=0.5 npm run launchpad:seed:arc
  */
 
 const LAUNCH_WINDOW = 300;
+
+/**
+ * Obrazki tokenow testowych. Kazdy inny, zeby na tablicy bylo widac, ze logo
+ * idzie z tokena, a nie ze wspolnego zapasu - przy szesciu tych samych
+ * kolkach nie odroznisz dzialajacego odczytu od przypadku.
+ */
+const SEED_LOGOS = [
+  { image: 'https://mysphere.fun/SphereWhite.png', description: 'Test launch on Arc. No value, no promises.' },
+  { image: 'https://mysphere.fun/ethlogo.png', description: 'Arc testnet probe token.' },
+  { image: 'https://mysphere.fun/Base_square_blue.png', description: 'Curve mechanics check on Arc.' },
+  { image: 'https://mysphere.fun/Camp.png', description: 'Seeded to keep the board alive.' },
+  { image: 'https://mysphere.fun/talent.png', description: 'Testnet only. Do not buy.' },
+  { image: 'https://mysphere.fun/Kaito-AI.png', description: 'Arc curve, small size, staying live.' },
+];
+
+function metadataUriFor(index: number) {
+  const entry = SEED_LOGOS[index % SEED_LOGOS.length];
+  const json = JSON.stringify({ image: entry.image, description: entry.description });
+  return `data:application/json;base64,${Buffer.from(json, 'utf8').toString('base64')}`;
+}
 
 function requireAddress(name: string) {
   const value = process.env[name];
@@ -106,6 +142,15 @@ async function main() {
 
   const pad = await ethers.getContractAt("CurveLaunchpad", launchpadAddress);
 
+  // Ekonomia zasianych tokenow ma byc DOKLADNIE domyslna - `launchAdvanced`
+  // rozni sie od `launch` wylacznie tym, ze przyjmuje logo. Dlatego oplaty i
+  // limit okna czytamy z WDROZONEGO kontraktu zamiast wpisywac je tutaj: gdyby
+  // ktos wdrozyl launchpada z innymi stawkami, wpisane liczby po cichu
+  // zasialyby tokeny na innych zasadach niz reszta sieci.
+  const feeBps = await pad.FEE_BPS();
+  const creatorFeeBps = await pad.CREATOR_FEE_BPS();
+  const windowCap = await pad.WINDOW_ADDR_CAP();
+
   // ---------------------------------------------------------------------
   // 1. STARTY - wszystkie naraz, zeby okna biegly rownolegle
   // ---------------------------------------------------------------------
@@ -116,7 +161,21 @@ async function main() {
     const name = `${prefix} Seed ${index + 1}`;
     const deadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
 
-    const receipt = (await (await pad.launch(name, symbol, 0, deadline)).wait())!;
+    const receipt = (await (
+      await pad.launchAdvanced(
+        name,
+        symbol,
+        0,
+        deadline,
+        feeBps,
+        creatorFeeBps,
+        0,
+        windowCap,
+        [signer.address],
+        [10_000],
+        metadataUriFor(index)
+      )
+    ).wait())!;
     const launched = parseEvent(pad, receipt, "Launched");
     const address = getAddress(launched.args[0]);
     const startedAt = Number(launched.args.startedAt);

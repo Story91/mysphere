@@ -100,6 +100,13 @@ type DeployArgs = {
   tokenFactory: string;
   /** Domyslnie adres, pod ktorym `beforeEach` testow instaluje `MockPoolManager`. */
   poolManager?: string;
+  /**
+   * Skala krzywej. Domyslnie 0.75 ether, czyli wartosc, ktora do 2026-08-14
+   * byla w kontrakcie STALA - dzieki temu wszystkie istniejace testy licza na
+   * dokladnie tych samych liczbach, co przedtem, i nie trzeba bylo ruszyc ani
+   * jednej ich asercji.
+   */
+  rVirt?: bigint;
 };
 
 /** Wdraza launchpad (a przez niego vault i hook) i oddaje wszystkie trzy. */
@@ -115,7 +122,8 @@ async function deployLaunchpad(args: DeployArgs) {
     args.feeRecipient,
     args.protocolShareBps,
     args.tokenFactory,
-    predicted.salt
+    predicted.salt,
+    args.rVirt ?? ethers.parseEther('0.75')
   );
   await pad.waitForDeployment();
 

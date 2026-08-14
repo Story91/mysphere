@@ -38,6 +38,13 @@ const DEAD = '0x000000000000000000000000000000000000dEaD';
 
 const T0 = ethers.parseEther('1000000000');
 const T_MIN = ethers.parseEther('200000000');
+/**
+ * Skala krzywej. Do 2026-08-14 stala w kontrakcie; od tej daty jest argumentem
+ * konstruktora, bo na Arc `msg.value` to USDC i ten sam bajtkod zbieral tam
+ * DOLARY zamiast eteru. Testy ponizej licza na liczbach sprzed zmiany, wiec
+ * podaja przy wdrozeniu dokladnie te sama wartosc - rownowaznosc przybija
+ * test/CurveScale.test.ts.
+ */
 const R_VIRT = ethers.parseEther('0.75');
 const FEE_BPS = 100n;
 const CREATOR_FEE_BPS = 40n;
@@ -172,7 +179,8 @@ describe('CurveLaunchpad', function () {
           treasury.address,
           6000,
           await tokenFactory.getAddress(),
-          ethers.ZeroHash
+          ethers.ZeroHash,
+          R_VIRT
         )
       ).to.be.revertedWithCustomError(vault, 'BadHookAddress');
     });
@@ -182,23 +190,32 @@ describe('CurveLaunchpad', function () {
       const tf = await tokenFactory.getAddress();
       // Te warunki stoja PRZED wdrozeniem vaulta, wiec salt jest tu bez znaczenia.
       await expect(
-        Pad.deploy(POOL_MANAGER, 101, 40, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 101, 40, treasury.address, 6000, tf, ethers.ZeroHash, R_VIRT)
       ).to.be.revertedWithCustomError(pad, 'FeeTooHigh');
       await expect(
-        Pad.deploy(POOL_MANAGER, 100, 101, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 101, treasury.address, 6000, tf, ethers.ZeroHash, R_VIRT)
       ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
       // Podloga protokolu obowiazuje TAKZE wdrazajacego: 71 ze 100 to juz 71%,
       // czyli ponad `MAX_CREATOR_SHARE_BPS`. Bez tego warunku domyslna
       // konfiguracja mogla by oddac cala oplate tworcy, a sufit w `_launch`
       // pilnowalby juz tylko startow wywolanych recznie.
       await expect(
-        Pad.deploy(POOL_MANAGER, 100, 71, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 71, treasury.address, 6000, tf, ethers.ZeroHash, R_VIRT)
       ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
       await expect(
-        Pad.deploy(POOL_MANAGER, 100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash, R_VIRT)
       ).to.be.revertedWithCustomError(pad, 'ZeroAddress');
       await expect(
-        Pad.deploy(POOL_MANAGER, 100, 40, treasury.address, 6000, ethers.ZeroAddress, ethers.ZeroHash)
+        Pad.deploy(
+          POOL_MANAGER,
+          100,
+          40,
+          treasury.address,
+          6000,
+          ethers.ZeroAddress,
+          ethers.ZeroHash,
+          R_VIRT
+        )
       ).to.be.revertedWithCustomError(pad, 'ZeroAddress');
     });
 

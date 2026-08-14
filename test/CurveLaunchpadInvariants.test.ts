@@ -67,6 +67,13 @@ const DEAD = '0x000000000000000000000000000000000000dEaD';
 
 const T0 = 10n ** 27n;
 const T_MIN = 2n * 10n ** 26n;
+/**
+ * Skala krzywej. Do 2026-08-14 stala w kontrakcie; od tej daty jest argumentem
+ * konstruktora, bo na Arc `msg.value` to USDC i ten sam bajtkod zbieral tam
+ * DOLARY zamiast eteru. Testy ponizej licza na liczbach sprzed zmiany, wiec
+ * podaja przy wdrozeniu dokladnie te sama wartosc - rownowaznosc przybija
+ * test/CurveScale.test.ts.
+ */
 const R_VIRT = 750000000000000000n;
 const FEE_BPS = 100n;
 const CREATOR_FEE_BPS = 40n;
@@ -1536,12 +1543,20 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       await expect(
         pad.connect(alice).buy(token, 1n, MAX_UINT, { value: max + 1n })
       ).to.be.revertedWithCustomError(pad, 'BuyTooLarge');
-      // 100 ETH i tak zostanie dociagniete do progu - reszta wraca.
+      // Caly sufit i tak zostanie dociagniety do progu - reszta wraca.
       let s = await snap(token);
       const r = await buyChecked(alice, token, t, max);
       s = await assertInvariants(token, t, s, 'buy');
       expect(s.tok).to.equal(T_MIN);
-      expect(r.refund).to.be.greaterThan(ethers.parseEther('96'));
+      // Granica jest WYPROWADZONA z parametrow wdrozenia, a nie wpisana recznie.
+      // Stalo tu `96`, czyli "100 minus zbiorka i troche" - liczba prawdziwa
+      // wylacznie dopoki sufit rowna sie 100. Od 2026-08-14 sufit skaluje sie
+      // z R_VIRT (132x), wiec przy tej samej skali wynosi 99 i asercja padala,
+      // mimo ze kontrakt zwracal poprawnie. Kupno pochlania najwyzej prog plus
+      // oplate od niego (sufit oplaty to 1%), a 2% zapasu miesci kazde
+      // zaokraglenie.
+      const target = R_VIRT * 4n;
+      expect(r.refund).to.be.greaterThan(max - target - target / 50n);
     });
 
     it('operacje na nieznanym tokenie rewertuja UnknownToken, a nie cicho przechodza', async function () {
@@ -1687,18 +1702,18 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       const tf = await tokenFactory.getAddress();
       // Te warunki stoja PRZED wdrozeniem vaulta, wiec salt jest bez znaczenia.
       await expect(
-        Pad.deploy(POOL_MANAGER, 101, 40, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 101, 40, treasury.address, 6000, tf, ethers.ZeroHash, R_VIRT)
       ).to.be.revertedWithCustomError(pad, 'FeeTooHigh');
       await expect(
-        Pad.deploy(POOL_MANAGER, 100, 101, treasury.address, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 101, treasury.address, 6000, tf, ethers.ZeroHash, R_VIRT)
       ).to.be.revertedWithCustomError(pad, 'CreatorFeeTooHigh');
       await expect(
-        Pad.deploy(POOL_MANAGER, 100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 40, ethers.ZeroAddress, 6000, tf, ethers.ZeroHash, R_VIRT)
       ).to.be.revertedWithCustomError(pad, 'ZeroAddress');
       // Sufit udzialu protokolu jest PODLOGA udzialu tworcy - 8000 znaczy
       // "tworcy nie da sie zejsc ponizej 20%, nawet literowka przy deployu".
       await expect(
-        Pad.deploy(POOL_MANAGER, 100, 40, treasury.address, 8001, tf, ethers.ZeroHash)
+        Pad.deploy(POOL_MANAGER, 100, 40, treasury.address, 8001, tf, ethers.ZeroHash, R_VIRT)
       ).to.be.revertedWithCustomError(vault, 'ProtocolShareTooHigh');
       // Granice od strony dozwolonej naprawde przechodza - tu salt musi juz byc
       // wykopany, bo deploy dochodzi do konstruktora vaulta.

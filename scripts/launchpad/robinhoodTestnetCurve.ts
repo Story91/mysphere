@@ -4,6 +4,9 @@ import path from "path";
 import { Contract, ContractTransactionReceipt } from "ethers";
 import { buildPlan } from "./plan";
 
+/** Skala krzywej, ktora do 2026-08-14 byla stala w kontrakcie. */
+const LEGACY_R_VIRT = ethers.parseEther("0.75");
+
 /**
  * PROBA KRZYWEJ NA ROBINHOOD TESTNET (46630) - prawdziwe transakcje, testowe ETH.
  *
@@ -83,7 +86,10 @@ async function main() {
     admin.address,
     PROTOCOL_SHARE_BPS,
     await factory.getAddress(),
-    plan.hookSalt
+    plan.hookSalt,
+    // Skala krzywej sprzed 2026-08-14 - ten przebieg ma pokazywac te sama
+    // krzywa, co dotychczasowe wdrozenia, a nie nowa.
+    LEGACY_R_VIRT
   );
   await pad.waitForDeployment();
   add("stack wdrozony na zywym testnecie", true, `pad ${await pad.getAddress()}, PM(mock) ${pmAddress}`);

@@ -114,16 +114,34 @@ contract CurveLaunchpad {
     uint256 public constant T_MIN = 200_000_000e18;
 
     /**
-     * Wirtualna rezerwa ETH. NIGDY nie jest wyplacana i wlasnie dlatego bilans
-     * sie domyka. Wyznacza jednoczesnie: kurs startowy 7.5e-10 ETH/token,
-     * mnoznik ceny na krzywej 25x = (T0/(T0-C))^2 i zbiorke do awansu
-     * G = R_VIRT * C/(T0-C) = 3.00 ETH DOKLADNIE.
+     * Wirtualna rezerwa. NIGDY nie jest wyplacana i wlasnie dlatego bilans sie
+     * domyka. Jest JEDYNA liczba, ktora ustawia skale calej krzywej, bo z niej
+     * wynikaja wszystkie pozostale:
      *
-     * Cena doktryny "zero administracji": ta stala jest w ETH, a percepcja
-     * uzytkownika w dolarach. Naprawa zlej stalej = nowa fabryka pod nowym
-     * adresem. Wyrocznia ceny ETH jest zakazana przez te sama zasade, co role.
+     *   kurs startowy        = R_VIRT / T0
+     *   zbiorka do awansu    G = R_VIRT * C/(T0-C) = 4 * R_VIRT
+     *   mnoznik ceny         (T0/(T0-C))^2 = 25x  (nie zalezy od skali)
+     *   kapitalizacja startu = R_VIRT       (kurs startowy razy cala podaz)
+     *   kapitalizacja awansu = 25 * R_VIRT
+     *
+     * ===========================================================================
+     * DLACZEGO PARAMETR KONSTRUKTORA, A NIE STALA
+     * ===========================================================================
+     * Do 2026-08-14 stalo tu `0.75 ether` na sztywno, z komentarzem, ze naprawa
+     * zlej stalej znaczy nowa fabryke pod nowym adresem. To bylo prawda dopoki
+     * jedyna jednostka natywna byl ETH.
+     *
+     * Arc (Circle) to konczy: tam jednostka natywna jest USDC. Ten sam bajtkod
+     * daje na Base zbiorke 3 ETH, a na Arc 3 DOLARY - kwote, za ktora nie
+     * powstaje rynek, tylko przycisk. Kontrakt nie wie i nie moze wiedziec,
+     * w czym liczy.
+     *
+     * Wiec skala wchodzi przy wdrozeniu. Sam kontrakt nadal nie ma zadnego
+     * settera i nadal nikt nie zmieni jej po fakcie: `immutable` znaczy
+     * "ustalone raz, w konstruktorze". Doktryna zero administracji zostaje;
+     * przenosi sie tylko moment, w ktorym liczba jest wybierana.
      */
-    uint256 public constant R_VIRT = 0.75 ether;
+    uint256 public immutable R_VIRT;
 
     /* ====================================================================== */
     /*  STALE - OPLATY                                                         */
@@ -262,21 +280,28 @@ contract CurveLaunchpad {
      * wyjac. Publiczna, indeksowana przez agregatory, z cena bez pokrycia -
      * i nie do posprzatania. Za 375k gazu.
      */
-    uint256 public constant MIN_LP_ETH = 0.01 ether;
+    uint256 public immutable MIN_LP_ETH;
 
     /**
-     * sqrt(T_MIN / (R_VIRT + G)) * 2^96, gdzie G = 3 ETH.
-     * = floor(sqrt(2e26 * 2^192 / 3.75e18)) = 578600690649970598590869571498871
+     * sqrt(T_MIN / (R_VIRT + G)) * 2^96. Dla R_VIRT = 0.75 ether wychodzi
+     * floor(sqrt(2e26 * 2^192 / 3.75e18)) = 578600690649970598590869571498871,
+     * czyli DOKLADNIE ta liczba, ktora stala tu wpisana recznie do 2026-08-14.
      *
-     * To jest DOKLADNIE cena zamkniecia krzywej. Pula otwiera sie tam, gdzie
-     * krzywa sie skonczyla - bez tego otwiera sie ~23% nizej i kazdy, kto kupil
-     * na koncu krzywej, jest pod woda w bloku awansu, czyli pierwszy handlujacy
-     * w puli dostaje darmowe pieniadze.
+     * To jest cena zamkniecia krzywej. Pula otwiera sie tam, gdzie krzywa sie
+     * skonczyla - bez tego otwiera sie ~23% nizej i kazdy, kto kupil na koncu
+     * krzywej, jest pod woda w bloku awansu, czyli pierwszy handlujacy w puli
+     * dostaje darmowe pieniadze.
+     *
+     * LICZONA W KONSTRUKTORZE, a nie podawana z zewnatrz, i to jest istota
+     * calej zmiany: wpisana recznie musialaby byc trzymana w zgodzie z R_VIRT
+     * przez czlowieka, a przy dwoch liczbach do uzgodnienia predzej czy pozniej
+     * ktos wdrozylby pare, ktora sie rozjechala. Wtedy pula otwiera sie w zlym
+     * miejscu i nikt tego nie zauwazy do pierwszego awansu.
      *
      * Kierunek waluty: v4 liczy cene jako amount1/amount0, u nas token/ETH,
      * czyli ODWROTNIE niz krzywa (ETH/token). Stad T_MIN w liczniku.
      */
-    uint160 public constant SQRT_PRICE_TERMINAL = 578600690649970598590869571498871;
+    uint160 public immutable SQRT_PRICE_TERMINAL;
 
     /* ====================================================================== */
     /*  STALE - LIMITY HANDLU                                                  */
@@ -286,8 +311,15 @@ contract CurveLaunchpad {
      * Granica analizy przepelnienia, 33x cala zbiorka. Nigdy nie zadziala
      * w praktyce - istnieje po to, zeby `tokenReserve * ethIn` mialo domkniety
      * zakres, a nie zeby cokolwiek regulowac.
+     *
+     * SKALUJE SIE Z R_VIRT i musi. Przy zbiorce 3 stala 100 byla 33-krotnoscia
+     * zbiorki, czyli faktycznie nieosiagalna. Ta sama stala przy zbiorce 1000
+     * bylaby DZIESIEC RAZY MNIEJSZA od zbiorki - przestalaby byc
+     * zabezpieczeniem, a stalaby sie regula gry ("nikt nie domknie krzywej
+     * mniej niz dziesiecioma transakcjami"), i to regula, ktorej nikt nigdy
+     * nie zaprojektowal.
      */
-    uint256 public constant MAX_BUY = 100 ether;
+    uint256 public immutable MAX_BUY;
 
     uint256 public constant LAUNCH_WINDOW = 300;
     /**
@@ -574,10 +606,15 @@ contract CurveLaunchpad {
         address feeRecipient_,
         uint16 protocolShareBps_,
         ITokenFactory tokenFactory_,
-        bytes32 hookSalt_
+        bytes32 hookSalt_,
+        uint256 rVirt_
     ) {
         if (feeRecipient_ == address(0)) revert ZeroAddress();
         if (address(tokenFactory_) == address(0)) revert ZeroAddress();
+        // Podloga sensu, nie arytmetyki. Ponizej tego `MIN_LP_ETH` (rVirt/75)
+        // zaokragla sie do zera, czyli znika prog chroniacy przed pula z pylem -
+        // a to jest jedyny warunek, ktorego zlamanie tworzy cos nieodwracalnego.
+        if (rVirt_ < 75) revert ZeroAmount();
         if (feeBps_ > MAX_FEE_BPS) revert FeeTooHigh();
         if (creatorFeeBps_ > feeBps_) revert CreatorFeeTooHigh();
         // Podloga protokolu obowiazuje TAKZE wdrazajacego. Inaczej domyslna
@@ -592,6 +629,26 @@ contract CurveLaunchpad {
         // `GRAD_FEE_BPS` ponad sufit przy nastepnej edycji tego pliku. Sufit,
         // ktorego nikt nie sprawdza, jest komentarzem, nie sufitem.
         if (GRAD_FEE_BPS > MAX_GRAD_FEE_BPS) revert FeeTooHigh();
+
+        // ------------------------------------------------------------------
+        // SKALA KRZYWEJ - jedna liczba, z niej trzy pozostale
+        // ------------------------------------------------------------------
+        // Kazda z nich MUSI byc wyprowadzona tutaj, a nie podana osobno z
+        // zewnatrz. Cztery liczby do uzgodnienia recznie to cztery okazje do
+        // wdrozenia zestawu, ktory sie rozjechal - a rozjazd widac dopiero
+        // przy pierwszym awansie, gdy pula otwiera sie w zlym miejscu.
+        R_VIRT = rVirt_;
+        // G/300. Dla 0.75 ether daje DOKLADNIE 0.01 ether, czyli wartosc,
+        // ktora stala tu wpisana recznie.
+        MIN_LP_ETH = rVirt_ / 75;
+        // 33 * G. Przy 0.75 ether wychodzi 99 zamiast dawnych 100 - to jedyna
+        // liczba, ktora ta zmiana rusza, i jest to granica przepelnienia
+        // trzydziestotrzykrotnie wyzsza od calej zbiorki, wiec nigdy nie wiaze.
+        MAX_BUY = rVirt_ * 132;
+        // sqrt(T_MIN * 2^192 / (R_VIRT + G)), gdzie G = 4 * R_VIRT.
+        // Dla 0.75 ether oddaje 578600690649970598590869571498871 co do cyfry -
+        // dokladnie te stala, ktora tu stala. Sprawdza to test rownowaznosci.
+        SQRT_PRICE_TERMINAL = uint160(_sqrt(FullMath.mulDivDown(T_MIN, 1 << 192, rVirt_ * 5)));
 
         FEE_BPS = feeBps_;
         CREATOR_FEE_BPS = creatorFeeBps_;
@@ -1107,9 +1164,12 @@ contract CurveLaunchpad {
      * Cala arytmetyka kupna w jednym miejscu - uzywana i przez `buy`, i przez
      * `quoteBuy`, wiec interfejs nie ma jak pokazac innej liczby niz lancuch.
      */
+    // `view`, a nie `pure`, odkad `R_VIRT` jest `immutable`: w Solidity odczyt
+    // immutable liczy sie jako siegniecie do kodu kontraktu. Zachowanie i koszt
+    // sa te same, zmienia sie wylacznie deklaracja.
     function _quoteBuy(uint256 ethReserve, uint256 tokenReserve, uint256 valueIn, uint16 feeBps_)
         private
-        pure
+        view
         returns (uint256 out, uint256 fee, uint256 refund)
     {
         // Oplata W GORE - na niekorzysc wolajacego.
@@ -1429,6 +1489,43 @@ contract CurveLaunchpad {
     /* ====================================================================== */
     /*  NISKI POZIOM                                                           */
     /* ====================================================================== */
+
+    /**
+     * Pierwiastek calkowity, w dol. Wolany DOKLADNIE RAZ, w konstruktorze,
+     * zeby wyprowadzic cene otwarcia puli z `R_VIRT`.
+     *
+     * Nie ma go w zadnej sciezce, ktora dotyka pieniedzy w czasie dzialania,
+     * wiec jego koszt gazu jest bez znaczenia - liczy sie wylacznie to, ze
+     * oddaje dokladnie floor(sqrt(x)) dla calego zakresu uint256. Wersja
+     * kanoniczna (Uniswap v2 / OpenZeppelin): przyblizenie startowe z dlugosci
+     * bitowej, potem siedem krokow Newtona, ktore dla uint256 zawsze wystarczaja,
+     * i na koncu zejscie do mniejszej z dwoch stron, zeby wynik NIGDY nie byl
+     * o jeden za duzy.
+     */
+    function _sqrt(uint256 x) private pure returns (uint256) {
+        if (x == 0) return 0;
+
+        uint256 xx = x;
+        uint256 r = 1;
+        if (xx >= 0x100000000000000000000000000000000) { xx >>= 128; r <<= 64; }
+        if (xx >= 0x10000000000000000) { xx >>= 64; r <<= 32; }
+        if (xx >= 0x100000000) { xx >>= 32; r <<= 16; }
+        if (xx >= 0x10000) { xx >>= 16; r <<= 8; }
+        if (xx >= 0x100) { xx >>= 8; r <<= 4; }
+        if (xx >= 0x10) { xx >>= 4; r <<= 2; }
+        if (xx >= 0x4) { r <<= 1; }
+
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+
+        uint256 down = x / r;
+        return r < down ? r : down;
+    }
 
     function _sendEth(address to, uint256 amount) private {
         (bool ok,) = to.call{value: amount}("");
