@@ -341,8 +341,27 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-soft-ink-soft">
-                      No recently played tracks found
+                    /* ===== "PUSTO" MA POWIEDZIEC, CZYJA TO SPRAWA =====
+                       Stalo tu samo "No recently played tracks found". Zdanie
+                       prawdziwe i mylace: brzmi jak "nie sluchales muzyki albo
+                       cos u nas nie gra", wiec wlasciciel poszedl podpinac
+                       konto drugi raz. Nie pomoglo i nie mialo prawa pomoc.
+
+                       Sprawdzone 14 sierpnia 2026 na zywym API Campa: konto
+                       JEST podpiete (rozwiazuje sie z portfela, ma nazwe i
+                       identyfikator), a `lastSynced` jest PUSTE od grudnia -
+                       Camp ani razu nie zaciagnal z niego historii. Trzy z
+                       czterech zbiorow oddaja pusta tablice, czwarty odmawia
+                       401. Naszego kodu to nie dotyczy, wiec interfejs nie ma
+                       prawa sugerowac, ze da sie to naprawic po naszej
+                       stronie. */
+                    <div className="mx-auto max-w-[320px] py-8 text-center text-[13px] leading-[1.5] text-soft-ink-soft">
+                      {spotifyData.user?.display_name
+                        ? `Linked as ${spotifyData.user.display_name}, but Camp has not sent any listening history for this account yet.`
+                        : 'Camp has not sent any listening history for this account yet.'}
+                      <span className="mt-2 block text-soft-ink-faint">
+                        Linking again does not change it. The history has to arrive from Camp.
+                      </span>
                     </div>
                   )}
                 </>
