@@ -95,26 +95,45 @@ Wdrozenia POPRZEDNIE sa MARTWE i nie wolno ich uzywac:
 - `0x811d...58ba` (popoludnie 2026-08-10, v2) - model 70/30 juz TAK, ale
   sniper cap zabity na 16M; zastapione przez v3 tego samego dnia.
 
-## Arc testnet (chainId 5042002) - W TOKU, 2026-08-13
+## Arc testnet (chainId 5042002) - W TOKU, 2026-08-14
 
 Circle Arc. Mainnet zapowiedziany na 16 wrzesnia 2026, dzis dziala publiczny
 testnet. Caly stos stoi, wszystkie 15 kontroli wiazan przeszlo przy deployu.
 
+**AKTUALNE WDROZENIE: 2026-08-14, prog 1000 USDC.**
+
 | kontrakt | adres |
 | --- | --- |
-| `CurveLaunchpad` | `0xdAe0dd6EE87a8d7eE7575dD9904A72fA9CA6600d` |
-| `LiquidityVault` | `0x8F224A0782b55aF138A05b0EEA03f8D6D69A51D6` |
-| `B20LaunchHook` | `0x2615415f5eE2E0dF65bF0788E7c43ACdCB036044` (salt `0x…01ae`, 431 prob) |
-| `PlainTokenFactory` | `0xC10eDaF3473CcDB6e91090F204b01Ccb555686C9` |
+| `CurveLaunchpad` | `0xe984986f4F1E067f697b548D5fe942813d03Da37` |
+| `LiquidityVault` | `0xaD714ce622D20d9A385DA751903C6B85beEB90e0` |
+| `B20LaunchHook` | `0x7e8E196cc94547c938725923cbB4B518146De044` (salt `0x…4dd4`) |
+| `PlainTokenFactory` | `0xC10eDaF3473CcDB6e91090F204b01Ccb555686C9` (wspoldzielona) |
 | PoolManager v4 (POSTAWIONY PRZEZ NAS) | `0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6` |
-| blok wdrozenia stosu | `56844144` |
+| blok wdrozenia stosu | `56866835` |
 | blok wdrozenia PoolManagera | `56843204` |
 | `FEE_RECIPIENT` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
 | deployer | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+| `R_VIRT` | 250 USDC |
+| prog graduacji | 1000 USDC |
+| mcap po graduacji | 6250 USDC |
 
 Parametry jak wszedzie: FEE_BPS=100, CREATOR_FEE_BPS=70, PROTOCOL_SHARE_BPS=3000.
 Fabryka to `PlainTokenFactory`, bo precompile B20 zyje tylko na Base - ta sama
 sciezka co na Robinhoodzie. Pelny zapis: `scripts/output/launchpad-arcTestnet.json`.
+
+### Dwa martwe wdrozenia na Arc z tego samego tygodnia
+
+Oba maja kod na lancuchu i oba dzialaja. Martwe znaczy tylko tyle, ze tablica
+czyta JEDEN adres na siec i nie jest to zaden z nich.
+
+| adres | prog | dlaczego odpadl |
+| --- | --- | --- |
+| `0xdAe0dd6EE87a8d7eE7575dD9904A72fA9CA6600d` | 3 USDC | 2026-08-13. Prog odziedziczony po Base, gdzie `R_VIRT` = 0.75 znaczylo 0,75 ETH; tutaj znaczyl 0,75 dolara. Siedem tokenow-sond zostaje pod nim. |
+| `0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD` | 20 USDC | 2026-08-14, wdrozony i porzucony tego samego dnia. Dobrany pod budzet testnetu zamiast pod realizm liczb; wybor padl na 1000. |
+
+Cale wdrozenie kosztuje na Arc **0,18 USDC**, wiec porzucony stos nie jest tu
+strata warta liczenia. Na mainnecie ten sam blad kosztuje inaczej i dlatego
+skrypt wypisuje prog oraz obie kapitalizacje przed `CONFIRM=tak`.
 
 ### Dlaczego PoolManagera stawialismy sami
 
@@ -215,17 +234,34 @@ Czego NIE WOLNO pisac bez dowodu, ktorego nie mamy: "pierwszy hook v4 na Arc",
 ktos ma tam hooka - ale dowodza, ze nikt nie sprawdzil, czy nie ma, a przy
 takim naglowku to sprawdzenie robi za nas ktos inny i publicznie.
 
-### Czego NIE trzeba zmieniac w kontraktach na testnet
+### Skala krzywej - ZROBIONE 2026-08-14, nie odlozone na wrzesien
 
-Prog graduacji to `G = 4 x R_VIRT`, a `R_VIRT` = 0.75 jednostki NATYWNEJ. Na
-Arc jednostka natywna to USDC, wiec prog wychodzi 3 USDC sam z siebie. Na
-testnecie to jest dokladnie to, czego trzeba: pelny cykl do graduacji kosztuje
-okolo 3,05 USDC (3 do krzywej, z czego 0,045 wraca wolajacemu `graduate()`).
+Stalo tu, ze na testnet nie trzeba zmieniac nic, bo `R_VIRT` = 0.75 daje na Arc
+prog 3 USDC i to wystarczy do pelnego cyklu. To bylo prawda o testach i falsz o
+produkcie: prog 3 dolary znaczy, ze token domyka krzywa przypadkiem, a tablica
+pokazuje wylacznie tokeny po graduacji.
 
-Dopiero mainnet Arc bedzie wymagal parametrow w rozsadnych dolarach (np. 2500
-wirtualnej rezerwy i 10 000 progu), czyli `R_VIRT`, `SQRT_PRICE`, `MIN_LP_ETH`
-i `MAX_BUY` z konstruktora zamiast ze stalych. Decyzja na wrzesien, nie warunek
-startu.
+`R_VIRT` jest teraz **osmym argumentem konstruktora** `CurveLaunchpad`, a nie
+stala. Kazda pochodna liczy sie z niego, wiec nie ma juz czterech liczb do
+recznego przeliczenia:
+
+| pochodna | wzor |
+| --- | --- |
+| prog graduacji | `4 x R_VIRT` |
+| sufit jednego kupna | `132 x R_VIRT` |
+| prog pylu w puli | `R_VIRT / 75` |
+| cena otwarcia puli | `isqrt(T_MIN x 2^192 / (5 x R_VIRT))` |
+
+Dwie proporcje zostaja na kazdej skali: graduacja to zawsze **25x** cena
+startowa, a kapitalizacja po graduacji zawsze **6,25x** zebrana kwota.
+
+Wdrozenie z `0.75 ether` odtwarza wszystkie dotychczasowe stale co do cyfry -
+przybija to `test/CurveScale.test.ts`, i to jest wazniejsza polowa tej zmiany
+niz sama parametryzacja. Jedna liczba zmienia sie celowo: sufit kupna to
+`132 x R_VIRT`, czyli 99 zamiast 100, bo 133,33 nie jest calkowite.
+
+Arc testnet stoi dzis na `R_VIRT = 250`, czyli progu 1000 USDC. Mainnet Arc
+dostanie swoja liczbe osobno.
 
 ### Fakty o sieci (ZMIERZONE 2026-08-13, nie przepisane z docsow)
 

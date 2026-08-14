@@ -72,6 +72,20 @@ async function main() {
   const feeBps = BigInt(process.env.FEE_BPS ?? "100");
   const creatorFeeBps = BigInt(process.env.CREATOR_FEE_BPS ?? "70");
 
+  /**
+   * SKALA KRZYWEJ. Domysl 0.75 to liczba, ktora do 2026-08-14 stala w kontrakcie
+   * jako stala - wdrozenie bez tej zmiennej daje wiec DOKLADNIE to samo, co
+   * wszystkie dotychczasowe.
+   *
+   * Podaje sie ja w jednostce natywnej SIECI, a nie "w eterze": na Arc
+   * `msg.value` to USDC, wiec R_VIRT=250 znaczy tam prog zbiorki 1000 USDC.
+   * Prog to zawsze czterokrotnosc R_VIRT, a kapitalizacja po graduacji jest
+   * szesc i cwierc raza wieksza od zebranej kwoty. Stad wypis nizej - skali nie
+   * wdraza sie w ciemno, bo nie ma settera.
+   */
+  const rVirt = ethers.parseEther(process.env.R_VIRT ?? "0.75");
+  if (rVirt < 75n) throw new Error(`R_VIRT=${process.env.R_VIRT} jest ponizej progu kontraktu (75 wei).`);
+
   // Sufity powtorzone z kontraktu. Nie zastepuja tamtych - odbijaja pomylke
   // ZANIM kosztuje ona gaz i zanim zaczniemy kopac.
   if (feeBps > 100n) throw new Error(`FEE_BPS=${feeBps} przekracza MAX_FEE_BPS=100.`);
@@ -101,14 +115,28 @@ async function main() {
     );
   }
 
+  // Jednostka natywna SIECI. Wypisywanie "ETH" na Arc bylo drobiazgiem tylko z
+  // pozoru: caly powod tej zmiany to fakt, ze te same liczby znacza tam dolary,
+  // wiec podpisanie ich zla waluta myli dokladnie tam, gdzie boli najbardziej.
+  const unit = chainId === 5042002 ? "USDC" : "ETH";
+
   console.log("siec              ", `${network.name} (chainId ${chainId})`);
   console.log("wdrazajacy        ", deployer);
-  console.log("saldo             ", ethers.formatEther(await ethers.provider.getBalance(deployer)), "ETH");
+  console.log("saldo             ", ethers.formatEther(await ethers.provider.getBalance(deployer)), unit);
   console.log("PoolManager       ", poolManager, `[${pmSource}, ${(pmCode.length - 2) / 2} B kodu]`);
   console.log("feeRecipient      ", feeRecipient);
   console.log("feeBps            ", feeBps.toString());
   console.log("creatorFeeBps     ", creatorFeeBps.toString());
   console.log("protocolShareBps  ", protocolShareBps.toString());
+  // Skala wypisana JAKO SKUTKI, nie jako surowa liczba. "R_VIRT 250" nie mowi
+  // nikomu nic; "prog 1000, kapitalizacja po graduacji 6250" mowi wszystko i
+  // pozwala zlapac pomylke o rzad wielkosci na sekunde przed CONFIRM=tak.
+  const target = rVirt * 4n;
+  console.log("R_VIRT            ", `${ethers.formatEther(rVirt)} ${unit}`);
+  console.log("prog zbiorki      ", `${ethers.formatEther(target)} ${unit}`);
+  console.log("mcap na starcie   ", `${ethers.formatEther(rVirt)} ${unit}`);
+  console.log("mcap po graduacji ", `${ethers.formatEther(rVirt * 25n)} ${unit}`);
+  console.log("sufit jednego kupna", `${ethers.formatEther(rVirt * 132n)} ${unit}`);
   console.log("");
 
   if (!isLocal && process.env.CONFIRM !== "tak") {
@@ -170,7 +198,8 @@ async function main() {
     feeRecipient,
     protocolShareBps,
     tokenFactory,
-    plan.hookSalt
+    plan.hookSalt,
+    rVirt
   );
   await launchpad.waitForDeployment();
   const launchpadAddress = getAddress(await launchpad.getAddress());
@@ -243,6 +272,12 @@ async function main() {
       feeBps: feeBps.toString(),
       creatorFeeBps: creatorFeeBps.toString(),
       protocolShareBps: protocolShareBps.toString(),
+      // Skala krzywej trafia do zapisu, bo od 2026-08-14 dwa launchpady moga
+      // miec ten sam bajtkod i ZUPELNIE inny prog. Bez tego pola nie da sie
+      // pozniej powiedziec, ktora krzywa stoi pod ktorym adresem, inaczej niz
+      // odpytujac lancuch - a zapis jest tym, co czyta `launchpad:env`.
+      rVirt: rVirt.toString(),
+      curveTarget: (rVirt * 4n).toString(),
       feeRecipient,
       deployBlock,
       deployedAt: new Date().toISOString(),
@@ -277,6 +312,8 @@ async function main() {
         feeBps: feeBps.toString(),
         creatorFeeBps: creatorFeeBps.toString(),
         protocolShareBps: protocolShareBps.toString(),
+        rVirt: rVirt.toString(),
+        curveTarget: (rVirt * 4n).toString(),
         feeRecipient,
         deployBlock,
         deployedAt: new Date().toISOString(),

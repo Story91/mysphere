@@ -15,6 +15,9 @@ import {
 } from "ethers";
 import { buildPlan, KNOWN_POOL_MANAGERS } from "./plan";
 
+/** Skala krzywej, ktora do 2026-08-14 byla stala w kontrakcie. */
+const LEGACY_R_VIRT = ethers.parseEther("0.75");
+
 /**
  * Cel forka. Sciezka puli (launch -> Locked -> graduate -> swapy) jest
  * identyczna na kazdej sieci z v4, wiec jeden skrypt obsluguje obie; roznia
@@ -105,7 +108,10 @@ async function deployPlainLaunchpad() {
     treasury.address,
     PROTOCOL_SHARE_BPS,
     await tokenFactory.getAddress(),
-    plan.hookSalt
+    plan.hookSalt,
+    // Skala krzywej sprzed 2026-08-14: ta sonda porownuje sie z pomiarami
+    // zrobionymi na starych stalych, wiec musi wdrazac te sama krzywa.
+    LEGACY_R_VIRT
   );
   const padDeployRc = await pad.deploymentTransaction()?.wait();
   await pad.waitForDeployment();

@@ -35,10 +35,13 @@ flowchart LR
 
 ## 2. The curve in numbers
 
-Constant-product curve with a **virtual ETH reserve**: `(0.75 ETH + ethReserve) ×
-tokenReserve = k`. Spot price = `(0.75 ETH + ethReserve) / tokenReserve`.
+Constant-product curve with a **virtual reserve**: `(R_VIRT + ethReserve) ×
+tokenReserve = k`. Spot price = `(R_VIRT + ethReserve) / tokenReserve`.
 
-| Parameter | Value |
+`R_VIRT` is a **constructor argument**, fixed for the life of a launchpad. On
+Base it is `0.75 ETH`, which is what every number in the table below assumes.
+
+| Parameter | Value on Base |
 | --- | --- |
 | Total supply (minted once, to the curve) | 1,000,000,000 |
 | Sold on the curve | up to 800,000,000 (80%) |
@@ -52,7 +55,34 @@ tokenReserve = k`. Spot price = `(0.75 ETH + ethReserve) / tokenReserve`.
 | Creator fee ceiling | **70% of every fee stream** — same ratio as PONS, everywhere |
 
 Solvency invariant: selling every circulating token back returns exactly the
-ETH reserve — the virtual 0.75 ETH is never paid out.
+reserve — the virtual `R_VIRT` is never paid out.
+
+### Why the scale is a parameter
+
+The contract counts in whatever the chain calls native. On Arc that unit is
+**USDC**, so the same bytecode that raises 3 ETH on Base raises **3 dollars**
+on Arc. The contract cannot tell the difference, so the scale has to be chosen
+at deployment.
+
+Everything derives from `R_VIRT`, so the curve keeps its **shape** at any scale:
+
+| Derived value | Formula | Base (`R_VIRT` = 0.75) |
+| --- | --- | --- |
+| Graduation trigger | `4 × R_VIRT` | 3.00 |
+| Market cap at start | `R_VIRT` | 0.75 |
+| Market cap at graduation | `25 × R_VIRT` | 18.75 |
+| Single-buy ceiling | `132 × R_VIRT` | 99 |
+| Dust floor for the LP | `R_VIRT / 75` | 0.01 |
+| Pool opening price | `isqrt(T_MIN × 2^192 / (5 × R_VIRT))` | 578600690649970598590869571498871 |
+
+Two ratios hold at every scale: graduation is always **25×** the starting
+price, and market cap at graduation is always **6.25×** the amount raised.
+
+`test/CurveScale.test.ts` pins this down. Its first assertion is that deploying
+with `0.75 ether` reproduces the previously hard-coded constants **digit for
+digit** — without that, "we turned the constants into parameters" would be a
+claim rather than a fact, and a drift in the pool's opening price would only
+surface at the first graduation, when it is too late to fix.
 
 ## 3. Where every fee goes
 
@@ -164,8 +194,21 @@ token.
 | `LiquidityVault` | owns the v4 LP position, harvests LP fees |
 | `B20LaunchHook` | 1% swap fee, buyback accounting, 70/30 split |
 | `B20TokenFactory` | asks the network precompile to create each B20 token, then verifies supply, cap and the absence of any live role |
+| `PlainTokenFactory` | the same job on chains **without** the B20 precompile (Arc, Robinhood): a plain ERC-20, minted once, no roles |
 
 Current addresses and deploy block: `docs/LAUNCHPAD-STAN.md`.
+
+### Constructor arguments
+
+`CurveLaunchpad` takes **eight**: `poolManager`, `feeBps`, `creatorFeeBps`,
+`feeRecipient`, `protocolShareBps`, `tokenFactory`, `hookSalt`, `rVirt`.
+
+`rVirt` was added on **2026-08-14**. Passing `0.75 ether` reproduces every
+pre-existing constant exactly, so all deployments before that date are
+unaffected. Anything deployed with a different value is a **different curve at
+the same bytecode** — which is why the deploy script prints the threshold, both
+market caps and the buy ceiling before it asks for `CONFIRM=tak`, and writes
+`rVirt` into `scripts/output/launchpad-<network>.json`.
 
 **Deployed to Base mainnet (chainId 8453) on 2026-08-11** — the mainnet-candidate
 build (audit fixes + vanity). `CurveLaunchpad` `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D`,

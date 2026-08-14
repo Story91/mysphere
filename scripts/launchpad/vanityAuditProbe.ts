@@ -1,6 +1,9 @@
 import { ethers, network } from "hardhat";
 import { buildPlan, KNOWN_POOL_MANAGERS } from "./plan";
 
+/** Skala krzywej, ktora do 2026-08-14 byla stala w kontrakcie. */
+const LEGACY_R_VIRT = ethers.parseEther("0.75");
+
 /**
  * AUDYT VANITY - krok 1.
  *
@@ -49,7 +52,7 @@ async function main() {
   const nonce = await deployer.getNonce("pending");
   const plan = await buildPlan({ poolManager: POOL_MANAGER, feeRecipient: treasury.address, protocolShareBps: PROTOCOL_SHARE_BPS, deployer: deployer.address, nonce });
   const Pad = await ethers.getContractFactory("CurveLaunchpad");
-  const pad = await Pad.deploy(POOL_MANAGER, FEE_BPS, CREATOR_FEE_BPS, treasury.address, PROTOCOL_SHARE_BPS, await tokenFactory.getAddress(), plan.hookSalt);
+  const pad = await Pad.deploy(POOL_MANAGER, FEE_BPS, CREATOR_FEE_BPS, treasury.address, PROTOCOL_SHARE_BPS, await tokenFactory.getAddress(), plan.hookSalt, LEGACY_R_VIRT);
   await pad.waitForDeployment();
   const hook = await pad.HOOK();
   console.log("pad", await pad.getAddress(), "hook", hook);

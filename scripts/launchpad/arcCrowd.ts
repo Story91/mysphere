@@ -76,8 +76,26 @@ async function main() {
   const [admin] = await ethers.getSigners();
   const pad = (await ethers.getContractAt("CurveLaunchpad", launchpadAddress)) as Contract;
 
+  /**
+   * WIELKOSC ZLECENIA IDZIE ZE SKALI KRZYWEJ, A NIE Z WPISANEJ LICZBY.
+   *
+   * Stalo tu "od 0,01 do 0,15" - dobrane pod launchpada, ktory zbieral 3 USDC.
+   * Na krzywej z progiem 1000 USDC taka transakcja nie rusza ceny o nic
+   * widocznego: wykres zostaje plaski, pasek postepu nie drgnie i caly przebieg
+   * udaje handel, zamiast go pokazywac.
+   *
+   * Teraz zakres to 0,1% - 1% progu zbiorki, wiec ten sam skrypt daje sensowny
+   * ruch na kazdej skali: 1-10 USDC przy progu 1000, 0,02-0,2 przy progu 20.
+   */
+  const rVirt = (await pad.R_VIRT()) as bigint;
+  const target = rVirt * 4n;
+  const minTrade = target / 1_000n;
+  const maxTrade = target / 100n;
+
   console.log("siec     ", hre.network.name, `(chainId ${chainId})`);
   console.log("launchpad", launchpadAddress);
+  console.log("prog     ", `${ethers.formatEther(target)} ${unit}`);
+  console.log("zlecenia ", `${ethers.formatEther(minTrade)} - ${ethers.formatEther(maxTrade)} ${unit}`);
   console.log("tokeny   ", tokens.length);
   console.log("portfele ", count, `po ${ethers.formatEther(fund)} ${unit}`);
   console.log("rundy    ", rounds);
@@ -87,11 +105,41 @@ async function main() {
   // 1. ZASILENIE - sekwencyjnie, bo nonce admina musi isc po kolei
   // ---------------------------------------------------------------------
   const wallets = Array.from({ length: count }, (_, index) => walletFor(index));
+
+  /**
+   * CALY RACHUNEK ZASILENIA PRZED PIERWSZYM PRZELEWEM.
+   *
+   * Przebieg z 2026-08-14 poszedl z `CROWD_FUND=14` przy 125 USDC na adminie.
+   * Dziesiec razy czternascie to wiecej, niz bylo - wiec skrypt rozdal srodki
+   * po kolei i wywrocil sie na ostatnim przelewie, ZANIM wykonal jakikolwiek
+   * handel. Nic nie przepadlo, bo klucze ida z ziarna, ale przebieg byl do
+   * powtorzenia, a admin zostal z 0,78 USDC.
+   *
+   * Policzenie sumy z gory zamienia to w blad, ktory kosztuje zero transakcji.
+   */
+  const topUps = await Promise.all(
+    wallets.map(async (wallet) => {
+      const balance = await ethers.provider.getBalance(wallet.address);
+      return balance >= fund ? 0n : fund - balance;
+    })
+  );
+  const needed = topUps.reduce((sum, value) => sum + value, 0n);
+  // Zapas na gaz zasilenia i na ewentualna graduacje na koncu przebiegu.
+  const reserve = ethers.parseEther("0.5");
+  const adminBalance = await ethers.provider.getBalance(admin.address);
+  if (needed > 0n && adminBalance < needed + reserve) {
+    throw new Error(
+      `Na zasilenie ${count} portfeli po ${ethers.formatEther(fund)} ${unit} brakuje srodkow: ` +
+        `potrzeba ${ethers.formatEther(needed + reserve)}, admin ma ${ethers.formatEther(adminBalance)}. ` +
+        `Zmniejsz CROWD_FUND albo CROWD_WALLETS. Juz zasilone portfele zachowuja srodki, wiec ` +
+        `przebieg BEZ zasilania odpalisz, podajac CROWD_FUND ponizej ich obecnych sald.`
+    );
+  }
+
   let funded = 0;
-  for (const wallet of wallets) {
-    const balance = await ethers.provider.getBalance(wallet.address);
-    if (balance >= fund) continue;
-    const tx = await admin.sendTransaction({ to: wallet.address, value: fund - balance });
+  for (const [index, wallet] of wallets.entries()) {
+    if (topUps[index] === 0n) continue;
+    const tx = await admin.sendTransaction({ to: wallet.address, value: topUps[index] });
     await tx.wait();
     funded += 1;
   }
@@ -115,14 +163,33 @@ async function main() {
       }
 
       const balance = await ethers.provider.getBalance(wallet.address);
-      if (balance <= GAS_RESERVE) {
+
+      /**
+       * Portfel bez srodkow moze jeszcze SPRZEDAWAC - i to jest cala roznica.
+       *
+       * Stalo tu jedno `if (balance <= GAS_RESERVE) continue` przed wyborem
+       * ruchu, wiec pusty portfel wypadal z rundy razem ze sprzedaza. To jest
+       * odwrotnie niz w rzeczywistosci: sprzedaz nie wydaje nic poza gazem
+       * (0,003 USDC przy rezerwie 0,2) i SAMA przynosi srodki.
+       *
+       * Skutek widac bylo w liczbach pierwszego przebiegu: 24 kupna i JEDNA
+       * sprzedaz, a rundy 5-8 to same pominiecia. Wykres rosl monotonicznie,
+       * czyli dokladnie to, czemu ten skrypt mial zapobiegac.
+       *
+       * Teraz brak srodkow wyklucza tylko KUPNO, a portfel z pozycja handluje
+       * dalej w druga strone.
+       */
+      const canBuy = balance > GAS_RESERVE;
+      const canAct = balance > GAS_RESERVE / 10n;
+      if (!canAct) {
         skipped += 1;
         continue;
       }
 
       // Co czwarty ruch to sprzedaz polowy pozycji - inaczej wykres rosnie
-      // monotonicznie i nie widac, czy spadki w ogole sie rysuja.
-      const sell = random() < 0.25;
+      // monotonicznie i nie widac, czy spadki w ogole sie rysuja. Portfel bez
+      // srodkow na kupno sprzedaje ZAWSZE, bo to jego jedyny mozliwy ruch.
+      const sell = !canBuy || random() < 0.25;
       const deadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
 
       try {
@@ -150,11 +217,14 @@ async function main() {
           sells += 1;
         } else {
           const spendable = balance - GAS_RESERVE;
-          // Od 0,01 do 0,15 jednostki - dosc, zeby ruszyc cena, za malo, zeby
-          // jeden portfel domknal krzywa.
-          const wanted = ethers.parseEther((0.01 + random() * 0.14).toFixed(4));
+          // Ulamek progu, a nie stala kwota - dosc, zeby ruszyc cena, za malo,
+          // zeby jeden portfel domknal krzywa.
+          const draw = BigInt(Math.floor(random() * 1_000));
+          const wanted = minTrade + ((maxTrade - minTrade) * draw) / 1_000n;
           const value = wanted > spendable ? spendable : wanted;
-          if (value < ethers.parseEther("0.005")) {
+          // Ponizej polowy dolnego widelka transakcja jest juz tylko oplata za
+          // gaz - portfel przepuszcza runde i zostawia srodki na nastepna.
+          if (value < minTrade / 2n) {
             skipped += 1;
             continue;
           }
