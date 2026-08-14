@@ -133,7 +133,17 @@ export async function readHistory(chainId: number, token: string): Promise<Histo
 
     const refs = ids.map((id) => docRef.collection(PARTS_SUBCOLLECTION).doc(id));
     const docs = await withDeadline(db.getAll(...refs), DB_DEADLINE_MS, null);
-    if (!docs) return { meta, trades: [], balances: new Map() };
+    // NAGLOWEK BEZ KAWALKOW TO NIE JEST CACHE, TYLKO KLAMSTWO O NIM.
+    //
+    // Stalo tu `return { meta, trades: [], balances: new Map() }` i kosztowalo
+    // to puste zakladki Trades i Holders na dobe: naglowek mowil "komplet, 141
+    // transakcji", lista byla pusta, trasa uznawala cache za gotowy, a
+    // przegladarka zapisywala te pustke jako PELNA migawke i od tej pory
+    // prosila juz tylko o roznice - czyli o nic.
+    //
+    // Nieprzeczytane kawalki znacza, ze cache'u nie ma. Skan lancucha policzy
+    // to samo w dwie sekundy.
+    if (!docs) return null;
     const parts: HistoryPart[] = [];
     for (const doc of docs) {
       if (!doc.exists) continue;

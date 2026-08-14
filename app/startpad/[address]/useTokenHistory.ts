@@ -104,6 +104,8 @@ type CacheResponse = {
   graduatedTs?: number | null;
   trades?: unknown;
   balances?: unknown;
+  /** Ile transakcji zna serwer LACZNIE - nie tylko ile przyslal w tej odpowiedzi. */
+  tradeCount?: number;
 };
 
 export function useTokenHistory(tokenAddress: Address | null, startedAt: number | null) {
@@ -212,6 +214,7 @@ export function useTokenHistory(tokenAddress: Address | null, startedAt: number 
       const highBlock = typeof data.highBlock === 'string' ? data.highBlock : '0';
       const complete = data.complete === true;
       const graduatedTs = typeof data.graduatedTs === 'number' ? data.graduatedTs : null;
+      const knownCount = typeof data.tradeCount === 'number' ? data.tradeCount : 0;
 
       // Roznicy wolno prosic dopiero wtedy, gdy cache siega startu tokena.
       // Dopoki nie siega, brakujace transakcje leza PONIZEJ `highBlock`, wiec
@@ -233,6 +236,18 @@ export function useTokenHistory(tokenAddress: Address | null, startedAt: number 
         for (const trade of live) applyTradeToBalances(balances, trade, LAUNCHPAD_ADDRESS.toLowerCase());
 
         const merged = live.length ? mergeTrades(trades, live) : trades;
+
+        // SAMONAPRAWA ZATRUTEJ MIGAWKI.
+        //
+        // Gdy serwer deklaruje wiecej transakcji, niz mamy po scaleniu, nasza
+        // migawka jest NIEPELNA mimo `full: true` - tak zdarzylo sie 14
+        // sierpnia 2026, gdy odczyt kawalkow historii nie zdazyl i trasa
+        // oddala komplet naglowka z pusta lista. Przegladarka zapisala te
+        // pustke jako pelna i od tej pory prosila juz tylko o roznice, czyli o
+        // nic. Odbieramy wtedy prawo do pytania roznicowego; nastepne wejscie
+        // pobierze calosc.
+        if (knownCount > merged.length) coverage.current = { highBlock, full: false };
+
         return {
           loading: false,
           loaded: true,
