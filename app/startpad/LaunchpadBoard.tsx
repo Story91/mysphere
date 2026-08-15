@@ -12,6 +12,7 @@ import {
   Copy,
   Crown,
   ExternalLink,
+  GraduationCap,
   Layers3,
   Plus,
   RefreshCw,
@@ -242,10 +243,23 @@ function spotPriceFromReserves(ethReserveAfter: bigint, tokenReserveAfter: bigin
   return (R_VIRT_NATIVE + Number(formatEther(ethReserveAfter))) / tokens;
 }
 
+/**
+ * ZNAK GRADUACJI.
+ *
+ * Token po graduacji to jedyny token na tablicy, ktoremu sie UDALO: krzywa
+ * zebrala cala kwote, plynnosc poszla do puli, a pozycja LP zostaje tam na
+ * zawsze. Wczesniej roznil sie od reszty jedna szara pastylka i przez to
+ * wygladal jak kazdy inny wiersz.
+ *
+ * Znak siedzi na GLIFIE, a nie w wierszu, bo glif jest jedynym elementem
+ * rysowanym we wszystkich trzech ukladach (lista, karta, panel) - jedna zmiana
+ * i graduacja widac wszedzie tak samo.
+ */
 function TokenGlyph({ token, large = false }: { token: LaunchpadToken; large?: boolean }) {
-  return (
+  const graduated = token.state === 'Graduated';
+  const glyph = (
     <div
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-[16px] font-soft-display font-extrabold text-white shadow-[0_4px_12px_rgba(0,0,0,0.12)] ${large ? 'h-16 w-16 text-[22px]' : 'h-11 w-11 text-[14px]'}`}
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-[16px] font-soft-display font-extrabold text-white shadow-[0_4px_12px_rgba(0,0,0,0.12)] ${large ? 'h-16 w-16 text-[22px]' : 'h-11 w-11 text-[14px]'} ${graduated ? 'ring-2 ring-sp-up' : ''}`}
       style={{ backgroundColor: token.accent }}
     >
       {token.logoUrl ? (
@@ -273,6 +287,20 @@ function TokenGlyph({ token, large = false }: { token: LaunchpadToken; large?: b
       )}
     </div>
   );
+
+  if (!graduated) return glyph;
+
+  return (
+    <div className={`relative shrink-0 ${large ? 'h-16 w-16' : 'h-11 w-11'}`}>
+      {glyph}
+      <span
+        aria-hidden="true"
+        className={`absolute -bottom-1 -right-1 flex items-center justify-center rounded-full bg-sp-up text-white shadow-[0_2px_6px_rgba(0,0,0,0.18)] ${large ? 'h-6 w-6' : 'h-5 w-5'}`}
+      >
+        <GraduationCap className={large ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+      </span>
+    </div>
+  );
 }
 
 function StatePill({ state }: { state: LaunchpadToken['state'] }) {
@@ -281,7 +309,12 @@ function StatePill({ state }: { state: LaunchpadToken['state'] }) {
     Locked: { label: 'Locked', className: 'bg-sp-brand-soft text-sp-brand-deep' },
     Graduated: { label: 'Graduated', className: 'bg-sp-up-soft text-sp-up' },
   }[state];
-  return <span className={`rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${meta.className}`}>{meta.label}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${meta.className}`}>
+      {state === 'Graduated' && <GraduationCap className="h-3 w-3" aria-hidden="true" />}
+      {meta.label}
+    </span>
+  );
 }
 
 function SamplePill() {

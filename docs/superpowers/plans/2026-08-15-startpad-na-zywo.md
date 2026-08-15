@@ -153,13 +153,19 @@ strona wyglada na martwa dla tokenow, ktorym sie udalo.
 - Zmien: `app/startpad/config.ts` (adres StateView per siec)
 - Zmien: `app/startpad/[address]/LaunchpadTokenDetail.tsx`
 
-- [ ] **5.1** Adres StateView v4 dla Base wziety z dokumentacji (basehub/Uniswap),
+- [x] **5.1** Adres StateView v4 dla Base wziety z dokumentacji (basehub/Uniswap),
   NIE z pamieci; brak adresu dla sieci = funkcja milczy zamiast zgadywac.
-- [ ] **5.2** `priceFromSqrtX96(sqrtPriceX96, tokenIsCurrency0)` + testy na znanych
+- [x] **5.2** `priceFromSqrtX96(sqrtPriceX96, tokenIsCurrency0)` + testy na znanych
   wartosciach.
-- [ ] **5.3** Odczyt `getSlot0(poolId)` i podmiana ceny/mcap w stanie Graduated.
-- [ ] **5.4** Weryfikacja na prawdziwym graduowanym tokenie, jesli taki jest.
-- [ ] **5.5** Commit.
+- [x] **5.3** Odczyt `getSlot0(poolId)` i podmiana ceny/mcap w stanie Graduated.
+- [x] **5.4** Weryfikacja na prawdziwym graduowanym tokenie, jesli taki jest.
+      (Na Base nikt jeszcze nie graduowal - zero zdarzen `Graduated` - wiec wzor
+      sprawdzony na czterech prawdziwych pulach v4 z natywnym ETH: zgodnosc z
+      przetestowanym wzorem z `/b20` do osmego miejsca.)
+- [x] **5.5** ZNAK GRADUACJI w UI (dopisane w trakcie): filtr „Graduated" na
+      tablicy juz byl, wiec doszedl znak na GLIFIE (pierscien + czapka), bo glif
+      rysuje sie we wszystkich trzech ukladach naraz, oraz ikona w pastylce stanu.
+- [x] **5.6** Commit.
 
 ---
 

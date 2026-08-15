@@ -1105,6 +1105,21 @@ export const CURVE_TARGET_ETH = ACTIVE_LAUNCHPAD_NETWORK.rVirt * 4;
  */
 export const LAUNCHPAD_DEPLOY_BLOCK = ACTIVE_LAUNCHPAD_NETWORK.deployBlock;
 
+/**
+ * StateView v4 - jedyny sposob odczytania `slot0` puli bez transient storage.
+ * Po graduacji to jest JEDYNE zrodlo biezacej ceny tokena.
+ *
+ * Adres wylacznie dla sieci, w ktorych jest POTWIERDZONY: Base mainnet, gdzie
+ * czytaja z niego takze strony /b20 (patrz docs/B20-LAUNCHPAD-ROZPOZNANIE.md,
+ * zweryfikowany rozmiar kodu). Dla sieci bez wpisu funkcja ceny z puli po
+ * prostu milczy - zgadniety adres kontraktu to gorsza odpowiedz niz jej brak.
+ */
+const STATE_VIEW_BY_CHAIN: Record<number, `0x${string}` | undefined> = {
+  [base.id]: '0xa3c0c9b65bad0b08107aa264b0f3db444b867a71',
+};
+
+export const STATE_VIEW_ADDRESS = STATE_VIEW_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id];
+
 /* -------------------------------------------------------------------------- */
 /*  TEMPO PODGLADU NA ZYWO                                                     */
 /* -------------------------------------------------------------------------- */

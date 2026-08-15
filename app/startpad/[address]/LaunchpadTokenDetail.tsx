@@ -57,6 +57,7 @@ import {
   type TradeEntry,
 } from './detailShared';
 import { applyClaimLogs, claimsNeedReload } from './liveClaims';
+import { hasPool, readPoolPriceWei } from './poolPrice';
 import { useTokenHistory, type LiveLaunchpadLog } from './useTokenHistory';
 
 const EXPLORER = LAUNCHPAD_EXPLORER_URL;
@@ -236,6 +237,39 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
   const historyComplete = history.loaded && !history.truncated;
 
   /**
+   * CENA PO GRADUACJI - z puli, a nie ostatnia cena krzywej.
+   *
+   * Po graduacji `spotPriceWeiPerToken` rewertuje, wiec strona pokazywala
+   * liczbe z chwili, w ktorej token przestal byc na krzywej, a wykres konczyl
+   * sie w tym samym miejscu. Akurat te tokeny, ktorym sie udalo, wygladaly na
+   * martwe. Teraz cena idzie z `slot0` puli i odswieza sie w tym samym tempie,
+   * co reszta podgladu - jeden `eth_call`, bez bazy i bez indeksera.
+   */
+  const [poolPriceWei, setPoolPriceWei] = useState<bigint | null>(null);
+  const graduated = core?.state === 'Graduated';
+  const poolId = core?.poolId ?? null;
+  const tokenDecimals = core?.decimals ?? 18;
+  useEffect(() => {
+    if (!readClient || !graduated || !hasPool(poolId)) {
+      setPoolPriceWei(null);
+      return;
+    }
+    let cancelled = false;
+    const read = () => {
+      void readPoolPriceWei(readClient, { poolId: poolId as string, decimals: tokenDecimals }).then((price) => {
+        // `null` znaczy "nie wiem" - zostaje ostatnia znana cena, a nie zero.
+        if (!cancelled && price !== null) setPoolPriceWei(price);
+      });
+    };
+    read();
+    const timer = window.setInterval(read, LIVE_WATCH.pollingInterval);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [readClient, graduated, poolId, tokenDecimals]);
+
+  /**
    * NA ZYWO: pojedyncze zdarzenia dokladane do stanu, ktory juz jest na
    * ekranie. Rezerwy bierzemy PROSTO ze zdarzenia (ethReserveAfter), nie z
    * wlasnej arytmetyki - ta sama zasada, co w LaunchpadBoard.
@@ -411,7 +445,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                 <div className="space-y-4 lg:sticky lg:top-4">
                   <TradePanel core={core} ethUsd={ethUsd} onAfterTx={() => void loadCore()} />
-                  <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} copied={copied} onCopy={() => void copyAddress()} />
+                  <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} poolPriceWei={poolPriceWei} copied={copied} onCopy={() => void copyAddress()} />
                 </div>
               </div>
 
@@ -618,6 +652,7 @@ function StatsCard({
   trades,
   balances,
   historyComplete,
+  poolPriceWei,
   copied,
   onCopy,
 }: {
@@ -628,13 +663,16 @@ function StatsCard({
   balances: Map<string, bigint>;
   /** Historia siega bloku startu tokena, wiec salda sa dokladne, nie przyblizone. */
   historyComplete: boolean;
+  /** Biezaca cena z puli po graduacji; null = nie wiemy, zostaje krzywa. */
+  poolPriceWei: bigint | null;
   copied: boolean;
   onCopy: () => void;
 }) {
   const lastTrade = trades.length ? trades[trades.length - 1] : null;
-  // Spot z lancucha wygrywa; po graduacji (odczyt rewertuje -> 0n) zostaje
-  // ostatnia cena krzywej - uczciwie podpisana w naglowku wykresu.
-  const priceWei = core.spotPriceWei > 0n ? core.spotPriceWei : lastTrade?.priceWei ?? START_PRICE_WEI;
+  // Kolejnosc zrodel: pula (po graduacji) -> spot z krzywej -> ostatnia cena z
+  // historii. Do 15 sierpnia 2026 pierwszego czlonu nie bylo i po graduacji
+  // strona zatrzymywala sie na ostatniej cenie krzywej.
+  const priceWei = poolPriceWei ?? (core.spotPriceWei > 0n ? core.spotPriceWei : lastTrade?.priceWei ?? START_PRICE_WEI);
   const volumeWei = useMemo(() => trades.reduce((sum, trade) => sum + trade.eth, 0n), [trades]);
   // Liczba posiadaczy z LANCUCHA: policzona z transferow, ktore i tak mamy.
   // Dziala offline wzgledem Blockscouta i jest fallbackiem, gdy indeks milczy.
@@ -669,7 +707,9 @@ function StatsCard({
   // wiersz wyglada dokladnie tak, jak przed dodaniem dopiskow.
   const rows: Array<{ label: string; value: string; usd?: string | null }> = [
     {
-      label: 'Price',
+      // Nazwa mowi, SKAD jest ta liczba. Po graduacji cena nie pochodzi juz z
+      // krzywej i udawanie, ze pochodzi, byloby drobnym klamstwem o rynku.
+      label: poolPriceWei ? 'Pool price' : 'Price',
       value: `${fmtPrice(priceToNumber(priceWei))} ${NATIVE_SYMBOL}`,
       // Cena tokena to ulamek centa - `fmtUsdPrice` pokazuje ja pelnym zapisem
       // ($0.00000367) zamiast bezuzytecznego "<$0.01".
