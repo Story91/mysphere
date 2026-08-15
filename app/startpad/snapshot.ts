@@ -43,6 +43,82 @@ export function loadSnapshot<T>(chainId: number): T[] | null {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  AGREGAT TABLICY - to, co pozwala skanowac SAME NOWE BLOKI                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Migawka wierszy wyzej jest PLACEHOLDEREM: maluje ostatni znany widok i czeka,
+ * az skan ja nadpisze. To nizej jest czyms innym - PUNKTEM KONTROLNYM. Trzyma
+ * wynik skanu razem z blokiem, do ktorego jest policzony, wiec kolejne wejscie
+ * nie powtarza pracy, tylko dolicza nowe bloki.
+ *
+ * Klucz niesie SIEC i ADRES LAUNCHPADA. Adresy w config.ts maja fallbacki, ktore
+ * zmieniaja sie przy kolejnych wdrozeniach - agregat z martwego wdrozenia
+ * doliczylby wolumen tokenow, ktorych ten launchpad nigdy nie widzial.
+ *
+ * Wersja w kluczu, bo zmiana ksztaltu agregatu nie moze przeczytac sie po cichu
+ * jako "stan sprzed" i dosumowac do nowego.
+ */
+const AGG_KEY = (chainId: number, launchpad: string) =>
+  `startpad.agg.v1.${chainId}.${launchpad.toLowerCase()}`;
+
+/**
+ * Tydzien, a nie doba jak przy wierszach. Wiersze po dobie sa nieaktualne jako
+ * podglad; agregat sie nie starzeje, bo opisuje zamkniety przedzial blokow.
+ * Sufit jest tu wylacznie po to, zeby ewentualna pomylka (reorganizacja
+ * lancucha przy samej glowie) nie zostala w liczbach na zawsze.
+ */
+const AGG_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type BoardAggregateSnapshot = {
+  /** Najwyzszy blok policzony w tym agregacie. */
+  lastBlock: bigint;
+  /** Ksztalt z `serializeAggregate`; ten modul go nie interpretuje. */
+  aggregate: unknown;
+};
+
+export function saveBoardAggregate(
+  chainId: number,
+  launchpad: string,
+  snapshot: { lastBlock: bigint; aggregate: unknown }
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      AGG_KEY(chainId, launchpad),
+      JSON.stringify({ savedAt: Date.now(), lastBlock: snapshot.lastBlock.toString(), aggregate: snapshot.aggregate })
+    );
+  } catch {
+    // Brak miejsca / tryb prywatny - wtedy po prostu wracamy do pelnego skanu.
+  }
+}
+
+export function loadBoardAggregate(chainId: number, launchpad: string): BoardAggregateSnapshot | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(AGG_KEY(chainId, launchpad));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { savedAt?: number; lastBlock?: string; aggregate?: unknown };
+    if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > AGG_MAX_AGE_MS) return null;
+    if (typeof parsed.lastBlock !== 'string' || !/^\d+$/.test(parsed.lastBlock)) return null;
+    const lastBlock = BigInt(parsed.lastBlock);
+    if (lastBlock <= 0n) return null;
+    return { lastBlock, aggregate: parsed.aggregate };
+  } catch {
+    return null;
+  }
+}
+
+export function dropBoardAggregate(chainId: number, launchpad: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(AGG_KEY(chainId, launchpad));
+  } catch {
+    // Nic nie szkodzi: nieprzeczytany agregat i tak konczy sie pelnym skanem.
+  }
+}
+
 /**
  * MIGAWKA HISTORII TOKENA - wykres i lista transakcji od razu przy wejsciu.
  *

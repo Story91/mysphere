@@ -12,6 +12,7 @@ import {
   Copy,
   Crown,
   ExternalLink,
+  GraduationCap,
   Layers3,
   Plus,
   RefreshCw,
@@ -41,6 +42,7 @@ import {
   LIQUIDITY_VAULT_ADDRESS,
   launchpadAbi,
   liquidityVaultAbi,
+  LIVE_WATCH,
   previewTokens,
   setLaunchpadChain,
   type LaunchpadToken,
@@ -48,8 +50,23 @@ import {
 import { fetchLogos, recallLogos, rememberLogos } from './logos';
 import { tokenAccent } from './metadata';
 import { browserStorage, flushPendingProfiles, postProfileWithRetry, sendTokenProfile } from './profileSync';
-import { loadSnapshot, saveSnapshot, loadFeedSnapshot, saveFeedSnapshot } from './snapshot';
-import { scanIsTrustworthy, shouldKeepUnscanned } from './boardScan';
+import {
+  loadBoardAggregate,
+  loadFeedSnapshot,
+  loadSnapshot,
+  saveBoardAggregate,
+  saveFeedSnapshot,
+  saveSnapshot,
+} from './snapshot';
+import {
+  mergeAggregates,
+  parseAggregate,
+  planBoardScan,
+  reduceBoardLogs,
+  scanIsTrustworthy,
+  serializeAggregate,
+  shouldKeepUnscanned,
+} from './boardScan';
 // Jedna, ZMIERZONA rezerwa na gaz i jedna arytmetyka procentow dla obu paneli
 // handlu - mini modala na tablicy i panelu na stronie tokena. Dwie kopie tej
 // samej liczby wlasnie kosztowaly nas przyciski, ktore wpisywaly zero.
@@ -226,10 +243,23 @@ function spotPriceFromReserves(ethReserveAfter: bigint, tokenReserveAfter: bigin
   return (R_VIRT_NATIVE + Number(formatEther(ethReserveAfter))) / tokens;
 }
 
+/**
+ * ZNAK GRADUACJI.
+ *
+ * Token po graduacji to jedyny token na tablicy, ktoremu sie UDALO: krzywa
+ * zebrala cala kwote, plynnosc poszla do puli, a pozycja LP zostaje tam na
+ * zawsze. Wczesniej roznil sie od reszty jedna szara pastylka i przez to
+ * wygladal jak kazdy inny wiersz.
+ *
+ * Znak siedzi na GLIFIE, a nie w wierszu, bo glif jest jedynym elementem
+ * rysowanym we wszystkich trzech ukladach (lista, karta, panel) - jedna zmiana
+ * i graduacja widac wszedzie tak samo.
+ */
 function TokenGlyph({ token, large = false }: { token: LaunchpadToken; large?: boolean }) {
-  return (
+  const graduated = token.state === 'Graduated';
+  const glyph = (
     <div
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-[16px] font-soft-display font-extrabold text-white shadow-[0_4px_12px_rgba(0,0,0,0.12)] ${large ? 'h-16 w-16 text-[22px]' : 'h-11 w-11 text-[14px]'}`}
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-[16px] font-soft-display font-extrabold text-white shadow-[0_4px_12px_rgba(0,0,0,0.12)] ${large ? 'h-16 w-16 text-[22px]' : 'h-11 w-11 text-[14px]'} ${graduated ? 'ring-2 ring-sp-up' : ''}`}
       style={{ backgroundColor: token.accent }}
     >
       {token.logoUrl ? (
@@ -257,6 +287,20 @@ function TokenGlyph({ token, large = false }: { token: LaunchpadToken; large?: b
       )}
     </div>
   );
+
+  if (!graduated) return glyph;
+
+  return (
+    <div className={`relative shrink-0 ${large ? 'h-16 w-16' : 'h-11 w-11'}`}>
+      {glyph}
+      <span
+        aria-hidden="true"
+        className={`absolute -bottom-1 -right-1 flex items-center justify-center rounded-full bg-sp-up text-white shadow-[0_2px_6px_rgba(0,0,0,0.18)] ${large ? 'h-6 w-6' : 'h-5 w-5'}`}
+      >
+        <GraduationCap className={large ? 'h-3.5 w-3.5' : 'h-3 w-3'} />
+      </span>
+    </div>
+  );
 }
 
 function StatePill({ state }: { state: LaunchpadToken['state'] }) {
@@ -265,7 +309,12 @@ function StatePill({ state }: { state: LaunchpadToken['state'] }) {
     Locked: { label: 'Locked', className: 'bg-sp-brand-soft text-sp-brand-deep' },
     Graduated: { label: 'Graduated', className: 'bg-sp-up-soft text-sp-up' },
   }[state];
-  return <span className={`rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${meta.className}`}>{meta.label}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${meta.className}`}>
+      {state === 'Graduated' && <GraduationCap className="h-3 w-3" aria-hidden="true" />}
+      {meta.label}
+    </span>
+  );
 }
 
 function SamplePill() {
@@ -542,6 +591,18 @@ type ActivityItem = {
   eth?: number;
   tone: 'launch' | 'buy' | 'sell' | 'graduate';
   logoUrl?: string;
+  /**
+   * Transakcja PODPISANA, ale jeszcze niewykopana.
+   *
+   * Wlasne kupno pojawialo sie na tasmie dopiero razem z cudzymi - po paragonie
+   * i po tym, jak subskrypcja zobaczyla zdarzenie. Miedzy podpisem a blokiem
+   * pasek nie wiedzial o niej nic, choc to jedyna transakcja, o ktorej wiemy
+   * NA PEWNO. Wiersz w tym stanie jest przygaszony i znika, gdy przychodzi
+   * prawdziwe zdarzenie z tego samego hasza.
+   */
+  pending?: boolean;
+  /** Hasz wlasnej transakcji - po nim rozpoznajemy jej zdarzenie. */
+  txHash?: string;
 };
 
 /**
@@ -606,11 +667,19 @@ function ActivityTicker({ events }: { events: ActivityItem[] }) {
     <div className="-mx-4 overflow-x-auto border-b border-sp-shade/10 bg-sp-surface sm:-mx-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Live Startpad events">
       <div className="flex min-h-[38px] w-max items-center gap-1.5 px-2 py-1.5">
         {items.length ? items.map((event) => (
-          <div key={event.id} className="lp-ticker-in flex shrink-0 items-center gap-1.5 rounded-full border border-sp-shade/10 bg-sp-surface px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+          // Wiersz „pending" to TWOJA podpisana transakcja przed blokiem:
+          // przerywana obwodka i pulsowanie mowia, ze jeszcze nie wyladowala,
+          // zamiast udawac zdarzenie, ktorego lancuch jeszcze nie potwierdzil.
+          <div
+            key={event.id}
+            className={`lp-ticker-in flex shrink-0 items-center gap-1.5 rounded-full border bg-sp-surface px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.05)] ${event.pending ? 'animate-pulse border-dashed border-sp-brand/40' : 'border-sp-shade/10'}`}
+          >
             <FeedGlyph item={event} />
             <span className="pr-1 text-left leading-tight">
               <span className="block text-[10px] font-bold text-sp-ink">{event.symbol}</span>
-              <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-sp-down-deep' : event.tone === 'buy' ? 'text-sp-up' : event.tone === 'graduate' ? 'text-sp-up' : 'text-sp-brand-deep'}`}>{event.label}</span>
+              <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-sp-down-deep' : event.tone === 'buy' ? 'text-sp-up' : event.tone === 'graduate' ? 'text-sp-up' : 'text-sp-brand-deep'}`}>
+                {event.pending ? `${event.label} · pending` : event.label}
+              </span>
             </span>
           </div>
         )) : <span className="px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/35">Listening for live Startpad events...</span>}
@@ -1090,6 +1159,13 @@ function TradePanel({
 // pokazywala mocki). Patrz LAUNCHPAD_NETWORKS w config.ts.
 const LOG_WINDOW = ACTIVE_LAUNCHPAD_NETWORK.scanWindow;
 const MAX_LOG_WINDOWS = ACTIVE_LAUNCHPAD_NETWORK.maxScanWindows;
+/**
+ * Najwieksza zaleglosc, ktora wolno nadrobic doliczeniem delty. Powyzej niej
+ * jedno zadanie i tak nie zeskanowaloby calego przedzialu, wiec zostalaby
+ * dziura - a dziury w sumie addytywnej nie da sie pozniej odroznic od prawdy.
+ * Praktycznie nieosiagalne: agregat starszy niz tydzien i tak wygasa.
+ */
+const MAX_DELTA_SPAN = LOG_WINDOW * BigInt(MAX_LOG_WINDOWS);
 
 const LAUNCHED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Launched' });
 const BOUGHT_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Bought' });
@@ -1202,35 +1278,32 @@ export default function LaunchpadBoard() {
     setBoardError(null);
     try {
       const latest = await readClient.getBlockNumber();
-      const launched = new Map<Address, { name: string; symbol: string; creator: Address; startedAt: number }>();
-      const buyers = new Map<Address, Set<Address>>();
-      const activity = new Map<Address, { volume: number; trades: number }>();
-      // Surowce tablicy zarobkow. Wei w bigint - na number przechodzimy
-      // dopiero przy wyswietlaniu.
-      const hookCreatorEth = new Map<Address, bigint>();
-      // FeeAccrued kind 1: dokladne naliczenia strony tworcy per ODBIORCA
-      // per token. Klucz lowercase; accountDisplay trzyma forme z checksumem.
-      const creatorSideEarned = new Map<string, Map<Address, bigint>>();
-      const accountDisplay = new Map<string, Address>();
-      // Okna ida od NAJNOWSZEGO wstecz, wiec kolejnosc napotkania nie jest
-      // chronologia - kazdy wpis niesie klucz (blok, logIndex) do posortowania.
-      const priceEntries = new Map<Address, Array<{ order: number; price: number }>>();
-      // Ten sam klucz (blok, logIndex) co przy cenach: okna ida od najnowszego
-      // wstecz, ale WEWNATRZ okna logi sa od najstarszego - bez sortowania
-      // tasma pokazywalaby najstarsze wpisy najnowszego okna jako "najswiezsze".
-      const rawFeed: Array<{ id: string; token: Address; label: string; eth?: number; tone: ActivityItem['tone']; order: number }> = [];
-      const orderOf = (log: { blockNumber: bigint | null; logIndex: number | null }) =>
-        Number(log.blockNumber ?? 0n) * 10_000 + Number(log.logIndex ?? 0);
 
-      const pushPrice = (token: Address, log: { blockNumber: bigint | null; logIndex: number | null }, ethReserveAfter?: bigint, tokenReserveAfter?: bigint) => {
-        if (ethReserveAfter === undefined || tokenReserveAfter === undefined || tokenReserveAfter <= 0n) return;
-        const list = priceEntries.get(token) ?? [];
-        list.push({
-          order: Number(log.blockNumber ?? 0n) * 10_000 + Number(log.logIndex ?? 0),
-          price: spotPriceFromReserves(ethReserveAfter, tokenReserveAfter),
-        });
-        priceEntries.set(token, list);
-      };
+      /**
+       * SKAN ZACZYNA SIE TAM, GDZIE SKONCZYL POPRZEDNI.
+       *
+       * Do 15 sierpnia 2026 kazde wejscie na tablice skanowalo lancuch od glowy
+       * az do bloku wdrozenia launchpada. Ten koszt rosl z kazda doba Base
+       * (~4,5 okna na dobe przy oknie 9500) i mial twardy koniec: po ~16,6 dnia
+       * od wdrozenia skan przestawal miescic sie w suficie okien, przestawal
+       * siegac startu, a najstarsze tokeny tracily wolumen, ceny i wykresy.
+       *
+       * Agregat z poprzedniej wizyty niesie blok, do ktorego jest policzony,
+       * wiec teraz dokladamy TYLKO nowe bloki. Zapisujemy go wylacznie wtedy,
+       * gdy pokrycie jest ciagle od bloku wdrozenia - dzieki temu `lastBlock`
+       * zawsze znaczy "policzone od poczatku do tego bloku", a nie "policzone
+       * cokolwiek".
+       */
+      const cached = loadBoardAggregate(ACTIVE_LAUNCHPAD_NETWORK.chain.id, LAUNCHPAD_ADDRESS);
+      const cachedAggregate = cached ? parseAggregate(cached.aggregate) : null;
+      const plan = planBoardScan({
+        cachedLastBlock: cachedAggregate ? (cached?.lastBlock ?? null) : null,
+        head: latest,
+        deployBlock: LAUNCHPAD_DEPLOY_BLOCK,
+        maxSpan: MAX_DELTA_SPAN,
+      });
+      const resumable = plan.resume;
+      const scanFloor = plan.floor;
 
       // Wszystkie okna [fromBlock,toBlock] liczymy Z GORY, potem strzelamy
       // ROWNOLEGLE w puli po 6. Okna sa niezalezne, a przetwarzanie i tak
@@ -1240,10 +1313,10 @@ export default function LaunchpadBoard() {
       const ranges: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
       {
         let cursor = latest;
-        for (let window = 0; window < MAX_LOG_WINDOWS && cursor >= LAUNCHPAD_DEPLOY_BLOCK; window += 1) {
-          const fromBlock = cursor > LAUNCHPAD_DEPLOY_BLOCK + LOG_WINDOW ? cursor - LOG_WINDOW : LAUNCHPAD_DEPLOY_BLOCK;
+        for (let window = 0; window < MAX_LOG_WINDOWS && cursor >= scanFloor; window += 1) {
+          const fromBlock = cursor > scanFloor + LOG_WINDOW ? cursor - LOG_WINDOW : scanFloor;
           ranges.push({ fromBlock, toBlock: cursor });
-          if (fromBlock === LAUNCHPAD_DEPLOY_BLOCK) break;
+          if (fromBlock === scanFloor) break;
           cursor = fromBlock - 1n;
         }
       }
@@ -1290,58 +1363,51 @@ export default function LaunchpadBoard() {
         const batch = (await Promise.all(ranges.slice(i, i + SCAN_CONCURRENCY).map(scanOne))) as unknown as ScanLog[][];
         for (const logs of batch) for (const log of logs) allLogs.push(log);
       }
-        for (const log of allLogs) {
-          const token = log.args.token as Address | undefined;
-          if (!token) continue;
-          if (log.eventName === 'Launched') {
-            launched.set(token, {
-              name: log.args.name as string,
-              symbol: log.args.symbol as string,
-              creator: log.args.creator as Address,
-              startedAt: Number(log.args.startedAt ?? 0),
-            });
-            rawFeed.push({ id: `${log.transactionHash}-launch`, token, label: 'Launched', tone: 'launch', order: orderOf(log) });
-          } else if (log.eventName === 'Bought') {
-            const set = buyers.get(token) ?? new Set<Address>();
-            set.add(log.args.buyer as Address);
-            buyers.set(token, set);
-            const ethNet = Number(formatEther(log.args.ethNet as bigint));
-            const current = activity.get(token) ?? { volume: 0, trades: 0 };
-            activity.set(token, { volume: current.volume + ethNet, trades: current.trades + 1 });
-            pushPrice(token, log, log.args.ethReserveAfter as bigint | undefined, log.args.tokenReserveAfter as bigint | undefined);
-            rawFeed.push({ id: `${log.transactionHash}-buy`, token, label: 'Buy', eth: ethNet, tone: 'buy', order: orderOf(log) });
-          } else if (log.eventName === 'Sold') {
-            const set = buyers.get(token) ?? new Set<Address>();
-            set.add(log.args.seller as Address);
-            buyers.set(token, set);
-            const ethOut = Number(formatEther(log.args.ethOut as bigint));
-            const current = activity.get(token) ?? { volume: 0, trades: 0 };
-            activity.set(token, { volume: current.volume + ethOut, trades: current.trades + 1 });
-            pushPrice(token, log, log.args.ethReserveAfter as bigint | undefined, log.args.tokenReserveAfter as bigint | undefined);
-            rawFeed.push({ id: `${log.transactionHash}-sell`, token, label: 'Sell', eth: ethOut, tone: 'sell', order: orderOf(log) });
-          } else if (log.eventName === 'HookFeeSettled') {
-            // Hook rozlicza tworcy jego czesc oplat puli JUZ PO potraceniu
-            // auto-buybacku (buyback schodzi wylacznie z dzialki tworcy),
-            // wiec ethToCreator sumujemy wprost - bez odtwarzania podzialu.
-            const ethToCreator = log.args.ethToCreator as bigint | undefined;
-            if (ethToCreator) hookCreatorEth.set(token, (hookCreatorEth.get(token) ?? 0n) + ethToCreator);
-          } else if (log.eventName === 'FeeAccrued') {
-            // kind 1 = strona TWORCY oplaty handlowej, per faktyczny ODBIORCA.
-            // To rozlicza splity miedzy odbiorcow co do wei - w przeciwienstwie
-            // do mnozenia feeEth przez konfiguracje, ktore przypisywalo cala
-            // dzialke tworcy jego adresowi.
-            const kind = Number(log.args.kind ?? 255);
-            const accountAddr = log.args.account as Address | undefined;
-            const amount = log.args.amount as bigint | undefined;
-            if (kind === 1 && accountAddr && amount) {
-              const accountKey = accountAddr.toLowerCase();
-              accountDisplay.set(accountKey, accountAddr);
-              const perToken = creatorSideEarned.get(accountKey) ?? new Map<Address, bigint>();
-              perToken.set(token, (perToken.get(token) ?? 0n) + amount);
-              creatorSideEarned.set(accountKey, perToken);
-            }
-          }
-        }
+      // Logi -> agregat. Ta sama redukcja, co wczesniej stala tutaj w petli,
+      // tylko wyjeta do `boardScan`, zeby dalo sie ja przetestowac i zeby
+      // wynik dalo sie DOSUMOWAC do zapamietanego.
+      const scannedAggregate = reduceBoardLogs(allLogs, {
+        ethOf: (wei) => Number(formatEther(wei)),
+        priceOf: spotPriceFromReserves,
+      });
+
+      /**
+       * Delte doklejamy TYLKO w calosci. Padniete okno znaczy dziure w
+       * przedziale, a dziura w sumie addytywnej jest nie do odkrecenia: zostaje
+       * w wolumenie na zawsze i nikt jej pozniej nie odrozni od prawdy. Wtedy
+       * pokazujemy to, co pewne (agregat sprzed), i probujemy ponownie przy
+       * kolejnym wejsciu.
+       */
+      const deltaComplete = failedWindows === 0;
+      const aggregate =
+        resumable && cachedAggregate
+          ? deltaComplete
+            ? mergeAggregates(cachedAggregate, scannedAggregate)
+            : cachedAggregate
+          : scannedAggregate;
+
+      // Pokrycie: przy skanie roznicowym dno siega bloku wdrozenia przez
+      // zapamietany agregat, bo inaczej nie zostalby zapisany.
+      const lowestScanned = resumable
+        ? LAUNCHPAD_DEPLOY_BLOCK
+        : ranges.length
+          ? ranges[ranges.length - 1].fromBlock
+          : latest;
+      // Wiarygodny = zszedl do bloku wdrozenia I ZADNE okno nie padlo. Dopiero
+      // taki skan ma prawo rozstrzygac, ze tokena nie ma.
+      const trustworthy = scanIsTrustworthy({ failedWindows, lowestScanned, deployBlock: LAUNCHPAD_DEPLOY_BLOCK });
+
+      // Zapis WYLACZNIE przy ciaglym pokryciu od bloku wdrozenia - tylko wtedy
+      // `lastBlock` znaczy "policzone od poczatku do tego bloku".
+      if (trustworthy) {
+        saveBoardAggregate(ACTIVE_LAUNCHPAD_NETWORK.chain.id, LAUNCHPAD_ADDRESS, {
+          lastBlock: latest,
+          aggregate: serializeAggregate(aggregate),
+        });
+      }
+
+      const { launched, buyers, activity, hookCreatorEth, creatorSideEarned, accountDisplay, priceEntries } = aggregate;
+      const rawFeed = aggregate.feed;
 
       // ===== TOZSAMOSCI Z BAZY, NIE Z TEGO SKANU =====
       // Lista startow przychodzi z /api/launchpad/board, gdzie jest ZAPISANA.
@@ -1385,12 +1451,9 @@ export default function LaunchpadBoard() {
       }
 
       // Skan mogl uciac historie na SUFICIE OKIEN zamiast dojsc do bloku
-      // wdrozenia - ale przy scalaniu ponizej zachowujemy wiersze spoza skanu,
-      // wiec cicho niezeskanowany token juz nie znika z tablicy.
-      const lowestScanned = ranges.length ? ranges[ranges.length - 1].fromBlock : latest;
-      // Wiarygodny = zszedl do bloku wdrozenia I ZADNE okno nie padlo. Dopiero
-      // taki skan ma prawo rozstrzygac, ze tokena nie ma.
-      const trustworthy = scanIsTrustworthy({ failedWindows, lowestScanned, deployBlock: LAUNCHPAD_DEPLOY_BLOCK });
+      // wdrozenia (`trustworthy` policzone wyzej) - ale przy scalaniu ponizej
+      // zachowujemy wiersze spoza skanu, wiec cicho niezeskanowany token juz
+      // nie znika z tablicy.
       if (stale()) return;
       setScanTruncated(!trustworthy);
 
@@ -1404,7 +1467,9 @@ export default function LaunchpadBoard() {
       }
 
       setActivityFeed(
-        rawFeed
+        // Kopia przed sortowaniem: `feed` nalezy do agregatu, ktory przy
+        // nieudanej delcie jest tym samym obiektem, co stan zapamietany.
+        [...rawFeed]
           .sort((a, b) => b.order - a.order)
           .slice(0, 24)
           .map((item) => ({ ...item, address: item.token, symbol: launched.get(item.token)?.symbol ?? shortAddress(item.token), accent: accentFor(item.token) }))
@@ -1658,9 +1723,12 @@ export default function LaunchpadBoard() {
     if (real.length) saveSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, real);
   }, [tokens]);
 
-  // Migawka live tape, zeby przy nastepnym wejsciu pasek byl od razu.
+  // Migawka live tape, zeby przy nastepnym wejsciu pasek byl od razu. Wiersze
+  // „pending" do niej NIE ida: transakcja czekajaca na blok jest stanem tej
+  // sesji, a nie faktem - po przeladowaniu wisialaby jako wieczne oczekiwanie.
   useEffect(() => {
-    if (activityFeed.length) saveFeedSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, activityFeed);
+    const landed = activityFeed.filter((item) => !item.pending);
+    if (landed.length) saveFeedSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, landed);
   }, [activityFeed]);
 
   /**
@@ -1684,14 +1752,18 @@ export default function LaunchpadBoard() {
     const unwatch = readClient.watchContractEvent({
       address: LAUNCHPAD_ADDRESS as Address,
       abi: launchpadAbi,
-      poll: true,
-      pollingInterval: 8_000,
+      // Tempo idzie z konfiguracji sieci (patrz `liveWatchFor`): raz na blok,
+      // gdy stoimy na wlasnym RPC, osiem sekund na publicznym.
+      poll: LIVE_WATCH.poll,
+      pollingInterval: LIVE_WATCH.pollingInterval,
       // Bez tego viem wypisuje kazde odbicie publicznego RPC do konsoli. Zywy
       // podglad jest DODATKIEM - tablica ma juz dane z `loadBoard`, wiec cicha
       // przerwa w subskrypcji jest wlasciwym zachowaniem, a nie awaria.
       onError: () => {},
       onLogs: (logs) => {
         const fresh: ActivityItem[] = [];
+        /** Hasze transakcji z tej paczki - po nich znika wiersz „pending". */
+        const freshHashes: string[] = [];
 
         for (const log of logs) {
           const decoded = log as unknown as { eventName?: string; args?: Record<string, unknown>; transactionHash?: string };
@@ -1699,6 +1771,7 @@ export default function LaunchpadBoard() {
           const eventName = decoded.eventName;
           if (!token || !eventName) continue;
           const id = `${decoded.transactionHash ?? ''}-${eventName}-${String(log.logIndex ?? 0)}`;
+          if (decoded.transactionHash) freshHashes.push(decoded.transactionHash);
 
           if (eventName === 'Launched') {
             const symbol = (decoded.args?.symbol as string) ?? shortAddress(token);
@@ -1802,7 +1875,12 @@ export default function LaunchpadBoard() {
           const seen = new Set(current.map((item) => item.id));
           const unique = fresh.filter((item) => !seen.has(item.id));
           if (unique.length === 0) return current;
-          return [...unique.reverse(), ...current].slice(0, 24);
+          // Wlasna transakcja czeka tu juz jako wiersz „pending". Teraz przyszlo
+          // jej prawdziwe zdarzenie, wiec podmieniamy jedno na drugie zamiast
+          // pokazywac te sama transakcje dwa razy.
+          const landed = new Set(freshHashes);
+          const withoutPending = current.filter((item) => !(item.pending && item.txHash && landed.has(item.txHash)));
+          return [...unique.reverse(), ...withoutPending].slice(0, 24);
         });
       },
     });
@@ -2087,6 +2165,43 @@ export default function LaunchpadBoard() {
     }
   };
 
+  /**
+   * WLASNA TRANSAKCJA NA TASMIE OD RAZU PO PODPISANIU.
+   *
+   * Pasek zdarzen pokazywal cudze transakcje szybciej niz twoje wlasne: cudze
+   * przychodzily z subskrypcji, a twoja czekala na paragon i dopiero potem na
+   * zdarzenie. Miedzy podpisem a blokiem tasma milczala akurat o tej jednej
+   * transakcji, o ktorej wiadomo NA PEWNO, ze istnieje.
+   *
+   * Wiersz jest przygaszony i znika, gdy przyjdzie prawdziwe zdarzenie z tego
+   * samego hasza (patrz `freshHashes`) albo gdy transakcja odpadnie.
+   */
+  const pushPendingTrade = useCallback(
+    (input: { hash: string; token: LaunchpadToken; side: 'buy' | 'sell'; eth?: number }) => {
+      setActivityFeed((current) =>
+        [
+          {
+            id: `${input.hash}-pending`,
+            address: input.token.address,
+            symbol: input.token.symbol,
+            accent: input.token.accent,
+            label: input.side === 'buy' ? 'Buy' : 'Sell',
+            eth: input.eth,
+            tone: input.side,
+            pending: true,
+            txHash: input.hash,
+          } as ActivityItem,
+          ...current,
+        ].slice(0, 24)
+      );
+    },
+    []
+  );
+
+  const dropPendingTrade = useCallback((hash: string) => {
+    setActivityFeed((current) => current.filter((item) => item.txHash !== hash));
+  }, []);
+
   const buy = async () => {
     if (!selected?.address || !address || !walletClient || !readClient) {
       setNotice({ kind: 'error', text: 'Launch a live token first. Preview rows are not connected to chain data.' });
@@ -2116,8 +2231,13 @@ export default function LaunchpadBoard() {
         chain: LAUNCHPAD_CHAIN,
         account: address,
       });
+      // Podpisane - na tasme idzie od razu, jeszcze przed blokiem.
+      pushPendingTrade({ hash, token: selected, side: 'buy', eth: Number(formatEther(value)) });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
-      if (receipt.status !== 'success') throw new Error('The buy transaction reverted.');
+      if (receipt.status !== 'success') {
+        dropPendingTrade(hash);
+        throw new Error('The buy transaction reverted.');
+      }
       // Kupno POTWIERDZONE. Sukces i zamkniecie NAJPIERW - zaden pozniejszy
       // odczyt nie moze wywrocic potwierdzonej transakcji w blad (to prowadzilo
       // do ponownego, podwojnego kupna). Blad writeContract/receipt (catch)
@@ -2189,8 +2309,14 @@ export default function LaunchpadBoard() {
         chain: LAUNCHPAD_CHAIN,
         account: address,
       });
+      // Podpisane - na tasme idzie od razu. Kwota z wyceny, bo sprzedaz podaje
+      // tokeny, a tasma mowi w pieniadzu sieci.
+      pushPendingTrade({ hash, token: selected, side: 'sell', eth: Number(formatEther(minEthOut)) });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
-      if (receipt.status !== 'success') throw new Error('The sell transaction reverted.');
+      if (receipt.status !== 'success') {
+        dropPendingTrade(hash);
+        throw new Error('The sell transaction reverted.');
+      }
       setSellAmount('0');
       // Sukces i zamkniecie NAJPIERW - potwierdzonego sella zaden pozniejszy
       // odczyt nie moze wywrocic w blad.

@@ -13,7 +13,7 @@ import {
   SearchX,
   Send,
 } from 'lucide-react';
-import { ContractFunctionExecutionError, formatEther, type Address } from 'viem';
+import { ContractFunctionExecutionError, formatEther, getAbiItem, type Address } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 import {
   NATIVE_SYMBOL,
@@ -28,6 +28,7 @@ import {
   launchpadAbi,
   LIQUIDITY_VAULT_ADDRESS,
   liquidityVaultAbi,
+  LIVE_WATCH,
 } from '../config';
 import { parseMetadataUri, pickTokenImage } from '../metadata';
 import { fetchLogos } from '../logos';
@@ -41,8 +42,10 @@ import {
   fmtEth,
   fmtPrice,
   fmtUsdPrice,
+  holdersAreExact,
   isAddressParam,
   mcapWei,
+  pickHolderCount,
   priceToNumber,
   priceWeiAfter,
   short,
@@ -53,9 +56,27 @@ import {
   type TokenProfileView,
   type TradeEntry,
 } from './detailShared';
+import { applyClaimLogs, claimsNeedReload } from './liveClaims';
+import { hasPool, readPoolPriceWei } from './poolPrice';
 import { useTokenHistory, type LiveLaunchpadLog } from './useTokenHistory';
 
 const EXPLORER = LAUNCHPAD_EXPLORER_URL;
+
+/**
+ * Zdarzenia, ktore strona tokena sledzi na zywo - z trzech kontraktow, ale w
+ * jednej subskrypcji. Wypisane po nazwie, a nie caly ABI, zeby subskrypcja
+ * niosla dokladnie to, czego uzywa `onLogs`, i ani jednego loga wiecej.
+ */
+const LIVE_EVENTS = [
+  getAbiItem({ abi: launchpadAbi, name: 'Bought' }),
+  getAbiItem({ abi: launchpadAbi, name: 'Sold' }),
+  getAbiItem({ abi: launchpadAbi, name: 'CurveLocked' }),
+  getAbiItem({ abi: launchpadAbi, name: 'Graduated' }),
+  getAbiItem({ abi: launchpadAbi, name: 'FeeAccrued' }),
+  getAbiItem({ abi: launchpadAbi, name: 'Claimed' }),
+  getAbiItem({ abi: hookAbi, name: 'HookFeeSettled' }),
+  getAbiItem({ abi: liquidityVaultAbi, name: 'Harvested' }),
+];
 
 /**
  * Strona tokena sklada sie z trzech NIEZALEZNYCH strumieni danych:
@@ -95,12 +116,52 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     if (!readClient || !tokenAddress) return;
     setCoreError(null);
     try {
-      const launch = await readClient.readContract({
-        address: LAUNCHPAD_ADDRESS as Address,
-        abi: launchpadAbi,
-        functionName: 'launchOf',
-        args: [tokenAddress],
-      });
+      const accountAddress = account ?? ('0x0000000000000000000000000000000000000000' as Address);
+      // Odczyty rozszerzonej konfiguracji maja WLASNE `catch` - pod
+      // LAUNCHPAD_ADDRESS moze stac wersja sprzed launchAdvanced i wtedy tych
+      // selektorow nie ma, a pojedynczy rewert nie moze zabrac calej strony.
+      const missing = Symbol('missing');
+
+      /**
+       * WSZYSTKO W JEDNEJ RUNDZIE.
+       *
+       * Bylo to rozbite na trzy `await` pod rzad: `launchOf`, potem czternascie
+       * odczytow, potem szesc. Kazda paczka to jeden multicall (wagmi domyslnie
+       * skleja rownolegle `readContract`), ale TRZY paczki to trzy podroze do
+       * RPC, jedna po drugiej, zanim strona narysuje cokolwiek. Jedna tablica
+       * `Promise.all` to jedna podroz.
+       *
+       * `gradFeeOf` wchodzi bezwarunkowo z wlasnym `catch`, bo warunek "tylko w
+       * stanie Locked" wymagalby znajomosci stanu, czyli osobnej rundy - a to
+       * jest dokladnie ten koszt, ktory tu usuwamy. Uzywamy go i tak dopiero po
+       * sprawdzeniu stanu.
+       */
+      const [launch, name, symbol, decimals, balance, allowance, spotPrice, position, pendingEth, pendingToken, launchClaimable, hookEthClaimable, hookTokenClaimable, vaultEthClaimable, vaultTokenClaimable, feeConfig, metadataUri, buybackBps, pendingBuybackEth, buybackBurned, gradFee] =
+        await Promise.all([
+          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchOf', args: [tokenAddress] }),
+          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'name' }),
+          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
+          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
+          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'balanceOf', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'allowance', args: [accountAddress, LAUNCHPAD_ADDRESS as Address] }) : Promise.resolve(0n),
+          // Po graduacji ten odczyt rewertuje - cena zyje wtedy w puli v4.
+          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [tokenAddress] }).catch(() => 0n),
+          readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'positionOf', args: [tokenAddress] }),
+          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingEth', args: [tokenAddress] }),
+          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingToken', args: [tokenAddress] }),
+          account ? readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
+        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'feeConfigOf', args: [tokenAddress] }).catch(() => missing),
+        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'metadataURI', args: [tokenAddress] }).catch(() => ''),
+        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackBps', args: [tokenAddress] }).catch(() => 0),
+        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingBuybackEth', args: [tokenAddress] }).catch(() => 0n),
+        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackTokens', args: [tokenAddress] }).catch(() => 0n),
+        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'gradFeeOf', args: [tokenAddress] }).catch(() => null),
+      ]);
+
       const [creator, stateIndex, ethReserve, tokenReserve, startedAt] = launch as readonly [
         Address,
         number,
@@ -117,41 +178,6 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
         return;
       }
       const state = LAUNCH_STATE[Number(stateIndex)] as CoreState['state'];
-      const accountAddress = account ?? ('0x0000000000000000000000000000000000000000' as Address);
-
-      const [name, symbol, decimals, balance, allowance, spotPrice, position, pendingEth, pendingToken, launchClaimable, hookEthClaimable, hookTokenClaimable, vaultEthClaimable, vaultTokenClaimable] =
-        await Promise.all([
-          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'name' }),
-          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
-          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
-          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'balanceOf', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'allowance', args: [accountAddress, LAUNCHPAD_ADDRESS as Address] }) : Promise.resolve(0n),
-          // Po graduacji ten odczyt rewertuje - cena zyje wtedy w puli v4.
-          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [tokenAddress] }).catch(() => 0n),
-          readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'positionOf', args: [tokenAddress] }),
-          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingEth', args: [tokenAddress] }),
-          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingToken', args: [tokenAddress] }),
-          account ? readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
-        ] as const);
-
-      // Odczyty rozszerzonej konfiguracji sa OSOBNE i kazdy ma swoj `catch`.
-      // Pod LAUNCHPAD_ADDRESS moze stac wersja sprzed launchAdvanced - wtedy
-      // tych selektorow nie ma i pojedynczy rewert nie moze zabrac calej strony.
-      const missing = Symbol('missing');
-      const [feeConfig, metadataUri, buybackBps, pendingBuybackEth, buybackBurned, gradFee] = await Promise.all([
-        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'feeConfigOf', args: [tokenAddress] }).catch(() => missing),
-        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'metadataURI', args: [tokenAddress] }).catch(() => ''),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackBps', args: [tokenAddress] }).catch(() => 0),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingBuybackEth', args: [tokenAddress] }).catch(() => 0n),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackTokens', args: [tokenAddress] }).catch(() => 0n),
-        state === 'Locked'
-          ? readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'gradFeeOf', args: [tokenAddress] }).catch(() => null)
-          : Promise.resolve(null),
-      ]);
       const feeTuple = feeConfig === missing ? null : (feeConfig as readonly [number, number, bigint]);
       const positionTuple = position as readonly [`0x${string}`, bigint, number, number];
 
@@ -177,7 +203,9 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
         hookTokenClaimable: hookTokenClaimable as bigint,
         vaultEthClaimable: vaultEthClaimable as bigint,
         vaultTokenClaimable: vaultTokenClaimable as bigint,
-        gradCallerReward: gradFee ? (gradFee as readonly [bigint, bigint])[1] : null,
+        // Nagroda za wywolanie graduate() ma sens WYLACZNIE w stanie Locked -
+        // odczyt leci bezwarunkowo (jedna runda), ale czytamy go warunkowo.
+        gradCallerReward: state === 'Locked' && gradFee ? (gradFee as readonly [bigint, bigint])[1] : null,
         config: {
           known: feeTuple !== null,
           feeBps: Number(feeTuple?.[0] ?? 0),
@@ -209,56 +237,124 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
   /** Tworca tokena - jedyny, kto moze uzupelnic profil i linki. */
   const isCreator = Boolean(account && core && account.toLowerCase() === core.creator.toLowerCase());
 
-  // NA ZYWO: pojedyncze zdarzenia dokladane do stanu, ktory juz jest na
-  // ekranie. Rezerwy bierzemy PROSTO ze zdarzenia (ethReserveAfter), nie z
-  // wlasnej arytmetyki - ta sama zasada, co w LaunchpadBoard.
+  /**
+   * Historia siega bloku startu tokena. Dopiero wtedy nasze salda sa PELNE, a
+   * nie przyblizone - i dopiero wtedy nasza liczba holderow bije indeks.
+   */
+  const historyComplete = history.loaded && !history.truncated;
+
+  /**
+   * CENA PO GRADUACJI - z puli, a nie ostatnia cena krzywej.
+   *
+   * Po graduacji `spotPriceWeiPerToken` rewertuje, wiec strona pokazywala
+   * liczbe z chwili, w ktorej token przestal byc na krzywej, a wykres konczyl
+   * sie w tym samym miejscu. Akurat te tokeny, ktorym sie udalo, wygladaly na
+   * martwe. Teraz cena idzie z `slot0` puli i odswieza sie w tym samym tempie,
+   * co reszta podgladu - jeden `eth_call`, bez bazy i bez indeksera.
+   */
+  const [poolPriceWei, setPoolPriceWei] = useState<bigint | null>(null);
+  const graduated = core?.state === 'Graduated';
+  const poolId = core?.poolId ?? null;
+  const tokenDecimals = core?.decimals ?? 18;
+  useEffect(() => {
+    if (!readClient || !graduated || !hasPool(poolId)) {
+      setPoolPriceWei(null);
+      return;
+    }
+    let cancelled = false;
+    const read = () => {
+      void readPoolPriceWei(readClient, { poolId: poolId as string, decimals: tokenDecimals }).then((price) => {
+        // `null` znaczy "nie wiem" - zostaje ostatnia znana cena, a nie zero.
+        if (!cancelled && price !== null) setPoolPriceWei(price);
+      });
+    };
+    read();
+    const timer = window.setInterval(read, LIVE_WATCH.pollingInterval);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [readClient, graduated, poolId, tokenDecimals]);
+
+  /**
+   * NA ZYWO: pojedyncze zdarzenia dokladane do stanu, ktory juz jest na
+   * ekranie. Rezerwy bierzemy PROSTO ze zdarzenia (ethReserveAfter), nie z
+   * wlasnej arytmetyki - ta sama zasada, co w LaunchpadBoard.
+   *
+   * Trzy adresy w JEDNEJ subskrypcji, a nie trzy pollery: launchpad (handel,
+   * naliczenia i wyplaty oplat), hook (rozliczenia oplat puli) i vault (zbior
+   * oplat puli). To dalej jedno `eth_getLogs` na rundę.
+   *
+   * Z tych samych logow ida dwa strumienie, bo dotycza czegos innego:
+   *   - historia, wykres i rezerwy to zdarzenia TEGO tokena;
+   *   - salda do odebrania to zdarzenia TWOJEGO KONTA. `claimable` jest wspolne
+   *     dla wszystkich twoich tokenow, a `Claimed` nie niesie nawet adresu
+   *     tokena - filtrowanie ich po tokenie gubiloby prawde.
+   */
   useEffect(() => {
     if (!readClient || !tokenAddress || notFound) return;
-    const unwatch = readClient.watchContractEvent({
-      address: LAUNCHPAD_ADDRESS as Address,
-      abi: launchpadAbi,
-      poll: true,
-      pollingInterval: 8_000,
+    const claimContext = {
+      viewer: account ? account.toLowerCase() : null,
+      token: tokenAddress.toLowerCase(),
+      isCreator,
+    };
+    const unwatch = readClient.watchEvent({
+      address: [LAUNCHPAD_ADDRESS, LAUNCH_HOOK_ADDRESS, LIQUIDITY_VAULT_ADDRESS] as Address[],
+      events: LIVE_EVENTS,
+      // Tempo z konfiguracji sieci: raz na blok na wlasnym RPC, osiem sekund na
+      // publicznym, subskrypcja gdy transportem jest WebSocket.
+      poll: LIVE_WATCH.poll,
+      pollingInterval: LIVE_WATCH.pollingInterval,
       // Publiczny RPC odbija; zywy podglad jest dodatkiem do zaladowanych
       // danych, wiec cicha przerwa jest wlasciwym zachowaniem, nie awaria.
       onError: () => {},
       onLogs: (logs) => {
+        const all = logs as unknown as LiveLaunchpadLog[];
         const mine: LiveLaunchpadLog[] = [];
-        for (const log of logs) {
-          const decoded = log as unknown as LiveLaunchpadLog;
-          const token = decoded.args?.token as string | undefined;
+        for (const log of all) {
+          const token = log.args?.token as string | undefined;
           if (!token || token.toLowerCase() !== tokenAddress.toLowerCase()) continue;
-          mine.push(decoded);
+          mine.push(log);
         }
-        if (mine.length === 0) return;
-        applyLive(mine);
-        setCore((prev) => {
-          if (!prev) return prev;
-          let next = prev;
-          for (const log of mine) {
-            if (log.eventName === 'Bought' || log.eventName === 'Sold') {
-              const reserve = log.args?.ethReserveAfter as bigint | undefined;
-              const tokenReserve = log.args?.tokenReserveAfter as bigint | undefined;
-              if (reserve !== undefined && tokenReserve !== undefined) {
-                next = { ...next, ethReserve: reserve, tokenReserve, spotPriceWei: priceWeiAfter(reserve, tokenReserve) };
+
+        if (mine.length > 0) {
+          applyLive(mine);
+          setCore((prev) => {
+            if (!prev) return prev;
+            let next = prev;
+            for (const log of mine) {
+              if (log.eventName === 'Bought' || log.eventName === 'Sold') {
+                const reserve = log.args?.ethReserveAfter as bigint | undefined;
+                const tokenReserve = log.args?.tokenReserveAfter as bigint | undefined;
+                if (reserve !== undefined && tokenReserve !== undefined) {
+                  next = { ...next, ethReserve: reserve, tokenReserve, spotPriceWei: priceWeiAfter(reserve, tokenReserve) };
+                }
+              } else if (log.eventName === 'CurveLocked') {
+                next = { ...next, state: 'Locked' };
+              } else if (log.eventName === 'Graduated') {
+                next = { ...next, state: 'Graduated', spotPriceWei: 0n };
               }
-            } else if (log.eventName === 'CurveLocked') {
-              next = { ...next, state: 'Locked' };
-            } else if (log.eventName === 'Graduated') {
-              next = { ...next, state: 'Graduated', spotPriceWei: 0n };
             }
-          }
-          return next;
-        });
+            return next;
+          });
+        }
+
+        // Salda do odebrania: liczone z naliczen, nie odpytywane. Kontrakt
+        // emituje kazde `FeeAccrued` co do wei, wiec kwota na ekranie rosnie w
+        // tej samej sekundzie, w ktorej ktos handluje.
+        setCore((prev) => (prev ? applyClaimLogs(prev, all, claimContext).core : prev));
+
         // Zamkniecie krzywej i graduacja zmieniaja wiecej niz jedna liczbe
-        // (nagroda, pula, salda) - po nich pelny odczyt zamiast skladanki.
-        if (mine.some((log) => log.eventName === 'CurveLocked' || log.eventName === 'Graduated')) void loadCore();
+        // (nagroda, pula, salda), a podzialu oplat puli nie odtwarzamy sami -
+        // po tych zdarzeniach pelny odczyt zamiast skladanki.
+        const heavy = mine.some((log) => log.eventName === 'CurveLocked' || log.eventName === 'Graduated');
+        if (heavy || claimsNeedReload(all, claimContext)) void loadCore();
       },
     });
     return () => {
       unwatch();
     };
-  }, [readClient, tokenAddress, notFound, applyLive, loadCore]);
+  }, [readClient, tokenAddress, notFound, applyLive, loadCore, account, isCreator]);
 
   // Profil (opis, linki) z API + LOGO z Bloba (dokladnie jak tablica). Firestore
   // trzyma logoUrl: null, wiec bez dociagniecia z Bloba detal nie mial logo w
@@ -356,7 +452,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                 <div className="space-y-4 lg:sticky lg:top-4">
                   <TradePanel core={core} ethUsd={ethUsd} onAfterTx={() => void loadCore()} />
-                  <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} copied={copied} onCopy={() => void copyAddress()} />
+                  <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} poolPriceWei={poolPriceWei} copied={copied} onCopy={() => void copyAddress()} />
                 </div>
               </div>
 
@@ -370,6 +466,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
                   historyLoading={history.loading}
                   historyError={history.error}
                   truncated={history.truncated}
+                  historyComplete={historyComplete}
                   onRetryHistory={() => void reloadHistory()}
                   profile={profile}
                   isCreator={isCreator}
@@ -561,6 +658,8 @@ function StatsCard({
   ethUsd,
   trades,
   balances,
+  historyComplete,
+  poolPriceWei,
   copied,
   onCopy,
 }: {
@@ -569,13 +668,18 @@ function StatsCard({
   ethUsd: number | null;
   trades: TradeEntry[];
   balances: Map<string, bigint>;
+  /** Historia siega bloku startu tokena, wiec salda sa dokladne, nie przyblizone. */
+  historyComplete: boolean;
+  /** Biezaca cena z puli po graduacji; null = nie wiemy, zostaje krzywa. */
+  poolPriceWei: bigint | null;
   copied: boolean;
   onCopy: () => void;
 }) {
   const lastTrade = trades.length ? trades[trades.length - 1] : null;
-  // Spot z lancucha wygrywa; po graduacji (odczyt rewertuje -> 0n) zostaje
-  // ostatnia cena krzywej - uczciwie podpisana w naglowku wykresu.
-  const priceWei = core.spotPriceWei > 0n ? core.spotPriceWei : lastTrade?.priceWei ?? START_PRICE_WEI;
+  // Kolejnosc zrodel: pula (po graduacji) -> spot z krzywej -> ostatnia cena z
+  // historii. Do 15 sierpnia 2026 pierwszego czlonu nie bylo i po graduacji
+  // strona zatrzymywala sie na ostatniej cenie krzywej.
+  const priceWei = poolPriceWei ?? (core.spotPriceWei > 0n ? core.spotPriceWei : lastTrade?.priceWei ?? START_PRICE_WEI);
   const volumeWei = useMemo(() => trades.reduce((sum, trade) => sum + trade.eth, 0n), [trades]);
   // Liczba posiadaczy z LANCUCHA: policzona z transferow, ktore i tak mamy.
   // Dziala offline wzgledem Blockscouta i jest fallbackiem, gdy indeks milczy.
@@ -587,8 +691,10 @@ function StatsCard({
     return count;
   }, [balances]);
 
-  // Liczniki z BLOCKSCOUTA jednym zapytaniem: posiadacze (pelni, nie ograniczeni
-  // oknem skanu) i WSZYSTKIE transfery tokena. `null` -> fallback na lancuch.
+  // Liczniki z BLOCKSCOUTA jednym zapytaniem: posiadacze i WSZYSTKIE transfery
+  // tokena. Transferow z wlasnych danych dzis nie liczymy, wiec to zapytanie
+  // zostaje - ale o liczbie POSIADACZY nie rozstrzyga juz, gdy mamy dokladne
+  // salda (patrz `holdersAreExact`).
   const [counters, setCounters] = useState<TokenCounters>({ holders: null, transfers: null });
   useEffect(() => {
     if (!tokenAddress) return;
@@ -601,15 +707,16 @@ function StatsCard({
     };
   }, [tokenAddress]);
 
-  // MAX z obu zrodel: Blockscout na Base Sepolii bywa spozniony i zanizalby
-  // liczbe, a odtworzenie z lancucha lapie swiezy ruch. Bierzemy wieksza.
-  const holdersCount = Math.max(holdersFromChain, counters.holders ?? 0);
+  const exactHolders = holdersAreExact({ complete: historyComplete, knownBalances: balances.size });
+  const holdersCount = pickHolderCount({ chain: holdersFromChain, index: counters.holders, exact: exactHolders });
 
   // USD to zawsze dopisek, nigdy wartosc glowna - przy braku kursu (null)
   // wiersz wyglada dokladnie tak, jak przed dodaniem dopiskow.
   const rows: Array<{ label: string; value: string; usd?: string | null }> = [
     {
-      label: 'Price',
+      // Nazwa mowi, SKAD jest ta liczba. Po graduacji cena nie pochodzi juz z
+      // krzywej i udawanie, ze pochodzi, byloby drobnym klamstwem o rynku.
+      label: poolPriceWei ? 'Pool price' : 'Price',
       value: `${fmtPrice(priceToNumber(priceWei))} ${NATIVE_SYMBOL}`,
       // Cena tokena to ulamek centa - `fmtUsdPrice` pokazuje ja pelnym zapisem
       // ($0.00000367) zamiast bezuzytecznego "<$0.01".

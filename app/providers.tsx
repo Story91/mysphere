@@ -4,7 +4,7 @@
 import { base, baseSepolia } from 'viem/chains';
 import { arcTestnet } from './startpad/arcChain';
 import { createContext, useContext, useState, useMemo } from 'react';
-import { createConfig, http, fallback, cookieStorage, createStorage } from 'wagmi';
+import { createConfig, http, fallback, webSocket, cookieStorage, createStorage } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
 import {
   injected,
@@ -75,7 +75,13 @@ const TRANSPORTS_BASE = {
   // obsluguje getLogs do ~50k blokow i ma wysokie limity (zmierzone). Ten sam
   // env wlacza tez cdpApi.ts (statystyki portfela). base.org zostaje jako
   // fallback - publicnode NIE nadaje sie, bo blokuje getLogs bez wlasnego tokenu.
+  // WebSocket idzie PRZED HTTP, gdy jest skonfigurowany: wtedy podglad na zywo
+  // (tasma, cena, rezerwa, lista transakcji) dostaje push zamiast pytania co
+  // kilka sekund. viem sam to rozpoznaje - przy transporcie `fallback`, ktorego
+  // pierwszym wpisem jest WebSocket, `watchEvent` przechodzi na subskrypcje.
+  // Brak zmiennej = wszystko jak dotad, czyli polling po HTTP.
   [base.id]: fallback([
+    ...(process.env.NEXT_PUBLIC_BASE_WS_URL ? [webSocket(process.env.NEXT_PUBLIC_BASE_WS_URL)] : []),
     http(process.env.NEXT_PUBLIC_BASE_RPC_URL || process.env.NEXT_PUBLIC_CDP_RPC_URL || 'https://mainnet.base.org'),
     http('https://mainnet.base.org'),
   ]),
