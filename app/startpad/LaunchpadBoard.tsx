@@ -48,8 +48,23 @@ import {
 import { fetchLogos, recallLogos, rememberLogos } from './logos';
 import { tokenAccent } from './metadata';
 import { browserStorage, flushPendingProfiles, postProfileWithRetry, sendTokenProfile } from './profileSync';
-import { loadSnapshot, saveSnapshot, loadFeedSnapshot, saveFeedSnapshot } from './snapshot';
-import { scanIsTrustworthy, shouldKeepUnscanned } from './boardScan';
+import {
+  loadBoardAggregate,
+  loadFeedSnapshot,
+  loadSnapshot,
+  saveBoardAggregate,
+  saveFeedSnapshot,
+  saveSnapshot,
+} from './snapshot';
+import {
+  mergeAggregates,
+  parseAggregate,
+  planBoardScan,
+  reduceBoardLogs,
+  scanIsTrustworthy,
+  serializeAggregate,
+  shouldKeepUnscanned,
+} from './boardScan';
 // Jedna, ZMIERZONA rezerwa na gaz i jedna arytmetyka procentow dla obu paneli
 // handlu - mini modala na tablicy i panelu na stronie tokena. Dwie kopie tej
 // samej liczby wlasnie kosztowaly nas przyciski, ktore wpisywaly zero.
@@ -1090,6 +1105,13 @@ function TradePanel({
 // pokazywala mocki). Patrz LAUNCHPAD_NETWORKS w config.ts.
 const LOG_WINDOW = ACTIVE_LAUNCHPAD_NETWORK.scanWindow;
 const MAX_LOG_WINDOWS = ACTIVE_LAUNCHPAD_NETWORK.maxScanWindows;
+/**
+ * Najwieksza zaleglosc, ktora wolno nadrobic doliczeniem delty. Powyzej niej
+ * jedno zadanie i tak nie zeskanowaloby calego przedzialu, wiec zostalaby
+ * dziura - a dziury w sumie addytywnej nie da sie pozniej odroznic od prawdy.
+ * Praktycznie nieosiagalne: agregat starszy niz tydzien i tak wygasa.
+ */
+const MAX_DELTA_SPAN = LOG_WINDOW * BigInt(MAX_LOG_WINDOWS);
 
 const LAUNCHED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Launched' });
 const BOUGHT_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Bought' });
@@ -1202,35 +1224,32 @@ export default function LaunchpadBoard() {
     setBoardError(null);
     try {
       const latest = await readClient.getBlockNumber();
-      const launched = new Map<Address, { name: string; symbol: string; creator: Address; startedAt: number }>();
-      const buyers = new Map<Address, Set<Address>>();
-      const activity = new Map<Address, { volume: number; trades: number }>();
-      // Surowce tablicy zarobkow. Wei w bigint - na number przechodzimy
-      // dopiero przy wyswietlaniu.
-      const hookCreatorEth = new Map<Address, bigint>();
-      // FeeAccrued kind 1: dokladne naliczenia strony tworcy per ODBIORCA
-      // per token. Klucz lowercase; accountDisplay trzyma forme z checksumem.
-      const creatorSideEarned = new Map<string, Map<Address, bigint>>();
-      const accountDisplay = new Map<string, Address>();
-      // Okna ida od NAJNOWSZEGO wstecz, wiec kolejnosc napotkania nie jest
-      // chronologia - kazdy wpis niesie klucz (blok, logIndex) do posortowania.
-      const priceEntries = new Map<Address, Array<{ order: number; price: number }>>();
-      // Ten sam klucz (blok, logIndex) co przy cenach: okna ida od najnowszego
-      // wstecz, ale WEWNATRZ okna logi sa od najstarszego - bez sortowania
-      // tasma pokazywalaby najstarsze wpisy najnowszego okna jako "najswiezsze".
-      const rawFeed: Array<{ id: string; token: Address; label: string; eth?: number; tone: ActivityItem['tone']; order: number }> = [];
-      const orderOf = (log: { blockNumber: bigint | null; logIndex: number | null }) =>
-        Number(log.blockNumber ?? 0n) * 10_000 + Number(log.logIndex ?? 0);
 
-      const pushPrice = (token: Address, log: { blockNumber: bigint | null; logIndex: number | null }, ethReserveAfter?: bigint, tokenReserveAfter?: bigint) => {
-        if (ethReserveAfter === undefined || tokenReserveAfter === undefined || tokenReserveAfter <= 0n) return;
-        const list = priceEntries.get(token) ?? [];
-        list.push({
-          order: Number(log.blockNumber ?? 0n) * 10_000 + Number(log.logIndex ?? 0),
-          price: spotPriceFromReserves(ethReserveAfter, tokenReserveAfter),
-        });
-        priceEntries.set(token, list);
-      };
+      /**
+       * SKAN ZACZYNA SIE TAM, GDZIE SKONCZYL POPRZEDNI.
+       *
+       * Do 15 sierpnia 2026 kazde wejscie na tablice skanowalo lancuch od glowy
+       * az do bloku wdrozenia launchpada. Ten koszt rosl z kazda doba Base
+       * (~4,5 okna na dobe przy oknie 9500) i mial twardy koniec: po ~16,6 dnia
+       * od wdrozenia skan przestawal miescic sie w suficie okien, przestawal
+       * siegac startu, a najstarsze tokeny tracily wolumen, ceny i wykresy.
+       *
+       * Agregat z poprzedniej wizyty niesie blok, do ktorego jest policzony,
+       * wiec teraz dokladamy TYLKO nowe bloki. Zapisujemy go wylacznie wtedy,
+       * gdy pokrycie jest ciagle od bloku wdrozenia - dzieki temu `lastBlock`
+       * zawsze znaczy "policzone od poczatku do tego bloku", a nie "policzone
+       * cokolwiek".
+       */
+      const cached = loadBoardAggregate(ACTIVE_LAUNCHPAD_NETWORK.chain.id, LAUNCHPAD_ADDRESS);
+      const cachedAggregate = cached ? parseAggregate(cached.aggregate) : null;
+      const plan = planBoardScan({
+        cachedLastBlock: cachedAggregate ? (cached?.lastBlock ?? null) : null,
+        head: latest,
+        deployBlock: LAUNCHPAD_DEPLOY_BLOCK,
+        maxSpan: MAX_DELTA_SPAN,
+      });
+      const resumable = plan.resume;
+      const scanFloor = plan.floor;
 
       // Wszystkie okna [fromBlock,toBlock] liczymy Z GORY, potem strzelamy
       // ROWNOLEGLE w puli po 6. Okna sa niezalezne, a przetwarzanie i tak
@@ -1240,10 +1259,10 @@ export default function LaunchpadBoard() {
       const ranges: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
       {
         let cursor = latest;
-        for (let window = 0; window < MAX_LOG_WINDOWS && cursor >= LAUNCHPAD_DEPLOY_BLOCK; window += 1) {
-          const fromBlock = cursor > LAUNCHPAD_DEPLOY_BLOCK + LOG_WINDOW ? cursor - LOG_WINDOW : LAUNCHPAD_DEPLOY_BLOCK;
+        for (let window = 0; window < MAX_LOG_WINDOWS && cursor >= scanFloor; window += 1) {
+          const fromBlock = cursor > scanFloor + LOG_WINDOW ? cursor - LOG_WINDOW : scanFloor;
           ranges.push({ fromBlock, toBlock: cursor });
-          if (fromBlock === LAUNCHPAD_DEPLOY_BLOCK) break;
+          if (fromBlock === scanFloor) break;
           cursor = fromBlock - 1n;
         }
       }
@@ -1290,58 +1309,51 @@ export default function LaunchpadBoard() {
         const batch = (await Promise.all(ranges.slice(i, i + SCAN_CONCURRENCY).map(scanOne))) as unknown as ScanLog[][];
         for (const logs of batch) for (const log of logs) allLogs.push(log);
       }
-        for (const log of allLogs) {
-          const token = log.args.token as Address | undefined;
-          if (!token) continue;
-          if (log.eventName === 'Launched') {
-            launched.set(token, {
-              name: log.args.name as string,
-              symbol: log.args.symbol as string,
-              creator: log.args.creator as Address,
-              startedAt: Number(log.args.startedAt ?? 0),
-            });
-            rawFeed.push({ id: `${log.transactionHash}-launch`, token, label: 'Launched', tone: 'launch', order: orderOf(log) });
-          } else if (log.eventName === 'Bought') {
-            const set = buyers.get(token) ?? new Set<Address>();
-            set.add(log.args.buyer as Address);
-            buyers.set(token, set);
-            const ethNet = Number(formatEther(log.args.ethNet as bigint));
-            const current = activity.get(token) ?? { volume: 0, trades: 0 };
-            activity.set(token, { volume: current.volume + ethNet, trades: current.trades + 1 });
-            pushPrice(token, log, log.args.ethReserveAfter as bigint | undefined, log.args.tokenReserveAfter as bigint | undefined);
-            rawFeed.push({ id: `${log.transactionHash}-buy`, token, label: 'Buy', eth: ethNet, tone: 'buy', order: orderOf(log) });
-          } else if (log.eventName === 'Sold') {
-            const set = buyers.get(token) ?? new Set<Address>();
-            set.add(log.args.seller as Address);
-            buyers.set(token, set);
-            const ethOut = Number(formatEther(log.args.ethOut as bigint));
-            const current = activity.get(token) ?? { volume: 0, trades: 0 };
-            activity.set(token, { volume: current.volume + ethOut, trades: current.trades + 1 });
-            pushPrice(token, log, log.args.ethReserveAfter as bigint | undefined, log.args.tokenReserveAfter as bigint | undefined);
-            rawFeed.push({ id: `${log.transactionHash}-sell`, token, label: 'Sell', eth: ethOut, tone: 'sell', order: orderOf(log) });
-          } else if (log.eventName === 'HookFeeSettled') {
-            // Hook rozlicza tworcy jego czesc oplat puli JUZ PO potraceniu
-            // auto-buybacku (buyback schodzi wylacznie z dzialki tworcy),
-            // wiec ethToCreator sumujemy wprost - bez odtwarzania podzialu.
-            const ethToCreator = log.args.ethToCreator as bigint | undefined;
-            if (ethToCreator) hookCreatorEth.set(token, (hookCreatorEth.get(token) ?? 0n) + ethToCreator);
-          } else if (log.eventName === 'FeeAccrued') {
-            // kind 1 = strona TWORCY oplaty handlowej, per faktyczny ODBIORCA.
-            // To rozlicza splity miedzy odbiorcow co do wei - w przeciwienstwie
-            // do mnozenia feeEth przez konfiguracje, ktore przypisywalo cala
-            // dzialke tworcy jego adresowi.
-            const kind = Number(log.args.kind ?? 255);
-            const accountAddr = log.args.account as Address | undefined;
-            const amount = log.args.amount as bigint | undefined;
-            if (kind === 1 && accountAddr && amount) {
-              const accountKey = accountAddr.toLowerCase();
-              accountDisplay.set(accountKey, accountAddr);
-              const perToken = creatorSideEarned.get(accountKey) ?? new Map<Address, bigint>();
-              perToken.set(token, (perToken.get(token) ?? 0n) + amount);
-              creatorSideEarned.set(accountKey, perToken);
-            }
-          }
-        }
+      // Logi -> agregat. Ta sama redukcja, co wczesniej stala tutaj w petli,
+      // tylko wyjeta do `boardScan`, zeby dalo sie ja przetestowac i zeby
+      // wynik dalo sie DOSUMOWAC do zapamietanego.
+      const scannedAggregate = reduceBoardLogs(allLogs, {
+        ethOf: (wei) => Number(formatEther(wei)),
+        priceOf: spotPriceFromReserves,
+      });
+
+      /**
+       * Delte doklejamy TYLKO w calosci. Padniete okno znaczy dziure w
+       * przedziale, a dziura w sumie addytywnej jest nie do odkrecenia: zostaje
+       * w wolumenie na zawsze i nikt jej pozniej nie odrozni od prawdy. Wtedy
+       * pokazujemy to, co pewne (agregat sprzed), i probujemy ponownie przy
+       * kolejnym wejsciu.
+       */
+      const deltaComplete = failedWindows === 0;
+      const aggregate =
+        resumable && cachedAggregate
+          ? deltaComplete
+            ? mergeAggregates(cachedAggregate, scannedAggregate)
+            : cachedAggregate
+          : scannedAggregate;
+
+      // Pokrycie: przy skanie roznicowym dno siega bloku wdrozenia przez
+      // zapamietany agregat, bo inaczej nie zostalby zapisany.
+      const lowestScanned = resumable
+        ? LAUNCHPAD_DEPLOY_BLOCK
+        : ranges.length
+          ? ranges[ranges.length - 1].fromBlock
+          : latest;
+      // Wiarygodny = zszedl do bloku wdrozenia I ZADNE okno nie padlo. Dopiero
+      // taki skan ma prawo rozstrzygac, ze tokena nie ma.
+      const trustworthy = scanIsTrustworthy({ failedWindows, lowestScanned, deployBlock: LAUNCHPAD_DEPLOY_BLOCK });
+
+      // Zapis WYLACZNIE przy ciaglym pokryciu od bloku wdrozenia - tylko wtedy
+      // `lastBlock` znaczy "policzone od poczatku do tego bloku".
+      if (trustworthy) {
+        saveBoardAggregate(ACTIVE_LAUNCHPAD_NETWORK.chain.id, LAUNCHPAD_ADDRESS, {
+          lastBlock: latest,
+          aggregate: serializeAggregate(aggregate),
+        });
+      }
+
+      const { launched, buyers, activity, hookCreatorEth, creatorSideEarned, accountDisplay, priceEntries } = aggregate;
+      const rawFeed = aggregate.feed;
 
       // ===== TOZSAMOSCI Z BAZY, NIE Z TEGO SKANU =====
       // Lista startow przychodzi z /api/launchpad/board, gdzie jest ZAPISANA.
@@ -1385,12 +1397,9 @@ export default function LaunchpadBoard() {
       }
 
       // Skan mogl uciac historie na SUFICIE OKIEN zamiast dojsc do bloku
-      // wdrozenia - ale przy scalaniu ponizej zachowujemy wiersze spoza skanu,
-      // wiec cicho niezeskanowany token juz nie znika z tablicy.
-      const lowestScanned = ranges.length ? ranges[ranges.length - 1].fromBlock : latest;
-      // Wiarygodny = zszedl do bloku wdrozenia I ZADNE okno nie padlo. Dopiero
-      // taki skan ma prawo rozstrzygac, ze tokena nie ma.
-      const trustworthy = scanIsTrustworthy({ failedWindows, lowestScanned, deployBlock: LAUNCHPAD_DEPLOY_BLOCK });
+      // wdrozenia (`trustworthy` policzone wyzej) - ale przy scalaniu ponizej
+      // zachowujemy wiersze spoza skanu, wiec cicho niezeskanowany token juz
+      // nie znika z tablicy.
       if (stale()) return;
       setScanTruncated(!trustworthy);
 
@@ -1404,7 +1413,9 @@ export default function LaunchpadBoard() {
       }
 
       setActivityFeed(
-        rawFeed
+        // Kopia przed sortowaniem: `feed` nalezy do agregatu, ktory przy
+        // nieudanej delcie jest tym samym obiektem, co stan zapamietany.
+        [...rawFeed]
           .sort((a, b) => b.order - a.order)
           .slice(0, 24)
           .map((item) => ({ ...item, address: item.token, symbol: launched.get(item.token)?.symbol ?? shortAddress(item.token), accent: accentFor(item.token) }))
