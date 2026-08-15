@@ -176,9 +176,9 @@ strona wyglada na martwa dla tokenow, ktorym sie udalo.
 - Zmien: `app/startpad/[address]/TradePanel.tsx` (natychmiastowa wycena lokalna)
 - Zmien: `app/startpad/LaunchpadBoard.tsx` (wiersz „pending" na tasmie)
 
-- [ ] **6.1** `launchOf` wchodzi do tej samej paczki co reszta odczytow; sprawdzenie
+- [x] **6.1** `launchOf` wchodzi do tej samej paczki co reszta odczytow; sprawdzenie
   stanu 0 po fakcie. Trzy rundy schodza do jednej.
-- [ ] **6.2** Lokalna wycena krzywej pokazywana natychmiast, `quoteBuy`/`quoteSell`
+- [x] **6.2** Lokalna wycena krzywej pokazywana natychmiast, `quoteBuy`/`quoteSell`
   zostaje jedynym zrodlem liczby do podpisu; rozjazd obu liczb kasuje podglad.
-- [ ] **6.3** Wlasna transakcja wchodzi na tasme jako „pending" po podpisaniu.
-- [ ] **6.4** Testy + commit.
+- [x] **6.3** Wlasna transakcja wchodzi na tasme jako „pending" po podpisaniu.
+- [x] **6.4** Testy + commit.

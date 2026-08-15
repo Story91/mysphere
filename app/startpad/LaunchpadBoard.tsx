@@ -591,6 +591,18 @@ type ActivityItem = {
   eth?: number;
   tone: 'launch' | 'buy' | 'sell' | 'graduate';
   logoUrl?: string;
+  /**
+   * Transakcja PODPISANA, ale jeszcze niewykopana.
+   *
+   * Wlasne kupno pojawialo sie na tasmie dopiero razem z cudzymi - po paragonie
+   * i po tym, jak subskrypcja zobaczyla zdarzenie. Miedzy podpisem a blokiem
+   * pasek nie wiedzial o niej nic, choc to jedyna transakcja, o ktorej wiemy
+   * NA PEWNO. Wiersz w tym stanie jest przygaszony i znika, gdy przychodzi
+   * prawdziwe zdarzenie z tego samego hasza.
+   */
+  pending?: boolean;
+  /** Hasz wlasnej transakcji - po nim rozpoznajemy jej zdarzenie. */
+  txHash?: string;
 };
 
 /**
@@ -655,11 +667,19 @@ function ActivityTicker({ events }: { events: ActivityItem[] }) {
     <div className="-mx-4 overflow-x-auto border-b border-sp-shade/10 bg-sp-surface sm:-mx-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Live Startpad events">
       <div className="flex min-h-[38px] w-max items-center gap-1.5 px-2 py-1.5">
         {items.length ? items.map((event) => (
-          <div key={event.id} className="lp-ticker-in flex shrink-0 items-center gap-1.5 rounded-full border border-sp-shade/10 bg-sp-surface px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+          // Wiersz „pending" to TWOJA podpisana transakcja przed blokiem:
+          // przerywana obwodka i pulsowanie mowia, ze jeszcze nie wyladowala,
+          // zamiast udawac zdarzenie, ktorego lancuch jeszcze nie potwierdzil.
+          <div
+            key={event.id}
+            className={`lp-ticker-in flex shrink-0 items-center gap-1.5 rounded-full border bg-sp-surface px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.05)] ${event.pending ? 'animate-pulse border-dashed border-sp-brand/40' : 'border-sp-shade/10'}`}
+          >
             <FeedGlyph item={event} />
             <span className="pr-1 text-left leading-tight">
               <span className="block text-[10px] font-bold text-sp-ink">{event.symbol}</span>
-              <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-sp-down-deep' : event.tone === 'buy' ? 'text-sp-up' : event.tone === 'graduate' ? 'text-sp-up' : 'text-sp-brand-deep'}`}>{event.label}</span>
+              <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-sp-down-deep' : event.tone === 'buy' ? 'text-sp-up' : event.tone === 'graduate' ? 'text-sp-up' : 'text-sp-brand-deep'}`}>
+                {event.pending ? `${event.label} · pending` : event.label}
+              </span>
             </span>
           </div>
         )) : <span className="px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/35">Listening for live Startpad events...</span>}
@@ -1703,9 +1723,12 @@ export default function LaunchpadBoard() {
     if (real.length) saveSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, real);
   }, [tokens]);
 
-  // Migawka live tape, zeby przy nastepnym wejsciu pasek byl od razu.
+  // Migawka live tape, zeby przy nastepnym wejsciu pasek byl od razu. Wiersze
+  // „pending" do niej NIE ida: transakcja czekajaca na blok jest stanem tej
+  // sesji, a nie faktem - po przeladowaniu wisialaby jako wieczne oczekiwanie.
   useEffect(() => {
-    if (activityFeed.length) saveFeedSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, activityFeed);
+    const landed = activityFeed.filter((item) => !item.pending);
+    if (landed.length) saveFeedSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, landed);
   }, [activityFeed]);
 
   /**
@@ -1739,6 +1762,8 @@ export default function LaunchpadBoard() {
       onError: () => {},
       onLogs: (logs) => {
         const fresh: ActivityItem[] = [];
+        /** Hasze transakcji z tej paczki - po nich znika wiersz „pending". */
+        const freshHashes: string[] = [];
 
         for (const log of logs) {
           const decoded = log as unknown as { eventName?: string; args?: Record<string, unknown>; transactionHash?: string };
@@ -1746,6 +1771,7 @@ export default function LaunchpadBoard() {
           const eventName = decoded.eventName;
           if (!token || !eventName) continue;
           const id = `${decoded.transactionHash ?? ''}-${eventName}-${String(log.logIndex ?? 0)}`;
+          if (decoded.transactionHash) freshHashes.push(decoded.transactionHash);
 
           if (eventName === 'Launched') {
             const symbol = (decoded.args?.symbol as string) ?? shortAddress(token);
@@ -1849,7 +1875,12 @@ export default function LaunchpadBoard() {
           const seen = new Set(current.map((item) => item.id));
           const unique = fresh.filter((item) => !seen.has(item.id));
           if (unique.length === 0) return current;
-          return [...unique.reverse(), ...current].slice(0, 24);
+          // Wlasna transakcja czeka tu juz jako wiersz „pending". Teraz przyszlo
+          // jej prawdziwe zdarzenie, wiec podmieniamy jedno na drugie zamiast
+          // pokazywac te sama transakcje dwa razy.
+          const landed = new Set(freshHashes);
+          const withoutPending = current.filter((item) => !(item.pending && item.txHash && landed.has(item.txHash)));
+          return [...unique.reverse(), ...withoutPending].slice(0, 24);
         });
       },
     });
@@ -2134,6 +2165,43 @@ export default function LaunchpadBoard() {
     }
   };
 
+  /**
+   * WLASNA TRANSAKCJA NA TASMIE OD RAZU PO PODPISANIU.
+   *
+   * Pasek zdarzen pokazywal cudze transakcje szybciej niz twoje wlasne: cudze
+   * przychodzily z subskrypcji, a twoja czekala na paragon i dopiero potem na
+   * zdarzenie. Miedzy podpisem a blokiem tasma milczala akurat o tej jednej
+   * transakcji, o ktorej wiadomo NA PEWNO, ze istnieje.
+   *
+   * Wiersz jest przygaszony i znika, gdy przyjdzie prawdziwe zdarzenie z tego
+   * samego hasza (patrz `freshHashes`) albo gdy transakcja odpadnie.
+   */
+  const pushPendingTrade = useCallback(
+    (input: { hash: string; token: LaunchpadToken; side: 'buy' | 'sell'; eth?: number }) => {
+      setActivityFeed((current) =>
+        [
+          {
+            id: `${input.hash}-pending`,
+            address: input.token.address,
+            symbol: input.token.symbol,
+            accent: input.token.accent,
+            label: input.side === 'buy' ? 'Buy' : 'Sell',
+            eth: input.eth,
+            tone: input.side,
+            pending: true,
+            txHash: input.hash,
+          } as ActivityItem,
+          ...current,
+        ].slice(0, 24)
+      );
+    },
+    []
+  );
+
+  const dropPendingTrade = useCallback((hash: string) => {
+    setActivityFeed((current) => current.filter((item) => item.txHash !== hash));
+  }, []);
+
   const buy = async () => {
     if (!selected?.address || !address || !walletClient || !readClient) {
       setNotice({ kind: 'error', text: 'Launch a live token first. Preview rows are not connected to chain data.' });
@@ -2163,8 +2231,13 @@ export default function LaunchpadBoard() {
         chain: LAUNCHPAD_CHAIN,
         account: address,
       });
+      // Podpisane - na tasme idzie od razu, jeszcze przed blokiem.
+      pushPendingTrade({ hash, token: selected, side: 'buy', eth: Number(formatEther(value)) });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
-      if (receipt.status !== 'success') throw new Error('The buy transaction reverted.');
+      if (receipt.status !== 'success') {
+        dropPendingTrade(hash);
+        throw new Error('The buy transaction reverted.');
+      }
       // Kupno POTWIERDZONE. Sukces i zamkniecie NAJPIERW - zaden pozniejszy
       // odczyt nie moze wywrocic potwierdzonej transakcji w blad (to prowadzilo
       // do ponownego, podwojnego kupna). Blad writeContract/receipt (catch)
@@ -2236,8 +2309,14 @@ export default function LaunchpadBoard() {
         chain: LAUNCHPAD_CHAIN,
         account: address,
       });
+      // Podpisane - na tasme idzie od razu. Kwota z wyceny, bo sprzedaz podaje
+      // tokeny, a tasma mowi w pieniadzu sieci.
+      pushPendingTrade({ hash, token: selected, side: 'sell', eth: Number(formatEther(minEthOut)) });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
-      if (receipt.status !== 'success') throw new Error('The sell transaction reverted.');
+      if (receipt.status !== 'success') {
+        dropPendingTrade(hash);
+        throw new Error('The sell transaction reverted.');
+      }
       setSellAmount('0');
       // Sukces i zamkniecie NAJPIERW - potwierdzonego sella zaden pozniejszy
       // odczyt nie moze wywrocic w blad.

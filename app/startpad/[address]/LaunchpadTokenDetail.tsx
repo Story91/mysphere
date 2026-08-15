@@ -116,12 +116,52 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     if (!readClient || !tokenAddress) return;
     setCoreError(null);
     try {
-      const launch = await readClient.readContract({
-        address: LAUNCHPAD_ADDRESS as Address,
-        abi: launchpadAbi,
-        functionName: 'launchOf',
-        args: [tokenAddress],
-      });
+      const accountAddress = account ?? ('0x0000000000000000000000000000000000000000' as Address);
+      // Odczyty rozszerzonej konfiguracji maja WLASNE `catch` - pod
+      // LAUNCHPAD_ADDRESS moze stac wersja sprzed launchAdvanced i wtedy tych
+      // selektorow nie ma, a pojedynczy rewert nie moze zabrac calej strony.
+      const missing = Symbol('missing');
+
+      /**
+       * WSZYSTKO W JEDNEJ RUNDZIE.
+       *
+       * Bylo to rozbite na trzy `await` pod rzad: `launchOf`, potem czternascie
+       * odczytow, potem szesc. Kazda paczka to jeden multicall (wagmi domyslnie
+       * skleja rownolegle `readContract`), ale TRZY paczki to trzy podroze do
+       * RPC, jedna po drugiej, zanim strona narysuje cokolwiek. Jedna tablica
+       * `Promise.all` to jedna podroz.
+       *
+       * `gradFeeOf` wchodzi bezwarunkowo z wlasnym `catch`, bo warunek "tylko w
+       * stanie Locked" wymagalby znajomosci stanu, czyli osobnej rundy - a to
+       * jest dokladnie ten koszt, ktory tu usuwamy. Uzywamy go i tak dopiero po
+       * sprawdzeniu stanu.
+       */
+      const [launch, name, symbol, decimals, balance, allowance, spotPrice, position, pendingEth, pendingToken, launchClaimable, hookEthClaimable, hookTokenClaimable, vaultEthClaimable, vaultTokenClaimable, feeConfig, metadataUri, buybackBps, pendingBuybackEth, buybackBurned, gradFee] =
+        await Promise.all([
+          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchOf', args: [tokenAddress] }),
+          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'name' }),
+          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
+          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
+          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'balanceOf', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'allowance', args: [accountAddress, LAUNCHPAD_ADDRESS as Address] }) : Promise.resolve(0n),
+          // Po graduacji ten odczyt rewertuje - cena zyje wtedy w puli v4.
+          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [tokenAddress] }).catch(() => 0n),
+          readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'positionOf', args: [tokenAddress] }),
+          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingEth', args: [tokenAddress] }),
+          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingToken', args: [tokenAddress] }),
+          account ? readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
+        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'feeConfigOf', args: [tokenAddress] }).catch(() => missing),
+        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'metadataURI', args: [tokenAddress] }).catch(() => ''),
+        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackBps', args: [tokenAddress] }).catch(() => 0),
+        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingBuybackEth', args: [tokenAddress] }).catch(() => 0n),
+        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackTokens', args: [tokenAddress] }).catch(() => 0n),
+        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'gradFeeOf', args: [tokenAddress] }).catch(() => null),
+      ]);
+
       const [creator, stateIndex, ethReserve, tokenReserve, startedAt] = launch as readonly [
         Address,
         number,
@@ -138,41 +178,6 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
         return;
       }
       const state = LAUNCH_STATE[Number(stateIndex)] as CoreState['state'];
-      const accountAddress = account ?? ('0x0000000000000000000000000000000000000000' as Address);
-
-      const [name, symbol, decimals, balance, allowance, spotPrice, position, pendingEth, pendingToken, launchClaimable, hookEthClaimable, hookTokenClaimable, vaultEthClaimable, vaultTokenClaimable] =
-        await Promise.all([
-          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'name' }),
-          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
-          readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
-          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'balanceOf', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'allowance', args: [accountAddress, LAUNCHPAD_ADDRESS as Address] }) : Promise.resolve(0n),
-          // Po graduacji ten odczyt rewertuje - cena zyje wtedy w puli v4.
-          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [tokenAddress] }).catch(() => 0n),
-          readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'positionOf', args: [tokenAddress] }),
-          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingEth', args: [tokenAddress] }),
-          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingToken', args: [tokenAddress] }),
-          account ? readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
-        ] as const);
-
-      // Odczyty rozszerzonej konfiguracji sa OSOBNE i kazdy ma swoj `catch`.
-      // Pod LAUNCHPAD_ADDRESS moze stac wersja sprzed launchAdvanced - wtedy
-      // tych selektorow nie ma i pojedynczy rewert nie moze zabrac calej strony.
-      const missing = Symbol('missing');
-      const [feeConfig, metadataUri, buybackBps, pendingBuybackEth, buybackBurned, gradFee] = await Promise.all([
-        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'feeConfigOf', args: [tokenAddress] }).catch(() => missing),
-        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'metadataURI', args: [tokenAddress] }).catch(() => ''),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackBps', args: [tokenAddress] }).catch(() => 0),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingBuybackEth', args: [tokenAddress] }).catch(() => 0n),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackTokens', args: [tokenAddress] }).catch(() => 0n),
-        state === 'Locked'
-          ? readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'gradFeeOf', args: [tokenAddress] }).catch(() => null)
-          : Promise.resolve(null),
-      ]);
       const feeTuple = feeConfig === missing ? null : (feeConfig as readonly [number, number, bigint]);
       const positionTuple = position as readonly [`0x${string}`, bigint, number, number];
 
@@ -198,7 +203,9 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
         hookTokenClaimable: hookTokenClaimable as bigint,
         vaultEthClaimable: vaultEthClaimable as bigint,
         vaultTokenClaimable: vaultTokenClaimable as bigint,
-        gradCallerReward: gradFee ? (gradFee as readonly [bigint, bigint])[1] : null,
+        // Nagroda za wywolanie graduate() ma sens WYLACZNIE w stanie Locked -
+        // odczyt leci bezwarunkowo (jedna runda), ale czytamy go warunkowo.
+        gradCallerReward: state === 'Locked' && gradFee ? (gradFee as readonly [bigint, bigint])[1] : null,
         config: {
           known: feeTuple !== null,
           feeBps: Number(feeTuple?.[0] ?? 0),

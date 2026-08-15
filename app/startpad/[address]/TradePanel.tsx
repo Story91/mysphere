@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -33,6 +33,7 @@ import {
   fmtTokens,
   fractionOf,
   GAS_RESERVE_WEI,
+  R_VIRT_WEI,
   spendableEth,
   SLIPPAGE_OPTIONS,
   TARGET_WEI,
@@ -41,6 +42,7 @@ import {
   usdSuffix,
   type CoreState,
 } from './detailShared';
+import { quoteBuyLocal, quoteDrifts, quoteSellLocal } from './curveQuote';
 
 /**
  * Panel handlu NA STRONIE tokena - koniec z odsylaniem do boardu. Wzorce
@@ -87,6 +89,28 @@ export default function TradePanel({
   const [sellQuote, setSellQuote] = useState<{ ethOut: bigint; fee: bigint } | null>(null);
   const [ethBalance, setEthBalance] = useState<bigint | null>(null);
   const [slippageBps, setSlippageBps] = useState<number>(DEFAULT_SLIPPAGE_BPS);
+  /**
+   * Czy lokalnemu podgladowi wolno jeszcze wierzyc.
+   *
+   * Wzory sa przepisane z kontraktu, ale wdrozony kontrakt jest zrodlem prawdy
+   * i moze byc inny niz ten w repozytorium. Pierwszy rozjazd z odpowiedzia
+   * `quoteBuy`/`quoteSell` wieksza niz promil wylacza podglad do konca sesji -
+   * lepiej pokazac kreske niz liczbe, ktora nie odpowiada rynkowi.
+   */
+  const [previewTrusted, setPreviewTrusted] = useState(true);
+  /**
+   * Najswiezszy stan krzywej, widziany POZA domknieciem efektu.
+   *
+   * Porownanie podgladu z odpowiedzia kontraktu ma sens tylko wtedy, gdy oba
+   * liczyly z tych samych rezerw. Miedzy wyslaniem zapytania a odpowiedzia
+   * moze wejsc cudza transakcja - a na mlodej krzywej jedno kupno przesuwa cene
+   * o kilka procent. Bez tego sprawdzenia taki wyscig wylaczalby podglad, choc
+   * wzor jest poprawny.
+   */
+  const coreRef = useRef(core);
+  useEffect(() => {
+    coreRef.current = core;
+  }, [core]);
 
   const onCurve = core.state === 'Curve';
   // Kontrakt w stanie Locked jawnie DOPUSZCZA sprzedaz (CurveLaunchpad._sell:
@@ -131,7 +155,23 @@ export default function TradePanel({
       readClient
         .readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [core.token, value] })
         .then((quote) => {
-          if (!cancelled) setBuyQuote({ tokensOut: quote[0], fee: quote[1], refund: quote[2] });
+          if (cancelled) return;
+          setBuyQuote({ tokensOut: quote[0], fee: quote[1], refund: quote[2] });
+          // Sprawdzenie kopii wzoru przeciwko zrodlu prawdy - patrz
+          // `previewTrusted` i `coreRef`. Tylko gdy rezerwy sie nie ruszyly,
+          // bo inaczej porownywalibysmy dwie rozne krzywe.
+          const same =
+            coreRef.current.ethReserve === core.ethReserve && coreRef.current.tokenReserve === core.tokenReserve;
+          if (same && core.config.known) {
+            const local = quoteBuyLocal({
+              ethIn: value,
+              ethReserve: core.ethReserve,
+              tokenReserve: core.tokenReserve,
+              feeBps: core.config.feeBps,
+              rVirtWei: R_VIRT_WEI,
+            });
+            if (quoteDrifts(local.tokensOut, quote[0])) setPreviewTrusted(false);
+          }
         })
         .catch(() => {
           if (!cancelled) setBuyQuote(null);
@@ -158,7 +198,20 @@ export default function TradePanel({
       readClient
         .readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [core.token, amount] })
         .then((quote) => {
-          if (!cancelled) setSellQuote({ ethOut: quote[0], fee: quote[1] });
+          if (cancelled) return;
+          setSellQuote({ ethOut: quote[0], fee: quote[1] });
+          const same =
+            coreRef.current.ethReserve === core.ethReserve && coreRef.current.tokenReserve === core.tokenReserve;
+          if (same && core.config.known) {
+            const local = quoteSellLocal({
+              tokensIn: amount,
+              ethReserve: core.ethReserve,
+              tokenReserve: core.tokenReserve,
+              feeBps: core.config.feeBps,
+              rVirtWei: R_VIRT_WEI,
+            });
+            if (quoteDrifts(local.ethOut, quote[0])) setPreviewTrusted(false);
+          }
         })
         .catch(() => {
           if (!cancelled) setSellQuote(null);
@@ -456,17 +509,62 @@ export default function TradePanel({
   const progressPct = core.state === 'Curve' ? Number((core.ethReserve * 10_000n) / TARGET_WEI) / 100 : 100;
   const remaining = TARGET_WEI > core.ethReserve ? TARGET_WEI - core.ethReserve : 0n;
 
+  /**
+   * PODGLAD NA CZAS OCZEKIWANIA.
+   *
+   * Wycena z kontraktu leci po 300 ms debouncu plus czasie odpowiedzi RPC, wiec
+   * po wpisaniu kwoty pole "dostaniesz" bylo przez chwile puste. Krzywa jest
+   * deterministyczna, wiec te sama liczbe umiemy policzyc od razu.
+   *
+   * Odpowiedz kontraktu ZAWSZE wygrywa, gdy tylko przyjdzie - i to ona idzie do
+   * minimum, ktore podpisujesz. Bez konfiguracji oplat (starsze wdrozenie) nie
+   * zgadujemy: podgladu wtedy nie ma.
+   */
+  const buyPreview = useMemo(() => {
+    if (!onCurve || !previewTrusted || !core.config.known) return null;
+    const value = toWei(buyAmount);
+    if (value === null || value === 0n) return null;
+    return quoteBuyLocal({
+      ethIn: value,
+      ethReserve: core.ethReserve,
+      tokenReserve: core.tokenReserve,
+      feeBps: core.config.feeBps,
+      rVirtWei: R_VIRT_WEI,
+    });
+  }, [onCurve, previewTrusted, core.config.known, core.config.feeBps, core.ethReserve, core.tokenReserve, buyAmount]);
+
+  const sellPreview = useMemo(() => {
+    if (!canSell || !previewTrusted || !core.config.known) return null;
+    let amount: bigint;
+    try {
+      amount = parseUnits(sellAmount || '0', decimals);
+    } catch {
+      return null;
+    }
+    if (amount <= 0n) return null;
+    return quoteSellLocal({
+      tokensIn: amount,
+      ethReserve: core.ethReserve,
+      tokenReserve: core.tokenReserve,
+      feeBps: core.config.feeBps,
+      rVirtWei: R_VIRT_WEI,
+    });
+  }, [canSell, previewTrusted, core.config.known, core.config.feeBps, core.ethReserve, core.tokenReserve, sellAmount, decimals]);
+
+  const shownBuy = buyQuote ?? buyPreview;
+  const shownSell = sellQuote ?? sellPreview;
+
   // Dopisek USD przy kupowanych tokenach liczymy z ETH, ktore REALNIE wchodzi
   // do krzywej (wklad minus oplata i zwrot) - to jest cena zaplacona za te
   // tokeny, a nie wycena po spocie, ktory duzy zakup sam przesuwa.
   const buyUsd = (() => {
-    if (!buyQuote) return null;
+    if (!shownBuy) return null;
     const value = toWei(buyAmount);
     if (value === null) return null;
-    const net = value - buyQuote.fee - buyQuote.refund;
+    const net = value - shownBuy.fee - shownBuy.refund;
     return net > 0n ? usdSuffix(net, ethUsd) : null;
   })();
-  const sellUsd = sellQuote ? usdSuffix(sellQuote.ethOut, ethUsd) : null;
+  const sellUsd = shownSell ? usdSuffix(shownSell.ethOut, ethUsd) : null;
 
   // USD tylko przy pozycjach w ETH - wycena claimow w tokenie wymagalaby
   // kursu tokena, ktorego swiezo wystartowany rynek po prostu nie ma.
@@ -550,18 +648,18 @@ export default function TradePanel({
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">You receive</span>
                   <span className="font-extrabold text-sp-ink">
-                    {buyQuote ? `~${fmtTokens(buyQuote.tokensOut, decimals)} ${core.symbol}` : '--'}
+                    {shownBuy ? `~${fmtTokens(shownBuy.tokensOut, decimals)} ${core.symbol}` : '--'}
                     {buyUsd && <span className="ml-1 text-[10px] font-bold text-sp-shade/40">· {buyUsd}</span>}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">Fee</span>
-                  <span className="font-bold text-sp-shade/60">{buyQuote ? `${fmtEth(buyQuote.fee)} ${NATIVE_SYMBOL}` : '--'}</span>
+                  <span className="font-bold text-sp-shade/60">{shownBuy ? `${fmtEth(shownBuy.fee)} ${NATIVE_SYMBOL}` : '--'}</span>
                 </div>
-                {buyQuote && buyQuote.refund > 0n && (
+                {shownBuy && shownBuy.refund > 0n && (
                   <div className="flex items-center justify-between">
                     <span className="text-sp-shade/50">Refund (curve fills at 3 {NATIVE_SYMBOL})</span>
-                    <span className="font-bold text-sp-up">{fmtEth(buyQuote.refund)} {NATIVE_SYMBOL}</span>
+                    <span className="font-bold text-sp-up">{fmtEth(shownBuy.refund)} {NATIVE_SYMBOL}</span>
                   </div>
                 )}
               </div>
@@ -599,13 +697,13 @@ export default function TradePanel({
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">You receive</span>
                   <span className="font-extrabold text-sp-ink">
-                    {sellQuote ? `~${fmtEth(sellQuote.ethOut)} ${NATIVE_SYMBOL}` : '--'}
+                    {shownSell ? `~${fmtEth(shownSell.ethOut)} ${NATIVE_SYMBOL}` : '--'}
                     {sellUsd && <span className="ml-1 text-[10px] font-bold text-sp-shade/40">· {sellUsd}</span>}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">Fee</span>
-                  <span className="font-bold text-sp-shade/60">{sellQuote ? `${fmtEth(sellQuote.fee)} ${NATIVE_SYMBOL}` : '--'}</span>
+                  <span className="font-bold text-sp-shade/60">{shownSell ? `${fmtEth(shownSell.fee)} ${NATIVE_SYMBOL}` : '--'}</span>
                 </div>
               </div>
               <button
