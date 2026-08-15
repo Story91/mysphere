@@ -29,7 +29,9 @@ import {
   fmtEth,
   fmtPrice,
   fmtTokens,
+  holdersAreExact,
   pageSlice,
+  pickHolderRows,
   POOL_MANAGER_ADDRESS,
   priceToNumber,
   short,
@@ -80,6 +82,7 @@ export default function DetailTabs({
   historyLoading,
   historyError,
   truncated,
+  historyComplete,
   onRetryHistory,
   profile,
   isCreator,
@@ -95,6 +98,8 @@ export default function DetailTabs({
   historyLoading: boolean;
   historyError: string | null;
   truncated: boolean;
+  /** Historia siega bloku startu tokena, wiec salda sa dokladne, nie przyblizone. */
+  historyComplete: boolean;
   onRetryHistory: () => void;
   profile: TokenProfileView | null;
   isCreator: boolean;
@@ -116,11 +121,19 @@ export default function DetailTabs({
     return () => clearTimeout(timer);
   }, [profileRequest, isCreator]);
 
-  // Ranking posiadaczy z Blockscouta - pelny, nie obciety oknem skanu. Pusty
-  // (brak klucza / token nieznany) -> zostaje odtworzenie z lancucha ponizej.
+  /**
+   * Ranking posiadaczy z Blockscouta - potrzebny TYLKO wtedy, gdy nasza historia
+   * nie siega startu tokena.
+   *
+   * Odkad salda czyta `balanceOf`, przy kompletnej historii nasza tabela jest
+   * dokladna co do wei, a indeks bywa spozniony o godziny - to on pokazywal
+   * „Holders (1)" przy czterech kupujacych na GLIFE. Pytanie go w takiej
+   * sytuacji kosztuje kredyty planu Buildera i nie wnosi nic.
+   */
+  const exactHolders = holdersAreExact({ complete: historyComplete, knownBalances: balances.size });
   const [indexHolders, setIndexHolders] = useState<IndexedHolder[] | null>(null);
   useEffect(() => {
-    if (!tokenAddress) return;
+    if (!tokenAddress || exactHolders) return;
     let cancelled = false;
     void fetchTokenHolders(LAUNCHPAD_CHAIN.id, tokenAddress).then((rows) => {
       if (!cancelled && rows.length > 0) setIndexHolders(rows);
@@ -128,16 +141,16 @@ export default function DetailTabs({
     return () => {
       cancelled = true;
     };
-  }, [tokenAddress]);
+  }, [tokenAddress, exactHolders]);
 
   // Jedno zrodlo logo dla tabel: profil tworcy wygrywa z lancuchem - ta sama
   // regula co w naglowku strony, zeby jedna strona nie pokazywala dwoch logo.
   const logoUrl = pickTokenImage({ profileLogoUrl: profile?.logoUrl, metadataUri: core.config.metadataURI }).url;
 
   const holders = useMemo<HolderRow[]>(() => {
-    // Bierzemy zrodlo z WIEKSZA liczba posiadaczy: Blockscout bywa na Base
-    // Sepolii spozniony i pokazuje mniej niz jest naprawde, a odtworzenie
-    // z lancucha lapie swiezy ruch. Wygrywa to, ktore widzi wiecej.
+    // Przy kompletnej historii wygrywaja NASZE salda - sa z `balanceOf`, wiec
+    // dokladne co do wei. Dopiero gdy historia jest ucieta, bierzemy zrodlo z
+    // wieksza liczba wierszy, bo wtedy nasza mapa jest przyblizeniem.
     //
     // Liczymy PO odsianiu sald niedodatnich, bo tylko one sa wierszami tabeli.
     // Bez tego mapa z lancucha wygrywala samymi zerami i pustymi wierszami po
@@ -145,7 +158,7 @@ export default function DetailTabs({
     const positive = (rows: Array<[string, bigint]>) => rows.filter(([, balance]) => balance > 0n);
     const chainRows = positive(Array.from(balances.entries()));
     const indexRows = positive((indexHolders ?? []).map((h) => [h.address, h.balance] as [string, bigint]));
-    const source: Array<[string, bigint]> = indexRows.length >= chainRows.length ? indexRows : chainRows;
+    const source = pickHolderRows({ chain: chainRows, index: indexRows, exact: exactHolders });
     const rows: HolderRow[] = [];
     for (const [address, balance] of source) {
       if (balance <= 0n) continue;
@@ -158,7 +171,7 @@ export default function DetailTabs({
     }
     rows.sort((a, b) => (a.balance === b.balance ? 0 : a.balance < b.balance ? 1 : -1));
     return rows.slice(0, 20);
-  }, [indexHolders, balances, core.creator]);
+  }, [indexHolders, balances, core.creator, exactHolders]);
 
   const newestFirst = useMemo(() => [...trades].reverse(), [trades]);
   // Strona liczona przy renderze, nie trzymana w stanie: lista zmienia dlugosc

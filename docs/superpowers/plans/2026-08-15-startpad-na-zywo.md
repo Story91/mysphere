@@ -134,11 +134,11 @@ opoznienie indeksu) mimo ze mamy dokladne salda z `balanceOf`.
 - Zmien: `app/startpad/[address]/LaunchpadTokenDetail.tsx`
 - Zmien: `app/startpad/[address]/DetailTabs.tsx`
 
-- [ ] **4.1** Gdy historia jest kompletna (`loaded && !truncated`), liczba holderow i
+- [x] **4.1** Gdy historia jest kompletna (`loaded && !truncated`), liczba holderow i
   tabela ida z naszej mapy, a Blockscout nie jest w ogole pytany.
-- [ ] **4.2** Historia nieukonczona - jak dzis: Blockscout jako zrodlo z wieksza
+- [x] **4.2** Historia nieukonczona - jak dzis: Blockscout jako zrodlo z wieksza
   liczba wierszy.
-- [ ] **4.3** Testy reguly wyboru zrodla + commit.
+- [x] **4.3** Testy reguly wyboru zrodla + commit.
 
 ---
 

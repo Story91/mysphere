@@ -171,6 +171,46 @@ export type HolderRow = {
   badge: 'dev' | 'bonding curve' | 'burned' | 'vault' | 'hook' | 'pool' | null;
 };
 
+/* -------------------------------------------------------------------------- */
+/*  KTO JEST HOLDEREM - i skad to wiemy                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * CZY NASZE SALDA SA JUZ PRAWDA, CZY DOPIERO PRZYBLIZENIEM.
+ *
+ * Do 15 sierpnia 2026 liczba holderow na stronie tokena brala sie z WIEKSZEJ z
+ * dwoch liczb: naszej (odtworzonej z transferow) i tej z indeksu Blockscouta.
+ * Miala sens, dopoki nasza byla przyblizeniem - salda skladalismy z roznic i
+ * przy ucietym skanie wychodzily za male.
+ *
+ * Od czasu, gdy salda czyta `balanceOf`, jest inaczej: przy KOMPLETNEJ historii
+ * nasza mapa jest dokladna co do wei, a Blockscout bywa spozniony o godziny (to
+ * on pokazywal „Holders (1)" przy czterech kupujacych na GLIFE). Wtedy branie
+ * maksimum nie chroni juz przed zanizeniem, tylko wpuszcza cudze opoznienie na
+ * ekran.
+ *
+ * `exact` znaczy: historia siega bloku startu tokena I mamy z niej salda.
+ */
+export function holdersAreExact(input: { complete: boolean; knownBalances: number }): boolean {
+  return input.complete && input.knownBalances > 0;
+}
+
+/** Liczba posiadaczy: przy dokladnych saldach nasza, inaczej wieksza z dwoch. */
+export function pickHolderCount(input: { chain: number; index: number | null; exact: boolean }): number {
+  if (input.exact) return input.chain;
+  return Math.max(input.chain, input.index ?? 0);
+}
+
+/**
+ * Zrodlo WIERSZY tabeli holderow. Przy dokladnych saldach nasze; inaczej to,
+ * ktore widzi wiecej - liczone PO odsianiu sald niedodatnich, bo tylko one sa
+ * wierszami.
+ */
+export function pickHolderRows<T>(input: { chain: T[]; index: T[]; exact: boolean }): T[] {
+  if (input.exact && input.chain.length > 0) return input.chain;
+  return input.index.length >= input.chain.length ? input.index : input.chain;
+}
+
 /**
  * Cena spot po transakcji na AKTYWNEJ sieci: (R_VIRT + ethReserve) * 1e18 /
  * tokenReserve. Ten sam wzor, co spotPriceWeiPerToken w kontrakcie - liczony

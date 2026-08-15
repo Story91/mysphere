@@ -42,8 +42,10 @@ import {
   fmtEth,
   fmtPrice,
   fmtUsdPrice,
+  holdersAreExact,
   isAddressParam,
   mcapWei,
+  pickHolderCount,
   priceToNumber,
   priceWeiAfter,
   short,
@@ -228,6 +230,12 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
   const isCreator = Boolean(account && core && account.toLowerCase() === core.creator.toLowerCase());
 
   /**
+   * Historia siega bloku startu tokena. Dopiero wtedy nasze salda sa PELNE, a
+   * nie przyblizone - i dopiero wtedy nasza liczba holderow bije indeks.
+   */
+  const historyComplete = history.loaded && !history.truncated;
+
+  /**
    * NA ZYWO: pojedyncze zdarzenia dokladane do stanu, ktory juz jest na
    * ekranie. Rezerwy bierzemy PROSTO ze zdarzenia (ethReserveAfter), nie z
    * wlasnej arytmetyki - ta sama zasada, co w LaunchpadBoard.
@@ -403,7 +411,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                 <div className="space-y-4 lg:sticky lg:top-4">
                   <TradePanel core={core} ethUsd={ethUsd} onAfterTx={() => void loadCore()} />
-                  <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} copied={copied} onCopy={() => void copyAddress()} />
+                  <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} copied={copied} onCopy={() => void copyAddress()} />
                 </div>
               </div>
 
@@ -417,6 +425,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
                   historyLoading={history.loading}
                   historyError={history.error}
                   truncated={history.truncated}
+                  historyComplete={historyComplete}
                   onRetryHistory={() => void reloadHistory()}
                   profile={profile}
                   isCreator={isCreator}
@@ -608,6 +617,7 @@ function StatsCard({
   ethUsd,
   trades,
   balances,
+  historyComplete,
   copied,
   onCopy,
 }: {
@@ -616,6 +626,8 @@ function StatsCard({
   ethUsd: number | null;
   trades: TradeEntry[];
   balances: Map<string, bigint>;
+  /** Historia siega bloku startu tokena, wiec salda sa dokladne, nie przyblizone. */
+  historyComplete: boolean;
   copied: boolean;
   onCopy: () => void;
 }) {
@@ -634,8 +646,10 @@ function StatsCard({
     return count;
   }, [balances]);
 
-  // Liczniki z BLOCKSCOUTA jednym zapytaniem: posiadacze (pelni, nie ograniczeni
-  // oknem skanu) i WSZYSTKIE transfery tokena. `null` -> fallback na lancuch.
+  // Liczniki z BLOCKSCOUTA jednym zapytaniem: posiadacze i WSZYSTKIE transfery
+  // tokena. Transferow z wlasnych danych dzis nie liczymy, wiec to zapytanie
+  // zostaje - ale o liczbie POSIADACZY nie rozstrzyga juz, gdy mamy dokladne
+  // salda (patrz `holdersAreExact`).
   const [counters, setCounters] = useState<TokenCounters>({ holders: null, transfers: null });
   useEffect(() => {
     if (!tokenAddress) return;
@@ -648,9 +662,8 @@ function StatsCard({
     };
   }, [tokenAddress]);
 
-  // MAX z obu zrodel: Blockscout na Base Sepolii bywa spozniony i zanizalby
-  // liczbe, a odtworzenie z lancucha lapie swiezy ruch. Bierzemy wieksza.
-  const holdersCount = Math.max(holdersFromChain, counters.holders ?? 0);
+  const exactHolders = holdersAreExact({ complete: historyComplete, knownBalances: balances.size });
+  const holdersCount = pickHolderCount({ chain: holdersFromChain, index: counters.holders, exact: exactHolders });
 
   // USD to zawsze dopisek, nigdy wartosc glowna - przy braku kursu (null)
   // wiersz wyglada dokladnie tak, jak przed dodaniem dopiskow.
