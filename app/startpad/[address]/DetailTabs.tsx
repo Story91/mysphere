@@ -138,8 +138,13 @@ export default function DetailTabs({
     // Bierzemy zrodlo z WIEKSZA liczba posiadaczy: Blockscout bywa na Base
     // Sepolii spozniony i pokazuje mniej niz jest naprawde, a odtworzenie
     // z lancucha lapie swiezy ruch. Wygrywa to, ktore widzi wiecej.
-    const chainRows = Array.from(balances.entries());
-    const indexRows: Array<[string, bigint]> = (indexHolders ?? []).map((h) => [h.address, h.balance]);
+    //
+    // Liczymy PO odsianiu sald niedodatnich, bo tylko one sa wierszami tabeli.
+    // Bez tego mapa z lancucha wygrywala samymi zerami i pustymi wierszami po
+    // sprzedazach - zrodlo "wieksze" o rzeczy, ktorych nikt nie zobaczy.
+    const positive = (rows: Array<[string, bigint]>) => rows.filter(([, balance]) => balance > 0n);
+    const chainRows = positive(Array.from(balances.entries()));
+    const indexRows = positive((indexHolders ?? []).map((h) => [h.address, h.balance] as [string, bigint]));
     const source: Array<[string, bigint]> = indexRows.length >= chainRows.length ? indexRows : chainRows;
     const rows: HolderRow[] = [];
     for (const [address, balance] of source) {
