@@ -4,7 +4,7 @@
 > launchpada — kontraktów, opłat, adresów lub UI, jeśli zmienia zachowanie opisane
 > tutaj. Stan wdrożenia i adresy: `docs/LAUNCHPAD-STAN.md`.
 >
-> Last updated: 2026-08-13 (v3 + internal-audit addendum §7; token-history cache §5) · deployments: `0x4Cc0...1A48` (Base Sepolia,
+> Last updated: 2026-08-15 (v3 + internal-audit addendum §7; token-history cache §5, holder balances read with `balanceOf`) · deployments: `0x4Cc0...1A48` (Base Sepolia,
 > B20 tokens) and `0x712E...B22f` (Robinhood Chain MAINNET, plain ERC-20 tokens
 > — no B20 precompile there; same rules, all four contracts verified on
 > Blockscout, smoke-tested with real transactions; the frontend has a network
@@ -185,6 +185,22 @@ token.
   later visit is ~0,4 s. Nothing priced comes from it: spot price,
   reserves, curve state and your own balance are still read straight from the
   chain on every load.
+- **Holder balances are read, not accumulated.** The cache used to store holder
+  balances as a running sum of `Transfer` deltas, one scanned range on top of
+  the last. That is only as good as its base, and on 2026-08-14 the base was
+  lost: Firestore hit its daily read quota, `readHistory` returned a header with
+  no chunks, and the route treated that emptiness as a valid starting point and
+  wrote back a map built from later deltas alone. The GLIFE token on Base was
+  left with the curve holding **minus 6.5M tokens** and one holder against four
+  buyers — a state no incremental scan could repair, because an incremental scan
+  only knows the *next* delta. Since 2026-08-15 the log scan answers only *who*
+  touched the token; *how much* comes from `balanceOf` at the head (Multicall3
+  where the chain has it, single reads where it does not), so every refresh
+  overwrites whatever the last one got wrong. Three invariants gate the write —
+  no negative balance, no history with trades and zero balance rows, no sum above
+  total supply — and a map that fails them is stored empty rather than as a lie;
+  the holders tab then falls back to the indexer. The same sieve runs in the
+  browser, so a poisoned `localStorage` snapshot cannot repaint the old numbers.
 
 ## 6. Contracts
 

@@ -114,6 +114,182 @@ describe('applyTransferLogs', () => {
   });
 });
 
+describe('balancesArePoisoned', () => {
+  const { balancesArePoisoned } = require('../app/startpad/[address]/historyScan');
+  const A = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const B = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const SUPPLY = 1_000_000_000n * 10n ** 18n;
+
+  it('zdrowa mapa nie jest zatruta', () => {
+    const balances = new Map([[A, SUPPLY - 10n], [B, 10n]]);
+
+    expect(balancesArePoisoned(balances, [trade()])).to.equal(false);
+  });
+
+  it('ujemne saldo znaczy, ze mapa stracila podstawe - tak wygladal GLIFE', () => {
+    const balances = new Map([[A, -6_531_400n], [B, 5_129_979n]]);
+
+    expect(balancesArePoisoned(balances, [trade()])).to.equal(true);
+  });
+
+  it('transakcje bez ani jednego salda to nie jest pusty rynek, tylko utracony cache', () => {
+    expect(balancesArePoisoned(new Map(), [trade()])).to.equal(true);
+  });
+
+  it('suma ponad cala podaz znaczy policzony dwa razy przedzial', () => {
+    const balances = new Map([[A, SUPPLY], [B, 1n]]);
+
+    expect(balancesArePoisoned(balances, [trade()])).to.equal(true);
+  });
+
+  it('token bez transakcji z pusta mapa jest w porzadku - nikt jeszcze nie kupil', () => {
+    expect(balancesArePoisoned(new Map(), [])).to.equal(false);
+  });
+
+  it('kupujacy, ktory sprzedal WSZYSTKO, nie jest bledem - zerowych wierszy nie zapisujemy', () => {
+    // Konto z transakcji nie ma wiersza w mapie, bo jego saldo to zero.
+    const balances = new Map([[A, 5n]]);
+
+    expect(balancesArePoisoned(balances, [trade({ account: B })])).to.equal(false);
+  });
+});
+
+describe('balanceCandidates', () => {
+  const { balanceCandidates } = require('../app/startpad/[address]/historyScan');
+  const CURVE = '0xCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCc';
+  const DEAD = '0x000000000000000000000000000000000000dEaD';
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  const A = '0xaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaA';
+  const B = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+  it('adresy systemowe ida pierwsze - krzywa i spalenie musza sie zmiescic zawsze', () => {
+    const out = balanceCandidates(new Map([[A.toLowerCase(), 5n]]), [], [CURVE, DEAD], 10);
+
+    expect(out.slice(0, 2)).to.deep.equal([CURVE.toLowerCase(), DEAD.toLowerCase()]);
+  });
+
+  it('bierze konta z transakcji, nawet gdy nie ma ich jeszcze w mapie sald', () => {
+    const out = balanceCandidates(new Map(), [trade({ account: B })], [], 10);
+
+    expect(out).to.deep.equal([B.toLowerCase()]);
+  });
+
+  it('jedno konto to jeden wpis, bez wzgledu na wielkosc liter', () => {
+    const out = balanceCandidates(new Map([[A.toLowerCase(), 5n]]), [trade({ account: A })], [A], 10);
+
+    expect(out).to.deep.equal([A.toLowerCase()]);
+  });
+
+  it('pomija adres zerowy - mint nie jest holderem', () => {
+    const out = balanceCandidates(new Map([[ZERO, 5n]]), [], [ZERO, CURVE], 10);
+
+    expect(out).to.deep.equal([CURVE.toLowerCase()]);
+  });
+
+  it('limit tnie ogon, a nie czolo', () => {
+    const balances = new Map([[A.toLowerCase(), 1n], [B.toLowerCase(), 9n]]);
+
+    expect(balanceCandidates(balances, [], [CURVE], 2)).to.deep.equal([CURVE.toLowerCase(), B.toLowerCase()]);
+  });
+
+  it('z reszty sald zostawia NAJWIEKSZE - one robia tabele holderow', () => {
+    const balances = new Map([[A.toLowerCase(), 1n], [B.toLowerCase(), 9n]]);
+
+    expect(balanceCandidates(balances, [], [], 1)).to.deep.equal([B.toLowerCase()]);
+  });
+});
+
+describe('readHolderBalances', () => {
+  const { readHolderBalances } = require('../app/api/launchpad/holderBalances');
+  const TOKEN = '0xb20000000000000000000000000000000000b20b';
+  const addr = (n: number) => `0x${n.toString(16).padStart(40, '0')}`;
+
+  const multicallClient = (answer: (account: string) => any) => {
+    const calls: number[] = [];
+    return {
+      calls,
+      chain: { contracts: { multicall3: { address: '0xca11bde05977b3631167028862be2a173976ca11' } } },
+      multicall: async ({ contracts }: any) => {
+        calls.push(contracts.length);
+        return contracts.map((entry: any) => answer(entry.args[0]));
+      },
+      readContract: async () => {
+        throw new Error('multicall mial wystarczyc');
+      },
+    };
+  };
+
+  it('czyta salda multicallem, gdy siec ma Multicall3', async () => {
+    const client = multicallClient(() => ({ status: 'success', result: 7n }));
+
+    const out = await readHolderBalances(client, TOKEN, [addr(1), addr(2)]);
+
+    expect(client.calls).to.deep.equal([2]);
+    expect(out.get(addr(1))).to.equal(7n);
+    expect(out.get(addr(2))).to.equal(7n);
+  });
+
+  it('nie wpisuje zerowych sald - konto bez tokenow nie jest holderem', async () => {
+    const client = multicallClient((account) => ({ status: 'success', result: account === addr(1) ? 0n : 3n }));
+
+    const out = await readHolderBalances(client, TOKEN, [addr(1), addr(2)]);
+
+    expect(out.has(addr(1))).to.equal(false);
+    expect(out.get(addr(2))).to.equal(3n);
+  });
+
+  it('nieudany odczyt konczy caly probe, zamiast oddac tabele bez wierszy', async () => {
+    const client = multicallClient((account) => (account === addr(2) ? { status: 'failure' } : { status: 'success', result: 5n }));
+
+    expect(await readHolderBalances(client, TOKEN, [addr(1), addr(2)])).to.equal(null);
+  });
+
+  it('siec bez Multicall3 dostaje odczyty pojedyncze - wolniej, tyle samo prawdy', async () => {
+    let reads = 0;
+    const client = {
+      chain: { contracts: {} },
+      readContract: async () => {
+        reads += 1;
+        return 4n;
+      },
+    };
+
+    const out = await readHolderBalances(client, TOKEN, [addr(1), addr(2)]);
+
+    expect(reads).to.equal(2);
+    expect(out.get(addr(2))).to.equal(4n);
+  });
+
+  it('odmowa RPC przy odczycie pojedynczym takze konczy probe', async () => {
+    const client = {
+      chain: { contracts: {} },
+      readContract: async () => {
+        throw new Error('over rate limit');
+      },
+    };
+
+    expect(await readHolderBalances(client, TOKEN, [addr(1)])).to.equal(null);
+  });
+
+  it('dluga lista idzie partiami, a nie jednym gigantycznym wywolaniem', async () => {
+    const client = multicallClient(() => ({ status: 'success', result: 1n }));
+    const accounts = Array.from({ length: 260 }, (_, index) => addr(index + 1));
+
+    const out = await readHolderBalances(client, TOKEN, accounts);
+
+    expect(client.calls).to.deep.equal([250, 10]);
+    expect(out.size).to.equal(260);
+  });
+
+  it('pusta lista kont nie rusza RPC', async () => {
+    const client = multicallClient(() => {
+      throw new Error('nie wolno pytac');
+    });
+
+    expect((await readHolderBalances(client, TOKEN, [])).size).to.equal(0);
+  });
+});
+
 describe('serializeTrades / parseTrades', () => {
   it('oddaje te sama transakcje po zapisie i odczycie', () => {
     const original = trade({ kind: 'sell', logIndex: 4, txHash: HASH(7), id: `${HASH(7)}-4` });

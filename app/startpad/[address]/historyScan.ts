@@ -1,6 +1,6 @@
 import { getAbiItem } from 'viem';
 import { erc20Abi, launchpadAbi } from '../config';
-import { priceWeiAfter, ZERO_ADDRESS, type TradeEntry } from './detailShared';
+import { priceWeiAfter, SUPPLY_WEI, ZERO_ADDRESS, type TradeEntry } from './detailShared';
 
 /**
  * Historia tokena z logow - CZYSTA logika, bez Reacta i bez stanu.
@@ -84,6 +84,76 @@ export function applyTradeToBalances(balances: Map<string, bigint>, trade: Trade
     applyBalanceDelta(balances, trade.account, -trade.tokens);
     applyBalanceDelta(balances, curve, trade.tokens);
   }
+}
+
+/**
+ * SALDA SA STANEM, A NIE SUMA ROZNIC - i to jest jedyny sposob, zeby to
+ * sprawdzic bez pytania lancucha.
+ *
+ * Cache historii dokleja do mapy sald roznice z KOLEJNYCH zeskanowanych
+ * przedzialow. Dopoki podstawa jest cala, wynik sie zgadza. Gdy podstawa
+ * przepadnie (14 sierpnia 2026 Firestore wyczerpal dzienny limit odczytow i
+ * `readHistory` oddawal naglowek bez kawalkow), zostaja same roznice z
+ * przedzialow zeskanowanych PO stracie - i taka mapa nie naprawia sie juz
+ * nigdy, bo skan przyrostowy zna wylacznie nastepne roznice.
+ *
+ * Tak wygladal token GLIFE na Base: cztery transakcje w cache, zero wierszy
+ * sald, potem trzy wiersze z krzywa na MINUSIE 6,5 mln tokenow. Strona
+ * pokazywala jednego holdera przy czterech kupujacych.
+ *
+ * Trzy niezmienniki, ktore trzymaja tylko dla zdrowej mapy:
+ *   - saldo ERC-20 nie bywa ujemne;
+ *   - historia z transakcjami nie ma pustej mapy sald (kupiec albo trzyma, albo
+ *     odsprzedal krzywej, wiec ktos zawsze ma niezerowe saldo);
+ *   - suma sald nie przekracza calej podazy (to lapie policzenie tego samego
+ *     przedzialu dwa razy).
+ *
+ * Brak konta z transakcji CELOWO nie jest tu bledem: kto sprzedal wszystko, ma
+ * saldo zero, a zerowych wierszy nie zapisujemy.
+ */
+export function balancesArePoisoned(balances: Map<string, bigint>, trades: TradeEntry[]): boolean {
+  if (trades.length > 0 && balances.size === 0) return true;
+  let total = 0n;
+  for (const value of balances.values()) {
+    if (value < 0n) return true;
+    total += value;
+  }
+  return total > SUPPLY_WEI;
+}
+
+/**
+ * Konta, ktorych saldo warto przeczytac z lancucha - w kolejnosci waznosci.
+ *
+ * Skan logow sluzy do tego, zeby wiedziec KTO, a nie ILE: adresy systemowe
+ * (krzywa, vault, hook, pula, adres spalenia), potem kupujacy i sprzedajacy od
+ * najswiezszego, a na koncu reszta znanych sald od najwiekszego. Limit tnie
+ * ogon, nie czolo - przy tokenie z tysiacami kont tabela holderow i tak
+ * pokazuje pierwsza dwudziestke, a laczna liczba posiadaczy idzie z indeksu
+ * (Blockscout), nie z tej listy.
+ */
+export function balanceCandidates(
+  balances: Map<string, bigint>,
+  trades: TradeEntry[],
+  system: string[],
+  limit: number
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  const push = (raw: string | null | undefined) => {
+    if (!raw || out.length >= limit) return;
+    const key = raw.toLowerCase();
+    if (key === ZERO_ADDRESS || seen.has(key)) return;
+    seen.add(key);
+    out.push(key);
+  };
+
+  for (const address of system) push(address);
+  for (let index = trades.length - 1; index >= 0; index -= 1) push(trades[index].account);
+  const known = [...balances.entries()].sort((a, b) => (a[1] === b[1] ? 0 : a[1] < b[1] ? 1 : -1));
+  for (const [address] of known) push(address);
+
+  return out;
 }
 
 /** Bought/Sold -> wpis historii. Null, gdy log nie niesie kompletu pol. */

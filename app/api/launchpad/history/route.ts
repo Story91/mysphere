@@ -2,12 +2,15 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, http, type Address } from 'viem';
 import { LAUNCHPAD_NETWORKS, type LaunchpadNetwork } from '../../../startpad/config';
 import {
+  balanceCandidates,
+  balancesArePoisoned,
   mergeTrades,
   scanBackward,
   serializeBalances,
   serializeTrades,
 } from '../../../startpad/[address]/historyScan';
-import type { TradeEntry } from '../../../startpad/[address]/detailShared';
+import { DEAD_ADDRESS, type TradeEntry } from '../../../startpad/[address]/detailShared';
+import { MAX_BALANCE_ACCOUNTS, readHolderBalances } from '../holderBalances';
 import { planScan } from '../historyLayout';
 import { rpcCandidates } from '../historyRpc';
 import {
@@ -150,7 +153,8 @@ export async function GET(request: NextRequest) {
   const meta: HistoryMeta | null = cached?.meta ?? null;
 
   let trades: TradeEntry[] = cached?.trades ?? [];
-  const balances = cached?.balances ?? new Map<string, bigint>();
+  // `let`, bo po skanie podmienia to odczyt `balanceOf` - patrz nizej.
+  let balances = cached?.balances ?? new Map<string, bigint>();
   let graduatedTs = meta?.graduatedTs ?? null;
   let launchBlock = meta?.launchBlock ?? null;
   let highBlock = meta?.highBlock ?? 0n;
@@ -175,6 +179,7 @@ export async function GET(request: NextRequest) {
   const mayScan = ranges.length > 0 && (locked || meta === null);
 
   let scanned = false;
+  let scanFailed = false;
   if (mayScan) {
     scanned = true;
     try {
@@ -220,27 +225,66 @@ export async function GET(request: NextRequest) {
         }
         if (reachedStart(result.launchBlock, result.scannedFrom, launchFloor)) complete = true;
       }
-
-      // Pisze tylko ten, kto trzyma blokade - inaczej dwa rownolegle skany
-      // nadpisywalyby sobie naglowek w niepewnej kolejnosci.
-      if (locked) {
-        await writeHistory({
-          chainId,
-          token,
-          previous: meta,
-          trades,
-          balances,
-          highBlock,
-          lowBlock,
-          complete,
-          launchBlock,
-          graduatedTs,
-        });
-      }
     } catch {
-      // Skan padl w polowie - oddajemy to, co udalo sie zlozyc, i zwalniamy
-      // blokade, zeby nastepne wejscie mialo prawo sprobowac od razu.
-      if (locked) await releaseScanLock(chainId, token);
+      // Skan padl w polowie - oddajemy to, co udalo sie zlozyc, i (nizej)
+      // zwalniamy blokade, zeby nastepne wejscie mialo prawo sprobowac od razu.
+      scanFailed = true;
+    }
+  }
+
+  /**
+   * SALDA HOLDEROW CZYTAMY Z LANCUCHA, A NIE SKLADAMY Z ROZNIC.
+   *
+   * Petla wyzej dokleila do mapy roznice z Transferow w zeskanowanym
+   * przedziale i tak dzialalo to do 15 sierpnia 2026. Suma roznic jest jednak
+   * tyle warta, co jej podstawa, a podstawa raz przepadla: 14 sierpnia
+   * Firestore wyczerpal dzienny limit odczytow, `readHistory` oddal naglowek
+   * bez kawalkow, trasa wziela te pustke za dobry punkt wyjscia i zapisala
+   * mape zlozona z samych pozniejszych roznic. Na tokenie GLIFE zostala po tym
+   * krzywa z saldem MINUS 6,5 mln tokenow i jeden holder przy czterech
+   * kupujacych - stan, ktorego skan przyrostowy nie mial jak naprawic, bo zna
+   * wylacznie nastepne roznice.
+   *
+   * `balanceOf` nie ma podstawy do stracenia. Skan logow zostaje przy tym, w
+   * czym jest niezastapiony (KTO dotykal tokena), a ILE mowi juz lancuch - wiec
+   * kazde odswiezenie naprawia to, co poprzednie zepsuly.
+   *
+   * Odczyt leci po skanie (sa juz wtedy znane nowe konta) i przy zatrutej
+   * mapie takze bez skanu - inaczej strona czekalaby na cudze wejscie z
+   * blokada. Gdy sie nie uda, zostaje mapa z roznic; zatrutej nie zapisujemy,
+   * bo pusta tabela jest uczciwsza niz ujemne saldo.
+   */
+  if (scanned || balancesArePoisoned(balances, trades)) {
+    const accounts = balanceCandidates(
+      balances,
+      trades,
+      [net.launchpad, net.vault, net.hook, net.poolManager, DEAD_ADDRESS],
+      MAX_BALANCE_ACCOUNTS
+    );
+    // Adres tokena malymi literami: konta z `balanceCandidates` juz takie sa,
+    // wiec caly odczyt idzie bez sumy kontrolnej i bez jej walidacji.
+    const probed = await readHolderBalances(client, token.toLowerCase(), accounts);
+    if (probed) balances = probed;
+    else if (balancesArePoisoned(balances, trades)) balances = new Map();
+  }
+
+  // Pisze tylko ten, kto trzyma blokade - inaczej dwa rownolegle skany
+  // nadpisywalyby sobie naglowek w niepewnej kolejnosci.
+  if (locked) {
+    if (scanFailed) await releaseScanLock(chainId, token);
+    else {
+      await writeHistory({
+        chainId,
+        token,
+        previous: meta,
+        trades,
+        balances,
+        highBlock,
+        lowBlock,
+        complete,
+        launchBlock,
+        graduatedTs,
+      });
     }
   }
 
