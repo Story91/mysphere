@@ -1105,6 +1105,74 @@ export const CURVE_TARGET_ETH = ACTIVE_LAUNCHPAD_NETWORK.rVirt * 4;
  */
 export const LAUNCHPAD_DEPLOY_BLOCK = ACTIVE_LAUNCHPAD_NETWORK.deployBlock;
 
+/* -------------------------------------------------------------------------- */
+/*  TEMPO PODGLADU NA ZYWO                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * WLASNE ENDPOINTY, WYPISANE LITERALNIE.
+ *
+ * Next podmienia `process.env.NEXT_PUBLIC_X` w kodzie przegladarki tylko przy
+ * dostepie przez kropke - `process.env[nazwa]` jest tam ZAWSZE undefined. Stad
+ * mapa z literalami zamiast pola w konfiguracji sieci. Te same zmienne, co
+ * w app/providers.tsx; rozjazd znaczylby tylko tyle, ze pytamy wolniej niz
+ * moglibysmy.
+ */
+const OWN_RPC_URL: Record<number, string | undefined> = {
+  [base.id]: process.env.NEXT_PUBLIC_BASE_RPC_URL || process.env.NEXT_PUBLIC_CDP_RPC_URL,
+  [baseSepolia.id]: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL,
+  [robinhoodChain.id]: process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL,
+  [arcTestnet.id]: process.env.NEXT_PUBLIC_ARC_TESTNET_RPC_URL,
+};
+
+/** WebSocket jest opcjonalny i dotyczy dzis wylacznie Base. */
+const OWN_WS_URL: Record<number, string | undefined> = {
+  [base.id]: process.env.NEXT_PUBLIC_BASE_WS_URL,
+};
+
+export type LiveWatchTempo = {
+  /**
+   * `true` = pytaj co `pollingInterval`. `undefined` = niech zdecyduje viem po
+   * REALNYM transporcie klienta (przy WebSockecie subskrypcja, przy HTTP i tak
+   * polling). Nigdy `false` na sztywno: gdyby konfiguracja WS byla, a transport
+   * nie, subskrypcja padlaby i podglad zamilklby bez sladu.
+   */
+  poll: true | undefined;
+  pollingInterval: number;
+};
+
+/** Publiczny RPC nie uniesie pytania co blok - zostaje przy osmiu sekundach. */
+export const PUBLIC_RPC_POLL_MS = 8_000;
+/** Ponizej sekundy nie ma czego szukac nawet na najszybszym lancuchu. */
+const MIN_POLL_MS = 1_000;
+
+export function liveWatchFor(input: {
+  secondsPerBlock: number;
+  ownRpc?: string | null;
+  wsRpc?: string | null;
+}): LiveWatchTempo {
+  const blockTempo = Math.max(MIN_POLL_MS, Math.round(input.secondsPerBlock * 1_000));
+  const hasOwn = typeof input.ownRpc === 'string' && input.ownRpc.trim() !== '';
+  const hasWs = typeof input.wsRpc === 'string' && input.wsRpc.trim() !== '';
+  if (hasWs) return { poll: undefined, pollingInterval: blockTempo };
+  return { poll: true, pollingInterval: hasOwn ? blockTempo : PUBLIC_RPC_POLL_MS };
+}
+
+/**
+ * ILE CZEKAMY NA CUDZA TRANSAKCJE.
+ *
+ * Stalo tu 8000 przy bloku co 2 s, wiec kupno widac bylo srednio po czterech
+ * sekundach, a w najgorszym po osmiu - i dotyczylo to naraz tasmy, ceny,
+ * rezerwy, wykresu i listy transakcji. Osiem sekund bylo ustepstwem na rzecz
+ * PUBLICZNEGO RPC, ktory przy serii odbija. Z wlasnym endpointem nie ma powodu
+ * pytac rzadziej niz raz na blok, a z WebSocketem nie ma powodu pytac w ogole.
+ */
+export const LIVE_WATCH = liveWatchFor({
+  secondsPerBlock: ACTIVE_LAUNCHPAD_NETWORK.secondsPerBlock,
+  ownRpc: OWN_RPC_URL[ACTIVE_LAUNCHPAD_NETWORK.chain.id],
+  wsRpc: OWN_WS_URL[ACTIVE_LAUNCHPAD_NETWORK.chain.id],
+});
+
 export type LaunchpadToken = {
   id: string;
   name: string;

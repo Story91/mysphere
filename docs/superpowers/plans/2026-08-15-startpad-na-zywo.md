@@ -93,14 +93,14 @@ delta stosowana all-or-nothing, wersja formatu w kluczu, TTL.
 - Zmien: `app/startpad/LaunchpadBoard.tsx`, `app/startpad/[address]/LaunchpadTokenDetail.tsx`
 - Zmien/utworz: `test/StartpadLiveTempo.test.ts`
 
-- [ ] **2.1** `LIVE_WATCH` w config: `{ poll, pollingInterval }` liczone z
+- [x] **2.1** `LIVE_WATCH` w config: `{ poll, pollingInterval }` liczone z
   `secondsPerBlock` sieci i z tego, czy jest wlasny RPC; publiczny endpoint zostaje
   na 8 s, wlasny schodzi do tempa bloku.
-- [ ] **2.2** Testy czystej funkcji `liveWatchFor(net, env)`.
-- [ ] **2.3** Podepnij `LIVE_WATCH` w obu subskrypcjach.
-- [ ] **2.4** WebSocket: gdy `NEXT_PUBLIC_BASE_WS_URL` jest ustawiony, transport
+- [x] **2.2** Testy czystej funkcji `liveWatchFor(net, env)`.
+- [x] **2.3** Podepnij `LIVE_WATCH` w obu subskrypcjach.
+- [x] **2.4** WebSocket: gdy `NEXT_PUBLIC_BASE_WS_URL` jest ustawiony, transport
   Base to `fallback([webSocket(ws), http(...)])`, a `poll` schodzi na false.
-- [ ] **2.5** `tsc --noEmit` + testy + commit.
+- [x] **2.5** `tsc --noEmit` + testy + commit.
 
 ---
 

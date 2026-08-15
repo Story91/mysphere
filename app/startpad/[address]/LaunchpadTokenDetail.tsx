@@ -28,6 +28,7 @@ import {
   launchpadAbi,
   LIQUIDITY_VAULT_ADDRESS,
   liquidityVaultAbi,
+  LIVE_WATCH,
 } from '../config';
 import { parseMetadataUri, pickTokenImage } from '../metadata';
 import { fetchLogos } from '../logos';
@@ -217,8 +218,10 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     const unwatch = readClient.watchContractEvent({
       address: LAUNCHPAD_ADDRESS as Address,
       abi: launchpadAbi,
-      poll: true,
-      pollingInterval: 8_000,
+      // Tempo z konfiguracji sieci: raz na blok na wlasnym RPC, osiem sekund na
+      // publicznym, subskrypcja gdy transportem jest WebSocket.
+      poll: LIVE_WATCH.poll,
+      pollingInterval: LIVE_WATCH.pollingInterval,
       // Publiczny RPC odbija; zywy podglad jest dodatkiem do zaladowanych
       // danych, wiec cicha przerwa jest wlasciwym zachowaniem, nie awaria.
       onError: () => {},

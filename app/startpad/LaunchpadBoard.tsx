@@ -41,6 +41,7 @@ import {
   LIQUIDITY_VAULT_ADDRESS,
   launchpadAbi,
   liquidityVaultAbi,
+  LIVE_WATCH,
   previewTokens,
   setLaunchpadChain,
   type LaunchpadToken,
@@ -1695,8 +1696,10 @@ export default function LaunchpadBoard() {
     const unwatch = readClient.watchContractEvent({
       address: LAUNCHPAD_ADDRESS as Address,
       abi: launchpadAbi,
-      poll: true,
-      pollingInterval: 8_000,
+      // Tempo idzie z konfiguracji sieci (patrz `liveWatchFor`): raz na blok,
+      // gdy stoimy na wlasnym RPC, osiem sekund na publicznym.
+      poll: LIVE_WATCH.poll,
+      pollingInterval: LIVE_WATCH.pollingInterval,
       // Bez tego viem wypisuje kazde odbicie publicznego RPC do konsoli. Zywy
       // podglad jest DODATKIEM - tablica ma juz dane z `loadBoard`, wiec cicha
       // przerwa w subskrypcji jest wlasciwym zachowaniem, a nie awaria.
