@@ -13,7 +13,7 @@ import {
   SearchX,
   Send,
 } from 'lucide-react';
-import { ContractFunctionExecutionError, formatEther, type Address } from 'viem';
+import { ContractFunctionExecutionError, formatEther, getAbiItem, type Address } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 import {
   NATIVE_SYMBOL,
@@ -54,9 +54,26 @@ import {
   type TokenProfileView,
   type TradeEntry,
 } from './detailShared';
+import { applyClaimLogs, claimsNeedReload } from './liveClaims';
 import { useTokenHistory, type LiveLaunchpadLog } from './useTokenHistory';
 
 const EXPLORER = LAUNCHPAD_EXPLORER_URL;
+
+/**
+ * Zdarzenia, ktore strona tokena sledzi na zywo - z trzech kontraktow, ale w
+ * jednej subskrypcji. Wypisane po nazwie, a nie caly ABI, zeby subskrypcja
+ * niosla dokladnie to, czego uzywa `onLogs`, i ani jednego loga wiecej.
+ */
+const LIVE_EVENTS = [
+  getAbiItem({ abi: launchpadAbi, name: 'Bought' }),
+  getAbiItem({ abi: launchpadAbi, name: 'Sold' }),
+  getAbiItem({ abi: launchpadAbi, name: 'CurveLocked' }),
+  getAbiItem({ abi: launchpadAbi, name: 'Graduated' }),
+  getAbiItem({ abi: launchpadAbi, name: 'FeeAccrued' }),
+  getAbiItem({ abi: launchpadAbi, name: 'Claimed' }),
+  getAbiItem({ abi: hookAbi, name: 'HookFeeSettled' }),
+  getAbiItem({ abi: liquidityVaultAbi, name: 'Harvested' }),
+];
 
 /**
  * Strona tokena sklada sie z trzech NIEZALEZNYCH strumieni danych:
@@ -210,14 +227,31 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
   /** Tworca tokena - jedyny, kto moze uzupelnic profil i linki. */
   const isCreator = Boolean(account && core && account.toLowerCase() === core.creator.toLowerCase());
 
-  // NA ZYWO: pojedyncze zdarzenia dokladane do stanu, ktory juz jest na
-  // ekranie. Rezerwy bierzemy PROSTO ze zdarzenia (ethReserveAfter), nie z
-  // wlasnej arytmetyki - ta sama zasada, co w LaunchpadBoard.
+  /**
+   * NA ZYWO: pojedyncze zdarzenia dokladane do stanu, ktory juz jest na
+   * ekranie. Rezerwy bierzemy PROSTO ze zdarzenia (ethReserveAfter), nie z
+   * wlasnej arytmetyki - ta sama zasada, co w LaunchpadBoard.
+   *
+   * Trzy adresy w JEDNEJ subskrypcji, a nie trzy pollery: launchpad (handel,
+   * naliczenia i wyplaty oplat), hook (rozliczenia oplat puli) i vault (zbior
+   * oplat puli). To dalej jedno `eth_getLogs` na rundę.
+   *
+   * Z tych samych logow ida dwa strumienie, bo dotycza czegos innego:
+   *   - historia, wykres i rezerwy to zdarzenia TEGO tokena;
+   *   - salda do odebrania to zdarzenia TWOJEGO KONTA. `claimable` jest wspolne
+   *     dla wszystkich twoich tokenow, a `Claimed` nie niesie nawet adresu
+   *     tokena - filtrowanie ich po tokenie gubiloby prawde.
+   */
   useEffect(() => {
     if (!readClient || !tokenAddress || notFound) return;
-    const unwatch = readClient.watchContractEvent({
-      address: LAUNCHPAD_ADDRESS as Address,
-      abi: launchpadAbi,
+    const claimContext = {
+      viewer: account ? account.toLowerCase() : null,
+      token: tokenAddress.toLowerCase(),
+      isCreator,
+    };
+    const unwatch = readClient.watchEvent({
+      address: [LAUNCHPAD_ADDRESS, LAUNCH_HOOK_ADDRESS, LIQUIDITY_VAULT_ADDRESS] as Address[],
+      events: LIVE_EVENTS,
       // Tempo z konfiguracji sieci: raz na blok na wlasnym RPC, osiem sekund na
       // publicznym, subskrypcja gdy transportem jest WebSocket.
       poll: LIVE_WATCH.poll,
@@ -226,42 +260,52 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
       // danych, wiec cicha przerwa jest wlasciwym zachowaniem, nie awaria.
       onError: () => {},
       onLogs: (logs) => {
+        const all = logs as unknown as LiveLaunchpadLog[];
         const mine: LiveLaunchpadLog[] = [];
-        for (const log of logs) {
-          const decoded = log as unknown as LiveLaunchpadLog;
-          const token = decoded.args?.token as string | undefined;
+        for (const log of all) {
+          const token = log.args?.token as string | undefined;
           if (!token || token.toLowerCase() !== tokenAddress.toLowerCase()) continue;
-          mine.push(decoded);
+          mine.push(log);
         }
-        if (mine.length === 0) return;
-        applyLive(mine);
-        setCore((prev) => {
-          if (!prev) return prev;
-          let next = prev;
-          for (const log of mine) {
-            if (log.eventName === 'Bought' || log.eventName === 'Sold') {
-              const reserve = log.args?.ethReserveAfter as bigint | undefined;
-              const tokenReserve = log.args?.tokenReserveAfter as bigint | undefined;
-              if (reserve !== undefined && tokenReserve !== undefined) {
-                next = { ...next, ethReserve: reserve, tokenReserve, spotPriceWei: priceWeiAfter(reserve, tokenReserve) };
+
+        if (mine.length > 0) {
+          applyLive(mine);
+          setCore((prev) => {
+            if (!prev) return prev;
+            let next = prev;
+            for (const log of mine) {
+              if (log.eventName === 'Bought' || log.eventName === 'Sold') {
+                const reserve = log.args?.ethReserveAfter as bigint | undefined;
+                const tokenReserve = log.args?.tokenReserveAfter as bigint | undefined;
+                if (reserve !== undefined && tokenReserve !== undefined) {
+                  next = { ...next, ethReserve: reserve, tokenReserve, spotPriceWei: priceWeiAfter(reserve, tokenReserve) };
+                }
+              } else if (log.eventName === 'CurveLocked') {
+                next = { ...next, state: 'Locked' };
+              } else if (log.eventName === 'Graduated') {
+                next = { ...next, state: 'Graduated', spotPriceWei: 0n };
               }
-            } else if (log.eventName === 'CurveLocked') {
-              next = { ...next, state: 'Locked' };
-            } else if (log.eventName === 'Graduated') {
-              next = { ...next, state: 'Graduated', spotPriceWei: 0n };
             }
-          }
-          return next;
-        });
+            return next;
+          });
+        }
+
+        // Salda do odebrania: liczone z naliczen, nie odpytywane. Kontrakt
+        // emituje kazde `FeeAccrued` co do wei, wiec kwota na ekranie rosnie w
+        // tej samej sekundzie, w ktorej ktos handluje.
+        setCore((prev) => (prev ? applyClaimLogs(prev, all, claimContext).core : prev));
+
         // Zamkniecie krzywej i graduacja zmieniaja wiecej niz jedna liczbe
-        // (nagroda, pula, salda) - po nich pelny odczyt zamiast skladanki.
-        if (mine.some((log) => log.eventName === 'CurveLocked' || log.eventName === 'Graduated')) void loadCore();
+        // (nagroda, pula, salda), a podzialu oplat puli nie odtwarzamy sami -
+        // po tych zdarzeniach pelny odczyt zamiast skladanki.
+        const heavy = mine.some((log) => log.eventName === 'CurveLocked' || log.eventName === 'Graduated');
+        if (heavy || claimsNeedReload(all, claimContext)) void loadCore();
       },
     });
     return () => {
       unwatch();
     };
-  }, [readClient, tokenAddress, notFound, applyLive, loadCore]);
+  }, [readClient, tokenAddress, notFound, applyLive, loadCore, account, isCreator]);
 
   // Profil (opis, linki) z API + LOGO z Bloba (dokladnie jak tablica). Firestore
   // trzyma logoUrl: null, wiec bez dociagniecia z Bloba detal nie mial logo w

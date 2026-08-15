@@ -115,13 +115,13 @@ ignorowany.
 - Utworz: `app/startpad/[address]/liveClaims.ts` (czysta arytmetyka naliczen)
 - Utworz: `test/StartpadLiveClaims.test.ts`
 
-- [ ] **3.1** `applyFeeAccrued(core, log, me)` - dolicza `amount` do
+- [x] **3.1** `applyFeeAccrued(core, log, me)` - dolicza `amount` do
   `launchClaimable`, gdy `account == me`; ignoruje cudze i nieznane `kind`.
-- [ ] **3.2** `applyHookSettled(core, log, me, creator)` - `ethToCreator` i
+- [x] **3.2** `applyHookSettled(core, log, me, creator)` - `ethToCreator` i
   `tokenToCreator` do claimow hooka, gdy patrzy tworca tokena.
-- [ ] **3.3** Subskrypcja obejmuje hook (jeden `watchEvent` na dwa adresy zamiast
+- [x] **3.3** Subskrypcja obejmuje hook (jeden `watchEvent` na dwa adresy zamiast
   drugiego pollera); `Harvested` na tym tokenie wymusza celowany doczyt claimow.
-- [ ] **3.4** Testy + wpiecie + commit.
+- [x] **3.4** Testy + wpiecie + commit.
 
 ---
 
