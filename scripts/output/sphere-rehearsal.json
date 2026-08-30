@@ -18,15 +18,15 @@
     6000,
     4000
   ],
-  "vanitySalt": "0xecb534e29f3b3b6a4e316c89b86f161ea51b5fad7327659d57fcacdc5b78d9a9",
-  "predictedToken": "0x0Fa75F3ede6e52Bda1FF9b58243bF586b51C478C",
-  "token": "0x0Fa75F3ede6e52Bda1FF9b58243bF586b51C478C",
+  "vanitySalt": "0x6f274efbd3e928309750578e495e08d34bbba5de90ab87884f7e6d5c9eabf33a",
+  "predictedToken": "0x685F9E7e5a61dA67E171a73988feAdd897f31996",
+  "token": "0x685F9E7e5a61dA67E171a73988feAdd897f31996",
   "devBuyEth": "0.05",
   "windowCap": "62532833020637898686679174",
   "vesting": {
-    "start": "1788131426",
+    "start": "1788131550",
     "cliff": "2592000",
     "duration": "31536000"
   },
-  "deployedAt": "2026-08-30T22:14:48.728Z"
+  "deployedAt": "2026-08-30T22:16:51.532Z"
 }

@@ -49,7 +49,8 @@ import { dirname, join } from "path";
  *   SAFE            wspolny adres rol (domyslnie Safe 0x83E2...4142F)
  *   CONSUMER / BENEFICIARY / POT / OPS   nadpisania per rola (domyslnie SAFE)
  *   LAUNCHPAD       adres pada (domyslnie wdrozenie Base 0xCF54...)
- *   VANITY_SALT     gotowy salt (hex32); bez niego salt pseudolosowy
+ *   VANITY_PREFIX   wzorzec hex do wymielenia (np. ba5ed) - tylko realny Base
+ *   VANITY_SALT     gotowy salt (hex32); bez obu: salt pseudolosowy
  *   DEV_BUY_ETH     wielkosc dev-buya w ETH (domyslnie 0.05)
  *   WINDOW_CAP      cap okna w tokenach (domyslnie: szacowany out dev-buya +1%)
  *   VESTING_START   unix start zegara vestingu (domyslnie teraz + 1h)
@@ -84,6 +85,45 @@ function estimateDevBuyOut(valueIn: bigint): bigint {
   const eIn = valueIn - fee;
   const k = R_VIRT * T0;
   return T0 - k / (R_VIRT + eIn);
+}
+
+/**
+ * Mielenie vanity OFFLINE dla PRZEWIDZIANEGO escrow - lancuszek 1:1
+ * z app/utils/b20/launchpadVanity.ts (launchId -> effectiveSalt -> ogon
+ * precompile'a). Wzorzec siedzi na POCZATKU 9-bajtowego ogona, tuz za pasem
+ * zer i bajtem wariantu. Formula precompile'a obowiazuje TYLKO na realnym
+ * Base - na forku/rehearsal precompile jest atrapa CREATE2 i wzorzec nie ma
+ * sensu. Tempo ~22k prob/s (1 watek): 4 znaki sekundy, 5 ~1 min, 6 ~13 min.
+ */
+function mineVanity(
+  padAddr: string,
+  factoryAddr: string,
+  creator: string,
+  chainId: number,
+  prefix: string
+): `0x${string}` {
+  const abi = ethers.AbiCoder.defaultAbiCoder();
+  const target = prefix.toLowerCase();
+  if (![...target].every((c) => "0123456789abcdef".includes(c))) {
+    throw new Error(`VANITY_PREFIX '${prefix}' zawiera znaki spoza hex 0-9a-f.`);
+  }
+  const expected = Math.pow(16, target.length);
+  console.log(`miele wzorzec '${target}' (srednio ~${expected.toLocaleString()} prob)...`);
+  for (let i = 0n; ; i++) {
+    const salt = ("0x" + i.toString(16).padStart(64, "0")) as `0x${string}`;
+    const launchId = ethers.keccak256(
+      abi.encode(["address", "address", "bytes32", "uint256"], [padAddr, creator, salt, chainId])
+    );
+    const effectiveSalt = ethers.keccak256(
+      ethers.solidityPacked(["address", "bytes32"], [padAddr, launchId])
+    );
+    const tail = ethers.keccak256(abi.encode(["address", "bytes32"], [factoryAddr, effectiveSalt])).slice(2, 20);
+    if (tail.startsWith(target)) {
+      console.log(`znaleziono po ${i} probach`);
+      return salt;
+    }
+    if (i % 500_000n === 0n && i > 0n) console.log(`...${i} prob`);
+  }
 }
 
 async function main() {
@@ -134,11 +174,6 @@ async function main() {
   const vestingCliff = BigInt(process.env.VESTING_CLIFF ?? 30n * 24n * 3600n);
   const vestingDuration = BigInt(process.env.VESTING_DURATION ?? 365n * 24n * 3600n);
 
-  const vanitySalt = (process.env.VANITY_SALT ??
-    ethers.keccak256(
-      ethers.toUtf8Bytes(`sphere-${chainId}-${nowTs}-${deployer.address}`)
-    )) as `0x${string}`;
-
   const pad = await ethers.getContractAt("CurveLaunchpad", padAddress);
   console.log(`siec: ${network.name} (chainId ${chainId})`);
   console.log(`wdrazajacy: ${deployer.address}`);
@@ -165,6 +200,23 @@ async function main() {
   const predictedEscrow = ethers.getCreateAddress({ from: deployer.address, nonce });
 
   // ---- 4. adres vanity dla PRZEWIDZIANEGO escrow ---------------------------
+  let vanitySalt: `0x${string}`;
+  if (process.env.VANITY_SALT) {
+    vanitySalt = process.env.VANITY_SALT as `0x${string}`;
+  } else if (process.env.VANITY_PREFIX) {
+    if (rehearsal || chainId !== 8453) {
+      throw new Error(
+        "VANITY_PREFIX dziala tylko na realnym Base (chainId 8453) - na forku " +
+          "precompile jest atrapa i formula adresu sie nie zgadza. Na probe uzyj VANITY_SALT albo nic."
+      );
+    }
+    const factoryAddr = await pad.TOKEN_FACTORY();
+    vanitySalt = mineVanity(padAddress, factoryAddr, predictedEscrow, chainId, process.env.VANITY_PREFIX);
+  } else {
+    vanitySalt = ethers.keccak256(
+      ethers.toUtf8Bytes(`sphere-${chainId}-${nowTs}-${deployer.address}`)
+    ) as `0x${string}`;
+  }
   const predictedToken = await pad.predictVanityToken(predictedEscrow, vanitySalt);
   console.log(`escrow (przewidziany): ${predictedEscrow}`);
   console.log(`token  (przewidziany): ${predictedToken} (salt ${vanitySalt})`);
