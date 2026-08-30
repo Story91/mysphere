@@ -209,7 +209,10 @@ export default function SphereSeasonPanel() {
         </div>
         <p className="mt-2 text-[10.5px] text-sp-shade/50">
           Shadow season calibrates the public reward formula on real volume before any SPHERE is paid.
-          Rules are published; anyone can recompute this page from chain logs.
+          Rules are published; anyone can recompute this page from chain logs.{' '}
+          <a href="/api/sphere/season" target="_blank" rel="noreferrer" className="font-bold text-sp-brand hover:underline">
+            Verify the math → raw data
+          </a>
         </p>
       </section>
 
