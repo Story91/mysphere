@@ -17,6 +17,12 @@ const SPHERE_PARAMS = {
   BUYBACK_BPS: 5000n,
   // #2 - split _feeReceivers = [SphereRewards, SphereCreatorEscrow]
   RECEIVER_SHARES_BPS: [6000n, 4000n],
+  // #11b (ZDECYDOWANE 2026-08-30): split ETH w release() escrow - pot/ops
+  ETH_POT_BPS: 5000,
+  // #11a (ZDECYDOWANE 2026-08-30): tokeny ida do vestingu; harmonogram to
+  // REKOMENDACJA do potwierdzenia przed launchem (klif 30 dni, 12 mies. liniowo)
+  VESTING_CLIFF: 30n * 24n * 3600n,
+  VESTING_DURATION: 365n * 24n * 3600n,
   // parametry wdrozenia Base (do liczenia oczekiwanych splitow)
   FEE_BPS: 100n,
   CREATOR_FEE_BPS: 70n,
