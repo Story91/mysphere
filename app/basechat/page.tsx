@@ -1208,7 +1208,7 @@ export default function BaseChat() {
         errorMessage = 'Invalid token parameters. Creating as regular post instead.';
         shouldFallback = true;
       } else if (error.message.includes('insufficient funds')) {
-        errorMessage = 'Insufficient funds to create the token. Please ensure you have enough ETH for gas fees.';
+        errorMessage = 'Not enough funds to create the token. Make sure you have enough ETH for gas.';
       } else if (error.message.includes('user rejected')) {
         errorMessage = 'Transaction was rejected by user.';
       } else if (error.message.includes('Failed to upload')) {
@@ -2682,7 +2682,7 @@ export default function BaseChat() {
               </svg>
               <div>
                 <p className="font-semibold text-lg">Welcome to BaseChat! 🎉</p>
-                <p className="text-sm opacity-90">You have been successfully registered through a referral link</p>
+                <p className="text-sm opacity-90">You&apos;re in. Your referral signup went through.</p>
               </div>
             </div>
           </motion.div>
@@ -3217,7 +3217,7 @@ export default function BaseChat() {
                             </div>
                           </div>
                           <p className="text-blue-200 text-sm mb-2">
-                            View your complete on-chain identity & activity
+                            See your on-chain identity and activity in one place
                           </p>
                           <div className="flex items-center justify-center text-blue-300 text-xs">
                             <span>Transactions • Tokens • NFTs • Contracts</span>
@@ -3297,7 +3297,7 @@ export default function BaseChat() {
                       </div>
                       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
                         <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                          Building the future of DeFi on Base 🚀 Love Web3, NFTs, and innovative blockchain solutions. Always learning, always building! 💙
+                          Building DeFi stuff on Base 🚀 Into Web3 and NFTs. Always learning, always building! 💙
                         </div>
                       </div>
                     </div>
@@ -3321,7 +3321,7 @@ export default function BaseChat() {
                           </div>
                         </div>
                         <p className="text-blue-200 text-sm mb-2">
-                          View your complete on-chain identity & activity
+                          See your on-chain identity and activity in one place
                         </p>
                         <div className="flex items-center justify-center text-blue-300 text-xs">
                           <span>Transactions • Tokens • NFTs • Contracts</span>

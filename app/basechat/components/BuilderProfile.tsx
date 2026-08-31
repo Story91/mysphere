@@ -2311,7 +2311,7 @@ export default function BuilderProfile({
                   Vitalik Buterin is the co-founder of Ethereum, a decentralized, open-source blockchain platform that enables smart contracts and decentralized applications (dApps). He proposed Ethereum in a white paper in late 2013 when he was just 19 years old.
                 </p>
                 <p className="leading-relaxed">
-                  Ethereum launched in 2015 and quickly became the second-largest blockchain platform after Bitcoin. It introduced programmability through smart contracts, revolutionizing blockchain technology by enabling DeFi, NFTs, and DAOs.
+                  Ethereum launched in 2015 and quickly became the second-largest blockchain after Bitcoin. Smart contracts made the chain programmable, which is what later made DeFi, NFTs and DAOs possible at all.
                 </p>
                 <p className="leading-relaxed">
                   Vitalik is known for his vision of a decentralized future and continues to lead Ethereum's development, including its major upgrade to Ethereum 2.0, which transitioned the network from Proof-of-Work (PoW) to Proof-of-Stake (PoS) for improved scalability and energy efficiency.

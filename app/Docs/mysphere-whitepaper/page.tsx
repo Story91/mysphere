@@ -172,7 +172,7 @@ export default function MySphereWhitepaper() {
           <div className="max-w-4xl mx-auto relative">
           <h1 className="text-4xl font-bold mb-2">MY SPHERE</h1>
           <h2 className="text-2xl mb-6">The Onchain Dapp Web3 Social Platform</h2>
-          <p className="italic mb-8">Revolutionizing Content Creation and Monetization through Blockchain Technology</p>
+          <p className="italic mb-8">Content creation and monetization, built on blockchain rails</p>
           
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-4">WHITEPAPER</h2>
@@ -183,16 +183,16 @@ export default function MySphereWhitepaper() {
           <section id="executive-summary" className="mb-12">
             <h2 className="text-2xl font-bold mb-4 pb-2 border-b border-[#0052FF]/30">1. EXECUTIVE SUMMARY</h2>
             <p className="mb-4">
-              MySphere.fun is a revolutionary Web3 social platform that combines traditional social media functionalities with blockchain technology. Our platform enables users to create, tokenize, and monetize content as NFTs, while building a decentralized reputation system on the Base blockchain.
+              MySphere.fun is a Web3 social platform that ties familiar social media features to the Base blockchain. Users create content, tokenize it as NFTs, and sell it. Alongside that sits a decentralized reputation system recorded on Base.
             </p>
             <p className="mb-4">
-              Leveraging the full capabilities of the onchainkit framework, mySphere.fun offers a seamless user experience that makes Web3 technologies accessible to mainstream users while providing the benefits of blockchain-based ownership, monetization opportunities, and data sovereignty.
+              Built on the onchainkit framework, mySphere.fun keeps the interface simple enough for mainstream users while still delivering what blockchain is good at: verifiable ownership, ways to earn from your work, and control over your own data.
             </p>
             <p className="mb-4">
-              The platform currently focuses on two main types of content bringing together builders from the Base network: onchain posts and crypto quotes, which can be minted as unique NFTs with provable ownership and transferable value. Our onchain reputation system incentivizes quality content creation and positive community engagement, creating a self-sustaining ecosystem that rewards valuable contributions.
+              The platform currently focuses on two content types that bring Base network builders together: onchain posts and crypto quotes. Both can be minted as unique NFTs with provable ownership and transferable value. The onchain reputation system rewards quality content and constructive engagement, so the people who contribute most get the most back.
             </p>
             <p className="mb-4">
-              This whitepaper outlines our vision, technology stack, economic model, and development roadmap as we build toward becoming the preeminent social platform in the Web3 space.
+              This whitepaper covers our vision, technology stack, economic model, and development roadmap.
             </p>
           </section>
 
@@ -202,10 +202,10 @@ export default function MySphereWhitepaper() {
             
             <h3 className="text-xl font-semibold mt-6 mb-3">2.1 Vision</h3>
             <p className="mb-4">
-              The social media landscape has evolved dramatically over the past decade, yet the fundamental model remains unchanged: centralized platforms extract value from user-generated content while maintaining complete control over data, monetization, and platform rules. This model has led to numerous issues related to content ownership, creator compensation, platform censorship, and data privacy.
+              Social media has changed a great deal over the past decade. The underlying model has not: centralized platforms extract value from user-generated content while keeping full control over data, monetization, and platform rules. The results are well documented: disputed content ownership, underpaid creators, censorship, and weak data privacy.
             </p>
             <p className="mb-4">
-              mySphere.fun aims to disrupt this paradigm by introducing a decentralized social platform where:
+              mySphere.fun takes a different approach: a decentralized social platform where:
             </p>
             <ul className="list-disc ml-6 mb-4 space-y-1">
               <li>Users store their content onchain</li>
@@ -217,7 +217,7 @@ export default function MySphereWhitepaper() {
 
             <h3 className="text-xl font-semibold mt-6 mb-3">2.2 Problem</h3>
             <p className="mb-4">
-              The current social media landscape presents several challenges:
+              Today's social media comes with a set of familiar problems:
             </p>
             <ol className="list-decimal ml-6 mb-4 space-y-2">
               <li><strong>Content Ownership</strong>: Creators lack true ownership of their content, which can be modified, censored, or removed by platform authorities.</li>
@@ -236,8 +236,8 @@ export default function MySphereWhitepaper() {
               <li><strong>Content and NFT Ownership</strong>: Enabling users to tokenize posts and quotes as NFTs, establishing verifiable onchain ownership.</li>
               <li><strong>Direct Monetization</strong>: Allowing creators to sell their content directly to buyers without platform intermediaries.</li>
               <li><strong>Onchain Reputation</strong>: Building a transparent reputation system based on onchain activity and community validation.</li>
-              <li><strong>Base Integration</strong>: Leveraging the Base blockchain for efficient transaction management and data storage.</li>
-              <li><strong>Simplified Web3 UX</strong>: Using onchainkit to create a user-friendly interface that abstracts away blockchain complexity.</li>
+              <li><strong>Base Integration</strong>: Using the Base blockchain for efficient transaction management and data storage.</li>
+              <li><strong>Simplified Web3 UX</strong>: Building the interface with onchainkit so users don't have to think about blockchain mechanics.</li>
               <li><strong>Community Governance</strong>: Implementing progressive decentralization to give users a voice in platform development.</li>
             </ol>
           </section>
@@ -251,7 +251,7 @@ export default function MySphereWhitepaper() {
               
               <ol className="list-decimal ml-6 mb-4 space-y-2">
                 <li><strong>Content Creators</strong>: Writers, thought leaders, and social media influencers looking for new monetization channels and true content ownership.</li>
-                <li><strong>Crypto Enthusiasts</strong>: Blockchain, Base network builders, and cryptocurrency enthusiasts interested in innovative Web3 applications and community building.</li>
+                <li><strong>Crypto Enthusiasts</strong>: Blockchain, Base network builders, and cryptocurrency enthusiasts interested in new Web3 applications and community building.</li>
                 <li><strong>Digital Collectors</strong>: Individuals interested in collecting and trading digital assets with cultural or social significance.</li>
               </ol>
               
@@ -260,7 +260,7 @@ export default function MySphereWhitepaper() {
               </p>
               
               <h3 className="text-xl font-semibold mt-6 mb-3">3.2 Competitive Landscape</h3>
-              <p className="mb-4">The Web3 social media space is still nascent but includes several notable competitors:</p>
+              <p className="mb-4">Web3 social media is still young, but there is real competition:</p>
               
               <ul className="list-disc ml-6 mb-4 space-y-1">
                 <li><strong>Traditional Social Platforms with Web3 Features</strong>: Major platforms experimenting with limited NFT and blockchain integrations.</li>
@@ -272,9 +272,9 @@ export default function MySphereWhitepaper() {
               <p className="mb-4">mySphere.fun differentiates itself through:</p>
               
               <ol className="list-decimal ml-6 mb-4 space-y-2">
-                <li><strong>Integrated Experience</strong>: Seamlessly combining social media functionality with web3 capabilities in a unified platform.</li>
-                <li><strong>Onchain Reputation</strong>: Implementing a comprehensive reputation system that incentivizes valuable contributions.</li>
-                <li><strong>Base Optimization</strong>: Leveraging Base's scalability and low fees to provide an efficient user experience.</li>
+                <li><strong>Integrated Experience</strong>: Social media functionality and web3 capabilities in one product, not bolted together.</li>
+                <li><strong>Onchain Reputation</strong>: A reputation system that pays off for people who contribute.</li>
+                <li><strong>Base Optimization</strong>: Base's scalability and low fees keep the experience fast and cheap.</li>
                 <li><strong>User-Friendly Interface</strong>: Prioritizing accessibility for mainstream users through intuitive design.</li>
                 <li><strong>Specialized Content Focus</strong>: Initial focus on onchain posts for Base network builders provides a clear value proposition and target audience.</li>
               </ol>
@@ -296,16 +296,16 @@ export default function MySphereWhitepaper() {
             <h2 className="text-2xl font-bold mb-4 pb-2 border-b border-[#0052FF]/30">4. PLATFORM OVERVIEW</h2>
               
               <h3 className="text-xl font-semibold mt-6 mb-3">4.1 Key Features</h3>
-              <p className="mb-4">mySphere.fun offers a comprehensive set of features designed to create a vibrant ecosystem for content creation, consumption, and monetization:</p>
+              <p className="mb-4">mySphere.fun covers the full loop of creating, consuming, and monetizing content:</p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">4.1.1 Social Posts</h4>
               <p className="mb-4">
-                Users can create standard social posts with text, links, and media, similar to traditional social platforms but with integrated Web3 capabilities. The platform offers advanced AI tools to generate and enhance posts, enabling the creation of professional content even for people without writing experience.
+                Users can create standard social posts with text, links, and media, much like on traditional platforms, with Web3 capabilities built in. AI tools help generate and improve posts, so people without writing experience can still publish professional content.
               </p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">4.1.2 Crypto Quotes</h4>
               <p className="mb-4">
-                Specialized functionality for creating, discovering, and sharing notable quotes from the cryptocurrency and blockchain space, preserving important insights and memorable statements. Users can leverage AI to generate quotes based on market trends, industry news, or technical analyses.
+                Dedicated tools for creating, discovering, and sharing notable quotes from the cryptocurrency and blockchain space, preserving insights and memorable statements. Users can also have AI generate quotes based on market trends, industry news, or technical analyses.
               </p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">4.1.3 NFT Minting</h4>
@@ -330,7 +330,7 @@ export default function MySphereWhitepaper() {
               
               <h4 className="text-lg font-semibold mt-4 mb-2">4.1.7 Onchain Reputation</h4>
               <p className="mb-4">
-                Comprehensive reputation system tracking contributions, engagement quality, content popularity, and market value of created NFTs.
+                Reputation system tracking contributions, engagement quality, content popularity, and market value of created NFTs.
               </p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">4.1.8 Social Graph</h4>
@@ -340,22 +340,22 @@ export default function MySphereWhitepaper() {
               
               <h4 className="text-lg font-semibold mt-4 mb-2">4.1.9 Wallet Integration</h4>
               <p className="mb-4">
-                Seamless connection with popular Web3 wallets for transaction management and identity verification.
+                Direct connection with popular Web3 wallets for transaction management and identity verification.
               </p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">4.1.10 Finance - $AIS Token Support</h4>
               <p className="mb-4">
-                The platform enables purchase and use of the $AIS token utilities, the official token of the MySphereAI creator, used for managing platform promotion. It's important to note that $AIS is not the official token of the mySphere.fun platform itself, but offers additional possibilities for users interested in the expanded ecosystem.
+                The platform supports buying and using $AIS, the official token of the MySphereAI creator, used for managing platform promotion. To be clear: $AIS is not the official token of the mySphere.fun platform itself. It is an optional extra for users who want to go deeper.
               </p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">4.1.11 Bridge to Base</h4>
               <p className="mb-4">
-                Integrated bridge functionality enabling easy asset transfers between different blockchains and the Base network, providing liquidity and flexibility for users with assets on various chains.
+                Built-in bridge for moving assets between other blockchains and the Base network, useful for anyone holding assets across several chains.
               </p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">4.1.12 Morpho Vault</h4>
               <p className="mb-4">
-                Vault functionality integrated with the Morpho protocol, allowing users to save by holding USDC in secure vaults, providing additional passive income opportunities without leaving the platform ecosystem.
+                Vaults built on the Morpho protocol. Users can hold USDC in secure vaults and earn passive income without leaving the platform.
               </p>
               
               <h3 className="text-xl font-semibold mt-6 mb-3">4.2 User Journey</h3>
@@ -427,7 +427,7 @@ export default function MySphereWhitepaper() {
             <h2 className="text-2xl font-bold mb-4 pb-2 border-b border-[#0052FF]/30">5. TECHNICAL ARCHITECTURE</h2>
               
               <h3 className="text-xl font-semibold mt-6 mb-3">5.1 Technology Stack</h3>
-              <p className="mb-4">MySphere AI is built on an advanced technology stack that effectively combines Web3 technologies with modern web development:</p>
+              <p className="mb-4">MySphere AI combines Web3 technologies with a modern web development stack:</p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">5.1.1 Blockchain Layer</h4>
               <ul className="list-disc ml-6 mb-4 space-y-1">
@@ -435,7 +435,7 @@ export default function MySphereWhitepaper() {
                 <li><strong>Web3 Integration</strong>: Complete system for interacting with contracts using WalletConnect and dedicated APIs</li>
                 <li><strong>IPFS Storage</strong>: Decentralized data storage through Pinata and Infura IPFS for long-term persistence</li>
                 <li><strong>Smart Contracts</strong>: Custom contracts for NFT operations, marketplace functionality, and reputation tracking</li>
-                <li><strong>onchainkit Integration</strong>: Comprehensive use of onchainkit components for seamless Base blockchain interaction</li>
+                <li><strong>onchainkit Integration</strong>: onchainkit components used throughout for direct Base blockchain interaction</li>
               </ul>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">5.1.2 Application Layer</h4>
@@ -461,7 +461,7 @@ export default function MySphereWhitepaper() {
                 <li><strong>Caching</strong>: Multi-level caching strategy minimizing blockchain reads and optimizing performance</li>
                 <li><strong>CDN</strong>: Content delivery network for media optimization</li>
                 <li><strong>Quotable API</strong>: Integration for accessing and generating inspirational quotes</li>
-                <li><strong>Firebase Ecosystem</strong>: Comprehensive suite of tools including Authentication, Realtime Database, Cloud Storage, and Analytics</li>
+                <li><strong>Firebase Ecosystem</strong>: Full suite of tools including Authentication, Realtime Database, Cloud Storage, and Analytics</li>
                 <li><strong>Vercel Blob Storage</strong>: High-performance blob storage for media and large content files</li>
                 <li><strong>Pinata IPFS Gateway</strong>: Professional IPFS pinning service ensuring content persistence</li>
               </ul>
@@ -471,8 +471,8 @@ export default function MySphereWhitepaper() {
                 <li><strong>Wallet-as-identity</strong>: Authentication based on cryptographic wallets with optional traditional methods</li>
                 <li><strong>Chainlink VRF</strong>: Verified randomness for processes requiring transparent entropy</li>
                 <li><strong>Smart contract infrastructure</strong>: Dedicated contracts for MySphere</li>
-                <li><strong>Security layer</strong>: Comprehensive application protection using reCAPTCHA and advanced authentication mechanisms</li>
-                <li><strong>MySphere</strong>: Integrates advanced APIs and cloud services creating a comprehensive Web3 platform ready for scaling, while ensuring high performance and security.</li>
+                <li><strong>Security layer</strong>: Application protection using reCAPTCHA and layered authentication mechanisms</li>
+                <li><strong>MySphere</strong>: Ties these APIs and cloud services together into a Web3 platform built for scale, performance, and security.</li>
                 <li><strong>Coinbase SDK</strong>: Secure wallet integration and cryptocurrency transaction management</li>
                 <li><strong>WalletConnect</strong>: Standardized protocol for connecting decentralized applications to mobile wallets</li>
                 <li><strong>Google Cloud Services</strong>: Enterprise-grade infrastructure for backend operations and scaling</li>
@@ -506,7 +506,7 @@ export default function MySphereWhitepaper() {
               </ul>
               
               <h3 className="text-xl font-semibold mt-6 mb-3">5.3 Data Management</h3>
-              <p className="mb-4">mySphere.fun employs a sophisticated data management strategy that balances decentralization with performance:</p>
+              <p className="mb-4">mySphere.fun manages data with one trade-off in mind: decentralization where it matters, performance everywhere else.</p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">5.3.1 On-Chain Data</h4>
               <ul className="list-disc ml-6 mb-4 space-y-1">
@@ -541,7 +541,7 @@ export default function MySphereWhitepaper() {
               
               <ul className="list-disc ml-6 mb-4 space-y-1">
                 <li>Formal verification of critical contract components</li>
-                <li>Comprehensive testing protocols for all platform updates</li>
+                <li>Full testing protocols for all platform updates</li>
                 <li>Bug bounty program for community-driven security improvements</li>
                 <li>Phased rollout of new features to minimize risk exposure</li>
                 <li>Educational resources helping users maintain wallet security</li>
@@ -662,7 +662,7 @@ export default function MySphereWhitepaper() {
             <h2 className="text-2xl font-bold mb-4 pb-2 border-b border-[#0052FF]/30">7. ONCHAIN REPUTATION SYSTEM</h2>
               
               <h3 className="text-xl font-semibold mt-6 mb-3">7.1 Reputation Framework</h3>
-              <p className="mb-4">The MySphere reputation system combines on-chain and off-chain signals to create a comprehensive trustworthiness metric:</p>
+              <p className="mb-4">The MySphere reputation system combines on-chain and off-chain signals into a single trustworthiness score:</p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">7.1.1 Reputation Components</h4>
               <ul className="list-disc ml-6 mb-4 space-y-1">
@@ -734,7 +734,7 @@ export default function MySphereWhitepaper() {
             <h2 className="text-2xl font-bold mb-4 pb-2 border-b border-[#0052FF]/30">8. BUSINESS MODEL</h2>
               
               <h3 className="text-xl font-semibold mt-6 mb-3">8.1 Revenue Streams</h3>
-              <p className="mb-4">MySphere implements a sustainable business model with multiple revenue sources:</p>
+              <p className="mb-4">MySphere's business model rests on several revenue sources rather than a single one:</p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">8.1.1 Primary Revenue Streams</h4>
               
@@ -787,7 +787,7 @@ export default function MySphereWhitepaper() {
               </ul>
               
               <h3 className="text-xl font-semibold mt-6 mb-3">8.2 Value Distribution</h3>
-              <p className="mb-4">MySphere is committed to fair value distribution among ecosystem participants:</p>
+              <p className="mb-4">Value on MySphere is meant to flow to the people who create it:</p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">8.2.1 Creator Focus</h4>
               <ul className="list-disc ml-6 mb-4 space-y-1">
@@ -815,7 +815,7 @@ export default function MySphereWhitepaper() {
               </ul>
               
               <h3 className="text-xl font-semibold mt-6 mb-3">8.3 Growth Strategy</h3>
-              <p className="mb-4">MySphere will pursue growth through a multi-faceted approach:</p>
+              <p className="mb-4">MySphere will pursue growth on several fronts:</p>
               
               <h4 className="text-lg font-semibold mt-4 mb-2">8.3.1 User Acquisition</h4>
               <ul className="list-disc ml-6 mb-4 space-y-1">
@@ -952,7 +952,7 @@ export default function MySphereWhitepaper() {
                 <li>📋 Cross-platform reputation protocol</li>
                 <li>📋 Advanced data privacy mechanisms</li>
                 <li>📋 Scalability for supporting millions of users</li>
-                <li>📋 Comprehensive interoperability with Web3 ecosystem</li>
+                <li>📋 Full interoperability with the Web3 ecosystem</li>
                 <li>📋 Development of blockchain ecological initiatives</li>
               </ul>
               
@@ -980,27 +980,27 @@ export default function MySphereWhitepaper() {
             <h2 className="text-2xl font-bold mb-4 pb-2 border-b border-[#0052FF]/30">11. CONCLUSION</h2>
               
               <p className="mb-4">
-                MySphere AI represents a forward-thinking approach to social media that addresses the limitations of traditional platforms while leveraging the unique capabilities of blockchain technology. By combining intuitive user experience with powerful Web3 functionality and advanced artificial intelligence capabilities, we aim to create a platform that provides real value to content creators, collectors, and community participants.
+                MySphere AI is our answer to the limits of traditional social platforms, built on what blockchain actually does well. The pairing is deliberate: an interface people can use without a manual, Web3 functionality underneath, and AI tooling on top. The aim is a platform that is genuinely useful to content creators, collectors, and community participants.
               </p>
               
               <p className="mb-4">
-                Our vision extends beyond building another social application – we strive to pioneer a model of content ownership, creator monetization, and reputation building that can influence the broader digital landscape. Integration with Base provides a solid foundation for achieving these goals, offering the scalability, efficiency, and ecosystem support necessary for mainstream adoption.
+                We are not trying to ship just another social app. The goal is a working model of content ownership, creator monetization, and reputation building that others can learn from. Base gives us a solid foundation for this, with the scalability, efficiency, and ecosystem support that mainstream adoption requires.
               </p>
               
               <p className="mb-4">
-                Artificial intelligence forms a central element of our strategy, going beyond typical applications in social media. Our AI solutions not only help personalize experiences and moderate content but also enable creators to generate unique digital assets, provide intelligent curation and content discovery tools, and support interactions between ecosystem participants. We believe that combining AI with blockchain technology creates a synergy that fundamentally changes how digital content is created and consumed.
+                Artificial intelligence is central to the strategy, and it does more here than the usual personalization and moderation. It helps creators generate unique digital assets, powers curation and content discovery, and supports interactions across the platform. We believe that putting AI and blockchain together changes how digital content gets made and consumed.
               </p>
               
               <p className="mb-4">
-                As we progress through our development roadmap, we remain committed to our core principles of user ownership, fair value distribution, and community empowerment. We invite creators, collectors, developers, and Web3 enthusiasts to join us in building the future of social content – a future where creativity is properly valued, contribution is fairly rewarded, and communities thrive through aligned incentives and shared ownership.
+                As the roadmap progresses, the principles stay the same: users own their work, value gets distributed fairly, and the community has a real say. Creators, collectors, developers, and Web3 enthusiasts are all welcome to help build a version of social content where creativity is properly valued and contribution is actually rewarded.
               </p>
               
               <p className="mb-4">
-                Together, we can transform how the world creates, shares, and values digital content - supported by state-of-the-art AI algorithms that enhance human creativity rather than replace it.
+                One thing worth stating plainly: the AI here is built to support human creativity, not replace it. That is the standard we hold every feature to.
               </p>
               
               <p className="mb-4">
-                This document outlines our current vision and plans for mySphere.fun. As with any innovative technology project, specific details may evolve as we develop and respond to market conditions, technological advances, and community feedback.
+                This document describes our current vision and plans for mySphere.fun. As with any early technology project, specifics may change as we build and respond to market conditions, technical progress, and community feedback.
               </p>
               
               <p className="mb-8">

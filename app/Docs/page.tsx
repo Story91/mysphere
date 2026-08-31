@@ -30,8 +30,8 @@ export default function DocsPage() {
             >
               <h2 className="text-2xl font-bold mb-4">MySphere Whitepaper</h2>
               <p className="text-gray-400 mb-4">
-                Comprehensive overview of the MySphere platform, including our vision, 
-                technology stack, tokenomics, and roadmap.
+                The full rundown on MySphere: what we are building, how it works
+                under the hood, tokenomics and where this is all going.
               </p>
               <div className="flex justify-between items-center mt-6">
                 <span className="text-[#0052FF]">View Whitepaper</span>
@@ -45,8 +45,8 @@ export default function DocsPage() {
             >
               <h2 className="text-2xl font-bold mb-4">API Documentation</h2>
               <p className="text-gray-400 mb-4">
-                Technical documentation for developers looking to integrate with the 
-                MySphere platform and ecosystem. 
+                For devs who want to build on top of MySphere. Endpoints, auth,
+                examples.
               </p>
               <div className="flex justify-between items-center mt-6">
                 <span className="text-[#0052FF]">Coming Soon</span>
@@ -60,8 +60,8 @@ export default function DocsPage() {
             >
               <h2 className="text-2xl font-bold mb-4">User Guide</h2>
               <p className="text-gray-400 mb-4">
-                Step-by-step instructions for using MySphere platform features, 
-                from account creation to NFT minting.
+                How to actually use the thing, from setting up an account to
+                minting your first NFT.
               </p>
               <div className="flex justify-between items-center mt-6">
                 <span className="text-[#0052FF]">Coming Soon</span>

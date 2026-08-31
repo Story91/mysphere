@@ -54,7 +54,7 @@ export default function TwitterCallbackPage() {
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-400 mx-auto mb-4"></div>
             <h2 className="text-2xl font-bold text-orange-200 mb-2">🐦 Connecting Twitter</h2>
-            <p className="text-orange-100">Processing your Twitter connection...</p>
+            <p className="text-orange-100">Linking your Twitter account...</p>
           </>
         )}
 
@@ -62,7 +62,7 @@ export default function TwitterCallbackPage() {
           <>
             <div className="text-6xl mb-4">✅</div>
             <h2 className="text-2xl font-bold text-green-300 mb-2">Twitter Connected!</h2>
-            <p className="text-orange-100 mb-4">Your Twitter account has been successfully linked to Camp Network.</p>
+            <p className="text-orange-100 mb-4">Your Twitter account is now linked to Camp Network.</p>
             <p className="text-orange-200/70 text-sm">Redirecting back to My Camp...</p>
           </>
         )}
@@ -71,7 +71,7 @@ export default function TwitterCallbackPage() {
           <>
             <div className="text-6xl mb-4">❌</div>
             <h2 className="text-2xl font-bold text-red-300 mb-2">Connection Failed</h2>
-            <p className="text-orange-100 mb-4">There was an issue connecting your Twitter account.</p>
+            <p className="text-orange-100 mb-4">We couldn't connect your Twitter account.</p>
             <p className="text-orange-200/70 text-sm">Redirecting back to My Camp...</p>
           </>
         )}

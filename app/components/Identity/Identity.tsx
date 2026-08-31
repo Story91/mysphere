@@ -1611,8 +1611,8 @@ export default function IdentityComponent() {
                             <div>
                               <h4 className="text-white font-medium">How ranks work</h4>
                               <p className="text-gray-400 text-sm mt-1">
-                                Your rank is determined by the total points you've earned through transactions, tokens, NFTs, and contract interactions. 
-                                Higher ranks require more points and unlock exclusive features and recognition within the Sphere ecosystem.
+                                Your rank comes from the points you rack up onchain: transactions, tokens, NFTs, contract interactions.
+                                The more points, the higher the rank, and higher ranks come with extra features.
                               </p>
                             </div>
                           </div>

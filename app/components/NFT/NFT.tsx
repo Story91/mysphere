@@ -479,7 +479,7 @@ export default function NFTComponent() {
             >
               <div className="text-xl font-bold mb-2 cyber-glitch text-[#0052FF]">SPHERE Pioneer</div>
               <p className="text-[#4C8FFF] text-sm">
-                Your gateway to the SPHERE universe. As a Pioneer, you gain access to core platform features, exclusive events, and future rewards. Begin your journey in the SPHERE ecosystem and shape the future of decentralized innovation.
+                The entry tier. Pioneers get access to the core platform features plus whatever rewards we ship down the line. This is where most people start.
               </p>
               <div className="absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent"></div>
             </motion.div>
@@ -493,7 +493,7 @@ export default function NFTComponent() {
             >
               <div className="text-xl font-bold mb-2 cyber-glitch text-[#0052FF]">SPHERE Guardian</div>
               <p className="text-[#4C8FFF] text-sm">
-                Guardian of the SPHERE ecosystem. This tier unlocks advanced features, priority access to new functionalities, and special rewards. Join an elite group of Guardians and help protect and grow the network.
+                The middle tier. Guardians get the advanced features and early access to anything new before it opens up to everyone else. Smaller group, better perks.
               </p>
               <div className="absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent"></div>
             </motion.div>
@@ -507,7 +507,7 @@ export default function NFTComponent() {
             >
               <div className="text-xl font-bold mb-2 cyber-glitch text-[#0052FF]">SPHERE Master</div>
               <p className="text-[#4C8FFF] text-sm">
-                The highest tier in the SPHERE hierarchy. As a Master, you receive full access to all features, exclusive VIP privileges, participation in key decisions, and maximum rewards. Become a SPHERE legend.
+                The top tier. Masters get everything: full feature access, VIP perks and a real say in where SPHERE goes next. There won't be many of these.
               </p>
               <div className="absolute -bottom-1 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent"></div>
             </motion.div>
@@ -523,19 +523,19 @@ export default function NFTComponent() {
               {[
                 {
                   question: "What are SPHERE NFTs?",
-                  answer: "SPHERE NFTs are unique digital assets that provide different levels of access and benefits within the SPHERE ecosystem. Each tier (Pioneer, Guardian, and Master) offers increasing privileges and rewards."
+                  answer: "They're access passes to SPHERE, minted as NFTs. There are three tiers (Pioneer, Guardian, Master) and each one comes with more perks than the last."
                 },
                 {
                   question: "How do I mint a SPHERE NFT?",
-                  answer: "To mint a SPHERE NFT, connect your wallet, select your desired tier, and click the mint button. Make sure you have enough ETH in your wallet to cover the minting cost and gas fees."
+                  answer: "Connect your wallet, pick a tier, hit mint. Just make sure you have enough ETH to cover the price plus gas."
                 },
                 {
                   question: "What benefits do SPHERE NFTs provide?",
-                  answer: "Each SPHERE NFT tier offers unique benefits. Pioneer NFTs provide basic access and future rewards, Guardian NFTs unlock enhanced features and exclusive events, while Master NFTs grant full access to all features and VIP privileges."
+                  answer: "Depends on the tier. Pioneer gets you basic access and future rewards, Guardian adds extra features and events, and Master is full access with VIP privileges on top."
                 },
                 {
                   question: "Can I trade my SPHERE NFTs?",
-                  answer: "Yes, SPHERE NFTs can be traded on supported NFT marketplaces. However, remember that the benefits and access levels are tied to the NFT ownership, so selling your NFT will transfer these privileges to the new owner."
+                  answer: "Yes, on any marketplace that supports them. One thing to keep in mind: the perks follow the NFT, so if you sell it, the buyer gets your access level too."
                 }
               ].map((item, index) => (
                 <motion.div 

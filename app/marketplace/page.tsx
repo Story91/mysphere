@@ -173,7 +173,7 @@ export default function MarketplacePage() {
                 </span>
               </h1>
               <span className="hidden lg:block text-gray-500 text-sm ml-2">
-                Buy, sell, and license intellectual property NFTs on Camp Network
+                Trade and license intellectual property NFTs on Camp Network
               </span>
             </div>
             
