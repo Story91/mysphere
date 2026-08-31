@@ -26,6 +26,8 @@
     "launchpad:deploy:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploy.ts --network base",
     "launchpad:sphere:rehearsal": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json FORK_REHEARSAL=tak hardhat run scripts/launchpad/deploySphere.ts",
     "launchpad:sphere:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploySphere.ts --network base",
+    "sphere:epoch": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/sphere/publishEpoch.ts --network base",
+    "sphere:keeper": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/sphere/sphereKeeper.ts --network base",
     "launchpad:fork:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/forkBaseProbe.ts",
     "launchpad:fork:robinhood": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json FORK_CHAIN=robinhood hardhat run scripts/launchpad/forkBaseProbe.ts",
     "launchpad:flow:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/sepoliaFlow.ts --network base-sepolia",

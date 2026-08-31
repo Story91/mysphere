@@ -1,0 +1,27 @@
+{
+  "chainId": 84532,
+  "network": "base-sepolia",
+  "rehearsal": false,
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "launchpad": "0xb890e74899c2c87a8763259696A3ca3A86a13575",
+  "vault": "0x6445d38A68D9316c82e984938E1A8CCC7A9B2b7f",
+  "hook": "0x3dB556E7Ed155c1d59e5a75B74f8d1FD32236044",
+  "safe": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "sphereRewards": "0xe94Dd931c98c6269219bc56f6Af296C8333412Ed",
+  "sphereTokenVesting": "0xB37e1A8B979D3Ae2d9efe1cf0A92E6Ec923ce2dB",
+  "sphereCreatorEscrow": "0x9255b78755d763dD17F17B3d5D11179950118dD6",
+  "vanitySalt": "0x000000000000000000000000000000000000000000000000000000000001862a",
+  "token": "0xb200000000000000000000Ba5ED02Ebf7B04aDBc",
+  "devBuyEth": "0.01",
+  "note": "rekord odtworzony z loga - deploySphere padl na stale-RPC read PO udanym launchu",
+  "runbook": {
+    "completedAt": "2026-08-31T01:34:22.046Z",
+    "proofs": {
+      "swapEthToToken": "0x2cf59ad5bcc99554fe90bf3c398b8f369fcaaac6965d3ee13cefcbfb9d89f2ea",
+      "swapTokenToEth": "0xc790a0d5f75bd72935c4d9e7df9445002025171de70e319798b35fb6db5d1672",
+      "settle": "0x5ef13fe61ff687a75d5a685dea72fc54c666f423f3a4b9d2cd3262ac660f652e",
+      "harvest": "0x6fa922cd7e7d01c1e3b7c54c776f736e0ba60222a34e959676a16de9babb0206",
+      "executeBuyback": "0x672984c12fbee72b3da9d9cb65f86ee9a8dfe8682f9a4ef28f425a3d733ed781"
+    }
+  }
+}

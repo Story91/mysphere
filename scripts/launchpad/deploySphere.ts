@@ -204,9 +204,12 @@ async function main() {
   if (process.env.VANITY_SALT) {
     vanitySalt = process.env.VANITY_SALT as `0x${string}`;
   } else if (process.env.VANITY_PREFIX) {
-    if (rehearsal || chainId !== 8453) {
+    // Formula adresu precompile'a obowiazuje na REALNYCH sieciach Base
+    // (mainnet 8453 i Sepolia 84532 - obie maja prawdziwy B20). Na forku
+    // precompile jest atrapa CREATE2 i wzorzec nie ma sensu.
+    if (rehearsal || (chainId !== 8453 && chainId !== 84532)) {
       throw new Error(
-        "VANITY_PREFIX dziala tylko na realnym Base (chainId 8453) - na forku " +
+        "VANITY_PREFIX dziala tylko na realnym Base/Base Sepolia - na forku " +
           "precompile jest atrapa i formula adresu sie nie zgadza. Na probe uzyj VANITY_SALT albo nic."
       );
     }
@@ -246,11 +249,26 @@ async function main() {
   console.log(`SphereCreatorEscrow: ${await escrow.getAddress()}`);
 
   // ---- 6. weryfikacja odczytami --------------------------------------------
-  if ((await rewards.CONSUMER()) !== consumer) throw new Error("rewards.CONSUMER nie zgadza sie");
-  if ((await vesting.BENEFICIARY()) !== beneficiary) throw new Error("vesting.BENEFICIARY nie zgadza sie");
-  if ((await escrow.LAUNCHPAD()) !== padAddress) throw new Error("escrow.LAUNCHPAD nie zgadza sie");
-  if ((await escrow.TOKEN_TARGET()) !== (await vesting.getAddress())) throw new Error("escrow.TOKEN_TARGET nie zgadza sie");
-  if (await escrow.launched()) throw new Error("escrow juz odpalony?");
+  // Z RETRY: publiczne RPC Base/Sepolii sa load-balansowane i lagujacy node
+  // potrafi oddac '0x' dla SWIEZO wdrozonego kontraktu (ta sama pulapka, co
+  // retryRpc w deploy.ts). Bez retry skrypt wywracal sie PO deployu,
+  // a PRZED launchem - kontrakty stoja, launch trzeba bylo dowolywac recznie.
+  async function readRetry<T>(label: string, read: () => Promise<T>): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await read();
+      } catch (e) {
+        if (attempt >= 8) throw e;
+        console.log(`oczekuje na propagacje RPC (${label}, ${attempt}/7)`);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+  }
+  if ((await readRetry("rewards.CONSUMER", () => rewards.CONSUMER())) !== consumer) throw new Error("rewards.CONSUMER nie zgadza sie");
+  if ((await readRetry("vesting.BENEFICIARY", () => vesting.BENEFICIARY())) !== beneficiary) throw new Error("vesting.BENEFICIARY nie zgadza sie");
+  if ((await readRetry("escrow.LAUNCHPAD", () => escrow.LAUNCHPAD())) !== padAddress) throw new Error("escrow.LAUNCHPAD nie zgadza sie");
+  if ((await readRetry("escrow.TOKEN_TARGET", () => escrow.TOKEN_TARGET())) !== (await vesting.getAddress())) throw new Error("escrow.TOKEN_TARGET nie zgadza sie");
+  if (await readRetry("escrow.launched", () => escrow.launched())) throw new Error("escrow juz odpalony?");
   console.log("weryfikacja wiazan: OK");
 
   // ---- 7. LAUNCH (nieodwracalny) -------------------------------------------

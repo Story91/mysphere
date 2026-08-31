@@ -13,6 +13,7 @@ import { SPHERE_LIVE } from './sphereConfig';
 
 const TABS = [
   { href: '/startpad/sphere', label: 'Overview' },
+  { href: '/startpad/sphere/season', label: 'Season' },
   { href: '/startpad/sphere/escrow', label: 'Escrow' },
   { href: '/startpad/sphere/rewards', label: 'Rewards' },
   { href: '/startpad/sphere/vesting', label: 'Vesting' },
