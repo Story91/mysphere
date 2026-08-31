@@ -1,19 +1,29 @@
 'use client';
 
 /**
- * Zarzadzanie SphereRewards - skarbonka nagrod.
+ * REWARDS VAULT = skarbonka nagrod, w jezyku Overview (redesign 2026-08-31).
  *
- * Kuratorskie: dostawa fee z krzywej (permissionless claimFor) i podglad
- * salda/poborow. `pull` jest w konsoli - wykonac moze go wylacznie CONSUMER
- * (Rewards Safe), wiec nie udajemy przycisku dla kazdego.
+ * Zero akapitow: hero z trzema wielkimi liczbami, adresy jako pastylki,
+ * dwie karty akcji. Objasnienia mieszkaja na /about.
+ *
+ * Logika bez zmian: `claimFor` jest permissionless, a `pull` moze wykonac
+ * wylacznie CONSUMER (Rewards Safe) - dlatego przycisku pull nie ma, jest
+ * tylko nota i konsola ABI.
  */
 
 import { formatEther, type Address } from 'viem';
+import { Coins } from 'lucide-react';
 import { LAUNCHPAD_ADDRESS, NATIVE_SYMBOL, launchpadAbi } from '../../config';
 import AbiConsole from '../AbiConsole';
 import { SPHERE_LIVE, SPHERE_REWARDS_ADDRESS, sphereRewardsAbi } from '../sphereConfig';
-import { ActionButton, StatRow, useSphereRead } from '../sphereActions';
+import { ActionButton, useSphereRead } from '../sphereActions';
 import { TeamRunBadge } from '../SphereShell';
+import { ActionCard, AddressPill, AdvancedSection, BigStat, LearnMore, PageHero } from '../SphereUI';
+
+/** Wei -> liczba dla NumberTicker; null zostaje null (szkielet ladowania). */
+function toNumber(wei: bigint | undefined): number | null {
+  return wei === undefined ? null : Number(formatEther(wei));
+}
 
 export default function SphereRewardsPanel() {
   const rewards = SPHERE_REWARDS_ADDRESS;
@@ -36,30 +46,45 @@ export default function SphereRewardsPanel() {
 
   if (!SPHERE_LIVE || !rewards) {
     return (
-      <p className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-shade/60">
-        Rewards vault is not deployed yet. After deployment this page shows the vault balance,
-        pending curve-fee deliveries and the pull history. Funds leave the vault only to the
-        rewards program, executed by the treasury Safe. <TeamRunBadge />
-      </p>
+      <div className="sph-stagger grid gap-4">
+        <PageHero
+          title="Rewards vault"
+          tagline="Where creator-reward fees accumulate"
+          icon={<Coins className="h-6 w-6 text-sp-brand" aria-hidden="true" />}
+          badge={<TeamRunBadge />}
+        />
+        <ActionCard
+          title="Not deployed yet"
+          hint="Balances, deliveries and pulls appear here the moment the vault ships."
+          disabledNote="Pre-launch - no vault address on chain."
+        />
+        <LearnMore>How rewards funding works</LearnMore>
+      </div>
     );
   }
 
   return (
     <div className="sph-stagger grid gap-4">
-      <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
-        <h2 className="text-[14px] font-extrabold text-sp-ink">Rewards vault</h2>
-        <p className="mt-1 text-[11.5px] text-sp-shade/55">
-          Accumulates the rewards share of curve fees from SPHERE and every Sphere-aligned
-          launch. Only the treasury Safe (CONSUMER) can pull - routing to the creator rewards
-          program is policy. <TeamRunBadge />
-        </p>
-        <div className="mt-3">
-          <StatRow label="In the vault now" value={state ? `${formatEther(state.pullable)} ${NATIVE_SYMBOL}` : '…'} />
-          <StatRow label="Waiting on curve (claimable)" value={state ? `${formatEther(state.padClaimable)} ${NATIVE_SYMBOL}` : '…'} />
-          <StatRow label="Pulled so far" value={state ? `${formatEther(state.totalPulled)} ${NATIVE_SYMBOL}` : '…'} />
-          <StatRow label="CONSUMER (key holder)" value={state ? state.consumer : '…'} />
+      <PageHero
+        title="Rewards vault"
+        tagline="Where creator-reward fees accumulate"
+        icon={<Coins className="h-6 w-6 text-sp-brand" aria-hidden="true" />}
+        badge={<TeamRunBadge />}
+      >
+        <div className="grid gap-3 sm:grid-cols-3">
+          <BigStat label="In the vault" value={toNumber(state?.pullable)} decimals={4} suffix={NATIVE_SYMBOL} tone="brand" />
+          <BigStat label="Waiting on curve" value={toNumber(state?.padClaimable)} decimals={4} suffix={NATIVE_SYMBOL} tone="up" />
+          <BigStat label="Pulled so far" value={toNumber(state?.totalPulled)} decimals={4} suffix={NATIVE_SYMBOL} />
         </div>
-        <div className="mt-3">
+      </PageHero>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <AddressPill address={rewards} label="vault" />
+        {state && <AddressPill address={state.consumer} label="key holder" />}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ActionCard title="Deliver curve fees" hint="Anyone can trigger this - you only pay gas, the ETH lands in the vault.">
           <ActionButton
             label="Deliver curve fees"
             address={LAUNCHPAD_ADDRESS as Address}
@@ -68,23 +93,20 @@ export default function SphereRewardsPanel() {
             args={[rewards]}
             disabled={!state || state.padClaimable === 0n}
           />
-        </div>
-        <p className="mt-2 text-[10.5px] text-sp-shade/45">
-          Delivery is permissionless (you pay gas, ETH lands in the vault). Pulling OUT requires
-          the CONSUMER key - use the console below from the Safe.
-        </p>
-      </section>
-      <details className="group">
-        <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-[20px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
-          Advanced - full contract console
-          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:hidden">show</span>
-          <span className="hidden text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:inline">hide</span>
-        </summary>
-        <div className="mt-3">
-  
-      <AbiConsole title="SphereRewards" address={rewards} abi={sphereRewardsAbi} />
-        </div>
-      </details>
+        </ActionCard>
+        <ActionCard
+          title="Pull to treasury"
+          badge={<TeamRunBadge />}
+          hint="Moves vault funds out to the creator rewards program."
+          disabledNote="CONSUMER key only (Rewards Safe) - execute it from the console below."
+        />
+      </div>
+
+      <AdvancedSection>
+        <AbiConsole title="SphereRewards" address={rewards} abi={sphereRewardsAbi} />
+      </AdvancedSection>
+
+      <LearnMore>How rewards funding works</LearnMore>
     </div>
   );
 }
