@@ -9,7 +9,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowLeft, Flame, ShieldCheck, Users } from 'lucide-react';
-import { SPHERE_LIVE } from './sphereConfig';
+import { SPHERE_LIVE, SPHERE_TOKEN_ADDRESS } from './sphereConfig';
 
 const TABS = [
   { href: '/startpad/sphere', label: 'Overview' },
@@ -78,6 +78,18 @@ export default function SphereShell({ children }: { children: React.ReactNode })
             SPHERE contracts are written, tested (46 tests incl. a full rehearsal on a Base
             mainnet fork) and awaiting deployment. This page switches to live management the
             moment addresses land in the config - nothing here is live yet.
+          </p>
+        </div>
+      )}
+
+      {/* Stan posredni: peryferia wdrozone, token jeszcze przed launch(). */}
+      {SPHERE_LIVE && !SPHERE_TOKEN_ADDRESS && (
+        <div className="mb-4 rounded-[20px] border border-sp-brand/30 bg-sp-brand-soft p-4">
+          <p className="text-[13px] font-extrabold text-sp-ink">Contracts live · token not launched yet</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-sp-shade/70">
+            The SPHERE peripheral contracts (escrow, rewards, vesting) are deployed on Base
+            mainnet and fully manageable below. The SPHERE token itself has not launched yet -
+            token balances and token actions stay dormant until launch() fires.
           </p>
         </div>
       )}

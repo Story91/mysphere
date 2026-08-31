@@ -1,12 +1,17 @@
 /**
  * Konfiguracja peryferii SPHERE (docs/SPHERE-TOKENOMIKA.md, faza 0).
  *
- * DWA STANY STRONY: kontrakty SPHERE NIE SA jeszcze wdrozone na mainnet -
- * wdrozenie robi scripts/launchpad/deploySphere.ts (CONFIRM=tak LAUNCH=tak),
- * ktory zapisuje adresy do scripts/output/sphere-base.json. Do tego czasu
- * adresy sa puste, a UI renderuje stan "pre-launch". Po wdrozeniu wystarczy
- * uzupelnic fallbacki ponizej (albo env NEXT_PUBLIC_SPHERE_*) - strona
- * przelaczy sie na pelne zarzadzanie bez zmian w kodzie.
+ * TRZY STANY STRONY:
+ *  1) pre-deploy: adresy peryferii puste, UI renderuje baner "Pre-launch";
+ *  2) POSREDNI: rewards/escrow/vesting wdrozone (SPHERE_LIVE = true), ale
+ *     token JESZCZE nie wystartowal - SPHERE_TOKEN_ADDRESS pusty, a
+ *     escrow.sphereToken() zwraca 0x0. UI pokazuje "Token not launched yet"
+ *     i chowa akcje tokenowe (releaseToken, release z vestingu);
+ *  3) po launchu: wpisanie adresu tokena odblokowuje pelny widok.
+ * Wdrozenie robi scripts/launchpad/deploySphere.ts (CONFIRM=tak LAUNCH=tak),
+ * ktory zapisuje adresy do scripts/output/sphere-base.json. Po wdrozeniu
+ * wystarczy uzupelnic fallbacki ponizej (albo env NEXT_PUBLIC_SPHERE_*) -
+ * strona przelaczy sie na dany stan bez zmian w kodzie.
  *
  * ABI sa wyciete 1:1 z artefaktow kompilacji galezi sphere-tests
  * (contracts/launchpad/sphere/*.sol) - to z nich strona buduje "cala
@@ -20,10 +25,19 @@ function envAddress(name: string, fallback: string): Address | null {
   return raw && raw.startsWith('0x') && raw.length === 42 ? (raw as Address) : null;
 }
 
-/** Adresy peryferii - PUSTE do wdrozenia. Po deployu wkleic z sphere-base.json. */
-export const SPHERE_REWARDS_ADDRESS = envAddress('NEXT_PUBLIC_SPHERE_REWARDS_ADDRESS', '');
-export const SPHERE_ESCROW_ADDRESS = envAddress('NEXT_PUBLIC_SPHERE_ESCROW_ADDRESS', '');
-export const SPHERE_VESTING_ADDRESS = envAddress('NEXT_PUBLIC_SPHERE_VESTING_ADDRESS', '');
+/** Adresy peryferii - wdrozenie Base mainnet 2026-08-31 (sphere-base.json). */
+export const SPHERE_REWARDS_ADDRESS = envAddress(
+  'NEXT_PUBLIC_SPHERE_REWARDS_ADDRESS',
+  '0x9030e53E7AC1bc81Cf28b196BA336E5544ce4A47'
+);
+export const SPHERE_ESCROW_ADDRESS = envAddress(
+  'NEXT_PUBLIC_SPHERE_ESCROW_ADDRESS',
+  '0xe984986f4F1E067f697b548D5fe942813d03Da37'
+);
+export const SPHERE_VESTING_ADDRESS = envAddress(
+  'NEXT_PUBLIC_SPHERE_VESTING_ADDRESS',
+  '0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD'
+);
 /** Adres tokena SPHERE - znany dopiero po launchu (escrow.sphereToken()). */
 export const SPHERE_TOKEN_ADDRESS = envAddress('NEXT_PUBLIC_SPHERE_TOKEN_ADDRESS', '');
 

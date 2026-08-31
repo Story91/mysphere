@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createPublicClient, http, parseAbiItem, type Address, type PublicClient } from 'viem';
+import { createPublicClient, http, parseAbiItem, type Address } from 'viem';
+
+// Viem instancjonuje typ klienta per-wywolanie (generyki chain/transport),
+// przez co identyczne klienty z .map() nie unifikuja sie do PublicClient.
+// Route i tak uzywa waskiego podzbioru API - luzny typ jest tu swiadomy.
+type LooseClient = ReturnType<typeof createPublicClient> & Record<string, any>;
 import { base } from 'viem/chains';
 import { rpcCandidates } from '../../launchpad/historyRpc';
 import {
@@ -80,10 +85,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * transport z listy (doktryna historyRpc: zepsuty endpoint nie kasuje funkcji).
  */
 async function scanRange<T>(
-  clients: PublicClient[],
+  clients: LooseClient[],
   from: bigint,
   to: bigint,
-  fetch: (client: PublicClient, a: bigint, b: bigint) => Promise<T[]>
+  fetch: (client: LooseClient, a: bigint, b: bigint) => Promise<T[]>
 ): Promise<T[]> {
   const out: T[] = [];
   let ci = 0;
@@ -118,7 +123,7 @@ export async function GET() {
     'https://mainnet.base.org',
     'https://base-rpc.publicnode.com',
   ].filter((u, i, arr): u is string => Boolean(u) && arr.indexOf(u) === i);
-  const clients = urls.map((u) => createPublicClient({ chain: base, transport: http(u) }));
+  const clients = urls.map((u) => createPublicClient({ chain: base, transport: http(u) })) as unknown as LooseClient[];
   const client = clients[0];
 
   const head = await client.getBlockNumber();

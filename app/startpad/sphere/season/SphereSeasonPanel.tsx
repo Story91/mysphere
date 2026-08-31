@@ -239,7 +239,16 @@ export default function SphereSeasonPanel() {
                 contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', fontSize: 11.5 }}
               />
               <Bar dataKey="volume" fill={BRAND} radius={[4, 4, 0, 0]} maxBarSize={40}>
-                <LabelList dataKey="volume" position="top" formatter={(v: number) => (v > 0 ? v.toFixed(2) : '')} style={{ fontSize: 10, fill: 'rgba(0,0,0,0.55)', fontWeight: 700 }} />
+                <LabelList
+                  dataKey="volume"
+                  position="top"
+                  // Typ formattera recharts to ReactNode -> ReactNode, stad Number().
+                  formatter={(v: React.ReactNode) => {
+                    const n = Number(v);
+                    return Number.isFinite(n) && n > 0 ? n.toFixed(2) : '';
+                  }}
+                  style={{ fontSize: 10, fill: 'rgba(0,0,0,0.55)', fontWeight: 700 }}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

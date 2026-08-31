@@ -95,7 +95,7 @@ export default function SphereVestingPanel() {
           <StatRow label="Released so far" value={state?.released != null ? formatEther(state.released) : '-'} />
           <StatRow label="Unlockable NOW" value={state?.releasable != null ? formatEther(state.releasable) : '-'} />
         </div>
-        {state && state.token !== zeroAddress && (
+        {state && state.token !== zeroAddress ? (
           <div className="mt-3">
             <ActionButton
               label="Release unlocked tokens → Safe"
@@ -106,7 +106,12 @@ export default function SphereVestingPanel() {
               disabled={!state.releasable || state.releasable === 0n}
             />
           </div>
-        )}
+        ) : state ? (
+          // Stan posredni: kontrakty zyja, token przed launch() - zero wartosci to norma.
+          <p className="mt-3 text-[10.5px] font-bold text-sp-shade/45">
+            Token not launched yet - vesting fills and release unlocks after the SPHERE launch.
+          </p>
+        ) : null}
       </section>
 
       <AbiConsole title="SphereTokenVesting" address={vesting} abi={sphereTokenVestingAbi} />
