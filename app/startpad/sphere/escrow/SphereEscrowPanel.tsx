@@ -51,7 +51,7 @@ export default function SphereEscrowPanel() {
 
   if (!SPHERE_LIVE || !escrow) {
     return (
-      <p className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-shade/60">
+      <p className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-shade/60">
         Escrow is not deployed yet. After deployment this page shows: pending fee deliveries
         from the curve, pool and LP streams, the ETH split release (50/50 buyback/ops,{' '}
         <EnforcedBadge />) and the token release into vesting - plus the full contract surface.
@@ -60,8 +60,8 @@ export default function SphereEscrowPanel() {
   }
 
   return (
-    <div className="grid gap-4">
-      <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+    <div className="sph-stagger grid gap-4">
+      <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
         <h2 className="text-[14px] font-extrabold text-sp-ink">Creator escrow</h2>
         <p className="mt-1 text-[11.5px] text-sp-shade/55">
           Holds the eternal creator stream of SPHERE. Exit rules are frozen: ETH splits 50/50 to
@@ -94,8 +94,17 @@ export default function SphereEscrowPanel() {
           the contracts.
         </p>
       </section>
-
+      <details className="group">
+        <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-[20px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
+          Advanced - full contract console
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:hidden">show</span>
+          <span className="hidden text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:inline">hide</span>
+        </summary>
+        <div className="mt-3">
+  
       <AbiConsole title="SphereCreatorEscrow" address={escrow} abi={sphereCreatorEscrowAbi} />
+        </div>
+      </details>
     </div>
   );
 }

@@ -1,0 +1,195 @@
+/**
+ * Warstwa motion centrum $SPHERE - detale, ktorych nikt swiadomie nie widzi,
+ * a ktore razem daja "czuje sie dobrze" (doktryna: tylko transform/opacity,
+ * ease-out z pazurem, wejscia <=300ms, exit szybszy niz enter, zadnych
+ * animacji na akcjach klawiaturowych).
+ */
+
+.sphere-shell {
+  /* Mocne krzywe - wbudowane CSS-owe sa za slabe. */
+  --sph-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --sph-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* ---- WEJSCIE STRONY: kaskada kart ------------------------------------- */
+/* Kazde bezposrednie dziecko kontenera tresci wchodzi z dolu, z opoznieniem
+   50ms na pozycje. Dekoracja - nie blokuje interakcji (pointer-events zyja
+   od pierwszej klatki). */
+@keyframes sph-rise {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sph-stagger > * {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: sph-rise 340ms var(--sph-ease-out) forwards;
+}
+.sph-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.sph-stagger > *:nth-child(2) { animation-delay: 50ms; }
+.sph-stagger > *:nth-child(3) { animation-delay: 100ms; }
+.sph-stagger > *:nth-child(4) { animation-delay: 150ms; }
+.sph-stagger > *:nth-child(5) { animation-delay: 200ms; }
+.sph-stagger > *:nth-child(6) { animation-delay: 250ms; }
+.sph-stagger > *:nth-child(n + 7) { animation-delay: 290ms; }
+
+/* ---- KARTY: subtelne uniesienie na hover (tylko prawdziwa mysz) -------- */
+.sph-card {
+  transition: transform 200ms var(--sph-ease-out), box-shadow 200ms var(--sph-ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sph-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(124, 107, 218, 0.14);
+  }
+}
+
+/* ---- KAZDY PRZYCISK W CENTRUM: natychmiastowy feedback nacisniecia ----- */
+.sphere-shell button {
+  transition: transform 160ms var(--sph-ease-out), background-color 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+.sphere-shell button:active {
+  transform: scale(0.97);
+}
+
+/* ---- ZAKLADKI: plywajaca pigulka aktywnej ------------------------------ */
+.sph-tab {
+  position: relative;
+  transition: color 180ms ease;
+}
+.sph-tab::after {
+  content: '';
+  position: absolute;
+  inset: 4px 2px;
+  border-radius: 9999px;
+  background: rgb(var(--sp-brand) / 0.12);
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 180ms var(--sph-ease-out), transform 180ms var(--sph-ease-out);
+  z-index: -1;
+}
+.sph-tab[data-active='true']::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ---- PASEK POSTEPU TYGODNIA: zywy, ale spokojny ------------------------ */
+.sph-progress {
+  transition: width 700ms var(--sph-ease-in-out);
+  position: relative;
+  overflow: hidden;
+}
+.sph-progress::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: sph-sheen 2.6s var(--sph-ease-in-out) infinite;
+}
+@keyframes sph-sheen {
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ---- ROZWIJANY BREAKDOWN: nowoczesna animacja wysokosci przez grid ----- */
+/* grid-template-rows 0fr->1fr to jedyny sposob na plynna, PRZERYWALNA
+   animacje "auto height" bez JS. */
+.sph-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms var(--sph-ease-in-out);
+}
+.sph-collapse[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+.sph-collapse > * {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ---- PLOMYK BURNOW: oddycha, nie krzyczy ------------------------------- */
+@keyframes sph-flame {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+.sph-flame {
+  animation: sph-flame 2.2s var(--sph-ease-in-out) infinite;
+  transform-origin: 50% 85%;
+}
+
+/* ---- SZKIELETY LADOWANIA ----------------------------------------------- */
+@keyframes sph-shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+.sph-skeleton {
+  border-radius: 12px;
+  background: linear-gradient(
+      90deg,
+      rgb(var(--sp-shade) / 0.06) 25%,
+      rgb(var(--sp-shade) / 0.12) 50%,
+      rgb(var(--sp-shade) / 0.06) 75%
+    )
+    0 0 / 200% 100%;
+  animation: sph-shimmer 1.4s linear infinite;
+}
+
+/* ---- REDUCED MOTION: zostaje sens, znika ruch -------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .sph-stagger > * {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+  .sph-card,
+  .sphere-shell button {
+    transition-property: background-color, color, opacity;
+  }
+  .sph-card:hover {
+    transform: none;
+  }
+  .sph-progress::after,
+  .sph-flame {
+    animation: none;
+  }
+  .sph-collapse {
+    transition: none;
+  }
+}
+
+/* ---- HERO: viralowy launchpadowy blask, light theme --------------------- */
+.sph-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(600px 300px at 15% -20%, rgb(var(--sp-brand) / 0.16), transparent 70%),
+    radial-gradient(500px 260px at 95% 120%, rgb(var(--sp-up) / 0.10), transparent 70%),
+    rgb(var(--sp-surface));
+}
+.sph-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(42px);
+  opacity: 0.5;
+  pointer-events: none;
+  animation: sph-drift 14s var(--sph-ease-in-out) infinite alternate;
+}
+@keyframes sph-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(24px, -18px, 0) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sph-orb { animation: none; }
+}

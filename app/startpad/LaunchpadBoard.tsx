@@ -121,7 +121,16 @@ function NetworkSwitch() {
       <span className="h-2 w-2 shrink-0 rounded-full bg-current" aria-hidden="true" />
       <select
         value={active.chain.id}
-        onChange={(event) => setLaunchpadChain(Number(event.target.value))}
+        onChange={(event) => {
+          // $SPHERE mieszka NA LISCIE sieci (decyzja wlasciciela 2026-08-31:
+          // osobny przycisk rozpychal piguke wyboru) - to nawigacja, nie
+          // zmiana lancucha, wiec przechwytujemy przed setLaunchpadChain.
+          if (event.target.value === 'sphere') {
+            window.location.href = '/startpad/sphere';
+            return;
+          }
+          setLaunchpadChain(Number(event.target.value));
+        }}
         aria-label="Launchpad network"
         className="cursor-pointer bg-transparent text-[12px] font-extrabold outline-none [color:inherit] [&>option]:bg-sp-surface [&>option]:text-sp-ink"
       >
@@ -130,6 +139,8 @@ function NetworkSwitch() {
             {net.label}
           </option>
         ))}
+        <option disabled>──────</option>
+        <option value="sphere">✦ $SPHERE</option>
       </select>
     </span>
   );
@@ -2552,17 +2563,6 @@ export default function LaunchpadBoard() {
                   kontrolka zamiast dwoch osobnych, ktore sie gryzly. */}
               <div className="inline-flex items-stretch overflow-hidden rounded-full border border-sp-shade/10 bg-sp-surface shadow-[0_6px_16px_rgba(124,107,218,0.18)]">
                 <NetworkSwitch />
-                <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-sp-shade/10" />
-                {/* Wejscie do centrum $SPHERE - obok wyboru sieci (decyzja
-                    wlasciciela 2026-08-31): token platformy z zarzadzaniem
-                    na /startpad/sphere i podstronami per kontrakt. */}
-                <button
-                  type="button"
-                  onClick={() => router.push('/startpad/sphere')}
-                  className="px-3 py-2.5 text-[12px] font-extrabold text-sp-brand transition-colors hover:bg-sp-brand-soft"
-                >
-                  $SPHERE
-                </button>
                 <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-sp-shade/10" />
                 {/* Udostepnianie CALEGO rynku tej sieci. Ma sens dopiero odkad
                     przelacznik dopisuje `?c=` do adresu - wczesniej wszystkie

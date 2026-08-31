@@ -57,7 +57,7 @@ export default function SphereVestingPanel() {
 
   if (!SPHERE_LIVE || !vesting) {
     return (
-      <p className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-shade/60">
+      <p className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-shade/60">
         Vesting is not deployed yet. After deployment this page shows the frozen schedule
         (30-day cliff, 12 months linear - final numbers set at deploy), how much is unlocked
         right now and a permissionless release button. <EnforcedBadge />
@@ -72,8 +72,8 @@ export default function SphereVestingPanel() {
       : 0;
 
   return (
-    <div className="grid gap-4">
-      <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+    <div className="sph-stagger grid gap-4">
+      <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
         <h2 className="text-[14px] font-extrabold text-sp-ink">Treasury vesting</h2>
         <p className="mt-1 text-[11.5px] text-sp-shade/55">
           Treasury tokens (dev-buy + token-side fees) unlock on a frozen schedule. Payouts go
@@ -113,8 +113,17 @@ export default function SphereVestingPanel() {
           </p>
         ) : null}
       </section>
-
+      <details className="group">
+        <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-[20px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
+          Advanced - full contract console
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:hidden">show</span>
+          <span className="hidden text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:inline">hide</span>
+        </summary>
+        <div className="mt-3">
+  
       <AbiConsole title="SphereTokenVesting" address={vesting} abi={sphereTokenVestingAbi} />
+        </div>
+      </details>
     </div>
   );
 }

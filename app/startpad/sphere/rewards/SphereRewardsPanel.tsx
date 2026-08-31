@@ -36,7 +36,7 @@ export default function SphereRewardsPanel() {
 
   if (!SPHERE_LIVE || !rewards) {
     return (
-      <p className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-shade/60">
+      <p className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-shade/60">
         Rewards vault is not deployed yet. After deployment this page shows the vault balance,
         pending curve-fee deliveries and the pull history. Funds leave the vault only to the
         rewards program, executed by the treasury Safe. <TeamRunBadge />
@@ -45,8 +45,8 @@ export default function SphereRewardsPanel() {
   }
 
   return (
-    <div className="grid gap-4">
-      <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+    <div className="sph-stagger grid gap-4">
+      <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
         <h2 className="text-[14px] font-extrabold text-sp-ink">Rewards vault</h2>
         <p className="mt-1 text-[11.5px] text-sp-shade/55">
           Accumulates the rewards share of curve fees from SPHERE and every Sphere-aligned
@@ -74,8 +74,17 @@ export default function SphereRewardsPanel() {
           the CONSUMER key - use the console below from the Safe.
         </p>
       </section>
-
+      <details className="group">
+        <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-[20px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
+          Advanced - full contract console
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:hidden">show</span>
+          <span className="hidden text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:inline">hide</span>
+        </summary>
+        <div className="mt-3">
+  
       <AbiConsole title="SphereRewards" address={rewards} abi={sphereRewardsAbi} />
+        </div>
+      </details>
     </div>
   );
 }
