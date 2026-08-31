@@ -4,8 +4,11 @@
 # Ignoruj foldery node_modules
 node_modules/
 
-# Ignoruj folder .next
+# Ignoruj folder .next oraz alternatywne distDir.
+# distDir jest sterowany zmienna NEXT_DIST_DIR (patrz next.config.js), zeby build
+# nie nadpisywal .next uzywanego przez dzialajacy `next dev`.
 .next/
+.next-*/
 
 # Ignoruj plik .env.local
 .env.local
@@ -18,12 +21,12 @@ node_modules
 .env
 
 # Hardhat files
-/cache
-/artifacts
+**/cache/solidity-files-cache.json
+**/artifacts/
 
 # TypeChain files
-/typechain
-/typechain-types
+**/typechain/
+**/typechain-types/
 
 # solidity-coverage files
 /coverage

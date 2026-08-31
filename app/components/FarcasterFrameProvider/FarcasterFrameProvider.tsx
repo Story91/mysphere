@@ -1,120 +1,64 @@
 'use client';
 
-import { PropsWithChildren, useEffect, useState } from 'react';
-import FrameSDK from '@farcaster/frame-sdk';
+import { PropsWithChildren, useEffect } from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { useConnect } from 'wagmi';
-import { farcasterFrame } from '@farcaster/frame-wagmi-connector';
+import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
+
+// Module-scope guard: init must run exactly once per page load, surviving
+// StrictMode double-mounts and any duplicate provider mounts in the tree.
+let initStarted = false;
 
 export function FarcasterFrameProvider({ children }: PropsWithChildren) {
-  const { connect } = useConnect();
-  const [isMounted, setIsMounted] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const { connect, connectors } = useConnect();
 
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isMounted) return;
-    
-    let mounted = true;
+    if (initStarted) return;
+    initStarted = true;
 
     const init = async () => {
       try {
-        const context = await FrameSDK.context;
+        // Resolves false within 1s outside a miniapp host — on localhost the old
+        // `await FrameSDK.context` hung forever because no host ever answers.
+        const inMiniApp = await sdk.isInMiniApp();
+        if (!inMiniApp) return;
 
-        if (!mounted) return;
+        const context = await sdk.context;
 
-        // Autoconnect if running in frame
+        // Autoconnect with the connector registered in wagmiConfig (id 'farcaster'),
+        // not a fresh instance that wagmi doesn't know about
         if (context?.client.clientFid) {
-          connect({ connector: farcasterFrame() });
+          const farcasterConnector =
+            connectors.find((c) => c.id === 'farcaster') ?? farcasterMiniApp();
+          connect({ connector: farcasterConnector });
         }
 
-        // Hide splash screen after UI render
+        // Hide the host splash screen once the UI is up
         setTimeout(() => {
-          if (mounted) {
-            FrameSDK.actions.ready();
-          }
+          sdk.actions.ready();
         }, 500);
 
         // Auto-prompt addMiniApp if not already added
-        // This triggers the "Add Mini App" modal automatically
         if (context && !context.client.added) {
-          // Small delay to let UI settle
           setTimeout(async () => {
-            if (!mounted) return;
             try {
-              const result = await FrameSDK.actions.addFrame();
-              // addFrame returns { notificationDetails } if user enabled notifications
-              // or throws if user declined
+              const result = await sdk.actions.addFrame();
               console.log('✅ Mini app added successfully');
               if (result?.notificationDetails) {
                 console.log('🔔 Notifications enabled:', result.notificationDetails);
               }
             } catch (addError) {
-              // User declined or error - that's fine
               console.log('ℹ️ Add mini app declined or failed:', addError);
             }
           }, 1500);
-        } else if (context?.client.added) {
-          console.log('✅ Mini app already added');
         }
       } catch (error) {
-        console.error('Failed to initialize Farcaster Frame:', error);
-        setError(error instanceof Error ? error : new Error('Unknown error initializing Farcaster Frame'));
+        console.error('Failed to initialize Farcaster miniapp:', error);
       }
     };
 
     init();
+  }, [connect, connectors]);
 
-    return () => {
-      mounted = false;
-    };
-  }, [connect, isMounted]);
-
-  // Add a global error handler for Transaction component errors
-  useEffect(() => {
-    // Original error handler to catch Transaction component errors
-    const originalError = console.error;
-    
-    console.error = (...args) => {
-      // Check if this is the Transaction prop error
-      const errorMessage = args[0]?.toString() || '';
-      if (typeof errorMessage === 'string' && 
-          (errorMessage.includes('Transaction: calls or contracts must be provided') ||
-           errorMessage.includes('Transaction component'))) {
-        // Log it but prevent it from crashing the app
-        console.warn('Intercepted Transaction component error:', errorMessage);
-        // Don't rethrow - this suppresses the error
-        return;
-      }
-      
-      // For other errors, use the original handler
-      originalError.apply(console, args);
-    };
-    
-    return () => {
-      // Restore original handler on cleanup
-      console.error = originalError;
-    };
-  }, []);
-
-  // Add error boundary functionality
-  if (error) {
-    console.error('FarcasterFrameProvider caught error:', error);
-    // Return children anyway to prevent the app from breaking entirely
-    return <>{children}</>;
-  }
-
-  if (!isMounted) {
-    return <>{children}</>;
-  }
-
-  // Return the children wrapped in an error boundary
-  try {
-    return <>{children}</>;
-  } catch (err) {
-    console.error('Error rendering FarcasterFrameProvider children:', err);
-    return <>{children}</>;
-  }
+  return <>{children}</>;
 }

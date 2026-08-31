@@ -26,7 +26,9 @@ async function uploadToIPFS(file: File): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const PINATA_JWT = process.env.NEXT_PUBLIC_PINATA_JWT || process.env.NEXT_PUBLIC_PINATA_JWT_TOKEN;
+  // Jedyny realny klucz to NEXT_PUBLIC_PINATA_JWT. Wariant NEXT_PUBLIC_PINATA_JWT_TOKEN
+  // nigdy nie istnial w env, wiec fallback byl martwym kodem i zostal usuniety.
+  const PINATA_JWT = process.env.NEXT_PUBLIC_PINATA_JWT;
   
   if (!PINATA_JWT) {
     console.error("PINATA_JWT environment variable is not set.");

@@ -3,6 +3,11 @@ import { createPublicClient, http, parseAbiItem } from 'viem';
 import { base } from 'viem/chains';
 import { createPaidPin } from '../../utils/firebase';
 
+// Trasa czyta dane z zadania (nextUrl / naglowki), wiec nie da sie jej
+// prerenderowac. Bez tej deklaracji Next probuje ja wygenerowac statycznie
+// przy buildzie i zasmieca log stacktrace'ami DYNAMIC_SERVER_USAGE.
+export const dynamic = 'force-dynamic';
+
 /**
  * Backup cron job - automatically sync recent contract events
  * Runs every 2 minutes as backup for ContractEventListener

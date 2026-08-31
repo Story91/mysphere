@@ -45,9 +45,48 @@ const config: Config = {
           text: '#FFFFFF',
           accent: '#00FF8F'
         },
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        border: "var(--border)",
+        // Tokeny shadcn - zmienne CSS zyja w app/globals.css (@layer base { :root } + .dark)
+        // i sa trojkami HSL, dlatego mapujemy je przez hsl(var(--x)).
+        // Bez tego mapowania komponenty z components/ui/ (button, dialog, select, card...)
+        // renderowaly sie z martwymi klasami: bg-popover, text-muted-foreground, bg-accent itd.
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
       backgroundImage: {
         'base-gradient': 'linear-gradient(90deg, #0052FF 0%, #00FF8F 100%)',
@@ -64,6 +103,6 @@ const config: Config = {
       }
     },
   },
-  plugins: [],
+  plugins: [require("tailwindcss-animate")],
 };
 export default config;

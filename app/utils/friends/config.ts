@@ -2,48 +2,10 @@
 // 🔧 FIREBASE CONFIG FOR SOCIAL FEATURES
 // ===============================================
 
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore,
-  connectFirestoreEmulator 
-} from 'firebase/firestore';
-
-// Import wspólnej konfiguracji Firebase z głównego pliku
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-};
-
-// Inicjalizuj Firebase (może być już zainicjalizowane w głównej aplikacji)
-let app;
-try {
-  app = initializeApp(firebaseConfig, 'social-features');
-} catch (error) {
-  // App już istnieje, użyj domyślnej
-  const { getApps, getApp } = require('firebase/app');
-  app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-}
-
-// Firestore instance dla social features
-export const db = getFirestore(app);
-
-// 🔥 EMULATOR CONFIGURATION (Development only)
-// Uncomment the lines below if you want to use Firebase Emulator
-// Make sure to start emulator first: firebase emulators:start
-/*
-if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
-  try {
-    connectFirestoreEmulator(db, 'localhost', 8080);
-    console.log('🔥 Connected to Firestore Emulator');
-  } catch (error) {
-    console.log('⚠️ Emulator connection failed, using production Firebase');
-  }
-}
-*/
+// Ta sama konfiguracja i ten sam projekt co app/utils/firebase.ts.
+// Wczesniej byl tu drugi klient Firebase (`initializeApp(config, 'social-features')`),
+// co oznaczalo dwa niezalezne kanaly do Firestore i podwojone polaczenia.
+export { db } from '../firebase';
 
 // Stała z adresem admina (kopiowane z głównego firebase.ts)
 export const ADMIN_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd'.toLowerCase();
@@ -204,5 +166,3 @@ export const sanitizeInput = (input: string): string => {
 export const isSameUser = (user1: string, user2: string): boolean => {
   return user1.toLowerCase() === user2.toLowerCase();
 };
-
-console.log('🔥 Firebase Social Config initialized');

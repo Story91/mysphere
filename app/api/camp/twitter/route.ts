@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TwitterAPI } from '@campnetwork/origin';
 
+// Trasa czyta dane z zadania (nextUrl / naglowki), wiec nie da sie jej
+// prerenderowac. Bez tej deklaracji Next probuje ja wygenerowac statycznie
+// przy buildzie i zasmieca log stacktrace'ami DYNAMIC_SERVER_USAGE.
+export const dynamic = 'force-dynamic';
+
 // Types for Camp Network API responses
 interface TwitterUser {
   id: string;

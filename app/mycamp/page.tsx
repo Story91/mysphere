@@ -634,12 +634,6 @@ export default function MyCampPage() {
     <ToastProvider>
       <div className="min-h-screen overflow-x-hidden relative">
       {/* Camp Mainnet banner removed on request */}
-      <Script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
-        crossOrigin="anonymous"
-        strategy="afterInteractive"
-      />
       {/* Background Image */}
       <div 
         className="fixed inset-0 bg-cover bg-center bg-no-repeat" 

@@ -3,7 +3,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
 
 /* Dodanie czcionki SF Pro Display */
 @font-face {
@@ -316,12 +315,12 @@ html {
 body {
   color: #1F2937;
   background: linear-gradient(to bottom right, white, #f9fafb, #eff6ff);
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: var(--font-body), 'Space Grotesk', sans-serif;
   letter-spacing: 0.3px;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-heading), 'Outfit', sans-serif;
   color: #111827;
   letter-spacing: -0.5px;
 }
@@ -580,41 +579,25 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Google Fonts Styles */
-.font-roboto { font-family: 'Roboto', sans-serif; }
-.font-open-sans { font-family: 'Open Sans', sans-serif; }
-.font-montserrat { font-family: 'Montserrat', sans-serif; }
-.font-lato { font-family: 'Lato', sans-serif; }
-.font-poppins { font-family: 'Poppins', sans-serif; }
-.font-pacifico { font-family: 'Pacifico', cursive; }
-.font-dancing-script { font-family: 'Dancing Script', cursive; }
-.font-lobster { font-family: 'Lobster', cursive; }
-.font-permanent-marker { font-family: 'Permanent Marker', cursive; }
-.font-playfair { font-family: 'Playfair Display', serif; }
-.font-merriweather { font-family: 'Merriweather', serif; }
-.font-crimson { font-family: 'Crimson Text', serif; }
-.font-bebas { font-family: 'Bebas Neue', sans-serif; }
-.font-oswald { font-family: 'Oswald', sans-serif; }
-.font-anton { font-family: 'Anton', sans-serif; }
+/* 15 martwych rodzin fontow usunietych - klasy .font-* nie byly uzywane nigdzie,
+   a same fonty nigdy sie nie ladowaly (brak @font-face i brak importu). */
 
-/* Style dla ikon w menu rozwijanym */
+/* Ikony w dropdownie portfela.
+
+   Wczesniej wymuszaly tu czern (#111111) pod biala powierzchnie. Powierzchnia
+   jest teraz ciemna, wiec ikony dziedzicza kolor z wiersza (`currentColor`),
+   dzieki czemu reaguja na hover razem z etykieta. OnchainKit wstrzykuje wlasne
+   kolory w niektore ikony - stad `!important` na dziedziczeniu. */
 .wallet-dropdown svg {
-  color: #111111 !important;
-  stroke: #111111 !important;
+  color: inherit !important;
+  stroke: currentColor !important;
 }
 
-.wallet-dropdown-link svg {
-  color: #111111 !important;
-  stroke: #111111 !important;
-}
-
-.wallet-dropdown-fund svg {
-  color: #111111 !important;
-  stroke: #111111 !important;
-}
-
-.wallet-dropdown-disconnect svg {
-  color: #111111 !important;
-  stroke: #111111 !important;
+/* Avatar w bloku tozsamosci to <img>/<svg> z wlasna paleta - nie nadpisujemy go. */
+.wallet-dropdown [data-testid='ockAvatar'] svg,
+.wallet-dropdown [data-testid='ockAvatar'] img {
+  color: revert !important;
+  stroke: revert !important;
 }
 
 /* Color Picker Styles */
@@ -689,21 +672,21 @@ appkit-button::part(button):hover {
   }
 }
 
-/* OnchainKit Connect Wallet modal - center only when not logged in */
-body.wallet-not-connected div[role="dialog"] {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  right: auto !important;
-  bottom: auto !important;
-  max-height: 90vh !important;
-  max-width: 90vw !important;
+/* Modal Connect Wallet z OnchainKit.
+
+   Poprzednia wersja tej reguly celowala w `div[role="dialog"]`, czyli w KAZDY
+   dialog w aplikacji, i nadpisywala !importantem pozycjonowanie oraz animacje
+   cudzych modali. Wlasciwy hak to data-testid="ockDialog" - OnchainKit stawia
+   go na DialogContent, czyli na tym samym elemencie co role="dialog"
+   (`ockModalOverlay` to element WEWNATRZ dialogu, nie jego rodzic).
+
+   OnchainKit 1.1.2 centruje ten dialog samodzielnie
+   (ock:fixed ock:top-[50%] ock:left-[50%] ock:translate-x/y-[-50%]), wiec
+   nadpisywanie position/top/left/transform jest tu zbedne i tylko walczyloby
+   z jego wlasnymi animacjami. Zostaja same ograniczenia rozmiaru, zeby modal
+   nie wychodzil poza ekran na malych viewportach. */
+div[role="dialog"][data-testid="ockDialog"] {
+  max-height: 90vh;
+  max-width: 90vw;
 }
 
-/* Hide Sign up text with more specific selectors */
-div[role="dialog"] h1,
-div[role="dialog"] h2, 
-div[role="dialog"] h3 {
-  /* Let JavaScript handle text replacement */
-}

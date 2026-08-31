@@ -1,7 +1,7 @@
 'use client';
 
 import Script from 'next/script';
-import '@rainbow-me/rainbowkit/styles.css';
+import { Space_Grotesk, Outfit } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from "@vercel/speed-insights/react"
@@ -10,8 +10,38 @@ import { Providers } from './providers';
 import Navigation from './components/Navigation/Navigation';
 import { ThemeProvider } from './context/ThemeContext';
 import ClientOnly from './components/ClientOnly';
-import ContextProvider from '@/context';
 import { usePathname } from 'next/navigation';
+
+// next/font hostuje fonty same-origin i wstrzykuje preload - zamiast
+// render-blokujacego @import z fonts.googleapis.com wewnatrz globals.css.
+const bodyFont = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-body',
+});
+
+const headingFont = Outfit({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-heading',
+});
+
+const MINIAPP_EMBED = JSON.stringify({
+  version: '1',
+  imageUrl: 'https://mysphere.fun/SphereWhite.png',
+  button: {
+    title: 'Tip Creators',
+    action: {
+      type: 'launch_miniapp',
+      name: 'MySphere',
+      url: 'https://mysphere.fun',
+      splashImageUrl: 'https://mysphere.fun/SPLASH.gif',
+      splashBackgroundColor: '#FFFFFF',
+    },
+  },
+});
 
 export default function RootLayout({
   children,
@@ -22,14 +52,8 @@ export default function RootLayout({
   const isHomepage = pathname === '/';
 
   return (
-    <html lang="pl">
+    <html lang="pl" className={`${bodyFont.variable} ${headingFont.variable}`}>
       <head>
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
         {/* Usunięto skrypt reCAPTCHA - obciążał stronę */}
         {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}
         <title>MySphere.fun</title>
@@ -53,24 +77,13 @@ export default function RootLayout({
         <meta name="twitter:image" content="https://mysphere.fun/share/share-no-admin.png" />
         <meta name="twitter:image:alt" content="Startpad contract surface: owner, pause, upgrade, blacklist and fee switch all listed as none." />
         
-        {/* Farcaster Frame - zaktualizowany format z launch_frame */}
-        <meta name="fc:frame" content='{
-          "version": "next",
-          "imageUrl": "https://mysphere.fun/SphereWhite.png",
-          "aspectRatio": "3:2",
-          "button": {
-            "title": "Tip Creators",
-            "action": {
-              "type": "launch_frame",
-              "name": "MySphere",
-              "url": "https://mysphere.fun",
-              "splashImageUrl": "https://mysphere.fun/SPLASH.gif",
-              "splashBackgroundColor": "#FFFFFF"
-            }
-          }
-        }' />
+        {/* Miniapp embed. `fc:miniapp` to aktualny tag; `fc:frame` zostawiony
+            dla wstecznej zgodnosci ze starszymi klientami. W obu `version` musi
+            byc stringiem "1" - "next" jest przestarzale i klienci je odrzucaja. */}
+        <meta name="fc:miniapp" content={MINIAPP_EMBED} />
+        <meta name="fc:frame" content={MINIAPP_EMBED} />
         
-        <link rel="stylesheet" href="https://unpkg.com/@coinbase/onchainkit@1.1.2/dist/assets/style.css" />
+        <link rel="stylesheet" href="/vendor/onchainkit.css" />
         <link rel="icon" type="image/x-icon" href="/favicon_io (1)/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io (1)/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io (1)/favicon-16x16.png" />
@@ -80,8 +93,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-white">
         <ThemeProvider>
-          <ContextProvider>
-            <Providers>
+          <Providers>
               <ClientOnly fallback={
                 <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
                   <div className="relative">
@@ -137,8 +149,14 @@ export default function RootLayout({
               
               <Analytics />
               <SpeedInsights />
+              <Script
+                id="adsbygoogle"
+                async
+                src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
+                crossOrigin="anonymous"
+                strategy="lazyOnload"
+              />
             </Providers>
-          </ContextProvider>
         </ThemeProvider>
       </body>
     </html>

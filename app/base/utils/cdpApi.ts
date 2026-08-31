@@ -2,6 +2,9 @@
 // CDP for: ETH balance, transaction count
 // Etherscan V2 for: Token list, NFT list, Transaction history
 
+// UWAGA: ani CDP_RPC_URL, ani NEXT_PUBLIC_CDP_RPC_URL nie sa ustawione w env.
+// W efekcie CDP_RPC_URL to pusty string, a kazde wywolanie RPC oparte na tej stalej
+// jest de facto wylaczone (brak endpointu). Do skonfigurowania przez wlasciciela repo.
 const CDP_RPC_URL = process.env.CDP_RPC_URL || process.env.NEXT_PUBLIC_CDP_RPC_URL || '';
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY || '';

@@ -1,11 +1,13 @@
 // @ts-nocheck
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
 import { Post, Comment } from '../../types';
 import { doc, updateDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
-import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, ADMIN_ADDRESS, pinPost, unpinPost, isUserAdmin, PinDuration } from '../../utils/firebase';
+import { fetchPosts, db, toggleLike, deletePost, toggleCommentLike, editComment, deleteComment, addCommentReply, addComment, ADMIN_ADDRESS, pinPost, unpinPost, isUserAdmin, PinDuration ,
+  getBulkPostTipStats,
+  PostTipStats} from '../../utils/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { Avatar as CoinbaseAvatar } from '@coinbase/onchainkit/identity';
@@ -24,7 +26,8 @@ import { LINEA_CHAIN_ID } from '../Linea/config/LineaNetworkConfig';
 import { base, baseSepolia } from 'wagmi/chains';
 import TipButton from './TipButton';
 import TipStats from './TipStats';
-import SpotifyTrackCard from './SpotifyTrackCard';
+import PostAudioPlayer from './PostAudioPlayer';
+import { stopAndReset as stopAudio } from './audioPlayerStore';
 
 // Import Zora SDK functions and types
 import { getProfileBalances } from '@zoralabs/coins-sdk';
@@ -46,7 +49,7 @@ const ERC20_BALANCE_ABI = [
 ] as const;
 
 // Import social features
-import { useSocial } from '../friendsystem/hooks';
+import { useSocialActions } from '../friendsystem/hooks';
 
 // Import icons
 import { Users, Coins, ShoppingCart, Tag, ExternalLink, X } from 'lucide-react';
@@ -185,7 +188,7 @@ const extractHashtags = (text: string): string[] => {
   return hashtags;
 };
 
-export default function PostList({
+function PostList({
   showOnlyUserPosts = false,
   searchTerm = '',
   sortOrder = 'newest',
@@ -260,29 +263,40 @@ export default function PostList({
   const { address, isConnected } = useAccount();
 
   // 🚀 SOCIAL FEATURES: Hook i stany (MOVED AFTER useAccount)
-  const { followUser, unfollowUser, checkIfFollowing } = useSocial(address || null);
+  // Lekki hook - feed nie potrzebuje pelnego loadAllData z useSocial (patrz hooks.ts).
+  const { followUser, unfollowUser, getFollowStatuses } = useSocialActions(address || null);
   const [followingStatus, setFollowingStatus] = useState<{[address: string]: boolean}>({});
   const [followLoading, setFollowLoading] = useState<{[address: string]: boolean}>({});
-  
-  // 🎵 Audio Player state for music previews
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
-  const [currentTrackUrl, setCurrentTrackUrl] = useState<string | null>(null);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.5);
-  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
-  // 🎵 Cleanup audio when component unmounts
+  // Statystyki tipow dla calego feedu jednym zapytaniem na 30 postow.
+  // Wczesniej kazdy <TipStats> robil wlasne getDocs - przy 25 postach 25 zapytan.
+  const [postTipStats, setPostTipStats] = useState<{ [postId: string]: PostTipStats }>({});
+  const [tipStatsLoading, setTipStatsLoading] = useState(true);
+
   useEffect(() => {
-    return () => {
-      if (currentAudio) {
-        currentAudio.pause();
-        setCurrentAudio(null);
-        setIsPlayingAudio(false);
-      }
-    };
-  }, [currentAudio]);
+    // Zrodlem jest internalPosts, nie prop `posts` - to z internalPosts renderuje
+    // sie lista i to tam trafiaja posty dodane optymistycznie (event 'post-created').
+    const ids = (internalPosts || []).map(p => p.id).filter(Boolean) as string[];
+
+    if (ids.length === 0) {
+      // Bez tego flaga zostawala na `true` i TipStats krecil spinner w nieskonczonosc.
+      setTipStatsLoading(false);
+      setPostTipStats({});
+      return;
+    }
+
+    let cancelled = false;
+    setTipStatsLoading(true);
+    getBulkPostTipStats(ids)
+      .then(stats => { if (!cancelled) setPostTipStats(stats); })
+      .catch(err => console.error('Error fetching bulk tip stats:', err))
+      .finally(() => { if (!cancelled) setTipStatsLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [internalPosts]);
+  
+  // 🎵 Stan odtwarzacza mieszka w audioPlayerStore (poza Reactem) - patrz PostAudioPlayer.
+  useEffect(() => stopAudio, []);
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const networkChainId = useChainId();
@@ -492,61 +506,6 @@ export default function PostList({
         await onRefreshPosts();
       }
     }
-  };
-
-  // 🎵 Audio Player Functions
-  const playTrack = (previewUrl: string) => {
-    if (!previewUrl) return;
-    
-    // If same track, just toggle play/pause
-    if (currentTrackUrl === previewUrl && currentAudio) {
-      if (currentAudio.paused) {
-        console.log('🎵 Resuming track');
-        currentAudio.play();
-        setIsPlayingAudio(true);
-      } else {
-        console.log('⏸️ Pausing track');
-        currentAudio.pause();
-        setIsPlayingAudio(false);
-      }
-      return;
-    }
-
-    // Stop current track if playing (only for different tracks)
-    if (currentAudio) {
-      currentAudio.pause();
-      setIsPlayingAudio(false);
-    }
-
-    // Create new audio for different track
-    setIsLoadingAudio(true);
-    setCurrentTrackUrl(previewUrl);
-    
-    const audio = new Audio(previewUrl);
-    audio.volume = volume;
-    
-    audio.addEventListener('loadedmetadata', () => {
-      setDuration(audio.duration);
-      setIsLoadingAudio(false);
-    });
-    
-    audio.addEventListener('timeupdate', () => {
-      setCurrentTime(audio.currentTime);
-    });
-    
-    audio.addEventListener('ended', () => {
-      setIsPlayingAudio(false);
-      setCurrentTime(0);
-    });
-    
-    audio.addEventListener('error', () => {
-      setIsLoadingAudio(false);
-      console.error('Failed to load audio');
-    });
-
-    setCurrentAudio(audio);
-    audio.play();
-    setIsPlayingAudio(true);
   };
 
   const handleAddComment = async (postId: string, txHash: string) => {
@@ -843,26 +802,21 @@ export default function PostList({
     if (!address || !posts || posts.length === 0) return;
 
     const checkFollowStatus = async () => {
-      const authorAddresses = [...new Set(posts.map(post => post.author))];
-      const followStatuses: {[address: string]: boolean} = {};
-      
-      for (const authorAddress of authorAddresses) {
-        if (authorAddress !== address) { // Don't check for self
-          try {
-            const isFollowing = await checkIfFollowing(authorAddress);
-            followStatuses[authorAddress] = isFollowing;
-          } catch (error) {
-            console.error('Error checking follow status:', error);
-            followStatuses[authorAddress] = false;
-          }
-        }
+      // Jedno zapytanie o wlasna liste following i porownanie lokalnie, zamiast
+      // seryjnego checkIfFollowing() dla kazdego autora w feedzie.
+      const authorAddresses = [...new Set(posts.map(post => post.author))]
+        .filter(a => a && a !== address);
+      if (authorAddresses.length === 0) return;
+
+      try {
+        setFollowingStatus(await getFollowStatuses(authorAddresses));
+      } catch (error) {
+        console.error('Error checking follow status:', error);
       }
-      
-      setFollowingStatus(followStatuses);
     };
 
     checkFollowStatus();
-  }, [posts, address, checkIfFollowing]);
+  }, [posts, address, getFollowStatuses]);
 
   const handleAddReply = async (postId: string, commentId: string, txHash?: string) => {
     if (!address || !replyContent.trim()) return;
@@ -1978,11 +1932,24 @@ export default function PostList({
               }
             }}
           >
+            {/* Kontener rezerwuje miejsce zanim media sie zaladuja - bez tego kazdy
+                obraz w feedzie przesuwal wszystko ponizej (CLS). images.unoptimized
+                jest wlaczone, wiec Next nie doda wymiarow za nas. */}
             {post.image && (
-              <img src={post.image} alt="Post media" className="max-h-96 w-full object-contain rounded-lg" />
+              <div className="relative w-full aspect-[16/10] max-h-96 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+                <img
+                  src={post.image}
+                  alt="Post media"
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-contain"
+                />
+              </div>
             )}
             {post.video && (
-              <video src={post.video} controls className="max-h-96 w-full rounded-lg" />
+              <div className="relative w-full aspect-[16/10] max-h-96 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+                <video src={post.video} controls preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
+              </div>
             )}
           </div>
         )}
@@ -1990,30 +1957,7 @@ export default function PostList({
         {/* 🎵 Music Track - wyświetlaj kafelek muzyczny jeśli post ma załączony utwór */}
         {post.musicTrack && (
           <div className="my-3">
-            <SpotifyTrackCard
-              trackData={{ track: post.musicTrack as any }}
-              isCompact={false}
-              showAudioPlayer={true}
-              onPlayTrack={playTrack}
-              currentTrackUrl={currentTrackUrl || undefined}
-              isPlaying={isPlayingAudio && currentTrackUrl === post.musicTrack.preview_url}
-              isLoading={isLoadingAudio && currentTrackUrl === post.musicTrack.preview_url}
-              currentTime={currentTrackUrl === post.musicTrack.preview_url ? currentTime : 0}
-              duration={currentTrackUrl === post.musicTrack.preview_url ? duration : 0}
-              volume={volume}
-              onVolumeChange={(newVolume) => {
-                setVolume(newVolume);
-                if (currentAudio) {
-                  currentAudio.volume = newVolume;
-                }
-              }}
-              onSeekTime={(time) => {
-                if (currentAudio) {
-                  currentAudio.currentTime = time;
-                  setCurrentTime(time);
-                }
-              }}
-            />
+            <PostAudioPlayer musicTrack={post.musicTrack} />
           </div>
         )}
 
@@ -2493,6 +2437,8 @@ export default function PostList({
         <div className="mt-2">
           <TipStats
             postId={post.id}
+            presetPostStats={postTipStats[post.id] ?? null}
+            presetLoading={tipStatsLoading}
             className="text-gray-900 dark:text-gray-200"
           />
         </div>
@@ -2681,4 +2627,9 @@ export default function PostList({
       )}
     </div>
   );
-} 
+}
+
+// Feed jest najciezszym poddrzewem na stronie - bez memo kazde nacisniecie klawisza
+// w kompozytorze posta re-renderowalo wszystkie posty. Propsy sa stabilne
+// (useCallback / module-level fn / useState), wiec plytkie porownanie wystarcza.
+export default memo(PostList);
