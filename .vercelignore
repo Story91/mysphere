@@ -1,6 +1,11 @@
-# Ignore deployment scripts
+# Ignore deployment scripts.
+# `scripts/*` rather than `scripts/`, so the negation below can re-include a
+# single file: gitignore syntax cannot re-include anything once its parent
+# directory itself is excluded. package.json's `prebuild` runs
+# copy-onchainkit-css.js, so that one file has to reach the build.
 app/basechat/Linea/scripts/
-scripts/
+scripts/*
+!scripts/copy-onchainkit-css.js
 
 # Ignore test files
 **/*.test.ts
